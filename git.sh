@@ -59,4 +59,9 @@ curl -s "https://api.github.com/orgs/hyperlane-dev/repos?per_page=100" |
 echo "Cloning eastspire/ltpp-docs..."
 clone_or_pull "https://github.com/eastspire/ltpp-docs" "ltpp-docs"
 
+if [ -d "$user_dir/hyperlane-ai" ]; then
+  rm -rf "$user_dir/hyperlane-ai"
+  echo "Removed self-reference: $user_dir/hyperlane-ai"
+fi
+
 echo "All repositories cloned/updated successfully!"
