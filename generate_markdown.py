@@ -256,12 +256,38 @@ class ThreadSafeFileProcessor:
         return True
 
     def generate_markdown_report(self):
-        """Generate complete Markdown report"""
+        """Generate Markdown report with file splitting"""
         # Create output directory (if it doesn't exist)
-        Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
+        output_path = Path(self.output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(self.output_file, "w", encoding="utf-8") as md:
-            md.write("## 🔍 File Content Details\n\n")
+        # Constants
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+        file_index = 1
+        current_file_size = 0
+        current_file_handle = None
+        base_name = output_path.stem
+        suffix = output_path.suffix
+
+        def get_output_filepath(index):
+            return output_path.parent / f"{base_name}_{index:03d}{suffix}"
+
+        def open_new_file():
+            nonlocal current_file_handle, current_file_size, file_index
+            if current_file_handle:
+                current_file_handle.close()
+            current_file_handle = open(
+                get_output_filepath(file_index), "w", encoding="utf-8"
+            )
+            current_file_size = 0
+            # Write header for new file
+            current_file_handle.write("## 🔍 File Content Details\n\n")
+            print(f"Creating new output file: {get_output_filepath(file_index)}")
+
+        # Open first file
+        open_new_file()
+
+        try:
             for item in sorted(self.dataset, key=lambda x: x.get("id", 0)):
                 if "error" in item:
                     continue
@@ -269,28 +295,51 @@ class ThreadSafeFileProcessor:
                 extension = item["extension"]
                 lang = self.extension_to_lang.get(extension, "")
 
-                md.write(f"### 📄 File #{item['id']} - `{item['filename']}`\n\n")
-                md.write(f"- **Path**: `{item['path']}`\n")
-                md.write(f"- **Size**: `{item['file_info']['size']:,} B`\n")
-                md.write(
+                # Format the content of one file entry
+                content_lines = []
+                content_lines.append(
+                    f"### 📄 File #{item['id']} - `{item['filename']}`\n"
+                )
+                content_lines.append(f"- **Path**: `{item['path']}`\n")
+                content_lines.append(f"- **Size**: `{item['file_info']['size']:,} B`\n")
+                content_lines.append(
                     f"- **Modified Time**: `{item['file_info']['modified_time']}`\n"
                 )
+                content_lines.append("\n#### Content Preview\n\n")
 
-                content = item.get("content", "")
-
-                md.write("#### Content Preview\n\n")
-
+                file_content = item.get("content", "")
                 if lang:
-                    # Wrap with corresponding language code block
-                    md.write(f"```{lang}\n")
-                    md.write(content)
-                    md.write("\n```\n\n")
+                    content_lines.append(f"```{lang}\n")
+                    content_lines.append(file_content)
+                    content_lines.append("\n```\n\n")
                 else:
-                    # Plain text or unknown type, write directly
-                    md.write(content)
-                    md.write("\n\n")
+                    content_lines.append(file_content)
+                    content_lines.append("\n\n")
 
-        print(f"\n✅ Markdown report generated: {self.output_file}")
+                # Calculate approximate size of this entry
+                entry_size = sum(len(line.encode("utf-8")) for line in content_lines)
+
+                # Check if adding this entry would exceed the size limit
+                if (
+                    current_file_size + entry_size > MAX_FILE_SIZE
+                    and current_file_size > 0
+                ):
+                    # Close current file and open a new one
+                    current_file_handle.close()
+                    file_index += 1
+                    open_new_file()
+
+                # Write the entry to current file
+                for line in content_lines:
+                    current_file_handle.write(line)
+                current_file_size += entry_size
+
+            print(
+                f"\n✅ Markdown reports generated: {get_output_filepath(1)} to {get_output_filepath(file_index)}"
+            )
+        finally:
+            if current_file_handle:
+                current_file_handle.close()
 
     def run(self):
         """Run complete process"""
