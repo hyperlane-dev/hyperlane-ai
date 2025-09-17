@@ -64,4 +64,18 @@ if [ -d "$user_dir/hyperlane-ai" ]; then
   echo "Removed self-reference: $user_dir/hyperlane-ai"
 fi
 
+ltpp_docs_dir="$user_dir/ltpp-docs"
+if [ -d "$ltpp_docs_dir" ]; then
+  echo "Cleaning up $ltpp_docs_dir..."
+  
+  find "$ltpp_docs_dir" -mindepth 1 -maxdepth 1 ! -name 'src' -exec rm -rf {} + 2>/dev/null || true
+  
+  src_dir="$ltpp_docs_dir/src"
+  if [ -d "$src_dir" ]; then
+    find "$src_dir" -mindepth 1 -maxdepth 1 -type d ! -name 'hyperlane*' -exec rm -rf {} + 2>/dev/null || true
+  fi
+  
+  echo "Cleanup completed for $ltpp_docs_dir"
+fi
+
 echo "All repositories cloned/updated successfully!"
