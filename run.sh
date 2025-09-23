@@ -105,6 +105,7 @@ python merge_model.py
 echo "Converting the merged model to GGUF format..."
 git clone https://github.com/ggml-org/llama.cpp
 python llama.cpp/convert_hf_to_gguf.py "$MERGED_MODEL_DIR" --outfile "$OUTPUT_DIR/$OUTPUT_DIR.gguf"
+# python llama.cpp/convert_hf_to_gguf.py "hyperlane-merged" --outfile "hyperlane-finetuned/hyperlane-finetuned.gguf"
 
 # 6. Analyze training arguments
 echo "Analyzing training arguments..."
