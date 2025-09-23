@@ -67,8 +67,8 @@ def generate_response(model, tokenizer, prompt):
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=500,
-                temperature=0.7,
+                max_new_tokens=8192,
+                temperature=0.0,
                 top_p=0.9,
                 do_sample=True,
                 pad_token_id=tokenizer.pad_token_id,
