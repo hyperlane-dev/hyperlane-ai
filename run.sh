@@ -61,7 +61,7 @@ else
 fi
 
 # Default max_steps value
-max_steps=10000
+max_steps=1000
 
 # Load environment variables from .env file
 if [ -f .env ]; then
