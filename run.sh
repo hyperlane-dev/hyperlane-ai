@@ -110,6 +110,11 @@ python llama.cpp/convert_hf_to_gguf.py "$MERGED_MODEL_DIR" --outfile "$OUTPUT_DI
 # 6. Analyze training arguments
 echo "Analyzing training arguments..."
 python analyze_training_args.py
+echo "The final GGUF model is located at: $OUTPUT_DIR/$OUTPUT_DIR.gguf"
+
+# 7. Upload the model to the Hugging Face Hub
+echo "Uploading the model to the Hugging Face Hub..."
+python upload_to_hub.py
+echo "Model uploaded successfully!"
 
 echo "All tasks completed successfully!"
-echo "The final GGUF model is located at: $OUTPUT_DIR/$OUTPUT_DIR.gguf"
