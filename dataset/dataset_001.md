@@ -12,7 +12,7 @@
 ### 📄 File #2 - `Cargo.toml`
 - **Path**: `hyperlane\Cargo.toml`
 - **Size**: `1,333 B`
-- **Modified Time**: `2025-09-15T22:37:10.290504`
+- **Modified Time**: `2025-10-01T21:58:27.401735`
 
 #### Content Preview
 
@@ -255,8 +255,8 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ### 📄 File #7 - `FETCH_HEAD`
 - **Path**: `hyperlane\.git\FETCH_HEAD`
-- **Size**: `104 B`
-- **Modified Time**: `2025-09-17T09:21:49.115802`
+- **Size**: `218 B`
+- **Modified Time**: `2025-10-01T21:58:27.346993`
 
 #### Content Preview
 
@@ -274,7 +274,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 ### 📄 File #9 - `index`
 - **Path**: `hyperlane\.git\index`
 - **Size**: `5,106 B`
-- **Modified Time**: `2025-09-15T22:44:00.771440`
+- **Modified Time**: `2025-10-01T21:58:27.401735`
 
 #### Content Preview
 
@@ -444,8 +444,8 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ### 📄 File #28 - `HEAD`
 - **Path**: `hyperlane\.git\logs\HEAD`
-- **Size**: `184 B`
-- **Modified Time**: `2025-09-15T22:37:10.276498`
+- **Size**: `337 B`
+- **Modified Time**: `2025-10-01T21:58:27.410736`
 
 #### Content Preview
 
@@ -453,8 +453,8 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ### 📄 File #29 - `master`
 - **Path**: `hyperlane\.git\logs\refs\heads\master`
-- **Size**: `184 B`
-- **Modified Time**: `2025-09-15T22:37:10.276498`
+- **Size**: `337 B`
+- **Modified Time**: `2025-10-01T21:58:27.411232`
 
 #### Content Preview
 
@@ -469,7 +469,70 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #31 - `pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.idx`
+### 📄 File #31 - `master`
+- **Path**: `hyperlane\.git\logs\refs\remotes\origin\master`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-01T21:58:27.338365`
+
+#### Content Preview
+
+
+
+### 📄 File #32 - `90ea77382c07c3064fae70d95b16d2d82d5f4d`
+- **Path**: `hyperlane\.git\objects\0c\90ea77382c07c3064fae70d95b16d2d82d5f4d`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-01T21:58:27.286167`
+
+#### Content Preview
+
+
+
+### 📄 File #33 - `39fcaeed20f85d156f59154fe85c083ff917f9`
+- **Path**: `hyperlane\.git\objects\15\39fcaeed20f85d156f59154fe85c083ff917f9`
+- **Size**: `5,979 B`
+- **Modified Time**: `2025-10-01T21:58:27.286167`
+
+#### Content Preview
+
+
+
+### 📄 File #34 - `cf033a6790633ef10ca1beb62018531330f301`
+- **Path**: `hyperlane\.git\objects\1b\cf033a6790633ef10ca1beb62018531330f301`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-01T21:58:27.286167`
+
+#### Content Preview
+
+
+
+### 📄 File #35 - `538c81f4ab791da627eda05b604c16d8054649`
+- **Path**: `hyperlane\.git\objects\80\538c81f4ab791da627eda05b604c16d8054649`
+- **Size**: `352 B`
+- **Modified Time**: `2025-10-01T21:58:27.286167`
+
+#### Content Preview
+
+
+
+### 📄 File #36 - `d9a914ec18f56fb17565bf74bd99051effad72`
+- **Path**: `hyperlane\.git\objects\ea\d9a914ec18f56fb17565bf74bd99051effad72`
+- **Size**: `141 B`
+- **Modified Time**: `2025-10-01T21:58:27.286167`
+
+#### Content Preview
+
+
+
+### 📄 File #37 - `038e7d43c78923ca8b12ba982c310f60f9290c`
+- **Path**: `hyperlane\.git\objects\ec\038e7d43c78923ca8b12ba982c310f60f9290c`
+- **Size**: `758 B`
+- **Modified Time**: `2025-10-01T21:58:27.286167`
+
+#### Content Preview
+
+
+
+### 📄 File #38 - `pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.idx`
 - **Path**: `hyperlane\.git\objects\pack\pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.idx`
 - **Size**: `2,976 B`
 - **Modified Time**: `2025-09-15T22:37:10.228009`
@@ -478,7 +541,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #32 - `pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.pack`
+### 📄 File #39 - `pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.pack`
 - **Path**: `hyperlane\.git\objects\pack\pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.pack`
 - **Size**: `44,622 B`
 - **Modified Time**: `2025-09-15T22:37:10.228009`
@@ -487,7 +550,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #33 - `pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.rev`
+### 📄 File #40 - `pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.rev`
 - **Path**: `hyperlane\.git\objects\pack\pack-9981d3ebc5423107c7b99ac7ce88ac2573ef186f.rev`
 - **Size**: `324 B`
 - **Modified Time**: `2025-09-15T22:37:10.229008`
@@ -496,16 +559,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #34 - `master`
+### 📄 File #41 - `master`
 - **Path**: `hyperlane\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:37:10.276498`
+- **Modified Time**: `2025-10-01T21:58:27.401735`
 
 #### Content Preview
 
 
 
-### 📄 File #35 - `HEAD`
+### 📄 File #42 - `HEAD`
 - **Path**: `hyperlane\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:10.272785`
@@ -514,7 +577,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #36 - `v9.4.4`
+### 📄 File #43 - `master`
+- **Path**: `hyperlane\.git\refs\remotes\origin\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:27.338365`
+
+#### Content Preview
+
+
+
+### 📄 File #44 - `v9.4.4`
 - **Path**: `hyperlane\.git\refs\tags\v9.4.4`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:10.271784`
@@ -523,7 +595,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #37 - `rust.yml`
+### 📄 File #45 - `v9.4.5`
+- **Path**: `hyperlane\.git\refs\tags\v9.4.5`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:27.338365`
+
+#### Content Preview
+
+
+
+### 📄 File #46 - `rust.yml`
 - **Path**: `hyperlane\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:10.289504`
@@ -786,7 +867,7 @@ jobs:
 
 ```
 
-### 📄 File #38 - `lib.rs`
+### 📄 File #47 - `lib.rs`
 - **Path**: `hyperlane\src\lib.rs`
 - **Size**: `1,435 B`
 - **Modified Time**: `2025-09-15T22:37:10.294505`
@@ -858,7 +939,7 @@ pub(crate) use tokio::{
 
 ```
 
-### 📄 File #39 - `enum.rs`
+### 📄 File #48 - `enum.rs`
 - **Path**: `hyperlane\src\attribute\enum.rs`
 - **Size**: `868 B`
 - **Modified Time**: `2025-09-15T22:37:10.290504`
@@ -895,7 +976,7 @@ pub(crate) enum InternalAttribute {
 
 ```
 
-### 📄 File #40 - `impl.rs`
+### 📄 File #49 - `impl.rs`
 - **Path**: `hyperlane\src\attribute\impl.rs`
 - **Size**: `1,228 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -955,7 +1036,7 @@ impl From<InternalAttribute> for Attribute {
 
 ```
 
-### 📄 File #41 - `mod.rs`
+### 📄 File #50 - `mod.rs`
 - **Path**: `hyperlane\src\attribute\mod.rs`
 - **Size**: `116 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -973,7 +1054,7 @@ pub(crate) use r#enum::*;
 
 ```
 
-### 📄 File #42 - `type.rs`
+### 📄 File #51 - `type.rs`
 - **Path**: `hyperlane\src\attribute\type.rs`
 - **Size**: `258 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -990,7 +1071,7 @@ pub type HashMapArcAnySendSync = HashMap<String, ArcAnySendSync>;
 
 ```
 
-### 📄 File #43 - `impl.rs`
+### 📄 File #52 - `impl.rs`
 - **Path**: `hyperlane\src\config\impl.rs`
 - **Size**: `6,766 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -1251,7 +1332,7 @@ impl ServerConfig {
 
 ```
 
-### 📄 File #44 - `mod.rs`
+### 📄 File #53 - `mod.rs`
 - **Path**: `hyperlane\src\config\mod.rs`
 - **Size**: `112 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -1268,7 +1349,7 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #45 - `struct.rs`
+### 📄 File #54 - `struct.rs`
 - **Path**: `hyperlane\src\config\struct.rs`
 - **Size**: `1,714 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -1326,7 +1407,7 @@ pub struct ServerConfig(#[get(pub(super))] pub(super) ArcRwLockServerConfigInner
 
 ```
 
-### 📄 File #46 - `type.rs`
+### 📄 File #55 - `type.rs`
 - **Path**: `hyperlane\src\config\type.rs`
 - **Size**: `736 B`
 - **Modified Time**: `2025-09-15T22:37:10.292505`
@@ -1351,7 +1432,7 @@ pub(crate) type RwLockWriteGuardServerConfigInner<'a> = RwLockWriteGuard<'a, Ser
 
 ```
 
-### 📄 File #47 - `impl.rs`
+### 📄 File #56 - `impl.rs`
 - **Path**: `hyperlane\src\context\impl.rs`
 - **Size**: `50,212 B`
 - **Modified Time**: `2025-09-15T22:37:10.292505`
@@ -3044,7 +3125,7 @@ impl Context {
 
 ```
 
-### 📄 File #48 - `mod.rs`
+### 📄 File #57 - `mod.rs`
 - **Path**: `hyperlane\src\context\mod.rs`
 - **Size**: `120 B`
 - **Modified Time**: `2025-09-15T22:37:10.292505`
@@ -3062,7 +3143,7 @@ pub(crate) use r#type::*;
 
 ```
 
-### 📄 File #49 - `struct.rs`
+### 📄 File #58 - `struct.rs`
 - **Path**: `hyperlane\src\context\struct.rs`
 - **Size**: `1,814 B`
 - **Modified Time**: `2025-09-15T22:37:10.292505`
@@ -3124,7 +3205,7 @@ pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextInner>);
 
 ```
 
-### 📄 File #50 - `type.rs`
+### 📄 File #59 - `type.rs`
 - **Path**: `hyperlane\src\context\type.rs`
 - **Size**: `451 B`
 - **Modified Time**: `2025-09-15T22:37:10.292505`
@@ -3145,7 +3226,7 @@ pub(crate) type RwLockReadContextInner<'a> = RwLockReadGuard<'a, ContextInner>;
 
 ```
 
-### 📄 File #51 - `enum.rs`
+### 📄 File #60 - `enum.rs`
 - **Path**: `hyperlane\src\error\enum.rs`
 - **Size**: `931 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3183,7 +3264,7 @@ pub enum RouteError {
 
 ```
 
-### 📄 File #52 - `mod.rs`
+### 📄 File #61 - `mod.rs`
 - **Path**: `hyperlane\src\error\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3197,7 +3278,7 @@ pub use r#enum::*;
 
 ```
 
-### 📄 File #53 - `enum.rs`
+### 📄 File #62 - `enum.rs`
 - **Path**: `hyperlane\src\hook\enum.rs`
 - **Size**: `1,157 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3235,7 +3316,7 @@ pub enum HookType {
 
 ```
 
-### 📄 File #54 - `fn.rs`
+### 📄 File #63 - `fn.rs`
 - **Path**: `hyperlane\src\hook\fn.rs`
 - **Size**: `1,007 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3275,7 +3356,7 @@ pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
 
 ```
 
-### 📄 File #55 - `impl.rs`
+### 📄 File #64 - `impl.rs`
 - **Path**: `hyperlane\src\hook\impl.rs`
 - **Size**: `4,264 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3388,7 +3469,7 @@ impl HookType {
 
 ```
 
-### 📄 File #56 - `mod.rs`
+### 📄 File #65 - `mod.rs`
 - **Path**: `hyperlane\src\hook\mod.rs`
 - **Size**: `236 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3411,7 +3492,7 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #57 - `struct.rs`
+### 📄 File #66 - `struct.rs`
 - **Path**: `hyperlane\src\hook\struct.rs`
 - **Size**: `1,621 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3459,7 +3540,7 @@ pub struct HookMacro {
 
 ```
 
-### 📄 File #58 - `trait.rs`
+### 📄 File #67 - `trait.rs`
 - **Path**: `hyperlane\src\hook\trait.rs`
 - **Size**: `1,719 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3503,7 +3584,7 @@ pub trait FnPinBoxFutureSend<T>: Fn() -> PinBoxFutureSend<T> + Send + Sync {}
 
 ```
 
-### 📄 File #59 - `type.rs`
+### 📄 File #68 - `type.rs`
 - **Path**: `hyperlane\src\hook\type.rs`
 - **Size**: `1,639 B`
 - **Modified Time**: `2025-09-15T22:37:10.294505`
@@ -3544,7 +3625,7 @@ pub type ArcFnPinBoxFutureSend<T> = Arc<dyn FnPinBoxFutureSend<T>>;
 
 ```
 
-### 📄 File #60 - `enum.rs`
+### 📄 File #69 - `enum.rs`
 - **Path**: `hyperlane\src\lifecycle\enum.rs`
 - **Size**: `789 B`
 - **Modified Time**: `2025-09-15T22:37:10.294505`
@@ -3569,7 +3650,7 @@ pub(crate) enum Lifecycle {
 
 ```
 
-### 📄 File #61 - `impl.rs`
+### 📄 File #70 - `impl.rs`
 - **Path**: `hyperlane\src\lifecycle\impl.rs`
 - **Size**: `1,795 B`
 - **Modified Time**: `2025-09-15T22:37:10.294505`
@@ -3641,7 +3722,7 @@ impl Lifecycle {
 
 ```
 
-### 📄 File #62 - `mod.rs`
+### 📄 File #71 - `mod.rs`
 - **Path**: `hyperlane\src\lifecycle\mod.rs`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:10.294505`
@@ -3656,7 +3737,7 @@ pub(crate) use r#enum::*;
 
 ```
 
-### 📄 File #63 - `impl.rs`
+### 📄 File #72 - `impl.rs`
 - **Path**: `hyperlane\src\panic\impl.rs`
 - **Size**: `2,379 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3743,7 +3824,7 @@ impl Panic {
 
 ```
 
-### 📄 File #64 - `mod.rs`
+### 📄 File #73 - `mod.rs`
 - **Path**: `hyperlane\src\panic\mod.rs`
 - **Size**: `112 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3760,7 +3841,7 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #65 - `struct.rs`
+### 📄 File #74 - `struct.rs`
 - **Path**: `hyperlane\src\panic\struct.rs`
 - **Size**: `897 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3792,7 +3873,7 @@ pub struct Panic {
 
 ```
 
-### 📄 File #66 - `type.rs`
+### 📄 File #75 - `type.rs`
 - **Path**: `hyperlane\src\panic\type.rs`
 - **Size**: `623 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3816,7 +3897,7 @@ pub type OptionLocationRef<'a, 'b> = Option<&'a Location<'b>>;
 
 ```
 
-### 📄 File #67 - `const.rs`
+### 📄 File #76 - `const.rs`
 - **Path**: `hyperlane\src\route\const.rs`
 - **Size**: `259 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3831,7 +3912,7 @@ pub(crate) const DYNAMIC_ROUTE_RIGHT_BRACKET: &str = "}";
 
 ```
 
-### 📄 File #68 - `enum.rs`
+### 📄 File #77 - `enum.rs`
 - **Path**: `hyperlane\src\route\enum.rs`
 - **Size**: `998 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3864,7 +3945,7 @@ pub(crate) enum RouteSegment {
 
 ```
 
-### 📄 File #69 - `fn.rs`
+### 📄 File #78 - `fn.rs`
 - **Path**: `hyperlane\src\route\fn.rs`
 - **Size**: `918 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3902,7 +3983,7 @@ pub(crate) fn segment_key(pattern: &RoutePattern) -> Vec<&str> {
 
 ```
 
-### 📄 File #70 - `impl.rs`
+### 📄 File #79 - `impl.rs`
 - **Path**: `hyperlane\src\route\impl.rs`
 - **Size**: `16,488 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -4390,7 +4471,7 @@ impl RouteMatcher {
 
 ```
 
-### 📄 File #71 - `mod.rs`
+### 📄 File #80 - `mod.rs`
 - **Path**: `hyperlane\src\route\mod.rs`
 - **Size**: `265 B`
 - **Modified Time**: `2025-09-15T22:37:10.297007`
@@ -4414,7 +4495,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #72 - `struct.rs`
+### 📄 File #81 - `struct.rs`
 - **Path**: `hyperlane\src\route\struct.rs`
 - **Size**: `1,966 B`
 - **Modified Time**: `2025-09-15T22:37:10.297007`
@@ -4468,7 +4549,7 @@ pub(crate) struct RouteMatcher {
 
 ```
 
-### 📄 File #73 - `type.rs`
+### 📄 File #82 - `type.rs`
 - **Path**: `hyperlane\src\route\type.rs`
 - **Size**: `1,826 B`
 - **Modified Time**: `2025-09-15T22:37:10.297007`
@@ -4519,10 +4600,10 @@ pub(crate) type OptionRouteParams = Option<RouteParams>;
 
 ```
 
-### 📄 File #74 - `impl.rs`
+### 📄 File #83 - `impl.rs`
 - **Path**: `hyperlane\src\server\impl.rs`
-- **Size**: `22,884 B`
-- **Modified Time**: `2025-09-15T22:37:10.297518`
+- **Size**: `22,949 B`
+- **Modified Time**: `2025-10-01T21:58:27.401735`
 
 #### Content Preview
 
@@ -4964,16 +5045,17 @@ impl Server {
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfigInner = self.read().await.get_config().clone();
-        let nodelay_opt: OptionBool = *config.get_nodelay();
-        let linger_opt: OptionDuration = *config.get_linger();
-        let ttl_opt: OptionU32 = *config.get_ttl();
-        let _ = stream.set_linger(linger_opt);
+        let server_inner: RwLockReadGuardServerInner = self.read().await;
+        let config: &ServerConfigInner = server_inner.get_config();
+        let linger_opt: &OptionDuration = config.get_linger();
+        let nodelay_opt: &OptionBool = config.get_nodelay();
+        let ttl_opt: &OptionU32 = config.get_ttl();
+        let _ = stream.set_linger(*linger_opt);
         if let Some(nodelay) = nodelay_opt {
-            let _ = stream.set_nodelay(nodelay);
+            let _ = stream.set_nodelay(*nodelay);
         }
         if let Some(ttl) = ttl_opt {
-            let _ = stream.set_ttl(ttl);
+            let _ = stream.set_ttl(*ttl);
         }
     }
 
@@ -5166,7 +5248,7 @@ impl Server {
 
 ```
 
-### 📄 File #75 - `mod.rs`
+### 📄 File #84 - `mod.rs`
 - **Path**: `hyperlane\src\server\mod.rs`
 - **Size**: `112 B`
 - **Modified Time**: `2025-09-15T22:37:10.297518`
@@ -5183,7 +5265,7 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #76 - `struct.rs`
+### 📄 File #85 - `struct.rs`
 - **Path**: `hyperlane\src\server\struct.rs`
 - **Size**: `3,247 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5262,7 +5344,7 @@ pub struct Server(#[get(pub(super))] pub(super) ArcRwLockServerInner);
 
 ```
 
-### 📄 File #77 - `type.rs`
+### 📄 File #86 - `type.rs`
 - **Path**: `hyperlane\src\server\type.rs`
 - **Size**: `1,331 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5299,7 +5381,7 @@ pub(crate) type RwLockWriteGuardServerInner<'a> = RwLockWriteGuard<'a, ServerInn
 
 ```
 
-### 📄 File #78 - `attribute.rs`
+### 📄 File #87 - `attribute.rs`
 - **Path**: `hyperlane\src\tests\attribute.rs`
 - **Size**: `2,282 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5381,7 +5463,7 @@ async fn send_body_hook() {
 
 ```
 
-### 📄 File #79 - `config.rs`
+### 📄 File #88 - `config.rs`
 - **Path**: `hyperlane\src\tests\config.rs`
 - **Size**: `730 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5416,7 +5498,7 @@ async fn config_from_str() {
 
 ```
 
-### 📄 File #80 - `context.rs`
+### 📄 File #89 - `context.rs`
 - **Path**: `hyperlane\src\tests\context.rs`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5474,7 +5556,7 @@ async fn context_request_and_response() {
 
 ```
 
-### 📄 File #81 - `error.rs`
+### 📄 File #90 - `error.rs`
 - **Path**: `hyperlane\src\tests\error.rs`
 - **Size**: `1,803 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5516,7 +5598,7 @@ async fn route_error() {
 
 ```
 
-### 📄 File #82 - `lifecycle.rs`
+### 📄 File #91 - `lifecycle.rs`
 - **Path**: `hyperlane\src\tests\lifecycle.rs`
 - **Size**: `2,405 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5593,7 +5675,7 @@ async fn lifecycle_keep_alive() {
 
 ```
 
-### 📄 File #83 - `mod.rs`
+### 📄 File #92 - `mod.rs`
 - **Path**: `hyperlane\src\tests\mod.rs`
 - **Size**: `110 B`
 - **Modified Time**: `2025-09-15T22:37:10.299039`
@@ -5613,7 +5695,7 @@ mod server;
 
 ```
 
-### 📄 File #84 - `panic.rs`
+### 📄 File #93 - `panic.rs`
 - **Path**: `hyperlane\src\tests\panic.rs`
 - **Size**: `875 B`
 - **Modified Time**: `2025-09-15T22:37:10.299039`
@@ -5654,7 +5736,7 @@ async fn from_join_error() {
 
 ```
 
-### 📄 File #85 - `route.rs`
+### 📄 File #94 - `route.rs`
 - **Path**: `hyperlane\src\tests\route.rs`
 - **Size**: `1,734 B`
 - **Modified Time**: `2025-09-15T22:37:10.299039`
@@ -5727,7 +5809,7 @@ async fn duplicate_route() {
 
 ```
 
-### 📄 File #86 - `send.rs`
+### 📄 File #95 - `send.rs`
 - **Path**: `hyperlane\src\tests\send.rs`
 - **Size**: `1,533 B`
 - **Modified Time**: `2025-09-15T22:37:10.299039`
@@ -5790,7 +5872,7 @@ async fn server_share_across_threads() {
 
 ```
 
-### 📄 File #87 - `server.rs`
+### 📄 File #96 - `server.rs`
 - **Path**: `hyperlane\src\tests\server.rs`
 - **Size**: `5,970 B`
 - **Modified Time**: `2025-09-15T22:37:10.299039`
@@ -5970,7 +6052,7 @@ async fn server() {
 
 ```
 
-### 📄 File #88 - `.gitignore`
+### 📄 File #97 - `.gitignore`
 - **Path**: `hyperlane-broadcast\.gitignore`
 - **Size**: `18 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -5979,7 +6061,7 @@ async fn server() {
 
 
 
-### 📄 File #89 - `Cargo.toml`
+### 📄 File #98 - `Cargo.toml`
 - **Path**: `hyperlane-broadcast\Cargo.toml`
 - **Size**: `1,128 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -5988,7 +6070,7 @@ async fn server() {
 
 
 
-### 📄 File #90 - `LICENSE`
+### 📄 File #99 - `LICENSE`
 - **Path**: `hyperlane-broadcast\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -5997,7 +6079,7 @@ async fn server() {
 
 
 
-### 📄 File #91 - `README.md`
+### 📄 File #100 - `README.md`
 - **Path**: `hyperlane-broadcast\README.md`
 - **Size**: `2,406 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -6070,7 +6152,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #92 - `config`
+### 📄 File #101 - `config`
 - **Path**: `hyperlane-broadcast\.git\config`
 - **Size**: `329 B`
 - **Modified Time**: `2025-09-15T22:37:19.361731`
@@ -6079,7 +6161,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #93 - `description`
+### 📄 File #102 - `description`
 - **Path**: `hyperlane-broadcast\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:17.377937`
@@ -6088,16 +6170,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #94 - `FETCH_HEAD`
+### 📄 File #103 - `FETCH_HEAD`
 - **Path**: `hyperlane-broadcast\.git\FETCH_HEAD`
 - **Size**: `114 B`
-- **Modified Time**: `2025-09-17T09:21:55.202440`
+- **Modified Time**: `2025-10-01T21:58:41.163589`
 
 #### Content Preview
 
 
 
-### 📄 File #95 - `HEAD`
+### 📄 File #104 - `HEAD`
 - **Path**: `hyperlane-broadcast\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:19.350057`
@@ -6106,7 +6188,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #96 - `index`
+### 📄 File #105 - `index`
 - **Path**: `hyperlane-broadcast\.git\index`
 - **Size**: `1,777 B`
 - **Modified Time**: `2025-09-15T22:44:15.549267`
@@ -6115,7 +6197,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #97 - `ORIG_HEAD`
+### 📄 File #106 - `ORIG_HEAD`
 - **Path**: `hyperlane-broadcast\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:17.295684`
@@ -6124,7 +6206,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #98 - `packed-refs`
+### 📄 File #107 - `packed-refs`
 - **Path**: `hyperlane-broadcast\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:19.340000`
@@ -6133,7 +6215,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #99 - `shallow`
+### 📄 File #108 - `shallow`
 - **Path**: `hyperlane-broadcast\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:19.272119`
@@ -6142,7 +6224,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #100 - `applypatch-msg.sample`
+### 📄 File #109 - `applypatch-msg.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:17.377937`
@@ -6151,7 +6233,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #101 - `commit-msg.sample`
+### 📄 File #110 - `commit-msg.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6160,7 +6242,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #102 - `fsmonitor-watchman.sample`
+### 📄 File #111 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6169,7 +6251,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #103 - `post-update.sample`
+### 📄 File #112 - `post-update.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6178,7 +6260,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #104 - `pre-applypatch.sample`
+### 📄 File #113 - `pre-applypatch.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6187,7 +6269,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #105 - `pre-commit.sample`
+### 📄 File #114 - `pre-commit.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6196,7 +6278,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #106 - `pre-merge-commit.sample`
+### 📄 File #115 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6205,7 +6287,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #107 - `pre-push.sample`
+### 📄 File #116 - `pre-push.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6214,7 +6296,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #108 - `pre-rebase.sample`
+### 📄 File #117 - `pre-rebase.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6223,7 +6305,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #109 - `pre-receive.sample`
+### 📄 File #118 - `pre-receive.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6232,7 +6314,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #110 - `prepare-commit-msg.sample`
+### 📄 File #119 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6241,7 +6323,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #111 - `push-to-checkout.sample`
+### 📄 File #120 - `push-to-checkout.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6250,7 +6332,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #112 - `sendemail-validate.sample`
+### 📄 File #121 - `sendemail-validate.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:17.380937`
@@ -6259,7 +6341,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #113 - `update.sample`
+### 📄 File #122 - `update.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:17.380937`
@@ -6268,7 +6350,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #114 - `exclude`
+### 📄 File #123 - `exclude`
 - **Path**: `hyperlane-broadcast\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:17.380937`
@@ -6277,7 +6359,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #115 - `HEAD`
+### 📄 File #124 - `HEAD`
 - **Path**: `hyperlane-broadcast\.git\logs\HEAD`
 - **Size**: `194 B`
 - **Modified Time**: `2025-09-15T22:37:19.352062`
@@ -6286,7 +6368,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #116 - `master`
+### 📄 File #125 - `master`
 - **Path**: `hyperlane-broadcast\.git\logs\refs\heads\master`
 - **Size**: `194 B`
 - **Modified Time**: `2025-09-15T22:37:19.352062`
@@ -6295,7 +6377,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #117 - `HEAD`
+### 📄 File #126 - `HEAD`
 - **Path**: `hyperlane-broadcast\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `194 B`
 - **Modified Time**: `2025-09-15T22:37:19.349058`
@@ -6304,7 +6386,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #118 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.idx`
+### 📄 File #127 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.idx`
 - **Path**: `hyperlane-broadcast\.git\objects\pack\pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.idx`
 - **Size**: `1,772 B`
 - **Modified Time**: `2025-09-15T22:37:19.306920`
@@ -6313,7 +6395,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #119 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.pack`
+### 📄 File #128 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.pack`
 - **Path**: `hyperlane-broadcast\.git\objects\pack\pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.pack`
 - **Size**: `10,052 B`
 - **Modified Time**: `2025-09-15T22:37:19.306920`
@@ -6322,7 +6404,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #120 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.rev`
+### 📄 File #129 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.rev`
 - **Path**: `hyperlane-broadcast\.git\objects\pack\pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.rev`
 - **Size**: `152 B`
 - **Modified Time**: `2025-09-15T22:37:19.307947`
@@ -6331,7 +6413,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #121 - `master`
+### 📄 File #130 - `master`
 - **Path**: `hyperlane-broadcast\.git\refs\heads\master`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:19.351059`
@@ -6340,7 +6422,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #122 - `HEAD`
+### 📄 File #131 - `HEAD`
 - **Path**: `hyperlane-broadcast\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:19.348058`
@@ -6349,7 +6431,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #123 - `v0.8.0`
+### 📄 File #132 - `v0.8.0`
 - **Path**: `hyperlane-broadcast\.git\refs\tags\v0.8.0`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:19.347042`
@@ -6358,7 +6440,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #124 - `rust.yml`
+### 📄 File #133 - `rust.yml`
 - **Path**: `hyperlane-broadcast\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -6621,7 +6703,7 @@ jobs:
 
 ```
 
-### 📄 File #125 - `cfg.rs`
+### 📄 File #134 - `cfg.rs`
 - **Path**: `hyperlane-broadcast\src\cfg.rs`
 - **Size**: `1,073 B`
 - **Modified Time**: `2025-09-15T22:37:19.373238`
@@ -6660,7 +6742,7 @@ pub async fn test_broadcast_map() {
 
 ```
 
-### 📄 File #126 - `lib.rs`
+### 📄 File #135 - `lib.rs`
 - **Path**: `hyperlane-broadcast\src\lib.rs`
 - **Size**: `808 B`
 - **Modified Time**: `2025-09-15T22:37:19.373238`
@@ -6694,7 +6776,7 @@ pub(crate) use twox_hash::XxHash3_64;
 
 ```
 
-### 📄 File #127 - `const.rs`
+### 📄 File #136 - `const.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\const.rs`
 - **Size**: `244 B`
 - **Modified Time**: `2025-09-15T22:37:19.371238`
@@ -6710,7 +6792,7 @@ pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
 
 ```
 
-### 📄 File #128 - `impl.rs`
+### 📄 File #137 - `impl.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\impl.rs`
 - **Size**: `2,413 B`
 - **Modified Time**: `2025-09-15T22:37:19.371238`
@@ -6795,7 +6877,7 @@ impl<T: BroadcastTrait> Broadcast<T> {
 
 ```
 
-### 📄 File #129 - `mod.rs`
+### 📄 File #138 - `mod.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\mod.rs`
 - **Size**: `84 B`
 - **Modified Time**: `2025-09-15T22:37:19.371238`
@@ -6811,7 +6893,7 @@ pub mod r#type;
 
 ```
 
-### 📄 File #130 - `struct.rs`
+### 📄 File #139 - `struct.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\struct.rs`
 - **Size**: `612 B`
 - **Modified Time**: `2025-09-15T22:37:19.371238`
@@ -6836,7 +6918,7 @@ pub struct Broadcast<T: BroadcastTrait> {
 
 ```
 
-### 📄 File #131 - `trait.rs`
+### 📄 File #140 - `trait.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\trait.rs`
 - **Size**: `299 B`
 - **Modified Time**: `2025-09-15T22:37:19.371238`
@@ -6854,7 +6936,7 @@ pub trait BroadcastTrait: Clone + Debug {}
 
 ```
 
-### 📄 File #132 - `type.rs`
+### 📄 File #141 - `type.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\type.rs`
 - **Size**: `872 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -6879,7 +6961,7 @@ pub type Capacity = usize;
 
 ```
 
-### 📄 File #133 - `impl.rs`
+### 📄 File #142 - `impl.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\impl.rs`
 - **Size**: `4,680 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7035,7 +7117,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
 
 ```
 
-### 📄 File #134 - `mod.rs`
+### 📄 File #143 - `mod.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\mod.rs`
 - **Size**: `67 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7050,7 +7132,7 @@ pub mod r#type;
 
 ```
 
-### 📄 File #135 - `struct.rs`
+### 📄 File #144 - `struct.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\struct.rs`
 - **Size**: `399 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7069,7 +7151,7 @@ pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>)
 
 ```
 
-### 📄 File #136 - `trait.rs`
+### 📄 File #145 - `trait.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\trait.rs`
 - **Size**: `334 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7087,7 +7169,7 @@ pub trait BroadcastMapTrait: Clone + Debug {}
 
 ```
 
-### 📄 File #137 - `type.rs`
+### 📄 File #146 - `type.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\type.rs`
 - **Size**: `1,414 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7118,7 +7200,7 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 
 ```
 
-### 📄 File #138 - `.gitignore`
+### 📄 File #147 - `.gitignore`
 - **Path**: `hyperlane-log\.gitignore`
 - **Size**: `30 B`
 - **Modified Time**: `2025-09-15T22:37:12.927907`
@@ -7127,7 +7209,7 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 
 
 
-### 📄 File #139 - `Cargo.toml`
+### 📄 File #148 - `Cargo.toml`
 - **Path**: `hyperlane-log\Cargo.toml`
 - **Size**: `1,517 B`
 - **Modified Time**: `2025-09-15T22:37:12.927907`
@@ -7136,7 +7218,7 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 
 
 
-### 📄 File #140 - `LICENSE`
+### 📄 File #149 - `LICENSE`
 - **Path**: `hyperlane-log\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:12.927907`
@@ -7145,7 +7227,7 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 
 
 
-### 📄 File #141 - `README.md`
+### 📄 File #150 - `README.md`
 - **Path**: `hyperlane-log\README.md`
 - **Size**: `4,066 B`
 - **Modified Time**: `2025-09-15T22:37:12.928908`
@@ -7267,7 +7349,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #142 - `config`
+### 📄 File #151 - `config`
 - **Path**: `hyperlane-log\.git\config`
 - **Size**: `323 B`
 - **Modified Time**: `2025-09-15T22:37:12.921397`
@@ -7276,7 +7358,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #143 - `description`
+### 📄 File #152 - `description`
 - **Path**: `hyperlane-log\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:10.337892`
@@ -7285,16 +7367,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #144 - `FETCH_HEAD`
+### 📄 File #153 - `FETCH_HEAD`
 - **Path**: `hyperlane-log\.git\FETCH_HEAD`
-- **Size**: `108 B`
-- **Modified Time**: `2025-09-17T09:21:50.664367`
+- **Size**: `0 B`
+- **Modified Time**: `2025-10-01T21:58:27.561776`
 
 #### Content Preview
 
 
 
-### 📄 File #145 - `HEAD`
+### 📄 File #154 - `HEAD`
 - **Path**: `hyperlane-log\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:12.912397`
@@ -7303,7 +7385,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #146 - `index`
+### 📄 File #155 - `index`
 - **Path**: `hyperlane-log\.git\index`
 - **Size**: `1,308 B`
 - **Modified Time**: `2025-09-15T22:44:07.189926`
@@ -7312,7 +7394,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #147 - `ORIG_HEAD`
+### 📄 File #156 - `ORIG_HEAD`
 - **Path**: `hyperlane-log\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:11.290119`
@@ -7321,7 +7403,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #148 - `packed-refs`
+### 📄 File #157 - `packed-refs`
 - **Path**: `hyperlane-log\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:12.902397`
@@ -7330,7 +7412,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #149 - `shallow`
+### 📄 File #158 - `shallow`
 - **Path**: `hyperlane-log\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:12.765583`
@@ -7339,7 +7421,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #150 - `applypatch-msg.sample`
+### 📄 File #159 - `applypatch-msg.sample`
 - **Path**: `hyperlane-log\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7348,7 +7430,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #151 - `commit-msg.sample`
+### 📄 File #160 - `commit-msg.sample`
 - **Path**: `hyperlane-log\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7357,7 +7439,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #152 - `fsmonitor-watchman.sample`
+### 📄 File #161 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-log\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7366,7 +7448,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #153 - `post-update.sample`
+### 📄 File #162 - `post-update.sample`
 - **Path**: `hyperlane-log\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7375,7 +7457,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #154 - `pre-applypatch.sample`
+### 📄 File #163 - `pre-applypatch.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7384,7 +7466,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #155 - `pre-commit.sample`
+### 📄 File #164 - `pre-commit.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7393,7 +7475,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #156 - `pre-merge-commit.sample`
+### 📄 File #165 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7402,7 +7484,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #157 - `pre-push.sample`
+### 📄 File #166 - `pre-push.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7411,7 +7493,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #158 - `pre-rebase.sample`
+### 📄 File #167 - `pre-rebase.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7420,7 +7502,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #159 - `pre-receive.sample`
+### 📄 File #168 - `pre-receive.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7429,7 +7511,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #160 - `prepare-commit-msg.sample`
+### 📄 File #169 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-log\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7438,7 +7520,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #161 - `push-to-checkout.sample`
+### 📄 File #170 - `push-to-checkout.sample`
 - **Path**: `hyperlane-log\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7447,7 +7529,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #162 - `sendemail-validate.sample`
+### 📄 File #171 - `sendemail-validate.sample`
 - **Path**: `hyperlane-log\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:10.340891`
@@ -7456,7 +7538,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #163 - `update.sample`
+### 📄 File #172 - `update.sample`
 - **Path**: `hyperlane-log\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:10.340891`
@@ -7465,7 +7547,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #164 - `exclude`
+### 📄 File #173 - `exclude`
 - **Path**: `hyperlane-log\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:10.340891`
@@ -7474,7 +7556,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #165 - `HEAD`
+### 📄 File #174 - `HEAD`
 - **Path**: `hyperlane-log\.git\logs\HEAD`
 - **Size**: `188 B`
 - **Modified Time**: `2025-09-15T22:37:12.914397`
@@ -7483,7 +7565,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #166 - `master`
+### 📄 File #175 - `master`
 - **Path**: `hyperlane-log\.git\logs\refs\heads\master`
 - **Size**: `188 B`
 - **Modified Time**: `2025-09-15T22:37:12.914397`
@@ -7492,7 +7574,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #167 - `HEAD`
+### 📄 File #176 - `HEAD`
 - **Path**: `hyperlane-log\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `188 B`
 - **Modified Time**: `2025-09-15T22:37:12.912397`
@@ -7501,7 +7583,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #168 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.idx`
+### 📄 File #177 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.idx`
 - **Path**: `hyperlane-log\.git\objects\pack\pack-8288281cadf0897a7078f431aa6915caf1801a01.idx`
 - **Size**: `1,632 B`
 - **Modified Time**: `2025-09-15T22:37:12.868651`
@@ -7510,7 +7592,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #169 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.pack`
+### 📄 File #178 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.pack`
 - **Path**: `hyperlane-log\.git\objects\pack\pack-8288281cadf0897a7078f431aa6915caf1801a01.pack`
 - **Size**: `10,203 B`
 - **Modified Time**: `2025-09-15T22:37:12.868651`
@@ -7519,7 +7601,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #170 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.rev`
+### 📄 File #179 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.rev`
 - **Path**: `hyperlane-log\.git\objects\pack\pack-8288281cadf0897a7078f431aa6915caf1801a01.rev`
 - **Size**: `132 B`
 - **Modified Time**: `2025-09-15T22:37:12.869652`
@@ -7528,7 +7610,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #171 - `master`
+### 📄 File #180 - `master`
 - **Path**: `hyperlane-log\.git\refs\heads\master`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:12.914397`
@@ -7537,7 +7619,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #172 - `HEAD`
+### 📄 File #181 - `HEAD`
 - **Path**: `hyperlane-log\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:12.911397`
@@ -7546,7 +7628,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #173 - `v1.19.0`
+### 📄 File #182 - `v1.19.0`
 - **Path**: `hyperlane-log\.git\refs\tags\v1.19.0`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:12.909397`
@@ -7555,7 +7637,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #174 - `rust.yml`
+### 📄 File #183 - `rust.yml`
 - **Path**: `hyperlane-log\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:12.927907`
@@ -7818,7 +7900,7 @@ jobs:
 
 ```
 
-### 📄 File #175 - `cfg.rs`
+### 📄 File #184 - `cfg.rs`
 - **Path**: `hyperlane-log\src\cfg.rs`
 - **Size**: `2,808 B`
 - **Modified Time**: `2025-09-15T22:37:12.928908`
@@ -7913,7 +7995,7 @@ async fn test_more_log_second() {
 
 ```
 
-### 📄 File #176 - `lib.rs`
+### 📄 File #185 - `lib.rs`
 - **Path**: `hyperlane-log\src\lib.rs`
 - **Size**: `918 B`
 - **Modified Time**: `2025-09-15T22:37:12.928908`
@@ -7948,7 +8030,7 @@ pub(crate) use std::{
 
 ```
 
-### 📄 File #177 - `const.rs`
+### 📄 File #186 - `const.rs`
 - **Path**: `hyperlane-log\src\log\const.rs`
 - **Size**: `871 B`
 - **Modified Time**: `2025-09-15T22:37:12.928908`
@@ -7981,7 +8063,7 @@ pub(crate) const BR: &str = "\n";
 
 ```
 
-### 📄 File #178 - `fn.rs`
+### 📄 File #187 - `fn.rs`
 - **Path**: `hyperlane-log\src\log\fn.rs`
 - **Size**: `3,601 B`
 - **Modified Time**: `2025-09-15T22:37:12.929908`
@@ -8112,7 +8194,7 @@ pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
 
 ```
 
-### 📄 File #179 - `impl.rs`
+### 📄 File #188 - `impl.rs`
 - **Path**: `hyperlane-log\src\log\impl.rs`
 - **Size**: `6,965 B`
 - **Modified Time**: `2025-09-15T22:37:12.929908`
@@ -8372,7 +8454,7 @@ impl Log {
 
 ```
 
-### 📄 File #180 - `mod.rs`
+### 📄 File #189 - `mod.rs`
 - **Path**: `hyperlane-log\src\log\mod.rs`
 - **Size**: `238 B`
 - **Modified Time**: `2025-09-15T22:37:12.929908`
@@ -8395,7 +8477,7 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #181 - `struct.rs`
+### 📄 File #190 - `struct.rs`
 - **Path**: `hyperlane-log\src\log\struct.rs`
 - **Size**: `457 B`
 - **Modified Time**: `2025-09-15T22:37:12.929908`
@@ -8418,7 +8500,7 @@ pub struct Log {
 
 ```
 
-### 📄 File #182 - `trait.rs`
+### 📄 File #191 - `trait.rs`
 - **Path**: `hyperlane-log\src\log\trait.rs`
 - **Size**: `373 B`
 - **Modified Time**: `2025-09-15T22:37:12.929908`
@@ -8438,7 +8520,7 @@ pub trait LogFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
 
 ```
 
-### 📄 File #183 - `type.rs`
+### 📄 File #192 - `type.rs`
 - **Path**: `hyperlane-log\src\log\type.rs`
 - **Size**: `636 B`
 - **Modified Time**: `2025-09-15T22:37:12.930907`
@@ -8463,7 +8545,7 @@ pub type ArcLog = Arc<Log>;
 
 ```
 
-### 📄 File #184 - `.gitignore`
+### 📄 File #193 - `.gitignore`
 - **Path**: `hyperlane-macros\.gitignore`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:29.398513`
@@ -8472,16 +8554,16 @@ pub type ArcLog = Arc<Log>;
 
 
 
-### 📄 File #185 - `Cargo.toml`
+### 📄 File #194 - `Cargo.toml`
 - **Path**: `hyperlane-macros\Cargo.toml`
-- **Size**: `1,231 B`
-- **Modified Time**: `2025-09-15T22:37:29.398513`
+- **Size**: `1,230 B`
+- **Modified Time**: `2025-10-01T21:58:50.909285`
 
 #### Content Preview
 
 
 
-### 📄 File #186 - `LICENSE`
+### 📄 File #195 - `LICENSE`
 - **Path**: `hyperlane-macros\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:29.399022`
@@ -8490,10 +8572,10 @@ pub type ArcLog = Arc<Log>;
 
 
 
-### 📄 File #187 - `README.md`
+### 📄 File #196 - `README.md`
 - **Path**: `hyperlane-macros\README.md`
-- **Size**: `22,428 B`
-- **Modified Time**: `2025-09-15T22:37:29.399022`
+- **Size**: `22,567 B`
+- **Modified Time**: `2025-10-01T21:58:50.914121`
 
 #### Content Preview
 
@@ -8565,6 +8647,7 @@ cargo add hyperlane-macros
 - `#[response_header("key" => "value")]` - Set response header (supports literals and global constants)
 - `#[response_body("data")]` - Set response body (supports literals and global constants)
 - `#[response_version(version)]` - Set response HTTP version (supports literals and global constants)
+- `#[clear_response_headers]` - Clear all response headers
 
 ### Send Operation Macros
 
@@ -8658,11 +8741,11 @@ cargo add hyperlane-macros
 
 ### Hook Macros
 
-- `#[prologue_hook(function_name)]` - Execute specified function before the main handler function
-- `#[epilogue_hook(function_name)]` - Execute specified function after the main handler function
+- `#[prologue_hooks(function_name)]` - Execute specified function before the main handler function
+- `#[epilogue_hooks(function_name)]` - Execute specified function after the main handler function
 - `#[panic_hook]` - Execute function when a panic occurs within the server
-- `#[prologue_hooks(macro1, macro2, ...)]` - Injects a list of macros before the decorated function.
-- `#[epilogue_hooks(macro1, macro2, ...)]` - Injects a list of macros after the decorated function.
+- `#[prologue_macros(macro1, macro2, ...)]` - Injects a list of macros before the decorated function.
+- `#[epilogue_macros(macro1, macro2, ...)]` - Injects a list of macros after the decorated function.
 
 ### Middleware Macros
 
@@ -8703,7 +8786,7 @@ cargo add hyperlane-macros
 ### Best Practice Warning
 
 - Request related macros are mostly query functions, while response related macros are mostly assignment functions.
-- When using `prologue_hook` or `epilogue_hook` macros, it is not recommended to combine them with other macros (such as `#[get]`, `#[post]`, `#[http]`, etc.) on the same function. These macros should be placed in the hook functions themselves. If you are not clear about how macros are expanded, combining them may lead to problematic code behavior.
+- When using `prologue_hooks` or `epilogue_hooks` macros, it is not recommended to combine them with other macros (such as `#[get]`, `#[post]`, `#[http]`, etc.) on the same function. These macros should be placed in the hook functions themselves. If you are not clear about how macros are expanded, combining them may lead to problematic code behavior.
 
 ## Example Usage
 
@@ -8729,11 +8812,11 @@ struct TestData {
 #[panic_hook]
 #[panic_hook(1)]
 #[panic_hook("2")]
-#[epilogue_hooks(response_body("panic_hook"), send)]
+#[epilogue_macros(response_body("panic_hook"), send)]
 async fn panic_hook(ctx: Context) {}
 
 #[request_middleware]
-#[epilogue_hooks(
+#[epilogue_macros(
     response_status_code(200),
     response_version(HttpVersion::HTTP1_1),
     response_header(SERVER => HYPERLANE),
@@ -8746,7 +8829,7 @@ async fn request_middleware(ctx: Context) {}
 
 #[ws]
 #[request_middleware(1)]
-#[epilogue_hooks(
+#[epilogue_macros(
     response_body(&vec![]),
     response_status_code(101),
     response_header(UPGRADE => WEBSOCKET),
@@ -8770,27 +8853,27 @@ async fn connected_hook(ctx: Context) {}
 async fn response_middleware_1(ctx: Context) {}
 
 #[response_middleware(2)]
-#[prologue_hooks(
+#[prologue_macros(
     reject(ctx.get_request().await.is_ws()),
     response_header(STEP => "response_middleware_2")
 )]
-#[epilogue_hooks(send, flush)]
+#[epilogue_macros(send, flush)]
 async fn response_middleware_2(ctx: Context) {}
 
 #[response_middleware("3")]
-#[prologue_hooks(
+#[prologue_macros(
     ws,
     response_header(STEP => "response_middleware_3")
 )]
-#[epilogue_hooks(send_body, flush)]
+#[epilogue_macros(send_body, flush)]
 async fn response_middleware_3(ctx: Context) {}
 
 #[get]
 #[http]
-async fn prologue_hook(ctx: Context) {}
+async fn prologue_hooks(ctx: Context) {}
 
 #[response_status_code(200)]
-async fn epilogue_hook(ctx: Context) {}
+async fn epilogue_hooks(ctx: Context) {}
 
 #[route("/response")]
 #[response_body(&RESPONSE_DATA)]
@@ -8800,71 +8883,72 @@ async fn epilogue_hook(ctx: Context) {}
 async fn response(ctx: Context) {}
 
 #[route("/connect")]
-#[prologue_hooks(connect, response_body("connect"))]
+#[prologue_macros(connect, response_body("connect"))]
 async fn connect(ctx: Context) {}
 
 #[route("/delete")]
-#[prologue_hooks(delete, response_body("delete"))]
+#[prologue_macros(delete, response_body("delete"))]
 async fn delete(ctx: Context) {}
 
 #[route("/head")]
-#[prologue_hooks(head, response_body("head"))]
+#[prologue_macros(head, response_body("head"))]
 async fn head(ctx: Context) {}
 
 #[route("/options")]
-#[prologue_hooks(options, response_body("options"))]
+#[prologue_macros(options, response_body("options"))]
 async fn options(ctx: Context) {}
 
 #[route("/patch")]
-#[prologue_hooks(patch, response_body("patch"))]
+#[prologue_macros(patch, response_body("patch"))]
 async fn patch(ctx: Context) {}
 
 #[route("/put")]
-#[prologue_hooks(put, response_body("put"))]
+#[prologue_macros(put, response_body("put"))]
 async fn put(ctx: Context) {}
 
 #[route("/trace")]
-#[prologue_hooks(trace, response_body("trace"))]
+#[prologue_macros(trace, response_body("trace"))]
 async fn trace(ctx: Context) {}
 
 #[route("/h2c")]
-#[prologue_hooks(h2c, response_body("h2c"))]
+#[prologue_macros(h2c, response_body("h2c"))]
 async fn h2c(ctx: Context) {}
 
 #[route("/http")]
-#[prologue_hooks(http, response_body("http"))]
+#[prologue_macros(http, response_body("http"))]
 async fn http_only(ctx: Context) {}
 
 #[route("/http0_9")]
-#[prologue_hooks(http0_9, response_body("http0_9"))]
+#[prologue_macros(http0_9, response_body("http0_9"))]
 async fn http0_9(ctx: Context) {}
 
 #[route("/http1_0")]
-#[prologue_hooks(http1_0, response_body("http1_0"))]
+#[prologue_macros(http1_0, response_body("http1_0"))]
 async fn http1_0(ctx: Context) {}
 
 #[route("/http1_1")]
-#[prologue_hooks(http1_1, response_body("http1_1"))]
+#[prologue_macros(http1_1, response_body("http1_1"))]
 async fn http1_1(ctx: Context) {}
 
 #[route("/http2")]
-#[prologue_hooks(http2, response_body("http2"))]
+#[prologue_macros(http2, response_body("http2"))]
 async fn http2(ctx: Context) {}
 
 #[route("/http3")]
-#[prologue_hooks(http3, response_body("http3"))]
+#[prologue_macros(http3, response_body("http3"))]
 async fn http3(ctx: Context) {}
 
 #[route("/tls")]
-#[prologue_hooks(tls, response_body("tls"))]
+#[prologue_macros(tls, response_body("tls"))]
 async fn tls(ctx: Context) {}
 
 #[route("/http1_1_or_higher")]
-#[prologue_hooks(http1_1_or_higher, response_body("http1_1_or_higher"))]
+#[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
 async fn http1_1_or_higher(ctx: Context) {}
 
 #[route("/unknown_method")]
-#[prologue_hooks(
+#[prologue_macros(
+    clear_response_headers,
     filter(ctx.get_request().await.is_unknown_method()),
     response_body("unknown_method")
 )]
@@ -8872,12 +8956,12 @@ async fn unknown_method(ctx: Context) {}
 
 #[route("/get")]
 #[send_body_once]
-#[prologue_hooks(ws, get, response_body("get"))]
+#[prologue_macros(ws, get, response_body("get"))]
 async fn get(ctx: Context) {}
 
 #[send_once]
 #[route("/post")]
-#[prologue_hooks(post, response_body("post"))]
+#[prologue_macros(post, response_body("post"))]
 async fn post(ctx: Context) {}
 
 #[ws]
@@ -8926,14 +9010,14 @@ async fn websocket_5(ctx: Context) {
 }
 
 #[route("/hook")]
-#[prologue_hook(prologue_hook)]
-#[epilogue_hook(epilogue_hook)]
+#[prologue_hooks(prologue_hooks)]
+#[epilogue_hooks(epilogue_hooks)]
 #[response_body("Testing hook macro")]
 async fn hook(ctx: Context) {}
 
 #[closed]
 #[route("/get_post")]
-#[prologue_hooks(
+#[prologue_macros(
     http,
     methods(get, post),
     response_body("get_post"),
@@ -8959,22 +9043,22 @@ async fn route_param(ctx: Context) {}
 
 #[route("/host")]
 #[host("localhost")]
-#[epilogue_hooks(
+#[epilogue_macros(
     response_body("host string literal: localhost"),
     send,
     http_from_stream
 )]
-#[prologue_hooks(response_body("host string literal: localhost"), send)]
+#[prologue_macros(response_body("host string literal: localhost"), send)]
 async fn host(ctx: Context) {}
 
 #[route("/request_query")]
-#[epilogue_hooks(
+#[epilogue_macros(
     request_query("test" => request_query_option),
     response_body(&format!("request query: {request_query_option:?}")),
     send,
     http_from_stream(1024)
 )]
-#[prologue_hooks(
+#[prologue_macros(
     request_query("test" => request_query_option),
     response_body(&format!("request query: {request_query_option:?}")),
     send
@@ -8982,13 +9066,13 @@ async fn host(ctx: Context) {}
 async fn request_query(ctx: Context) {}
 
 #[route("/request_header")]
-#[epilogue_hooks(
+#[epilogue_macros(
     request_header(HOST => request_header_option),
     response_body(&format!("request header: {request_header_option:?}")),
     send,
     http_from_stream(_request)
 )]
-#[prologue_hooks(
+#[prologue_macros(
     request_header(HOST => request_header_option),
     response_body(&format!("request header: {request_header_option:?}")),
     send
@@ -8996,13 +9080,13 @@ async fn request_query(ctx: Context) {}
 async fn request_header(ctx: Context) {}
 
 #[route("/request_querys")]
-#[epilogue_hooks(
+#[epilogue_macros(
     request_querys(request_querys),
     response_body(&format!("request querys: {request_querys:?}")),
     send,
     http_from_stream(1024, _request)
 )]
-#[prologue_hooks(
+#[prologue_macros(
     request_querys(request_querys),
     response_body(&format!("request querys: {request_querys:?}")),
     send
@@ -9010,13 +9094,13 @@ async fn request_header(ctx: Context) {}
 async fn request_querys(ctx: Context) {}
 
 #[route("/request_headers")]
-#[epilogue_hooks(
+#[epilogue_macros(
     request_headers(request_headers),
     response_body(&format!("request headers: {request_headers:?}")),
     send,
     http_from_stream(_request, 1024)
 )]
-#[prologue_hooks(
+#[prologue_macros(
     request_headers(request_headers),
     response_body(&format!("request headers: {request_headers:?}")),
     send
@@ -9029,7 +9113,7 @@ async fn request_headers(ctx: Context) {}
 async fn request_body(ctx: Context) {}
 
 #[route("/reject_host")]
-#[prologue_hooks(
+#[prologue_macros(
     reject_host("filter.localhost"),
     response_body("host filter string literal")
 )]
@@ -9046,14 +9130,14 @@ async fn attribute(ctx: Context) {}
 async fn request_body_json(ctx: Context) {}
 
 #[route("/referer")]
-#[prologue_hooks(
+#[prologue_macros(
     referer("http://localhost"),
     response_body("referer string literal: http://localhost")
 )]
 async fn referer(ctx: Context) {}
 
 #[route("/reject_referer")]
-#[prologue_hooks(
+#[prologue_macros(
     reject_referer("http://localhost"),
     response_body("referer filter string literal")
 )]
@@ -9117,7 +9201,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #188 - `config`
+### 📄 File #197 - `config`
 - **Path**: `hyperlane-macros\.git\config`
 - **Size**: `326 B`
 - **Modified Time**: `2025-09-15T22:37:29.390902`
@@ -9126,7 +9210,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #189 - `description`
+### 📄 File #198 - `description`
 - **Path**: `hyperlane-macros\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:27.027664`
@@ -9135,16 +9219,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #190 - `FETCH_HEAD`
+### 📄 File #199 - `FETCH_HEAD`
 - **Path**: `hyperlane-macros\.git\FETCH_HEAD`
-- **Size**: `111 B`
-- **Modified Time**: `2025-09-17T09:21:59.710912`
+- **Size**: `716 B`
+- **Modified Time**: `2025-10-01T21:58:50.856348`
 
 #### Content Preview
 
 
 
-### 📄 File #191 - `HEAD`
+### 📄 File #200 - `HEAD`
 - **Path**: `hyperlane-macros\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:29.384877`
@@ -9153,16 +9237,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #192 - `index`
+### 📄 File #201 - `index`
 - **Path**: `hyperlane-macros\.git\index`
 - **Size**: `6,789 B`
-- **Modified Time**: `2025-09-15T22:44:21.371231`
+- **Modified Time**: `2025-10-01T21:58:50.938057`
 
 #### Content Preview
 
 
 
-### 📄 File #193 - `ORIG_HEAD`
+### 📄 File #202 - `ORIG_HEAD`
 - **Path**: `hyperlane-macros\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:23.276438`
@@ -9171,7 +9255,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #194 - `packed-refs`
+### 📄 File #203 - `packed-refs`
 - **Path**: `hyperlane-macros\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:29.374722`
@@ -9180,7 +9264,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #195 - `shallow`
+### 📄 File #204 - `shallow`
 - **Path**: `hyperlane-macros\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:29.168042`
@@ -9189,7 +9273,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #196 - `applypatch-msg.sample`
+### 📄 File #205 - `applypatch-msg.sample`
 - **Path**: `hyperlane-macros\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:27.028180`
@@ -9198,7 +9282,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #197 - `commit-msg.sample`
+### 📄 File #206 - `commit-msg.sample`
 - **Path**: `hyperlane-macros\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:27.028180`
@@ -9207,7 +9291,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #198 - `fsmonitor-watchman.sample`
+### 📄 File #207 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-macros\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:27.028696`
@@ -9216,7 +9300,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #199 - `post-update.sample`
+### 📄 File #208 - `post-update.sample`
 - **Path**: `hyperlane-macros\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:27.028696`
@@ -9225,7 +9309,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #200 - `pre-applypatch.sample`
+### 📄 File #209 - `pre-applypatch.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:27.028696`
@@ -9234,7 +9318,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #201 - `pre-commit.sample`
+### 📄 File #210 - `pre-commit.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:27.029209`
@@ -9243,7 +9327,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #202 - `pre-merge-commit.sample`
+### 📄 File #211 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:27.029209`
@@ -9252,7 +9336,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #203 - `pre-push.sample`
+### 📄 File #212 - `pre-push.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:27.029729`
@@ -9261,7 +9345,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #204 - `pre-rebase.sample`
+### 📄 File #213 - `pre-rebase.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:27.029729`
@@ -9270,7 +9354,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #205 - `pre-receive.sample`
+### 📄 File #214 - `pre-receive.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:27.029729`
@@ -9279,7 +9363,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #206 - `prepare-commit-msg.sample`
+### 📄 File #215 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-macros\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:27.030243`
@@ -9288,7 +9372,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #207 - `push-to-checkout.sample`
+### 📄 File #216 - `push-to-checkout.sample`
 - **Path**: `hyperlane-macros\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:27.030243`
@@ -9297,7 +9381,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #208 - `sendemail-validate.sample`
+### 📄 File #217 - `sendemail-validate.sample`
 - **Path**: `hyperlane-macros\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:27.030243`
@@ -9306,7 +9390,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #209 - `update.sample`
+### 📄 File #218 - `update.sample`
 - **Path**: `hyperlane-macros\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:27.030243`
@@ -9315,7 +9399,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #210 - `exclude`
+### 📄 File #219 - `exclude`
 - **Path**: `hyperlane-macros\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:27.030755`
@@ -9324,25 +9408,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #211 - `HEAD`
+### 📄 File #220 - `HEAD`
 - **Path**: `hyperlane-macros\.git\logs\HEAD`
-- **Size**: `191 B`
-- **Modified Time**: `2025-09-15T22:37:29.385879`
+- **Size**: `344 B`
+- **Modified Time**: `2025-10-01T21:58:50.938057`
 
 #### Content Preview
 
 
 
-### 📄 File #212 - `master`
+### 📄 File #221 - `master`
 - **Path**: `hyperlane-macros\.git\logs\refs\heads\master`
-- **Size**: `191 B`
-- **Modified Time**: `2025-09-15T22:37:29.386877`
+- **Size**: `344 B`
+- **Modified Time**: `2025-10-01T21:58:50.938057`
 
 #### Content Preview
 
 
 
-### 📄 File #213 - `HEAD`
+### 📄 File #222 - `HEAD`
 - **Path**: `hyperlane-macros\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `191 B`
 - **Modified Time**: `2025-09-15T22:37:29.383875`
@@ -9351,7 +9435,322 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #214 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.idx`
+### 📄 File #223 - `master`
+- **Path**: `hyperlane-macros\.git\logs\refs\remotes\origin\master`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-01T21:58:50.797657`
+
+#### Content Preview
+
+
+
+### 📄 File #224 - `b5f77eadd85aa84cf2e268828327e9f76e1247`
+- **Path**: `hyperlane-macros\.git\objects\03\b5f77eadd85aa84cf2e268828327e9f76e1247`
+- **Size**: `240 B`
+- **Modified Time**: `2025-10-01T21:58:50.648070`
+
+#### Content Preview
+
+
+
+### 📄 File #225 - `1f19bb026d1404c5d3ee497e2be33c3ac8669b`
+- **Path**: `hyperlane-macros\.git\objects\07\1f19bb026d1404c5d3ee497e2be33c3ac8669b`
+- **Size**: `652 B`
+- **Modified Time**: `2025-10-01T21:58:50.665325`
+
+#### Content Preview
+
+
+
+### 📄 File #226 - `cd87addf49bff29c2acfd4a88a443a608f0c5b`
+- **Path**: `hyperlane-macros\.git\objects\09\cd87addf49bff29c2acfd4a88a443a608f0c5b`
+- **Size**: `935 B`
+- **Modified Time**: `2025-10-01T21:58:50.723491`
+
+#### Content Preview
+
+
+
+### 📄 File #227 - `edbe696a8767d5ce0b9359fe818ccd9ec83868`
+- **Path**: `hyperlane-macros\.git\objects\10\edbe696a8767d5ce0b9359fe818ccd9ec83868`
+- **Size**: `240 B`
+- **Modified Time**: `2025-10-01T21:58:50.648070`
+
+#### Content Preview
+
+
+
+### 📄 File #228 - `f3d0e5b5f7eec3defafa50d224a0931c8e4ac8`
+- **Path**: `hyperlane-macros\.git\objects\18\f3d0e5b5f7eec3defafa50d224a0931c8e4ac8`
+- **Size**: `78 B`
+- **Modified Time**: `2025-10-01T21:58:50.640031`
+
+#### Content Preview
+
+
+
+### 📄 File #229 - `b03a62f482c5ebc492fc0fe2b0b032e469e215`
+- **Path**: `hyperlane-macros\.git\objects\1b\b03a62f482c5ebc492fc0fe2b0b032e469e215`
+- **Size**: `241 B`
+- **Modified Time**: `2025-10-01T21:58:50.648070`
+
+#### Content Preview
+
+
+
+### 📄 File #230 - `921370bedec8251ecbd269f6e6dcd8ecd7c23e`
+- **Path**: `hyperlane-macros\.git\objects\21\921370bedec8251ecbd269f6e6dcd8ecd7c23e`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-01T21:58:50.631999`
+
+#### Content Preview
+
+
+
+### 📄 File #231 - `f5e482d4a2c0a30ca7784feec69b28c583264a`
+- **Path**: `hyperlane-macros\.git\objects\29\f5e482d4a2c0a30ca7784feec69b28c583264a`
+- **Size**: `9,197 B`
+- **Modified Time**: `2025-10-01T21:58:50.713219`
+
+#### Content Preview
+
+
+
+### 📄 File #232 - `2c4d1bcb33767c0fab1945fc7712035729b4dc`
+- **Path**: `hyperlane-macros\.git\objects\2c\2c4d1bcb33767c0fab1945fc7712035729b4dc`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-01T21:58:50.634139`
+
+#### Content Preview
+
+
+
+### 📄 File #233 - `aa6599719692a84fc0e9b368b4c5d660171b2f`
+- **Path**: `hyperlane-macros\.git\objects\36\aa6599719692a84fc0e9b368b4c5d660171b2f`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-01T21:58:50.633581`
+
+#### Content Preview
+
+
+
+### 📄 File #234 - `eafb18021b3be9da8af7a8716fa6a3ef967753`
+- **Path**: `hyperlane-macros\.git\objects\39\eafb18021b3be9da8af7a8716fa6a3ef967753`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-01T21:58:50.629580`
+
+#### Content Preview
+
+
+
+### 📄 File #235 - `73f38085eaf893de92fe7b912fe358460c0a8a`
+- **Path**: `hyperlane-macros\.git\objects\3b\73f38085eaf893de92fe7b912fe358460c0a8a`
+- **Size**: `52 B`
+- **Modified Time**: `2025-10-01T21:58:50.639031`
+
+#### Content Preview
+
+
+
+### 📄 File #236 - `0c4adc2741703c7daf0f260a79ac37e42a49b5`
+- **Path**: `hyperlane-macros\.git\objects\53\0c4adc2741703c7daf0f260a79ac37e42a49b5`
+- **Size**: `240 B`
+- **Modified Time**: `2025-10-01T21:58:50.640031`
+
+#### Content Preview
+
+
+
+### 📄 File #237 - `46113a141074b64683eea473d19264927d1728`
+- **Path**: `hyperlane-macros\.git\objects\59\46113a141074b64683eea473d19264927d1728`
+- **Size**: `240 B`
+- **Modified Time**: `2025-10-01T21:58:50.663557`
+
+#### Content Preview
+
+
+
+### 📄 File #238 - `a3e973a0f8b0386d8f73aea5d7077574da58e7`
+- **Path**: `hyperlane-macros\.git\objects\61\a3e973a0f8b0386d8f73aea5d7077574da58e7`
+- **Size**: `84 B`
+- **Modified Time**: `2025-10-01T21:58:50.637031`
+
+#### Content Preview
+
+
+
+### 📄 File #239 - `d95fa87a4b9f0bca0d3425e4e4946b96bc3f24`
+- **Path**: `hyperlane-macros\.git\objects\81\d95fa87a4b9f0bca0d3425e4e4946b96bc3f24`
+- **Size**: `169 B`
+- **Modified Time**: `2025-10-01T21:58:50.721878`
+
+#### Content Preview
+
+
+
+### 📄 File #240 - `a545160eebc7030a425b7f892bbe1c8f0e0a0b`
+- **Path**: `hyperlane-macros\.git\objects\86\a545160eebc7030a425b7f892bbe1c8f0e0a0b`
+- **Size**: `9,286 B`
+- **Modified Time**: `2025-10-01T21:58:50.720877`
+
+#### Content Preview
+
+
+
+### 📄 File #241 - `59203278d954190af3d8785828c4c0fad563f9`
+- **Path**: `hyperlane-macros\.git\objects\87\59203278d954190af3d8785828c4c0fad563f9`
+- **Size**: `652 B`
+- **Modified Time**: `2025-10-01T21:58:50.679620`
+
+#### Content Preview
+
+
+
+### 📄 File #242 - `596ced0ba477141d3cbf507d77d96a47fefcef`
+- **Path**: `hyperlane-macros\.git\objects\89\596ced0ba477141d3cbf507d77d96a47fefcef`
+- **Size**: `85 B`
+- **Modified Time**: `2025-10-01T21:58:50.648070`
+
+#### Content Preview
+
+
+
+### 📄 File #243 - `59e48abcd2da539b8048d0dab8ab83d3a93e69`
+- **Path**: `hyperlane-macros\.git\objects\af\59e48abcd2da539b8048d0dab8ab83d3a93e69`
+- **Size**: `5,858 B`
+- **Modified Time**: `2025-10-01T21:58:50.688590`
+
+#### Content Preview
+
+
+
+### 📄 File #244 - `de0e812c30e48502e53e193d37456192e41f0f`
+- **Path**: `hyperlane-macros\.git\objects\b9\de0e812c30e48502e53e193d37456192e41f0f`
+- **Size**: `1,159 B`
+- **Modified Time**: `2025-10-01T21:58:50.711388`
+
+#### Content Preview
+
+
+
+### 📄 File #245 - `8ca0467a9101bc1a7d9929a95cbc90753b3a76`
+- **Path**: `hyperlane-macros\.git\objects\ba\8ca0467a9101bc1a7d9929a95cbc90753b3a76`
+- **Size**: `673 B`
+- **Modified Time**: `2025-10-01T21:58:50.701754`
+
+#### Content Preview
+
+
+
+### 📄 File #246 - `708b9ecf7e2856724e025562ef18a0b10b74c0`
+- **Path**: `hyperlane-macros\.git\objects\be\708b9ecf7e2856724e025562ef18a0b10b74c0`
+- **Size**: `672 B`
+- **Modified Time**: `2025-10-01T21:58:50.708737`
+
+#### Content Preview
+
+
+
+### 📄 File #247 - `d600272541aecf0a3b35192d352b610a7236e4`
+- **Path**: `hyperlane-macros\.git\objects\be\d600272541aecf0a3b35192d352b610a7236e4`
+- **Size**: `653 B`
+- **Modified Time**: `2025-10-01T21:58:50.685593`
+
+#### Content Preview
+
+
+
+### 📄 File #248 - `1928f80f8f9e7e137c946b2f1ce773fffb2bb3`
+- **Path**: `hyperlane-macros\.git\objects\c0\1928f80f8f9e7e137c946b2f1ce773fffb2bb3`
+- **Size**: `1,012 B`
+- **Modified Time**: `2025-10-01T21:58:50.710354`
+
+#### Content Preview
+
+
+
+### 📄 File #249 - `fe4a1c1ab395643db1432a76ea9c15f766e65a`
+- **Path**: `hyperlane-macros\.git\objects\da\fe4a1c1ab395643db1432a76ea9c15f766e65a`
+- **Size**: `78 B`
+- **Modified Time**: `2025-10-01T21:58:50.640031`
+
+#### Content Preview
+
+
+
+### 📄 File #250 - `b6e37ce0d3909d8e04c03f38587ae4020134c0`
+- **Path**: `hyperlane-macros\.git\objects\df\b6e37ce0d3909d8e04c03f38587ae4020134c0`
+- **Size**: `654 B`
+- **Modified Time**: `2025-10-01T21:58:50.673338`
+
+#### Content Preview
+
+
+
+### 📄 File #251 - `83d9e8e3f412adb0beb13607b7e9172cb09387`
+- **Path**: `hyperlane-macros\.git\objects\e8\83d9e8e3f412adb0beb13607b7e9172cb09387`
+- **Size**: `2,780 B`
+- **Modified Time**: `2025-10-01T21:58:50.700755`
+
+#### Content Preview
+
+
+
+### 📄 File #252 - `c86834726d2f001acb20e22a76067896933f58`
+- **Path**: `hyperlane-macros\.git\objects\ec\c86834726d2f001acb20e22a76067896933f58`
+- **Size**: `5,860 B`
+- **Modified Time**: `2025-10-01T21:58:50.693561`
+
+#### Content Preview
+
+
+
+### 📄 File #253 - `0dcc2478ff1684900eaca445c5b84c72582fb6`
+- **Path**: `hyperlane-macros\.git\objects\f0\0dcc2478ff1684900eaca445c5b84c72582fb6`
+- **Size**: `5,850 B`
+- **Modified Time**: `2025-10-01T21:58:50.686723`
+
+#### Content Preview
+
+
+
+### 📄 File #254 - `6d7ad261e43967cb8edbb94a6c05dfe1fcb87e`
+- **Path**: `hyperlane-macros\.git\objects\f3\6d7ad261e43967cb8edbb94a6c05dfe1fcb87e`
+- **Size**: `51 B`
+- **Modified Time**: `2025-10-01T21:58:50.648070`
+
+#### Content Preview
+
+
+
+### 📄 File #255 - `3c9c447920075172c4e5f145be556eefffb554`
+- **Path**: `hyperlane-macros\.git\objects\f6\3c9c447920075172c4e5f145be556eefffb554`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-01T21:58:50.635959`
+
+#### Content Preview
+
+
+
+### 📄 File #256 - `5d49636fc74acc2b8100ec67c286265217860b`
+- **Path**: `hyperlane-macros\.git\objects\f7\5d49636fc74acc2b8100ec67c286265217860b`
+- **Size**: `2,777 B`
+- **Modified Time**: `2025-10-01T21:58:50.693561`
+
+#### Content Preview
+
+
+
+### 📄 File #257 - `201926e2f06b1acf69ed89e064b063ecf8cba8`
+- **Path**: `hyperlane-macros\.git\objects\fc\201926e2f06b1acf69ed89e064b063ecf8cba8`
+- **Size**: `654 B`
+- **Modified Time**: `2025-10-01T21:58:50.667299`
+
+#### Content Preview
+
+
+
+### 📄 File #258 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.idx`
 - **Path**: `hyperlane-macros\.git\objects\pack\pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.idx`
 - **Size**: `3,424 B`
 - **Modified Time**: `2025-09-15T22:37:29.336083`
@@ -9360,7 +9759,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #215 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.pack`
+### 📄 File #259 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.pack`
 - **Path**: `hyperlane-macros\.git\objects\pack\pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.pack`
 - **Size**: `42,771 B`
 - **Modified Time**: `2025-09-15T22:37:29.336083`
@@ -9369,7 +9768,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #216 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.rev`
+### 📄 File #260 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.rev`
 - **Path**: `hyperlane-macros\.git\objects\pack\pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.rev`
 - **Size**: `388 B`
 - **Modified Time**: `2025-09-15T22:37:29.337910`
@@ -9378,16 +9777,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #217 - `master`
+### 📄 File #261 - `master`
 - **Path**: `hyperlane-macros\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:37:29.385879`
+- **Modified Time**: `2025-10-01T21:58:50.938057`
 
 #### Content Preview
 
 
 
-### 📄 File #218 - `HEAD`
+### 📄 File #262 - `HEAD`
 - **Path**: `hyperlane-macros\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:29.383373`
@@ -9396,7 +9795,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #219 - `v7.1.11`
+### 📄 File #263 - `master`
+- **Path**: `hyperlane-macros\.git\refs\remotes\origin\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:50.797657`
+
+#### Content Preview
+
+
+
+### 📄 File #264 - `v7.1.11`
 - **Path**: `hyperlane-macros\.git\refs\tags\v7.1.11`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:29.382016`
@@ -9405,7 +9813,52 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #220 - `rust.yml`
+### 📄 File #265 - `v8.0.0`
+- **Path**: `hyperlane-macros\.git\refs\tags\v8.0.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:50.849577`
+
+#### Content Preview
+
+
+
+### 📄 File #266 - `v9.0.0`
+- **Path**: `hyperlane-macros\.git\refs\tags\v9.0.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:50.849577`
+
+#### Content Preview
+
+
+
+### 📄 File #267 - `v9.0.1`
+- **Path**: `hyperlane-macros\.git\refs\tags\v9.0.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:50.856348`
+
+#### Content Preview
+
+
+
+### 📄 File #268 - `v9.0.2`
+- **Path**: `hyperlane-macros\.git\refs\tags\v9.0.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:50.856348`
+
+#### Content Preview
+
+
+
+### 📄 File #269 - `v9.0.3`
+- **Path**: `hyperlane-macros\.git\refs\tags\v9.0.3`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:50.797657`
+
+#### Content Preview
+
+
+
+### 📄 File #270 - `rust.yml`
 - **Path**: `hyperlane-macros\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:29.398513`
@@ -9668,7 +10121,7 @@ jobs:
 
 ```
 
-### 📄 File #221 - `Cargo.toml`
+### 📄 File #271 - `Cargo.toml`
 - **Path**: `hyperlane-macros\debug\Cargo.toml`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:29.399529`
@@ -9677,10 +10130,10 @@ jobs:
 
 
 
-### 📄 File #222 - `main.rs`
+### 📄 File #272 - `main.rs`
 - **Path**: `hyperlane-macros\debug\src\main.rs`
-- **Size**: `11,668 B`
-- **Modified Time**: `2025-09-15T22:37:29.399529`
+- **Size**: `11,742 B`
+- **Modified Time**: `2025-10-01T21:58:50.920332`
 
 #### Content Preview
 
@@ -9706,11 +10159,11 @@ struct TestData {
 #[panic_hook]
 #[panic_hook(1)]
 #[panic_hook("2")]
-#[epilogue_hooks(response_body("panic_hook"), send)]
+#[epilogue_macros(response_body("panic_hook"), send)]
 async fn panic_hook(ctx: Context) {}
 
 #[request_middleware]
-#[epilogue_hooks(
+#[epilogue_macros(
     response_status_code(200),
     response_version(HttpVersion::HTTP1_1),
     response_header(SERVER => HYPERLANE),
@@ -9723,7 +10176,7 @@ async fn request_middleware(ctx: Context) {}
 
 #[ws]
 #[request_middleware(1)]
-#[epilogue_hooks(
+#[epilogue_macros(
     response_body(&vec![]),
     response_status_code(101),
     response_header(UPGRADE => WEBSOCKET),
@@ -9747,27 +10200,27 @@ async fn connected_hook(ctx: Context) {}
 async fn response_middleware_1(ctx: Context) {}
 
 #[response_middleware(2)]
-#[prologue_hooks(
+#[prologue_macros(
     reject(ctx.get_request().await.is_ws()),
     response_header(STEP => "response_middleware_2")
 )]
-#[epilogue_hooks(send, flush)]
+#[epilogue_macros(send, flush)]
 async fn response_middleware_2(ctx: Context) {}
 
 #[response_middleware("3")]
-#[prologue_hooks(
+#[prologue_macros(
     ws,
     response_header(STEP => "response_middleware_3")
 )]
-#[epilogue_hooks(send_body, flush)]
+#[epilogue_macros(send_body, flush)]
 async fn response_middleware_3(ctx: Context) {}
 
 #[get]
 #[http]
-async fn prologue_hook(ctx: Context) {}
+async fn prologue_hooks(ctx: Context) {}
 
 #[response_status_code(200)]
-async fn epilogue_hook(ctx: Context) {}
+async fn epilogue_hooks(ctx: Context) {}
 
 #[route("/response")]
 #[response_body(&RESPONSE_DATA)]
@@ -9777,71 +10230,72 @@ async fn epilogue_hook(ctx: Context) {}
 async fn response(ctx: Context) {}
 
 #[route("/connect")]
-#[prologue_hooks(connect, response_body("connect"))]
+#[prologue_macros(connect, response_body("connect"))]
 async fn connect(ctx: Context) {}
 
 #[route("/delete")]
-#[prologue_hooks(delete, response_body("delete"))]
+#[prologue_macros(delete, response_body("delete"))]
 async fn delete(ctx: Context) {}
 
 #[route("/head")]
-#[prologue_hooks(head, response_body("head"))]
+#[prologue_macros(head, response_body("head"))]
 async fn head(ctx: Context) {}
 
 #[route("/options")]
-#[prologue_hooks(options, response_body("options"))]
+#[prologue_macros(options, response_body("options"))]
 async fn options(ctx: Context) {}
 
 #[route("/patch")]
-#[prologue_hooks(patch, response_body("patch"))]
+#[prologue_macros(patch, response_body("patch"))]
 async fn patch(ctx: Context) {}
 
 #[route("/put")]
-#[prologue_hooks(put, response_body("put"))]
+#[prologue_macros(put, response_body("put"))]
 async fn put(ctx: Context) {}
 
 #[route("/trace")]
-#[prologue_hooks(trace, response_body("trace"))]
+#[prologue_macros(trace, response_body("trace"))]
 async fn trace(ctx: Context) {}
 
 #[route("/h2c")]
-#[prologue_hooks(h2c, response_body("h2c"))]
+#[prologue_macros(h2c, response_body("h2c"))]
 async fn h2c(ctx: Context) {}
 
 #[route("/http")]
-#[prologue_hooks(http, response_body("http"))]
+#[prologue_macros(http, response_body("http"))]
 async fn http_only(ctx: Context) {}
 
 #[route("/http0_9")]
-#[prologue_hooks(http0_9, response_body("http0_9"))]
+#[prologue_macros(http0_9, response_body("http0_9"))]
 async fn http0_9(ctx: Context) {}
 
 #[route("/http1_0")]
-#[prologue_hooks(http1_0, response_body("http1_0"))]
+#[prologue_macros(http1_0, response_body("http1_0"))]
 async fn http1_0(ctx: Context) {}
 
 #[route("/http1_1")]
-#[prologue_hooks(http1_1, response_body("http1_1"))]
+#[prologue_macros(http1_1, response_body("http1_1"))]
 async fn http1_1(ctx: Context) {}
 
 #[route("/http2")]
-#[prologue_hooks(http2, response_body("http2"))]
+#[prologue_macros(http2, response_body("http2"))]
 async fn http2(ctx: Context) {}
 
 #[route("/http3")]
-#[prologue_hooks(http3, response_body("http3"))]
+#[prologue_macros(http3, response_body("http3"))]
 async fn http3(ctx: Context) {}
 
 #[route("/tls")]
-#[prologue_hooks(tls, response_body("tls"))]
+#[prologue_macros(tls, response_body("tls"))]
 async fn tls(ctx: Context) {}
 
 #[route("/http1_1_or_higher")]
-#[prologue_hooks(http1_1_or_higher, response_body("http1_1_or_higher"))]
+#[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
 async fn http1_1_or_higher(ctx: Context) {}
 
 #[route("/unknown_method")]
-#[prologue_hooks(
+#[prologue_macros(
+    clear_response_headers,
     filter(ctx.get_request().await.is_unknown_method()),
     response_body("unknown_method")
 )]
@@ -9849,12 +10303,12 @@ async fn unknown_method(ctx: Context) {}
 
 #[route("/get")]
 #[send_body_once]
-#[prologue_hooks(ws, get, response_body("get"))]
+#[prologue_macros(ws, get, response_body("get"))]
 async fn get(ctx: Context) {}
 
 #[send_once]
 #[route("/post")]
-#[prologue_hooks(post, response_body("post"))]
+#[prologue_macros(post, response_body("post"))]
 async fn post(ctx: Context) {}
 
 #[ws]
@@ -9903,14 +10357,14 @@ async fn websocket_5(ctx: Context) {
 }
 
 #[route("/hook")]
-#[prologue_hook(prologue_hook)]
-#[epilogue_hook(epilogue_hook)]
+#[prologue_hooks(prologue_hooks)]
+#[epilogue_hooks(epilogue_hooks)]
 #[response_body("Testing hook macro")]
 async fn hook(ctx: Context) {}
 
 #[closed]
 #[route("/get_post")]
-#[prologue_hooks(
+#[prologue_macros(
     http,
     methods(get, post),
     response_body("get_post"),
@@ -9936,22 +10390,22 @@ async fn route_param(ctx: Context) {}
 
 #[route("/host")]
 #[host("localhost")]
-#[epilogue_hooks(
+#[epilogue_macros(
     response_body("host string literal: localhost"),
     send,
     http_from_stream
 )]
-#[prologue_hooks(response_body("host string literal: localhost"), send)]
+#[prologue_macros(response_body("host string literal: localhost"), send)]
 async fn host(ctx: Context) {}
 
 #[route("/request_query")]
-#[epilogue_hooks(
+#[epilogue_macros(
     request_query("test" => request_query_option),
     response_body(&format!("request query: {request_query_option:?}")),
     send,
     http_from_stream(1024)
 )]
-#[prologue_hooks(
+#[prologue_macros(
     request_query("test" => request_query_option),
     response_body(&format!("request query: {request_query_option:?}")),
     send
@@ -9959,13 +10413,13 @@ async fn host(ctx: Context) {}
 async fn request_query(ctx: Context) {}
 
 #[route("/request_header")]
-#[epilogue_hooks(
+#[epilogue_macros(
     request_header(HOST => request_header_option),
     response_body(&format!("request header: {request_header_option:?}")),
     send,
     http_from_stream(_request)
 )]
-#[prologue_hooks(
+#[prologue_macros(
     request_header(HOST => request_header_option),
     response_body(&format!("request header: {request_header_option:?}")),
     send
@@ -9973,13 +10427,13 @@ async fn request_query(ctx: Context) {}
 async fn request_header(ctx: Context) {}
 
 #[route("/request_querys")]
-#[epilogue_hooks(
+#[epilogue_macros(
     request_querys(request_querys),
     response_body(&format!("request querys: {request_querys:?}")),
     send,
     http_from_stream(1024, _request)
 )]
-#[prologue_hooks(
+#[prologue_macros(
     request_querys(request_querys),
     response_body(&format!("request querys: {request_querys:?}")),
     send
@@ -9987,13 +10441,13 @@ async fn request_header(ctx: Context) {}
 async fn request_querys(ctx: Context) {}
 
 #[route("/request_headers")]
-#[epilogue_hooks(
+#[epilogue_macros(
     request_headers(request_headers),
     response_body(&format!("request headers: {request_headers:?}")),
     send,
     http_from_stream(_request, 1024)
 )]
-#[prologue_hooks(
+#[prologue_macros(
     request_headers(request_headers),
     response_body(&format!("request headers: {request_headers:?}")),
     send
@@ -10006,7 +10460,7 @@ async fn request_headers(ctx: Context) {}
 async fn request_body(ctx: Context) {}
 
 #[route("/reject_host")]
-#[prologue_hooks(
+#[prologue_macros(
     reject_host("filter.localhost"),
     response_body("host filter string literal")
 )]
@@ -10023,14 +10477,14 @@ async fn attribute(ctx: Context) {}
 async fn request_body_json(ctx: Context) {}
 
 #[route("/referer")]
-#[prologue_hooks(
+#[prologue_macros(
     referer("http://localhost"),
     response_body("referer string literal: http://localhost")
 )]
 async fn referer(ctx: Context) {}
 
 #[route("/reject_referer")]
-#[prologue_hooks(
+#[prologue_macros(
     reject_referer("http://localhost"),
     response_body("referer filter string literal")
 )]
@@ -10086,10 +10540,10 @@ async fn main() {
 
 ```
 
-### 📄 File #223 - `lib.rs`
+### 📄 File #273 - `lib.rs`
 - **Path**: `hyperlane-macros\src\lib.rs`
-- **Size**: `58,246 B`
-- **Modified Time**: `2025-09-15T22:37:29.404385`
+- **Size**: `59,282 B`
+- **Modified Time**: `2025-10-01T21:58:50.933329`
 
 #### Content Preview
 
@@ -10607,6 +11061,28 @@ pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_body_macro(attr, item, Position::Prologue)
+}
+
+/// Clears all response headers.
+///
+/// This attribute macro clears all response headers from the response.
+///
+/// # Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+///
+/// #[clear_response_headers]
+/// async fn clear_headers(ctx: Context) {
+///     // Clear all response headers
+/// }
+/// ```
+///
+/// The macro should be applied to async functions that accept a `Context` parameter.   
+#[proc_macro_attribute]
+pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    clear_response_headers_macro(item, Position::Prologue)
 }
 
 /// Sets the HTTP response version.
@@ -11192,10 +11668,10 @@ pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
     reject_referer_macro(attr, item, Position::Prologue)
 }
 
-/// Executes a specified function before the main handler function.
+/// Executes multiple specified functions before the main handler function.
 ///
-/// This attribute macro configures a pre-execution hook that runs before the main function logic.
-/// The specified hook function will be called first, followed by the main function execution.
+/// This attribute macro configures multiple pre-execution hooks that run before the main function logic.
+/// The specified hook functions will be called in the order provided, followed by the main function execution.
 ///
 /// # Usage
 ///
@@ -11204,28 +11680,33 @@ pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane_macros::*;
 ///
 /// #[get]
-/// async fn prologue_handler(ctx: Context) {
-///     // Pre-execution logic
+/// async fn prologue_handler1(ctx: Context) {
+///     // First pre-execution logic
 /// }
 ///
-/// #[prologue_hook(prologue_handler)]
+/// #[http]
+/// async fn prologue_handler2(ctx: Context) {
+///     // Second pre-execution logic
+/// }
+///
+/// #[prologue_hooks(prologue_handler1, prologue_handler2)]
 /// async fn main_handler(ctx: Context) {
-///     // Main function logic (runs after prologue_handler)
+///     // Main function logic (runs after prologue_handler1 and prologue_handler2)
 /// }
 /// ```
 ///
-/// The macro accepts a function name as parameter. Both the hook function and main function
-/// must accept a `Context` parameter. Avoid combining this macro with other macros on the
-/// same function to prevent macro expansion conflicts.
+/// The macro accepts a comma-separated list of function names as parameters. All hook functions
+/// and the main function must accept a `Context` parameter. Avoid combining this macro with other
+/// macros on the same function to prevent macro expansion conflicts.
 #[proc_macro_attribute]
-pub fn prologue_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
-    prologue_hook_macro(attr, item, Position::Prologue)
+pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
+    prologue_hooks_macro(attr, item, Position::Prologue)
 }
 
-/// Executes a specified function after the main handler function.
+/// Executes multiple specified functions after the main handler function.
 ///
-/// This attribute macro configures a post-execution hook that runs after the main function logic.
-/// The main function will execute first, followed by the specified hook function.
+/// This attribute macro configures multiple post-execution hooks that run after the main function logic.
+/// The main function will execute first, followed by the specified hook functions in the order provided.
 ///
 /// # Usage
 ///
@@ -11234,22 +11715,27 @@ pub fn prologue_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane_macros::*;
 ///
 /// #[send]
-/// async fn epilogue_handler(ctx: Context) {
-///     // Post-execution logic
+/// async fn epilogue_handler1(ctx: Context) {
+///     // First post-execution logic
 /// }
 ///
-/// #[epilogue_hook(epilogue_handler)]
+/// #[flush]
+/// async fn epilogue_handler2(ctx: Context) {
+///     // Second post-execution logic
+/// }
+///
+/// #[epilogue_hooks(epilogue_handler1, epilogue_handler2)]
 /// async fn main_handler(ctx: Context) {
-///     // Main function logic (runs before epilogue_handler)
+///     // Main function logic (runs before epilogue_handler1 and epilogue_handler2)
 /// }
 /// ```
 ///
-/// The macro accepts a function name as parameter. Both the hook function and main function
-/// must accept a `Context` parameter. Avoid combining this macro with other macros on the
-/// same function to prevent macro expansion conflicts.
+/// The macro accepts a comma-separated list of function names as parameters. All hook functions
+/// and the main function must accept a `Context` parameter. Avoid combining this macro with other
+/// macros on the same function to prevent macro expansion conflicts.
 #[proc_macro_attribute]
-pub fn epilogue_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
-    epilogue_hook_macro(attr, item, Position::Epilogue)
+pub fn epilogue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
+    epilogue_hooks_macro(attr, item, Position::Epilogue)
 }
 
 /// Extracts the raw request body into a specified variable.
@@ -11801,14 +12287,14 @@ pub fn panic_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[prologue_hooks(post, send)]
+/// #[prologue_macros(post, send)]
 /// async fn handler(ctx: Context) {
 ///     // ...
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
-    prologue_hooks_macro(attr, item)
+pub fn prologue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
+    prologue_macros_macro(attr, item)
 }
 
 /// Injects a list of macros after the decorated function.
@@ -11822,14 +12308,14 @@ pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[epilogue_hooks(post, send)]
+/// #[epilogue_macros(post, send)]
 /// async fn handler(ctx: Context) {
 ///     // ...
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn epilogue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
-    epilogue_hooks_macro(attr, item)
+pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
+    epilogue_macros_macro(attr, item)
 }
 
 /// Sends only the response body with data after function execution.
@@ -12008,7 +12494,7 @@ pub fn http_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 ```
 
-### 📄 File #224 - `fn.rs`
+### 📄 File #274 - `fn.rs`
 - **Path**: `hyperlane-macros\src\aborted\fn.rs`
 - **Size**: `908 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12050,7 +12536,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #225 - `mod.rs`
+### 📄 File #275 - `mod.rs`
 - **Path**: `hyperlane-macros\src\aborted\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12064,7 +12550,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #226 - `fn.rs`
+### 📄 File #276 - `fn.rs`
 - **Path**: `hyperlane-macros\src\closed\fn.rs`
 - **Size**: `900 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12106,7 +12592,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #227 - `mod.rs`
+### 📄 File #277 - `mod.rs`
 - **Path**: `hyperlane-macros\src\closed\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12120,7 +12606,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #228 - `enum.rs`
+### 📄 File #278 - `enum.rs`
 - **Path**: `hyperlane-macros\src\common\enum.rs`
 - **Size**: `1,838 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12167,7 +12653,7 @@ pub(crate) enum Position {
 
 ```
 
-### 📄 File #229 - `fn.rs`
+### 📄 File #279 - `fn.rs`
 - **Path**: `hyperlane-macros\src\common\fn.rs`
 - **Size**: `5,783 B`
 - **Modified Time**: `2025-09-15T22:37:29.400831`
@@ -12352,7 +12838,7 @@ pub(crate) fn is_integer_literal(expr: &Expr) -> bool {
 
 ```
 
-### 📄 File #230 - `impl.rs`
+### 📄 File #280 - `impl.rs`
 - **Path**: `hyperlane-macros\src\common\impl.rs`
 - **Size**: `751 B`
 - **Modified Time**: `2025-09-15T22:37:29.400831`
@@ -12388,7 +12874,7 @@ impl Parse for OrderAttr {
 
 ```
 
-### 📄 File #231 - `mod.rs`
+### 📄 File #281 - `mod.rs`
 - **Path**: `hyperlane-macros\src\common\mod.rs`
 - **Size**: `165 B`
 - **Modified Time**: `2025-09-15T22:37:29.400831`
@@ -12409,7 +12895,7 @@ pub(crate) use r#type::*;
 
 ```
 
-### 📄 File #232 - `struct.rs`
+### 📄 File #282 - `struct.rs`
 - **Path**: `hyperlane-macros\src\common\struct.rs`
 - **Size**: `722 B`
 - **Modified Time**: `2025-09-15T22:37:29.400831`
@@ -12441,7 +12927,7 @@ pub(crate) struct InjectableMacro {
 
 ```
 
-### 📄 File #233 - `type.rs`
+### 📄 File #283 - `type.rs`
 - **Path**: `hyperlane-macros\src\common\type.rs`
 - **Size**: `860 B`
 - **Modified Time**: `2025-09-15T22:37:29.401339`
@@ -12470,7 +12956,7 @@ pub(crate) type MacroHandlerWithAttrPosition =
 
 ```
 
-### 📄 File #234 - `fn.rs`
+### 📄 File #284 - `fn.rs`
 - **Path**: `hyperlane-macros\src\filter\fn.rs`
 - **Size**: `1,060 B`
 - **Modified Time**: `2025-09-15T22:37:29.401339`
@@ -12519,7 +13005,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #235 - `mod.rs`
+### 📄 File #285 - `mod.rs`
 - **Path**: `hyperlane-macros\src\filter\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.401339`
@@ -12533,7 +13019,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #236 - `fn.rs`
+### 📄 File #286 - `fn.rs`
 - **Path**: `hyperlane-macros\src\flush\fn.rs`
 - **Size**: `614 B`
 - **Modified Time**: `2025-09-15T22:37:29.401339`
@@ -12570,7 +13056,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #237 - `mod.rs`
+### 📄 File #287 - `mod.rs`
 - **Path**: `hyperlane-macros\src\flush\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.401845`
@@ -12584,7 +13070,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #238 - `impl.rs`
+### 📄 File #288 - `impl.rs`
 - **Path**: `hyperlane-macros\src\from_stream\impl.rs`
 - **Size**: `4,623 B`
 - **Modified Time**: `2025-09-15T22:37:29.401845`
@@ -12706,7 +13192,7 @@ impl Parse for FromStreamData {
 
 ```
 
-### 📄 File #239 - `mod.rs`
+### 📄 File #289 - `mod.rs`
 - **Path**: `hyperlane-macros\src\from_stream\mod.rs`
 - **Size**: `55 B`
 - **Modified Time**: `2025-09-15T22:37:29.401845`
@@ -12721,7 +13207,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #240 - `struct.rs`
+### 📄 File #290 - `struct.rs`
 - **Path**: `hyperlane-macros\src\from_stream\struct.rs`
 - **Size**: `348 B`
 - **Modified Time**: `2025-09-15T22:37:29.401845`
@@ -12743,10 +13229,10 @@ pub(crate) struct FromStreamData {
 
 ```
 
-### 📄 File #241 - `fn.rs`
+### 📄 File #291 - `fn.rs`
 - **Path**: `hyperlane-macros\src\hook\fn.rs`
-- **Size**: `3,014 B`
-- **Modified Time**: `2025-09-15T22:37:29.402351`
+- **Size**: `3,522 B`
+- **Modified Time**: `2025-10-01T21:58:50.927240`
 
 #### Content Preview
 
@@ -12794,71 +13280,83 @@ inventory::submit! {
     }
 }
 
-/// Expands macro to add pre-hook function call.
+/// Expands macro to add multiple pre-hook function calls.
 ///
 /// # Arguments
 ///
-/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The attribute token stream containing a list of function names.
 /// - `TokenStream` - The input token stream to process.
 /// - `Position` - The position to inject the code.
 ///
 /// # Returns
 ///
-/// Returns the expanded `TokenStream` with pre-hook call.
-pub(crate) fn prologue_hook_macro(
+/// Returns the expanded `TokenStream` with multiple pre-hook calls.
+pub(crate) fn prologue_hooks_macro(
     attr: TokenStream,
     item: TokenStream,
     position: Position,
 ) -> TokenStream {
-    let function_name: Ident = parse_macro_input!(attr as Ident);
+    let functions: Punctuated<Ident, Token![,]> =
+        parse_macro_input!(attr with Punctuated::parse_terminated);
     inject(position, item, |context| {
+        let hook_calls = functions.iter().map(|function_name| {
+            quote! {
+                let _ = #function_name(#context.clone()).await;
+            }
+        });
         quote! {
-            let _ = #function_name(#context.clone()).await;
+            #(#hook_calls)*
         }
     })
 }
 
 inventory::submit! {
     InjectableMacro {
-        name: "prologue_hook",
-        handler: Handler::WithAttrPosition(prologue_hook_macro),
+        name: "prologue_hooks",
+        handler: Handler::WithAttrPosition(prologue_hooks_macro),
     }
 }
 
-/// Expands macro to add post-hook function call.
+/// Expands macro to add multiple post-hook function calls.
 ///
 /// # Arguments
 ///
-/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The attribute token stream containing a list of function names.
 /// - `TokenStream` - The input token stream to process.
 /// - `Position` - The position to inject the code.
 ///
 /// # Returns
 ///
-/// Returns the expanded `TokenStream` with post-hook call.
-pub(crate) fn epilogue_hook_macro(
+/// Returns the expanded `TokenStream` with multiple post-hook calls.
+pub(crate) fn epilogue_hooks_macro(
     attr: TokenStream,
     item: TokenStream,
     position: Position,
 ) -> TokenStream {
-    let function_name: Ident = parse_macro_input!(attr as Ident);
+    let functions: Punctuated<Ident, Token![,]> =
+        parse_macro_input!(attr with Punctuated::parse_terminated);
     inject(position, item, |context| {
+        let hook_calls = functions.iter().map(|function_name| {
+            quote! {
+                let _ = #function_name(#context.clone()).await;
+            }
+        });
         quote! {
-            let _ = #function_name(#context.clone()).await;
+            #(#hook_calls)*
         }
     })
 }
 
 inventory::submit! {
     InjectableMacro {
-        name: "epilogue_hook",
-        handler: Handler::WithAttrPosition(epilogue_hook_macro),
+        name: "epilogue_hooks",
+        handler: Handler::WithAttrPosition(epilogue_hooks_macro),
     }
 }
 
 ```
 
-### 📄 File #242 - `mod.rs`
+### 📄 File #292 - `mod.rs`
 - **Path**: `hyperlane-macros\src\hook\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.402351`
@@ -12872,7 +13370,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #243 - `fn.rs`
+### 📄 File #293 - `fn.rs`
 - **Path**: `hyperlane-macros\src\host\fn.rs`
 - **Size**: `1,923 B`
 - **Modified Time**: `2025-09-15T22:37:29.402351`
@@ -12950,7 +13448,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #244 - `impl.rs`
+### 📄 File #294 - `impl.rs`
 - **Path**: `hyperlane-macros\src\host\impl.rs`
 - **Size**: `442 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -12980,7 +13478,7 @@ impl Parse for HostData {
 
 ```
 
-### 📄 File #245 - `mod.rs`
+### 📄 File #295 - `mod.rs`
 - **Path**: `hyperlane-macros\src\host\mod.rs`
 - **Size**: `122 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -12997,7 +13495,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #246 - `struct.rs`
+### 📄 File #296 - `struct.rs`
 - **Path**: `hyperlane-macros\src\host\struct.rs`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -13017,7 +13515,7 @@ pub(crate) struct HostData {
 
 ```
 
-### 📄 File #247 - `fn.rs`
+### 📄 File #297 - `fn.rs`
 - **Path**: `hyperlane-macros\src\http\fn.rs`
 - **Size**: `4,380 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -13161,7 +13659,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #248 - `mod.rs`
+### 📄 File #298 - `mod.rs`
 - **Path**: `hyperlane-macros\src\http\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -13175,7 +13673,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #249 - `fn.rs`
+### 📄 File #299 - `fn.rs`
 - **Path**: `hyperlane-macros\src\hyperlane\fn.rs`
 - **Size**: `2,078 B`
 - **Modified Time**: `2025-09-15T22:37:29.403364`
@@ -13243,7 +13741,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #250 - `impl.rs`
+### 📄 File #300 - `impl.rs`
 - **Path**: `hyperlane-macros\src\hyperlane\impl.rs`
 - **Size**: `623 B`
 - **Modified Time**: `2025-09-15T22:37:29.403364`
@@ -13277,7 +13775,7 @@ impl Parse for HyperlaneAttr {
 
 ```
 
-### 📄 File #251 - `mod.rs`
+### 📄 File #301 - `mod.rs`
 - **Path**: `hyperlane-macros\src\hyperlane\mod.rs`
 - **Size**: `122 B`
 - **Modified Time**: `2025-09-15T22:37:29.403871`
@@ -13294,7 +13792,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #252 - `struct.rs`
+### 📄 File #302 - `struct.rs`
 - **Path**: `hyperlane-macros\src\hyperlane\struct.rs`
 - **Size**: `466 B`
 - **Modified Time**: `2025-09-15T22:37:29.403871`
@@ -13318,10 +13816,10 @@ pub(crate) struct HyperlaneAttr {
 
 ```
 
-### 📄 File #253 - `fn.rs`
+### 📄 File #303 - `fn.rs`
 - **Path**: `hyperlane-macros\src\inject\fn.rs`
-- **Size**: `3,826 B`
-- **Modified Time**: `2025-09-15T22:37:29.403871`
+- **Size**: `3,828 B`
+- **Modified Time**: `2025-10-01T21:58:50.931329`
 
 #### Content Preview
 
@@ -13395,7 +13893,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
 /// # Returns
 ///
 /// The resulting token stream after applying all the prologue hooks.
-pub(crate) fn prologue_hooks_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
         .parse(attr.into())
         .expect("Failed to parse macro attributes");
@@ -13419,7 +13917,7 @@ pub(crate) fn prologue_hooks_macro(attr: TokenStream, item: TokenStream) -> Toke
 /// # Returns
 ///
 /// The resulting token stream after applying all the epilogue hooks.
-pub(crate) fn epilogue_hooks_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
         .parse(attr.into())
         .expect("Failed to parse macro attributes");
@@ -13432,7 +13930,7 @@ pub(crate) fn epilogue_hooks_macro(attr: TokenStream, item: TokenStream) -> Toke
 
 ```
 
-### 📄 File #254 - `mod.rs`
+### 📄 File #304 - `mod.rs`
 - **Path**: `hyperlane-macros\src\inject\mod.rs`
 - **Size**: `46 B`
 - **Modified Time**: `2025-09-15T22:37:29.404385`
@@ -13446,7 +13944,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #255 - `fn.rs`
+### 📄 File #305 - `fn.rs`
 - **Path**: `hyperlane-macros\src\protocol\fn.rs`
 - **Size**: `3,699 B`
 - **Modified Time**: `2025-09-15T22:37:29.404385`
@@ -13581,7 +14079,7 @@ impl_protocol_check_macro!(tls_macro, is_tls, "tls");
 
 ```
 
-### 📄 File #256 - `mod.rs`
+### 📄 File #306 - `mod.rs`
 - **Path**: `hyperlane-macros\src\protocol\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.404896`
@@ -13595,7 +14093,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #257 - `fn.rs`
+### 📄 File #307 - `fn.rs`
 - **Path**: `hyperlane-macros\src\referer\fn.rs`
 - **Size**: `2,267 B`
 - **Modified Time**: `2025-09-15T22:37:29.404896`
@@ -13683,7 +14181,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #258 - `impl.rs`
+### 📄 File #308 - `impl.rs`
 - **Path**: `hyperlane-macros\src\referer\impl.rs`
 - **Size**: `466 B`
 - **Modified Time**: `2025-09-15T22:37:29.404896`
@@ -13713,7 +14211,7 @@ impl Parse for RefererData {
 
 ```
 
-### 📄 File #259 - `mod.rs`
+### 📄 File #309 - `mod.rs`
 - **Path**: `hyperlane-macros\src\referer\mod.rs`
 - **Size**: `89 B`
 - **Modified Time**: `2025-09-15T22:37:29.404896`
@@ -13730,7 +14228,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #260 - `struct.rs`
+### 📄 File #310 - `struct.rs`
 - **Path**: `hyperlane-macros\src\referer\struct.rs`
 - **Size**: `265 B`
 - **Modified Time**: `2025-09-15T22:37:29.405406`
@@ -13750,7 +14248,7 @@ pub(crate) struct RefererData {
 
 ```
 
-### 📄 File #261 - `fn.rs`
+### 📄 File #311 - `fn.rs`
 - **Path**: `hyperlane-macros\src\reject\fn.rs`
 - **Size**: `1,041 B`
 - **Modified Time**: `2025-09-15T22:37:29.405406`
@@ -13799,7 +14297,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #262 - `mod.rs`
+### 📄 File #312 - `mod.rs`
 - **Path**: `hyperlane-macros\src\reject\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.405406`
@@ -13813,7 +14311,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #263 - `fn.rs`
+### 📄 File #313 - `fn.rs`
 - **Path**: `hyperlane-macros\src\request\fn.rs`
 - **Size**: `13,253 B`
 - **Modified Time**: `2025-09-15T22:37:29.405406`
@@ -14280,7 +14778,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #264 - `impl.rs`
+### 📄 File #314 - `impl.rs`
 - **Path**: `hyperlane-macros\src\request\impl.rs`
 - **Size**: `7,571 B`
 - **Modified Time**: `2025-09-15T22:37:29.405922`
@@ -14584,7 +15082,7 @@ impl Parse for RequestPathData {
 
 ```
 
-### 📄 File #265 - `mod.rs`
+### 📄 File #315 - `mod.rs`
 - **Path**: `hyperlane-macros\src\request\mod.rs`
 - **Size**: `89 B`
 - **Modified Time**: `2025-09-15T22:37:29.405922`
@@ -14601,7 +15099,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #266 - `struct.rs`
+### 📄 File #316 - `struct.rs`
 - **Path**: `hyperlane-macros\src\request\struct.rs`
 - **Size**: `4,044 B`
 - **Modified Time**: `2025-09-15T22:37:29.405922`
@@ -14747,7 +15245,7 @@ pub(crate) struct RequestPathData {
 
 ```
 
-### 📄 File #267 - `fn.rs`
+### 📄 File #317 - `fn.rs`
 - **Path**: `hyperlane-macros\src\request_middleware\fn.rs`
 - **Size**: `1,495 B`
 - **Modified Time**: `2025-09-15T22:37:29.405922`
@@ -14800,7 +15298,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #268 - `mod.rs`
+### 📄 File #318 - `mod.rs`
 - **Path**: `hyperlane-macros\src\request_middleware\mod.rs`
 - **Size**: `46 B`
 - **Modified Time**: `2025-09-15T22:37:29.406432`
@@ -14814,7 +15312,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #269 - `enum.rs`
+### 📄 File #319 - `enum.rs`
 - **Path**: `hyperlane-macros\src\response\enum.rs`
 - **Size**: `260 B`
 - **Modified Time**: `2025-09-15T22:37:29.406432`
@@ -14832,10 +15330,10 @@ pub(crate) enum HeaderOperation {
 
 ```
 
-### 📄 File #270 - `fn.rs`
+### 📄 File #320 - `fn.rs`
 - **Path**: `hyperlane-macros\src\response\fn.rs`
-- **Size**: `4,735 B`
-- **Modified Time**: `2025-09-15T22:37:29.406432`
+- **Size**: `5,453 B`
+- **Modified Time**: `2025-10-01T21:58:50.938057`
 
 #### Content Preview
 
@@ -14983,6 +15481,32 @@ inventory::submit! {
     }
 }
 
+/// Clears all response headers from macro input.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The input token stream to process.
+/// - `Position` - The position to inject the code.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream with header operation.
+pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            #context.clear_response_headers().await;
+        }
+    })
+}
+
+inventory::submit! {
+    InjectableMacro {
+        name: "clear_response_headers",
+        handler: Handler::NoAttrPosition(clear_response_headers_macro),
+    }
+}
+
 /// Sets response version from macro input.
 ///
 /// # Arguments
@@ -15019,7 +15543,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #271 - `impl.rs`
+### 📄 File #321 - `impl.rs`
 - **Path**: `hyperlane-macros\src\response\impl.rs`
 - **Size**: `1,173 B`
 - **Modified Time**: `2025-09-15T22:37:29.406432`
@@ -15068,7 +15592,7 @@ impl Parse for ResponseBodyData {
 
 ```
 
-### 📄 File #272 - `mod.rs`
+### 📄 File #322 - `mod.rs`
 - **Path**: `hyperlane-macros\src\response\mod.rs`
 - **Size**: `127 B`
 - **Modified Time**: `2025-09-15T22:37:29.406944`
@@ -15087,7 +15611,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #273 - `struct.rs`
+### 📄 File #323 - `struct.rs`
 - **Path**: `hyperlane-macros\src\response\struct.rs`
 - **Size**: `185 B`
 - **Modified Time**: `2025-09-15T22:37:29.406944`
@@ -15107,7 +15631,7 @@ pub(crate) struct SendData {
 
 ```
 
-### 📄 File #274 - `fn.rs`
+### 📄 File #324 - `fn.rs`
 - **Path**: `hyperlane-macros\src\response_middleware\fn.rs`
 - **Size**: `1,532 B`
 - **Modified Time**: `2025-09-15T22:37:29.406944`
@@ -15160,7 +15684,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #275 - `mod.rs`
+### 📄 File #325 - `mod.rs`
 - **Path**: `hyperlane-macros\src\response_middleware\mod.rs`
 - **Size**: `46 B`
 - **Modified Time**: `2025-09-15T22:37:29.406944`
@@ -15174,7 +15698,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #276 - `fn.rs`
+### 📄 File #326 - `fn.rs`
 - **Path**: `hyperlane-macros\src\route\fn.rs`
 - **Size**: `1,524 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15230,7 +15754,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #277 - `impl.rs`
+### 📄 File #327 - `impl.rs`
 - **Path**: `hyperlane-macros\src\route\impl.rs`
 - **Size**: `384 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15253,7 +15777,7 @@ impl Parse for RouteAttr {
 
 ```
 
-### 📄 File #278 - `mod.rs`
+### 📄 File #328 - `mod.rs`
 - **Path**: `hyperlane-macros\src\route\mod.rs`
 - **Size**: `122 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15270,7 +15794,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #279 - `struct.rs`
+### 📄 File #329 - `struct.rs`
 - **Path**: `hyperlane-macros\src\route\struct.rs`
 - **Size**: `293 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15291,7 +15815,7 @@ pub(crate) struct RouteAttr {
 
 ```
 
-### 📄 File #280 - `fn.rs`
+### 📄 File #330 - `fn.rs`
 - **Path**: `hyperlane-macros\src\send\fn.rs`
 - **Size**: `5,213 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15499,7 +16023,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #281 - `impl.rs`
+### 📄 File #331 - `impl.rs`
 - **Path**: `hyperlane-macros\src\send\impl.rs`
 - **Size**: `276 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15521,7 +16045,7 @@ impl Parse for SendData {
 
 ```
 
-### 📄 File #282 - `mod.rs`
+### 📄 File #332 - `mod.rs`
 - **Path**: `hyperlane-macros\src\send\mod.rs`
 - **Size**: `89 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15538,7 +16062,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #283 - `struct.rs`
+### 📄 File #333 - `struct.rs`
 - **Path**: `hyperlane-macros\src\send\struct.rs`
 - **Size**: `596 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15570,7 +16094,7 @@ pub(crate) struct ResponseBodyData {
 
 ```
 
-### 📄 File #284 - `fn.rs`
+### 📄 File #334 - `fn.rs`
 - **Path**: `hyperlane-macros\src\stream\fn.rs`
 - **Size**: `4,988 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15728,7 +16252,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #285 - `mod.rs`
+### 📄 File #335 - `mod.rs`
 - **Path**: `hyperlane-macros\src\stream\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.408506`
@@ -15742,7 +16266,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #286 - `.gitignore`
+### 📄 File #336 - `.gitignore`
 - **Path**: `hyperlane-plugin-websocket\.gitignore`
 - **Size**: `30 B`
 - **Modified Time**: `2025-09-15T22:37:26.967372`
@@ -15751,16 +16275,16 @@ pub(crate) use r#fn::*;
 
 
 
-### 📄 File #287 - `Cargo.toml`
+### 📄 File #337 - `Cargo.toml`
 - **Path**: `hyperlane-plugin-websocket\Cargo.toml`
 - **Size**: `865 B`
-- **Modified Time**: `2025-09-15T22:37:26.968377`
+- **Modified Time**: `2025-10-01T21:58:44.941996`
 
 #### Content Preview
 
 
 
-### 📄 File #288 - `LICENSE`
+### 📄 File #338 - `LICENSE`
 - **Path**: `hyperlane-plugin-websocket\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:26.968377`
@@ -15769,7 +16293,7 @@ pub(crate) use r#fn::*;
 
 
 
-### 📄 File #289 - `README.md`
+### 📄 File #339 - `README.md`
 - **Path**: `hyperlane-plugin-websocket\README.md`
 - **Size**: `9,289 B`
 - **Modified Time**: `2025-09-15T22:37:26.968377`
@@ -16013,7 +16537,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #290 - `config`
+### 📄 File #340 - `config`
 - **Path**: `hyperlane-plugin-websocket\.git\config`
 - **Size**: `336 B`
 - **Modified Time**: `2025-09-15T22:37:26.959662`
@@ -16022,7 +16546,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #291 - `description`
+### 📄 File #341 - `description`
 - **Path**: `hyperlane-plugin-websocket\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:22.216632`
@@ -16031,16 +16555,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #292 - `FETCH_HEAD`
+### 📄 File #342 - `FETCH_HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\FETCH_HEAD`
-- **Size**: `121 B`
-- **Modified Time**: `2025-09-17T09:21:58.307055`
+- **Size**: `253 B`
+- **Modified Time**: `2025-10-01T21:58:44.904393`
 
 #### Content Preview
 
 
 
-### 📄 File #293 - `HEAD`
+### 📄 File #343 - `HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:26.951946`
@@ -16049,16 +16573,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #294 - `index`
+### 📄 File #344 - `index`
 - **Path**: `hyperlane-plugin-websocket\.git\index`
 - **Size**: `1,392 B`
-- **Modified Time**: `2025-09-15T22:44:19.212927`
+- **Modified Time**: `2025-10-01T21:58:44.941996`
 
 #### Content Preview
 
 
 
-### 📄 File #295 - `ORIG_HEAD`
+### 📄 File #345 - `ORIG_HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:20.979455`
@@ -16067,7 +16591,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #296 - `packed-refs`
+### 📄 File #346 - `packed-refs`
 - **Path**: `hyperlane-plugin-websocket\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:26.941218`
@@ -16076,7 +16600,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #297 - `shallow`
+### 📄 File #347 - `shallow`
 - **Path**: `hyperlane-plugin-websocket\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:26.875105`
@@ -16085,7 +16609,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #298 - `applypatch-msg.sample`
+### 📄 File #348 - `applypatch-msg.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:22.217633`
@@ -16094,7 +16618,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #299 - `commit-msg.sample`
+### 📄 File #349 - `commit-msg.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:22.217633`
@@ -16103,7 +16627,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #300 - `fsmonitor-watchman.sample`
+### 📄 File #350 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:22.217633`
@@ -16112,7 +16636,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #301 - `post-update.sample`
+### 📄 File #351 - `post-update.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:22.217633`
@@ -16121,7 +16645,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #302 - `pre-applypatch.sample`
+### 📄 File #352 - `pre-applypatch.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:22.218633`
@@ -16130,7 +16654,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #303 - `pre-commit.sample`
+### 📄 File #353 - `pre-commit.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:22.218633`
@@ -16139,7 +16663,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #304 - `pre-merge-commit.sample`
+### 📄 File #354 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:22.218633`
@@ -16148,7 +16672,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #305 - `pre-push.sample`
+### 📄 File #355 - `pre-push.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16157,7 +16681,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #306 - `pre-rebase.sample`
+### 📄 File #356 - `pre-rebase.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16166,7 +16690,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #307 - `pre-receive.sample`
+### 📄 File #357 - `pre-receive.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16175,7 +16699,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #308 - `prepare-commit-msg.sample`
+### 📄 File #358 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16184,7 +16708,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #309 - `push-to-checkout.sample`
+### 📄 File #359 - `push-to-checkout.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16193,7 +16717,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #310 - `sendemail-validate.sample`
+### 📄 File #360 - `sendemail-validate.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:22.220242`
@@ -16202,7 +16726,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #311 - `update.sample`
+### 📄 File #361 - `update.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:22.220242`
@@ -16211,7 +16735,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #312 - `exclude`
+### 📄 File #362 - `exclude`
 - **Path**: `hyperlane-plugin-websocket\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:22.220242`
@@ -16220,25 +16744,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #313 - `HEAD`
+### 📄 File #363 - `HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\logs\HEAD`
-- **Size**: `201 B`
-- **Modified Time**: `2025-09-15T22:37:26.953492`
+- **Size**: `354 B`
+- **Modified Time**: `2025-10-01T21:58:44.952992`
 
 #### Content Preview
 
 
 
-### 📄 File #314 - `master`
+### 📄 File #364 - `master`
 - **Path**: `hyperlane-plugin-websocket\.git\logs\refs\heads\master`
-- **Size**: `201 B`
-- **Modified Time**: `2025-09-15T22:37:26.954000`
+- **Size**: `354 B`
+- **Modified Time**: `2025-10-01T21:58:44.952992`
 
 #### Content Preview
 
 
 
-### 📄 File #315 - `HEAD`
+### 📄 File #365 - `HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `201 B`
 - **Modified Time**: `2025-09-15T22:37:26.951442`
@@ -16247,7 +16771,43 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #316 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.idx`
+### 📄 File #366 - `master`
+- **Path**: `hyperlane-plugin-websocket\.git\logs\refs\remotes\origin\master`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-01T21:58:44.895381`
+
+#### Content Preview
+
+
+
+### 📄 File #367 - `1ebda971d1d3c8b4d205161947f4443db69fc2`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\3b\1ebda971d1d3c8b4d205161947f4443db69fc2`
+- **Size**: `483 B`
+- **Modified Time**: `2025-10-01T21:58:44.861316`
+
+#### Content Preview
+
+
+
+### 📄 File #368 - `02374d2dd7a71741b253bd66472f5871f583c4`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\ac\02374d2dd7a71741b253bd66472f5871f583c4`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-01T21:58:44.859311`
+
+#### Content Preview
+
+
+
+### 📄 File #369 - `1ec4265467905506ee79fcf99353ecbfa518a7`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\cb\1ec4265467905506ee79fcf99353ecbfa518a7`
+- **Size**: `167 B`
+- **Modified Time**: `2025-10-01T21:58:44.857924`
+
+#### Content Preview
+
+
+
+### 📄 File #370 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.idx`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\pack\pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.idx`
 - **Size**: `1,660 B`
 - **Modified Time**: `2025-09-15T22:37:26.906923`
@@ -16256,7 +16816,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #317 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.pack`
+### 📄 File #371 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.pack`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\pack\pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.pack`
 - **Size**: `12,964 B`
 - **Modified Time**: `2025-09-15T22:37:26.906410`
@@ -16265,7 +16825,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #318 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.rev`
+### 📄 File #372 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.rev`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\pack\pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.rev`
 - **Size**: `136 B`
 - **Modified Time**: `2025-09-15T22:37:26.907950`
@@ -16274,16 +16834,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #319 - `master`
+### 📄 File #373 - `master`
 - **Path**: `hyperlane-plugin-websocket\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:37:26.953492`
+- **Modified Time**: `2025-10-01T21:58:44.952394`
 
 #### Content Preview
 
 
 
-### 📄 File #320 - `HEAD`
+### 📄 File #374 - `HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:26.950418`
@@ -16292,7 +16852,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #321 - `v2.2.63`
+### 📄 File #375 - `master`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\remotes\origin\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:44.894357`
+
+#### Content Preview
+
+
+
+### 📄 File #376 - `v2.2.63`
 - **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v2.2.63`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:26.949404`
@@ -16301,7 +16870,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #322 - `rust.yml`
+### 📄 File #377 - `v2.2.64`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v2.2.64`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:44.895984`
+
+#### Content Preview
+
+
+
+### 📄 File #378 - `rust.yml`
 - **Path**: `hyperlane-plugin-websocket\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:26.967372`
@@ -16564,7 +17142,7 @@ jobs:
 
 ```
 
-### 📄 File #323 - `lib.rs`
+### 📄 File #379 - `lib.rs`
 - **Path**: `hyperlane-plugin-websocket\src\lib.rs`
 - **Size**: `850 B`
 - **Modified Time**: `2025-09-15T22:37:26.968880`
@@ -16603,7 +17181,7 @@ pub(crate) use std::sync::OnceLock;
 
 ```
 
-### 📄 File #324 - `cfg.rs`
+### 📄 File #380 - `cfg.rs`
 - **Path**: `hyperlane-plugin-websocket\src\tests\cfg.rs`
 - **Size**: `8,850 B`
 - **Modified Time**: `2025-09-15T22:37:26.969414`
@@ -16813,7 +17391,7 @@ async fn test() {
 
 ```
 
-### 📄 File #325 - `mod.rs`
+### 📄 File #381 - `mod.rs`
 - **Path**: `hyperlane-plugin-websocket\src\tests\mod.rs`
 - **Size**: `9 B`
 - **Modified Time**: `2025-09-15T22:37:26.969414`
@@ -16825,7 +17403,7 @@ mod cfg;
 
 ```
 
-### 📄 File #326 - `const.rs`
+### 📄 File #382 - `const.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\const.rs`
 - **Size**: `418 B`
 - **Modified Time**: `2025-09-15T22:37:26.969414`
@@ -16844,7 +17422,7 @@ pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
 
 ```
 
-### 📄 File #327 - `enum.rs`
+### 📄 File #383 - `enum.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\enum.rs`
 - **Size**: `971 B`
 - **Modified Time**: `2025-09-15T22:37:26.969929`
@@ -16880,7 +17458,7 @@ pub enum BroadcastType<T: BroadcastTypeTrait> {
 
 ```
 
-### 📄 File #328 - `impl.rs`
+### 📄 File #384 - `impl.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\impl.rs`
 - **Size**: `25,945 B`
 - **Modified Time**: `2025-09-15T22:37:26.969929`
@@ -17600,7 +18178,7 @@ impl WebSocket {
 
 ```
 
-### 📄 File #329 - `mod.rs`
+### 📄 File #385 - `mod.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\mod.rs`
 - **Size**: `119 B`
 - **Modified Time**: `2025-09-15T22:37:26.969929`
@@ -17616,7 +18194,7 @@ pub(crate) mod r#trait;
 
 ```
 
-### 📄 File #330 - `struct.rs`
+### 📄 File #386 - `struct.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\struct.rs`
 - **Size**: `2,098 B`
 - **Modified Time**: `2025-09-15T22:37:26.970439`
@@ -17682,7 +18260,7 @@ pub struct WebSocketConfig<B: BroadcastTypeTrait> {
 
 ```
 
-### 📄 File #331 - `trait.rs`
+### 📄 File #387 - `trait.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\trait.rs`
 - **Size**: `245 B`
 - **Modified Time**: `2025-09-15T22:37:26.970439`
@@ -17698,7 +18276,7 @@ pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 
 ```
 
-### 📄 File #332 - `.gitignore`
+### 📄 File #388 - `.gitignore`
 - **Path**: `hyperlane-quick-start\.gitignore`
 - **Size**: `50 B`
 - **Modified Time**: `2025-09-15T22:37:17.324739`
@@ -17707,25 +18285,25 @@ pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 
 
 
-### 📄 File #333 - `Cargo.lock`
+### 📄 File #389 - `Cargo.lock`
 - **Path**: `hyperlane-quick-start\Cargo.lock`
-- **Size**: `58,314 B`
-- **Modified Time**: `2025-09-15T22:37:17.325739`
+- **Size**: `58,324 B`
+- **Modified Time**: `2025-10-01T21:58:37.485286`
 
 #### Content Preview
 
 
 
-### 📄 File #334 - `Cargo.toml`
+### 📄 File #390 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\Cargo.toml`
 - **Size**: `1,497 B`
-- **Modified Time**: `2025-09-15T22:37:17.325739`
+- **Modified Time**: `2025-10-01T21:58:37.503267`
 
 #### Content Preview
 
 
 
-### 📄 File #335 - `LICENSE`
+### 📄 File #391 - `LICENSE`
 - **Path**: `hyperlane-quick-start\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:17.325739`
@@ -17734,7 +18312,7 @@ pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 
 
 
-### 📄 File #336 - `README.md`
+### 📄 File #392 - `README.md`
 - **Path**: `hyperlane-quick-start\README.md`
 - **Size**: `2,129 B`
 - **Modified Time**: `2025-09-15T22:37:17.325739`
@@ -17830,7 +18408,7 @@ If you have any questions, please contact the author: [root@ltpp.vip](mailto:roo
 
 ```
 
-### 📄 File #337 - `README.ZH-CN.md`
+### 📄 File #393 - `README.ZH-CN.md`
 - **Path**: `hyperlane-quick-start\README.ZH-CN.md`
 - **Size**: `2,056 B`
 - **Modified Time**: `2025-09-15T22:37:17.325739`
@@ -17926,7 +18504,7 @@ cargo run restart -d
 
 ```
 
-### 📄 File #338 - `config`
+### 📄 File #394 - `config`
 - **Path**: `hyperlane-quick-start\.git\config`
 - **Size**: `331 B`
 - **Modified Time**: `2025-09-15T22:37:17.317739`
@@ -17935,7 +18513,7 @@ cargo run restart -d
 
 
 
-### 📄 File #339 - `description`
+### 📄 File #395 - `description`
 - **Path**: `hyperlane-quick-start\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:15.228194`
@@ -17944,16 +18522,16 @@ cargo run restart -d
 
 
 
-### 📄 File #340 - `FETCH_HEAD`
+### 📄 File #396 - `FETCH_HEAD`
 - **Path**: `hyperlane-quick-start\.git\FETCH_HEAD`
-- **Size**: `116 B`
-- **Modified Time**: `2025-09-17T09:21:53.848148`
+- **Size**: `242 B`
+- **Modified Time**: `2025-10-01T21:58:37.431512`
 
 #### Content Preview
 
 
 
-### 📄 File #341 - `HEAD`
+### 📄 File #397 - `HEAD`
 - **Path**: `hyperlane-quick-start\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:17.309951`
@@ -17962,16 +18540,16 @@ cargo run restart -d
 
 
 
-### 📄 File #342 - `index`
+### 📄 File #398 - `index`
 - **Path**: `hyperlane-quick-start\.git\index`
-- **Size**: `9,686 B`
-- **Modified Time**: `2025-09-15T22:44:13.186673`
+- **Size**: `9,650 B`
+- **Modified Time**: `2025-10-01T21:58:37.583193`
 
 #### Content Preview
 
 
 
-### 📄 File #343 - `ORIG_HEAD`
+### 📄 File #399 - `ORIG_HEAD`
 - **Path**: `hyperlane-quick-start\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:15.407859`
@@ -17980,7 +18558,7 @@ cargo run restart -d
 
 
 
-### 📄 File #344 - `packed-refs`
+### 📄 File #400 - `packed-refs`
 - **Path**: `hyperlane-quick-start\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:17.298243`
@@ -17989,7 +18567,7 @@ cargo run restart -d
 
 
 
-### 📄 File #345 - `shallow`
+### 📄 File #401 - `shallow`
 - **Path**: `hyperlane-quick-start\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:17.201798`
@@ -17998,7 +18576,7 @@ cargo run restart -d
 
 
 
-### 📄 File #346 - `applypatch-msg.sample`
+### 📄 File #402 - `applypatch-msg.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:15.228194`
@@ -18007,7 +18585,7 @@ cargo run restart -d
 
 
 
-### 📄 File #347 - `commit-msg.sample`
+### 📄 File #403 - `commit-msg.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:15.228194`
@@ -18016,7 +18594,7 @@ cargo run restart -d
 
 
 
-### 📄 File #348 - `fsmonitor-watchman.sample`
+### 📄 File #404 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18025,7 +18603,7 @@ cargo run restart -d
 
 
 
-### 📄 File #349 - `post-update.sample`
+### 📄 File #405 - `post-update.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18034,7 +18612,7 @@ cargo run restart -d
 
 
 
-### 📄 File #350 - `pre-applypatch.sample`
+### 📄 File #406 - `pre-applypatch.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18043,7 +18621,7 @@ cargo run restart -d
 
 
 
-### 📄 File #351 - `pre-commit.sample`
+### 📄 File #407 - `pre-commit.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18052,7 +18630,7 @@ cargo run restart -d
 
 
 
-### 📄 File #352 - `pre-merge-commit.sample`
+### 📄 File #408 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18061,7 +18639,7 @@ cargo run restart -d
 
 
 
-### 📄 File #353 - `pre-push.sample`
+### 📄 File #409 - `pre-push.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18070,7 +18648,7 @@ cargo run restart -d
 
 
 
-### 📄 File #354 - `pre-rebase.sample`
+### 📄 File #410 - `pre-rebase.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18079,7 +18657,7 @@ cargo run restart -d
 
 
 
-### 📄 File #355 - `pre-receive.sample`
+### 📄 File #411 - `pre-receive.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18088,7 +18666,7 @@ cargo run restart -d
 
 
 
-### 📄 File #356 - `prepare-commit-msg.sample`
+### 📄 File #412 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18097,7 +18675,7 @@ cargo run restart -d
 
 
 
-### 📄 File #357 - `push-to-checkout.sample`
+### 📄 File #413 - `push-to-checkout.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18106,7 +18684,7 @@ cargo run restart -d
 
 
 
-### 📄 File #358 - `sendemail-validate.sample`
+### 📄 File #414 - `sendemail-validate.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18115,7 +18693,7 @@ cargo run restart -d
 
 
 
-### 📄 File #359 - `update.sample`
+### 📄 File #415 - `update.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:15.231194`
@@ -18124,7 +18702,7 @@ cargo run restart -d
 
 
 
-### 📄 File #360 - `exclude`
+### 📄 File #416 - `exclude`
 - **Path**: `hyperlane-quick-start\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:15.231194`
@@ -18133,25 +18711,25 @@ cargo run restart -d
 
 
 
-### 📄 File #361 - `HEAD`
+### 📄 File #417 - `HEAD`
 - **Path**: `hyperlane-quick-start\.git\logs\HEAD`
-- **Size**: `196 B`
-- **Modified Time**: `2025-09-15T22:37:17.311962`
+- **Size**: `349 B`
+- **Modified Time**: `2025-10-01T21:58:37.584757`
 
 #### Content Preview
 
 
 
-### 📄 File #362 - `master`
+### 📄 File #418 - `master`
 - **Path**: `hyperlane-quick-start\.git\logs\refs\heads\master`
-- **Size**: `196 B`
-- **Modified Time**: `2025-09-15T22:37:17.311962`
+- **Size**: `349 B`
+- **Modified Time**: `2025-10-01T21:58:37.584757`
 
 #### Content Preview
 
 
 
-### 📄 File #363 - `HEAD`
+### 📄 File #419 - `HEAD`
 - **Path**: `hyperlane-quick-start\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `196 B`
 - **Modified Time**: `2025-09-15T22:37:17.308951`
@@ -18160,7 +18738,763 @@ cargo run restart -d
 
 
 
-### 📄 File #364 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.idx`
+### 📄 File #420 - `master`
+- **Path**: `hyperlane-quick-start\.git\logs\refs\remotes\origin\master`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-01T21:58:37.366450`
+
+#### Content Preview
+
+
+
+### 📄 File #421 - `54822384d766ce6ee631d890def4e46ba79d8c`
+- **Path**: `hyperlane-quick-start\.git\objects\00\54822384d766ce6ee631d890def4e46ba79d8c`
+- **Size**: `78 B`
+- **Modified Time**: `2025-10-01T21:58:36.992006`
+
+#### Content Preview
+
+
+
+### 📄 File #422 - `6a150fdc67b73bc4212f336e5c23af9933b057`
+- **Path**: `hyperlane-quick-start\.git\objects\10\6a150fdc67b73bc4212f336e5c23af9933b057`
+- **Size**: `116 B`
+- **Modified Time**: `2025-10-01T21:58:36.992006`
+
+#### Content Preview
+
+
+
+### 📄 File #423 - `90f492cd7fdb1010952e7a3a4a30d8a87d968e`
+- **Path**: `hyperlane-quick-start\.git\objects\12\90f492cd7fdb1010952e7a3a4a30d8a87d968e`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-01T21:58:36.986875`
+
+#### Content Preview
+
+
+
+### 📄 File #424 - `5ab91ae5c9cdb5a06a916525dee765e6211d61`
+- **Path**: `hyperlane-quick-start\.git\objects\13\5ab91ae5c9cdb5a06a916525dee765e6211d61`
+- **Size**: `678 B`
+- **Modified Time**: `2025-10-01T21:58:37.065431`
+
+#### Content Preview
+
+
+
+### 📄 File #425 - `f8ce4b0a44372820420b5158a08b27a3404c2e`
+- **Path**: `hyperlane-quick-start\.git\objects\15\f8ce4b0a44372820420b5158a08b27a3404c2e`
+- **Size**: `109 B`
+- **Modified Time**: `2025-10-01T21:58:37.012248`
+
+#### Content Preview
+
+
+
+### 📄 File #426 - `5c6629985f2e0b3a49995306bdd6b0286b6f41`
+- **Path**: `hyperlane-quick-start\.git\objects\22\5c6629985f2e0b3a49995306bdd6b0286b6f41`
+- **Size**: `393 B`
+- **Modified Time**: `2025-10-01T21:58:37.022772`
+
+#### Content Preview
+
+
+
+### 📄 File #427 - `b8559eacc9f2458f2afb02f37abdc146c5c85e`
+- **Path**: `hyperlane-quick-start\.git\objects\22\b8559eacc9f2458f2afb02f37abdc146c5c85e`
+- **Size**: `679 B`
+- **Modified Time**: `2025-10-01T21:58:37.084678`
+
+#### Content Preview
+
+
+
+### 📄 File #428 - `a250a9d9c3485e283e66646ebc496b82f181e5`
+- **Path**: `hyperlane-quick-start\.git\objects\27\a250a9d9c3485e283e66646ebc496b82f181e5`
+- **Size**: `59 B`
+- **Modified Time**: `2025-10-01T21:58:37.119726`
+
+#### Content Preview
+
+
+
+### 📄 File #429 - `f555398305b31f3386b093c4db4dcbd49cf2e6`
+- **Path**: `hyperlane-quick-start\.git\objects\27\f555398305b31f3386b093c4db4dcbd49cf2e6`
+- **Size**: `392 B`
+- **Modified Time**: `2025-10-01T21:58:37.022772`
+
+#### Content Preview
+
+
+
+### 📄 File #430 - `ed63df6d88585f1103dde2f099d2322dea88ca`
+- **Path**: `hyperlane-quick-start\.git\objects\2d\ed63df6d88585f1103dde2f099d2322dea88ca`
+- **Size**: `679 B`
+- **Modified Time**: `2025-10-01T21:58:37.065431`
+
+#### Content Preview
+
+
+
+### 📄 File #431 - `a8cf67216bd3c2b97ceed09696b4c06ce0852e`
+- **Path**: `hyperlane-quick-start\.git\objects\2f\a8cf67216bd3c2b97ceed09696b4c06ce0852e`
+- **Size**: `660 B`
+- **Modified Time**: `2025-10-01T21:58:37.132122`
+
+#### Content Preview
+
+
+
+### 📄 File #432 - `0d28dfbcbc1dcb97ba4c9e932efffb0636cdd0`
+- **Path**: `hyperlane-quick-start\.git\objects\30\0d28dfbcbc1dcb97ba4c9e932efffb0636cdd0`
+- **Size**: `78 B`
+- **Modified Time**: `2025-10-01T21:58:36.992006`
+
+#### Content Preview
+
+
+
+### 📄 File #433 - `2608accffd421b27efeadbd1808db4235cd6bc`
+- **Path**: `hyperlane-quick-start\.git\objects\31\2608accffd421b27efeadbd1808db4235cd6bc`
+- **Size**: `67 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #434 - `27cd89e2629a5181ae250fd6316c5f2775bc00`
+- **Path**: `hyperlane-quick-start\.git\objects\33\27cd89e2629a5181ae250fd6316c5f2775bc00`
+- **Size**: `112 B`
+- **Modified Time**: `2025-10-01T21:58:37.022772`
+
+#### Content Preview
+
+
+
+### 📄 File #435 - `4b16ecc3dde7d279b3b3a7d6570e045c868a95`
+- **Path**: `hyperlane-quick-start\.git\objects\40\4b16ecc3dde7d279b3b3a7d6570e045c868a95`
+- **Size**: `82 B`
+- **Modified Time**: `2025-10-01T21:58:37.015493`
+
+#### Content Preview
+
+
+
+### 📄 File #436 - `0b8c4d48c905d6f8e9b5f1ae7eb95180c9c5a6`
+- **Path**: `hyperlane-quick-start\.git\objects\43\0b8c4d48c905d6f8e9b5f1ae7eb95180c9c5a6`
+- **Size**: `79 B`
+- **Modified Time**: `2025-10-01T21:58:36.992006`
+
+#### Content Preview
+
+
+
+### 📄 File #437 - `214f3861f80d366e88edfcacf9e9abc8ae937a`
+- **Path**: `hyperlane-quick-start\.git\objects\48\214f3861f80d366e88edfcacf9e9abc8ae937a`
+- **Size**: `105 B`
+- **Modified Time**: `2025-10-01T21:58:37.123610`
+
+#### Content Preview
+
+
+
+### 📄 File #438 - `34d31fc11eb7debbe5c7f06dadab88eb192af6`
+- **Path**: `hyperlane-quick-start\.git\objects\48\34d31fc11eb7debbe5c7f06dadab88eb192af6`
+- **Size**: `81 B`
+- **Modified Time**: `2025-10-01T21:58:37.011296`
+
+#### Content Preview
+
+
+
+### 📄 File #439 - `50ce1c515dd2247f606d3e920ee5e4d130433c`
+- **Path**: `hyperlane-quick-start\.git\objects\49\50ce1c515dd2247f606d3e920ee5e4d130433c`
+- **Size**: `107 B`
+- **Modified Time**: `2025-10-01T21:58:37.148859`
+
+#### Content Preview
+
+
+
+### 📄 File #440 - `7e7bd50ff79b8b70899c7ddb2b67445bee3d61`
+- **Path**: `hyperlane-quick-start\.git\objects\49\7e7bd50ff79b8b70899c7ddb2b67445bee3d61`
+- **Size**: `314 B`
+- **Modified Time**: `2025-10-01T21:58:37.091820`
+
+#### Content Preview
+
+
+
+### 📄 File #441 - `83dba23be6c95595edaa65c30e7529e84e66e5`
+- **Path**: `hyperlane-quick-start\.git\objects\4a\83dba23be6c95595edaa65c30e7529e84e66e5`
+- **Size**: `78 B`
+- **Modified Time**: `2025-10-01T21:58:36.992006`
+
+#### Content Preview
+
+
+
+### 📄 File #442 - `eb508a34daebbd0220a600b37f26067bb7ab0b`
+- **Path**: `hyperlane-quick-start\.git\objects\4c\eb508a34daebbd0220a600b37f26067bb7ab0b`
+- **Size**: `279 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #443 - `3b39e1611a66369743526c0990c3e0ea1f13d5`
+- **Path**: `hyperlane-quick-start\.git\objects\4d\3b39e1611a66369743526c0990c3e0ea1f13d5`
+- **Size**: `16,603 B`
+- **Modified Time**: `2025-10-01T21:58:37.036698`
+
+#### Content Preview
+
+
+
+### 📄 File #444 - `a3fd145164ba0be2f0b975cdd129a32becb68f`
+- **Path**: `hyperlane-quick-start\.git\objects\4f\a3fd145164ba0be2f0b975cdd129a32becb68f`
+- **Size**: `81 B`
+- **Modified Time**: `2025-10-01T21:58:37.005793`
+
+#### Content Preview
+
+
+
+### 📄 File #445 - `0ee3ab08804c8a6406bff9833c3ccce4b01504`
+- **Path**: `hyperlane-quick-start\.git\objects\51\0ee3ab08804c8a6406bff9833c3ccce4b01504`
+- **Size**: `78 B`
+- **Modified Time**: `2025-10-01T21:58:36.992006`
+
+#### Content Preview
+
+
+
+### 📄 File #446 - `9aa533f1cbeafb3559a76be8a1baf1ef38ddf8`
+- **Path**: `hyperlane-quick-start\.git\objects\52\9aa533f1cbeafb3559a76be8a1baf1ef38ddf8`
+- **Size**: `678 B`
+- **Modified Time**: `2025-10-01T21:58:37.065431`
+
+#### Content Preview
+
+
+
+### 📄 File #447 - `ec1719125d40680e7185dd8252fbcec3a9fee1`
+- **Path**: `hyperlane-quick-start\.git\objects\52\ec1719125d40680e7185dd8252fbcec3a9fee1`
+- **Size**: `147 B`
+- **Modified Time**: `2025-10-01T21:58:37.015493`
+
+#### Content Preview
+
+
+
+### 📄 File #448 - `a480ed9211ef8f30fdd8d81dfce3de94c9db35`
+- **Path**: `hyperlane-quick-start\.git\objects\54\a480ed9211ef8f30fdd8d81dfce3de94c9db35`
+- **Size**: `47 B`
+- **Modified Time**: `2025-10-01T21:58:37.022772`
+
+#### Content Preview
+
+
+
+### 📄 File #449 - `48cfad83eb58346dc8b84c4f08af91218044ac`
+- **Path**: `hyperlane-quick-start\.git\objects\55\48cfad83eb58346dc8b84c4f08af91218044ac`
+- **Size**: `98 B`
+- **Modified Time**: `2025-10-01T21:58:37.120730`
+
+#### Content Preview
+
+
+
+### 📄 File #450 - `20d6c18c5877978a0cbee2e6badf21b4c5ee42`
+- **Path**: `hyperlane-quick-start\.git\objects\56\20d6c18c5877978a0cbee2e6badf21b4c5ee42`
+- **Size**: `359 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #451 - `d15266d60b7c1466fecefb1822af05c233b5cf`
+- **Path**: `hyperlane-quick-start\.git\objects\62\d15266d60b7c1466fecefb1822af05c233b5cf`
+- **Size**: `175 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #452 - `65615b924029e2a7e53212fd5ba815cb46575a`
+- **Path**: `hyperlane-quick-start\.git\objects\65\65615b924029e2a7e53212fd5ba815cb46575a`
+- **Size**: `55 B`
+- **Modified Time**: `2025-10-01T21:58:37.015493`
+
+#### Content Preview
+
+
+
+### 📄 File #453 - `545319a2d8e86c21e3549bfdc02abc1d506405`
+- **Path**: `hyperlane-quick-start\.git\objects\6a\545319a2d8e86c21e3549bfdc02abc1d506405`
+- **Size**: `154 B`
+- **Modified Time**: `2025-10-01T21:58:37.150270`
+
+#### Content Preview
+
+
+
+### 📄 File #454 - `9ab9c109fc482abdbf626f3746f9bc45ba2338`
+- **Path**: `hyperlane-quick-start\.git\objects\6b\9ab9c109fc482abdbf626f3746f9bc45ba2338`
+- **Size**: `314 B`
+- **Modified Time**: `2025-10-01T21:58:37.101808`
+
+#### Content Preview
+
+
+
+### 📄 File #455 - `21b78e9a4050df1fb6255fe935a882dc45638a`
+- **Path**: `hyperlane-quick-start\.git\objects\71\21b78e9a4050df1fb6255fe935a882dc45638a`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-01T21:58:36.986875`
+
+#### Content Preview
+
+
+
+### 📄 File #456 - `3cccb763d62c6d5d49181726557b707bb4b808`
+- **Path**: `hyperlane-quick-start\.git\objects\71\3cccb763d62c6d5d49181726557b707bb4b808`
+- **Size**: `170 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #457 - `5fdf93e1cce1b3865e8b9ee763c2b5e2fa4b0e`
+- **Path**: `hyperlane-quick-start\.git\objects\72\5fdf93e1cce1b3865e8b9ee763c2b5e2fa4b0e`
+- **Size**: `679 B`
+- **Modified Time**: `2025-10-01T21:58:37.065431`
+
+#### Content Preview
+
+
+
+### 📄 File #458 - `094932d6587d087e45c36e5a96958b5b5256d9`
+- **Path**: `hyperlane-quick-start\.git\objects\74\094932d6587d087e45c36e5a96958b5b5256d9`
+- **Size**: `16,598 B`
+- **Modified Time**: `2025-10-01T21:58:37.054503`
+
+#### Content Preview
+
+
+
+### 📄 File #459 - `e10753b5318a539ca2253a1b96c3db1f3c5f61`
+- **Path**: `hyperlane-quick-start\.git\objects\74\e10753b5318a539ca2253a1b96c3db1f3c5f61`
+- **Size**: `183 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #460 - `ba2a490553300308a2c4345f9fb6a16a67b10e`
+- **Path**: `hyperlane-quick-start\.git\objects\75\ba2a490553300308a2c4345f9fb6a16a67b10e`
+- **Size**: `150 B`
+- **Modified Time**: `2025-10-01T21:58:37.022772`
+
+#### Content Preview
+
+
+
+### 📄 File #461 - `41206b87dc1306c59c955a2559f4760ebf2fb5`
+- **Path**: `hyperlane-quick-start\.git\objects\76\41206b87dc1306c59c955a2559f4760ebf2fb5`
+- **Size**: `678 B`
+- **Modified Time**: `2025-10-01T21:58:37.086672`
+
+#### Content Preview
+
+
+
+### 📄 File #462 - `a1e27fecfe5f2f43ecf02f7bab725a31979d37`
+- **Path**: `hyperlane-quick-start\.git\objects\78\a1e27fecfe5f2f43ecf02f7bab725a31979d37`
+- **Size**: `71 B`
+- **Modified Time**: `2025-10-01T21:58:37.125590`
+
+#### Content Preview
+
+
+
+### 📄 File #463 - `0e9f911caa19cb8d553ed5b1f343166126f063`
+- **Path**: `hyperlane-quick-start\.git\objects\7b\0e9f911caa19cb8d553ed5b1f343166126f063`
+- **Size**: `16,606 B`
+- **Modified Time**: `2025-10-01T21:58:37.052457`
+
+#### Content Preview
+
+
+
+### 📄 File #464 - `c5699b50da97afc5af132dd09c2a768b8e612b`
+- **Path**: `hyperlane-quick-start\.git\objects\7c\c5699b50da97afc5af132dd09c2a768b8e612b`
+- **Size**: `192 B`
+- **Modified Time**: `2025-10-01T21:58:37.030787`
+
+#### Content Preview
+
+
+
+### 📄 File #465 - `05db84f55921ac2aec694a973c463e926ab73e`
+- **Path**: `hyperlane-quick-start\.git\objects\83\05db84f55921ac2aec694a973c463e926ab73e`
+- **Size**: `87 B`
+- **Modified Time**: `2025-10-01T21:58:37.127806`
+
+#### Content Preview
+
+
+
+### 📄 File #466 - `b06bf134250a25c82a0f06e326a2533c0671f5`
+- **Path**: `hyperlane-quick-start\.git\objects\86\b06bf134250a25c82a0f06e326a2533c0671f5`
+- **Size**: `680 B`
+- **Modified Time**: `2025-10-01T21:58:37.065431`
+
+#### Content Preview
+
+
+
+### 📄 File #467 - `f970861b358ab4f4a4c958675ea0715d47f33f`
+- **Path**: `hyperlane-quick-start\.git\objects\89\f970861b358ab4f4a4c958675ea0715d47f33f`
+- **Size**: `231 B`
+- **Modified Time**: `2025-10-01T21:58:37.124609`
+
+#### Content Preview
+
+
+
+### 📄 File #468 - `21904cd3b97aa45fed6fdd67147d208c7d2d1e`
+- **Path**: `hyperlane-quick-start\.git\objects\94\21904cd3b97aa45fed6fdd67147d208c7d2d1e`
+- **Size**: `199 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #469 - `f00db2f5dd3614b2d249f417a63b6e734acf4c`
+- **Path**: `hyperlane-quick-start\.git\objects\9f\f00db2f5dd3614b2d249f417a63b6e734acf4c`
+- **Size**: `148 B`
+- **Modified Time**: `2025-10-01T21:58:36.991497`
+
+#### Content Preview
+
+
+
+### 📄 File #470 - `09e33a57ef773cd82907a8ec686043131cc17d`
+- **Path**: `hyperlane-quick-start\.git\objects\a0\09e33a57ef773cd82907a8ec686043131cc17d`
+- **Size**: `181 B`
+- **Modified Time**: `2025-10-01T21:58:37.153576`
+
+#### Content Preview
+
+
+
+### 📄 File #471 - `ce85df7a45c00c753e9c62faa0a0bed6c92c69`
+- **Path**: `hyperlane-quick-start\.git\objects\a2\ce85df7a45c00c753e9c62faa0a0bed6c92c69`
+- **Size**: `181 B`
+- **Modified Time**: `2025-10-01T21:58:37.002871`
+
+#### Content Preview
+
+
+
+### 📄 File #472 - `218d4668de7760aacec67ef07760af2a1199dc`
+- **Path**: `hyperlane-quick-start\.git\objects\a8\218d4668de7760aacec67ef07760af2a1199dc`
+- **Size**: `392 B`
+- **Modified Time**: `2025-10-01T21:58:37.152346`
+
+#### Content Preview
+
+
+
+### 📄 File #473 - `f9ff56624159dd922dcfafcc8598be6fbd80da`
+- **Path**: `hyperlane-quick-start\.git\objects\ab\f9ff56624159dd922dcfafcc8598be6fbd80da`
+- **Size**: `392 B`
+- **Modified Time**: `2025-10-01T21:58:37.153576`
+
+#### Content Preview
+
+
+
+### 📄 File #474 - `faf493260a821249be6870f7bd9fa920c7f9eb`
+- **Path**: `hyperlane-quick-start\.git\objects\b2\faf493260a821249be6870f7bd9fa920c7f9eb`
+- **Size**: `51 B`
+- **Modified Time**: `2025-10-01T21:58:37.015493`
+
+#### Content Preview
+
+
+
+### 📄 File #475 - `8da5bb90af26404909756041c14ddb88470902`
+- **Path**: `hyperlane-quick-start\.git\objects\b3\8da5bb90af26404909756041c14ddb88470902`
+- **Size**: `16,590 B`
+- **Modified Time**: `2025-10-01T21:58:37.036698`
+
+#### Content Preview
+
+
+
+### 📄 File #476 - `9257c2b8d3f0cba0ef1486284b6d21e6909101`
+- **Path**: `hyperlane-quick-start\.git\objects\b4\9257c2b8d3f0cba0ef1486284b6d21e6909101`
+- **Size**: `150 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #477 - `afbd878670485e5788ea33e904eef72a6b99bf`
+- **Path**: `hyperlane-quick-start\.git\objects\b5\afbd878670485e5788ea33e904eef72a6b99bf`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-01T21:58:37.022772`
+
+#### Content Preview
+
+
+
+### 📄 File #478 - `0c5d3e17feda11c278f0289f8f70cfa9f53ea1`
+- **Path**: `hyperlane-quick-start\.git\objects\bd\0c5d3e17feda11c278f0289f8f70cfa9f53ea1`
+- **Size**: `393 B`
+- **Modified Time**: `2025-10-01T21:58:37.035498`
+
+#### Content Preview
+
+
+
+### 📄 File #479 - `4dcc6f4f675052cee07b3634ff68c4fbf84268`
+- **Path**: `hyperlane-quick-start\.git\objects\c0\4dcc6f4f675052cee07b3634ff68c4fbf84268`
+- **Size**: `155 B`
+- **Modified Time**: `2025-10-01T21:58:37.132122`
+
+#### Content Preview
+
+
+
+### 📄 File #480 - `073b9828073442ce38662a864702db1547585b`
+- **Path**: `hyperlane-quick-start\.git\objects\c8\073b9828073442ce38662a864702db1547585b`
+- **Size**: `16,615 B`
+- **Modified Time**: `2025-10-01T21:58:37.065431`
+
+#### Content Preview
+
+
+
+### 📄 File #481 - `a1e8052532377599d045617208bba1ba266bb4`
+- **Path**: `hyperlane-quick-start\.git\objects\ca\a1e8052532377599d045617208bba1ba266bb4`
+- **Size**: `81 B`
+- **Modified Time**: `2025-10-01T21:58:37.003591`
+
+#### Content Preview
+
+
+
+### 📄 File #482 - `d9869251780fb511597347f39ff87d702f44e9`
+- **Path**: `hyperlane-quick-start\.git\objects\ca\d9869251780fb511597347f39ff87d702f44e9`
+- **Size**: `109 B`
+- **Modified Time**: `2025-10-01T21:58:37.103302`
+
+#### Content Preview
+
+
+
+### 📄 File #483 - `90878a24c714f3d5231d4a8db03f637c264f95`
+- **Path**: `hyperlane-quick-start\.git\objects\cc\90878a24c714f3d5231d4a8db03f637c264f95`
+- **Size**: `81 B`
+- **Modified Time**: `2025-10-01T21:58:37.008554`
+
+#### Content Preview
+
+
+
+### 📄 File #484 - `efaac99b48e134655b4b4e6f7ca5ca8ec0d030`
+- **Path**: `hyperlane-quick-start\.git\objects\d1\efaac99b48e134655b4b4e6f7ca5ca8ec0d030`
+- **Size**: `87 B`
+- **Modified Time**: `2025-10-01T21:58:36.992006`
+
+#### Content Preview
+
+
+
+### 📄 File #485 - `76e0369515394f9abc8c45c56ae9df4b4107d7`
+- **Path**: `hyperlane-quick-start\.git\objects\d2\76e0369515394f9abc8c45c56ae9df4b4107d7`
+- **Size**: `64 B`
+- **Modified Time**: `2025-10-01T21:58:37.132122`
+
+#### Content Preview
+
+
+
+### 📄 File #486 - `21484dc2b2f513703030862c973cf3d3d56f99`
+- **Path**: `hyperlane-quick-start\.git\objects\d6\21484dc2b2f513703030862c973cf3d3d56f99`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-01T21:58:36.981554`
+
+#### Content Preview
+
+
+
+### 📄 File #487 - `56cd4f53009e177c6b12252614b13369382bcf`
+- **Path**: `hyperlane-quick-start\.git\objects\d9\56cd4f53009e177c6b12252614b13369382bcf`
+- **Size**: `178 B`
+- **Modified Time**: `2025-10-01T21:58:37.132122`
+
+#### Content Preview
+
+
+
+### 📄 File #488 - `ae3e6d670fc370b2d76cd5315b5ade939657a8`
+- **Path**: `hyperlane-quick-start\.git\objects\d9\ae3e6d670fc370b2d76cd5315b5ade939657a8`
+- **Size**: `77 B`
+- **Modified Time**: `2025-10-01T21:58:37.015493`
+
+#### Content Preview
+
+
+
+### 📄 File #489 - `79d07f971826e79738f914e03ad756e71d46d1`
+- **Path**: `hyperlane-quick-start\.git\objects\da\79d07f971826e79738f914e03ad756e71d46d1`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-01T21:58:36.986875`
+
+#### Content Preview
+
+
+
+### 📄 File #490 - `343c64d8daaa5084e9670592aeca01ef6520cf`
+- **Path**: `hyperlane-quick-start\.git\objects\db\343c64d8daaa5084e9670592aeca01ef6520cf`
+- **Size**: `112 B`
+- **Modified Time**: `2025-10-01T21:58:37.132122`
+
+#### Content Preview
+
+
+
+### 📄 File #491 - `6afbbe5839c681489f15800d83af6aa9f1e72d`
+- **Path**: `hyperlane-quick-start\.git\objects\dd\6afbbe5839c681489f15800d83af6aa9f1e72d`
+- **Size**: `80 B`
+- **Modified Time**: `2025-10-01T21:58:37.009295`
+
+#### Content Preview
+
+
+
+### 📄 File #492 - `e125cf1cdb5d1a83dbbc7017133f5135932428`
+- **Path**: `hyperlane-quick-start\.git\objects\df\e125cf1cdb5d1a83dbbc7017133f5135932428`
+- **Size**: `191 B`
+- **Modified Time**: `2025-10-01T21:58:37.153576`
+
+#### Content Preview
+
+
+
+### 📄 File #493 - `572418295d04c05594f8428777fa22d596ea71`
+- **Path**: `hyperlane-quick-start\.git\objects\e0\572418295d04c05594f8428777fa22d596ea71`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-01T21:58:37.132122`
+
+#### Content Preview
+
+
+
+### 📄 File #494 - `a13cde65b50e505d19dadd3fe66e5484c588bc`
+- **Path**: `hyperlane-quick-start\.git\objects\e1\a13cde65b50e505d19dadd3fe66e5484c588bc`
+- **Size**: `16,615 B`
+- **Modified Time**: `2025-10-01T21:58:37.036698`
+
+#### Content Preview
+
+
+
+### 📄 File #495 - `e2fdb7411125c1d98d5e1d48c881cd8113ec85`
+- **Path**: `hyperlane-quick-start\.git\objects\e2\e2fdb7411125c1d98d5e1d48c881cd8113ec85`
+- **Size**: `392 B`
+- **Modified Time**: `2025-10-01T21:58:37.036698`
+
+#### Content Preview
+
+
+
+### 📄 File #496 - `691a87cebb3164785c8577f4f79294bb270b6a`
+- **Path**: `hyperlane-quick-start\.git\objects\e3\691a87cebb3164785c8577f4f79294bb270b6a`
+- **Size**: `81 B`
+- **Modified Time**: `2025-10-01T21:58:37.006934`
+
+#### Content Preview
+
+
+
+### 📄 File #497 - `1d1d948f1653289708f5bbda30883679905cfc`
+- **Path**: `hyperlane-quick-start\.git\objects\e4\1d1d948f1653289708f5bbda30883679905cfc`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-01T21:58:36.985631`
+
+#### Content Preview
+
+
+
+### 📄 File #498 - `dbe242fdf50e77b33c66b1cc058efe5ab364b6`
+- **Path**: `hyperlane-quick-start\.git\objects\e4\dbe242fdf50e77b33c66b1cc058efe5ab364b6`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-01T21:58:36.984783`
+
+#### Content Preview
+
+
+
+### 📄 File #499 - `122b5214665c1fc209ab9bc914587bf604a108`
+- **Path**: `hyperlane-quick-start\.git\objects\e5\122b5214665c1fc209ab9bc914587bf604a108`
+- **Size**: `16,605 B`
+- **Modified Time**: `2025-10-01T21:58:37.060400`
+
+#### Content Preview
+
+
+
+### 📄 File #500 - `9c073963ca8b7d607f5e15dbc6e70b8685e055`
+- **Path**: `hyperlane-quick-start\.git\objects\e6\9c073963ca8b7d607f5e15dbc6e70b8685e055`
+- **Size**: `391 B`
+- **Modified Time**: `2025-10-01T21:58:37.153576`
+
+#### Content Preview
+
+
+
+### 📄 File #501 - `24f83af145912a84d93d7020f00e14b61be916`
+- **Path**: `hyperlane-quick-start\.git\objects\ee\24f83af145912a84d93d7020f00e14b61be916`
+- **Size**: `115 B`
+- **Modified Time**: `2025-10-01T21:58:37.122591`
+
+#### Content Preview
+
+
+
+### 📄 File #502 - `62843f8f25d44788a71a058521b4ff02cc4d97`
+- **Path**: `hyperlane-quick-start\.git\objects\f7\62843f8f25d44788a71a058521b4ff02cc4d97`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-01T21:58:36.982677`
+
+#### Content Preview
+
+
+
+### 📄 File #503 - `11d5e1175f952acb54e3761aade3dcd63313c3`
+- **Path**: `hyperlane-quick-start\.git\objects\ff\11d5e1175f952acb54e3761aade3dcd63313c3`
+- **Size**: `78 B`
+- **Modified Time**: `2025-10-01T21:58:37.013547`
+
+#### Content Preview
+
+
+
+### 📄 File #504 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.idx`
 - **Path**: `hyperlane-quick-start\.git\objects\pack\pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.idx`
 - **Size**: `3,984 B`
 - **Modified Time**: `2025-09-15T22:37:17.264239`
@@ -18169,16 +19503,16 @@ cargo run restart -d
 
 
 
-### 📄 File #365 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.pack`
+### 📄 File #505 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.pack`
 - **Path**: `hyperlane-quick-start\.git\objects\pack\pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.pack`
 - **Size**: `29,817 B`
-- **Modified Time**: `2025-09-15T22:37:17.264239`
+- **Modified Time**: `2025-10-01T21:58:37.149256`
 
 #### Content Preview
 
 
 
-### 📄 File #366 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.rev`
+### 📄 File #506 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.rev`
 - **Path**: `hyperlane-quick-start\.git\objects\pack\pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.rev`
 - **Size**: `468 B`
 - **Modified Time**: `2025-09-15T22:37:17.265239`
@@ -18187,16 +19521,16 @@ cargo run restart -d
 
 
 
-### 📄 File #367 - `master`
+### 📄 File #507 - `master`
 - **Path**: `hyperlane-quick-start\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:37:17.311962`
+- **Modified Time**: `2025-10-01T21:58:37.584236`
 
 #### Content Preview
 
 
 
-### 📄 File #368 - `HEAD`
+### 📄 File #508 - `HEAD`
 - **Path**: `hyperlane-quick-start\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:17.307951`
@@ -18205,7 +19539,16 @@ cargo run restart -d
 
 
 
-### 📄 File #369 - `v6.3.5`
+### 📄 File #509 - `master`
+- **Path**: `hyperlane-quick-start\.git\refs\remotes\origin\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:37.366450`
+
+#### Content Preview
+
+
+
+### 📄 File #510 - `v6.3.5`
 - **Path**: `hyperlane-quick-start\.git\refs\tags\v6.3.5`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:17.306951`
@@ -18214,7 +19557,16 @@ cargo run restart -d
 
 
 
-### 📄 File #370 - `Cargo.toml`
+### 📄 File #511 - `v7.0.3`
+- **Path**: `hyperlane-quick-start\.git\refs\tags\v7.0.3`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:37.431512`
+
+#### Content Preview
+
+
+
+### 📄 File #512 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\app\Cargo.toml`
 - **Size**: `260 B`
 - **Modified Time**: `2025-09-15T22:37:17.326739`
@@ -18223,7 +19575,7 @@ cargo run restart -d
 
 
 
-### 📄 File #371 - `lib.rs`
+### 📄 File #513 - `lib.rs`
 - **Path**: `hyperlane-quick-start\app\lib.rs`
 - **Size**: `242 B`
 - **Modified Time**: `2025-09-15T22:37:17.328740`
@@ -18249,7 +19601,7 @@ use hyperlane_plugin::log::*;
 
 ```
 
-### 📄 File #372 - `mod.rs`
+### 📄 File #514 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\aspect\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.326739`
@@ -18261,15 +19613,15 @@ use hyperlane_plugin::log::*;
 
 ```
 
-### 📄 File #373 - `mod.rs`
+### 📄 File #515 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\controller\mod.rs`
-- **Size**: `70 B`
-- **Modified Time**: `2025-09-15T22:37:17.327740`
+- **Size**: `66 B`
+- **Modified Time**: `2025-10-01T21:58:37.520759`
 
 #### Content Preview
 
 ```rust
-pub mod favicon_ico;
+pub mod favicon;
 pub mod hello;
 pub mod websocket;
 
@@ -18277,10 +19629,10 @@ use super::*;
 
 ```
 
-### 📄 File #374 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\controller\favicon_ico\fn.rs`
-- **Size**: `178 B`
-- **Modified Time**: `2025-09-15T22:37:17.326739`
+### 📄 File #516 - `fn.rs`
+- **Path**: `hyperlane-quick-start\app\controller\favicon\fn.rs`
+- **Size**: `179 B`
+- **Modified Time**: `2025-10-01T21:58:37.509446`
 
 #### Content Preview
 
@@ -18288,7 +19640,7 @@ use super::*;
 use super::*;
 
 #[route("/favicon.ico")]
-#[prologue_hooks(
+#[prologue_macros(
   get,
   response_status_code(301),
   response_header(LOCATION => LOGO_IMG_URL)
@@ -18297,10 +19649,10 @@ pub async fn handle(ctx: Context) {}
 
 ```
 
-### 📄 File #375 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\controller\favicon_ico\mod.rs`
+### 📄 File #517 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\controller\favicon\mod.rs`
 - **Size**: `88 B`
-- **Modified Time**: `2025-09-15T22:37:17.326739`
+- **Modified Time**: `2025-10-01T21:58:37.509446`
 
 #### Content Preview
 
@@ -18314,10 +19666,10 @@ use hyperlane_config::business::logo_img::*;
 
 ```
 
-### 📄 File #376 - `fn.rs`
+### 📄 File #518 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\controller\hello\fn.rs`
-- **Size**: `226 B`
-- **Modified Time**: `2025-09-15T22:37:17.327740`
+- **Size**: `227 B`
+- **Modified Time**: `2025-10-01T21:58:37.517108`
 
 #### Content Preview
 
@@ -18325,7 +19677,7 @@ use hyperlane_config::business::logo_img::*;
 use super::*;
 
 #[route("/hello/{name}")]
-#[prologue_hooks(
+#[prologue_macros(
   methods(get, post),
   route_param(NAME_KEY => name_opt),
   response_body(format!("Hello {}", name_opt.unwrap_or_default())),
@@ -18334,7 +19686,7 @@ pub async fn handle(ctx: Context) {}
 
 ```
 
-### 📄 File #377 - `mod.rs`
+### 📄 File #519 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\controller\hello\mod.rs`
 - **Size**: `85 B`
 - **Modified Time**: `2025-09-15T22:37:17.327740`
@@ -18351,7 +19703,7 @@ use hyperlane_config::business::hello::*;
 
 ```
 
-### 📄 File #378 - `fn.rs`
+### 📄 File #520 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\controller\websocket\fn.rs`
 - **Size**: `342 B`
 - **Modified Time**: `2025-09-15T22:37:17.327740`
@@ -18373,7 +19725,7 @@ pub async fn handle(ctx: Context) {
 
 ```
 
-### 📄 File #379 - `mod.rs`
+### 📄 File #521 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\controller\websocket\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:17.327740`
@@ -18389,7 +19741,7 @@ use super::*;
 
 ```
 
-### 📄 File #380 - `mod.rs`
+### 📄 File #522 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\exception\mod.rs`
 - **Size**: `34 B`
 - **Modified Time**: `2025-09-15T22:37:17.327740`
@@ -18403,10 +19755,10 @@ use super::*;
 
 ```
 
-### 📄 File #381 - `fn.rs`
+### 📄 File #523 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\exception\framework\fn.rs`
-- **Size**: `640 B`
-- **Modified Time**: `2025-09-15T22:37:17.327740`
+- **Size**: `621 B`
+- **Modified Time**: `2025-10-01T21:58:37.522858`
 
 #### Content Preview
 
@@ -18414,7 +19766,8 @@ use super::*;
 use super::*;
 
 #[panic_hook]
-#[epilogue_hooks(
+#[epilogue_macros(
+    clear_response_headers,
     response_status_code(500),
     response_body(&response_body),
     response_header(SERVER => HYPERLANE),
@@ -18428,12 +19781,11 @@ pub async fn panic_hook(ctx: Context) {
     log_error(&response_body).await;
     println_error!(response_body);
     let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-    let _ = ctx.clear_response_headers().await;
 }
 
 ```
 
-### 📄 File #382 - `mod.rs`
+### 📄 File #524 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\exception\framework\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:17.327740`
@@ -18449,7 +19801,7 @@ use super::*;
 
 ```
 
-### 📄 File #383 - `mod.rs`
+### 📄 File #525 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\filter\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.328740`
@@ -18461,7 +19813,7 @@ use super::*;
 
 ```
 
-### 📄 File #384 - `mod.rs`
+### 📄 File #526 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\mapper\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.328740`
@@ -18473,7 +19825,7 @@ use super::*;
 
 ```
 
-### 📄 File #385 - `mod.rs`
+### 📄 File #527 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\mod.rs`
 - **Size**: `50 B`
 - **Modified Time**: `2025-09-15T22:37:17.328740`
@@ -18488,7 +19840,7 @@ use super::*;
 
 ```
 
-### 📄 File #386 - `mod.rs`
+### 📄 File #528 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\mod.rs`
 - **Size**: `79 B`
 - **Modified Time**: `2025-09-15T22:37:17.329739`
@@ -18505,7 +19857,7 @@ use super::*;
 
 ```
 
-### 📄 File #387 - `fn.rs`
+### 📄 File #529 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\cross\fn.rs`
 - **Size**: `311 B`
 - **Modified Time**: `2025-09-15T22:37:17.329739`
@@ -18524,7 +19876,7 @@ pub async fn cross(ctx: Context) {}
 
 ```
 
-### 📄 File #388 - `mod.rs`
+### 📄 File #530 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\cross\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:17.329739`
@@ -18540,7 +19892,7 @@ use super::*;
 
 ```
 
-### 📄 File #389 - `fn.rs`
+### 📄 File #531 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\response\fn.rs`
 - **Size**: `808 B`
 - **Modified Time**: `2025-09-15T22:37:17.329739`
@@ -18574,7 +19926,7 @@ pub async fn response_body(ctx: Context) {}
 
 ```
 
-### 📄 File #390 - `mod.rs`
+### 📄 File #532 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\response\mod.rs`
 - **Size**: `89 B`
 - **Modified Time**: `2025-09-15T22:37:17.329739`
@@ -18591,7 +19943,7 @@ use hyperlane_config::business::templates::*;
 
 ```
 
-### 📄 File #391 - `fn.rs`
+### 📄 File #533 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\send\fn.rs`
 - **Size**: `137 B`
 - **Modified Time**: `2025-09-15T22:37:17.329739`
@@ -18609,7 +19961,7 @@ pub async fn send_body(ctx: Context) {
 
 ```
 
-### 📄 File #392 - `mod.rs`
+### 📄 File #534 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\send\mod.rs`
 - **Size**: `65 B`
 - **Modified Time**: `2025-09-15T22:37:17.329739`
@@ -18626,10 +19978,10 @@ use service::send::*;
 
 ```
 
-### 📄 File #393 - `fn.rs`
+### 📄 File #535 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\upgrade\fn.rs`
-- **Size**: `410 B`
-- **Modified Time**: `2025-09-15T22:37:17.329739`
+- **Size**: `411 B`
+- **Modified Time**: `2025-10-01T21:58:37.527873`
 
 #### Content Preview
 
@@ -18638,7 +19990,7 @@ use super::*;
 
 #[ws]
 #[request_middleware(5)]
-#[epilogue_hooks(
+#[epilogue_macros(
     response_body(&vec![]),
     response_status_code(101),
     response_header(UPGRADE => WEBSOCKET),
@@ -18650,7 +20002,7 @@ pub async fn upgrade(ctx: Context) {}
 
 ```
 
-### 📄 File #394 - `mod.rs`
+### 📄 File #536 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\upgrade\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:17.330739`
@@ -18666,7 +20018,7 @@ use super::*;
 
 ```
 
-### 📄 File #395 - `mod.rs`
+### 📄 File #537 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\response\mod.rs`
 - **Size**: `42 B`
 - **Modified Time**: `2025-09-15T22:37:17.330739`
@@ -18681,7 +20033,7 @@ use super::*;
 
 ```
 
-### 📄 File #396 - `fn.rs`
+### 📄 File #538 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\response\log\fn.rs`
 - **Size**: `264 B`
 - **Modified Time**: `2025-09-15T22:37:17.330739`
@@ -18701,7 +20053,7 @@ pub async fn log(ctx: Context) {
 
 ```
 
-### 📄 File #397 - `mod.rs`
+### 📄 File #539 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\response\log\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:17.330739`
@@ -18717,10 +20069,10 @@ use super::*;
 
 ```
 
-### 📄 File #398 - `fn.rs`
+### 📄 File #540 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\response\send\fn.rs`
-- **Size**: `160 B`
-- **Modified Time**: `2025-09-15T22:37:17.330739`
+- **Size**: `161 B`
+- **Modified Time**: `2025-10-01T21:58:37.527873`
 
 #### Content Preview
 
@@ -18728,12 +20080,12 @@ use super::*;
 use super::*;
 
 #[response_middleware(1)]
-#[epilogue_hooks(http, reject(ctx.get_request_upgrade_type().await.is_ws()), send)]
+#[epilogue_macros(http, reject(ctx.get_request_upgrade_type().await.is_ws()), send)]
 pub async fn send(ctx: Context) {}
 
 ```
 
-### 📄 File #399 - `mod.rs`
+### 📄 File #541 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\response\send\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:17.330739`
@@ -18749,7 +20101,7 @@ use super::*;
 
 ```
 
-### 📄 File #400 - `mod.rs`
+### 📄 File #542 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\mod.rs`
 - **Size**: `176 B`
 - **Modified Time**: `2025-09-15T22:37:17.332739`
@@ -18770,7 +20122,7 @@ pub mod view;
 
 ```
 
-### 📄 File #401 - `mod.rs`
+### 📄 File #543 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\application\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.331741`
@@ -18782,7 +20134,7 @@ pub mod view;
 
 ```
 
-### 📄 File #402 - `mod.rs`
+### 📄 File #544 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\bean\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.331741`
@@ -18794,7 +20146,7 @@ pub mod view;
 
 ```
 
-### 📄 File #403 - `mod.rs`
+### 📄 File #545 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\business\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.331741`
@@ -18806,7 +20158,7 @@ pub mod view;
 
 ```
 
-### 📄 File #404 - `mod.rs`
+### 📄 File #546 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\data\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.331741`
@@ -18818,7 +20170,7 @@ pub mod view;
 
 ```
 
-### 📄 File #405 - `mod.rs`
+### 📄 File #547 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\data_access\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.331741`
@@ -18830,7 +20182,7 @@ pub mod view;
 
 ```
 
-### 📄 File #406 - `mod.rs`
+### 📄 File #548 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\data_transfer\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.331741`
@@ -18842,7 +20194,7 @@ pub mod view;
 
 ```
 
-### 📄 File #407 - `mod.rs`
+### 📄 File #549 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\domain\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.332739`
@@ -18854,7 +20206,7 @@ pub mod view;
 
 ```
 
-### 📄 File #408 - `mod.rs`
+### 📄 File #550 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\param\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.332739`
@@ -18866,7 +20218,7 @@ pub mod view;
 
 ```
 
-### 📄 File #409 - `mod.rs`
+### 📄 File #551 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\persistent\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.332739`
@@ -18878,7 +20230,7 @@ pub mod view;
 
 ```
 
-### 📄 File #410 - `mod.rs`
+### 📄 File #552 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\view\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.332739`
@@ -18890,7 +20242,7 @@ pub mod view;
 
 ```
 
-### 📄 File #411 - `mod.rs`
+### 📄 File #553 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\service\mod.rs`
 - **Size**: `29 B`
 - **Modified Time**: `2025-09-15T22:37:17.333740`
@@ -18904,7 +20256,7 @@ use super::*;
 
 ```
 
-### 📄 File #412 - `fn.rs`
+### 📄 File #554 - `fn.rs`
 - **Path**: `hyperlane-quick-start\app\service\send\fn.rs`
 - **Size**: `371 B`
 - **Modified Time**: `2025-09-15T22:37:17.333740`
@@ -18926,7 +20278,7 @@ pub async fn send_body_hook(ctx: Context) {
 
 ```
 
-### 📄 File #413 - `mod.rs`
+### 📄 File #555 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\service\send\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:17.333740`
@@ -18942,7 +20294,7 @@ use super::*;
 
 ```
 
-### 📄 File #414 - `mod.rs`
+### 📄 File #556 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\utils\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.333740`
@@ -18954,7 +20306,7 @@ use super::*;
 
 ```
 
-### 📄 File #415 - `mod.rs`
+### 📄 File #557 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\view\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.333740`
@@ -18966,7 +20318,7 @@ use super::*;
 
 ```
 
-### 📄 File #416 - `Cargo.toml`
+### 📄 File #558 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\config\Cargo.toml`
 - **Size**: `182 B`
 - **Modified Time**: `2025-09-15T22:37:17.333740`
@@ -18975,23 +20327,23 @@ use super::*;
 
 
 
-### 📄 File #417 - `lib.rs`
+### 📄 File #559 - `lib.rs`
 - **Path**: `hyperlane-quick-start\config\lib.rs`
-- **Size**: `80 B`
-- **Modified Time**: `2025-09-15T22:37:17.335894`
+- **Size**: `73 B`
+- **Modified Time**: `2025-10-01T21:58:37.543855`
 
 #### Content Preview
 
 ```rust
 pub mod business;
 pub mod framework;
-pub mod server_manager;
+pub mod process;
 
 use hyperlane::*;
 
 ```
 
-### 📄 File #418 - `mod.rs`
+### 📄 File #560 - `mod.rs`
 - **Path**: `hyperlane-quick-start\config\business\mod.rs`
 - **Size**: `71 B`
 - **Modified Time**: `2025-09-15T22:37:17.334894`
@@ -19006,19 +20358,19 @@ pub mod templates;
 
 ```
 
-### 📄 File #419 - `const.rs`
+### 📄 File #561 - `const.rs`
 - **Path**: `hyperlane-quick-start\config\business\hello\const.rs`
-- **Size**: `35 B`
-- **Modified Time**: `2025-09-15T22:37:17.334894`
+- **Size**: `43 B`
+- **Modified Time**: `2025-10-01T21:58:37.534840`
 
 #### Content Preview
 
 ```rust
-pub const NAME_KEY: &str = "name";
+pub const NAME_KEY: &'static str = "name";
 
 ```
 
-### 📄 File #420 - `mod.rs`
+### 📄 File #562 - `mod.rs`
 - **Path**: `hyperlane-quick-start\config\business\hello\mod.rs`
 - **Size**: `34 B`
 - **Modified Time**: `2025-09-15T22:37:17.334894`
@@ -19032,19 +20384,19 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #421 - `const.rs`
+### 📄 File #563 - `const.rs`
 - **Path**: `hyperlane-quick-start\config\business\logo_img\const.rs`
-- **Size**: `74 B`
-- **Modified Time**: `2025-09-15T22:37:17.334894`
+- **Size**: `82 B`
+- **Modified Time**: `2025-10-01T21:58:37.534840`
 
 #### Content Preview
 
 ```rust
-pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
+pub const LOGO_IMG_URL: &'static str = "https://docs.ltpp.vip/img/hyperlane.png";
 
 ```
 
-### 📄 File #422 - `mod.rs`
+### 📄 File #564 - `mod.rs`
 - **Path**: `hyperlane-quick-start\config\business\logo_img\mod.rs`
 - **Size**: `34 B`
 - **Modified Time**: `2025-09-15T22:37:17.334894`
@@ -19058,19 +20410,20 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #423 - `const.rs`
+### 📄 File #565 - `const.rs`
 - **Path**: `hyperlane-quick-start\config\business\not_found\const.rs`
-- **Size**: `98 B`
-- **Modified Time**: `2025-09-15T22:37:17.334894`
+- **Size**: `109 B`
+- **Modified Time**: `2025-10-01T21:58:37.543855`
 
 #### Content Preview
 
 ```rust
-pub const NOT_FOUND_HTML: &'static str = include_str!("../../../resources/static/html/404.html");
+pub const NOT_FOUND_HTML: &'static str =
+    include_str!("../../../resources/static/not_found/index.html");
 
 ```
 
-### 📄 File #424 - `mod.rs`
+### 📄 File #566 - `mod.rs`
 - **Path**: `hyperlane-quick-start\config\business\not_found\mod.rs`
 - **Size**: `34 B`
 - **Modified Time**: `2025-09-15T22:37:17.334894`
@@ -19084,19 +20437,19 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #425 - `const.rs`
+### 📄 File #567 - `const.rs`
 - **Path**: `hyperlane-quick-start\config\business\templates\const.rs`
-- **Size**: `99 B`
-- **Modified Time**: `2025-09-15T22:37:17.334894`
+- **Size**: `100 B`
+- **Modified Time**: `2025-10-01T21:58:37.543855`
 
 #### Content Preview
 
 ```rust
-pub const INDEX_HTML: &'static str = include_str!("../../../resources/templates/html/index.html");
+pub const INDEX_HTML: &'static str = include_str!("../../../resources/templates/index/index.html");
 
 ```
 
-### 📄 File #426 - `mod.rs`
+### 📄 File #568 - `mod.rs`
 - **Path**: `hyperlane-quick-start\config\business\templates\mod.rs`
 - **Size**: `34 B`
 - **Modified Time**: `2025-09-15T22:37:17.335894`
@@ -19110,10 +20463,10 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #427 - `const.rs`
+### 📄 File #569 - `const.rs`
 - **Path**: `hyperlane-quick-start\config\framework\const.rs`
-- **Size**: `433 B`
-- **Modified Time**: `2025-09-15T22:37:17.335894`
+- **Size**: `449 B`
+- **Modified Time**: `2025-10-01T21:58:37.543855`
 
 #### Content Preview
 
@@ -19121,10 +20474,10 @@ pub use r#const::*;
 use super::*;
 
 pub const SERVER_PORT: usize = 60000;
-pub const SERVER_HOST: &str = "0.0.0.0";
+pub const SERVER_HOST: &'static str = "0.0.0.0";
 pub const SERVER_BUFFER: usize = 4096;
 pub const SERVER_LOG_SIZE: usize = 100_024_000;
-pub const SERVER_LOG_DIR: &str = "./tmp/logs";
+pub const SERVER_LOG_DIR: &'static str = "./tmp/logs";
 pub const SERVER_INNER_PRINT: bool = true;
 pub const SERVER_INNER_LOG: bool = true;
 pub const SERVER_NODELAY: bool = false;
@@ -19133,7 +20486,7 @@ pub const SERVER_TTI: u32 = 128;
 
 ```
 
-### 📄 File #428 - `mod.rs`
+### 📄 File #570 - `mod.rs`
 - **Path**: `hyperlane-quick-start\config\framework\mod.rs`
 - **Size**: `49 B`
 - **Modified Time**: `2025-09-15T22:37:17.335894`
@@ -19149,22 +20502,22 @@ use super::*;
 
 ```
 
-### 📄 File #429 - `const.rs`
-- **Path**: `hyperlane-quick-start\config\server_manager\const.rs`
-- **Size**: `63 B`
-- **Modified Time**: `2025-09-15T22:37:17.335894`
+### 📄 File #571 - `const.rs`
+- **Path**: `hyperlane-quick-start\config\process\const.rs`
+- **Size**: `71 B`
+- **Modified Time**: `2025-10-01T21:58:37.560829`
 
 #### Content Preview
 
 ```rust
-pub const PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
+pub const PID_FILE_PATH: &'static str = "./tmp/process/hyperlane.pid";
 
 ```
 
-### 📄 File #430 - `mod.rs`
-- **Path**: `hyperlane-quick-start\config\server_manager\mod.rs`
+### 📄 File #572 - `mod.rs`
+- **Path**: `hyperlane-quick-start\config\process\mod.rs`
 - **Size**: `34 B`
-- **Modified Time**: `2025-09-15T22:37:17.335894`
+- **Modified Time**: `2025-10-01T21:58:37.561336`
 
 #### Content Preview
 
@@ -19175,7 +20528,7 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #431 - `Cargo.toml`
+### 📄 File #573 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\init\Cargo.toml`
 - **Size**: `298 B`
 - **Modified Time**: `2025-09-15T22:37:17.335894`
@@ -19184,7 +20537,7 @@ pub use r#const::*;
 
 
 
-### 📄 File #432 - `lib.rs`
+### 📄 File #574 - `lib.rs`
 - **Path**: `hyperlane-quick-start\init\lib.rs`
 - **Size**: `80 B`
 - **Modified Time**: `2025-09-15T22:37:17.336894`
@@ -19200,7 +20553,7 @@ use hyperlane_utils::*;
 
 ```
 
-### 📄 File #433 - `mod.rs`
+### 📄 File #575 - `mod.rs`
 - **Path**: `hyperlane-quick-start\init\business\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.335894`
@@ -19212,7 +20565,7 @@ use hyperlane_utils::*;
 
 ```
 
-### 📄 File #434 - `mod.rs`
+### 📄 File #576 - `mod.rs`
 - **Path**: `hyperlane-quick-start\init\framework\mod.rs`
 - **Size**: `47 B`
 - **Modified Time**: `2025-09-15T22:37:17.336894`
@@ -19227,10 +20580,10 @@ use super::*;
 
 ```
 
-### 📄 File #435 - `fn.rs`
+### 📄 File #577 - `fn.rs`
 - **Path**: `hyperlane-quick-start\init\framework\shutdown\fn.rs`
-- **Size**: `307 B`
-- **Modified Time**: `2025-09-15T22:37:17.336894`
+- **Size**: `251 B`
+- **Modified Time**: `2025-10-01T21:58:37.565503`
 
 #### Content Preview
 
@@ -19238,9 +20591,6 @@ use super::*;
 use super::*;
 
 pub fn set_shutdown(shutdown: ArcFnPinBoxFutureSend<()>) {
-    if SHUTDOWN.get().is_some() {
-        return;
-    }
     let _ = SHUTDOWN.set(shutdown);
 }
 
@@ -19252,7 +20602,7 @@ pub fn shutdown() -> ArcFnPinBoxFutureSend<()> {
 
 ```
 
-### 📄 File #436 - `mod.rs`
+### 📄 File #578 - `mod.rs`
 - **Path**: `hyperlane-quick-start\init\framework\shutdown\mod.rs`
 - **Size**: `107 B`
 - **Modified Time**: `2025-09-15T22:37:17.336894`
@@ -19272,7 +20622,7 @@ use std::sync::{Arc, OnceLock};
 
 ```
 
-### 📄 File #437 - `static.rs`
+### 📄 File #579 - `static.rs`
 - **Path**: `hyperlane-quick-start\init\framework\shutdown\static.rs`
 - **Size**: `98 B`
 - **Modified Time**: `2025-09-15T22:37:17.336894`
@@ -19286,10 +20636,10 @@ pub(super) static SHUTDOWN: OnceLock<ArcFnPinBoxFutureSend<()>> = OnceLock::new(
 
 ```
 
-### 📄 File #438 - `fn.rs`
+### 📄 File #580 - `fn.rs`
 - **Path**: `hyperlane-quick-start\init\framework\wait\fn.rs`
-- **Size**: `1,410 B`
-- **Modified Time**: `2025-09-15T22:37:17.336894`
+- **Size**: `1,403 B`
+- **Modified Time**: `2025-10-01T21:58:37.569735`
 
 #### Content Preview
 
@@ -19336,15 +20686,15 @@ async fn create_server() {
 }
 
 pub fn run() {
-    runtime().block_on(server_manager::create(create_server));
+    runtime().block_on(process::create(create_server));
 }
 
 ```
 
-### 📄 File #439 - `mod.rs`
+### 📄 File #581 - `mod.rs`
 - **Path**: `hyperlane-quick-start\init\framework\wait\mod.rs`
-- **Size**: `220 B`
-- **Modified Time**: `2025-09-15T22:37:17.336894`
+- **Size**: `213 B`
+- **Modified Time**: `2025-10-01T21:58:37.570259`
 
 #### Content Preview
 
@@ -19357,13 +20707,13 @@ use super::{shutdown::*, *};
 #[allow(unused_imports)]
 use hyperlane_app::*;
 use hyperlane_config::framework::*;
-use hyperlane_plugin::server_manager;
+use hyperlane_plugin::process;
 
 use tokio::runtime::{Builder, Runtime};
 
 ```
 
-### 📄 File #440 - `Cargo.toml`
+### 📄 File #582 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\plugin\Cargo.toml`
 - **Size**: `223 B`
 - **Modified Time**: `2025-09-15T22:37:17.336894`
@@ -19372,22 +20722,22 @@ use tokio::runtime::{Builder, Runtime};
 
 
 
-### 📄 File #441 - `lib.rs`
+### 📄 File #583 - `lib.rs`
 - **Path**: `hyperlane-quick-start\plugin\lib.rs`
-- **Size**: `62 B`
-- **Modified Time**: `2025-09-15T22:37:17.337896`
+- **Size**: `55 B`
+- **Modified Time**: `2025-10-01T21:58:37.577576`
 
 #### Content Preview
 
 ```rust
 pub mod log;
-pub mod server_manager;
+pub mod process;
 
 use hyperlane_utils::*;
 
 ```
 
-### 📄 File #442 - `fn.rs`
+### 📄 File #584 - `fn.rs`
 - **Path**: `hyperlane-quick-start\plugin\log\fn.rs`
 - **Size**: `345 B`
 - **Modified Time**: `2025-09-15T22:37:17.337896`
@@ -19420,7 +20770,7 @@ where
 
 ```
 
-### 📄 File #443 - `mod.rs`
+### 📄 File #585 - `mod.rs`
 - **Path**: `hyperlane-quick-start\plugin\log\mod.rs`
 - **Size**: `158 B`
 - **Modified Time**: `2025-09-15T22:37:17.337896`
@@ -19440,7 +20790,7 @@ use hyperlane_utils::once_cell::sync::Lazy;
 
 ```
 
-### 📄 File #444 - `static.rs`
+### 📄 File #586 - `static.rs`
 - **Path**: `hyperlane-quick-start\plugin\log\static.rs`
 - **Size**: `181 B`
 - **Modified Time**: `2025-09-15T22:37:17.337896`
@@ -19459,10 +20809,10 @@ pub static LOG: Lazy<Log> = Lazy::new(|| {
 
 ```
 
-### 📄 File #445 - `fn.rs`
-- **Path**: `hyperlane-quick-start\plugin\server_manager\fn.rs`
+### 📄 File #587 - `fn.rs`
+- **Path**: `hyperlane-quick-start\plugin\process\fn.rs`
 - **Size**: `1,975 B`
-- **Modified Time**: `2025-09-15T22:37:17.337896`
+- **Modified Time**: `2025-10-01T21:58:37.578093`
 
 #### Content Preview
 
@@ -19528,10 +20878,10 @@ where
 
 ```
 
-### 📄 File #446 - `mod.rs`
-- **Path**: `hyperlane-quick-start\plugin\server_manager\mod.rs`
-- **Size**: `123 B`
-- **Modified Time**: `2025-09-15T22:37:17.337896`
+### 📄 File #588 - `mod.rs`
+- **Path**: `hyperlane-quick-start\plugin\process\mod.rs`
+- **Size**: `116 B`
+- **Modified Time**: `2025-10-01T21:58:37.581639`
 
 #### Content Preview
 
@@ -19541,16 +20891,16 @@ mod r#fn;
 pub use r#fn::*;
 
 use super::*;
-use hyperlane_config::server_manager::*;
+use hyperlane_config::process::*;
 
 use std::{env::args, future::Future};
 
 ```
 
-### 📄 File #447 - `404.html`
-- **Path**: `hyperlane-quick-start\resources\static\html\404.html`
+### 📄 File #589 - `index.html`
+- **Path**: `hyperlane-quick-start\resources\static\not_found\index.html`
 - **Size**: `788 B`
-- **Modified Time**: `2025-09-15T22:37:17.338894`
+- **Modified Time**: `2025-10-01T21:58:37.582152`
 
 #### Content Preview
 
@@ -19593,10 +20943,10 @@ use std::{env::args, future::Future};
 
 ```
 
-### 📄 File #448 - `index.html`
-- **Path**: `hyperlane-quick-start\resources\templates\html\index.html`
+### 📄 File #590 - `index.html`
+- **Path**: `hyperlane-quick-start\resources\templates\index\index.html`
 - **Size**: `798 B`
-- **Modified Time**: `2025-09-15T22:37:17.338894`
+- **Modified Time**: `2025-10-01T21:58:37.582673`
 
 #### Content Preview
 
@@ -19639,7 +20989,7 @@ use std::{env::args, future::Future};
 
 ```
 
-### 📄 File #449 - `main.rs`
+### 📄 File #591 - `main.rs`
 - **Path**: `hyperlane-quick-start\src\main.rs`
 - **Size**: `79 B`
 - **Modified Time**: `2025-09-15T22:37:17.338894`
@@ -19655,7 +21005,7 @@ fn main() {
 
 ```
 
-### 📄 File #450 - `.gitignore`
+### 📄 File #592 - `.gitignore`
 - **Path**: `hyperlane-time\.gitignore`
 - **Size**: `18 B`
 - **Modified Time**: `2025-09-15T22:37:15.186780`
@@ -19664,7 +21014,7 @@ fn main() {
 
 
 
-### 📄 File #451 - `Cargo.toml`
+### 📄 File #593 - `Cargo.toml`
 - **Path**: `hyperlane-time\Cargo.toml`
 - **Size**: `746 B`
 - **Modified Time**: `2025-09-15T22:37:15.186780`
@@ -19673,7 +21023,7 @@ fn main() {
 
 
 
-### 📄 File #452 - `LICENSE`
+### 📄 File #594 - `LICENSE`
 - **Path**: `hyperlane-time\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:15.186780`
@@ -19682,7 +21032,7 @@ fn main() {
 
 
 
-### 📄 File #453 - `README.md`
+### 📄 File #595 - `README.md`
 - **Path**: `hyperlane-time\README.md`
 - **Size**: `2,085 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -19756,7 +21106,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #454 - `config`
+### 📄 File #596 - `config`
 - **Path**: `hyperlane-time\.git\config`
 - **Size**: `324 B`
 - **Modified Time**: `2025-09-15T22:37:15.180588`
@@ -19765,7 +21115,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #455 - `description`
+### 📄 File #597 - `description`
 - **Path**: `hyperlane-time\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:12.972096`
@@ -19774,16 +21124,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #456 - `FETCH_HEAD`
+### 📄 File #598 - `FETCH_HEAD`
 - **Path**: `hyperlane-time\.git\FETCH_HEAD`
 - **Size**: `109 B`
-- **Modified Time**: `2025-09-17T09:21:52.207124`
+- **Modified Time**: `2025-10-01T21:58:34.908391`
 
 #### Content Preview
 
 
 
-### 📄 File #457 - `HEAD`
+### 📄 File #599 - `HEAD`
 - **Path**: `hyperlane-time\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:15.173589`
@@ -19792,7 +21142,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #458 - `index`
+### 📄 File #600 - `index`
 - **Path**: `hyperlane-time\.git\index`
 - **Size**: `989 B`
 - **Modified Time**: `2025-09-15T22:44:11.387195`
@@ -19801,7 +21151,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #459 - `ORIG_HEAD`
+### 📄 File #601 - `ORIG_HEAD`
 - **Path**: `hyperlane-time\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:12.969263`
@@ -19810,7 +21160,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #460 - `packed-refs`
+### 📄 File #602 - `packed-refs`
 - **Path**: `hyperlane-time\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:15.164995`
@@ -19819,7 +21169,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #461 - `shallow`
+### 📄 File #603 - `shallow`
 - **Path**: `hyperlane-time\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:15.106441`
@@ -19828,7 +21178,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #462 - `applypatch-msg.sample`
+### 📄 File #604 - `applypatch-msg.sample`
 - **Path**: `hyperlane-time\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:12.972096`
@@ -19837,7 +21187,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #463 - `commit-msg.sample`
+### 📄 File #605 - `commit-msg.sample`
 - **Path**: `hyperlane-time\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:12.972096`
@@ -19846,7 +21196,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #464 - `fsmonitor-watchman.sample`
+### 📄 File #606 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-time\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:12.972096`
@@ -19855,7 +21205,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #465 - `post-update.sample`
+### 📄 File #607 - `post-update.sample`
 - **Path**: `hyperlane-time\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:12.973096`
@@ -19864,7 +21214,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #466 - `pre-applypatch.sample`
+### 📄 File #608 - `pre-applypatch.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:12.973096`
@@ -19873,7 +21223,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #467 - `pre-commit.sample`
+### 📄 File #609 - `pre-commit.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:12.973096`
@@ -19882,7 +21232,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #468 - `pre-merge-commit.sample`
+### 📄 File #610 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:12.973096`
@@ -19891,7 +21241,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #469 - `pre-push.sample`
+### 📄 File #611 - `pre-push.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -19900,7 +21250,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #470 - `pre-rebase.sample`
+### 📄 File #612 - `pre-rebase.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -19909,7 +21259,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #471 - `pre-receive.sample`
+### 📄 File #613 - `pre-receive.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -19918,7 +21268,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #472 - `prepare-commit-msg.sample`
+### 📄 File #614 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-time\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -19927,7 +21277,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #473 - `push-to-checkout.sample`
+### 📄 File #615 - `push-to-checkout.sample`
 - **Path**: `hyperlane-time\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -19936,7 +21286,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #474 - `sendemail-validate.sample`
+### 📄 File #616 - `sendemail-validate.sample`
 - **Path**: `hyperlane-time\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -19945,7 +21295,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #475 - `update.sample`
+### 📄 File #617 - `update.sample`
 - **Path**: `hyperlane-time\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:12.975098`
@@ -19954,7 +21304,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #476 - `exclude`
+### 📄 File #618 - `exclude`
 - **Path**: `hyperlane-time\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:12.975098`
@@ -19963,7 +21313,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #477 - `HEAD`
+### 📄 File #619 - `HEAD`
 - **Path**: `hyperlane-time\.git\logs\HEAD`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:15.174588`
@@ -19972,7 +21322,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #478 - `master`
+### 📄 File #620 - `master`
 - **Path**: `hyperlane-time\.git\logs\refs\heads\master`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:15.175589`
@@ -19981,7 +21331,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #479 - `HEAD`
+### 📄 File #621 - `HEAD`
 - **Path**: `hyperlane-time\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:15.172589`
@@ -19990,7 +21340,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #480 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.idx`
+### 📄 File #622 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.idx`
 - **Path**: `hyperlane-time\.git\objects\pack\pack-6e08451308d3bfead0713de09bb80ca471015a9b.idx`
 - **Size**: `1,520 B`
 - **Modified Time**: `2025-09-15T22:37:15.126243`
@@ -19999,7 +21349,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #481 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.pack`
+### 📄 File #623 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.pack`
 - **Path**: `hyperlane-time\.git\objects\pack\pack-6e08451308d3bfead0713de09bb80ca471015a9b.pack`
 - **Size**: `9,141 B`
 - **Modified Time**: `2025-09-15T22:37:15.125739`
@@ -20008,7 +21358,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #482 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.rev`
+### 📄 File #624 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.rev`
 - **Path**: `hyperlane-time\.git\objects\pack\pack-6e08451308d3bfead0713de09bb80ca471015a9b.rev`
 - **Size**: `116 B`
 - **Modified Time**: `2025-09-15T22:37:15.127246`
@@ -20017,7 +21367,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #483 - `master`
+### 📄 File #625 - `master`
 - **Path**: `hyperlane-time\.git\refs\heads\master`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:15.174588`
@@ -20026,7 +21376,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #484 - `HEAD`
+### 📄 File #626 - `HEAD`
 - **Path**: `hyperlane-time\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:15.171588`
@@ -20035,7 +21385,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #485 - `v0.7.8`
+### 📄 File #627 - `v0.7.8`
 - **Path**: `hyperlane-time\.git\refs\tags\v0.7.8`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:15.170587`
@@ -20044,7 +21394,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #486 - `rust.yml`
+### 📄 File #628 - `rust.yml`
 - **Path**: `hyperlane-time\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:15.186780`
@@ -20307,7 +21657,7 @@ jobs:
 
 ```
 
-### 📄 File #487 - `lib.rs`
+### 📄 File #629 - `lib.rs`
 - **Path**: `hyperlane-time\src\lib.rs`
 - **Size**: `316 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -20334,7 +21684,7 @@ pub(crate) use std::{
 
 ```
 
-### 📄 File #488 - `cfg.rs`
+### 📄 File #630 - `cfg.rs`
 - **Path**: `hyperlane-time\src\time\cfg.rs`
 - **Size**: `1,211 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -20381,7 +21731,7 @@ fn test_methods() {
 
 ```
 
-### 📄 File #489 - `enum.rs`
+### 📄 File #631 - `enum.rs`
 - **Path**: `hyperlane-time\src\time\enum.rs`
 - **Size**: `5,784 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -20571,7 +21921,7 @@ pub fn from_env_var() -> Lang {
 
 ```
 
-### 📄 File #490 - `fn.rs`
+### 📄 File #632 - `fn.rs`
 - **Path**: `hyperlane-time\src\time\fn.rs`
 - **Size**: `8,755 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -20898,7 +22248,7 @@ pub fn timestamp_micros() -> u64 {
 
 ```
 
-### 📄 File #491 - `mod.rs`
+### 📄 File #633 - `mod.rs`
 - **Path**: `hyperlane-time\src\time\mod.rs`
 - **Size**: `64 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -20912,7 +22262,7 @@ pub(crate) mod r#fn;
 
 ```
 
-### 📄 File #492 - `.gitignore`
+### 📄 File #634 - `.gitignore`
 - **Path**: `hyperlane-utils\.gitignore`
 - **Size**: `18 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -20921,16 +22271,16 @@ pub(crate) mod r#fn;
 
 
 
-### 📄 File #493 - `Cargo.toml`
+### 📄 File #635 - `Cargo.toml`
 - **Path**: `hyperlane-utils\Cargo.toml`
-- **Size**: `1,706 B`
-- **Modified Time**: `2025-09-15T22:37:22.172645`
+- **Size**: `1,705 B`
+- **Modified Time**: `2025-10-01T21:58:43.209529`
 
 #### Content Preview
 
 
 
-### 📄 File #494 - `LICENSE`
+### 📄 File #636 - `LICENSE`
 - **Path**: `hyperlane-utils\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -20939,7 +22289,7 @@ pub(crate) mod r#fn;
 
 
 
-### 📄 File #495 - `README.md`
+### 📄 File #637 - `README.md`
 - **Path**: `hyperlane-utils\README.md`
 - **Size**: `1,186 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -20993,7 +22343,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #496 - `config`
+### 📄 File #638 - `config`
 - **Path**: `hyperlane-utils\.git\config`
 - **Size**: `325 B`
 - **Modified Time**: `2025-09-15T22:37:22.166642`
@@ -21002,7 +22352,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #497 - `description`
+### 📄 File #639 - `description`
 - **Path**: `hyperlane-utils\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:19.442179`
@@ -21011,16 +22361,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #498 - `FETCH_HEAD`
+### 📄 File #640 - `FETCH_HEAD`
 - **Path**: `hyperlane-utils\.git\FETCH_HEAD`
-- **Size**: `110 B`
-- **Modified Time**: `2025-09-17T09:21:56.637230`
+- **Size**: `473 B`
+- **Modified Time**: `2025-10-01T21:58:43.162923`
 
 #### Content Preview
 
 
 
-### 📄 File #499 - `HEAD`
+### 📄 File #641 - `HEAD`
 - **Path**: `hyperlane-utils\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:22.158642`
@@ -21029,16 +22379,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #500 - `index`
+### 📄 File #642 - `index`
 - **Path**: `hyperlane-utils\.git\index`
 - **Size**: `639 B`
-- **Modified Time**: `2025-09-15T22:44:17.378905`
+- **Modified Time**: `2025-10-01T21:58:43.209529`
 
 #### Content Preview
 
 
 
-### 📄 File #501 - `ORIG_HEAD`
+### 📄 File #643 - `ORIG_HEAD`
 - **Path**: `hyperlane-utils\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:19.087178`
@@ -21047,7 +22397,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #502 - `packed-refs`
+### 📄 File #644 - `packed-refs`
 - **Path**: `hyperlane-utils\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:22.148643`
@@ -21056,7 +22406,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #503 - `shallow`
+### 📄 File #645 - `shallow`
 - **Path**: `hyperlane-utils\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:22.041021`
@@ -21065,7 +22415,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #504 - `applypatch-msg.sample`
+### 📄 File #646 - `applypatch-msg.sample`
 - **Path**: `hyperlane-utils\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:19.442179`
@@ -21074,7 +22424,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #505 - `commit-msg.sample`
+### 📄 File #647 - `commit-msg.sample`
 - **Path**: `hyperlane-utils\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:19.442179`
@@ -21083,7 +22433,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #506 - `fsmonitor-watchman.sample`
+### 📄 File #648 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-utils\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:19.442179`
@@ -21092,7 +22442,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #507 - `post-update.sample`
+### 📄 File #649 - `post-update.sample`
 - **Path**: `hyperlane-utils\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -21101,7 +22451,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #508 - `pre-applypatch.sample`
+### 📄 File #650 - `pre-applypatch.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -21110,7 +22460,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #509 - `pre-commit.sample`
+### 📄 File #651 - `pre-commit.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -21119,7 +22469,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #510 - `pre-merge-commit.sample`
+### 📄 File #652 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -21128,7 +22478,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #511 - `pre-push.sample`
+### 📄 File #653 - `pre-push.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -21137,7 +22487,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #512 - `pre-rebase.sample`
+### 📄 File #654 - `pre-rebase.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -21146,7 +22496,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #513 - `pre-receive.sample`
+### 📄 File #655 - `pre-receive.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -21155,7 +22505,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #514 - `prepare-commit-msg.sample`
+### 📄 File #656 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-utils\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -21164,7 +22514,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #515 - `push-to-checkout.sample`
+### 📄 File #657 - `push-to-checkout.sample`
 - **Path**: `hyperlane-utils\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -21173,7 +22523,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #516 - `sendemail-validate.sample`
+### 📄 File #658 - `sendemail-validate.sample`
 - **Path**: `hyperlane-utils\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -21182,7 +22532,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #517 - `update.sample`
+### 📄 File #659 - `update.sample`
 - **Path**: `hyperlane-utils\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -21191,7 +22541,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #518 - `exclude`
+### 📄 File #660 - `exclude`
 - **Path**: `hyperlane-utils\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:19.445184`
@@ -21200,25 +22550,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #519 - `HEAD`
+### 📄 File #661 - `HEAD`
 - **Path**: `hyperlane-utils\.git\logs\HEAD`
-- **Size**: `190 B`
-- **Modified Time**: `2025-09-15T22:37:22.160643`
+- **Size**: `343 B`
+- **Modified Time**: `2025-10-01T21:58:43.216333`
 
 #### Content Preview
 
 
 
-### 📄 File #520 - `master`
+### 📄 File #662 - `master`
 - **Path**: `hyperlane-utils\.git\logs\refs\heads\master`
-- **Size**: `190 B`
-- **Modified Time**: `2025-09-15T22:37:22.160643`
+- **Size**: `343 B`
+- **Modified Time**: `2025-10-01T21:58:43.217059`
 
 #### Content Preview
 
 
 
-### 📄 File #521 - `HEAD`
+### 📄 File #663 - `HEAD`
 - **Path**: `hyperlane-utils\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `190 B`
 - **Modified Time**: `2025-09-15T22:37:22.158642`
@@ -21227,7 +22577,97 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #522 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.idx`
+### 📄 File #664 - `master`
+- **Path**: `hyperlane-utils\.git\logs\refs\remotes\origin\master`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-01T21:58:43.102881`
+
+#### Content Preview
+
+
+
+### 📄 File #665 - `f3eb9bddac6b16cedc6f87996a3d4e7f946578`
+- **Path**: `hyperlane-utils\.git\objects\0c\f3eb9bddac6b16cedc6f87996a3d4e7f946578`
+- **Size**: `167 B`
+- **Modified Time**: `2025-10-01T21:58:43.035397`
+
+#### Content Preview
+
+
+
+### 📄 File #666 - `2f8d9a1b3db3bdb1b7db067b437b28b5fd6797`
+- **Path**: `hyperlane-utils\.git\objects\11\2f8d9a1b3db3bdb1b7db067b437b28b5fd6797`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-01T21:58:43.045009`
+
+#### Content Preview
+
+
+
+### 📄 File #667 - `efaf3ab811cdbc2c4d35a227e3580ef7e9b037`
+- **Path**: `hyperlane-utils\.git\objects\13\efaf3ab811cdbc2c4d35a227e3580ef7e9b037`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-01T21:58:43.038516`
+
+#### Content Preview
+
+
+
+### 📄 File #668 - `9d2e65453f76916c714ebafe77f666ec99cf6c`
+- **Path**: `hyperlane-utils\.git\objects\22\9d2e65453f76916c714ebafe77f666ec99cf6c`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-01T21:58:43.033816`
+
+#### Content Preview
+
+
+
+### 📄 File #669 - `42b4648037f4e680a6ac00f8493832087343d4`
+- **Path**: `hyperlane-utils\.git\objects\25\42b4648037f4e680a6ac00f8493832087343d4`
+- **Size**: `167 B`
+- **Modified Time**: `2025-10-01T21:58:43.036982`
+
+#### Content Preview
+
+
+
+### 📄 File #670 - `de6f85aa5602241a9209f14557a546dfefd89d`
+- **Path**: `hyperlane-utils\.git\objects\57\de6f85aa5602241a9209f14557a546dfefd89d`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-01T21:58:43.039884`
+
+#### Content Preview
+
+
+
+### 📄 File #671 - `32acfb7f82699cd6a6459e688ee23e3c6b810f`
+- **Path**: `hyperlane-utils\.git\objects\67\32acfb7f82699cd6a6459e688ee23e3c6b810f`
+- **Size**: `858 B`
+- **Modified Time**: `2025-10-01T21:58:43.045009`
+
+#### Content Preview
+
+
+
+### 📄 File #672 - `15af91ad27fd2d1487f7e43b63cedad7a149b8`
+- **Path**: `hyperlane-utils\.git\objects\9e\15af91ad27fd2d1487f7e43b63cedad7a149b8`
+- **Size**: `858 B`
+- **Modified Time**: `2025-10-01T21:58:43.045009`
+
+#### Content Preview
+
+
+
+### 📄 File #673 - `f0d36334794774236f41b59168e2686aeae332`
+- **Path**: `hyperlane-utils\.git\objects\bb\f0d36334794774236f41b59168e2686aeae332`
+- **Size**: `857 B`
+- **Modified Time**: `2025-10-01T21:58:43.055554`
+
+#### Content Preview
+
+
+
+### 📄 File #674 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.idx`
 - **Path**: `hyperlane-utils\.git\objects\pack\pack-78110a727ebec78f36ff99029a073b184aa2d39d.idx`
 - **Size**: `1,380 B`
 - **Modified Time**: `2025-09-15T22:37:22.095720`
@@ -21236,7 +22676,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #523 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.pack`
+### 📄 File #675 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.pack`
 - **Path**: `hyperlane-utils\.git\objects\pack\pack-78110a727ebec78f36ff99029a073b184aa2d39d.pack`
 - **Size**: `5,003 B`
 - **Modified Time**: `2025-09-15T22:37:22.095720`
@@ -21245,7 +22685,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #524 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.rev`
+### 📄 File #676 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.rev`
 - **Path**: `hyperlane-utils\.git\objects\pack\pack-78110a727ebec78f36ff99029a073b184aa2d39d.rev`
 - **Size**: `96 B`
 - **Modified Time**: `2025-09-15T22:37:22.096749`
@@ -21254,16 +22694,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #525 - `master`
+### 📄 File #677 - `master`
 - **Path**: `hyperlane-utils\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:37:22.159642`
+- **Modified Time**: `2025-10-01T21:58:43.216333`
 
 #### Content Preview
 
 
 
-### 📄 File #526 - `HEAD`
+### 📄 File #678 - `HEAD`
 - **Path**: `hyperlane-utils\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:22.157643`
@@ -21272,7 +22712,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #527 - `v10.3.8`
+### 📄 File #679 - `master`
+- **Path**: `hyperlane-utils\.git\refs\remotes\origin\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:43.102881`
+
+#### Content Preview
+
+
+
+### 📄 File #680 - `v10.3.8`
 - **Path**: `hyperlane-utils\.git\refs\tags\v10.3.8`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:22.155643`
@@ -21281,7 +22730,34 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #528 - `rust.yml`
+### 📄 File #681 - `v11.0.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.0.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:43.160923`
+
+#### Content Preview
+
+
+
+### 📄 File #682 - `v11.0.1`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.0.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:43.161923`
+
+#### Content Preview
+
+
+
+### 📄 File #683 - `v11.0.2`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.0.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-01T21:58:43.102881`
+
+#### Content Preview
+
+
+
+### 📄 File #684 - `rust.yml`
 - **Path**: `hyperlane-utils\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -21544,7 +23020,7 @@ jobs:
 
 ```
 
-### 📄 File #529 - `lib.rs`
+### 📄 File #685 - `lib.rs`
 - **Path**: `hyperlane-utils\src\lib.rs`
 - **Size**: `861 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -21593,7 +23069,7 @@ pub use utoipa_swagger_ui;
 
 ```
 
-### 📄 File #530 - `appreciate.md`
+### 📄 File #686 - `appreciate.md`
 - **Path**: `ltpp-docs\src\appreciate.md`
 - **Size**: `292 B`
 - **Modified Time**: `2025-09-15T22:37:47.184462`
@@ -21628,7 +23104,7 @@ sidebar: false
 
 ```
 
-### 📄 File #531 - `catalog.md`
+### 📄 File #687 - `catalog.md`
 - **Path**: `ltpp-docs\src\catalog.md`
 - **Size**: `294 B`
 - **Modified Time**: `2025-09-15T22:37:47.185463`
@@ -21663,7 +23139,7 @@ sidebar: false
 
 ```
 
-### 📄 File #532 - `README.md`
+### 📄 File #688 - `README.md`
 - **Path**: `ltpp-docs\src\README.md`
 - **Size**: `3,848 B`
 - **Modified Time**: `2025-09-15T22:37:47.184462`
@@ -21869,7 +23345,7 @@ features:
 
 ```
 
-### 📄 File #533 - `license.md`
+### 📄 File #689 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane\license.md`
 - **Size**: `1,226 B`
 - **Modified Time**: `2025-09-15T22:37:47.198100`
@@ -21917,7 +23393,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #534 - `README.md`
+### 📄 File #690 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\README.md`
 - **Size**: `6,821 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -22143,7 +23619,7 @@ async fn main() {
 
 ```
 
-### 📄 File #535 - `config.md`
+### 📄 File #691 - `config.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\config.md`
 - **Size**: `3,725 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -22334,7 +23810,7 @@ server.config(config).await;
 
 ```
 
-### 📄 File #536 - `middleware.md`
+### 📄 File #692 - `middleware.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\middleware.md`
 - **Size**: `1,548 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -22428,7 +23904,7 @@ server.response_middleware(|ctx: Context| async move {
 
 ```
 
-### 📄 File #537 - `panic-hook.md`
+### 📄 File #693 - `panic-hook.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\panic-hook.md`
 - **Size**: `822 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -22472,7 +23948,7 @@ server.panic_hook(|cxt: Context| {
 
 ```
 
-### 📄 File #538 - `README.md`
+### 📄 File #694 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\README.md`
 - **Size**: `219 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -22499,7 +23975,7 @@ dir:
 
 ```
 
-### 📄 File #539 - `route.md`
+### 📄 File #695 - `route.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\route.md`
 - **Size**: `736 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -22545,7 +24021,7 @@ server.route("路由名称", |ctx: Context| async move {
 
 ```
 
-### 📄 File #540 - `runtime.md`
+### 📄 File #696 - `runtime.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\runtime.md`
 - **Size**: `902 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -22604,7 +24080,7 @@ fn main() {
 
 ```
 
-### 📄 File #541 - `server.md`
+### 📄 File #697 - `server.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\server.md`
 - **Size**: `1,162 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -22663,7 +24139,7 @@ let _ = std::io::Write::flush(&mut std::io::stderr());
 
 ```
 
-### 📄 File #542 - `async.md`
+### 📄 File #698 - `async.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\async.md`
 - **Size**: `418 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -22699,7 +24175,7 @@ order: 3
 
 ```
 
-### 📄 File #543 - `build.md`
+### 📄 File #699 - `build.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\build.md`
 - **Size**: `900 B`
 - **Modified Time**: `2025-09-15T22:37:47.196978`
@@ -22750,7 +24226,7 @@ docker run --rm -v "${pwd}:/tmp/cargo_build" ccr.ccs.tencentyun.com/linux_enviro
 
 ```
 
-### 📄 File #544 - `explain.md`
+### 📄 File #700 - `explain.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\explain.md`
 - **Size**: `686 B`
 - **Modified Time**: `2025-09-15T22:37:47.196978`
@@ -22792,7 +24268,7 @@ order: 1
 
 ```
 
-### 📄 File #545 - `flamegraph.md`
+### 📄 File #701 - `flamegraph.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\flamegraph.md`
 - **Size**: `520 B`
 - **Modified Time**: `2025-09-15T22:37:47.196978`
@@ -22839,7 +24315,7 @@ CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --release
 
 ```
 
-### 📄 File #546 - `install.md`
+### 📄 File #702 - `install.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\install.md`
 - **Size**: `440 B`
 - **Modified Time**: `2025-09-15T22:37:47.197598`
@@ -22882,7 +24358,7 @@ cargo add hyperlane;
 
 ```
 
-### 📄 File #547 - `README.md`
+### 📄 File #703 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\README.md`
 - **Size**: `229 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -22910,7 +24386,7 @@ dir:
 
 ```
 
-### 📄 File #548 - `plaintext_flamegraph.svg`
+### 📄 File #704 - `plaintext_flamegraph.svg`
 - **Path**: `ltpp-docs\src\hyperlane\markdown-images\plaintext_flamegraph.svg`
 - **Size**: `519,722 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -22919,7 +24395,7 @@ dir:
 
 
 
-### 📄 File #549 - `auth.md`
+### 📄 File #705 - `auth.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\auth.md`
 - **Size**: `1,392 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -23006,7 +24482,7 @@ async fn main() {
 
 ```
 
-### 📄 File #550 - `cross.md`
+### 📄 File #706 - `cross.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\cross.md`
 - **Size**: `1,156 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -23079,7 +24555,7 @@ async fn main() {
 
 ```
 
-### 📄 File #551 - `README.md`
+### 📄 File #707 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\README.md`
 - **Size**: `228 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -23106,7 +24582,7 @@ dir:
 
 ```
 
-### 📄 File #552 - `static-file.md`
+### 📄 File #708 - `static-file.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\static-file.md`
 - **Size**: `1,966 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -23192,7 +24668,7 @@ async fn main() {
 
 ```
 
-### 📄 File #553 - `timeout.md`
+### 📄 File #709 - `timeout.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\timeout.md`
 - **Size**: `1,554 B`
 - **Modified Time**: `2025-09-15T22:37:47.200103`
@@ -23287,7 +24763,7 @@ async fn main() {
 
 ```
 
-### 📄 File #554 - `directory.md`
+### 📄 File #710 - `directory.md`
 - **Path**: `ltpp-docs\src\hyperlane\quick-start\directory.md`
 - **Size**: `9,126 B`
 - **Modified Time**: `2025-09-15T22:37:47.200103`
@@ -23530,7 +25006,7 @@ order: 1
 
 ```
 
-### 📄 File #555 - `README.md`
+### 📄 File #711 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\quick-start\README.md`
 - **Size**: `1,063 B`
 - **Modified Time**: `2025-09-15T22:37:47.200103`
@@ -23622,7 +25098,7 @@ cargo run hot
 
 ```
 
-### 📄 File #556 - `close-keep-alive.md`
+### 📄 File #712 - `close-keep-alive.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\close-keep-alive.md`
 - **Size**: `10,868 B`
 - **Modified Time**: `2025-09-15T22:37:47.201103`
@@ -24063,7 +25539,7 @@ Percentage of the requests served within a certain time (ms)
 
 ```
 
-### 📄 File #557 - `env.md`
+### 📄 File #713 - `env.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\env.md`
 - **Size**: `2,058 B`
 - **Modified Time**: `2025-09-15T22:37:47.201103`
@@ -24150,7 +25626,7 @@ RUSTFLAGS="-C target-cpu=native -C link-arg=-fuse-ld=lld" cargo run --release
 
 ```
 
-### 📄 File #558 - `flamegraph.md`
+### 📄 File #714 - `flamegraph.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\flamegraph.md`
 - **Size**: `271 B`
 - **Modified Time**: `2025-09-15T22:37:47.201606`
@@ -24183,7 +25659,7 @@ order: 5
 
 ```
 
-### 📄 File #559 - `open-keep-alive.md`
+### 📄 File #715 - `open-keep-alive.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\open-keep-alive.md`
 - **Size**: `11,086 B`
 - **Modified Time**: `2025-09-15T22:37:47.201606`
@@ -24631,7 +26107,7 @@ Percentage of the requests served within a certain time (ms)
 
 ```
 
-### 📄 File #560 - `README.md`
+### 📄 File #716 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\README.md`
 - **Size**: `227 B`
 - **Modified Time**: `2025-09-15T22:37:47.200103`
@@ -24658,7 +26134,7 @@ dir:
 
 ```
 
-### 📄 File #561 - `request-time.md`
+### 📄 File #717 - `request-time.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\request-time.md`
 - **Size**: `630 B`
 - **Modified Time**: `2025-09-15T22:37:47.201606`
@@ -24701,7 +26177,7 @@ order: 2
 
 ```
 
-### 📄 File #562 - `addr.md`
+### 📄 File #718 - `addr.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\addr.md`
 - **Size**: `848 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -24774,7 +26250,7 @@ ctx.try_get_socket_port().await;
 
 ```
 
-### 📄 File #563 - `async.md`
+### 📄 File #719 - `async.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\async.md`
 - **Size**: `1,862 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -24874,7 +26350,7 @@ server.route("/test/async", func).await;
 
 ```
 
-### 📄 File #564 - `attribute.md`
+### 📄 File #720 - `attribute.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\attribute.md`
 - **Size**: `1,349 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -24954,7 +26430,7 @@ println_hyperlane("test");
 
 ```
 
-### 📄 File #565 - `connection.md`
+### 📄 File #721 - `connection.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\connection.md`
 - **Size**: `1,467 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -25052,7 +26528,7 @@ while !ctx.get_closed().await && !ctx.get_aborted().await {
 
 ```
 
-### 📄 File #566 - `cookie.md`
+### 📄 File #722 - `cookie.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\cookie.md`
 - **Size**: `2,890 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -25209,7 +26685,7 @@ ctx.set_response_header(SET_COOKIE, clear_cookie).await;
 
 ```
 
-### 📄 File #567 - `multi-server.md`
+### 📄 File #723 - `multi-server.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\multi-server.md`
 - **Size**: `1,173 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -25271,7 +26747,7 @@ let _ = tokio::join!(app1, app2);
 
 ```
 
-### 📄 File #568 - `panic.md`
+### 📄 File #724 - `panic.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\panic.md`
 - **Size**: `1,203 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -25333,7 +26809,7 @@ server.panic_hook(default_panic_hook);
 
 ```
 
-### 📄 File #569 - `README.md`
+### 📄 File #725 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\README.md`
 - **Size**: `248 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -25360,7 +26836,7 @@ dir:
 
 ```
 
-### 📄 File #570 - `request.md`
+### 📄 File #726 - `request.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\request.md`
 - **Size**: `3,763 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -25565,7 +27041,7 @@ let request_string: String = ctx.get_request_string().await;
 
 ```
 
-### 📄 File #571 - `response.md`
+### 📄 File #727 - `response.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\response.md`
 - **Size**: `4,895 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -25827,7 +27303,7 @@ let response_string: String = ctx.get_response_string().await;
 
 ```
 
-### 📄 File #572 - `route.md`
+### 📄 File #728 - `route.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\route.md`
 - **Size**: `1,656 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -25908,7 +27384,7 @@ ctx.get_route_param("text").await;
 
 ```
 
-### 📄 File #573 - `send.md`
+### 📄 File #729 - `send.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\send.md`
 - **Size**: `4,192 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -26097,7 +27573,7 @@ pub async fn handle(ctx: Context) {
 
 ```
 
-### 📄 File #574 - `sse.md`
+### 📄 File #730 - `sse.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\sse.md`
 - **Size**: `2,773 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -26220,7 +27696,7 @@ eventSource.onerror = function (event) {
 
 ```
 
-### 📄 File #575 - `stream.md`
+### 📄 File #731 - `stream.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\stream.md`
 - **Size**: `1,182 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -26288,7 +27764,7 @@ ctx.closed().await;
 
 ```
 
-### 📄 File #576 - `websocket.md`
+### 📄 File #732 - `websocket.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\websocket.md`
 - **Size**: `1,809 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -26370,7 +27846,7 @@ ws.onclose = () => {
 
 ```
 
-### 📄 File #577 - `inner-utils.md`
+### 📄 File #733 - `inner-utils.md`
 - **Path**: `ltpp-docs\src\hyperlane\utils\inner-utils.md`
 - **Size**: `811 B`
 - **Modified Time**: `2025-09-15T22:37:47.205161`
@@ -26422,7 +27898,7 @@ order: 1
 
 ```
 
-### 📄 File #578 - `README.md`
+### 📄 File #734 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\utils\README.md`
 - **Size**: `218 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -26449,7 +27925,7 @@ dir:
 
 ```
 
-### 📄 File #579 - `recommend-utils.md`
+### 📄 File #735 - `recommend-utils.md`
 - **Path**: `ltpp-docs\src\hyperlane\utils\recommend-utils.md`
 - **Size**: `6,599 B`
 - **Modified Time**: `2025-09-15T22:37:47.205161`
@@ -26733,7 +28209,7 @@ async fn main() {
 
 ```
 
-### 📄 File #580 - `license.md`
+### 📄 File #736 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-ai\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.191474`
@@ -26780,7 +28256,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #581 - `README.md`
+### 📄 File #737 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-ai\README.md`
 - **Size**: `2,725 B`
 - **Modified Time**: `2025-09-15T22:37:47.191474`
@@ -26926,7 +28402,7 @@ OUTPUT_DIR=my_output
 
 ```
 
-### 📄 File #582 - `license.md`
+### 📄 File #738 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-broadcast\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.192474`
@@ -26973,7 +28449,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #583 - `README.md`
+### 📄 File #739 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-broadcast\README.md`
 - **Size**: `2,576 B`
 - **Modified Time**: `2025-09-15T22:37:47.192474`
@@ -27062,7 +28538,7 @@ assert_eq!(rec3.recv().await, Ok(10));
 
 ```
 
-### 📄 File #584 - `license.md`
+### 📄 File #740 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-log\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.192474`
@@ -27109,7 +28585,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #585 - `README.md`
+### 📄 File #741 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-log\README.md`
 - **Size**: `4,112 B`
 - **Modified Time**: `2025-09-15T22:37:47.192474`
@@ -27249,7 +28725,7 @@ let log: Log = Log::new("./logs", DISABLE_LOG_FILE_SIZE);
 
 ```
 
-### 📄 File #586 - `license.md`
+### 📄 File #742 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-macros\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -27296,7 +28772,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #587 - `README.md`
+### 📄 File #743 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-macros\README.md`
 - **Size**: `21,478 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -27939,7 +29415,7 @@ async fn main() {
 
 ```
 
-### 📄 File #588 - `license.md`
+### 📄 File #744 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-plugin-websocket\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -27986,7 +29462,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #589 - `README.md`
+### 📄 File #745 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-plugin-websocket\README.md`
 - **Size**: `6,326 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -28199,7 +29675,7 @@ async fn main() {
 
 ```
 
-### 📄 File #590 - `license.md`
+### 📄 File #746 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-time\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.194473`
@@ -28246,7 +29722,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #591 - `README.md`
+### 📄 File #747 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-time\README.md`
 - **Size**: `2,261 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -28338,7 +29814,7 @@ println!("Current Time with Micros: {}", time_micros());
 
 ```
 
-### 📄 File #592 - `license.md`
+### 📄 File #748 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-utils\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -28385,7 +29861,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #593 - `README.md`
+### 📄 File #749 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-utils\README.md`
 - **Size**: `1,413 B`
 - **Modified Time**: `2025-09-15T22:37:47.194473`
