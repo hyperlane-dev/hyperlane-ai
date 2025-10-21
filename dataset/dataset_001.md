@@ -2,8 +2,8 @@
 
 ### 📄 File #1 - `.gitignore`
 - **Path**: `hyperlane\.gitignore`
-- **Size**: `30 B`
-- **Modified Time**: `2025-09-15T22:37:10.290504`
+- **Size**: `37 B`
+- **Modified Time**: `2025-10-21T08:11:39.651738`
 
 #### Content Preview
 
@@ -11,8 +11,8 @@
 
 ### 📄 File #2 - `Cargo.toml`
 - **Path**: `hyperlane\Cargo.toml`
-- **Size**: `1,333 B`
-- **Modified Time**: `2025-10-01T21:58:27.401735`
+- **Size**: `1,334 B`
+- **Modified Time**: `2025-10-21T08:11:39.652238`
 
 #### Content Preview
 
@@ -29,8 +29,8 @@
 
 ### 📄 File #4 - `README.md`
 - **Path**: `hyperlane\README.md`
-- **Size**: `6,530 B`
-- **Modified Time**: `2025-09-15T22:37:10.290504`
+- **Size**: `7,903 B`
+- **Modified Time**: `2025-10-21T08:11:39.652238`
 
 #### Content Preview
 
@@ -77,125 +77,181 @@ git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```rust
 use hyperlane::*;
 
-async fn send_body_hook(ctx: Context) {
-    let body: ResponseBody = ctx.get_response_body().await;
-    if ctx.get_request().await.is_ws() {
-        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-        ctx.send_body_list_with_data(&frame_list).await.unwrap();
-    } else {
-        ctx.send_body().await.unwrap();
+struct UpgradeMiddleware;
+struct SendBodyMiddleware;
+struct ResponseMiddleware;
+struct ServerPanicHook;
+struct RootRoute;
+struct SseRoute;
+struct WebsocketRoute;
+struct DynamicRoute;
+
+impl ServerHook for SendBodyMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        ctx.set_response_version(HttpVersion::HTTP1_1)
+            .await
+            .set_response_status_code(200)
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONNECTION, KEEP_ALIVE)
+            .await
+            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .await
+            .set_response_header("SocketAddr", &socket_addr)
+            .await;
     }
 }
 
-async fn request_middleware(ctx: Context) {
-    ctx.set_send_body_hook(send_body_hook).await;
-    let socket_addr: String = ctx.get_socket_addr_string().await;
-    ctx.set_response_version(HttpVersion::HTTP1_1)
-        .await
-        .set_response_status_code(200)
-        .await
-        .set_response_header(SERVER, HYPERLANE)
-        .await
-        .set_response_header(CONNECTION, KEEP_ALIVE)
-        .await
-        .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-        .await
-        .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-        .await
-        .set_response_header("SocketAddr", &socket_addr)
-        .await;
-}
-
-async fn upgrade_hook(ctx: Context) {
-    if !ctx.get_request().await.is_ws() {
-        return;
+impl ServerHook for UpgradeMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
     }
-    if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-        let accept_key: String = WebSocketFrame::generate_accept_key(key);
-        ctx.set_response_status_code(101)
-            .await
-            .set_response_header(UPGRADE, WEBSOCKET)
-            .await
-            .set_response_header(CONNECTION, UPGRADE)
-            .await
-            .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-            .await
-            .set_response_body(&vec![])
-            .await
-            .send()
-            .await
-            .unwrap();
-    }
-}
 
-async fn response_middleware(ctx: Context) {
-    if ctx.get_request().await.is_ws() {
-        return;
-    }
-    let _ = ctx.send().await;
-}
-
-async fn root_route(ctx: Context) {
-    let path: RequestPath = ctx.get_request_path().await;
-    let response_body: String = format!("Hello hyperlane => {}", path);
-    let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
-    let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-    ctx.add_response_header(SET_COOKIE, &cookie1)
-        .await
-        .add_response_header(SET_COOKIE, &cookie2)
-        .await
-        .set_response_body(&response_body)
-        .await;
-}
-
-async fn ws_route(ctx: Context) {
-    if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
-        while ctx.ws_from_stream(4096).await.is_ok() {
-            let request_body: Vec<u8> = ctx.get_request_body().await;
-            ctx.set_response_body(&request_body).await;
-            send_body_hook(ctx.clone()).await;
+    async fn handle(self, ctx: &Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            ctx.set_response_status_code(101)
+                .await
+                .set_response_header(UPGRADE, WEBSOCKET)
+                .await
+                .set_response_header(CONNECTION, UPGRADE)
+                .await
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .await
+                .set_response_body(&vec![])
+                .await
+                .send()
+                .await
+                .unwrap();
         }
     }
 }
 
-async fn sse_route(ctx: Context) {
-    let _ = ctx
-        .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-        .await
-        .send()
-        .await;
-    for i in 0..10 {
-        let _ = ctx
-            .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        if ctx.get_request().await.is_ws() {
+            return;
+        }
+        let _ = ctx.send().await;
+    }
+}
+
+impl ServerHook for RootRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let path: RequestPath = ctx.get_request_path().await;
+        let response_body: String = format!("Hello hyperlane => {}", path);
+        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
+        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
+        ctx.add_response_header(SET_COOKIE, &cookie1)
             .await
-            .send_body()
+            .add_response_header(SET_COOKIE, &cookie2)
+            .await
+            .set_response_body(&response_body)
             .await;
     }
-    let _ = ctx.closed().await;
 }
 
-async fn dynamic_route(ctx: Context) {
-    let param: RouteParams = ctx.get_route_params().await;
-    panic!("Test panic {:?}", param);
+impl WebsocketRoute {
+    async fn send_body_hook(&self, ctx: &Context) {
+        let body: ResponseBody = ctx.get_response_body().await;
+        if ctx.get_request().await.is_ws() {
+            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+            ctx.send_body_list_with_data(&frame_list).await.unwrap();
+        } else {
+            ctx.send_body().await.unwrap();
+        }
+    }
 }
 
-async fn panic_hook(ctx: Context) {
-    let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-    let response_body: String = error.to_string();
-    let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-    let _ = ctx
-        .set_response_status_code(500)
-        .await
-        .clear_response_headers()
-        .await
-        .set_response_header(SERVER, HYPERLANE)
-        .await
-        .set_response_header(CONTENT_TYPE, &content_type)
-        .await
-        .set_response_body(&response_body)
-        .await
-        .send()
-        .await;
+impl ServerHook for WebsocketRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        while ctx.ws_from_stream(4096).await.is_ok() {
+            let request_body: Vec<u8> = ctx.get_request_body().await;
+            ctx.set_response_body(&request_body).await;
+            self.send_body_hook(ctx).await;
+        }
+    }
+}
+
+impl ServerHook for SseRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let _ = ctx
+            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .send()
+            .await;
+        for i in 0..10 {
+            let _ = ctx
+                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .await
+                .send_body()
+                .await;
+        }
+        let _ = ctx.closed().await;
+    }
+}
+
+impl ServerHook for DynamicRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let param: RouteParams = ctx.get_route_params().await;
+        panic!("Test panic {:?}", param);
+    }
+}
+
+impl ServerHook for ServerPanicHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        let _ = ctx
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &content_type)
+            .await
+            .set_response_body(&response_body)
+            .await
+            .send()
+            .await;
+    }
 }
 
 #[tokio::main]
@@ -207,16 +263,16 @@ async fn main() {
     config.disable_linger().await;
     config.disable_nodelay().await;
     let server: Server = Server::from(config).await;
-    server.panic_hook(panic_hook).await;
-    server.request_middleware(request_middleware).await;
-    server.request_middleware(upgrade_hook).await;
-    server.response_middleware(response_middleware).await;
-    server.route("/", root_route).await;
-    server.route("/ws", ws_route).await;
-    server.route("/sse", sse_route).await;
-    server.route("/dynamic/{routing}", dynamic_route).await;
-    server.route("/regex/{file:^.*$}", dynamic_route).await;
-    let server_hook: ServerHook = server.run().await.unwrap_or_default();
+    server.request_middleware::<SendBodyMiddleware>().await;
+    server.request_middleware::<UpgradeMiddleware>().await;
+    server.response_middleware::<ResponseMiddleware>().await;
+    server.panic_hook::<ServerPanicHook>().await;
+    server.route::<RootRoute>("/").await;
+    server.route::<WebsocketRoute>("/websocket").await;
+    server.route::<SseRoute>("/sse").await;
+    server.route::<DynamicRoute>("/dynamic/{routing}").await;
+    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
+    let server_hook: ServerControlHook = server.run().await.unwrap_or_default();
     server_hook.wait().await;
 }
 ```
@@ -255,8 +311,8 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ### 📄 File #7 - `FETCH_HEAD`
 - **Path**: `hyperlane\.git\FETCH_HEAD`
-- **Size**: `218 B`
-- **Modified Time**: `2025-10-01T21:58:27.346993`
+- **Size**: `1,827 B`
+- **Modified Time**: `2025-10-21T08:11:39.605139`
 
 #### Content Preview
 
@@ -273,8 +329,8 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ### 📄 File #9 - `index`
 - **Path**: `hyperlane\.git\index`
-- **Size**: `5,106 B`
-- **Modified Time**: `2025-10-01T21:58:27.401735`
+- **Size**: `5,482 B`
+- **Modified Time**: `2025-10-21T08:11:39.664753`
 
 #### Content Preview
 
@@ -283,7 +339,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 ### 📄 File #10 - `ORIG_HEAD`
 - **Path**: `hyperlane\.git\ORIG_HEAD`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:44:07.075363`
+- **Modified Time**: `2025-10-21T08:11:39.649240`
 
 #### Content Preview
 
@@ -444,8 +500,8 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ### 📄 File #28 - `HEAD`
 - **Path**: `hyperlane\.git\logs\HEAD`
-- **Size**: `337 B`
-- **Modified Time**: `2025-10-01T21:58:27.410736`
+- **Size**: `490 B`
+- **Modified Time**: `2025-10-21T08:11:39.666254`
 
 #### Content Preview
 
@@ -453,8 +509,8 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ### 📄 File #29 - `master`
 - **Path**: `hyperlane\.git\logs\refs\heads\master`
-- **Size**: `337 B`
-- **Modified Time**: `2025-10-01T21:58:27.411232`
+- **Size**: `490 B`
+- **Modified Time**: `2025-10-21T08:11:39.666254`
 
 #### Content Preview
 
@@ -471,8 +527,8 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ### 📄 File #31 - `master`
 - **Path**: `hyperlane\.git\logs\refs\remotes\origin\master`
-- **Size**: `153 B`
-- **Modified Time**: `2025-10-01T21:58:27.338365`
+- **Size**: `306 B`
+- **Modified Time**: `2025-10-21T08:11:39.536877`
 
 #### Content Preview
 
@@ -559,16 +615,43 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #41 - `master`
-- **Path**: `hyperlane\.git\refs\heads\master`
-- **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:27.401735`
+### 📄 File #41 - `pack-bd960b883cc1bab9196f292c6b6e978758e08637.idx`
+- **Path**: `hyperlane\.git\objects\pack\pack-bd960b883cc1bab9196f292c6b6e978758e08637.idx`
+- **Size**: `10,648 B`
+- **Modified Time**: `2025-10-21T08:11:39.497406`
 
 #### Content Preview
 
 
 
-### 📄 File #42 - `HEAD`
+### 📄 File #42 - `pack-bd960b883cc1bab9196f292c6b6e978758e08637.pack`
+- **Path**: `hyperlane\.git\objects\pack\pack-bd960b883cc1bab9196f292c6b6e978758e08637.pack`
+- **Size**: `86,633 B`
+- **Modified Time**: `2025-10-21T08:11:39.496906`
+
+#### Content Preview
+
+
+
+### 📄 File #43 - `pack-bd960b883cc1bab9196f292c6b6e978758e08637.rev`
+- **Path**: `hyperlane\.git\objects\pack\pack-bd960b883cc1bab9196f292c6b6e978758e08637.rev`
+- **Size**: `1,420 B`
+- **Modified Time**: `2025-10-21T08:11:39.498406`
+
+#### Content Preview
+
+
+
+### 📄 File #44 - `master`
+- **Path**: `hyperlane\.git\refs\heads\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.665753`
+
+#### Content Preview
+
+
+
+### 📄 File #45 - `HEAD`
 - **Path**: `hyperlane\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:10.272785`
@@ -577,16 +660,133 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #43 - `master`
+### 📄 File #46 - `master`
 - **Path**: `hyperlane\.git\refs\remotes\origin\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:27.338365`
+- **Modified Time**: `2025-10-21T08:11:39.536374`
 
 #### Content Preview
 
 
 
-### 📄 File #44 - `v9.4.4`
+### 📄 File #47 - `v10.0.0`
+- **Path**: `hyperlane\.git\refs\tags\v10.0.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.591831`
+
+#### Content Preview
+
+
+
+### 📄 File #48 - `v10.0.1`
+- **Path**: `hyperlane\.git\refs\tags\v10.0.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.592831`
+
+#### Content Preview
+
+
+
+### 📄 File #49 - `v10.1.0`
+- **Path**: `hyperlane\.git\refs\tags\v10.1.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.593332`
+
+#### Content Preview
+
+
+
+### 📄 File #50 - `v10.2.0`
+- **Path**: `hyperlane\.git\refs\tags\v10.2.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.594331`
+
+#### Content Preview
+
+
+
+### 📄 File #51 - `v10.2.1`
+- **Path**: `hyperlane\.git\refs\tags\v10.2.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.594831`
+
+#### Content Preview
+
+
+
+### 📄 File #52 - `v10.2.2`
+- **Path**: `hyperlane\.git\refs\tags\v10.2.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.595830`
+
+#### Content Preview
+
+
+
+### 📄 File #53 - `v10.3.0`
+- **Path**: `hyperlane\.git\refs\tags\v10.3.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.596330`
+
+#### Content Preview
+
+
+
+### 📄 File #54 - `v10.3.1`
+- **Path**: `hyperlane\.git\refs\tags\v10.3.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.596830`
+
+#### Content Preview
+
+
+
+### 📄 File #55 - `v10.4.0`
+- **Path**: `hyperlane\.git\refs\tags\v10.4.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.597330`
+
+#### Content Preview
+
+
+
+### 📄 File #56 - `v10.4.2`
+- **Path**: `hyperlane\.git\refs\tags\v10.4.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.598331`
+
+#### Content Preview
+
+
+
+### 📄 File #57 - `v10.4.3`
+- **Path**: `hyperlane\.git\refs\tags\v10.4.3`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.598831`
+
+#### Content Preview
+
+
+
+### 📄 File #58 - `v10.5.0`
+- **Path**: `hyperlane\.git\refs\tags\v10.5.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.599832`
+
+#### Content Preview
+
+
+
+### 📄 File #59 - `v10.6.0`
+- **Path**: `hyperlane\.git\refs\tags\v10.6.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.537379`
+
+#### Content Preview
+
+
+
+### 📄 File #60 - `v9.4.4`
 - **Path**: `hyperlane\.git\refs\tags\v9.4.4`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:10.271784`
@@ -595,7 +795,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #45 - `v9.4.5`
+### 📄 File #61 - `v9.4.5`
 - **Path**: `hyperlane\.git\refs\tags\v9.4.5`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:27.338365`
@@ -604,7 +804,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #46 - `rust.yml`
+### 📄 File #62 - `v9.4.6`
+- **Path**: `hyperlane\.git\refs\tags\v9.4.6`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.600332`
+
+#### Content Preview
+
+
+
+### 📄 File #63 - `v9.5.0`
+- **Path**: `hyperlane\.git\refs\tags\v9.5.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:39.600831`
+
+#### Content Preview
+
+
+
+### 📄 File #64 - `rust.yml`
 - **Path**: `hyperlane\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:10.289504`
@@ -867,10 +1085,10 @@ jobs:
 
 ```
 
-### 📄 File #47 - `lib.rs`
+### 📄 File #65 - `lib.rs`
 - **Path**: `hyperlane\src\lib.rs`
-- **Size**: `1,435 B`
-- **Modified Time**: `2025-09-15T22:37:10.294505`
+- **Size**: `1,506 B`
+- **Modified Time**: `2025-10-21T08:11:39.658747`
 
 #### Content Preview
 
@@ -890,6 +1108,7 @@ mod attribute;
 mod config;
 mod context;
 mod error;
+mod handler;
 mod hook;
 mod lifecycle;
 mod panic;
@@ -901,12 +1120,14 @@ pub use attribute::*;
 pub use config::*;
 pub use context::*;
 pub use error::*;
+pub use handler::*;
 pub use hook::*;
 pub use panic::*;
 pub use route::*;
 pub use server::*;
 
 pub use http_type::*;
+pub use inventory::{collect as server_collect, submit as server_submit};
 
 pub(crate) use lifecycle::*;
 
@@ -923,7 +1144,6 @@ pub(crate) use std::{
     time::Duration,
 };
 
-pub(crate) use inventory::collect;
 pub(crate) use lombok_macros::*;
 pub(crate) use regex::Regex;
 pub(crate) use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -939,10 +1159,10 @@ pub(crate) use tokio::{
 
 ```
 
-### 📄 File #48 - `enum.rs`
+### 📄 File #66 - `enum.rs`
 - **Path**: `hyperlane\src\attribute\enum.rs`
-- **Size**: `868 B`
-- **Modified Time**: `2025-09-15T22:37:10.290504`
+- **Size**: `838 B`
+- **Modified Time**: `2025-10-21T08:11:39.652739`
 
 #### Content Preview
 
@@ -968,15 +1188,13 @@ pub(crate) enum Attribute {
 pub(crate) enum InternalAttribute {
     /// The attribute key for panic handling.
     Panic,
-    /// The attribute key for send body hook.
-    SendBodyHook,
-    /// The attribute key for send hook.
-    SendHook,
+    /// The attribute key for hook functions with a custom identifier.
+    Hook(String),
 }
 
 ```
 
-### 📄 File #49 - `impl.rs`
+### 📄 File #67 - `impl.rs`
 - **Path**: `hyperlane\src\attribute\impl.rs`
 - **Size**: `1,228 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -1036,7 +1254,7 @@ impl From<InternalAttribute> for Attribute {
 
 ```
 
-### 📄 File #50 - `mod.rs`
+### 📄 File #68 - `mod.rs`
 - **Path**: `hyperlane\src\attribute\mod.rs`
 - **Size**: `116 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -1054,27 +1272,27 @@ pub(crate) use r#enum::*;
 
 ```
 
-### 📄 File #51 - `type.rs`
+### 📄 File #69 - `type.rs`
 - **Path**: `hyperlane\src\attribute\type.rs`
-- **Size**: `258 B`
-- **Modified Time**: `2025-09-15T22:37:10.291505`
+- **Size**: `229 B`
+- **Modified Time**: `2025-10-21T08:11:39.652739`
 
 #### Content Preview
 
 ```rust
 use crate::*;
 
-/// A type alias for a HashMap storing string keys and thread-safe, shareable values.
+/// A type alias for a thread-safe attribute storage.
 ///
 /// This type is used for storing attributes that can be safely shared across threads.
-pub type HashMapArcAnySendSync = HashMap<String, ArcAnySendSync>;
+pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
 
 ```
 
-### 📄 File #52 - `impl.rs`
+### 📄 File #70 - `impl.rs`
 - **Path**: `hyperlane\src\config\impl.rs`
-- **Size**: `6,766 B`
-- **Modified Time**: `2025-09-15T22:37:10.291505`
+- **Size**: `7,265 B`
+- **Modified Time**: `2025-10-21T08:11:39.652739`
 
 #### Content Preview
 
@@ -1089,7 +1307,7 @@ impl Default for ServerConfigInner {
     ///
     /// # Returns
     ///
-    /// A `ServerConfigInner` instance with default settings.
+    /// - `Self` - A `ServerConfigInner` instance with default settings.
     fn default() -> Self {
         Self {
             host: DEFAULT_HOST.to_owned(),
@@ -1110,7 +1328,7 @@ impl Default for ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `ServerConfig` instance with default settings.
+    /// - `Self` - A `ServerConfig` instance with default settings.
     fn default() -> Self {
         Self(arc_rwlock(ServerConfigInner::default()))
     }
@@ -1127,11 +1345,11 @@ impl PartialEq for ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `ServerConfig` to compare against.
+    /// - `&Self`- The other `ServerConfig` to compare against.
     ///
     /// # Returns
     ///
-    /// A `bool` indicating whether the configurations are equal.
+    /// - `bool` - Indicating whether the configurations are equal.
     fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(self.get_0(), other.get_0()) {
             return true;
@@ -1155,7 +1373,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A new `ServerConfig` instance.
+    /// - `Self` - A new `ServerConfig` instance.
     pub async fn new() -> Self {
         Self::default()
     }
@@ -1164,8 +1382,8 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `RwLockReadGuardServerConfigInner` for the inner configuration.
-    async fn read(&self) -> RwLockReadGuardServerConfigInner {
+    /// - `ConfigReadGuard` - A `ConfigReadGuard` for the inner configuration.
+    async fn read(&self) -> ConfigReadGuard<'_> {
         self.get_0().read().await
     }
 
@@ -1173,8 +1391,8 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `RwLockWriteGuardServerConfigInner` for the inner configuration.
-    async fn write(&self) -> RwLockWriteGuardServerConfigInner {
+    /// - `ConfigWriteGuard` - A `ConfigWriteGuard` for the inner configuration.
+    async fn write(&self) -> ConfigWriteGuard<'_> {
         self.get_0().write().await
     }
 
@@ -1185,7 +1403,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A `ServerConfigInner` instance containing the current server configuration.
+    /// - `ServerConfigInner` - A `ServerConfigInner` instance containing the current server configuration.
     pub(crate) async fn get_inner(&self) -> ServerConfigInner {
         self.read().await.clone()
     }
@@ -1194,11 +1412,11 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `H`: The host address to set.
+    /// - `H`- The host address to set.
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn host<H: ToString>(&self, host: H) -> &Self {
         self.write().await.set_host(host.to_string());
         self
@@ -1208,11 +1426,11 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `usize`: The port number to set.
+    /// - `usize`- The port number to set.
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn port(&self, port: usize) -> &Self {
         self.write().await.set_port(port);
         self
@@ -1222,11 +1440,11 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `usize`: The HTTP buffer size to set.
+    /// - `usize`- The HTTP buffer size to set.
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn buffer(&self, buffer: usize) -> &Self {
         self.write().await.set_buffer(buffer);
         self
@@ -1236,11 +1454,11 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `bool`: The `bool` value for `TCP_NODELAY`.
+    /// - `bool`- The `bool` value for `TCP_NODELAY`.
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn nodelay(&self, nodelay: bool) -> &Self {
         self.write().await.set_nodelay(Some(nodelay));
         self
@@ -1250,7 +1468,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn enable_nodelay(&self) -> &Self {
         self.nodelay(true).await
     }
@@ -1259,7 +1477,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn disable_nodelay(&self) -> &Self {
         self.nodelay(false).await
     }
@@ -1268,11 +1486,11 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `OptionDuration`: The `Duration` value for `SO_LINGER`.
+    /// - `OptionDuration`- The `Duration` value for `SO_LINGER`.
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn linger(&self, linger_opt: OptionDuration) -> &Self {
         self.write().await.set_linger(linger_opt);
         self
@@ -1282,11 +1500,11 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `Duration`: The `Duration` value for `SO_LINGER`.
+    /// - `Duration`- The `Duration` value for `SO_LINGER`.
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn enable_linger(&self, linger: Duration) -> &Self {
         self.linger(Some(linger)).await;
         self
@@ -1296,7 +1514,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn disable_linger(&self) -> &Self {
         self.linger(None).await;
         self
@@ -1306,11 +1524,11 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `u32`: The `u32` value for `IP_TTL`.
+    /// - `u32`- The `u32` value for `IP_TTL`.
     ///
     /// # Returns
     ///
-    /// A reference to `Self` for method chaining.
+    /// - `&Self` - A reference to `Self` for method chaining.
     pub async fn ttl(&self, ttl: u32) -> &Self {
         self.write().await.set_ttl(Some(ttl));
         self
@@ -1320,19 +1538,28 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `&str`: The JSON string to parse.
+    /// - `&str`- The JSON string to parse.
     ///
     /// # Returns
     ///
-    /// A `ServerConfigResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
-    pub fn from_str(config_str: &str) -> ServerConfigResult {
+    /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
+    ///   Creates a `ServerConfig` from a JSON string.
+    ///
+    /// # Arguments
+    ///
+    /// - `config_str` - The JSON string to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
+    pub fn from_json_str(config_str: &str) -> ConfigLoadResult {
         serde_json::from_str(config_str).map(|config: ServerConfigInner| Self(arc_rwlock(config)))
     }
 }
 
 ```
 
-### 📄 File #53 - `mod.rs`
+### 📄 File #71 - `mod.rs`
 - **Path**: `hyperlane\src\config\mod.rs`
 - **Size**: `112 B`
 - **Modified Time**: `2025-09-15T22:37:10.291505`
@@ -1349,10 +1576,10 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #54 - `struct.rs`
+### 📄 File #72 - `struct.rs`
 - **Path**: `hyperlane\src\config\struct.rs`
-- **Size**: `1,714 B`
-- **Modified Time**: `2025-09-15T22:37:10.291505`
+- **Size**: `1,706 B`
+- **Modified Time**: `2025-10-21T08:11:39.652739`
 
 #### Content Preview
 
@@ -1403,39 +1630,39 @@ pub(crate) struct ServerConfigInner {
 /// This structure wraps `ServerConfigInner` in an `Arc<RwLock<ServerConfigInner>>`
 /// to allow for safe concurrent access and modification of the server settings.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug)]
-pub struct ServerConfig(#[get(pub(super))] pub(super) ArcRwLockServerConfigInner);
+pub struct ServerConfig(#[get(pub(super))] pub(super) SharedServerConfig);
 
 ```
 
-### 📄 File #55 - `type.rs`
+### 📄 File #73 - `type.rs`
 - **Path**: `hyperlane\src\config\type.rs`
-- **Size**: `736 B`
-- **Modified Time**: `2025-09-15T22:37:10.292505`
+- **Size**: `653 B`
+- **Modified Time**: `2025-10-21T08:11:39.653742`
 
 #### Content Preview
 
 ```rust
 use crate::*;
 
-/// A type alias for a `Result<ServerConfig, serde_json::Error>`.
+/// A type alias for configuration loading result.
 ///
 /// This is used for operations that can fail during `ServerConfig` deserialization.
-pub type ServerConfigResult = Result<ServerConfig, serde_json::Error>;
-/// A type alias for `RwLockReadGuard<'a, ServerConfigInner>`.
+pub type ConfigLoadResult = Result<ServerConfig, serde_json::Error>;
+/// A type alias for configuration read guard.
 ///
 /// This provides read-only access to the `ServerConfigInner` wrapped in a `RwLock`.
-pub(crate) type RwLockReadGuardServerConfigInner<'a> = RwLockReadGuard<'a, ServerConfigInner>;
-/// A type alias for `RwLockWriteGuard<'a, ServerConfigInner>`.
+pub(crate) type ConfigReadGuard<'a> = RwLockReadGuard<'a, ServerConfigInner>;
+/// A type alias for configuration write guard.
 ///
 /// This provides mutable access to the `ServerConfigInner` wrapped in a `RwLock`.
-pub(crate) type RwLockWriteGuardServerConfigInner<'a> = RwLockWriteGuard<'a, ServerConfigInner>;
+pub(crate) type ConfigWriteGuard<'a> = RwLockWriteGuard<'a, ServerConfigInner>;
 
 ```
 
-### 📄 File #56 - `impl.rs`
+### 📄 File #74 - `impl.rs`
 - **Path**: `hyperlane\src\context\impl.rs`
-- **Size**: `50,212 B`
-- **Modified Time**: `2025-09-15T22:37:10.292505`
+- **Size**: `49,382 B`
+- **Modified Time**: `2025-10-21T08:11:39.654245`
 
 #### Content Preview
 
@@ -1453,6 +1680,7 @@ impl Context {
     /// # Returns
     ///
     /// - `Context` - The newly created context instance.
+    #[inline]
     pub(crate) fn from_internal_context(ctx: ContextInner) -> Self {
         Self(arc_rwlock(ctx))
     }
@@ -1481,8 +1709,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `RwLockReadContextInner` - The read guard for the inner context.
-    async fn read(&self) -> RwLockReadContextInner {
+    /// - `ContextReadGuard` - The read guard for the inner context.
+    async fn read(&self) -> ContextReadGuard<'_> {
         self.get_0().read().await
     }
 
@@ -1490,8 +1718,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `RwLockWriteContextInner` - The write guard for the inner context.
-    async fn write(&self) -> RwLockWriteContextInner {
+    /// - `ContextWriteGuard` - The write guard for the inner context.
+    async fn write(&self) -> ContextWriteGuard<'_> {
         self.get_0().write().await
     }
 
@@ -1606,9 +1834,7 @@ impl Context {
     /// - `OptionSocketAddr` - The socket address of the remote peer if available.
     pub async fn try_get_socket_addr(&self) -> OptionSocketAddr {
         let stream_result: OptionArcRwLockStream = self.try_get_stream().await;
-        if stream_result.is_none() {
-            return None;
-        }
+        stream_result.as_ref()?;
         stream_result.unwrap().read().await.peer_addr().ok()
     }
 
@@ -2594,7 +2820,7 @@ impl Context {
     ///
     /// The status code of the response.
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
-        self.read().await.get_response().get_status_code().clone()
+        *self.read().await.get_response().get_status_code()
     }
 
     /// Sets the status code for the response.
@@ -2661,8 +2887,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `HashMapArcAnySendSync` - A map containing all attributes.
-    pub async fn get_attributes(&self) -> HashMapArcAnySendSync {
+    /// - `ThreadSafeAttributeStore` - A map containing all attributes.
+    pub async fn get_attributes(&self) -> ThreadSafeAttributeStore {
         self.read().await.get_attributes().clone()
     }
 
@@ -2786,8 +3012,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionPanic` - The panic information if a panic was caught.
-    pub async fn try_get_panic(&self) -> OptionPanic {
+    /// - `OptionalPanicInfo` - The panic information if a panic was caught.
+    pub async fn try_get_panic(&self) -> OptionalPanicInfo {
         self.try_get_internal_attribute(InternalAttribute::Panic)
             .await
     }
@@ -2806,63 +3032,42 @@ impl Context {
             .await
     }
 
-    /// Sets the send function for the context.
+    /// Sets a hook function for the context with a custom key.
     ///
     /// # Arguments
     ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>, Fut: FutureSendStatic<()>` - The send function to store.
+    /// - `ToString` - The key to identify this hook.
+    /// - `FnContextSendSyncStatic<Fut, ()>, Fut: FutureSendStatic<()>` - The hook function to store.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_hook<F, Fut>(&self, hook: F) -> &Self
+    pub async fn set_hook<K, F, Fut>(&self, key: K, hook: F) -> &Self
     where
+        K: ToString,
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        let send_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::SendHook, send_hook)
+        let hook_fn: SharedHookHandler<()> =
+            Arc::new(move |ctx: Context| -> SendableAsyncTask<()> { Box::pin(hook(ctx)) });
+        self.set_internal_attribute(InternalAttribute::Hook(key.to_string()), hook_fn)
             .await
     }
 
-    /// Retrieves the send function if it has been set.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send function if it has been set.
-    pub async fn try_get_send_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
-        self.try_get_internal_attribute(InternalAttribute::SendHook)
-            .await
-    }
-
-    /// Sets the send body function for the context.
+    /// Retrieves a hook function if it has been set.
     ///
     /// # Arguments
     ///
-    /// - `F` - The send body function to store.
+    /// - `K: ToString` - The key to identify the hook.
     ///
     /// # Returns
     ///
-    /// - `&Self` - A reference to the modified context.
-    pub async fn set_send_body_hook<F, Fut>(&self, hook: F) -> &Self
+    /// - `OptionalHookHandler<()>` - The hook function if it has been set.
+    pub async fn try_get_hook<K>(&self, key: K) -> OptionalHookHandler<()>
     where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        K: ToString,
     {
-        let send_body_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::SendBodyHook, send_body_hook)
-            .await
-    }
-
-    /// Retrieves the send body function if it has been set.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionArcFnContextPinBoxSendSync<()>` - The send body function if it has been set.
-    pub async fn try_get_send_body_hook(&self) -> OptionArcFnContextPinBoxSendSync<()> {
-        self.try_get_internal_attribute(InternalAttribute::SendBodyHook)
+        self.try_get_internal_attribute(InternalAttribute::Hook(key.to_string()))
             .await
     }
 
@@ -2870,8 +3075,8 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `&mut Lifecycle` - The lifecycle to update.
-    pub(crate) async fn update_lifecycle_status(&self, lifecycle: &mut Lifecycle) {
+    /// - `&mut RequestLifecycle` - The request lifecycle to update.
+    pub(crate) async fn update_lifecycle_status(&self, lifecycle: &mut RequestLifecycle) {
         let keep_alive: bool = !self.get_closed().await && lifecycle.is_keep_alive();
         let aborted: bool = self.get_aborted().await;
         lifecycle.update_status(aborted, keep_alive);
@@ -3111,7 +3316,7 @@ impl Context {
                 Request::ws_from_stream(stream, buffer, &mut last_request).await;
             match request_res.as_ref() {
                 Ok(request) => {
-                    self.set_request(&request).await;
+                    self.set_request(request).await;
                 }
                 Err(_) => {
                     self.set_request(&last_request).await;
@@ -3125,7 +3330,7 @@ impl Context {
 
 ```
 
-### 📄 File #57 - `mod.rs`
+### 📄 File #75 - `mod.rs`
 - **Path**: `hyperlane\src\context\mod.rs`
 - **Size**: `120 B`
 - **Modified Time**: `2025-09-15T22:37:10.292505`
@@ -3143,10 +3348,10 @@ pub(crate) use r#type::*;
 
 ```
 
-### 📄 File #58 - `struct.rs`
+### 📄 File #76 - `struct.rs`
 - **Path**: `hyperlane\src\context\struct.rs`
-- **Size**: `1,814 B`
-- **Modified Time**: `2025-09-15T22:37:10.292505`
+- **Size**: `1,817 B`
+- **Modified Time**: `2025-10-21T08:11:39.654245`
 
 #### Content Preview
 
@@ -3193,7 +3398,7 @@ pub(crate) struct ContextInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    attributes: HashMapArcAnySendSync,
+    attributes: ThreadSafeAttributeStore,
 }
 
 /// The main application context, providing thread-safe access to request and response data.
@@ -3205,28 +3410,28 @@ pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextInner>);
 
 ```
 
-### 📄 File #59 - `type.rs`
+### 📄 File #77 - `type.rs`
 - **Path**: `hyperlane\src\context\type.rs`
-- **Size**: `451 B`
-- **Modified Time**: `2025-09-15T22:37:10.292505`
+- **Size**: `427 B`
+- **Modified Time**: `2025-10-21T08:11:39.654745`
 
 #### Content Preview
 
 ```rust
 use crate::*;
 
-/// A type alias for a write guard on the inner context data.
+/// A type alias for a write guard on the context data.
 ///
 /// This provides exclusive, mutable access to the `ContextInner` data.
-pub(crate) type RwLockWriteContextInner<'a> = RwLockWriteGuard<'a, ContextInner>;
-/// A type alias for a read guard on the inner context data.
+pub(crate) type ContextWriteGuard<'a> = RwLockWriteGuard<'a, ContextInner>;
+/// A type alias for a read guard on the context data.
 ///
 /// This provides shared, immutable access to the `ContextInner` data.
-pub(crate) type RwLockReadContextInner<'a> = RwLockReadGuard<'a, ContextInner>;
+pub(crate) type ContextReadGuard<'a> = RwLockReadGuard<'a, ContextInner>;
 
 ```
 
-### 📄 File #60 - `enum.rs`
+### 📄 File #78 - `enum.rs`
 - **Path**: `hyperlane\src\error\enum.rs`
 - **Size**: `931 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3264,7 +3469,7 @@ pub enum RouteError {
 
 ```
 
-### 📄 File #61 - `mod.rs`
+### 📄 File #79 - `mod.rs`
 - **Path**: `hyperlane\src\error\mod.rs`
 - **Size**: `43 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3278,15 +3483,164 @@ pub use r#enum::*;
 
 ```
 
-### 📄 File #62 - `enum.rs`
-- **Path**: `hyperlane\src\hook\enum.rs`
-- **Size**: `1,157 B`
-- **Modified Time**: `2025-09-15T22:37:10.293505`
+### 📄 File #80 - `fn.rs`
+- **Path**: `hyperlane\src\handler\fn.rs`
+- **Size**: `547 B`
+- **Modified Time**: `2025-10-21T08:11:39.654745`
 
 #### Content Preview
 
 ```rust
 use crate::*;
+
+/// Creates a new `ServerHookHandler` from a trait object.
+///
+/// # Arguments
+///
+/// - `ServerHook` - The trait object implementing `ServerHook`.
+///
+/// # Returns
+///
+/// - `ServerHookHandler` - A new `ServerHookHandler` instance.
+#[inline]
+pub(crate) fn create_server_hook<R>() -> ServerHookHandler
+where
+    R: ServerHook,
+{
+    Arc::new(move |ctx: &Context| -> SendableAsyncTask<()> {
+        let ctx: Context = ctx.clone();
+        Box::pin(async move {
+            R::new(&ctx).await.handle(&ctx).await;
+        })
+    })
+}
+
+```
+
+### 📄 File #81 - `mod.rs`
+- **Path**: `hyperlane\src\handler\mod.rs`
+- **Size**: `133 B`
+- **Modified Time**: `2025-10-21T08:11:39.655244`
+
+#### Content Preview
+
+```rust
+pub(crate) mod r#fn;
+pub(crate) mod r#trait;
+pub(crate) mod r#type;
+
+pub use r#trait::*;
+pub use r#type::*;
+
+pub(crate) use r#fn::*;
+
+```
+
+### 📄 File #82 - `trait.rs`
+- **Path**: `hyperlane\src\handler\trait.rs`
+- **Size**: `1,540 B`
+- **Modified Time**: `2025-10-21T08:11:39.655244`
+
+#### Content Preview
+
+```rust
+use crate::*;
+
+/// Trait for server lifecycle hooks that process requests.
+///
+/// `ServerHook` provides a unified interface for different types of request processing
+/// handlers in the server lifecycle, including route handlers, middleware, and panic hooks.
+/// All hooks follow the same pattern: instantiation via `new` and execution via `handle`.
+///
+/// This trait is designed to work with the server's request processing pipeline, where
+/// each hook receives the `Context` directly for both initialization and processing.
+pub trait ServerHook: Send + Sync + 'static {
+    /// Creates a new instance of this hook from the context.
+    ///
+    /// This method is called by the framework to instantiate the hook,
+    /// passing in the `Context` directly.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context containing all request/response data.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves to a new instance of this hook.
+    fn new(ctx: &Context) -> impl Future<Output = Self> + Send;
+
+    /// Executes the hook's processing logic.
+    ///
+    /// This method contains the actual logic for processing the request.
+    /// It receives the `Context` as a parameter for accessing request/response data.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context for accessing request/response data.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves when the processing is complete.
+    fn handle(self, ctx: &Context) -> impl Future<Output = ()> + Send;
+}
+
+```
+
+### 📄 File #83 - `type.rs`
+- **Path**: `hyperlane\src\handler\type.rs`
+- **Size**: `1,275 B`
+- **Modified Time**: `2025-10-21T08:11:39.655745`
+
+#### Content Preview
+
+```rust
+use crate::*;
+
+/// Type alias for a shared server hook handler.
+///
+/// This type allows storing handlers (routes and middleware) of different concrete types
+/// in the same collection. The handler takes a `&Context` and returns
+/// a pinned, boxed future that resolves to `()`.
+pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Send + Sync>;
+/// Type alias for an optional server hook handler.
+///
+/// This type allows storing optional handlers of different concrete types in
+/// the same collection. The handler takes a `&Context` and returns
+/// a pinned, boxed future that resolves to `()`.
+pub type OptionalServerHookHandler = Option<ServerHookHandler>;
+/// Type alias for a list of server hooks.
+///
+/// Used to store middleware handlers in the request/response processing pipeline.
+pub type ServerHookList = Vec<ServerHookHandler>;
+/// Type alias for a map of server hook handlers.
+///
+/// Used for fast lookup of exact-match routes.
+pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
+/// Type alias for a collection of pattern-based server hook routes.
+///
+/// Used to store dynamic and regex route handlers with their matching patterns.
+pub(crate) type ServerHookPatternRoutes = Vec<(RoutePattern, ServerHookHandler)>;
+
+```
+
+### 📄 File #84 - `enum.rs`
+- **Path**: `hyperlane\src\hook\enum.rs`
+- **Size**: `1,451 B`
+- **Modified Time**: `2025-10-21T08:11:39.655745`
+
+#### Content Preview
+
+```rust
+use crate::*;
+
+/// Represents different handler types for hooks.
+#[derive(Clone)]
+pub enum HookHandler {
+    /// Arc handler (used for request/response middleware and routes)
+    Handler(ServerHookHandler),
+    /// Factory function that creates a handler when called
+    Factory(ServerHookHandlerFactory),
+}
 
 /// Represents different kinds of hooks in the server lifecycle.
 ///
@@ -3298,28 +3652,28 @@ use crate::*;
 pub enum HookType {
     /// Triggered when a panic occurs in the server.
     ///
-    /// - `Option<isize>`: Optional priority of the panic hook. `None` means default.
+    /// - `Option<isize>`- Optional priority of the panic hook. `None` means default.
     PanicHook(Option<isize>),
     /// Executed before a request reaches its designated route handler.
     ///
-    /// - `Option<isize>`: Optional priority of the request middleware.
+    /// - `Option<isize>`- Optional priority of the request middleware.
     RequestMiddleware(Option<isize>),
     /// Represents a route handler for a specific path.
     ///
-    /// - `&'static str`: The route path handled by this hook.
+    /// - `&'static str`- The route path handled by this hook.
     Route(&'static str),
     /// Executed after a route handler but before the response is sent.
     ///
-    /// - `Option<isize>`: Optional priority of the response middleware.
+    /// - `Option<isize>`- Optional priority of the response middleware.
     ResponseMiddleware(Option<isize>),
 }
 
 ```
 
-### 📄 File #63 - `fn.rs`
+### 📄 File #85 - `fn.rs`
 - **Path**: `hyperlane\src\hook\fn.rs`
-- **Size**: `1,007 B`
-- **Modified Time**: `2025-09-15T22:37:10.293505`
+- **Size**: `1,017 B`
+- **Modified Time**: `2025-10-21T08:11:39.656245`
 
 #### Content Preview
 
@@ -3334,11 +3688,12 @@ use crate::*;
 ///
 /// # Arguments
 ///
-/// - `Vec<HookMacro>`: A vector of `HookMacro` instances to be checked.
+/// - `Vec<HookMacro>`- A vector of `HookMacro` instances to be checked.
 ///
 /// # Panics
 ///
 /// - Panics if two or more `Hook` items of the same type define the same non-zero `order`.
+#[inline]
 pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
     list.iter()
@@ -3356,10 +3711,10 @@ pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
 
 ```
 
-### 📄 File #64 - `impl.rs`
+### 📄 File #86 - `impl.rs`
 - **Path**: `hyperlane\src\hook\impl.rs`
-- **Size**: `4,264 B`
-- **Modified Time**: `2025-09-15T22:37:10.293505`
+- **Size**: `4,811 B`
+- **Modified Time**: `2025-10-21T08:11:39.657244`
 
 #### Content Preview
 
@@ -3377,7 +3732,7 @@ impl<F, R> FnContextSendSync<R> for F where F: Fn(Context) -> R + Send + Sync {}
 /// This trait is a common pattern for asynchronous handlers in Rust, enabling type
 /// erasure and dynamic dispatch for futures. It is essential for storing different
 /// async functions in a collection.
-impl<F, T> FnContextPinBoxSendSync<T> for F where F: FnContextSendSync<PinBoxFutureSend<T>> {}
+impl<F, T> FnContextPinBoxSendSync<T> for F where F: FnContextSendSync<SendableAsyncTask<T>> {}
 
 /// A blanket implementation for static, sendable, synchronous functions that return a future.
 ///
@@ -3402,18 +3757,18 @@ impl<T, R> FutureSendStatic<R> for T where T: Future<Output = R> + Send + 'stati
 impl<T, O> FutureSend<O> for T where T: Future<Output = O> + Send {}
 
 /// Blanket implementation of `FnPinBoxFutureSend` for any type that satisfies the bounds.
-impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> PinBoxFutureSend<O> + Send + Sync {}
+impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> SendableAsyncTask<O> + Send + Sync {}
 
-/// Provides a default implementation for `ServerHook`.
-impl Default for ServerHook {
-    /// Creates a new `ServerHook` instance with default no-op hooks.
+/// Provides a default implementation for `ServerControlHook`.
+impl Default for ServerControlHook {
+    /// Creates a new `ServerControlHook` instance with default no-op hooks.
     ///
     /// The default `wait_hook` and `shutdown_hook` do nothing, allowing the server
     /// to run without specific shutdown or wait logic unless configured otherwise.
     ///
     /// # Returns
     ///
-    /// - `Self` - A new `ServerHook` instance with default hooks.
+    /// - `Self` - A new `ServerControlHook` instance with default hooks.
     fn default() -> Self {
         Self {
             wait_hook: Arc::new(|| Box::pin(async {})),
@@ -3425,7 +3780,7 @@ impl Default for ServerHook {
 /// Manages server lifecycle hooks, including waiting and shutdown procedures.
 ///
 /// This struct holds closures that are executed during specific server lifecycle events.
-impl ServerHook {
+impl ServerControlHook {
     /// Waits for the server's shutdown signal or completion.
     ///
     /// This method asynchronously waits until the server's `wait_hook` is triggered,
@@ -3443,6 +3798,22 @@ impl ServerHook {
     }
 }
 
+impl PartialEq for HookHandler {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (HookHandler::Handler(handler_a), HookHandler::Handler(handler_b)) => {
+                Arc::ptr_eq(handler_a, handler_b)
+            }
+            (HookHandler::Factory(factory_a), HookHandler::Factory(factory_b)) => {
+                std::ptr::eq(factory_a as *const _, factory_b as *const _)
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Eq for HookHandler {}
+
 /// Implementation block for `HookType`.
 ///
 /// This block defines utility methods associated with the `HookType` enum.
@@ -3457,6 +3828,7 @@ impl HookType {
     /// # Returns
     ///
     /// - `Option<isize>` - `Some(order)` if the hook defines a priority, otherwise `None`.
+    #[inline]
     pub fn try_get(&self) -> Option<isize> {
         match *self {
             HookType::RequestMiddleware(order)
@@ -3469,7 +3841,7 @@ impl HookType {
 
 ```
 
-### 📄 File #65 - `mod.rs`
+### 📄 File #87 - `mod.rs`
 - **Path**: `hyperlane\src\hook\mod.rs`
 - **Size**: `236 B`
 - **Modified Time**: `2025-09-15T22:37:10.293505`
@@ -3492,10 +3864,10 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #66 - `struct.rs`
+### 📄 File #88 - `struct.rs`
 - **Path**: `hyperlane\src\hook\struct.rs`
-- **Size**: `1,621 B`
-- **Modified Time**: `2025-09-15T22:37:10.293505`
+- **Size**: `3,864 B`
+- **Modified Time**: `2025-10-21T08:11:39.657747`
 
 #### Content Preview
 
@@ -3505,45 +3877,128 @@ use crate::*;
 /// Represents the hooks for managing the server's lifecycle, specifically for waiting and shutting down.
 ///
 /// This struct is returned by the `run` method and provides two key hooks:
-/// - `wait_hook`: A future that resolves when the server has stopped accepting new connections.
-/// - `shutdown_hook`: A function that can be called to gracefully shut down the server.
+/// - `wait_hook`- A future that resolves when the server has stopped accepting new connections.
+/// - `shutdown_hook`- A function that can be called to gracefully shut down the server.
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
-pub struct ServerHook {
+pub struct ServerControlHook {
     /// A hook that returns a future, which completes when the server's main task finishes.
     /// This is typically used to wait for the server to stop accepting connections before
     /// the application exits.
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(crate))]
-    pub(super) wait_hook: ArcFnPinBoxFutureSend<()>,
+    pub(super) wait_hook: SharedAsyncTaskFactory<()>,
     /// A hook that, when called, initiates a graceful shutdown of the server.
     /// This will stop the server from accepting new connections and allow existing ones
     /// to complete.
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(crate))]
-    pub(super) shutdown_hook: ArcFnPinBoxFutureSend<()>,
+    pub(super) shutdown_hook: SharedAsyncTaskFactory<()>,
 }
 
 /// Represents a route definition created by a macro.
 ///
 /// This struct encapsulates the necessary information to register a new hook.
-#[derive(Getter, Setter, Clone, Debug, PartialEq, Eq)]
+#[derive(Getter, Setter, Clone, CustomDebug, PartialEq, Eq)]
 pub struct HookMacro {
-    /// Represents the asynchronous handler function that is executed when
+    /// Represents the asynchronous handler that is executed when
     /// the associated hook is triggered.
-    pub handler: fn(Context) -> PinBoxFutureSend<()>,
+    #[debug(skip)]
+    pub handler: HookHandler,
     /// Represents the type of the hook that determines when the handler
     /// should be executed.
     pub hook_type: HookType,
 }
 
+impl HookMacro {
+    /// Creates a new HookMacro for a panic hook with a generic type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `P: ServerHook` - The panic hook type.
+    ///
+    /// # Arguments
+    ///
+    /// - `order` - Optional execution priority.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The created HookMacro instance.
+    pub fn panic_hook<P: ServerHook>(order: Option<isize>) -> Self {
+        Self {
+            handler: HookHandler::Factory(create_server_hook::<P>),
+            hook_type: HookType::PanicHook(order),
+        }
+    }
+
+    /// Creates a new HookMacro for request middleware with a generic type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `M: ServerHook` - The middleware type.
+    ///
+    /// # Arguments
+    ///
+    /// - `order` - Optional execution priority.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The created HookMacro instance.
+    pub fn request_middleware<M: ServerHook>(order: Option<isize>) -> Self {
+        Self {
+            handler: HookHandler::Factory(create_server_hook::<M>),
+            hook_type: HookType::RequestMiddleware(order),
+        }
+    }
+
+    /// Creates a new HookMacro for response middleware with a generic type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `M: ServerHook` - The middleware type.
+    ///
+    /// # Arguments
+    ///
+    /// - `order` - Optional execution priority.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The created HookMacro instance.
+    pub fn response_middleware<M: ServerHook>(order: Option<isize>) -> Self {
+        Self {
+            handler: HookHandler::Factory(create_server_hook::<M>),
+            hook_type: HookType::ResponseMiddleware(order),
+        }
+    }
+
+    /// Creates a new HookMacro for a route with a generic type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `R: ServerHook` - The route handler type.
+    ///
+    /// # Arguments
+    ///
+    /// - `path` - The route path.
+    ///
+    /// # Returns
+    ///
+    /// - `Self` - The created HookMacro instance.
+    pub fn route<R: ServerHook>(path: &'static str) -> Self {
+        Self {
+            handler: HookHandler::Factory(create_server_hook::<R>),
+            hook_type: HookType::Route(path),
+        }
+    }
+}
+
 ```
 
-### 📄 File #67 - `trait.rs`
+### 📄 File #89 - `trait.rs`
 - **Path**: `hyperlane\src\hook\trait.rs`
-- **Size**: `1,719 B`
-- **Modified Time**: `2025-09-15T22:37:10.293505`
+- **Size**: `1,722 B`
+- **Modified Time**: `2025-10-21T08:11:39.658247`
 
 #### Content Preview
 
@@ -3561,7 +4016,7 @@ pub trait FnContextSendSync<R>: Fn(Context) -> R + Send + Sync {}
 /// This trait is essential for creating type-erased async function pointers,
 /// which is a common pattern for storing and dynamically dispatching different
 /// asynchronous handlers in a collection.
-pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<PinBoxFutureSend<T>> {}
+pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<SendableAsyncTask<T>> {}
 /// A trait for static, sendable, synchronous functions that return a future.
 ///
 /// This trait ensures that a handler function is safe to be sent across threads
@@ -3579,56 +4034,61 @@ where
 pub trait FutureSendStatic<T>: Future<Output = T> + Send + 'static {}
 /// A trait for `Send`-able futures with a generic output.
 pub trait FutureSend<T>: Future<Output = T> + Send {}
-/// A trait for thread-safe, reference-counted closures that produce a `PinBoxFutureSend`.
-pub trait FnPinBoxFutureSend<T>: Fn() -> PinBoxFutureSend<T> + Send + Sync {}
+/// A trait for thread-safe, reference-counted closures that produce a sendable async task.
+pub trait FnPinBoxFutureSend<T>: Fn() -> SendableAsyncTask<T> + Send + Sync {}
 
 ```
 
-### 📄 File #68 - `type.rs`
+### 📄 File #90 - `type.rs`
 - **Path**: `hyperlane\src\hook\type.rs`
-- **Size**: `1,639 B`
-- **Modified Time**: `2025-09-15T22:37:10.294505`
+- **Size**: `1,695 B`
+- **Modified Time**: `2025-10-21T08:11:39.658247`
 
 #### Content Preview
 
 ```rust
 use crate::*;
 
-/// A type alias for a thread-safe, shareable, pinned, boxed, sendable, synchronous function.
+/// A type alias for a shared hook handler.
 ///
 /// This type is used for storing handlers in a shared context, allowing multiple
 /// parts of the application to safely access and execute the same handler.
-pub type ArcFnContextPinBoxSendSync<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
-/// An optional, thread-safe, shareable handler function.
+pub type SharedHookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
+/// A type alias for an optional hook handler.
 ///
 /// This is used when a handler may or may not be present, such as for optional
 /// middleware or hooks.
-pub type OptionArcFnContextPinBoxSendSync<T> = Option<ArcFnContextPinBoxSendSync<T>>;
-/// A vector of thread-safe, shareable handler functions.
+pub type OptionalHookHandler<T> = Option<SharedHookHandler<T>>;
+/// A type alias for a hook handler chain.
 ///
 /// This type is used to represent a chain of middleware or hooks that can be
 /// executed sequentially.
-pub type VecArcFnContextPinBoxSendSync<T> = Vec<ArcFnContextPinBoxSendSync<T>>;
-/// A type alias for a pinned, boxed, sendable, static future.
+pub type HookHandlerChain<T> = Vec<SharedHookHandler<T>>;
+/// A type alias for an asynchronous task.
 ///
 /// This is a common return type for asynchronous handlers, providing a type-erased
 /// future that can be easily managed by the async runtime.
-pub type PinBoxFutureSendStatic = Pin<Box<(dyn Future<Output = ()> + Send + 'static)>>;
-/// A type alias for a pinned, boxed, `Send`-able future with a generic output.
+pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+/// A type alias for a sendable asynchronous task with a generic output.
 ///
 /// This is often used to represent an asynchronous task that can be sent across threads.
-pub type PinBoxFutureSend<T> = Pin<Box<dyn Future<Output = T> + Send>>;
-/// A type alias for a thread-safe, reference-counted closure that produces a `FnPinBoxFutureSend`.
+pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+/// A type alias for a shared asynchronous task factory.
 ///
 /// This is useful for creating and sharing asynchronous task factories.
-pub type ArcFnPinBoxFutureSend<T> = Arc<dyn FnPinBoxFutureSend<T>>;
+pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
+/// A type alias for a hook handler factory function.
+///
+/// This function pointer type is used to create ServerHookHandler instances
+/// based on generic types. It allows delayed instantiation of hooks.
+pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
 
 ```
 
-### 📄 File #69 - `enum.rs`
+### 📄 File #91 - `enum.rs`
 - **Path**: `hyperlane\src\lifecycle\enum.rs`
-- **Size**: `789 B`
-- **Modified Time**: `2025-09-15T22:37:10.294505`
+- **Size**: `800 B`
+- **Modified Time**: `2025-10-21T08:11:39.659248`
 
 #### Content Preview
 
@@ -3639,30 +4099,30 @@ pub type ArcFnPinBoxFutureSend<T> = Arc<dyn FnPinBoxFutureSend<T>>;
 /// should proceed to the next stage or be terminated prematurely. It also tracks
 /// whether the underlying connection should be kept alive for subsequent requests.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Lifecycle {
+pub(crate) enum RequestLifecycle {
     /// Indicates that the request processing should be aborted.
     /// The boolean value specifies whether the connection should be kept alive (`true`) or closed (`false`).
-    Abort(bool),
+    Aborted(bool),
     /// Indicates that the request processing should continue to the next stage.
     /// The boolean value specifies whether the connection should be kept alive (`true`) or closed (`false`).
-    Continue(bool),
+    Continuing(bool),
 }
 
 ```
 
-### 📄 File #70 - `impl.rs`
+### 📄 File #92 - `impl.rs`
 - **Path**: `hyperlane\src\lifecycle\impl.rs`
-- **Size**: `1,795 B`
-- **Modified Time**: `2025-09-15T22:37:10.294505`
+- **Size**: `2,016 B`
+- **Modified Time**: `2025-10-21T08:11:39.659248`
 
 #### Content Preview
 
 ```rust
 use super::*;
 
-/// Implementation of methods for the `Lifecycle` enum.
-impl Lifecycle {
-    /// Creates a new Lifecycle instance with Continue state.
+/// Implementation of methods for the `RequestLifecycle` enum.
+impl RequestLifecycle {
+    /// Creates a new RequestLifecycle instance with Continuing state.
     ///
     /// # Arguments
     ///
@@ -3670,33 +4130,36 @@ impl Lifecycle {
     ///
     /// # Returns
     ///
-    /// - `Lifecycle` - A new Lifecycle::Continue instance.
+    /// - `RequestLifecycle` - A new RequestLifecycle::Continuing instance.
+    #[inline]
     pub(crate) fn new(keep_alive: bool) -> Self {
-        Self::Continue(keep_alive)
+        Self::Continuing(keep_alive)
     }
 
     /// Updates the lifecycle status based on abort and keep-alive flags.
     ///
     /// # Arguments
     ///
-    /// - `&mut self` - A mutable reference to the `Lifecycle` instance.
+    /// - `&mut self` - A mutable reference to the `RequestLifecycle` instance.
     /// - `bool` - Whether the request processing has been aborted.
     /// - `bool` - Whether the connection should be kept alive.
+    #[inline]
     pub(crate) fn update_status(&mut self, aborted: bool, keep_alive: bool) {
         *self = if aborted {
-            Lifecycle::Abort(keep_alive)
+            RequestLifecycle::Aborted(keep_alive)
         } else {
-            Lifecycle::Continue(keep_alive)
+            RequestLifecycle::Continuing(keep_alive)
         };
     }
 
-    /// Checks if the lifecycle state is Abort.
+    /// Checks if the lifecycle state is Aborted.
     ///
     /// # Returns
     ///
-    /// - `bool` - true if in Abort state, false otherwise.
-    pub(crate) fn is_abort(&self) -> bool {
-        matches!(self, Lifecycle::Abort(_))
+    /// - `bool` - true if in Aborted state, false otherwise.
+    #[inline]
+    pub(crate) fn is_aborted(&self) -> bool {
+        matches!(self, RequestLifecycle::Aborted(_))
     }
 
     /// Checks if the connection should be kept alive.
@@ -3704,8 +4167,12 @@ impl Lifecycle {
     /// # Returns
     ///
     /// - `bool` - true if keep-alive flag is set, false otherwise.
+    #[inline]
     pub(crate) fn is_keep_alive(&self) -> bool {
-        matches!(self, Lifecycle::Continue(true) | Lifecycle::Abort(true))
+        matches!(
+            self,
+            RequestLifecycle::Continuing(true) | RequestLifecycle::Aborted(true)
+        )
     }
 
     /// Returns the keep-alive status of the connection.
@@ -3713,16 +4180,17 @@ impl Lifecycle {
     /// # Returns
     ///
     /// - `bool` - The keep-alive flag value.
+    #[inline]
     pub(crate) fn keep_alive(&self) -> bool {
         match self {
-            Lifecycle::Continue(res) | Lifecycle::Abort(res) => *res,
+            RequestLifecycle::Continuing(res) | RequestLifecycle::Aborted(res) => *res,
         }
     }
 }
 
 ```
 
-### 📄 File #71 - `mod.rs`
+### 📄 File #93 - `mod.rs`
 - **Path**: `hyperlane\src\lifecycle\mod.rs`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:10.294505`
@@ -3737,10 +4205,10 @@ pub(crate) use r#enum::*;
 
 ```
 
-### 📄 File #72 - `impl.rs`
+### 📄 File #94 - `impl.rs`
 - **Path**: `hyperlane\src\panic\impl.rs`
-- **Size**: `2,379 B`
-- **Modified Time**: `2025-09-15T22:37:10.295504`
+- **Size**: `2,335 B`
+- **Modified Time**: `2025-10-21T08:11:39.659747`
 
 #### Content Preview
 
@@ -3760,6 +4228,7 @@ impl Panic {
     /// # Returns
     ///
     /// - `Panic` - A new panic instance.
+    #[inline]
     pub(crate) fn new(
         message: OptionString,
         location: OptionString,
@@ -3786,10 +4255,8 @@ impl Panic {
     fn try_extract_panic_message(panic_payload: &dyn Any) -> OptionString {
         if let Some(s) = panic_payload.downcast_ref::<&str>() {
             Some(s.to_string())
-        } else if let Some(s) = panic_payload.downcast_ref::<String>() {
-            Some(s.clone())
         } else {
-            None
+            panic_payload.downcast_ref::<String>().cloned()
         }
     }
 
@@ -3824,7 +4291,7 @@ impl Panic {
 
 ```
 
-### 📄 File #73 - `mod.rs`
+### 📄 File #95 - `mod.rs`
 - **Path**: `hyperlane\src\panic\mod.rs`
 - **Size**: `112 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3841,7 +4308,7 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #74 - `struct.rs`
+### 📄 File #96 - `struct.rs`
 - **Path**: `hyperlane\src\panic\struct.rs`
 - **Size**: `897 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3873,31 +4340,31 @@ pub struct Panic {
 
 ```
 
-### 📄 File #75 - `type.rs`
+### 📄 File #97 - `type.rs`
 - **Path**: `hyperlane\src\panic\type.rs`
-- **Size**: `623 B`
-- **Modified Time**: `2025-09-15T22:37:10.295504`
+- **Size**: `618 B`
+- **Modified Time**: `2025-10-21T08:11:39.660247`
 
 #### Content Preview
 
 ```rust
 use crate::*;
 
-/// A type alias for an `Option` that may contain a `Panic` struct.
+/// A type alias for optional panic information.
 ///
 /// This is used in contexts where a panic might not have occurred, allowing for
 /// graceful handling of both panic and non-panic scenarios.
-pub type OptionPanic = Option<Panic>;
-/// A type alias for an optional reference to a `Location`.
+pub type OptionalPanicInfo = Option<Panic>;
+/// A type alias for an optional reference to a panic location.
 ///
 /// The lifetimes `'a` and `'b` are tied to the `PanicHookInfo` from which the
 /// location information is sourced. This ensures that the reference does not
 /// outlive the panic information itself, preventing dangling pointers.
-pub type OptionLocationRef<'a, 'b> = Option<&'a Location<'b>>;
+pub type OptionalPanicLocation<'a, 'b> = Option<&'a Location<'b>>;
 
 ```
 
-### 📄 File #76 - `const.rs`
+### 📄 File #98 - `const.rs`
 - **Path**: `hyperlane\src\route\const.rs`
 - **Size**: `259 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3912,7 +4379,7 @@ pub(crate) const DYNAMIC_ROUTE_RIGHT_BRACKET: &str = "}";
 
 ```
 
-### 📄 File #77 - `enum.rs`
+### 📄 File #99 - `enum.rs`
 - **Path**: `hyperlane\src\route\enum.rs`
 - **Size**: `998 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3945,7 +4412,7 @@ pub(crate) enum RouteSegment {
 
 ```
 
-### 📄 File #78 - `fn.rs`
+### 📄 File #100 - `fn.rs`
 - **Path**: `hyperlane\src\route\fn.rs`
 - **Size**: `918 B`
 - **Modified Time**: `2025-09-15T22:37:10.295504`
@@ -3983,18 +4450,17 @@ pub(crate) fn segment_key(pattern: &RoutePattern) -> Vec<&str> {
 
 ```
 
-### 📄 File #79 - `impl.rs`
+### 📄 File #101 - `impl.rs`
 - **Path**: `hyperlane\src\route\impl.rs`
-- **Size**: `16,488 B`
-- **Modified Time**: `2025-09-15T22:37:10.295504`
+- **Size**: `16,580 B`
+- **Modified Time**: `2025-10-21T08:11:39.660747`
 
 #### Content Preview
 
 ```rust
 use crate::*;
 
-// Collects route macro definitions for the inventory system.
-collect!(HookMacro);
+server_collect!(HookMacro);
 
 /// Provides a default implementation for RouteMatcher.
 impl Default for RouteMatcher {
@@ -4020,11 +4486,11 @@ impl PartialEq for RoutePattern {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RoutePattern` instance to compare against.
+    /// - `&Self` - The other `RoutePattern` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         self.get_0() == other.get_0()
     }
@@ -4043,11 +4509,11 @@ impl PartialOrd for RoutePattern {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RoutePattern` instance to compare against.
+    /// - `&Self`- The other `RoutePattern` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `Option<Ordering>`: The ordering of the two instances.
+    /// - `Option<Ordering>`- The ordering of the two instances.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -4061,13 +4527,13 @@ impl Ord for RoutePattern {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RoutePattern` instance to compare against.
+    /// - `&Self`- The other `RoutePattern` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `Ordering`: The ordering of the two instances.
+    /// - `Ordering`- The ordering of the two instances.
     fn cmp(&self, other: &Self) -> Ordering {
-        self.get_0().cmp(&other.get_0())
+        self.get_0().cmp(other.get_0())
     }
 }
 
@@ -4079,11 +4545,11 @@ impl PartialEq for RouteMatcher {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RouteMatcher` instance to compare against.
+    /// - `&Self`- The other `RouteMatcher` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         let self_static_keys: HashSet<&String> = self.static_routes.keys().collect();
         let other_static_keys: HashSet<&String> = other.static_routes.keys().collect();
@@ -4138,11 +4604,11 @@ impl PartialOrd for RouteSegment {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RouteSegment` instance to compare against.
+    /// - `&Self`- The other `RouteSegment` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `Option<Ordering>`: The ordering of the two instances.
+    /// - `Option<Ordering>`- The ordering of the two instances.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -4156,11 +4622,11 @@ impl Ord for RouteSegment {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RouteSegment` instance to compare against.
+    /// - `&Self`- The other `RouteSegment` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `Ordering`: The ordering of the two instances.
+    /// - `Ordering`- The ordering of the two instances.
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Self::Static(s1), Self::Static(s2)) => s1.cmp(s2),
@@ -4184,11 +4650,11 @@ impl PartialEq for RouteSegment {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `RouteSegment` instance to compare against.
+    /// - `&Self`- The other `RouteSegment` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Static(l0), Self::Static(r0)) => l0 == r0,
@@ -4213,7 +4679,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Result<RoutePattern, RouteError>` - The parsed RoutePattern on success, or RouteError on failure.
-    pub(crate) fn new(route: &str) -> ResultRoutePatternRouteError {
+    pub(crate) fn new(route: &str) -> RoutePatternResult {
         Ok(Self(Self::parse_route(route)?))
     }
 
@@ -4228,7 +4694,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Result<Vec<RouteSegment>, RouteError>` - Vector of RouteSegments on success, or RouteError on failure.
-    fn parse_route(route: &str) -> ResultVecRouteSegmentRouteError {
+    fn parse_route(route: &str) -> RouteParseResult {
         if route.is_empty() {
             return Err(RouteError::EmptyPattern);
         }
@@ -4237,7 +4703,7 @@ impl RoutePattern {
             return Ok(Vec::new());
         }
         let estimated_segments: usize = route.matches(DEFAULT_HTTP_PATH).count() + 1;
-        let mut segments: VecRouteSegment = Vec::with_capacity(estimated_segments);
+        let mut segments: RouteSegmentList = Vec::with_capacity(estimated_segments);
         for segment in route.split(DEFAULT_HTTP_PATH) {
             if segment.starts_with(DYNAMIC_ROUTE_LEFT_BRACKET)
                 && segment.ends_with(DYNAMIC_ROUTE_RIGHT_BRACKET)
@@ -4276,7 +4742,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Option<RouteParams>` - Some with parameters if matched, None otherwise.
-    pub(crate) fn try_match_path(&self, path: &str) -> OptionRouteParams {
+    pub(crate) fn try_match_path(&self, path: &str) -> OptionalRouteParameters {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
         let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
@@ -4286,12 +4752,12 @@ impl RoutePattern {
             }
             return None;
         }
-        let mut path_segments: VecStrRef = Vec::with_capacity(route_segments_len);
-        let mut segment_start: usize = 0;
+        let mut path_segments: PathComponentList = Vec::with_capacity(route_segments_len);
         let path_bytes: &[u8] = path.as_bytes();
-        let path_separator_byte: u8 = b'/';
-        for i in 0..path_bytes.len() {
-            if path_bytes[i] == path_separator_byte {
+        let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
+        let mut segment_start: usize = 0;
+        for (i, &byte) in path_bytes.iter().enumerate() {
+            if byte == path_separator_byte {
                 if segment_start < i {
                     path_segments.push(&path[segment_start..i]);
                 }
@@ -4316,9 +4782,7 @@ impl RoutePattern {
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    let Some(value) = path_segments.get(idx) else {
-                        return None;
-                    };
+                    let &value = path_segments.get(idx)?;
                     params.insert(param_name.clone(), value.to_string());
                 }
                 RouteSegment::Regex(param_name, regex) => {
@@ -4352,6 +4816,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the pattern is static, false otherwise.
+    #[inline]
     pub(crate) fn is_static(&self) -> bool {
         self.get_0()
             .iter()
@@ -4363,6 +4828,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `bool` - true if the pattern is dynamic, false otherwise.
+    #[inline]
     pub(crate) fn is_dynamic(&self) -> bool {
         self.get_0()
             .iter()
@@ -4394,12 +4860,15 @@ impl RouteMatcher {
 
     /// Adds a new route and its handler to the matcher.
     ///
-    /// The route is categorized as static, dynamic, or regex based on its pattern.
+    /// Adds a route handler to the matcher.
+    ///
+    /// This method categorizes the route as static, dynamic, or regex based on its pattern
+    /// and stores it in the appropriate collection.
     ///
     /// # Arguments
     ///
     /// - `&str` - The route pattern string.
-    /// - `ArcFnContextPinBoxSendSync` - The handler function for this route.
+    /// - `ServerHookHandler` - The boxed route handler.
     ///
     /// # Returns
     ///
@@ -4407,8 +4876,8 @@ impl RouteMatcher {
     pub(crate) fn add(
         &mut self,
         pattern: &str,
-        handler: ArcFnContextPinBoxSendSync<()>,
-    ) -> ResultAddRoute {
+        handler: ServerHookHandler,
+    ) -> RouteRegistrationResult {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
             if self.get_static_routes().contains_key(pattern) {
@@ -4418,8 +4887,7 @@ impl RouteMatcher {
                 .insert(pattern.to_string(), handler);
             return Ok(());
         }
-        let target_vec: &mut VecRoutePatternArcFnPinBoxSendSync<()> = if route_pattern.is_dynamic()
-        {
+        let target_vec: &mut ServerHookPatternRoutes = if route_pattern.is_dynamic() {
             self.get_mut_dynamic_routes()
         } else {
             self.get_mut_regex_routes()
@@ -4434,7 +4902,10 @@ impl RouteMatcher {
         Ok(())
     }
 
-    /// Finds the handler for a path by matching against registered routes.
+    /// Resolves and executes a route handler.
+    ///
+    /// This method searches for a matching route and executes it if found.
+    /// Finds a matching route handler for the given path.
     ///
     /// # Arguments
     ///
@@ -4443,12 +4914,12 @@ impl RouteMatcher {
     ///
     /// # Returns
     ///
-    /// - `Option<ArcFnContextPinBoxSendSync>` - Some handler if match found, None otherwise.
+    /// - `OptionalServerHookHandler` - The matched route handler if found, None otherwise.
     pub(crate) async fn try_resolve_route(
         &self,
         ctx: &Context,
         path: &str,
-    ) -> OptionArcFnContextPinBoxSendSync<()> {
+    ) -> OptionalServerHookHandler {
         if let Some(handler) = self.get_static_routes().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
@@ -4471,7 +4942,7 @@ impl RouteMatcher {
 
 ```
 
-### 📄 File #80 - `mod.rs`
+### 📄 File #102 - `mod.rs`
 - **Path**: `hyperlane\src\route\mod.rs`
 - **Size**: `265 B`
 - **Modified Time**: `2025-09-15T22:37:10.297007`
@@ -4495,10 +4966,10 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #81 - `struct.rs`
+### 📄 File #103 - `struct.rs`
 - **Path**: `hyperlane\src\route\struct.rs`
-- **Size**: `1,966 B`
-- **Modified Time**: `2025-09-15T22:37:10.297007`
+- **Size**: `1,904 B`
+- **Modified Time**: `2025-10-21T08:11:39.661247`
 
 #### Content Preview
 
@@ -4514,15 +4985,15 @@ use crate::*;
 pub(crate) struct RoutePattern(
     /// The collection of segments that make up the route pattern.
     #[get(pub(super))]
-    pub(super) VecRouteSegment,
+    pub(super) RouteSegmentList,
 );
 
 /// The core routing engine responsible for matching request paths to their corresponding handlers.
 ///
 /// The matcher categorizes routes into three types for optimized performance:
-/// 1.  `static_routes`: For exact path matches, offering the fastest lookups.
-/// 2.  `dynamic_routes`: For paths with variable segments.
-/// 3.  `regex_routes`: For complex matching based on regular expressions.
+/// 1.  `static_routes`- For exact path matches, offering the fastest lookups.
+/// 2.  `dynamic_routes`- For paths with variable segments.
+/// 3.  `regex_routes`- For complex matching based on regular expressions.
 ///
 /// When a request comes in, the matcher checks these categories in order to find the appropriate handler.
 #[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug)]
@@ -4532,27 +5003,27 @@ pub(crate) struct RouteMatcher {
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) static_routes: HashMapStringArcFnPinBoxSendSyncXxHash3_64<()>,
+    pub(super) static_routes: ServerHookMap,
     /// A vector of routes that contain dynamic segments.
     /// These are evaluated sequentially if no static route matches.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) dynamic_routes: VecRoutePatternArcFnPinBoxSendSync<()>,
+    pub(super) dynamic_routes: ServerHookPatternRoutes,
     /// A vector of routes that use regular expressions for matching.
     /// These provide the most flexibility but are evaluated last due to their performance overhead.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
-    pub(super) regex_routes: VecRoutePatternArcFnPinBoxSendSync<()>,
+    pub(super) regex_routes: ServerHookPatternRoutes,
 }
 
 ```
 
-### 📄 File #82 - `type.rs`
+### 📄 File #104 - `type.rs`
 - **Path**: `hyperlane\src\route\type.rs`
-- **Size**: `1,826 B`
-- **Modified Time**: `2025-09-15T22:37:10.297007`
+- **Size**: `1,249 B`
+- **Modified Time**: `2025-10-21T08:11:39.661247`
 
 #### Content Preview
 
@@ -4563,47 +5034,37 @@ use crate::*;
 ///
 /// The key is the parameter name and the value is the captured string.
 pub type RouteParams = HashMapXxHash3_64<String, String>;
-/// A type alias for a vector of `RouteSegment`s.
+/// A type alias for a list of route segments.
 ///
 /// This is used to represent a parsed route.
-pub(crate) type VecRouteSegment = Vec<RouteSegment>;
-/// A type alias for a vector of string slices.
+pub(crate) type RouteSegmentList = Vec<RouteSegment>;
+/// A type alias for a list of path components.
 ///
 /// This is often used for path components.
-pub(crate) type VecStrRef<'a> = Vec<&'a str>;
-/// A type alias for a vector containing tuples of a `RoutePattern` and its associated handler function.
-///
-/// This is used for storing dynamic and regex routes.
-pub(crate) type VecRoutePatternArcFnPinBoxSendSync<T> =
-    Vec<(RoutePattern, ArcFnContextPinBoxSendSync<T>)>;
-/// A type alias for a hash map that stores static routes and their handlers.
-///
-/// The key is the exact path string.
-pub(crate) type HashMapStringArcFnPinBoxSendSyncXxHash3_64<T> =
-    HashMapXxHash3_64<String, ArcFnContextPinBoxSendSync<T>>;
-/// A type alias for a `Result` returned when adding a new route.
+pub(crate) type PathComponentList<'a> = Vec<&'a str>;
+/// A type alias for route registration result.
 ///
 /// This indicates success or a `RouteError`.
-pub(crate) type ResultAddRoute = Result<(), RouteError>;
-/// A type alias for a `Result` from parsing a route string.
+pub(crate) type RouteRegistrationResult = Result<(), RouteError>;
+/// A type alias for route parsing result.
 ///
 /// This yields a vector of `RouteSegment`s or a `RouteError`.
-pub(crate) type ResultVecRouteSegmentRouteError = Result<VecRouteSegment, RouteError>;
-/// A type alias for a `Result` from creating a `RoutePattern`.
+pub(crate) type RouteParseResult = Result<RouteSegmentList, RouteError>;
+/// A type alias for route pattern creation result.
 ///
 /// This can fail with a `RouteError`.
-pub(crate) type ResultRoutePatternRouteError = Result<RoutePattern, RouteError>;
-/// A type alias for an optional `RouteParams` map.
+pub(crate) type RoutePatternResult = Result<RoutePattern, RouteError>;
+/// A type alias for optional route parameters.
 ///
 /// It is `Some` if a dynamic or regex route matches and captures parameters, and `None` otherwise.
-pub(crate) type OptionRouteParams = Option<RouteParams>;
+pub(crate) type OptionalRouteParameters = Option<RouteParams>;
 
 ```
 
-### 📄 File #83 - `impl.rs`
+### 📄 File #105 - `impl.rs`
 - **Path**: `hyperlane\src\server\impl.rs`
-- **Size**: `22,949 B`
-- **Modified Time**: `2025-10-01T21:58:27.401735`
+- **Size**: `25,290 B`
+- **Modified Time**: `2025-10-21T08:11:39.661747`
 
 #### Content Preview
 
@@ -4621,8 +5082,8 @@ impl Default for ServerInner {
         Self {
             config: ServerConfigInner::default(),
             panic_hook: vec![],
-            request_middleware: vec![],
             route: RouteMatcher::new(),
+            request_middleware: vec![],
             response_middleware: vec![],
         }
     }
@@ -4636,17 +5097,22 @@ impl PartialEq for ServerInner {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `ServerInner` instance to compare against.
+    /// - `&Self`- The other `ServerInner` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
             && self.route == other.route
+            && self.panic_hook.len() == other.panic_hook.len()
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
-            && self.panic_hook.len() == other.panic_hook.len()
+            && self
+                .panic_hook
+                .iter()
+                .zip(other.panic_hook.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .request_middleware
                 .iter()
@@ -4656,11 +5122,6 @@ impl PartialEq for ServerInner {
                 .response_middleware
                 .iter()
                 .zip(other.response_middleware.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
-            && self
-                .panic_hook
-                .iter()
-                .zip(other.panic_hook.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
     }
 }
@@ -4678,13 +5139,13 @@ impl PartialEq for Server {
     ///
     /// # Arguments
     ///
-    /// - `&Self`: The other `Server` instance to compare against.
+    /// - `&Self`- The other `Server` instance to compare against.
     ///
     /// # Returns
     ///
-    /// - `bool`: `true` if the instances are equal, `false` otherwise.
+    /// - `bool`- `true` if the instances are equal, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(&self.get_0(), &other.get_0()) {
+        if Arc::ptr_eq(self.get_0(), other.get_0()) {
             return true;
         }
         if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
@@ -4704,7 +5165,7 @@ impl Eq for Server {}
 ///
 /// This struct provides a convenient way to pass around the necessary components
 /// for processing a request or WebSocket frame.
-impl<'a> HandlerState {
+impl HandlerState {
     /// Creates a new HandlerState instance.
     ///
     /// # Arguments
@@ -4716,6 +5177,7 @@ impl<'a> HandlerState {
     /// # Returns
     ///
     /// - `Self` - The newly created handler state.
+    #[inline]
     pub(super) fn new(stream: ArcRwLockStream, ctx: Context, buffer: usize) -> Self {
         Self {
             stream,
@@ -4759,8 +5221,8 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `RwLockReadGuardServerInner` - The read guard for ServerInner.
-    async fn read(&self) -> RwLockReadGuardServerInner {
+    /// - `ServerStateReadGuard` - The read guard for ServerInner.
+    pub(super) async fn read(&self) -> ServerStateReadGuard<'_> {
         self.get_0().read().await
     }
 
@@ -4768,8 +5230,8 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `RwLockWriteGuardServerInner` - The write guard for ServerInner.
-    async fn write(&self) -> RwLockWriteGuardServerInner {
+    /// - `ServerStateWriteGuard` - The write guard for ServerInner.
+    async fn write(&self) -> ServerStateWriteGuard<'_> {
         self.get_0().write().await
     }
 
@@ -4777,25 +5239,56 @@ impl Server {
     ///
     /// This function dispatches the provided `HookMacro` to the appropriate
     /// internal handler based on its `HookType`. Supported hook types include
-    /// panic hooks, disable HTTP/WS hooks, connected hooks, pre-upgrade hooks,
-    /// request/response middleware, and routes.
+    /// panic hooks, request/response middleware, and routes.
     ///
     /// # Arguments
     ///
-    /// - `HookMacro`: The `HookMacro` instance containing the `HookType` and its handler.
+    /// - `HookMacro`- The `HookMacro` instance containing the `HookType` and its handler.
     pub async fn handle_hook(&self, hook: HookMacro) {
-        match hook.hook_type {
-            HookType::PanicHook(_) => {
-                self.panic_hook(hook.handler).await;
+        match (hook.hook_type, hook.handler) {
+            (HookType::PanicHook(_), HookHandler::Handler(handler)) => {
+                self.write().await.get_mut_panic_hook().push(handler);
             }
-            HookType::RequestMiddleware(_) => {
-                self.request_middleware(hook.handler).await;
+            (HookType::PanicHook(_), HookHandler::Factory(factory)) => {
+                self.write().await.get_mut_panic_hook().push(factory());
             }
-            HookType::Route(path) => {
-                self.route(path, hook.handler).await;
+            (HookType::RequestMiddleware(_), HookHandler::Handler(handler)) => {
+                self.write()
+                    .await
+                    .get_mut_request_middleware()
+                    .push(handler);
             }
-            HookType::ResponseMiddleware(_) => {
-                self.response_middleware(hook.handler).await;
+            (HookType::RequestMiddleware(_), HookHandler::Factory(factory)) => {
+                self.write()
+                    .await
+                    .get_mut_request_middleware()
+                    .push(factory());
+            }
+            (HookType::Route(path), HookHandler::Handler(handler)) => {
+                self.write()
+                    .await
+                    .get_mut_route()
+                    .add(path, handler)
+                    .unwrap();
+            }
+            (HookType::Route(path), HookHandler::Factory(factory)) => {
+                self.write()
+                    .await
+                    .get_mut_route()
+                    .add(path, factory())
+                    .unwrap();
+            }
+            (HookType::ResponseMiddleware(_), HookHandler::Handler(handler)) => {
+                self.write()
+                    .await
+                    .get_mut_response_middleware()
+                    .push(handler);
+            }
+            (HookType::ResponseMiddleware(_), HookHandler::Factory(factory)) => {
+                self.write()
+                    .await
+                    .get_mut_response_middleware()
+                    .push(factory());
             }
         };
     }
@@ -4810,7 +5303,7 @@ impl Server {
     ///
     /// - `&Self` - Reference to self for method chaining.
     pub async fn config_str<C: ToString>(&self, config_str: C) -> &Self {
-        let config: ServerConfig = ServerConfig::from_str(&config_str.to_string()).unwrap();
+        let config: ServerConfig = ServerConfig::from_json_str(&config_str.to_string()).unwrap();
         self.write().await.set_config(config.get_inner().await);
         self
     }
@@ -4829,100 +5322,100 @@ impl Server {
         self
     }
 
-    /// Sets a custom panic hook for request processing.
+    /// Registers a panic hook handler to the processing pipeline.
     ///
-    /// # Arguments
+    /// This method allows registering panic hooks that implement the `ServerHook` trait,
+    /// which will be executed when a panic occurs during request processing.
     ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The panic handler function.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the panic handler.
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The panic hook type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn panic_hook<F, Fut>(&self, hook: F) -> &Self
+    pub async fn panic_hook<S>(&self) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        S: ServerHook,
     {
-        let panic_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
-        self.write().await.get_mut_panic_hook().push(panic_hook);
+        self.write()
+            .await
+            .get_mut_panic_hook()
+            .push(create_server_hook::<S>());
         self
     }
 
-    /// Adds a route handler for a specific path.
+    /// Registers a route handler for a specific path.
+    ///
+    /// This method allows registering route handlers that implement the `ServerHook` trait,
+    /// providing type safety and better code organization.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The route handler type that implements `ServerHook`.
     ///
     /// # Arguments
     ///
-    /// - `R: ToString` - The route path pattern.
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The handler function for the route.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the handler.
+    /// - `path` - The route path pattern.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn route<R, F, Fut>(&self, route: R, hook: F) -> &Self
+    pub async fn route<S>(&self, path: impl ToString) -> &Self
     where
-        R: ToString,
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        S: ServerHook,
     {
-        let route_str: String = route.to_string();
-        let route_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_route()
-            .add(&route_str, route_hook)
+            .add(&path.to_string(), create_server_hook::<S>())
             .unwrap();
         self
     }
 
-    /// Adds request middleware to the processing pipeline.
+    /// Registers request middleware to the processing pipeline.
     ///
-    /// # Arguments
+    /// This method allows registering middleware that implements the `ServerHook` trait,
+    /// which will be executed before route handlers for every incoming request.
     ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The middleware function.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the middleware.
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The middleware type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn request_middleware<F, Fut>(&self, hook: F) -> &Self
+    pub async fn request_middleware<S>(&self) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        S: ServerHook,
     {
-        let request_middleware_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_request_middleware()
-            .push(request_middleware_hook);
+            .push(create_server_hook::<S>());
         self
     }
 
-    /// Adds response middleware to the processing pipeline.
+    /// Registers response middleware to the processing pipeline.
     ///
-    /// # Arguments
+    /// This method allows registering middleware that implements the `ServerHook` trait,
+    /// which will be executed after route handlers for every outgoing response.
     ///
-    /// - `F: FnContextSendSyncStatic<Fut, ()>` - The middleware function.
-    /// - `Fut: FutureSendStatic<()>` - The future returned by the middleware.
+    /// # Type Parameters
+    ///
+    /// - `ServerHook` - The middleware type that implements `ServerHook`.
     ///
     /// # Returns
     ///
     /// - `&Self` - Reference to self for method chaining.
-    pub async fn response_middleware<F, Fut>(&self, hook: F) -> &Self
+    pub async fn response_middleware<S>(&self) -> &Self
     where
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
+        S: ServerHook,
     {
-        let response_middleware_hook: ArcFnContextPinBoxSendSync<()> =
-            Arc::new(move |ctx: Context| -> PinBoxFutureSend<()> { Box::pin(hook(ctx)) });
         self.write()
             .await
             .get_mut_response_middleware()
-            .push(response_middleware_hook);
+            .push(create_server_hook::<S>());
         self
     }
 
@@ -4936,6 +5429,7 @@ impl Server {
     /// # Returns
     ///
     /// - `String` - The formatted address string.
+    #[inline]
     pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
         format!("{}{}{}", host.to_string(), COLON_SPACE_SYMBOL, port)
     }
@@ -4958,7 +5452,11 @@ impl Server {
         let panic_clone: Panic = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
         for hook in self.read().await.get_panic_hook().iter() {
-            hook(ctx.clone()).await;
+            if let Err(join_error) = spawn(hook(ctx)).await
+                && join_error.is_panic()
+            {
+                eprintln!("Panic occurred in panic hook: {:?}", join_error);
+            }
             if ctx.get_aborted().await {
                 return;
             }
@@ -4975,30 +5473,56 @@ impl Server {
     /// - `JoinError` - The `JoinError` returned from the panicked task.
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
         let panic: Panic = Panic::from_join_error(join_error);
-        self.handle_panic_with_context(&ctx, &panic).await;
+        self.handle_panic_with_context(ctx, &panic).await;
     }
 
-    /// Executes a given hook function within a spawned task and manages the request lifecycle.
+    /// Executes a middleware handler and manages the request lifecycle.
     ///
-    /// This function also handles panics that may occur within the hook's execution.
+    /// This function executes middleware with spawn to catch panics properly.
+    /// While this adds some overhead, it's necessary to ensure panic hooks
+    /// can send error responses to clients.
     ///
     /// # Arguments
     ///
-    /// - `ctx: &Context` - The request context.
-    /// - `lifecycle: &mut Lifecycle` - A mutable reference to the current `Lifecycle` state.
-    /// - `hook: ArcFnContextPinBoxSendSync<()>` - The hook function to execute.
-    async fn run_hook_with_lifecycle(
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
+    /// - `&ServerHookHandler` - The middleware handler to execute.
+    async fn run_middleware_with_lifecycle(
         &self,
         ctx: &Context,
-        lifecycle: &mut Lifecycle,
-        hook: &ArcFnContextPinBoxSendSync<()>,
+        lifecycle: &mut RequestLifecycle,
+        handler: &ServerHookHandler,
     ) {
-        let result: ResultJoinError<()> = spawn(hook(ctx.clone())).await;
         ctx.update_lifecycle_status(lifecycle).await;
-        if let Err(join_error) = result {
-            if join_error.is_panic() {
-                self.handle_task_panic(&ctx, join_error).await;
-            }
+        if let Err(join_error) = spawn(handler(ctx)).await
+            && join_error.is_panic()
+        {
+            self.handle_task_panic(ctx, join_error).await;
+        }
+    }
+
+    /// Executes a route handler and manages the request lifecycle.
+    ///
+    /// This function executes the route handler with spawn to catch panics properly.
+    /// While this adds some overhead, it's necessary to ensure panic hooks
+    /// can send error responses to clients.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the current request lifecycle state.
+    /// - `&ServerHookHandler` - The route handler to execute.
+    async fn run_route_with_lifecycle(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut RequestLifecycle,
+        handler: &ServerHookHandler,
+    ) {
+        ctx.update_lifecycle_status(lifecycle).await;
+        if let Err(join_error) = spawn(handler(ctx)).await
+            && join_error.is_panic()
+        {
+            self.handle_task_panic(ctx, join_error).await;
         }
     }
 
@@ -5027,7 +5551,7 @@ impl Server {
     /// # Returns
     ///
     /// - `ServerResult<()>` - A `ServerResult` which is typically `Ok(())` unless an unrecoverable
-    /// error occurs.
+    ///   error occurs.
     async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerResult<()> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
@@ -5045,7 +5569,7 @@ impl Server {
     ///
     /// - `&TcpStream` - A reference to the `TcpStream` to configure.
     async fn configure_stream(&self, stream: &TcpStream) {
-        let server_inner: RwLockReadGuardServerInner = self.read().await;
+        let server_inner: ServerStateReadGuard = self.read().await;
         let config: &ServerConfigInner = server_inner.get_config();
         let linger_opt: &OptionDuration = config.get_linger();
         let nodelay_opt: &OptionBool = config.get_nodelay();
@@ -5088,73 +5612,10 @@ impl Server {
         }
     }
 
-    /// Executes all registered request middleware in sequence.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_request_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for hook in self.read().await.get_request_middleware().iter() {
-            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
-            if lifecycle.is_abort() {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Executes the matched route handler.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&OptionArcFnContextPinBoxSendSync` - An `Option` containing the handler function if a route was matched.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_route_hook(
-        &self,
-        ctx: &Context,
-        handler: &OptionArcFnContextPinBoxSendSync<()>,
-        lifecycle: &mut Lifecycle,
-    ) -> bool {
-        if let Some(hook) = handler {
-            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
-        }
-        lifecycle.is_abort()
-    }
-
-    /// Executes all registered response middleware in sequence.
-    ///
-    /// # Arguments
-    ///
-    /// - `&Context` - The request context.
-    /// - `&mut Lifecycle` - A mutable reference to the request lifecycle state.
-    ///
-    /// # Returns
-    ///
-    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
-    async fn run_response_middleware(&self, ctx: &Context, lifecycle: &mut Lifecycle) -> bool {
-        for hook in self.read().await.get_response_middleware().iter() {
-            self.run_hook_with_lifecycle(ctx, lifecycle, hook).await;
-            if lifecycle.is_abort() {
-                return true;
-            }
-        }
-        false
-    }
-
     /// The core request handling pipeline.
     ///
     /// This function orchestrates the execution of request middleware, the route handler,
-    /// and response middleware.
+    /// and response middleware. It supports both function-based and trait-based handlers.
     ///
     /// # Arguments
     ///
@@ -5164,24 +5625,23 @@ impl Server {
     /// # Returns
     ///
     /// - `bool` - A boolean indicating whether the connection should be kept alive.
-    async fn request_hook<'a>(&self, state: &HandlerState, request: &Request) -> bool {
+    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
         let ctx: &Context = state.get_ctx();
         ctx.set_request(request).await;
-        let mut lifecycle: Lifecycle = Lifecycle::new(request.is_enable_keep_alive());
-        let route_hook: OptionArcFnContextPinBoxSendSync<()> = self
-            .read()
-            .await
-            .get_route()
-            .try_resolve_route(ctx, route)
-            .await;
+        let mut lifecycle: RequestLifecycle = RequestLifecycle::new(request.is_enable_keep_alive());
         if self.run_request_middleware(ctx, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
-        if self.run_route_hook(ctx, &route_hook, &mut lifecycle).await {
+        if self.run_route(ctx, route, &mut lifecycle).await {
             return lifecycle.keep_alive();
         }
-        self.run_response_middleware(ctx, &mut lifecycle).await;
+        if self.run_response_middleware(ctx, &mut lifecycle).await {
+            return lifecycle.keep_alive();
+        }
+        if let Some(panic) = ctx.try_get_panic().await {
+            self.handle_panic_with_context(ctx, &panic).await;
+        }
         lifecycle.keep_alive()
     }
 
@@ -5191,7 +5651,7 @@ impl Server {
     ///
     /// - `&HandlerState` - The `HandlerState` for the current connection.
     /// - `&Request` - The initial request that established the keep-alive connection.
-    async fn handle_http_requests<'a>(&self, state: &HandlerState, request: &Request) {
+    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
         if self.request_hook(state, request).await {
             return;
         }
@@ -5214,7 +5674,7 @@ impl Server {
     /// Returns a `ServerResult` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ServerHook> {
+    pub async fn run(&self) -> ServerResult<ServerControlHook> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());
@@ -5223,13 +5683,13 @@ impl Server {
             let _ = server.accept_connections(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
-        let wait_hook: ArcFnPinBoxFutureSend<()> = Arc::new(move || {
+        let wait_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
                 let _ = wait_receiver_clone.changed().await;
             })
         });
-        let shutdown_hook: ArcFnPinBoxFutureSend<()> = Arc::new(move || {
+        let shutdown_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
                 let _ = shutdown_sender_clone.send(());
@@ -5239,16 +5699,94 @@ impl Server {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
         });
-        let mut server_hook: ServerHook = ServerHook::default();
-        server_hook.set_shutdown_hook(shutdown_hook);
-        server_hook.set_wait_hook(wait_hook);
-        Ok(server_hook)
+        let mut server_lifecycle: ServerControlHook = ServerControlHook::default();
+        server_lifecycle.set_shutdown_hook(shutdown_hook);
+        server_lifecycle.set_wait_hook(wait_hook);
+        Ok(server_lifecycle)
+    }
+
+    /// Executes trait-based request middleware in sequence.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn run_request_middleware(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        for handler in self.read().await.get_request_middleware().iter() {
+            self.run_middleware_with_lifecycle(ctx, lifecycle, handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Executes a trait-based route handler if one matches.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&str` - The request path to match.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn run_route(
+        &self,
+        ctx: &Context,
+        path: &str,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        let route_matcher: RouteMatcher = self.read().await.get_route().clone();
+        if let Some(handler) = route_matcher.try_resolve_route(ctx, path).await {
+            self.run_route_with_lifecycle(ctx, lifecycle, &handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Executes trait-based response middleware in sequence.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&mut RequestLifecycle` - A mutable reference to the request lifecycle state.
+    ///
+    /// # Returns
+    ///
+    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.
+    pub(super) async fn run_response_middleware(
+        &self,
+        ctx: &Context,
+        lifecycle: &mut RequestLifecycle,
+    ) -> bool {
+        for handler in self.read().await.get_response_middleware().iter() {
+            self.run_middleware_with_lifecycle(ctx, lifecycle, handler)
+                .await;
+            if lifecycle.is_aborted() {
+                return true;
+            }
+        }
+        false
     }
 }
 
 ```
 
-### 📄 File #84 - `mod.rs`
+### 📄 File #106 - `mod.rs`
 - **Path**: `hyperlane\src\server\mod.rs`
 - **Size**: `112 B`
 - **Modified Time**: `2025-09-15T22:37:10.297518`
@@ -5265,10 +5803,10 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #85 - `struct.rs`
+### 📄 File #107 - `struct.rs`
 - **Path**: `hyperlane\src\server\struct.rs`
-- **Size**: `3,247 B`
-- **Modified Time**: `2025-09-15T22:37:10.298034`
+- **Size**: `3,017 B`
+- **Modified Time**: `2025-10-21T08:11:39.662247`
 
 #### Content Preview
 
@@ -5311,27 +5849,25 @@ pub(crate) struct ServerInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) route: RouteMatcher,
-    /// A collection of middleware functions that are executed for every incoming request
-    /// before it is passed to the corresponding route handler.
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) request_middleware: VecArcFnContextPinBoxSendSync<()>,
-    /// A collection of middleware functions that are executed for every outgoing response
-    /// before it is sent back to the client.
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) response_middleware: VecArcFnContextPinBoxSendSync<()>,
-    /// A custom error handler that is invoked when a panic occurs during request processing.
+    /// A collection of panic hook handlers that are invoked when a panic occurs during request processing.
     /// This allows for graceful error recovery and customized error responses.
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic_hook: VecArcFnContextPinBoxSendSync<()>,
+    pub(super) panic_hook: ServerHookList,
+    /// A collection of request middleware handlers.
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) request_middleware: ServerHookList,
+    /// A collection of response middleware handlers.
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) response_middleware: ServerHookList,
 }
 
 /// The primary server structure that provides a thread-safe interface to the server's state.
@@ -5340,51 +5876,51 @@ pub(crate) struct ServerInner {
 /// It allows multiple parts of the application to safely share and modify the server's
 /// configuration and state across different threads and asynchronous tasks.
 #[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
-pub struct Server(#[get(pub(super))] pub(super) ArcRwLockServerInner);
+pub struct Server(#[get(pub(super))] pub(super) SharedServerState);
 
 ```
 
-### 📄 File #86 - `type.rs`
+### 📄 File #108 - `type.rs`
 - **Path**: `hyperlane\src\server\type.rs`
-- **Size**: `1,331 B`
-- **Modified Time**: `2025-09-15T22:37:10.298034`
+- **Size**: `1,112 B`
+- **Modified Time**: `2025-10-21T08:11:39.662247`
 
 #### Content Preview
 
 ```rust
 use crate::*;
 
-/// A type alias for a `Result` that returns a `ServerError` on failure.
+/// A type alias for server operation result.
 ///
 /// This is commonly used throughout the server's public-facing API.
 pub type ServerResult<T> = Result<T, ServerError>;
-/// A type alias for a `Result` that returns a `JoinError` on failure.
+/// A type alias for task join result.
 ///
 /// This is used when waiting for asynchronous tasks to complete.
-pub type ResultJoinError<T> = Result<T, JoinError>;
-/// A type alias for a thread-safe, reference-counted read-write lock over `ServerInner`.
+pub type TaskJoinResult<T> = Result<T, JoinError>;
+/// A type alias for shared server state.
 ///
 /// This is the core mechanism for sharing server state across threads.
-pub(crate) type ArcRwLockServerInner = ArcRwLock<ServerInner>;
-/// A type alias for a thread-safe, reference-counted read-write lock over `ServerConfigInner`.
+pub(crate) type SharedServerState = ArcRwLock<ServerInner>;
+/// A type alias for shared server configuration.
 ///
 /// This is the core mechanism for sharing server config state across threads.
-pub(crate) type ArcRwLockServerConfigInner = ArcRwLock<ServerConfigInner>;
-/// A type alias for a read guard on the `ServerInner`'s `RwLock`.
+pub(crate) type SharedServerConfig = ArcRwLock<ServerConfigInner>;
+/// A type alias for server state read guard.
 ///
 /// This provides read-only access to the server's internal state.
-pub(crate) type RwLockReadGuardServerInner<'a> = RwLockReadGuard<'a, ServerInner>;
-/// A type alias for a write guard on the `ServerInner`'s `RwLock`.
+pub(crate) type ServerStateReadGuard<'a> = RwLockReadGuard<'a, ServerInner>;
+/// A type alias for server state write guard.
 ///
 /// This provides mutable access to the server's internal state.
-pub(crate) type RwLockWriteGuardServerInner<'a> = RwLockWriteGuard<'a, ServerInner>;
+pub(crate) type ServerStateWriteGuard<'a> = RwLockWriteGuard<'a, ServerInner>;
 
 ```
 
-### 📄 File #87 - `attribute.rs`
+### 📄 File #109 - `attribute.rs`
 - **Path**: `hyperlane\src\tests\attribute.rs`
-- **Size**: `2,282 B`
-- **Modified Time**: `2025-09-15T22:37:10.298034`
+- **Size**: `2,286 B`
+- **Modified Time**: `2025-10-21T08:11:39.662747`
 
 #### Content Preview
 
@@ -5457,16 +5993,16 @@ async fn send_body_hook() {
     async fn send_body_hook_fn(ctx: Context) {
         let _ = ctx.send_body().await;
     }
-    ctx.set_send_body_hook(send_body_hook_fn).await;
-    assert!(ctx.try_get_send_body_hook().await.is_some());
+    ctx.set_hook("send_body", send_body_hook_fn).await;
+    assert!(ctx.try_get_hook("send_body").await.is_some());
 }
 
 ```
 
-### 📄 File #88 - `config.rs`
+### 📄 File #110 - `config.rs`
 - **Path**: `hyperlane\src\tests\config.rs`
-- **Size**: `730 B`
-- **Modified Time**: `2025-09-15T22:37:10.298034`
+- **Size**: `735 B`
+- **Modified Time**: `2025-10-21T08:11:39.663247`
 
 #### Content Preview
 
@@ -5485,7 +6021,7 @@ async fn config_from_str() {
             "ttl": 64
         }
     "#;
-    let config: ServerConfig = ServerConfig::from_str(config_str).unwrap();
+    let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
     let new_config: ServerConfig = ServerConfig::new().await;
     new_config.host("0.0.0.0").await;
     new_config.port(80).await;
@@ -5498,7 +6034,7 @@ async fn config_from_str() {
 
 ```
 
-### 📄 File #89 - `context.rs`
+### 📄 File #111 - `context.rs`
 - **Path**: `hyperlane\src\tests\context.rs`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5556,7 +6092,7 @@ async fn context_request_and_response() {
 
 ```
 
-### 📄 File #90 - `error.rs`
+### 📄 File #112 - `error.rs`
 - **Path**: `hyperlane\src\tests\error.rs`
 - **Size**: `1,803 B`
 - **Modified Time**: `2025-09-15T22:37:10.298034`
@@ -5598,10 +6134,10 @@ async fn route_error() {
 
 ```
 
-### 📄 File #91 - `lifecycle.rs`
+### 📄 File #113 - `lifecycle.rs`
 - **Path**: `hyperlane\src\tests\lifecycle.rs`
-- **Size**: `2,405 B`
-- **Modified Time**: `2025-09-15T22:37:10.298034`
+- **Size**: `2,690 B`
+- **Modified Time**: `2025-10-21T08:11:39.663247`
 
 #### Content Preview
 
@@ -5610,72 +6146,72 @@ use crate::*;
 
 #[tokio::test]
 async fn lifecycle_new() {
-    let lifecycle: Lifecycle = Lifecycle::new(true);
-    assert_eq!(lifecycle, Lifecycle::Continue(true));
+    let lifecycle: RequestLifecycle = RequestLifecycle::new(true);
+    assert_eq!(lifecycle, RequestLifecycle::Continuing(true));
     assert!(lifecycle.is_keep_alive());
-    assert!(!lifecycle.is_abort());
+    assert!(!lifecycle.is_aborted());
 }
 
 #[tokio::test]
 async fn lifecycle_update_status() {
-    let mut lifecycle: Lifecycle = Lifecycle::new(true);
+    let mut lifecycle: RequestLifecycle = RequestLifecycle::new(true);
     lifecycle.update_status(true, true);
-    assert_eq!(lifecycle, Lifecycle::Abort(true));
-    assert!(lifecycle.is_abort());
+    assert_eq!(lifecycle, RequestLifecycle::Aborted(true));
+    assert!(lifecycle.is_aborted());
     assert!(lifecycle.is_keep_alive());
     lifecycle.update_status(true, false);
-    assert_eq!(lifecycle, Lifecycle::Abort(false));
-    assert!(lifecycle.is_abort());
+    assert_eq!(lifecycle, RequestLifecycle::Aborted(false));
+    assert!(lifecycle.is_aborted());
     assert!(!lifecycle.is_keep_alive());
     lifecycle.update_status(false, true);
-    assert_eq!(lifecycle, Lifecycle::Continue(true));
-    assert!(!lifecycle.is_abort());
+    assert_eq!(lifecycle, RequestLifecycle::Continuing(true));
+    assert!(!lifecycle.is_aborted());
     assert!(lifecycle.is_keep_alive());
     lifecycle.update_status(false, false);
-    assert_eq!(lifecycle, Lifecycle::Continue(false));
-    assert!(!lifecycle.is_abort());
+    assert_eq!(lifecycle, RequestLifecycle::Continuing(false));
+    assert!(!lifecycle.is_aborted());
     assert!(!lifecycle.is_keep_alive());
 }
 
 #[tokio::test]
-async fn lifecycle_is_abort() {
-    let abort_true: Lifecycle = Lifecycle::Abort(true);
-    assert!(abort_true.is_abort());
-    let abort_false: Lifecycle = Lifecycle::Abort(false);
-    assert!(abort_false.is_abort());
-    let continue_true: Lifecycle = Lifecycle::Continue(true);
-    assert!(!continue_true.is_abort());
-    let continue_false: Lifecycle = Lifecycle::Continue(false);
-    assert!(!continue_false.is_abort());
+async fn lifecycle_is_aborted() {
+    let abort_true: RequestLifecycle = RequestLifecycle::Aborted(true);
+    assert!(abort_true.is_aborted());
+    let abort_false: RequestLifecycle = RequestLifecycle::Aborted(false);
+    assert!(abort_false.is_aborted());
+    let continue_true: RequestLifecycle = RequestLifecycle::Continuing(true);
+    assert!(!continue_true.is_aborted());
+    let continue_false: RequestLifecycle = RequestLifecycle::Continuing(false);
+    assert!(!continue_false.is_aborted());
 }
 
 #[tokio::test]
 async fn lifecycle_is_keep_alive() {
-    let abort_true: Lifecycle = Lifecycle::Abort(true);
+    let abort_true: RequestLifecycle = RequestLifecycle::Aborted(true);
     assert!(abort_true.is_keep_alive());
-    let abort_false: Lifecycle = Lifecycle::Abort(false);
+    let abort_false: RequestLifecycle = RequestLifecycle::Aborted(false);
     assert!(!abort_false.is_keep_alive());
-    let continue_true: Lifecycle = Lifecycle::Continue(true);
+    let continue_true: RequestLifecycle = RequestLifecycle::Continuing(true);
     assert!(continue_true.is_keep_alive());
-    let continue_false: Lifecycle = Lifecycle::Continue(false);
+    let continue_false: RequestLifecycle = RequestLifecycle::Continuing(false);
     assert!(!continue_false.is_keep_alive());
 }
 
 #[tokio::test]
 async fn lifecycle_keep_alive() {
-    let abort_true: Lifecycle = Lifecycle::Abort(true);
+    let abort_true: RequestLifecycle = RequestLifecycle::Aborted(true);
     assert!(abort_true.keep_alive());
-    let abort_false: Lifecycle = Lifecycle::Abort(false);
+    let abort_false: RequestLifecycle = RequestLifecycle::Aborted(false);
     assert!(!abort_false.keep_alive());
-    let continue_true: Lifecycle = Lifecycle::Continue(true);
+    let continue_true: RequestLifecycle = RequestLifecycle::Continuing(true);
     assert!(continue_true.keep_alive());
-    let continue_false: Lifecycle = Lifecycle::Continue(false);
+    let continue_false: RequestLifecycle = RequestLifecycle::Continuing(false);
     assert!(!continue_false.keep_alive());
 }
 
 ```
 
-### 📄 File #92 - `mod.rs`
+### 📄 File #114 - `mod.rs`
 - **Path**: `hyperlane\src\tests\mod.rs`
 - **Size**: `110 B`
 - **Modified Time**: `2025-09-15T22:37:10.299039`
@@ -5695,7 +6231,7 @@ mod server;
 
 ```
 
-### 📄 File #93 - `panic.rs`
+### 📄 File #115 - `panic.rs`
 - **Path**: `hyperlane\src\tests\panic.rs`
 - **Size**: `875 B`
 - **Modified Time**: `2025-09-15T22:37:10.299039`
@@ -5736,10 +6272,10 @@ async fn from_join_error() {
 
 ```
 
-### 📄 File #94 - `route.rs`
+### 📄 File #116 - `route.rs`
 - **Path**: `hyperlane\src\tests\route.rs`
-- **Size**: `1,734 B`
-- **Modified Time**: `2025-09-15T22:37:10.299039`
+- **Size**: `1,852 B`
+- **Modified Time**: `2025-10-21T08:11:39.663247`
 
 #### Content Preview
 
@@ -5752,7 +6288,7 @@ where
     F: Fn() -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    let result: ResultJoinError<_> = spawn(future_factory()).await;
+    let result: TaskJoinResult<_> = spawn(future_factory()).await;
     assert!(
         result.is_err(),
         "Expected panic, but task completed successfully"
@@ -5777,14 +6313,23 @@ where
     );
 }
 
+#[cfg(test)]
+struct TestRoute;
+
+#[cfg(test)]
+impl ServerHook for TestRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, _ctx: &Context) {}
+}
+
 #[tokio::test]
 async fn empty_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new()
-                .await
-                .route(EMPTY_STR, |_| async move {})
-                .await;
+            let _server: &Server = Server::new().await.route::<TestRoute>(EMPTY_STR).await;
         },
         &RouteError::EmptyPattern.to_string(),
     )
@@ -5797,9 +6342,9 @@ async fn duplicate_route() {
         || async {
             let _server: &Server = Server::new()
                 .await
-                .route(ROOT_PATH, |_| async move {})
+                .route::<TestRoute>(ROOT_PATH)
                 .await
-                .route(ROOT_PATH, |_| async move {})
+                .route::<TestRoute>(ROOT_PATH)
                 .await;
         },
         &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
@@ -5809,15 +6354,26 @@ async fn duplicate_route() {
 
 ```
 
-### 📄 File #95 - `send.rs`
+### 📄 File #117 - `send.rs`
 - **Path**: `hyperlane\src\tests\send.rs`
-- **Size**: `1,533 B`
-- **Modified Time**: `2025-09-15T22:37:10.299039`
+- **Size**: `1,719 B`
+- **Modified Time**: `2025-10-21T08:11:39.664250`
 
 #### Content Preview
 
 ```rust
 use crate::*;
+
+#[allow(dead_code)]
+struct TestSendRoute;
+
+impl ServerHook for TestSendRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, _ctx: &Context) {}
+}
 
 #[tokio::test]
 async fn server_send_sync() {
@@ -5833,7 +6389,7 @@ async fn server_send_sync() {
 async fn server_clone_across_threads() {
     let server: Server = Server::new()
         .await
-        .route("/test", |_| async move {})
+        .route::<TestSendRoute>("/test")
         .await
         .clone();
     let server_clone: Server = server.clone();
@@ -5850,7 +6406,7 @@ async fn server_share_across_threads() {
     let server: Arc<Server> = Arc::new(
         Server::new()
             .await
-            .route("/test", |_| async move {})
+            .route::<TestSendRoute>("/test")
             .await
             .clone(),
     );
@@ -5872,10 +6428,10 @@ async fn server_share_across_threads() {
 
 ```
 
-### 📄 File #96 - `server.rs`
+### 📄 File #118 - `server.rs`
 - **Path**: `hyperlane\src\tests\server.rs`
-- **Size**: `5,970 B`
-- **Modified Time**: `2025-09-15T22:37:10.299039`
+- **Size**: `7,584 B`
+- **Modified Time**: `2025-10-21T08:11:39.664250`
 
 #### Content Preview
 
@@ -5899,126 +6455,183 @@ async fn server_inner_partial_eq() {
 }
 
 #[tokio::test]
-async fn server() {
-    async fn send_body_hook(ctx: Context) {
-        let body: ResponseBody = ctx.get_response_body().await;
-        if ctx.get_request().await.is_ws() {
-            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-            ctx.send_body_list_with_data(&frame_list).await.unwrap();
-        } else {
-            ctx.send_body().await.unwrap();
+async fn test_server() {
+    struct UpgradeMiddleware;
+    struct SendBodyMiddleware;
+    struct ResponseMiddleware;
+    struct ServerPanicHook;
+    struct RootRoute;
+    struct SseRoute;
+    struct WebsocketRoute;
+    struct DynamicRoute;
+
+    impl ServerHook for SendBodyMiddleware {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let socket_addr: String = ctx.get_socket_addr_string().await;
+            ctx.set_response_version(HttpVersion::HTTP1_1)
+                .await
+                .set_response_status_code(200)
+                .await
+                .set_response_header(SERVER, HYPERLANE)
+                .await
+                .set_response_header(CONNECTION, KEEP_ALIVE)
+                .await
+                .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+                .await
+                .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+                .await
+                .set_response_header("SocketAddr", &socket_addr)
+                .await;
         }
     }
 
-    async fn request_middleware(ctx: Context) {
-        ctx.set_send_body_hook(send_body_hook).await;
-        let socket_addr: String = ctx.get_socket_addr_string().await;
-        ctx.set_response_version(HttpVersion::HTTP1_1)
-            .await
-            .set_response_status_code(200)
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONNECTION, KEEP_ALIVE)
-            .await
-            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-            .await
-            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .await
-            .set_response_header("SocketAddr", &socket_addr)
-            .await;
-    }
-
-    async fn upgrade_hook(ctx: Context) {
-        if !ctx.get_request().await.is_ws() {
-            return;
+    impl ServerHook for UpgradeMiddleware {
+        async fn new(_ctx: &Context) -> Self {
+            Self
         }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_status_code(101)
-                .await
-                .set_response_header(UPGRADE, WEBSOCKET)
-                .await
-                .set_response_header(CONNECTION, UPGRADE)
-                .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .await
-                .set_response_body(&vec![])
-                .await
-                .send()
-                .await
-                .unwrap();
-        }
-    }
 
-    async fn response_middleware(ctx: Context) {
-        if ctx.get_request().await.is_ws() {
-            return;
-        }
-        let _ = ctx.send().await;
-    }
-
-    async fn root_route(ctx: Context) {
-        let path: RequestPath = ctx.get_request_path().await;
-        let response_body: String = format!("Hello hyperlane => {}", path);
-        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
-        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-        ctx.add_response_header(SET_COOKIE, &cookie1)
-            .await
-            .add_response_header(SET_COOKIE, &cookie2)
-            .await
-            .set_response_body(&response_body)
-            .await;
-    }
-
-    async fn ws_route(ctx: Context) {
-        if let Some(send_body_hook) = ctx.try_get_send_body_hook().await {
-            while ctx.ws_from_stream(4096).await.is_ok() {
-                let request_body: Vec<u8> = ctx.get_request_body().await;
-                ctx.set_response_body(&request_body).await;
-                send_body_hook(ctx.clone()).await;
+        async fn handle(self, ctx: &Context) {
+            if !ctx.get_request().await.is_ws() {
+                return;
+            }
+            if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+                let accept_key: String = WebSocketFrame::generate_accept_key(key);
+                ctx.set_response_status_code(101)
+                    .await
+                    .set_response_header(UPGRADE, WEBSOCKET)
+                    .await
+                    .set_response_header(CONNECTION, UPGRADE)
+                    .await
+                    .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                    .await
+                    .set_response_body(&vec![])
+                    .await
+                    .send()
+                    .await
+                    .unwrap();
             }
         }
     }
 
-    async fn sse_route(ctx: Context) {
-        let _ = ctx
-            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .await
-            .send()
-            .await;
-        for i in 0..10 {
-            let _ = ctx
-                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+    impl ServerHook for ResponseMiddleware {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            if ctx.get_request().await.is_ws() {
+                return;
+            }
+            let _ = ctx.send().await;
+        }
+    }
+
+    impl ServerHook for RootRoute {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let path: RequestPath = ctx.get_request_path().await;
+            let response_body: String = format!("Hello hyperlane => {}", path);
+            let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
+            let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
+            ctx.add_response_header(SET_COOKIE, &cookie1)
                 .await
-                .send_body()
+                .add_response_header(SET_COOKIE, &cookie2)
+                .await
+                .set_response_body(&response_body)
                 .await;
         }
-        let _ = ctx.closed().await;
     }
 
-    async fn dynamic_route(ctx: Context) {
-        let param: RouteParams = ctx.get_route_params().await;
-        panic!("Test panic {:?}", param);
+    impl WebsocketRoute {
+        async fn send_body_hook(&self, ctx: &Context) {
+            let body: ResponseBody = ctx.get_response_body().await;
+            if ctx.get_request().await.is_ws() {
+                let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+                ctx.send_body_list_with_data(&frame_list).await.unwrap();
+            } else {
+                ctx.send_body().await.unwrap();
+            }
+        }
     }
 
-    async fn panic_hook(ctx: Context) {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        let _ = ctx
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &content_type)
-            .await
-            .set_response_body(&response_body)
-            .await
-            .send()
-            .await;
+    impl ServerHook for WebsocketRoute {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            while ctx.ws_from_stream(4096).await.is_ok() {
+                let request_body: Vec<u8> = ctx.get_request_body().await;
+                ctx.set_response_body(&request_body).await;
+                self.send_body_hook(ctx).await;
+            }
+        }
+    }
+
+    impl ServerHook for SseRoute {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let _ = ctx
+                .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+                .await
+                .send()
+                .await;
+            for i in 0..10 {
+                let _ = ctx
+                    .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                    .await
+                    .send_body()
+                    .await;
+            }
+            let _ = ctx.closed().await;
+        }
+    }
+
+    impl ServerHook for DynamicRoute {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let param: RouteParams = ctx.get_route_params().await;
+            panic!("Test panic {:?}", param);
+        }
+    }
+
+    impl ServerHook for ServerPanicHook {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+            let response_body: String = error.to_string();
+            let content_type: String =
+                ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+            let _ = ctx
+                .set_response_status_code(500)
+                .await
+                .clear_response_headers()
+                .await
+                .set_response_header(SERVER, HYPERLANE)
+                .await
+                .set_response_header(CONTENT_TYPE, &content_type)
+                .await
+                .set_response_body(&response_body)
+                .await
+                .send()
+                .await;
+        }
     }
 
     async fn main() {
@@ -6029,22 +6642,22 @@ async fn server() {
         config.disable_linger().await;
         config.disable_nodelay().await;
         let server: Server = Server::from(config).await;
-        server.panic_hook(panic_hook).await;
-        server.request_middleware(request_middleware).await;
-        server.request_middleware(upgrade_hook).await;
-        server.response_middleware(response_middleware).await;
-        server.route("/", root_route).await;
-        server.route("/ws", ws_route).await;
-        server.route("/sse", sse_route).await;
-        server.route("/dynamic/{routing}", dynamic_route).await;
-        server.route("/regex/{file:^.*$}", dynamic_route).await;
-        let server_hook: ServerHook = server.run().await.unwrap_or_default();
-        let server_hook_clone: ServerHook = server_hook.clone();
+        server.request_middleware::<SendBodyMiddleware>().await;
+        server.request_middleware::<UpgradeMiddleware>().await;
+        server.response_middleware::<ResponseMiddleware>().await;
+        server.panic_hook::<ServerPanicHook>().await;
+        server.route::<RootRoute>("/").await;
+        server.route::<WebsocketRoute>("/websocket").await;
+        server.route::<SseRoute>("/sse").await;
+        server.route::<DynamicRoute>("/dynamic/{routing}").await;
+        server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
+        let server_lifecycle: ServerControlHook = server.run().await.unwrap_or_default();
+        let server_lifecycle_clone: ServerControlHook = server_lifecycle.clone();
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-            server_hook.shutdown().await;
+            server_lifecycle.shutdown().await;
         });
-        server_hook_clone.wait().await;
+        server_lifecycle_clone.wait().await;
     }
 
     main().await;
@@ -6052,7 +6665,7 @@ async fn server() {
 
 ```
 
-### 📄 File #97 - `.gitignore`
+### 📄 File #119 - `.gitignore`
 - **Path**: `hyperlane-broadcast\.gitignore`
 - **Size**: `18 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -6061,16 +6674,16 @@ async fn server() {
 
 
 
-### 📄 File #98 - `Cargo.toml`
+### 📄 File #120 - `Cargo.toml`
 - **Path**: `hyperlane-broadcast\Cargo.toml`
 - **Size**: `1,128 B`
-- **Modified Time**: `2025-09-15T22:37:19.370238`
+- **Modified Time**: `2025-10-21T08:11:47.002435`
 
 #### Content Preview
 
 
 
-### 📄 File #99 - `LICENSE`
+### 📄 File #121 - `LICENSE`
 - **Path**: `hyperlane-broadcast\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -6079,7 +6692,7 @@ async fn server() {
 
 
 
-### 📄 File #100 - `README.md`
+### 📄 File #122 - `README.md`
 - **Path**: `hyperlane-broadcast\README.md`
 - **Size**: `2,406 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -6152,7 +6765,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #101 - `config`
+### 📄 File #123 - `config`
 - **Path**: `hyperlane-broadcast\.git\config`
 - **Size**: `329 B`
 - **Modified Time**: `2025-09-15T22:37:19.361731`
@@ -6161,7 +6774,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #102 - `description`
+### 📄 File #124 - `description`
 - **Path**: `hyperlane-broadcast\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:17.377937`
@@ -6170,16 +6783,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #103 - `FETCH_HEAD`
+### 📄 File #125 - `FETCH_HEAD`
 - **Path**: `hyperlane-broadcast\.git\FETCH_HEAD`
-- **Size**: `114 B`
-- **Modified Time**: `2025-10-01T21:58:41.163589`
+- **Size**: `362 B`
+- **Modified Time**: `2025-10-21T08:11:46.957173`
 
 #### Content Preview
 
 
 
-### 📄 File #104 - `HEAD`
+### 📄 File #126 - `HEAD`
 - **Path**: `hyperlane-broadcast\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:19.350057`
@@ -6188,16 +6801,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #105 - `index`
+### 📄 File #127 - `index`
 - **Path**: `hyperlane-broadcast\.git\index`
 - **Size**: `1,777 B`
-- **Modified Time**: `2025-09-15T22:44:15.549267`
+- **Modified Time**: `2025-10-21T08:11:47.018444`
 
 #### Content Preview
 
 
 
-### 📄 File #106 - `ORIG_HEAD`
+### 📄 File #128 - `ORIG_HEAD`
 - **Path**: `hyperlane-broadcast\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:17.295684`
@@ -6206,7 +6819,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #107 - `packed-refs`
+### 📄 File #129 - `packed-refs`
 - **Path**: `hyperlane-broadcast\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:19.340000`
@@ -6215,7 +6828,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #108 - `shallow`
+### 📄 File #130 - `shallow`
 - **Path**: `hyperlane-broadcast\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:19.272119`
@@ -6224,7 +6837,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #109 - `applypatch-msg.sample`
+### 📄 File #131 - `applypatch-msg.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:17.377937`
@@ -6233,7 +6846,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #110 - `commit-msg.sample`
+### 📄 File #132 - `commit-msg.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6242,7 +6855,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #111 - `fsmonitor-watchman.sample`
+### 📄 File #133 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6251,7 +6864,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #112 - `post-update.sample`
+### 📄 File #134 - `post-update.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6260,7 +6873,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #113 - `pre-applypatch.sample`
+### 📄 File #135 - `pre-applypatch.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6269,7 +6882,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #114 - `pre-commit.sample`
+### 📄 File #136 - `pre-commit.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6278,7 +6891,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #115 - `pre-merge-commit.sample`
+### 📄 File #137 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:17.378936`
@@ -6287,7 +6900,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #116 - `pre-push.sample`
+### 📄 File #138 - `pre-push.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6296,7 +6909,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #117 - `pre-rebase.sample`
+### 📄 File #139 - `pre-rebase.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6305,7 +6918,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #118 - `pre-receive.sample`
+### 📄 File #140 - `pre-receive.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6314,7 +6927,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #119 - `prepare-commit-msg.sample`
+### 📄 File #141 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6323,7 +6936,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #120 - `push-to-checkout.sample`
+### 📄 File #142 - `push-to-checkout.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:17.379936`
@@ -6332,7 +6945,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #121 - `sendemail-validate.sample`
+### 📄 File #143 - `sendemail-validate.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:17.380937`
@@ -6341,7 +6954,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #122 - `update.sample`
+### 📄 File #144 - `update.sample`
 - **Path**: `hyperlane-broadcast\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:17.380937`
@@ -6350,7 +6963,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #123 - `exclude`
+### 📄 File #145 - `exclude`
 - **Path**: `hyperlane-broadcast\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:17.380937`
@@ -6359,25 +6972,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #124 - `HEAD`
+### 📄 File #146 - `HEAD`
 - **Path**: `hyperlane-broadcast\.git\logs\HEAD`
-- **Size**: `194 B`
-- **Modified Time**: `2025-09-15T22:37:19.352062`
+- **Size**: `347 B`
+- **Modified Time**: `2025-10-21T08:11:47.020165`
 
 #### Content Preview
 
 
 
-### 📄 File #125 - `master`
+### 📄 File #147 - `master`
 - **Path**: `hyperlane-broadcast\.git\logs\refs\heads\master`
-- **Size**: `194 B`
-- **Modified Time**: `2025-09-15T22:37:19.352062`
+- **Size**: `347 B`
+- **Modified Time**: `2025-10-21T08:11:47.020669`
 
 #### Content Preview
 
 
 
-### 📄 File #126 - `HEAD`
+### 📄 File #148 - `HEAD`
 - **Path**: `hyperlane-broadcast\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `194 B`
 - **Modified Time**: `2025-09-15T22:37:19.349058`
@@ -6386,7 +6999,169 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #127 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.idx`
+### 📄 File #149 - `master`
+- **Path**: `hyperlane-broadcast\.git\logs\refs\remotes\origin\master`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-21T08:11:46.902603`
+
+#### Content Preview
+
+
+
+### 📄 File #150 - `c7aa584b6282323c4f25b712a87279b0af778d`
+- **Path**: `hyperlane-broadcast\.git\objects\15\c7aa584b6282323c4f25b712a87279b0af778d`
+- **Size**: `850 B`
+- **Modified Time**: `2025-10-21T08:11:46.837689`
+
+#### Content Preview
+
+
+
+### 📄 File #151 - `ace322b6fa826c570be93afc3c2aa1a8c7f6c6`
+- **Path**: `hyperlane-broadcast\.git\objects\1e\ace322b6fa826c570be93afc3c2aa1a8c7f6c6`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:46.812077`
+
+#### Content Preview
+
+
+
+### 📄 File #152 - `7ebdde893443bdde2b782f36baa4bffb66b811`
+- **Path**: `hyperlane-broadcast\.git\objects\27\7ebdde893443bdde2b782f36baa4bffb66b811`
+- **Size**: `253 B`
+- **Modified Time**: `2025-10-21T08:11:46.843689`
+
+#### Content Preview
+
+
+
+### 📄 File #153 - `8c1315cbe24dfa52ad5355272688aa2176d0b9`
+- **Path**: `hyperlane-broadcast\.git\objects\2b\8c1315cbe24dfa52ad5355272688aa2176d0b9`
+- **Size**: `1,394 B`
+- **Modified Time**: `2025-10-21T08:11:46.845461`
+
+#### Content Preview
+
+
+
+### 📄 File #154 - `117d35782b61a06948b9fd0f505faf913fad7c`
+- **Path**: `hyperlane-broadcast\.git\objects\32\117d35782b61a06948b9fd0f505faf913fad7c`
+- **Size**: `169 B`
+- **Modified Time**: `2025-10-21T08:11:46.815077`
+
+#### Content Preview
+
+
+
+### 📄 File #155 - `d70225445aaba66a196762eb2733e9287f9555`
+- **Path**: `hyperlane-broadcast\.git\objects\3a\d70225445aaba66a196762eb2733e9287f9555`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:46.821796`
+
+#### Content Preview
+
+
+
+### 📄 File #156 - `7e6450af37f425307fd32b02b70c7b8187b9f2`
+- **Path**: `hyperlane-broadcast\.git\objects\3e\7e6450af37f425307fd32b02b70c7b8187b9f2`
+- **Size**: `198 B`
+- **Modified Time**: `2025-10-21T08:11:46.836190`
+
+#### Content Preview
+
+
+
+### 📄 File #157 - `62f00f73b46b31a7c64a0db535bcb6d1ee455c`
+- **Path**: `hyperlane-broadcast\.git\objects\4e\62f00f73b46b31a7c64a0db535bcb6d1ee455c`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-21T08:11:46.804342`
+
+#### Content Preview
+
+
+
+### 📄 File #158 - `9f98b591d8b94313e5b9d0286d26fb37da350d`
+- **Path**: `hyperlane-broadcast\.git\objects\4e\9f98b591d8b94313e5b9d0286d26fb37da350d`
+- **Size**: `143 B`
+- **Modified Time**: `2025-10-21T08:11:46.813577`
+
+#### Content Preview
+
+
+
+### 📄 File #159 - `2a5e8da156635734c23a12ee2148236ddd9c04`
+- **Path**: `hyperlane-broadcast\.git\objects\5a\2a5e8da156635734c23a12ee2148236ddd9c04`
+- **Size**: `169 B`
+- **Modified Time**: `2025-10-21T08:11:46.810577`
+
+#### Content Preview
+
+
+
+### 📄 File #160 - `eb1b64248d99615c394a06daaf89b812a31cc7`
+- **Path**: `hyperlane-broadcast\.git\objects\60\eb1b64248d99615c394a06daaf89b812a31cc7`
+- **Size**: `612 B`
+- **Modified Time**: `2025-10-21T08:11:46.823175`
+
+#### Content Preview
+
+
+
+### 📄 File #161 - `a1fb99c6838637b350e93fc3c3110a765fac8d`
+- **Path**: `hyperlane-broadcast\.git\objects\84\a1fb99c6838637b350e93fc3c3110a765fac8d`
+- **Size**: `793 B`
+- **Modified Time**: `2025-10-21T08:11:46.842691`
+
+#### Content Preview
+
+
+
+### 📄 File #162 - `da93d79fb8bed5ca14742df7874eddc5683f5f`
+- **Path**: `hyperlane-broadcast\.git\objects\a0\da93d79fb8bed5ca14742df7874eddc5683f5f`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:46.806572`
+
+#### Content Preview
+
+
+
+### 📄 File #163 - `c4b29b29b3e24d447cefc4427e02c153970f48`
+- **Path**: `hyperlane-broadcast\.git\objects\a8\c4b29b29b3e24d447cefc4427e02c153970f48`
+- **Size**: `198 B`
+- **Modified Time**: `2025-10-21T08:11:46.830675`
+
+#### Content Preview
+
+
+
+### 📄 File #164 - `3fbef7f4fe5ef4ea012e8f8e01d3f10e903a4d`
+- **Path**: `hyperlane-broadcast\.git\objects\b4\3fbef7f4fe5ef4ea012e8f8e01d3f10e903a4d`
+- **Size**: `612 B`
+- **Modified Time**: `2025-10-21T08:11:46.829175`
+
+#### Content Preview
+
+
+
+### 📄 File #165 - `f34c5e2c82ab0af95a1859b6559bcf49279b6e`
+- **Path**: `hyperlane-broadcast\.git\objects\e5\f34c5e2c82ab0af95a1859b6559bcf49279b6e`
+- **Size**: `143 B`
+- **Modified Time**: `2025-10-21T08:11:46.808572`
+
+#### Content Preview
+
+
+
+### 📄 File #166 - `877aa3916de7384802fe62ff0133418e5f6011`
+- **Path**: `hyperlane-broadcast\.git\objects\e9\877aa3916de7384802fe62ff0133418e5f6011`
+- **Size**: `1,387 B`
+- **Modified Time**: `2025-10-21T08:11:46.850466`
+
+#### Content Preview
+
+
+
+### 📄 File #167 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.idx`
 - **Path**: `hyperlane-broadcast\.git\objects\pack\pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.idx`
 - **Size**: `1,772 B`
 - **Modified Time**: `2025-09-15T22:37:19.306920`
@@ -6395,7 +7170,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #128 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.pack`
+### 📄 File #168 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.pack`
 - **Path**: `hyperlane-broadcast\.git\objects\pack\pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.pack`
 - **Size**: `10,052 B`
 - **Modified Time**: `2025-09-15T22:37:19.306920`
@@ -6404,7 +7179,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #129 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.rev`
+### 📄 File #169 - `pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.rev`
 - **Path**: `hyperlane-broadcast\.git\objects\pack\pack-f1ebad11ff9bb4a4ecc5c0ba4d30487c50b9b7ff.rev`
 - **Size**: `152 B`
 - **Modified Time**: `2025-09-15T22:37:19.307947`
@@ -6413,16 +7188,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #130 - `master`
+### 📄 File #170 - `master`
 - **Path**: `hyperlane-broadcast\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:37:19.351059`
+- **Modified Time**: `2025-10-21T08:11:47.020165`
 
 #### Content Preview
 
 
 
-### 📄 File #131 - `HEAD`
+### 📄 File #171 - `HEAD`
 - **Path**: `hyperlane-broadcast\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:19.348058`
@@ -6431,7 +7206,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #132 - `v0.8.0`
+### 📄 File #172 - `master`
+- **Path**: `hyperlane-broadcast\.git\refs\remotes\origin\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:46.902103`
+
+#### Content Preview
+
+
+
+### 📄 File #173 - `v0.8.0`
 - **Path**: `hyperlane-broadcast\.git\refs\tags\v0.8.0`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:19.347042`
@@ -6440,7 +7224,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #133 - `rust.yml`
+### 📄 File #174 - `v0.8.1`
+- **Path**: `hyperlane-broadcast\.git\refs\tags\v0.8.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:46.953671`
+
+#### Content Preview
+
+
+
+### 📄 File #175 - `v0.8.2`
+- **Path**: `hyperlane-broadcast\.git\refs\tags\v0.8.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:46.903602`
+
+#### Content Preview
+
+
+
+### 📄 File #176 - `rust.yml`
 - **Path**: `hyperlane-broadcast\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:19.370238`
@@ -6703,7 +7505,7 @@ jobs:
 
 ```
 
-### 📄 File #134 - `cfg.rs`
+### 📄 File #177 - `cfg.rs`
 - **Path**: `hyperlane-broadcast\src\cfg.rs`
 - **Size**: `1,073 B`
 - **Modified Time**: `2025-09-15T22:37:19.373238`
@@ -6742,7 +7544,7 @@ pub async fn test_broadcast_map() {
 
 ```
 
-### 📄 File #135 - `lib.rs`
+### 📄 File #178 - `lib.rs`
 - **Path**: `hyperlane-broadcast\src\lib.rs`
 - **Size**: `808 B`
 - **Modified Time**: `2025-09-15T22:37:19.373238`
@@ -6776,7 +7578,7 @@ pub(crate) use twox_hash::XxHash3_64;
 
 ```
 
-### 📄 File #136 - `const.rs`
+### 📄 File #179 - `const.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\const.rs`
 - **Size**: `244 B`
 - **Modified Time**: `2025-09-15T22:37:19.371238`
@@ -6792,10 +7594,10 @@ pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
 
 ```
 
-### 📄 File #137 - `impl.rs`
+### 📄 File #180 - `impl.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\impl.rs`
-- **Size**: `2,413 B`
-- **Modified Time**: `2025-09-15T22:37:19.371238`
+- **Size**: `2,265 B`
+- **Modified Time**: `2025-10-21T08:11:47.009939`
 
 #### Content Preview
 
@@ -6817,10 +7619,7 @@ impl<T: BroadcastTrait> Default for Broadcast<T> {
     /// - `Broadcast<T>` - A broadcast instance with default sender capacity.
     fn default() -> Self {
         let sender: BroadcastSender<T> = BroadcastSender::new(DEFAULT_BROADCAST_SENDER_CAPACITY);
-        Broadcast {
-            capacity: 0,
-            sender,
-        }
+        Self(sender)
     }
 }
 
@@ -6835,12 +7634,10 @@ impl<T: BroadcastTrait> Broadcast<T> {
     /// # Returns
     ///
     /// - `Broadcast<T>` - A new broadcast instance.
+    #[inline]
     pub fn new(capacity: Capacity) -> Self {
         let sender: BroadcastSender<T> = BroadcastSender::new(capacity);
-        let mut broadcast: Broadcast<T> = Broadcast::default();
-        broadcast.sender = sender;
-        broadcast.capacity = capacity;
-        broadcast
+        Self(sender)
     }
 
     /// Retrieves the current number of active receivers subscribed to this broadcast channel.
@@ -6848,8 +7645,9 @@ impl<T: BroadcastTrait> Broadcast<T> {
     /// # Returns
     ///
     /// - `ReceiverCount` - The total count of active receivers.
+    #[inline]
     pub fn receiver_count(&self) -> ReceiverCount {
-        self.sender.receiver_count()
+        self.0.receiver_count()
     }
 
     /// Subscribes a new receiver to the broadcast channel.
@@ -6857,8 +7655,9 @@ impl<T: BroadcastTrait> Broadcast<T> {
     /// # Returns
     ///
     /// - `BroadcastReceiver<T>` - A new receiver instance.
+    #[inline]
     pub fn subscribe(&self) -> BroadcastReceiver<T> {
-        self.sender.subscribe()
+        self.0.subscribe()
     }
 
     /// Sends a message to all active receivers subscribed to this broadcast channel.
@@ -6870,14 +7669,15 @@ impl<T: BroadcastTrait> Broadcast<T> {
     /// # Returns
     ///
     /// - `BroadcastSendResult<T>` - Result indicating send status.
+    #[inline]
     pub fn send(&self, data: T) -> BroadcastSendResult<T> {
-        self.sender.send(data)
+        self.0.send(data)
     }
 }
 
 ```
 
-### 📄 File #138 - `mod.rs`
+### 📄 File #181 - `mod.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\mod.rs`
 - **Size**: `84 B`
 - **Modified Time**: `2025-09-15T22:37:19.371238`
@@ -6893,10 +7693,10 @@ pub mod r#type;
 
 ```
 
-### 📄 File #139 - `struct.rs`
+### 📄 File #182 - `struct.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\struct.rs`
-- **Size**: `612 B`
-- **Modified Time**: `2025-09-15T22:37:19.371238`
+- **Size**: `381 B`
+- **Modified Time**: `2025-10-21T08:11:47.013941`
 
 #### Content Preview
 
@@ -6909,16 +7709,11 @@ use crate::*;
 /// including the capacity of the broadcast channel and the sender responsible
 /// for dispatching messages.
 #[derive(Debug, Clone)]
-pub struct Broadcast<T: BroadcastTrait> {
-    /// The maximum number of messages that can be buffered in the broadcast channel.
-    pub(super) capacity: Capacity,
-    /// The sender component responsible for distributing messages to all connected receivers.
-    pub(super) sender: BroadcastSender<T>,
-}
+pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
 
 ```
 
-### 📄 File #140 - `trait.rs`
+### 📄 File #183 - `trait.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\trait.rs`
 - **Size**: `299 B`
 - **Modified Time**: `2025-09-15T22:37:19.371238`
@@ -6936,7 +7731,7 @@ pub trait BroadcastTrait: Clone + Debug {}
 
 ```
 
-### 📄 File #141 - `type.rs`
+### 📄 File #184 - `type.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast\type.rs`
 - **Size**: `872 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -6961,10 +7756,10 @@ pub type Capacity = usize;
 
 ```
 
-### 📄 File #142 - `impl.rs`
+### 📄 File #185 - `impl.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\impl.rs`
-- **Size**: `4,680 B`
-- **Modified Time**: `2025-09-15T22:37:19.372237`
+- **Size**: `4,724 B`
+- **Modified Time**: `2025-10-21T08:11:47.018444`
 
 #### Content Preview
 
@@ -6998,6 +7793,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
     /// # Returns
     ///
     /// - `BroadcastMap<T>` - An empty broadcast map.
+    #[inline]
     pub fn new() -> Self {
         Self::default()
     }
@@ -7009,6 +7805,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
     /// # Returns
     ///
     /// - `&DashMapStringBroadcast<T>` - Reference to the internal map.
+    #[inline]
     fn get(&self) -> &DashMapStringBroadcast<T> {
         &self.0
     }
@@ -7025,6 +7822,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
     /// # Returns
     ///
     /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.
+    #[inline]
     pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>
     where
         K: AsRef<str>,
@@ -7042,6 +7840,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
     /// # Returns
     ///
     /// - `Option<ReceiverCount>` - Number of receivers if channel exists.
+    #[inline]
     pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount
     where
         K: AsRef<str>,
@@ -7060,6 +7859,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
     /// # Returns
     ///
     /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.
+    #[inline]
     pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>
     where
         K: AsRef<str>,
@@ -7080,6 +7880,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
     /// # Returns
     ///
     /// - `BroadcastReceiver<T>` - New receiver for the channel.
+    #[inline]
     pub fn subscribe_or_insert<K>(&self, key: K, capacity: Capacity) -> BroadcastMapReceiver<T>
     where
         K: AsRef<str>,
@@ -7104,12 +7905,10 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
     /// # Returns
     ///
     /// - `Result<Option<ReceiverCount>, SendError<T>>` - Send result with receiver count or error.
-    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T>
-    where
-        K: AsRef<str>,
-    {
+    #[inline]
+    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T> {
         match self.get().get(key.as_ref()) {
-            Some(sender) => sender.send(data).map(|result| Some(result)),
+            Some(sender) => sender.send(data).map(Some),
             None => Ok(None),
         }
     }
@@ -7117,7 +7916,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
 
 ```
 
-### 📄 File #143 - `mod.rs`
+### 📄 File #186 - `mod.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\mod.rs`
 - **Size**: `67 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7132,7 +7931,7 @@ pub mod r#type;
 
 ```
 
-### 📄 File #144 - `struct.rs`
+### 📄 File #187 - `struct.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\struct.rs`
 - **Size**: `399 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7151,7 +7950,7 @@ pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>)
 
 ```
 
-### 📄 File #145 - `trait.rs`
+### 📄 File #188 - `trait.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\trait.rs`
 - **Size**: `334 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7169,7 +7968,7 @@ pub trait BroadcastMapTrait: Clone + Debug {}
 
 ```
 
-### 📄 File #146 - `type.rs`
+### 📄 File #189 - `type.rs`
 - **Path**: `hyperlane-broadcast\src\broadcast_map\type.rs`
 - **Size**: `1,414 B`
 - **Modified Time**: `2025-09-15T22:37:19.372237`
@@ -7200,7 +7999,7 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 
 ```
 
-### 📄 File #147 - `.gitignore`
+### 📄 File #190 - `.gitignore`
 - **Path**: `hyperlane-log\.gitignore`
 - **Size**: `30 B`
 - **Modified Time**: `2025-09-15T22:37:12.927907`
@@ -7209,16 +8008,16 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 
 
 
-### 📄 File #148 - `Cargo.toml`
+### 📄 File #191 - `Cargo.toml`
 - **Path**: `hyperlane-log\Cargo.toml`
-- **Size**: `1,517 B`
-- **Modified Time**: `2025-09-15T22:37:12.927907`
+- **Size**: `1,518 B`
+- **Modified Time**: `2025-10-21T08:11:41.433173`
 
 #### Content Preview
 
 
 
-### 📄 File #149 - `LICENSE`
+### 📄 File #192 - `LICENSE`
 - **Path**: `hyperlane-log\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:12.927907`
@@ -7227,7 +8026,7 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 
 
 
-### 📄 File #150 - `README.md`
+### 📄 File #193 - `README.md`
 - **Path**: `hyperlane-log\README.md`
 - **Size**: `4,066 B`
 - **Modified Time**: `2025-09-15T22:37:12.928908`
@@ -7349,7 +8148,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #151 - `config`
+### 📄 File #194 - `config`
 - **Path**: `hyperlane-log\.git\config`
 - **Size**: `323 B`
 - **Modified Time**: `2025-09-15T22:37:12.921397`
@@ -7358,7 +8157,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #152 - `description`
+### 📄 File #195 - `description`
 - **Path**: `hyperlane-log\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:10.337892`
@@ -7367,16 +8166,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #153 - `FETCH_HEAD`
+### 📄 File #196 - `FETCH_HEAD`
 - **Path**: `hyperlane-log\.git\FETCH_HEAD`
-- **Size**: `0 B`
-- **Modified Time**: `2025-10-01T21:58:27.561776`
+- **Size**: `465 B`
+- **Modified Time**: `2025-10-21T08:11:41.385654`
 
 #### Content Preview
 
 
 
-### 📄 File #154 - `HEAD`
+### 📄 File #197 - `HEAD`
 - **Path**: `hyperlane-log\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:12.912397`
@@ -7385,16 +8184,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #155 - `index`
+### 📄 File #198 - `index`
 - **Path**: `hyperlane-log\.git\index`
 - **Size**: `1,308 B`
-- **Modified Time**: `2025-09-15T22:44:07.189926`
+- **Modified Time**: `2025-10-21T08:11:41.448524`
 
 #### Content Preview
 
 
 
-### 📄 File #156 - `ORIG_HEAD`
+### 📄 File #199 - `ORIG_HEAD`
 - **Path**: `hyperlane-log\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:11.290119`
@@ -7403,7 +8202,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #157 - `packed-refs`
+### 📄 File #200 - `packed-refs`
 - **Path**: `hyperlane-log\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:12.902397`
@@ -7412,7 +8211,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #158 - `shallow`
+### 📄 File #201 - `shallow`
 - **Path**: `hyperlane-log\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:12.765583`
@@ -7421,7 +8220,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #159 - `applypatch-msg.sample`
+### 📄 File #202 - `applypatch-msg.sample`
 - **Path**: `hyperlane-log\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7430,7 +8229,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #160 - `commit-msg.sample`
+### 📄 File #203 - `commit-msg.sample`
 - **Path**: `hyperlane-log\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7439,7 +8238,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #161 - `fsmonitor-watchman.sample`
+### 📄 File #204 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-log\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7448,7 +8247,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #162 - `post-update.sample`
+### 📄 File #205 - `post-update.sample`
 - **Path**: `hyperlane-log\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7457,7 +8256,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #163 - `pre-applypatch.sample`
+### 📄 File #206 - `pre-applypatch.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7466,7 +8265,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #164 - `pre-commit.sample`
+### 📄 File #207 - `pre-commit.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:10.338892`
@@ -7475,7 +8274,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #165 - `pre-merge-commit.sample`
+### 📄 File #208 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7484,7 +8283,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #166 - `pre-push.sample`
+### 📄 File #209 - `pre-push.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7493,7 +8292,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #167 - `pre-rebase.sample`
+### 📄 File #210 - `pre-rebase.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7502,7 +8301,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #168 - `pre-receive.sample`
+### 📄 File #211 - `pre-receive.sample`
 - **Path**: `hyperlane-log\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7511,7 +8310,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #169 - `prepare-commit-msg.sample`
+### 📄 File #212 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-log\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7520,7 +8319,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #170 - `push-to-checkout.sample`
+### 📄 File #213 - `push-to-checkout.sample`
 - **Path**: `hyperlane-log\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:10.339891`
@@ -7529,7 +8328,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #171 - `sendemail-validate.sample`
+### 📄 File #214 - `sendemail-validate.sample`
 - **Path**: `hyperlane-log\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:10.340891`
@@ -7538,7 +8337,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #172 - `update.sample`
+### 📄 File #215 - `update.sample`
 - **Path**: `hyperlane-log\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:10.340891`
@@ -7547,7 +8346,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #173 - `exclude`
+### 📄 File #216 - `exclude`
 - **Path**: `hyperlane-log\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:10.340891`
@@ -7556,25 +8355,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #174 - `HEAD`
+### 📄 File #217 - `HEAD`
 - **Path**: `hyperlane-log\.git\logs\HEAD`
-- **Size**: `188 B`
-- **Modified Time**: `2025-09-15T22:37:12.914397`
+- **Size**: `341 B`
+- **Modified Time**: `2025-10-21T08:11:41.450027`
 
 #### Content Preview
 
 
 
-### 📄 File #175 - `master`
+### 📄 File #218 - `master`
 - **Path**: `hyperlane-log\.git\logs\refs\heads\master`
-- **Size**: `188 B`
-- **Modified Time**: `2025-09-15T22:37:12.914397`
+- **Size**: `341 B`
+- **Modified Time**: `2025-10-21T08:11:41.450027`
 
 #### Content Preview
 
 
 
-### 📄 File #176 - `HEAD`
+### 📄 File #219 - `HEAD`
 - **Path**: `hyperlane-log\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `188 B`
 - **Modified Time**: `2025-09-15T22:37:12.912397`
@@ -7583,7 +8382,169 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #177 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.idx`
+### 📄 File #220 - `master`
+- **Path**: `hyperlane-log\.git\logs\refs\remotes\origin\master`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-21T08:11:41.323115`
+
+#### Content Preview
+
+
+
+### 📄 File #221 - `2920bb1f370ef861050bc5632b070878a15b49`
+- **Path**: `hyperlane-log\.git\objects\07\2920bb1f370ef861050bc5632b070878a15b49`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:41.212396`
+
+#### Content Preview
+
+
+
+### 📄 File #222 - `814caf8be041a7419c6c24dca6a566947d59b0`
+- **Path**: `hyperlane-log\.git\objects\0f\814caf8be041a7419c6c24dca6a566947d59b0`
+- **Size**: `802 B`
+- **Modified Time**: `2025-10-21T08:11:41.247931`
+
+#### Content Preview
+
+
+
+### 📄 File #223 - `f21999f07ec3615f4dd91dbb9d260573c46812`
+- **Path**: `hyperlane-log\.git\objects\10\f21999f07ec3615f4dd91dbb9d260573c46812`
+- **Size**: `802 B`
+- **Modified Time**: `2025-10-21T08:11:41.242941`
+
+#### Content Preview
+
+
+
+### 📄 File #224 - `eef4a6b4b654cefd16b6ad48183c3cdb301492`
+- **Path**: `hyperlane-log\.git\objects\1a\eef4a6b4b654cefd16b6ad48183c3cdb301492`
+- **Size**: `1,343 B`
+- **Modified Time**: `2025-10-21T08:11:41.273578`
+
+#### Content Preview
+
+
+
+### 📄 File #225 - `9a9323c7637ffb2b07779c291a1c80e803e122`
+- **Path**: `hyperlane-log\.git\objects\2b\9a9323c7637ffb2b07779c291a1c80e803e122`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:41.228417`
+
+#### Content Preview
+
+
+
+### 📄 File #226 - `9e98d8c977278ccf3850b9907966491315fa22`
+- **Path**: `hyperlane-log\.git\objects\2f\9e98d8c977278ccf3850b9907966491315fa22`
+- **Size**: `227 B`
+- **Modified Time**: `2025-10-21T08:11:41.259437`
+
+#### Content Preview
+
+
+
+### 📄 File #227 - `ca5529bdc6271e25e667e123e4c0a1ba9d9cb5`
+- **Path**: `hyperlane-log\.git\objects\42\ca5529bdc6271e25e667e123e4c0a1ba9d9cb5`
+- **Size**: `1,291 B`
+- **Modified Time**: `2025-10-21T08:11:41.260938`
+
+#### Content Preview
+
+
+
+### 📄 File #228 - `043451e05746fde26a93686656ec306bb8130e`
+- **Path**: `hyperlane-log\.git\objects\4b\043451e05746fde26a93686656ec306bb8130e`
+- **Size**: `1,344 B`
+- **Modified Time**: `2025-10-21T08:11:41.268566`
+
+#### Content Preview
+
+
+
+### 📄 File #229 - `0f6753b5cb5ccbc81419396ddb1a147fe7b56a`
+- **Path**: `hyperlane-log\.git\objects\55\0f6753b5cb5ccbc81419396ddb1a147fe7b56a`
+- **Size**: `800 B`
+- **Modified Time**: `2025-10-21T08:11:41.236941`
+
+#### Content Preview
+
+
+
+### 📄 File #230 - `24432c6da24e1baeef7559f4056131fbaddc07`
+- **Path**: `hyperlane-log\.git\objects\55\24432c6da24e1baeef7559f4056131fbaddc07`
+- **Size**: `108 B`
+- **Modified Time**: `2025-10-21T08:11:41.253937`
+
+#### Content Preview
+
+
+
+### 📄 File #231 - `78e8bae2135ddbac83c46a59349768d492a183`
+- **Path**: `hyperlane-log\.git\objects\5f\78e8bae2135ddbac83c46a59349768d492a183`
+- **Size**: `1,292 B`
+- **Modified Time**: `2025-10-21T08:11:41.267066`
+
+#### Content Preview
+
+
+
+### 📄 File #232 - `fa4cd339d79406dbcf9672967cfbbf16a62f74`
+- **Path**: `hyperlane-log\.git\objects\61\fa4cd339d79406dbcf9672967cfbbf16a62f74`
+- **Size**: `226 B`
+- **Modified Time**: `2025-10-21T08:11:41.218404`
+
+#### Content Preview
+
+
+
+### 📄 File #233 - `b7472f5b48a97312cdada8af8fc411e08fdba4`
+- **Path**: `hyperlane-log\.git\objects\75\b7472f5b48a97312cdada8af8fc411e08fdba4`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:41.235440`
+
+#### Content Preview
+
+
+
+### 📄 File #234 - `35253c510ba1572c1e3493d7f68281ea1ec504`
+- **Path**: `hyperlane-log\.git\objects\7f\35253c510ba1572c1e3493d7f68281ea1ec504`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:41.215395`
+
+#### Content Preview
+
+
+
+### 📄 File #235 - `8fabe4c9381ee66e0870c2fa0474850104595a`
+- **Path**: `hyperlane-log\.git\objects\e5\8fabe4c9381ee66e0870c2fa0474850104595a`
+- **Size**: `109 B`
+- **Modified Time**: `2025-10-21T08:11:41.216397`
+
+#### Content Preview
+
+
+
+### 📄 File #236 - `f4ad69360b6ab2a61ae8f3dcbf22c935423bf2`
+- **Path**: `hyperlane-log\.git\objects\ee\f4ad69360b6ab2a61ae8f3dcbf22c935423bf2`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:41.213896`
+
+#### Content Preview
+
+
+
+### 📄 File #237 - `f212a21295118c2b1dfba720a329f4809de99d`
+- **Path**: `hyperlane-log\.git\objects\ff\f212a21295118c2b1dfba720a329f4809de99d`
+- **Size**: `167 B`
+- **Modified Time**: `2025-10-21T08:11:41.210246`
+
+#### Content Preview
+
+
+
+### 📄 File #238 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.idx`
 - **Path**: `hyperlane-log\.git\objects\pack\pack-8288281cadf0897a7078f431aa6915caf1801a01.idx`
 - **Size**: `1,632 B`
 - **Modified Time**: `2025-09-15T22:37:12.868651`
@@ -7592,7 +8553,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #178 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.pack`
+### 📄 File #239 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.pack`
 - **Path**: `hyperlane-log\.git\objects\pack\pack-8288281cadf0897a7078f431aa6915caf1801a01.pack`
 - **Size**: `10,203 B`
 - **Modified Time**: `2025-09-15T22:37:12.868651`
@@ -7601,7 +8562,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #179 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.rev`
+### 📄 File #240 - `pack-8288281cadf0897a7078f431aa6915caf1801a01.rev`
 - **Path**: `hyperlane-log\.git\objects\pack\pack-8288281cadf0897a7078f431aa6915caf1801a01.rev`
 - **Size**: `132 B`
 - **Modified Time**: `2025-09-15T22:37:12.869652`
@@ -7610,16 +8571,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #180 - `master`
+### 📄 File #241 - `master`
 - **Path**: `hyperlane-log\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:37:12.914397`
+- **Modified Time**: `2025-10-21T08:11:41.449024`
 
 #### Content Preview
 
 
 
-### 📄 File #181 - `HEAD`
+### 📄 File #242 - `HEAD`
 - **Path**: `hyperlane-log\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:12.911397`
@@ -7628,7 +8589,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #182 - `v1.19.0`
+### 📄 File #243 - `master`
+- **Path**: `hyperlane-log\.git\refs\remotes\origin\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:41.322110`
+
+#### Content Preview
+
+
+
+### 📄 File #244 - `v1.19.0`
 - **Path**: `hyperlane-log\.git\refs\tags\v1.19.0`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:12.909397`
@@ -7637,7 +8607,34 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #183 - `rust.yml`
+### 📄 File #245 - `v1.19.1`
+- **Path**: `hyperlane-log\.git\refs\tags\v1.19.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:41.381649`
+
+#### Content Preview
+
+
+
+### 📄 File #246 - `v1.19.2`
+- **Path**: `hyperlane-log\.git\refs\tags\v1.19.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:41.382151`
+
+#### Content Preview
+
+
+
+### 📄 File #247 - `v1.19.3`
+- **Path**: `hyperlane-log\.git\refs\tags\v1.19.3`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:41.323944`
+
+#### Content Preview
+
+
+
+### 📄 File #248 - `rust.yml`
 - **Path**: `hyperlane-log\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:12.927907`
@@ -7900,7 +8897,7 @@ jobs:
 
 ```
 
-### 📄 File #184 - `cfg.rs`
+### 📄 File #249 - `cfg.rs`
 - **Path**: `hyperlane-log\src\cfg.rs`
 - **Size**: `2,808 B`
 - **Modified Time**: `2025-09-15T22:37:12.928908`
@@ -7995,7 +8992,7 @@ async fn test_more_log_second() {
 
 ```
 
-### 📄 File #185 - `lib.rs`
+### 📄 File #250 - `lib.rs`
 - **Path**: `hyperlane-log\src\lib.rs`
 - **Size**: `918 B`
 - **Modified Time**: `2025-09-15T22:37:12.928908`
@@ -8030,7 +9027,7 @@ pub(crate) use std::{
 
 ```
 
-### 📄 File #186 - `const.rs`
+### 📄 File #251 - `const.rs`
 - **Path**: `hyperlane-log\src\log\const.rs`
 - **Size**: `871 B`
 - **Modified Time**: `2025-09-15T22:37:12.928908`
@@ -8063,10 +9060,10 @@ pub(crate) const BR: &str = "\n";
 
 ```
 
-### 📄 File #187 - `fn.rs`
+### 📄 File #252 - `fn.rs`
 - **Path**: `hyperlane-log\src\log\fn.rs`
-- **Size**: `3,601 B`
-- **Modified Time**: `2025-09-15T22:37:12.929908`
+- **Size**: `3,629 B`
+- **Modified Time**: `2025-10-21T08:11:41.442511`
 
 #### Content Preview
 
@@ -8088,10 +9085,10 @@ pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
         for entry in entries.filter_map(Result::ok) {
             let file_name: String = entry.file_name().to_string_lossy().to_string();
             let parts: Vec<&str> = file_name.split(POINT).collect();
-            if parts.len() > 1 {
-                if let Ok(second_element) = parts[1].parse::<usize>() {
-                    res_idx = second_element.max(res_idx);
-                }
+            if parts.len() > 1
+                && let Ok(second_element) = parts[1].parse::<usize>()
+            {
+                res_idx = second_element.max(res_idx);
             }
         }
     }
@@ -8107,6 +9104,7 @@ pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
 /// # Returns
 ///
 /// - `String` - The formatted log filename with path.
+#[inline]
 pub(crate) fn get_file_name(idx: usize) -> String {
     format!(
         "{}{}{}{}{}{}",
@@ -8124,6 +9122,7 @@ pub(crate) fn get_file_name(idx: usize) -> String {
 /// # Returns
 ///
 /// - `String` - The directory name based on current date.
+#[inline]
 pub(crate) fn get_file_dir_name() -> String {
     format!("{}{}", ROOT_PATH, date())
 }
@@ -8170,6 +9169,7 @@ pub(crate) fn get_log_path(system_dir: &str, base_path: &str, limit_file_size: &
 /// # Returns
 ///
 /// - `String` - The formatted log string with timestamps.
+#[inline]
 pub fn common_log<T: AsRef<str>>(data: T) -> String {
     let mut log_string: String = String::new();
     for line in data.as_ref().lines() {
@@ -8188,16 +9188,17 @@ pub fn common_log<T: AsRef<str>>(data: T) -> String {
 /// # Returns
 ///
 /// - `String` - The formatted log string.
+#[inline]
 pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
     common_log(log_data)
 }
 
 ```
 
-### 📄 File #188 - `impl.rs`
+### 📄 File #253 - `impl.rs`
 - **Path**: `hyperlane-log\src\log\impl.rs`
-- **Size**: `6,965 B`
-- **Modified Time**: `2025-09-15T22:37:12.929908`
+- **Size**: `7,019 B`
+- **Modified Time**: `2025-10-21T08:11:41.448024`
 
 #### Content Preview
 
@@ -8240,6 +9241,7 @@ impl Log {
     /// # Returns
     ///
     /// - `Self` - A new Log instance with specified configuration.
+    #[inline]
     pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {
         Self {
             path: path.as_ref().to_owned(),
@@ -8270,6 +9272,7 @@ impl Log {
     /// # Returns
     ///
     /// - `&mut Self` - Mutable reference to self for method chaining.
+    #[inline]
     pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {
         self.limit_file_size = limit_file_size;
         self
@@ -8280,6 +9283,7 @@ impl Log {
     /// # Returns
     ///
     /// - `bool` - True if logging is enabled.
+    #[inline]
     pub fn is_enable(&self) -> bool {
         self.limit_file_size != DISABLE_LOG_FILE_SIZE
     }
@@ -8289,6 +9293,7 @@ impl Log {
     /// # Returns
     ///
     /// - `bool` - True if logging is disabled.
+    #[inline]
     pub fn is_disable(&self) -> bool {
         !self.is_enable()
     }
@@ -8314,7 +9319,7 @@ impl Log {
         }
         let out: String = func(data);
         let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
-        let _ = append_to_file(&path, &out.as_bytes());
+        let _ = append_to_file(&path, out.as_bytes());
         self
     }
 
@@ -8339,7 +9344,7 @@ impl Log {
         }
         let out: String = func(data);
         let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
-        let _ = async_append_to_file(&path, &out.as_bytes()).await;
+        let _ = async_append_to_file(&path, out.as_bytes()).await;
         self
     }
 
@@ -8454,7 +9459,7 @@ impl Log {
 
 ```
 
-### 📄 File #189 - `mod.rs`
+### 📄 File #254 - `mod.rs`
 - **Path**: `hyperlane-log\src\log\mod.rs`
 - **Size**: `238 B`
 - **Modified Time**: `2025-09-15T22:37:12.929908`
@@ -8477,7 +9482,7 @@ pub use r#type::*;
 
 ```
 
-### 📄 File #190 - `struct.rs`
+### 📄 File #255 - `struct.rs`
 - **Path**: `hyperlane-log\src\log\struct.rs`
 - **Size**: `457 B`
 - **Modified Time**: `2025-09-15T22:37:12.929908`
@@ -8500,7 +9505,7 @@ pub struct Log {
 
 ```
 
-### 📄 File #191 - `trait.rs`
+### 📄 File #256 - `trait.rs`
 - **Path**: `hyperlane-log\src\log\trait.rs`
 - **Size**: `373 B`
 - **Modified Time**: `2025-09-15T22:37:12.929908`
@@ -8520,7 +9525,7 @@ pub trait LogFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
 
 ```
 
-### 📄 File #192 - `type.rs`
+### 📄 File #257 - `type.rs`
 - **Path**: `hyperlane-log\src\log\type.rs`
 - **Size**: `636 B`
 - **Modified Time**: `2025-09-15T22:37:12.930907`
@@ -8545,7 +9550,7 @@ pub type ArcLog = Arc<Log>;
 
 ```
 
-### 📄 File #193 - `.gitignore`
+### 📄 File #258 - `.gitignore`
 - **Path**: `hyperlane-macros\.gitignore`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:29.398513`
@@ -8554,16 +9559,16 @@ pub type ArcLog = Arc<Log>;
 
 
 
-### 📄 File #194 - `Cargo.toml`
+### 📄 File #259 - `Cargo.toml`
 - **Path**: `hyperlane-macros\Cargo.toml`
-- **Size**: `1,230 B`
-- **Modified Time**: `2025-10-01T21:58:50.909285`
+- **Size**: `1,232 B`
+- **Modified Time**: `2025-10-21T08:11:52.871140`
 
 #### Content Preview
 
 
 
-### 📄 File #195 - `LICENSE`
+### 📄 File #260 - `LICENSE`
 - **Path**: `hyperlane-macros\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:29.399022`
@@ -8572,10 +9577,10 @@ pub type ArcLog = Arc<Log>;
 
 
 
-### 📄 File #196 - `README.md`
+### 📄 File #261 - `README.md`
 - **Path**: `hyperlane-macros\README.md`
-- **Size**: `22,567 B`
-- **Modified Time**: `2025-10-01T21:58:50.914121`
+- **Size**: `35,238 B`
+- **Modified Time**: `2025-10-21T08:11:52.871140`
 
 #### Content Preview
 
@@ -8812,369 +9817,1019 @@ struct TestData {
 #[panic_hook]
 #[panic_hook(1)]
 #[panic_hook("2")]
-#[epilogue_macros(response_body("panic_hook"), send)]
-async fn panic_hook(ctx: Context) {}
+struct PanicHook;
+
+impl ServerHook for PanicHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(response_body("panic_hook"), send)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[request_middleware]
-#[epilogue_macros(
-    response_status_code(200),
-    response_version(HttpVersion::HTTP1_1),
-    response_header(SERVER => HYPERLANE),
-    response_header(CONNECTION => KEEP_ALIVE),
-    response_header(CONTENT_TYPE => TEXT_PLAIN),
-    response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY),
-    response_header(STEP => "request_middleware"),
-)]
-async fn request_middleware(ctx: Context) {}
+struct RequestMiddleware;
 
-#[ws]
+impl ServerHook for RequestMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        response_status_code(200),
+        response_version(HttpVersion::HTTP1_1),
+        response_header(SERVER => HYPERLANE),
+        response_header(CONNECTION => KEEP_ALIVE),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY),
+        response_header(STEP => "request_middleware"),
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[request_middleware(1)]
-#[epilogue_macros(
-    response_body(&vec![]),
-    response_status_code(101),
-    response_header(UPGRADE => WEBSOCKET),
-    response_header(CONNECTION => UPGRADE),
-    response_header(SEC_WEBSOCKET_ACCEPT => &WebSocketFrame::generate_accept_key(&ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
-    response_header(STEP => "upgrade_hook"),
-    send
-)]
-async fn upgrade_hook(ctx: Context) {}
+struct UpgradeHook;
+
+impl ServerHook for UpgradeHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        ws,
+        response_body(&vec![]),
+        response_status_code(101),
+        response_header(UPGRADE => WEBSOCKET),
+        response_header(CONNECTION => UPGRADE),
+        response_header(SEC_WEBSOCKET_ACCEPT => &WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
+        response_header(STEP => "upgrade_hook"),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[request_middleware(2)]
-#[response_status_code(200)]
-#[response_header(SERVER => HYPERLANE)]
-#[response_version(HttpVersion::HTTP1_1)]
-#[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
-#[response_header(STEP => "connected_hook")]
-async fn connected_hook(ctx: Context) {}
+struct ConnectedHook;
+
+impl ServerHook for ConnectedHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_status_code(200)]
+    #[response_header(SERVER => HYPERLANE)]
+    #[response_version(HttpVersion::HTTP1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
+    #[response_header(STEP => "connected_hook")]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[response_middleware]
-#[response_header(STEP => "response_middleware_1")]
-async fn response_middleware_1(ctx: Context) {}
+struct ResponseMiddleware1;
+
+impl ServerHook for ResponseMiddleware1 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_header(STEP => "response_middleware_1")]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[response_middleware(2)]
-#[prologue_macros(
-    reject(ctx.get_request().await.is_ws()),
-    response_header(STEP => "response_middleware_2")
-)]
-#[epilogue_macros(send, flush)]
-async fn response_middleware_2(ctx: Context) {}
+struct ResponseMiddleware2;
+
+impl ServerHook for ResponseMiddleware2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        reject(ctx.get_request().await.is_ws()),
+        response_header(STEP => "response_middleware_2")
+    )]
+    #[epilogue_macros(send, flush)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[response_middleware("3")]
-#[prologue_macros(
-    ws,
-    response_header(STEP => "response_middleware_3")
-)]
-#[epilogue_macros(send_body, flush)]
-async fn response_middleware_3(ctx: Context) {}
+struct ResponseMiddleware3;
 
-#[get]
-#[http]
-async fn prologue_hooks(ctx: Context) {}
+impl ServerHook for ResponseMiddleware3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
 
-#[response_status_code(200)]
-async fn epilogue_hooks(ctx: Context) {}
+    #[prologue_macros(
+        ws,
+        response_header(STEP => "response_middleware_3")
+    )]
+    #[epilogue_macros(send_body, flush)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+struct PrologueHooks;
+
+impl ServerHook for PrologueHooks {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[get]
+    #[http]
+    async fn handle(self, _ctx: &Context) {}
+}
+
+struct EpilogueHooks;
+
+impl ServerHook for EpilogueHooks {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_status_code(200)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+async fn prologue_hooks_fn(ctx: Context) {
+    let hook = PrologueHooks::new(&ctx).await;
+    hook.handle(&ctx).await;
+}
+
+async fn epilogue_hooks_fn(ctx: Context) {
+    let hook = EpilogueHooks::new(&ctx).await;
+    hook.handle(&ctx).await;
+}
 
 #[route("/response")]
-#[response_body(&RESPONSE_DATA)]
-#[response_reason_phrase(CUSTOM_REASON)]
-#[response_status_code(CUSTOM_STATUS_CODE)]
-#[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
-async fn response(ctx: Context) {}
+struct Response;
+
+impl ServerHook for Response {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&RESPONSE_DATA)]
+    #[response_reason_phrase(CUSTOM_REASON)]
+    #[response_status_code(CUSTOM_STATUS_CODE)]
+    #[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/connect")]
-#[prologue_macros(connect, response_body("connect"))]
-async fn connect(ctx: Context) {}
+struct Connect;
+
+impl ServerHook for Connect {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(connect, response_body("connect"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/delete")]
-#[prologue_macros(delete, response_body("delete"))]
-async fn delete(ctx: Context) {}
+struct Delete;
+
+impl ServerHook for Delete {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(delete, response_body("delete"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/head")]
-#[prologue_macros(head, response_body("head"))]
-async fn head(ctx: Context) {}
+struct Head;
+
+impl ServerHook for Head {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(head, response_body("head"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/options")]
-#[prologue_macros(options, response_body("options"))]
-async fn options(ctx: Context) {}
+struct Options;
+
+impl ServerHook for Options {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(options, response_body("options"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/patch")]
-#[prologue_macros(patch, response_body("patch"))]
-async fn patch(ctx: Context) {}
+struct Patch;
+
+impl ServerHook for Patch {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(patch, response_body("patch"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/put")]
-#[prologue_macros(put, response_body("put"))]
-async fn put(ctx: Context) {}
+struct Put;
+
+impl ServerHook for Put {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(put, response_body("put"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/trace")]
-#[prologue_macros(trace, response_body("trace"))]
-async fn trace(ctx: Context) {}
+struct Trace;
+
+impl ServerHook for Trace {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(trace, response_body("trace"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/h2c")]
-#[prologue_macros(h2c, response_body("h2c"))]
-async fn h2c(ctx: Context) {}
+struct H2c;
+
+impl ServerHook for H2c {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(h2c, response_body("h2c"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http")]
-#[prologue_macros(http, response_body("http"))]
-async fn http_only(ctx: Context) {}
+struct HttpOnly;
+
+impl ServerHook for HttpOnly {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http, response_body("http"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http0_9")]
-#[prologue_macros(http0_9, response_body("http0_9"))]
-async fn http0_9(ctx: Context) {}
+struct Http09;
+
+impl ServerHook for Http09 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http0_9, response_body("http0_9"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http1_0")]
-#[prologue_macros(http1_0, response_body("http1_0"))]
-async fn http1_0(ctx: Context) {}
+struct Http10;
+
+impl ServerHook for Http10 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http1_0, response_body("http1_0"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http1_1")]
-#[prologue_macros(http1_1, response_body("http1_1"))]
-async fn http1_1(ctx: Context) {}
+struct Http11;
+
+impl ServerHook for Http11 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http1_1, response_body("http1_1"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http2")]
-#[prologue_macros(http2, response_body("http2"))]
-async fn http2(ctx: Context) {}
+struct Http2;
+
+impl ServerHook for Http2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http2, response_body("http2"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http3")]
-#[prologue_macros(http3, response_body("http3"))]
-async fn http3(ctx: Context) {}
+struct Http3;
+
+impl ServerHook for Http3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http3, response_body("http3"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/tls")]
-#[prologue_macros(tls, response_body("tls"))]
-async fn tls(ctx: Context) {}
+struct Tls;
+
+impl ServerHook for Tls {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(tls, response_body("tls"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http1_1_or_higher")]
-#[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
-async fn http1_1_or_higher(ctx: Context) {}
+struct Http11OrHigher;
+
+impl ServerHook for Http11OrHigher {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/unknown_method")]
-#[prologue_macros(
-    clear_response_headers,
-    filter(ctx.get_request().await.is_unknown_method()),
-    response_body("unknown_method")
-)]
-async fn unknown_method(ctx: Context) {}
+struct UnknownMethod;
+
+impl ServerHook for UnknownMethod {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        clear_response_headers,
+        filter(ctx.get_request().await.is_unknown_method()),
+        response_body("unknown_method")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/get")]
-#[send_body_once]
-#[prologue_macros(ws, get, response_body("get"))]
-async fn get(ctx: Context) {}
+struct Get;
 
-#[send_once]
+impl ServerHook for Get {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(ws, get, response_body("get"), send_body_once)]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/post")]
-#[prologue_macros(post, response_body("post"))]
-async fn post(ctx: Context) {}
+struct Post;
 
-#[ws]
+impl ServerHook for Post {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(post, response_body("post"), send_once)]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/ws1")]
-#[ws_from_stream]
-async fn websocket_1(ctx: Context) {
-    let body: RequestBody = ctx.get_request_body().await;
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket1;
+
+impl ServerHook for Websocket1 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream]
+    async fn handle(self, ctx: &Context) {
+        let body: RequestBody = ctx.get_request_body().await;
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
-#[ws]
 #[route("/ws2")]
-#[ws_from_stream(1024)]
-async fn websocket_2(ctx: Context) {
-    let body: RequestBody = ctx.get_request_body().await;
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket2;
+
+impl ServerHook for Websocket2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream(request)]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
-#[ws]
 #[route("/ws3")]
-#[ws_from_stream(request)]
-async fn websocket_3(ctx: Context) {
-    let body: RequestBody = request.get_body().clone();
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket3;
+
+impl ServerHook for Websocket3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream(1024, request)]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
-#[ws]
 #[route("/ws4")]
-#[ws_from_stream(1024, request)]
-async fn websocket_4(ctx: Context) {
-    let body: RequestBody = request.get_body().clone();
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket4;
+
+impl ServerHook for Websocket4 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream(request, 1024)]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
-#[ws]
 #[route("/ws5")]
-#[ws_from_stream(request, 1024)]
-async fn websocket_5(ctx: Context) {
-    let body: RequestBody = request.get_body().clone();
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket5;
+
+impl ServerHook for Websocket5 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream(1024)]
+    async fn handle(self, ctx: &Context) {
+        let body: RequestBody = ctx.get_request_body().await;
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
 #[route("/hook")]
-#[prologue_hooks(prologue_hooks)]
-#[epilogue_hooks(epilogue_hooks)]
-#[response_body("Testing hook macro")]
-async fn hook(ctx: Context) {}
+struct Hook;
 
-#[closed]
+impl ServerHook for Hook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_hooks(prologue_hooks_fn)]
+    #[epilogue_hooks(epilogue_hooks_fn)]
+    #[response_body("Testing hook macro")]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/get_post")]
-#[prologue_macros(
-    http,
-    methods(get, post),
-    response_body("get_post"),
-    response_status_code(200),
-    response_reason_phrase("OK")
-)]
-async fn get_post(ctx: Context) {}
+struct GetPost;
+
+impl ServerHook for GetPost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[closed]
+    #[prologue_macros(
+        http,
+        methods(get, post),
+        response_body("get_post"),
+        response_status_code(200),
+        response_reason_phrase("OK")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/attributes")]
-#[response_body(&format!("request attributes: {request_attributes:?}"))]
-#[attributes(request_attributes)]
-async fn attributes(ctx: Context) {}
+struct Attributes;
+
+impl ServerHook for Attributes {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request attributes: {request_attributes:?}"))]
+    #[attributes(request_attributes)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/route_params/:test")]
-#[response_body(&format!("request route params: {request_route_params:?}"))]
-#[route_params(request_route_params)]
-async fn route_params(ctx: Context) {}
+struct RouteParams;
+
+impl ServerHook for RouteParams {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request route params: {request_route_params:?}"))]
+    #[route_params(request_route_params)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/route_param/:test")]
-#[response_body(&format!("route param: {request_route_param:?}"))]
-#[route_param("test" => request_route_param)]
-async fn route_param(ctx: Context) {}
+struct RouteParam;
+
+impl ServerHook for RouteParam {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("route param: {request_route_param:?}"))]
+    #[route_param("test" => request_route_param)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/host")]
-#[host("localhost")]
-#[epilogue_macros(
-    response_body("host string literal: localhost"),
-    send,
-    http_from_stream
-)]
-#[prologue_macros(response_body("host string literal: localhost"), send)]
-async fn host(ctx: Context) {}
+struct Host;
+
+impl ServerHook for Host {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[host("localhost")]
+    #[epilogue_macros(
+        response_body("host string literal: localhost"),
+        send,
+        http_from_stream
+    )]
+    #[prologue_macros(response_body("host string literal: localhost"), send)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_query")]
-#[epilogue_macros(
-    request_query("test" => request_query_option),
-    response_body(&format!("request query: {request_query_option:?}")),
-    send,
-    http_from_stream(1024)
-)]
-#[prologue_macros(
-    request_query("test" => request_query_option),
-    response_body(&format!("request query: {request_query_option:?}")),
-    send
-)]
-async fn request_query(ctx: Context) {}
+struct RequestQuery;
+
+impl ServerHook for RequestQuery {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_query("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send,
+        http_from_stream(1024)
+    )]
+    #[prologue_macros(
+        request_query("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_header")]
-#[epilogue_macros(
-    request_header(HOST => request_header_option),
-    response_body(&format!("request header: {request_header_option:?}")),
-    send,
-    http_from_stream(_request)
-)]
-#[prologue_macros(
-    request_header(HOST => request_header_option),
-    response_body(&format!("request header: {request_header_option:?}")),
-    send
-)]
-async fn request_header(ctx: Context) {}
+struct RequestHeader;
+
+impl ServerHook for RequestHeader {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_header(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
+        send,
+        http_from_stream(_request)
+    )]
+    #[prologue_macros(
+        request_header(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_querys")]
-#[epilogue_macros(
-    request_querys(request_querys),
-    response_body(&format!("request querys: {request_querys:?}")),
-    send,
-    http_from_stream(1024, _request)
-)]
-#[prologue_macros(
-    request_querys(request_querys),
-    response_body(&format!("request querys: {request_querys:?}")),
-    send
-)]
-async fn request_querys(ctx: Context) {}
+struct RequestQuerys;
+
+impl ServerHook for RequestQuerys {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_querys(request_querys),
+        response_body(&format!("request querys: {request_querys:?}")),
+        send,
+        http_from_stream(1024, _request)
+    )]
+    #[prologue_macros(
+        request_querys(request_querys),
+        response_body(&format!("request querys: {request_querys:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_headers")]
-#[epilogue_macros(
-    request_headers(request_headers),
-    response_body(&format!("request headers: {request_headers:?}")),
-    send,
-    http_from_stream(_request, 1024)
-)]
-#[prologue_macros(
-    request_headers(request_headers),
-    response_body(&format!("request headers: {request_headers:?}")),
-    send
-)]
-async fn request_headers(ctx: Context) {}
+struct RequestHeaders;
 
-#[response_body(&format!("raw body: {raw_body:?}"))]
-#[request_body(raw_body)]
+impl ServerHook for RequestHeaders {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_headers(request_headers),
+        response_body(&format!("request headers: {request_headers:?}")),
+        send,
+        http_from_stream(_request, 1024)
+    )]
+    #[prologue_macros(
+        request_headers(request_headers),
+        response_body(&format!("request headers: {request_headers:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/request_body")]
-async fn request_body(ctx: Context) {}
+struct RequestBodyRoute;
+
+impl ServerHook for RequestBodyRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("raw body: {raw_body:?}"))]
+    #[request_body(raw_body)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/reject_host")]
-#[prologue_macros(
-    reject_host("filter.localhost"),
-    response_body("host filter string literal")
-)]
-async fn reject_host(ctx: Context) {}
+struct RejectHost;
+
+impl ServerHook for RejectHost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        reject_host("filter.localhost"),
+        response_body("host filter string literal")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/attribute")]
-#[response_body(&format!("request attribute: {request_attribute_option:?}"))]
-#[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
-async fn attribute(ctx: Context) {}
+struct Attribute;
+
+impl ServerHook for Attribute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
+    #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_body_json")]
-#[response_body(&format!("request data: {request_data_result:?}"))]
-#[request_body_json(request_data_result: TestData)]
-async fn request_body_json(ctx: Context) {}
+struct RequestBodyJson;
+
+impl ServerHook for RequestBodyJson {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request data: {request_data_result:?}"))]
+    #[request_body_json(request_data_result: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/referer")]
-#[prologue_macros(
-    referer("http://localhost"),
-    response_body("referer string literal: http://localhost")
-)]
-async fn referer(ctx: Context) {}
+struct Referer;
+
+impl ServerHook for Referer {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        referer("http://localhost"),
+        response_body("referer string literal: http://localhost")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/reject_referer")]
-#[prologue_macros(
-    reject_referer("http://localhost"),
-    response_body("referer filter string literal")
-)]
-async fn reject_referer(ctx: Context) {}
+struct RejectReferer;
+
+impl ServerHook for RejectReferer {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        reject_referer("http://localhost"),
+        response_body("referer filter string literal")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/cookies")]
-#[response_body(&format!("All cookies: {cookie_value:?}"))]
-#[request_cookies(cookie_value)]
-async fn cookies(ctx: Context) {}
+struct Cookies;
+
+impl ServerHook for Cookies {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("All cookies: {cookie_value:?}"))]
+    #[request_cookies(cookie_value)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/cookie")]
-#[response_body(&format!("Session cookie: {session_cookie_opt:?}"))]
-#[request_cookie("test" => session_cookie_opt)]
-async fn cookie(ctx: Context) {}
+struct Cookie;
+
+impl ServerHook for Cookie {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("Session cookie: {session_cookie_opt:?}"))]
+    #[request_cookie("test" => session_cookie_opt)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_version")]
-#[response_body(&format!("HTTP Version: {http_version}"))]
-#[request_version(http_version)]
-async fn request_version_test(ctx: Context) {}
+struct RequestVersionTest;
+
+impl ServerHook for RequestVersionTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("HTTP Version: {http_version}"))]
+    #[request_version(http_version)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_path")]
-#[response_body(&format!("Request Path: {request_path}"))]
-#[request_path(request_path)]
-async fn request_path_test(ctx: Context) {}
+struct RequestPathTest;
+
+impl ServerHook for RequestPathTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("Request Path: {request_path}"))]
+    #[request_path(request_path)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/response_header")]
-#[response_body("Testing header set and replace operations")]
-#[response_header("X-Add-Header", "add-value")]
-#[response_header("X-Set-Header" => "set-value")]
-async fn response_header_test(ctx: Context) {}
+struct ResponseHeaderTest;
+
+impl ServerHook for ResponseHeaderTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body("Testing header set and replace operations")]
+    #[response_header("X-Add-Header", "add-value")]
+    #[response_header("X-Set-Header" => "set-value")]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/literals")]
-#[response_status_code(201)]
-#[response_header(CONTENT_TYPE => APPLICATION_JSON)]
-#[response_body("{\"message\": \"Resource created\"}")]
-#[response_reason_phrase(HttpStatus::Created.to_string())]
-async fn literals(ctx: Context) {}
+struct Literals;
+
+impl ServerHook for Literals {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_status_code(201)]
+    #[response_header(CONTENT_TYPE => APPLICATION_JSON)]
+    #[response_body("{\"message\": \"Resource created\"}")]
+    #[response_reason_phrase(HttpStatus::Created.to_string())]
+    async fn handle(self, ctx: &Context) {}
+}
+
+#[route("/inject/response_body")]
+struct InjectResponseBody;
+
+impl ServerHook for InjectResponseBody {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.response_body_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectResponseBody {
+    #[response_body("response body with ref self")]
+    async fn response_body_with_ref_self(&self, ctx: &Context) {}
+}
+
+#[route("/inject/post_method")]
+struct InjectPostMethod;
+
+impl ServerHook for InjectPostMethod {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.post_method_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectPostMethod {
+    #[prologue_macros(post, response_body("post method with ref self"))]
+    async fn post_method_with_ref_self(&self, ctx: &Context) {}
+}
+
+#[route("/inject/send_flush")]
+struct InjectSendFlush;
+
+impl ServerHook for InjectSendFlush {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.send_and_flush_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectSendFlush {
+    #[epilogue_macros(send, flush)]
+    async fn send_and_flush_with_ref_self(&self, ctx: &Context) {}
+}
+
+#[route("/inject/request_body")]
+struct InjectRequestBody;
+
+impl ServerHook for InjectRequestBody {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.extract_request_body_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectRequestBody {
+    #[request_body(_raw_body)]
+    async fn extract_request_body_with_ref_self(&self, _ctx: &Context) {}
+}
+
+#[route("/inject/multiple_methods")]
+struct InjectMultipleMethods;
+
+impl ServerHook for InjectMultipleMethods {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.multiple_methods_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectMultipleMethods {
+    #[methods(get, post)]
+    async fn multiple_methods_with_ref_self(&self, ctx: &Context) {}
+}
+
+#[route("/inject/http_stream")]
+struct InjectHttpStream;
+
+impl ServerHook for InjectHttpStream {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.http_stream_handler_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectHttpStream {
+    #[http_from_stream(1024, _request)]
+    async fn http_stream_handler_with_ref_self(&self, _ctx: &Context) {}
+}
+
+#[route("/inject/ws_stream")]
+struct InjectWsStream;
+
+impl ServerHook for InjectWsStream {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.websocket_stream_handler_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectWsStream {
+    #[ws_from_stream(_request)]
+    async fn websocket_stream_handler_with_ref_self(&self, _ctx: &Context) {}
+}
+
+#[route("/inject/complex_post")]
+struct InjectComplexPost;
+
+impl ServerHook for InjectComplexPost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.complex_post_handler_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectComplexPost {
+    #[prologue_macros(
+        post,
+        http,
+        request_body(raw_body),
+        response_status_code(201),
+        response_header(CONTENT_TYPE => APPLICATION_JSON),
+        response_body(&format!("Received: {raw_body:?}"))
+    )]
+    #[epilogue_macros(send, flush)]
+    async fn complex_post_handler_with_ref_self(&self, ctx: &Context) {}
+}
+
+impl InjectComplexPost {
+    #[post]
+    async fn test_with_bool_param(_a: bool, ctx: &Context) {}
+
+    #[get]
+    async fn test_with_multiple_params(_a: bool, ctx: &Context, _b: i32) {}
+}
+
+#[response_body("standalone response body")]
+async fn standalone_response_body_handler(ctx: &Context) {}
+
+#[prologue_macros(get, response_body("standalone get handler"))]
+async fn standalone_get_handler(ctx: &Context) {}
+
+#[epilogue_macros(send, flush)]
+async fn standalone_send_and_flush_handler(ctx: &Context) {}
+
+#[request_body(_raw_body)]
+async fn standalone_request_body_extractor(ctx: &Context) {}
+
+#[methods(get, post)]
+async fn standalone_multiple_methods_handler(ctx: &Context) {}
+
+#[http_from_stream]
+async fn standalone_http_stream_handler(ctx: &Context) {}
+
+#[ws_from_stream]
+async fn standalone_websocket_stream_handler(ctx: &Context) {}
+
+#[prologue_macros(
+    get,
+    http,
+    response_status_code(200),
+    response_header(CONTENT_TYPE => TEXT_PLAIN),
+    response_body("standalone complex handler")
+)]
+#[epilogue_macros(send, flush)]
+async fn standalone_complex_get_handler(ctx: &Context) {}
+
+#[get]
+async fn standalone_get_handler_with_param(_a: bool, ctx: &Context) {}
 
 #[hyperlane(server: Server)]
 #[hyperlane(config: ServerConfig)]
@@ -9182,7 +10837,7 @@ async fn literals(ctx: Context) {}
 async fn main() {
     config.disable_nodelay().await;
     server.config(config).await;
-    let server_hook: ServerHook = server.run().await.unwrap_or_default();
+    let server_hook: ServerControlHook = server.run().await.unwrap_or_default();
     server_hook.wait().await;
 }
 ```
@@ -9201,7 +10856,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #197 - `config`
+### 📄 File #262 - `config`
 - **Path**: `hyperlane-macros\.git\config`
 - **Size**: `326 B`
 - **Modified Time**: `2025-09-15T22:37:29.390902`
@@ -9210,7 +10865,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #198 - `description`
+### 📄 File #263 - `description`
 - **Path**: `hyperlane-macros\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:27.027664`
@@ -9219,16 +10874,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #199 - `FETCH_HEAD`
+### 📄 File #264 - `FETCH_HEAD`
 - **Path**: `hyperlane-macros\.git\FETCH_HEAD`
-- **Size**: `716 B`
-- **Modified Time**: `2025-10-01T21:58:50.856348`
+- **Size**: `1,451 B`
+- **Modified Time**: `2025-10-21T08:11:52.825567`
 
 #### Content Preview
 
 
 
-### 📄 File #200 - `HEAD`
+### 📄 File #265 - `HEAD`
 - **Path**: `hyperlane-macros\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:29.384877`
@@ -9237,25 +10892,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #201 - `index`
+### 📄 File #266 - `index`
 - **Path**: `hyperlane-macros\.git\index`
 - **Size**: `6,789 B`
-- **Modified Time**: `2025-10-01T21:58:50.938057`
+- **Modified Time**: `2025-10-21T08:11:52.875648`
 
 #### Content Preview
 
 
 
-### 📄 File #202 - `ORIG_HEAD`
+### 📄 File #267 - `ORIG_HEAD`
 - **Path**: `hyperlane-macros\.git\ORIG_HEAD`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:44:23.276438`
+- **Modified Time**: `2025-10-21T08:11:52.868642`
 
 #### Content Preview
 
 
 
-### 📄 File #203 - `packed-refs`
+### 📄 File #268 - `packed-refs`
 - **Path**: `hyperlane-macros\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:29.374722`
@@ -9264,7 +10919,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #204 - `shallow`
+### 📄 File #269 - `shallow`
 - **Path**: `hyperlane-macros\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:29.168042`
@@ -9273,7 +10928,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #205 - `applypatch-msg.sample`
+### 📄 File #270 - `applypatch-msg.sample`
 - **Path**: `hyperlane-macros\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:27.028180`
@@ -9282,7 +10937,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #206 - `commit-msg.sample`
+### 📄 File #271 - `commit-msg.sample`
 - **Path**: `hyperlane-macros\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:27.028180`
@@ -9291,7 +10946,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #207 - `fsmonitor-watchman.sample`
+### 📄 File #272 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-macros\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:27.028696`
@@ -9300,7 +10955,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #208 - `post-update.sample`
+### 📄 File #273 - `post-update.sample`
 - **Path**: `hyperlane-macros\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:27.028696`
@@ -9309,7 +10964,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #209 - `pre-applypatch.sample`
+### 📄 File #274 - `pre-applypatch.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:27.028696`
@@ -9318,7 +10973,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #210 - `pre-commit.sample`
+### 📄 File #275 - `pre-commit.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:27.029209`
@@ -9327,7 +10982,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #211 - `pre-merge-commit.sample`
+### 📄 File #276 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:27.029209`
@@ -9336,7 +10991,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #212 - `pre-push.sample`
+### 📄 File #277 - `pre-push.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:27.029729`
@@ -9345,7 +11000,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #213 - `pre-rebase.sample`
+### 📄 File #278 - `pre-rebase.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:27.029729`
@@ -9354,7 +11009,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #214 - `pre-receive.sample`
+### 📄 File #279 - `pre-receive.sample`
 - **Path**: `hyperlane-macros\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:27.029729`
@@ -9363,7 +11018,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #215 - `prepare-commit-msg.sample`
+### 📄 File #280 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-macros\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:27.030243`
@@ -9372,7 +11027,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #216 - `push-to-checkout.sample`
+### 📄 File #281 - `push-to-checkout.sample`
 - **Path**: `hyperlane-macros\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:27.030243`
@@ -9381,7 +11036,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #217 - `sendemail-validate.sample`
+### 📄 File #282 - `sendemail-validate.sample`
 - **Path**: `hyperlane-macros\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:27.030243`
@@ -9390,7 +11045,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #218 - `update.sample`
+### 📄 File #283 - `update.sample`
 - **Path**: `hyperlane-macros\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:27.030243`
@@ -9399,7 +11054,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #219 - `exclude`
+### 📄 File #284 - `exclude`
 - **Path**: `hyperlane-macros\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:27.030755`
@@ -9408,25 +11063,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #220 - `HEAD`
+### 📄 File #285 - `HEAD`
 - **Path**: `hyperlane-macros\.git\logs\HEAD`
-- **Size**: `344 B`
-- **Modified Time**: `2025-10-01T21:58:50.938057`
+- **Size**: `497 B`
+- **Modified Time**: `2025-10-21T08:11:52.877647`
 
 #### Content Preview
 
 
 
-### 📄 File #221 - `master`
+### 📄 File #286 - `master`
 - **Path**: `hyperlane-macros\.git\logs\refs\heads\master`
-- **Size**: `344 B`
-- **Modified Time**: `2025-10-01T21:58:50.938057`
+- **Size**: `497 B`
+- **Modified Time**: `2025-10-21T08:11:52.877647`
 
 #### Content Preview
 
 
 
-### 📄 File #222 - `HEAD`
+### 📄 File #287 - `HEAD`
 - **Path**: `hyperlane-macros\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `191 B`
 - **Modified Time**: `2025-09-15T22:37:29.383875`
@@ -9435,16 +11090,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #223 - `master`
+### 📄 File #288 - `master`
 - **Path**: `hyperlane-macros\.git\logs\refs\remotes\origin\master`
-- **Size**: `153 B`
-- **Modified Time**: `2025-10-01T21:58:50.797657`
+- **Size**: `306 B`
+- **Modified Time**: `2025-10-21T08:11:52.756716`
 
 #### Content Preview
 
 
 
-### 📄 File #224 - `b5f77eadd85aa84cf2e268828327e9f76e1247`
+### 📄 File #289 - `b5f77eadd85aa84cf2e268828327e9f76e1247`
 - **Path**: `hyperlane-macros\.git\objects\03\b5f77eadd85aa84cf2e268828327e9f76e1247`
 - **Size**: `240 B`
 - **Modified Time**: `2025-10-01T21:58:50.648070`
@@ -9453,7 +11108,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #225 - `1f19bb026d1404c5d3ee497e2be33c3ac8669b`
+### 📄 File #290 - `1f19bb026d1404c5d3ee497e2be33c3ac8669b`
 - **Path**: `hyperlane-macros\.git\objects\07\1f19bb026d1404c5d3ee497e2be33c3ac8669b`
 - **Size**: `652 B`
 - **Modified Time**: `2025-10-01T21:58:50.665325`
@@ -9462,7 +11117,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #226 - `cd87addf49bff29c2acfd4a88a443a608f0c5b`
+### 📄 File #291 - `cd87addf49bff29c2acfd4a88a443a608f0c5b`
 - **Path**: `hyperlane-macros\.git\objects\09\cd87addf49bff29c2acfd4a88a443a608f0c5b`
 - **Size**: `935 B`
 - **Modified Time**: `2025-10-01T21:58:50.723491`
@@ -9471,7 +11126,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #227 - `edbe696a8767d5ce0b9359fe818ccd9ec83868`
+### 📄 File #292 - `edbe696a8767d5ce0b9359fe818ccd9ec83868`
 - **Path**: `hyperlane-macros\.git\objects\10\edbe696a8767d5ce0b9359fe818ccd9ec83868`
 - **Size**: `240 B`
 - **Modified Time**: `2025-10-01T21:58:50.648070`
@@ -9480,7 +11135,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #228 - `f3d0e5b5f7eec3defafa50d224a0931c8e4ac8`
+### 📄 File #293 - `f3d0e5b5f7eec3defafa50d224a0931c8e4ac8`
 - **Path**: `hyperlane-macros\.git\objects\18\f3d0e5b5f7eec3defafa50d224a0931c8e4ac8`
 - **Size**: `78 B`
 - **Modified Time**: `2025-10-01T21:58:50.640031`
@@ -9489,7 +11144,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #229 - `b03a62f482c5ebc492fc0fe2b0b032e469e215`
+### 📄 File #294 - `b03a62f482c5ebc492fc0fe2b0b032e469e215`
 - **Path**: `hyperlane-macros\.git\objects\1b\b03a62f482c5ebc492fc0fe2b0b032e469e215`
 - **Size**: `241 B`
 - **Modified Time**: `2025-10-01T21:58:50.648070`
@@ -9498,7 +11153,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #230 - `921370bedec8251ecbd269f6e6dcd8ecd7c23e`
+### 📄 File #295 - `921370bedec8251ecbd269f6e6dcd8ecd7c23e`
 - **Path**: `hyperlane-macros\.git\objects\21\921370bedec8251ecbd269f6e6dcd8ecd7c23e`
 - **Size**: `165 B`
 - **Modified Time**: `2025-10-01T21:58:50.631999`
@@ -9507,7 +11162,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #231 - `f5e482d4a2c0a30ca7784feec69b28c583264a`
+### 📄 File #296 - `f5e482d4a2c0a30ca7784feec69b28c583264a`
 - **Path**: `hyperlane-macros\.git\objects\29\f5e482d4a2c0a30ca7784feec69b28c583264a`
 - **Size**: `9,197 B`
 - **Modified Time**: `2025-10-01T21:58:50.713219`
@@ -9516,7 +11171,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #232 - `2c4d1bcb33767c0fab1945fc7712035729b4dc`
+### 📄 File #297 - `2c4d1bcb33767c0fab1945fc7712035729b4dc`
 - **Path**: `hyperlane-macros\.git\objects\2c\2c4d1bcb33767c0fab1945fc7712035729b4dc`
 - **Size**: `165 B`
 - **Modified Time**: `2025-10-01T21:58:50.634139`
@@ -9525,7 +11180,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #233 - `aa6599719692a84fc0e9b368b4c5d660171b2f`
+### 📄 File #298 - `aa6599719692a84fc0e9b368b4c5d660171b2f`
 - **Path**: `hyperlane-macros\.git\objects\36\aa6599719692a84fc0e9b368b4c5d660171b2f`
 - **Size**: `164 B`
 - **Modified Time**: `2025-10-01T21:58:50.633581`
@@ -9534,7 +11189,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #234 - `eafb18021b3be9da8af7a8716fa6a3ef967753`
+### 📄 File #299 - `eafb18021b3be9da8af7a8716fa6a3ef967753`
 - **Path**: `hyperlane-macros\.git\objects\39\eafb18021b3be9da8af7a8716fa6a3ef967753`
 - **Size**: `164 B`
 - **Modified Time**: `2025-10-01T21:58:50.629580`
@@ -9543,7 +11198,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #235 - `73f38085eaf893de92fe7b912fe358460c0a8a`
+### 📄 File #300 - `73f38085eaf893de92fe7b912fe358460c0a8a`
 - **Path**: `hyperlane-macros\.git\objects\3b\73f38085eaf893de92fe7b912fe358460c0a8a`
 - **Size**: `52 B`
 - **Modified Time**: `2025-10-01T21:58:50.639031`
@@ -9552,7 +11207,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #236 - `0c4adc2741703c7daf0f260a79ac37e42a49b5`
+### 📄 File #301 - `0c4adc2741703c7daf0f260a79ac37e42a49b5`
 - **Path**: `hyperlane-macros\.git\objects\53\0c4adc2741703c7daf0f260a79ac37e42a49b5`
 - **Size**: `240 B`
 - **Modified Time**: `2025-10-01T21:58:50.640031`
@@ -9561,7 +11216,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #237 - `46113a141074b64683eea473d19264927d1728`
+### 📄 File #302 - `46113a141074b64683eea473d19264927d1728`
 - **Path**: `hyperlane-macros\.git\objects\59\46113a141074b64683eea473d19264927d1728`
 - **Size**: `240 B`
 - **Modified Time**: `2025-10-01T21:58:50.663557`
@@ -9570,7 +11225,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #238 - `a3e973a0f8b0386d8f73aea5d7077574da58e7`
+### 📄 File #303 - `a3e973a0f8b0386d8f73aea5d7077574da58e7`
 - **Path**: `hyperlane-macros\.git\objects\61\a3e973a0f8b0386d8f73aea5d7077574da58e7`
 - **Size**: `84 B`
 - **Modified Time**: `2025-10-01T21:58:50.637031`
@@ -9579,7 +11234,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #239 - `d95fa87a4b9f0bca0d3425e4e4946b96bc3f24`
+### 📄 File #304 - `d95fa87a4b9f0bca0d3425e4e4946b96bc3f24`
 - **Path**: `hyperlane-macros\.git\objects\81\d95fa87a4b9f0bca0d3425e4e4946b96bc3f24`
 - **Size**: `169 B`
 - **Modified Time**: `2025-10-01T21:58:50.721878`
@@ -9588,7 +11243,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #240 - `a545160eebc7030a425b7f892bbe1c8f0e0a0b`
+### 📄 File #305 - `a545160eebc7030a425b7f892bbe1c8f0e0a0b`
 - **Path**: `hyperlane-macros\.git\objects\86\a545160eebc7030a425b7f892bbe1c8f0e0a0b`
 - **Size**: `9,286 B`
 - **Modified Time**: `2025-10-01T21:58:50.720877`
@@ -9597,7 +11252,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #241 - `59203278d954190af3d8785828c4c0fad563f9`
+### 📄 File #306 - `59203278d954190af3d8785828c4c0fad563f9`
 - **Path**: `hyperlane-macros\.git\objects\87\59203278d954190af3d8785828c4c0fad563f9`
 - **Size**: `652 B`
 - **Modified Time**: `2025-10-01T21:58:50.679620`
@@ -9606,7 +11261,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #242 - `596ced0ba477141d3cbf507d77d96a47fefcef`
+### 📄 File #307 - `596ced0ba477141d3cbf507d77d96a47fefcef`
 - **Path**: `hyperlane-macros\.git\objects\89\596ced0ba477141d3cbf507d77d96a47fefcef`
 - **Size**: `85 B`
 - **Modified Time**: `2025-10-01T21:58:50.648070`
@@ -9615,7 +11270,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #243 - `59e48abcd2da539b8048d0dab8ab83d3a93e69`
+### 📄 File #308 - `59e48abcd2da539b8048d0dab8ab83d3a93e69`
 - **Path**: `hyperlane-macros\.git\objects\af\59e48abcd2da539b8048d0dab8ab83d3a93e69`
 - **Size**: `5,858 B`
 - **Modified Time**: `2025-10-01T21:58:50.688590`
@@ -9624,7 +11279,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #244 - `de0e812c30e48502e53e193d37456192e41f0f`
+### 📄 File #309 - `de0e812c30e48502e53e193d37456192e41f0f`
 - **Path**: `hyperlane-macros\.git\objects\b9\de0e812c30e48502e53e193d37456192e41f0f`
 - **Size**: `1,159 B`
 - **Modified Time**: `2025-10-01T21:58:50.711388`
@@ -9633,7 +11288,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #245 - `8ca0467a9101bc1a7d9929a95cbc90753b3a76`
+### 📄 File #310 - `8ca0467a9101bc1a7d9929a95cbc90753b3a76`
 - **Path**: `hyperlane-macros\.git\objects\ba\8ca0467a9101bc1a7d9929a95cbc90753b3a76`
 - **Size**: `673 B`
 - **Modified Time**: `2025-10-01T21:58:50.701754`
@@ -9642,7 +11297,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #246 - `708b9ecf7e2856724e025562ef18a0b10b74c0`
+### 📄 File #311 - `708b9ecf7e2856724e025562ef18a0b10b74c0`
 - **Path**: `hyperlane-macros\.git\objects\be\708b9ecf7e2856724e025562ef18a0b10b74c0`
 - **Size**: `672 B`
 - **Modified Time**: `2025-10-01T21:58:50.708737`
@@ -9651,7 +11306,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #247 - `d600272541aecf0a3b35192d352b610a7236e4`
+### 📄 File #312 - `d600272541aecf0a3b35192d352b610a7236e4`
 - **Path**: `hyperlane-macros\.git\objects\be\d600272541aecf0a3b35192d352b610a7236e4`
 - **Size**: `653 B`
 - **Modified Time**: `2025-10-01T21:58:50.685593`
@@ -9660,7 +11315,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #248 - `1928f80f8f9e7e137c946b2f1ce773fffb2bb3`
+### 📄 File #313 - `1928f80f8f9e7e137c946b2f1ce773fffb2bb3`
 - **Path**: `hyperlane-macros\.git\objects\c0\1928f80f8f9e7e137c946b2f1ce773fffb2bb3`
 - **Size**: `1,012 B`
 - **Modified Time**: `2025-10-01T21:58:50.710354`
@@ -9669,7 +11324,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #249 - `fe4a1c1ab395643db1432a76ea9c15f766e65a`
+### 📄 File #314 - `fe4a1c1ab395643db1432a76ea9c15f766e65a`
 - **Path**: `hyperlane-macros\.git\objects\da\fe4a1c1ab395643db1432a76ea9c15f766e65a`
 - **Size**: `78 B`
 - **Modified Time**: `2025-10-01T21:58:50.640031`
@@ -9678,7 +11333,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #250 - `b6e37ce0d3909d8e04c03f38587ae4020134c0`
+### 📄 File #315 - `b6e37ce0d3909d8e04c03f38587ae4020134c0`
 - **Path**: `hyperlane-macros\.git\objects\df\b6e37ce0d3909d8e04c03f38587ae4020134c0`
 - **Size**: `654 B`
 - **Modified Time**: `2025-10-01T21:58:50.673338`
@@ -9687,7 +11342,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #251 - `83d9e8e3f412adb0beb13607b7e9172cb09387`
+### 📄 File #316 - `83d9e8e3f412adb0beb13607b7e9172cb09387`
 - **Path**: `hyperlane-macros\.git\objects\e8\83d9e8e3f412adb0beb13607b7e9172cb09387`
 - **Size**: `2,780 B`
 - **Modified Time**: `2025-10-01T21:58:50.700755`
@@ -9696,7 +11351,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #252 - `c86834726d2f001acb20e22a76067896933f58`
+### 📄 File #317 - `c86834726d2f001acb20e22a76067896933f58`
 - **Path**: `hyperlane-macros\.git\objects\ec\c86834726d2f001acb20e22a76067896933f58`
 - **Size**: `5,860 B`
 - **Modified Time**: `2025-10-01T21:58:50.693561`
@@ -9705,7 +11360,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #253 - `0dcc2478ff1684900eaca445c5b84c72582fb6`
+### 📄 File #318 - `0dcc2478ff1684900eaca445c5b84c72582fb6`
 - **Path**: `hyperlane-macros\.git\objects\f0\0dcc2478ff1684900eaca445c5b84c72582fb6`
 - **Size**: `5,850 B`
 - **Modified Time**: `2025-10-01T21:58:50.686723`
@@ -9714,7 +11369,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #254 - `6d7ad261e43967cb8edbb94a6c05dfe1fcb87e`
+### 📄 File #319 - `6d7ad261e43967cb8edbb94a6c05dfe1fcb87e`
 - **Path**: `hyperlane-macros\.git\objects\f3\6d7ad261e43967cb8edbb94a6c05dfe1fcb87e`
 - **Size**: `51 B`
 - **Modified Time**: `2025-10-01T21:58:50.648070`
@@ -9723,7 +11378,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #255 - `3c9c447920075172c4e5f145be556eefffb554`
+### 📄 File #320 - `3c9c447920075172c4e5f145be556eefffb554`
 - **Path**: `hyperlane-macros\.git\objects\f6\3c9c447920075172c4e5f145be556eefffb554`
 - **Size**: `165 B`
 - **Modified Time**: `2025-10-01T21:58:50.635959`
@@ -9732,7 +11387,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #256 - `5d49636fc74acc2b8100ec67c286265217860b`
+### 📄 File #321 - `5d49636fc74acc2b8100ec67c286265217860b`
 - **Path**: `hyperlane-macros\.git\objects\f7\5d49636fc74acc2b8100ec67c286265217860b`
 - **Size**: `2,777 B`
 - **Modified Time**: `2025-10-01T21:58:50.693561`
@@ -9741,7 +11396,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #257 - `201926e2f06b1acf69ed89e064b063ecf8cba8`
+### 📄 File #322 - `201926e2f06b1acf69ed89e064b063ecf8cba8`
 - **Path**: `hyperlane-macros\.git\objects\fc\201926e2f06b1acf69ed89e064b063ecf8cba8`
 - **Size**: `654 B`
 - **Modified Time**: `2025-10-01T21:58:50.667299`
@@ -9750,7 +11405,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #258 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.idx`
+### 📄 File #323 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.idx`
 - **Path**: `hyperlane-macros\.git\objects\pack\pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.idx`
 - **Size**: `3,424 B`
 - **Modified Time**: `2025-09-15T22:37:29.336083`
@@ -9759,7 +11414,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #259 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.pack`
+### 📄 File #324 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.pack`
 - **Path**: `hyperlane-macros\.git\objects\pack\pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.pack`
 - **Size**: `42,771 B`
 - **Modified Time**: `2025-09-15T22:37:29.336083`
@@ -9768,7 +11423,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #260 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.rev`
+### 📄 File #325 - `pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.rev`
 - **Path**: `hyperlane-macros\.git\objects\pack\pack-19c30813ea463b0ec192e86c37e4408eaa01bdba.rev`
 - **Size**: `388 B`
 - **Modified Time**: `2025-09-15T22:37:29.337910`
@@ -9777,16 +11432,43 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #261 - `master`
-- **Path**: `hyperlane-macros\.git\refs\heads\master`
-- **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:50.938057`
+### 📄 File #326 - `pack-7da00328665a478ef1c49a92c2a1e21eab72144c.idx`
+- **Path**: `hyperlane-macros\.git\objects\pack\pack-7da00328665a478ef1c49a92c2a1e21eab72144c.idx`
+- **Size**: `5,412 B`
+- **Modified Time**: `2025-10-21T08:11:52.709266`
 
 #### Content Preview
 
 
 
-### 📄 File #262 - `HEAD`
+### 📄 File #327 - `pack-7da00328665a478ef1c49a92c2a1e21eab72144c.pack`
+- **Path**: `hyperlane-macros\.git\objects\pack\pack-7da00328665a478ef1c49a92c2a1e21eab72144c.pack`
+- **Size**: `58,395 B`
+- **Modified Time**: `2025-10-21T08:11:52.708332`
+
+#### Content Preview
+
+
+
+### 📄 File #328 - `pack-7da00328665a478ef1c49a92c2a1e21eab72144c.rev`
+- **Path**: `hyperlane-macros\.git\objects\pack\pack-7da00328665a478ef1c49a92c2a1e21eab72144c.rev`
+- **Size**: `672 B`
+- **Modified Time**: `2025-10-21T08:11:52.710002`
+
+#### Content Preview
+
+
+
+### 📄 File #329 - `master`
+- **Path**: `hyperlane-macros\.git\refs\heads\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.877147`
+
+#### Content Preview
+
+
+
+### 📄 File #330 - `HEAD`
 - **Path**: `hyperlane-macros\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:29.383373`
@@ -9795,16 +11477,97 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #263 - `master`
+### 📄 File #331 - `master`
 - **Path**: `hyperlane-macros\.git\refs\remotes\origin\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:50.797657`
+- **Modified Time**: `2025-10-21T08:11:52.755712`
 
 #### Content Preview
 
 
 
-### 📄 File #264 - `v7.1.11`
+### 📄 File #332 - `v10.0.0`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.0.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.815809`
+
+#### Content Preview
+
+
+
+### 📄 File #333 - `v10.0.1`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.0.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.816809`
+
+#### Content Preview
+
+
+
+### 📄 File #334 - `v10.0.2`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.0.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.817309`
+
+#### Content Preview
+
+
+
+### 📄 File #335 - `v10.0.3`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.0.3`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.817809`
+
+#### Content Preview
+
+
+
+### 📄 File #336 - `v10.0.4`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.0.4`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.818308`
+
+#### Content Preview
+
+
+
+### 📄 File #337 - `v10.1.0`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.1.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.818809`
+
+#### Content Preview
+
+
+
+### 📄 File #338 - `v10.1.1`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.1.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.819812`
+
+#### Content Preview
+
+
+
+### 📄 File #339 - `v10.2.0`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.2.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.820316`
+
+#### Content Preview
+
+
+
+### 📄 File #340 - `v10.2.1`
+- **Path**: `hyperlane-macros\.git\refs\tags\v10.2.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.759140`
+
+#### Content Preview
+
+
+
+### 📄 File #341 - `v7.1.11`
 - **Path**: `hyperlane-macros\.git\refs\tags\v7.1.11`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:29.382016`
@@ -9813,7 +11576,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #265 - `v8.0.0`
+### 📄 File #342 - `v8.0.0`
 - **Path**: `hyperlane-macros\.git\refs\tags\v8.0.0`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:50.849577`
@@ -9822,7 +11585,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #266 - `v9.0.0`
+### 📄 File #343 - `v9.0.0`
 - **Path**: `hyperlane-macros\.git\refs\tags\v9.0.0`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:50.849577`
@@ -9831,7 +11594,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #267 - `v9.0.1`
+### 📄 File #344 - `v9.0.1`
 - **Path**: `hyperlane-macros\.git\refs\tags\v9.0.1`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:50.856348`
@@ -9840,7 +11603,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #268 - `v9.0.2`
+### 📄 File #345 - `v9.0.2`
 - **Path**: `hyperlane-macros\.git\refs\tags\v9.0.2`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:50.856348`
@@ -9849,7 +11612,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #269 - `v9.0.3`
+### 📄 File #346 - `v9.0.3`
 - **Path**: `hyperlane-macros\.git\refs\tags\v9.0.3`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:50.797657`
@@ -9858,7 +11621,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #270 - `rust.yml`
+### 📄 File #347 - `v9.0.4`
+- **Path**: `hyperlane-macros\.git\refs\tags\v9.0.4`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.820816`
+
+#### Content Preview
+
+
+
+### 📄 File #348 - `v9.0.5`
+- **Path**: `hyperlane-macros\.git\refs\tags\v9.0.5`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:52.821816`
+
+#### Content Preview
+
+
+
+### 📄 File #349 - `rust.yml`
 - **Path**: `hyperlane-macros\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:29.398513`
@@ -10121,7 +11902,7 @@ jobs:
 
 ```
 
-### 📄 File #271 - `Cargo.toml`
+### 📄 File #350 - `Cargo.toml`
 - **Path**: `hyperlane-macros\debug\Cargo.toml`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:29.399529`
@@ -10130,10 +11911,10 @@ jobs:
 
 
 
-### 📄 File #272 - `main.rs`
+### 📄 File #351 - `main.rs`
 - **Path**: `hyperlane-macros\debug\src\main.rs`
-- **Size**: `11,742 B`
-- **Modified Time**: `2025-10-01T21:58:50.920332`
+- **Size**: `24,416 B`
+- **Modified Time**: `2025-10-21T08:11:52.872143`
 
 #### Content Preview
 
@@ -10159,369 +11940,1019 @@ struct TestData {
 #[panic_hook]
 #[panic_hook(1)]
 #[panic_hook("2")]
-#[epilogue_macros(response_body("panic_hook"), send)]
-async fn panic_hook(ctx: Context) {}
+struct PanicHook;
+
+impl ServerHook for PanicHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(response_body("panic_hook"), send)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[request_middleware]
-#[epilogue_macros(
-    response_status_code(200),
-    response_version(HttpVersion::HTTP1_1),
-    response_header(SERVER => HYPERLANE),
-    response_header(CONNECTION => KEEP_ALIVE),
-    response_header(CONTENT_TYPE => TEXT_PLAIN),
-    response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY),
-    response_header(STEP => "request_middleware"),    
-)]
-async fn request_middleware(ctx: Context) {}
+struct RequestMiddleware;
 
-#[ws]
+impl ServerHook for RequestMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        response_status_code(200),
+        response_version(HttpVersion::HTTP1_1),
+        response_header(SERVER => HYPERLANE),
+        response_header(CONNECTION => KEEP_ALIVE),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY),
+        response_header(STEP => "request_middleware"),
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[request_middleware(1)]
-#[epilogue_macros(
-    response_body(&vec![]),
-    response_status_code(101),
-    response_header(UPGRADE => WEBSOCKET),
-    response_header(CONNECTION => UPGRADE),
-    response_header(SEC_WEBSOCKET_ACCEPT => &WebSocketFrame::generate_accept_key(&ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
-    response_header(STEP => "upgrade_hook"),
-    send
-)]
-async fn upgrade_hook(ctx: Context) {}
+struct UpgradeHook;
+
+impl ServerHook for UpgradeHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        ws,
+        response_body(&vec![]),
+        response_status_code(101),
+        response_header(UPGRADE => WEBSOCKET),
+        response_header(CONNECTION => UPGRADE),
+        response_header(SEC_WEBSOCKET_ACCEPT => &WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
+        response_header(STEP => "upgrade_hook"),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[request_middleware(2)]
-#[response_status_code(200)]
-#[response_header(SERVER => HYPERLANE)]
-#[response_version(HttpVersion::HTTP1_1)]
-#[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
-#[response_header(STEP => "connected_hook")]
-async fn connected_hook(ctx: Context) {}
+struct ConnectedHook;
+
+impl ServerHook for ConnectedHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_status_code(200)]
+    #[response_header(SERVER => HYPERLANE)]
+    #[response_version(HttpVersion::HTTP1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
+    #[response_header(STEP => "connected_hook")]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[response_middleware]
-#[response_header(STEP => "response_middleware_1")]
-async fn response_middleware_1(ctx: Context) {}
+struct ResponseMiddleware1;
+
+impl ServerHook for ResponseMiddleware1 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_header(STEP => "response_middleware_1")]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[response_middleware(2)]
-#[prologue_macros(
-    reject(ctx.get_request().await.is_ws()),
-    response_header(STEP => "response_middleware_2")
-)]
-#[epilogue_macros(send, flush)]
-async fn response_middleware_2(ctx: Context) {}
+struct ResponseMiddleware2;
+
+impl ServerHook for ResponseMiddleware2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        reject(ctx.get_request().await.is_ws()),
+        response_header(STEP => "response_middleware_2")
+    )]
+    #[epilogue_macros(send, flush)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[response_middleware("3")]
-#[prologue_macros(
-    ws,
-    response_header(STEP => "response_middleware_3")
-)]
-#[epilogue_macros(send_body, flush)]
-async fn response_middleware_3(ctx: Context) {}
+struct ResponseMiddleware3;
 
-#[get]
-#[http]
-async fn prologue_hooks(ctx: Context) {}
+impl ServerHook for ResponseMiddleware3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
 
-#[response_status_code(200)]
-async fn epilogue_hooks(ctx: Context) {}
+    #[prologue_macros(
+        ws,
+        response_header(STEP => "response_middleware_3")
+    )]
+    #[epilogue_macros(send_body, flush)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+struct PrologueHooks;
+
+impl ServerHook for PrologueHooks {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[get]
+    #[http]
+    async fn handle(self, _ctx: &Context) {}
+}
+
+struct EpilogueHooks;
+
+impl ServerHook for EpilogueHooks {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_status_code(200)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+async fn prologue_hooks_fn(ctx: Context) {
+    let hook = PrologueHooks::new(&ctx).await;
+    hook.handle(&ctx).await;
+}
+
+async fn epilogue_hooks_fn(ctx: Context) {
+    let hook = EpilogueHooks::new(&ctx).await;
+    hook.handle(&ctx).await;
+}
 
 #[route("/response")]
-#[response_body(&RESPONSE_DATA)]
-#[response_reason_phrase(CUSTOM_REASON)]
-#[response_status_code(CUSTOM_STATUS_CODE)]
-#[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
-async fn response(ctx: Context) {}
+struct Response;
+
+impl ServerHook for Response {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&RESPONSE_DATA)]
+    #[response_reason_phrase(CUSTOM_REASON)]
+    #[response_status_code(CUSTOM_STATUS_CODE)]
+    #[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/connect")]
-#[prologue_macros(connect, response_body("connect"))]
-async fn connect(ctx: Context) {}
+struct Connect;
+
+impl ServerHook for Connect {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(connect, response_body("connect"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/delete")]
-#[prologue_macros(delete, response_body("delete"))]
-async fn delete(ctx: Context) {}
+struct Delete;
+
+impl ServerHook for Delete {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(delete, response_body("delete"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/head")]
-#[prologue_macros(head, response_body("head"))]
-async fn head(ctx: Context) {}
+struct Head;
+
+impl ServerHook for Head {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(head, response_body("head"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/options")]
-#[prologue_macros(options, response_body("options"))]
-async fn options(ctx: Context) {}
+struct Options;
+
+impl ServerHook for Options {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(options, response_body("options"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/patch")]
-#[prologue_macros(patch, response_body("patch"))]
-async fn patch(ctx: Context) {}
+struct Patch;
+
+impl ServerHook for Patch {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(patch, response_body("patch"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/put")]
-#[prologue_macros(put, response_body("put"))]
-async fn put(ctx: Context) {}
+struct Put;
+
+impl ServerHook for Put {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(put, response_body("put"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/trace")]
-#[prologue_macros(trace, response_body("trace"))]
-async fn trace(ctx: Context) {}
+struct Trace;
+
+impl ServerHook for Trace {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(trace, response_body("trace"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/h2c")]
-#[prologue_macros(h2c, response_body("h2c"))]
-async fn h2c(ctx: Context) {}
+struct H2c;
+
+impl ServerHook for H2c {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(h2c, response_body("h2c"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http")]
-#[prologue_macros(http, response_body("http"))]
-async fn http_only(ctx: Context) {}
+struct HttpOnly;
+
+impl ServerHook for HttpOnly {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http, response_body("http"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http0_9")]
-#[prologue_macros(http0_9, response_body("http0_9"))]
-async fn http0_9(ctx: Context) {}
+struct Http09;
+
+impl ServerHook for Http09 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http0_9, response_body("http0_9"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http1_0")]
-#[prologue_macros(http1_0, response_body("http1_0"))]
-async fn http1_0(ctx: Context) {}
+struct Http10;
+
+impl ServerHook for Http10 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http1_0, response_body("http1_0"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http1_1")]
-#[prologue_macros(http1_1, response_body("http1_1"))]
-async fn http1_1(ctx: Context) {}
+struct Http11;
+
+impl ServerHook for Http11 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http1_1, response_body("http1_1"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http2")]
-#[prologue_macros(http2, response_body("http2"))]
-async fn http2(ctx: Context) {}
+struct Http2;
+
+impl ServerHook for Http2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http2, response_body("http2"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http3")]
-#[prologue_macros(http3, response_body("http3"))]
-async fn http3(ctx: Context) {}
+struct Http3;
+
+impl ServerHook for Http3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http3, response_body("http3"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/tls")]
-#[prologue_macros(tls, response_body("tls"))]
-async fn tls(ctx: Context) {}
+struct Tls;
+
+impl ServerHook for Tls {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(tls, response_body("tls"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/http1_1_or_higher")]
-#[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
-async fn http1_1_or_higher(ctx: Context) {}
+struct Http11OrHigher;
+
+impl ServerHook for Http11OrHigher {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/unknown_method")]
-#[prologue_macros(
-    clear_response_headers,
-    filter(ctx.get_request().await.is_unknown_method()),
-    response_body("unknown_method")
-)]
-async fn unknown_method(ctx: Context) {}
+struct UnknownMethod;
+
+impl ServerHook for UnknownMethod {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        clear_response_headers,
+        filter(ctx.get_request().await.is_unknown_method()),
+        response_body("unknown_method")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/get")]
-#[send_body_once]
-#[prologue_macros(ws, get, response_body("get"))]
-async fn get(ctx: Context) {}
+struct Get;
 
-#[send_once]
+impl ServerHook for Get {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(ws, get, response_body("get"), send_body_once)]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/post")]
-#[prologue_macros(post, response_body("post"))]
-async fn post(ctx: Context) {}
+struct Post;
 
-#[ws]
+impl ServerHook for Post {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(post, response_body("post"), send_once)]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/ws1")]
-#[ws_from_stream]
-async fn websocket_1(ctx: Context) {
-    let body: RequestBody = ctx.get_request_body().await;
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket1;
+
+impl ServerHook for Websocket1 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream]
+    async fn handle(self, ctx: &Context) {
+        let body: RequestBody = ctx.get_request_body().await;
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
-#[ws]
 #[route("/ws2")]
-#[ws_from_stream(1024)]
-async fn websocket_2(ctx: Context) {
-    let body: RequestBody = ctx.get_request_body().await;
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket2;
+
+impl ServerHook for Websocket2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream(request)]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
-#[ws]
 #[route("/ws3")]
-#[ws_from_stream(request)]
-async fn websocket_3(ctx: Context) {
-    let body: RequestBody = request.get_body().clone();
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket3;
+
+impl ServerHook for Websocket3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream(1024, request)]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
-#[ws]
 #[route("/ws4")]
-#[ws_from_stream(1024, request)]
-async fn websocket_4(ctx: Context) {
-    let body: RequestBody = request.get_body().clone();
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket4;
+
+impl ServerHook for Websocket4 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream(request, 1024)]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
-#[ws]
 #[route("/ws5")]
-#[ws_from_stream(request, 1024)]
-async fn websocket_5(ctx: Context) {
-    let body: RequestBody = request.get_body().clone();
-    let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-    ctx.send_body_list_with_data(&body_list).await.unwrap();
+struct Websocket5;
+
+impl ServerHook for Websocket5 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[ws_from_stream(1024)]
+    async fn handle(self, ctx: &Context) {
+        let body: RequestBody = ctx.get_request_body().await;
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
 }
 
 #[route("/hook")]
-#[prologue_hooks(prologue_hooks)]
-#[epilogue_hooks(epilogue_hooks)]
-#[response_body("Testing hook macro")]
-async fn hook(ctx: Context) {}
+struct Hook;
 
-#[closed]
+impl ServerHook for Hook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_hooks(prologue_hooks_fn)]
+    #[epilogue_hooks(epilogue_hooks_fn)]
+    #[response_body("Testing hook macro")]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/get_post")]
-#[prologue_macros(
-    http,
-    methods(get, post),
-    response_body("get_post"),
-    response_status_code(200),
-    response_reason_phrase("OK")
-)]
-async fn get_post(ctx: Context) {}
+struct GetPost;
+
+impl ServerHook for GetPost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[closed]
+    #[prologue_macros(
+        http,
+        methods(get, post),
+        response_body("get_post"),
+        response_status_code(200),
+        response_reason_phrase("OK")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/attributes")]
-#[response_body(&format!("request attributes: {request_attributes:?}"))]
-#[attributes(request_attributes)]
-async fn attributes(ctx: Context) {}
+struct Attributes;
+
+impl ServerHook for Attributes {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request attributes: {request_attributes:?}"))]
+    #[attributes(request_attributes)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/route_params/:test")]
-#[response_body(&format!("request route params: {request_route_params:?}"))]
-#[route_params(request_route_params)]
-async fn route_params(ctx: Context) {}
+struct RouteParams;
+
+impl ServerHook for RouteParams {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request route params: {request_route_params:?}"))]
+    #[route_params(request_route_params)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/route_param/:test")]
-#[response_body(&format!("route param: {request_route_param:?}"))]
-#[route_param("test" => request_route_param)]
-async fn route_param(ctx: Context) {}
+struct RouteParam;
+
+impl ServerHook for RouteParam {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("route param: {request_route_param:?}"))]
+    #[route_param("test" => request_route_param)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/host")]
-#[host("localhost")]
-#[epilogue_macros(
-    response_body("host string literal: localhost"),
-    send,
-    http_from_stream
-)]
-#[prologue_macros(response_body("host string literal: localhost"), send)]
-async fn host(ctx: Context) {}
+struct Host;
+
+impl ServerHook for Host {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[host("localhost")]
+    #[epilogue_macros(
+        response_body("host string literal: localhost"),
+        send,
+        http_from_stream
+    )]
+    #[prologue_macros(response_body("host string literal: localhost"), send)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_query")]
-#[epilogue_macros(
-    request_query("test" => request_query_option),
-    response_body(&format!("request query: {request_query_option:?}")),
-    send,
-    http_from_stream(1024)
-)]
-#[prologue_macros(
-    request_query("test" => request_query_option),
-    response_body(&format!("request query: {request_query_option:?}")),
-    send
-)]
-async fn request_query(ctx: Context) {}
+struct RequestQuery;
+
+impl ServerHook for RequestQuery {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_query("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send,
+        http_from_stream(1024)
+    )]
+    #[prologue_macros(
+        request_query("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_header")]
-#[epilogue_macros(
-    request_header(HOST => request_header_option),
-    response_body(&format!("request header: {request_header_option:?}")),
-    send,
-    http_from_stream(_request)
-)]
-#[prologue_macros(
-    request_header(HOST => request_header_option),
-    response_body(&format!("request header: {request_header_option:?}")),
-    send
-)]
-async fn request_header(ctx: Context) {}
+struct RequestHeader;
+
+impl ServerHook for RequestHeader {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_header(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
+        send,
+        http_from_stream(_request)
+    )]
+    #[prologue_macros(
+        request_header(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_querys")]
-#[epilogue_macros(
-    request_querys(request_querys),
-    response_body(&format!("request querys: {request_querys:?}")),
-    send,
-    http_from_stream(1024, _request)
-)]
-#[prologue_macros(
-    request_querys(request_querys),
-    response_body(&format!("request querys: {request_querys:?}")),
-    send
-)]
-async fn request_querys(ctx: Context) {}
+struct RequestQuerys;
+
+impl ServerHook for RequestQuerys {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_querys(request_querys),
+        response_body(&format!("request querys: {request_querys:?}")),
+        send,
+        http_from_stream(1024, _request)
+    )]
+    #[prologue_macros(
+        request_querys(request_querys),
+        response_body(&format!("request querys: {request_querys:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_headers")]
-#[epilogue_macros(
-    request_headers(request_headers),
-    response_body(&format!("request headers: {request_headers:?}")),
-    send,
-    http_from_stream(_request, 1024)
-)]
-#[prologue_macros(
-    request_headers(request_headers),
-    response_body(&format!("request headers: {request_headers:?}")),
-    send
-)]
-async fn request_headers(ctx: Context) {}
+struct RequestHeaders;
 
-#[response_body(&format!("raw body: {raw_body:?}"))]
-#[request_body(raw_body)]
+impl ServerHook for RequestHeaders {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_headers(request_headers),
+        response_body(&format!("request headers: {request_headers:?}")),
+        send,
+        http_from_stream(_request, 1024)
+    )]
+    #[prologue_macros(
+        request_headers(request_headers),
+        response_body(&format!("request headers: {request_headers:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/request_body")]
-async fn request_body(ctx: Context) {}
+struct RequestBodyRoute;
+
+impl ServerHook for RequestBodyRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("raw body: {raw_body:?}"))]
+    #[request_body(raw_body)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/reject_host")]
-#[prologue_macros(
-    reject_host("filter.localhost"),
-    response_body("host filter string literal")
-)]
-async fn reject_host(ctx: Context) {}
+struct RejectHost;
+
+impl ServerHook for RejectHost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        reject_host("filter.localhost"),
+        response_body("host filter string literal")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/attribute")]
-#[response_body(&format!("request attribute: {request_attribute_option:?}"))]
-#[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
-async fn attribute(ctx: Context) {}
+struct Attribute;
+
+impl ServerHook for Attribute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
+    #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_body_json")]
-#[response_body(&format!("request data: {request_data_result:?}"))]
-#[request_body_json(request_data_result: TestData)]
-async fn request_body_json(ctx: Context) {}
+struct RequestBodyJson;
+
+impl ServerHook for RequestBodyJson {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request data: {request_data_result:?}"))]
+    #[request_body_json(request_data_result: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/referer")]
-#[prologue_macros(
-    referer("http://localhost"),
-    response_body("referer string literal: http://localhost")
-)]
-async fn referer(ctx: Context) {}
+struct Referer;
+
+impl ServerHook for Referer {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        referer("http://localhost"),
+        response_body("referer string literal: http://localhost")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/reject_referer")]
-#[prologue_macros(
-    reject_referer("http://localhost"),
-    response_body("referer filter string literal")
-)]
-async fn reject_referer(ctx: Context) {}
+struct RejectReferer;
+
+impl ServerHook for RejectReferer {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+        reject_referer("http://localhost"),
+        response_body("referer filter string literal")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/cookies")]
-#[response_body(&format!("All cookies: {cookie_value:?}"))]
-#[request_cookies(cookie_value)]
-async fn cookies(ctx: Context) {}
+struct Cookies;
+
+impl ServerHook for Cookies {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("All cookies: {cookie_value:?}"))]
+    #[request_cookies(cookie_value)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/cookie")]
-#[response_body(&format!("Session cookie: {session_cookie_opt:?}"))]
-#[request_cookie("test" => session_cookie_opt)]
-async fn cookie(ctx: Context) {}
+struct Cookie;
+
+impl ServerHook for Cookie {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("Session cookie: {session_cookie_opt:?}"))]
+    #[request_cookie("test" => session_cookie_opt)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_version")]
-#[response_body(&format!("HTTP Version: {http_version}"))]
-#[request_version(http_version)]
-async fn request_version_test(ctx: Context) {}
+struct RequestVersionTest;
+
+impl ServerHook for RequestVersionTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("HTTP Version: {http_version}"))]
+    #[request_version(http_version)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/request_path")]
-#[response_body(&format!("Request Path: {request_path}"))]
-#[request_path(request_path)]
-async fn request_path_test(ctx: Context) {}
+struct RequestPathTest;
+
+impl ServerHook for RequestPathTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("Request Path: {request_path}"))]
+    #[request_path(request_path)]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/response_header")]
-#[response_body("Testing header set and replace operations")]
-#[response_header("X-Add-Header", "add-value")]
-#[response_header("X-Set-Header" => "set-value")]
-async fn response_header_test(ctx: Context) {}
+struct ResponseHeaderTest;
+
+impl ServerHook for ResponseHeaderTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body("Testing header set and replace operations")]
+    #[response_header("X-Add-Header", "add-value")]
+    #[response_header("X-Set-Header" => "set-value")]
+    async fn handle(self, ctx: &Context) {}
+}
 
 #[route("/literals")]
-#[response_status_code(201)]
-#[response_header(CONTENT_TYPE => APPLICATION_JSON)]
-#[response_body("{\"message\": \"Resource created\"}")]
-#[response_reason_phrase(HttpStatus::Created.to_string())]
-async fn literals(ctx: Context) {}
+struct Literals;
+
+impl ServerHook for Literals {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_status_code(201)]
+    #[response_header(CONTENT_TYPE => APPLICATION_JSON)]
+    #[response_body("{\"message\": \"Resource created\"}")]
+    #[response_reason_phrase(HttpStatus::Created.to_string())]
+    async fn handle(self, ctx: &Context) {}
+}
+
+#[route("/inject/response_body")]
+struct InjectResponseBody;
+
+impl ServerHook for InjectResponseBody {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.response_body_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectResponseBody {
+    #[response_body("response body with ref self")]
+    async fn response_body_with_ref_self(&self, ctx: &Context) {}
+}
+
+#[route("/inject/post_method")]
+struct InjectPostMethod;
+
+impl ServerHook for InjectPostMethod {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.post_method_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectPostMethod {
+    #[prologue_macros(post, response_body("post method with ref self"))]
+    async fn post_method_with_ref_self(&self, ctx: &Context) {}
+}
+
+#[route("/inject/send_flush")]
+struct InjectSendFlush;
+
+impl ServerHook for InjectSendFlush {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.send_and_flush_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectSendFlush {
+    #[epilogue_macros(send, flush)]
+    async fn send_and_flush_with_ref_self(&self, ctx: &Context) {}
+}
+
+#[route("/inject/request_body")]
+struct InjectRequestBody;
+
+impl ServerHook for InjectRequestBody {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.extract_request_body_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectRequestBody {
+    #[request_body(_raw_body)]
+    async fn extract_request_body_with_ref_self(&self, _ctx: &Context) {}
+}
+
+#[route("/inject/multiple_methods")]
+struct InjectMultipleMethods;
+
+impl ServerHook for InjectMultipleMethods {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.multiple_methods_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectMultipleMethods {
+    #[methods(get, post)]
+    async fn multiple_methods_with_ref_self(&self, ctx: &Context) {}
+}
+
+#[route("/inject/http_stream")]
+struct InjectHttpStream;
+
+impl ServerHook for InjectHttpStream {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.http_stream_handler_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectHttpStream {
+    #[http_from_stream(1024, _request)]
+    async fn http_stream_handler_with_ref_self(&self, _ctx: &Context) {}
+}
+
+#[route("/inject/ws_stream")]
+struct InjectWsStream;
+
+impl ServerHook for InjectWsStream {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.websocket_stream_handler_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectWsStream {
+    #[ws_from_stream(_request)]
+    async fn websocket_stream_handler_with_ref_self(&self, _ctx: &Context) {}
+}
+
+#[route("/inject/complex_post")]
+struct InjectComplexPost;
+
+impl ServerHook for InjectComplexPost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        self.complex_post_handler_with_ref_self(ctx).await;
+    }
+}
+
+impl InjectComplexPost {
+    #[prologue_macros(
+        post,
+        http,
+        request_body(raw_body),
+        response_status_code(201),
+        response_header(CONTENT_TYPE => APPLICATION_JSON),
+        response_body(&format!("Received: {raw_body:?}"))
+    )]
+    #[epilogue_macros(send, flush)]
+    async fn complex_post_handler_with_ref_self(&self, ctx: &Context) {}
+}
+
+impl InjectComplexPost {
+    #[post]
+    async fn test_with_bool_param(_a: bool, ctx: &Context) {}
+
+    #[get]
+    async fn test_with_multiple_params(_a: bool, ctx: &Context, _b: i32) {}
+}
+
+#[response_body("standalone response body")]
+async fn standalone_response_body_handler(ctx: &Context) {}
+
+#[prologue_macros(get, response_body("standalone get handler"))]
+async fn standalone_get_handler(ctx: &Context) {}
+
+#[epilogue_macros(send, flush)]
+async fn standalone_send_and_flush_handler(ctx: &Context) {}
+
+#[request_body(_raw_body)]
+async fn standalone_request_body_extractor(ctx: &Context) {}
+
+#[methods(get, post)]
+async fn standalone_multiple_methods_handler(ctx: &Context) {}
+
+#[http_from_stream]
+async fn standalone_http_stream_handler(ctx: &Context) {}
+
+#[ws_from_stream]
+async fn standalone_websocket_stream_handler(ctx: &Context) {}
+
+#[prologue_macros(
+    get,
+    http,
+    response_status_code(200),
+    response_header(CONTENT_TYPE => TEXT_PLAIN),
+    response_body("standalone complex handler")
+)]
+#[epilogue_macros(send, flush)]
+async fn standalone_complex_get_handler(ctx: &Context) {}
+
+#[get]
+async fn standalone_get_handler_with_param(_a: bool, ctx: &Context) {}
 
 #[hyperlane(server: Server)]
 #[hyperlane(config: ServerConfig)]
@@ -10529,8 +12960,8 @@ async fn literals(ctx: Context) {}
 async fn main() {
     config.disable_nodelay().await;
     server.config(config).await;
-    let server_hook: ServerHook = server.run().await.unwrap_or_default();
-    let server_hook_clone: ServerHook = server_hook.clone();
+    let server_hook: ServerControlHook = server.run().await.unwrap_or_default();
+    let server_hook_clone: ServerControlHook = server_hook.clone();
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
         server_hook.shutdown().await;
@@ -10540,10 +12971,10 @@ async fn main() {
 
 ```
 
-### 📄 File #273 - `lib.rs`
+### 📄 File #352 - `lib.rs`
 - **Path**: `hyperlane-macros\src\lib.rs`
-- **Size**: `59,282 B`
-- **Modified Time**: `2025-10-01T21:58:50.933329`
+- **Size**: `82,319 B`
+- **Modified Time**: `2025-10-21T08:11:52.874148`
 
 #### Content Preview
 
@@ -10623,14 +13054,29 @@ inventory::collect!(InjectableMacro);
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[get]
-/// async fn handle_get(ctx: Context) {
-///     // Function body
+/// #[route("/get")]
+/// struct Get;
+///
+/// impl ServerHook for Get {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(get, response_body("get"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Get {
+///     #[get]
+///     async fn get_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[get]
+/// async fn standalone_get_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn get(_attr: TokenStream, item: TokenStream) -> TokenStream {
     get_handler(item, Position::Prologue)
@@ -10647,14 +13093,29 @@ pub fn get(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[post]
-/// async fn handle_post(ctx: Context) {
-///     // Function body
+/// #[route("/post")]
+/// struct Post;
+///
+/// impl ServerHook for Post {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(post, response_body("post"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Post {
+///     #[post]
+///     async fn post_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[post]
+/// async fn standalone_post_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn post(_attr: TokenStream, item: TokenStream) -> TokenStream {
     epilogue_handler(item, Position::Prologue)
@@ -10671,14 +13132,29 @@ pub fn post(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[put]
-/// async fn handle_put(ctx: Context) {
-///     // Function body
+/// #[route("/put")]
+/// struct Put;
+///
+/// impl ServerHook for Put {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(put, response_body("put"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Put {
+///     #[put]
+///     async fn put_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[put]
+/// async fn standalone_put_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn put(_attr: TokenStream, item: TokenStream) -> TokenStream {
     put_handler(item, Position::Prologue)
@@ -10695,14 +13171,29 @@ pub fn put(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[delete]
-/// async fn handle_delete(ctx: Context) {
-///     // Function body
+/// #[route("/delete")]
+/// struct Delete;
+///
+/// impl ServerHook for Delete {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(delete, response_body("delete"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Delete {
+///     #[delete]
+///     async fn delete_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[delete]
+/// async fn standalone_delete_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn delete(_attr: TokenStream, item: TokenStream) -> TokenStream {
     delete_handler(item, Position::Prologue)
@@ -10719,14 +13210,29 @@ pub fn delete(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[patch]
-/// async fn handle_patch(ctx: Context) {
-///     // Function body
+/// #[route("/patch")]
+/// struct Patch;
+///
+/// impl ServerHook for Patch {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(patch, response_body("patch"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Patch {
+///     #[patch]
+///     async fn patch_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[patch]
+/// async fn standalone_patch_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn patch(_attr: TokenStream, item: TokenStream) -> TokenStream {
     patch_handler(item, Position::Prologue)
@@ -10743,14 +13249,29 @@ pub fn patch(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[head]
-/// async fn handle_head(ctx: Context) {
-///     // Function body
+/// #[route("/head")]
+/// struct Head;
+///
+/// impl ServerHook for Head {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(head, response_body("head"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Head {
+///     #[head]
+///     async fn head_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[head]
+/// async fn standalone_head_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn head(_attr: TokenStream, item: TokenStream) -> TokenStream {
     head_handler(item, Position::Prologue)
@@ -10767,14 +13288,29 @@ pub fn head(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[options]
-/// async fn handle_options(ctx: Context) {
-///     // Function body
+/// #[route("/options")]
+/// struct Options;
+///
+/// impl ServerHook for Options {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(options, response_body("options"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Options {
+///     #[options]
+///     async fn options_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[options]
+/// async fn standalone_options_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn options(_attr: TokenStream, item: TokenStream) -> TokenStream {
     options_handler(item, Position::Prologue)
@@ -10791,14 +13327,29 @@ pub fn options(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[connect]
-/// async fn handle_connect(ctx: Context) {
-///     // Function body
+/// #[route("/connect")]
+/// struct Connect;
+///
+/// impl ServerHook for Connect {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(connect, response_body("connect"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Connect {
+///     #[connect]
+///     async fn connect_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[connect]
+/// async fn standalone_connect_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn connect(_attr: TokenStream, item: TokenStream) -> TokenStream {
     connect_handler(item, Position::Prologue)
@@ -10815,14 +13366,29 @@ pub fn connect(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[trace]
-/// async fn handle_trace(ctx: Context) {
-///     // Function body
+/// #[route("/trace")]
+/// struct Trace;
+///
+/// impl ServerHook for Trace {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(trace, response_body("trace"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Trace {
+///     #[trace]
+///     async fn trace_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[trace]
+/// async fn standalone_trace_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn trace(_attr: TokenStream, item: TokenStream) -> TokenStream {
     trace_handler(item, Position::Prologue)
@@ -10839,19 +13405,33 @@ pub fn trace(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[methods(get, post)]
-/// async fn handle_get_post(ctx: Context) {
-///     // Function body
+/// #[route("/get_post")]
+/// struct GetPost;
+///
+/// impl ServerHook for GetPost {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         http,
+///         methods(get, post),
+///         response_body("get_post")
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// #[methods(put, patch, delete)]
-/// async fn handle_modifications(ctx: Context) {
-///     // Function body
+/// impl GetPost {
+///     #[methods(get, post)]
+///     async fn methods_with_ref_self(&self, ctx: &Context) {}
 /// }
+///
+/// #[methods(get, post)]
+/// async fn standalone_methods_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a comma-separated list of HTTP method names (lowercase) and should be
-/// applied to async functions that accept a `Context` parameter.
+/// applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn methods(attr: TokenStream, item: TokenStream) -> TokenStream {
     methods_macro(attr, item, Position::Prologue)
@@ -10868,14 +13448,34 @@ pub fn methods(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[ws]
-/// async fn handle_websocket(ctx: Context) {
-///     // WebSocket handling logic
+/// #[route("/ws")]
+/// struct Websocket;
+///
+/// impl ServerHook for Websocket {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[ws]
+///     #[ws_from_stream]
+///     async fn handle(self, ctx: &Context) {
+///         let body: RequestBody = ctx.get_request_body().await;
+///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+///         ctx.send_body_list_with_data(&body_list).await.unwrap();
+///     }
 /// }
+///
+/// impl Websocket {
+///     #[ws]
+///     async fn ws_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[ws]
+/// async fn standalone_ws_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn ws(_attr: TokenStream, item: TokenStream) -> TokenStream {
     ws_macro(item, Position::Prologue)
@@ -10892,14 +13492,29 @@ pub fn ws(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[http]
-/// async fn handle_http(ctx: Context) {
-///     // HTTP request handling logic
+/// #[route("/http")]
+/// struct HttpOnly;
+///
+/// impl ServerHook for HttpOnly {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(http, response_body("http"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl HttpOnly {
+///     #[http]
+///     async fn http_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[http]
+/// async fn standalone_http_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn http(_attr: TokenStream, item: TokenStream) -> TokenStream {
     http_macro(item, Position::Prologue)
@@ -10916,26 +13531,31 @@ pub fn http(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// const CUSTOM_STATUS: i32 = 418;
+/// const CUSTOM_STATUS_CODE: i32 = 200;
+///
+/// #[route("/response")]
+/// struct Response;
+///
+/// impl ServerHook for Response {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_status_code(CUSTOM_STATUS_CODE)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl Response {
+///     #[response_status_code(CUSTOM_STATUS_CODE)]
+///     async fn response_status_code_with_ref_self(&self, ctx: &Context) {}
+/// }
 ///
 /// #[response_status_code(200)]
-/// async fn success_handler(ctx: Context) {
-///     // Response will have status code 200
-/// }
-///
-/// #[response_status_code(404)]
-/// async fn not_found_handler(ctx: Context) {
-///     // Response will have status code 404
-/// }
-///
-/// #[response_status_code(CUSTOM_STATUS)]
-/// async fn custom_handler(ctx: Context) {
-///     // Response will have status code from global constant
-/// }
+/// async fn standalone_response_status_code_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a numeric HTTP status code or a global constant
-/// and should be applied to async functions that accept a `Context` parameter.
+/// and should be applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_status_code_macro(attr, item, Position::Prologue)
@@ -10952,26 +13572,31 @@ pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// const CUSTOM_REASON: &str = "I'm a teapot";
+/// const CUSTOM_REASON: &str = "Accepted";
+///
+/// #[route("/response")]
+/// struct Response;
+///
+/// impl ServerHook for Response {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_reason_phrase(CUSTOM_REASON)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl Response {
+///     #[response_reason_phrase(CUSTOM_REASON)]
+///     async fn response_reason_phrase_with_ref_self(&self, ctx: &Context) {}
+/// }
 ///
 /// #[response_reason_phrase("OK")]
-/// async fn success_handler(ctx: Context) {
-///     // Response will have reason phrase "OK"
-/// }
-///
-/// #[response_reason_phrase("Not Found")]
-/// async fn not_found_handler(ctx: Context) {
-///     // Response will have reason phrase "Not Found"
-/// }
-///
-/// #[response_reason_phrase(CUSTOM_REASON)]
-/// async fn custom_handler(ctx: Context) {
-///     // Response will have reason phrase from global constant
-/// }
+/// async fn standalone_response_reason_phrase_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a string literal or global constant for the reason phrase and should be
-/// applied to async functions that accept a `Context` parameter.
+/// applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn response_reason_phrase(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_reason_phrase_macro(attr, item, Position::Prologue)
@@ -10989,39 +13614,47 @@ pub fn response_reason_phrase(attr: TokenStream, item: TokenStream) -> TokenStre
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// const HEADER_NAME: &str = "X-Custom-Header";
-/// const HEADER_VALUE: &str = "custom-value";
+/// const CUSTOM_HEADER_NAME: &str = "X-Custom-Header";
+/// const CUSTOM_HEADER_VALUE: &str = "custom-value";
 ///
-/// #[response_header("Content-Type", "application/json")]
-/// async fn json_handler(ctx: Context) {
-///     // Response will have Content-Type header set to application/json
+/// #[route("/response")]
+/// struct Response;
+///
+/// impl ServerHook for Response {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// #[response_header("X-Static-Header" => "static-value")]
-/// async fn set_header_handler(ctx: Context) {
-///     // Response will have static header replaced (overwrite existing)
+/// impl Response {
+///     #[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
+///     async fn response_header_with_ref_self(&self, ctx: &Context) {}
 /// }
 ///
-/// #[response_header(HEADER_NAME, HEADER_VALUE)]
-/// async fn dynamic_header_handler(ctx: Context) {
-///     // Response will have header from global constants
+/// #[route("/response_header")]
+/// struct ResponseHeaderTest;
+///
+/// impl ServerHook for ResponseHeaderTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body("Testing header set and replace operations")]
+///     #[response_header("X-Add-Header", "add-value")]
+///     #[response_header("X-Set-Header" => "set-value")]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// #[response_header("Cache-Control" => "no-cache")]
-/// async fn set_cache_handler(ctx: Context) {
-///     // Response will have Cache-Control header replaced
-/// }
-///
-/// #[response_header("X-Add-Header", "add-value")]
-/// #[response_header("X-Set-Header" => "set-value")]
-/// async fn header_operations_handler(ctx: Context) {
-///     // Response will have X-Add-Header set and X-Set-Header replaced
-/// }
+/// #[response_header("X-Custom" => "value")]
+/// async fn standalone_response_header_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts header name and header value, both can be string literals or global constants.
 /// Use `"key", "value"` for setting headers and `"key" => "value"` for replacing headers.
-/// Should be applied to async functions that accept a `Context` parameter.
+/// Should be applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_header_macro(attr, item, Position::Prologue)
@@ -11038,26 +13671,31 @@ pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// const RESPONSE_DATA: &str = "Dynamic content from constant";
+/// const RESPONSE_DATA: &str = "{\"status\": \"success\"}";
 ///
-/// #[response_body("Hello, World!")]
-/// async fn hello_handler(ctx: Context) {
-///     // Response will have body "Hello, World!"
+/// #[route("/response")]
+/// struct Response;
+///
+/// impl ServerHook for Response {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&RESPONSE_DATA)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// #[response_body("{\"message\": \"success\"}")]
-/// async fn json_response_handler(ctx: Context) {
-///     // Response will have JSON body
+/// impl Response {
+///     #[response_body(&RESPONSE_DATA)]
+///     async fn response_body_with_ref_self(&self, ctx: &Context) {}
 /// }
 ///
-/// #[response_body(RESPONSE_DATA)]
-/// async fn dynamic_body_handler(ctx: Context) {
-///     // Response will have body from global constant
-/// }
+/// #[response_body("standalone response body")]
+/// async fn standalone_response_body_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a string literal or global constant for the response body and should be
-/// applied to async functions that accept a `Context` parameter.
+/// applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_body_macro(attr, item, Position::Prologue)
@@ -11073,13 +13711,32 @@ pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[clear_response_headers]
-/// async fn clear_headers(ctx: Context) {
-///     // Clear all response headers
+/// #[route("/unknown_method")]
+/// struct UnknownMethod;
+///
+/// impl ServerHook for UnknownMethod {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         clear_response_headers,
+///         filter(ctx.get_request().await.is_unknown_method()),
+///         response_body("unknown_method")
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl UnknownMethod {
+///     #[clear_response_headers]
+///     async fn clear_response_headers_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[clear_response_headers]
+/// async fn standalone_clear_response_headers_handler(ctx: &Context) {}
 /// ```
 ///
-/// The macro should be applied to async functions that accept a `Context` parameter.   
+/// The macro should be applied to async functions that accept a `&Context` parameter.   
 #[proc_macro_attribute]
 pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStream {
     clear_response_headers_macro(item, Position::Prologue)
@@ -11096,14 +13753,25 @@ pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStr
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[response_version(HttpVersion::HTTP1_1)]
-/// async fn version_from_constant(ctx: Context) {
-///     // Response will have version from global constant
+/// #[request_middleware]
+/// struct RequestMiddleware;
+///
+/// impl ServerHook for RequestMiddleware {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(
+///         response_status_code(200),
+///         response_version(HttpVersion::HTTP1_1),
+///         response_header(SERVER => HYPERLANE)
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
 /// The macro accepts a variable or code block for the response version and should be
-/// applied to async functions that accept a `Context` parameter.
+/// applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn response_version(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_version_macro(attr, item, Position::Prologue)
@@ -11120,15 +13788,29 @@ pub fn response_version(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[send]
-/// async fn auto_send_handler(ctx: Context) {
-///     let _ = ctx.set_response_body("Hello World").await;
-///     // Response is automatically sent after function returns
+/// #[route("/send")]
+/// struct SendTest;
+///
+/// impl ServerHook for SendTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(send)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl SendTest {
+///     #[send]
+///     async fn send_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[send]
+/// async fn standalone_send_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn send(_attr: TokenStream, item: TokenStream) -> TokenStream {
     send_macro(item, Position::Epilogue)
@@ -11145,15 +13827,29 @@ pub fn send(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[send_body]
-/// async fn auto_send_body_handler(ctx: Context) {
-///     let _ = ctx.set_response_body("Response body content").await;
-///     // Only response body is automatically sent after function returns
+/// #[route("/send_body")]
+/// struct SendBodyTest;
+///
+/// impl ServerHook for SendBodyTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(send_body)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl SendBodyTest {
+///     #[send_body]
+///     async fn send_body_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[send_body]
+/// async fn standalone_send_body_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn send_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
     send_body_macro(item, Position::Epilogue)
@@ -11170,14 +13866,29 @@ pub fn send_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[send_with_data("Hello, World!")]
-/// async fn auto_send_with_data_handler(ctx: Context) {
-///     // Response is automatically sent with the specified data after function returns
+/// #[route("/send_with_data")]
+/// struct SendWithData;
+///
+/// impl ServerHook for SendWithData {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(send_with_data("Hello, World!"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl SendWithData {
+///     #[send_with_data("Hello, World!")]
+///     async fn send_with_data_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[send_with_data("data")]
+/// async fn standalone_send_with_data_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts data to send and should be applied to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn send_with_data(attr: TokenStream, item: TokenStream) -> TokenStream {
     send_with_data_macro(attr, item, Position::Epilogue)
@@ -11194,15 +13905,29 @@ pub fn send_with_data(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[send_once]
-/// async fn send_once_handler(ctx: Context) {
-///     let _ = ctx.set_response_body("One-time response").await;
-///     // Response is sent exactly once after function returns
+/// #[route("/send_once")]
+/// struct SendOnceTest;
+///
+/// impl ServerHook for SendOnceTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(send_once)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl SendOnceTest {
+///     #[send_once]
+///     async fn send_once_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[send_once]
+/// async fn standalone_send_once_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn send_once(_attr: TokenStream, item: TokenStream) -> TokenStream {
     send_once_macro(item, Position::Epilogue)
@@ -11219,15 +13944,29 @@ pub fn send_once(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[send_body_once]
-/// async fn send_body_once_handler(ctx: Context) {
-///     let _ = ctx.set_response_body("One-time body content").await;
-///     // Response body is sent exactly once after function returns
+/// #[route("/send_body_once")]
+/// struct SendBodyOnceTest;
+///
+/// impl ServerHook for SendBodyOnceTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(send_body_once)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl SendBodyOnceTest {
+///     #[send_body_once]
+///     async fn send_body_once_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[send_body_once]
+/// async fn standalone_send_body_once_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn send_body_once(_attr: TokenStream, item: TokenStream) -> TokenStream {
     send_body_once_macro(item, Position::Epilogue)
@@ -11244,14 +13983,29 @@ pub fn send_body_once(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[send_once_with_data("One-time response")]
-/// async fn send_once_with_data_handler(ctx: Context) {
-///     // Response is sent exactly once with the specified data after function returns
+/// #[route("/send_once_with_data")]
+/// struct SendOnceWithData;
+///
+/// impl ServerHook for SendOnceWithData {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(send_once_with_data("One-time response"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl SendOnceWithData {
+///     #[send_once_with_data("One-time response")]
+///     async fn send_once_with_data_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[send_once_with_data("data")]
+/// async fn standalone_send_once_with_data_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts data to send and should be applied to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn send_once_with_data(attr: TokenStream, item: TokenStream) -> TokenStream {
     send_once_with_data_macro(attr, item, Position::Epilogue)
@@ -11268,15 +14022,29 @@ pub fn send_once_with_data(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[flush]
-/// async fn flush_handler(ctx: Context) {
-///     let _ = ctx.set_response_body("Immediate response").await;
-///     // Response stream is flushed after function returns
+/// #[route("/flush")]
+/// struct FlushTest;
+///
+/// impl ServerHook for FlushTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(flush)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl FlushTest {
+///     #[flush]
+///     async fn flush_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[flush]
+/// async fn standalone_flush_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
     flush_macro(item, Position::Prologue)
@@ -11293,14 +14061,29 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[aborted]
-/// async fn handle_aborted(ctx: Context) {
-///     // Handle aborted request logic
+/// #[route("/aborted")]
+/// struct Aborted;
+///
+/// impl ServerHook for Aborted {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[aborted]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Aborted {
+///     #[aborted]
+///     async fn aborted_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[aborted]
+/// async fn standalone_aborted_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn aborted(_attr: TokenStream, item: TokenStream) -> TokenStream {
     aborted_macro(item, Position::Prologue)
@@ -11317,14 +14100,29 @@ pub fn aborted(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[closed]
-/// async fn handle_closed(ctx: Context) {
-///     // Handle closed connection logic
+/// #[route("/closed")]
+/// struct ClosedTest;
+///
+/// impl ServerHook for ClosedTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[closed]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl ClosedTest {
+///     #[closed]
+///     async fn closed_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[closed]
+/// async fn standalone_closed_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn closed(_attr: TokenStream, item: TokenStream) -> TokenStream {
     closed_macro(item, Position::Prologue)
@@ -11341,14 +14139,29 @@ pub fn closed(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[h2c]
-/// async fn handle_h2c(ctx: Context) {
-///     // Handle HTTP/2 cleartext requests
+/// #[route("/h2c")]
+/// struct H2c;
+///
+/// impl ServerHook for H2c {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(h2c, response_body("h2c"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl H2c {
+///     #[h2c]
+///     async fn h2c_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[h2c]
+/// async fn standalone_h2c_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn h2c(_attr: TokenStream, item: TokenStream) -> TokenStream {
     h2c_macro(item, Position::Prologue)
@@ -11365,14 +14178,29 @@ pub fn h2c(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[http0_9]
-/// async fn handle_http09(ctx: Context) {
-///     // Handle HTTP/0.9 requests
+/// #[route("/http0_9")]
+/// struct Http09;
+///
+/// impl ServerHook for Http09 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(http0_9, response_body("http0_9"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Http09 {
+///     #[http0_9]
+///     async fn http0_9_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[http0_9]
+/// async fn standalone_http0_9_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn http0_9(_attr: TokenStream, item: TokenStream) -> TokenStream {
     http0_9_macro(item, Position::Prologue)
@@ -11389,14 +14217,29 @@ pub fn http0_9(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[http1_0]
-/// async fn handle_http10(ctx: Context) {
-///     // Handle HTTP/1.0 requests
+/// #[route("/http1_0")]
+/// struct Http10;
+///
+/// impl ServerHook for Http10 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(http1_0, response_body("http1_0"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Http10 {
+///     #[http1_0]
+///     async fn http1_0_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[http1_0]
+/// async fn standalone_http1_0_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn http1_0(_attr: TokenStream, item: TokenStream) -> TokenStream {
     http1_0_macro(item, Position::Prologue)
@@ -11413,14 +14256,29 @@ pub fn http1_0(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[http1_1]
-/// async fn handle_http11(ctx: Context) {
-///     // Handle HTTP/1.1 requests
+/// #[route("/http1_1")]
+/// struct Http11;
+///
+/// impl ServerHook for Http11 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(http1_1, response_body("http1_1"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Http11 {
+///     #[http1_1]
+///     async fn http1_1_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[http1_1]
+/// async fn standalone_http1_1_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn http1_1(_attr: TokenStream, item: TokenStream) -> TokenStream {
     http1_1_macro(item, Position::Prologue)
@@ -11437,14 +14295,29 @@ pub fn http1_1(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[http1_1_or_higher]
-/// async fn handle_modern_http(ctx: Context) {
-///     // Handle HTTP/1.1, HTTP/2, HTTP/3, etc.
+/// #[route("/http1_1_or_higher")]
+/// struct Http11OrHigher;
+///
+/// impl ServerHook for Http11OrHigher {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Http11OrHigher {
+///     #[http1_1_or_higher]
+///     async fn http1_1_or_higher_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[http1_1_or_higher]
+/// async fn standalone_http1_1_or_higher_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn http1_1_or_higher(_attr: TokenStream, item: TokenStream) -> TokenStream {
     http1_1_or_higher_macro(item, Position::Prologue)
@@ -11461,14 +14334,29 @@ pub fn http1_1_or_higher(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[http2]
-/// async fn handle_http2(ctx: Context) {
-///     // Handle HTTP/2 requests
+/// #[route("/http2")]
+/// struct Http2;
+///
+/// impl ServerHook for Http2 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(http2, response_body("http2"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Http2 {
+///     #[http2]
+///     async fn http2_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[http2]
+/// async fn standalone_http2_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn http2(_attr: TokenStream, item: TokenStream) -> TokenStream {
     http2_macro(item, Position::Prologue)
@@ -11485,14 +14373,29 @@ pub fn http2(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[http3]
-/// async fn handle_http3(ctx: Context) {
-///     // Handle HTTP/3 requests
+/// #[route("/http3")]
+/// struct Http3;
+///
+/// impl ServerHook for Http3 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(http3, response_body("http3"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Http3 {
+///     #[http3]
+///     async fn http3_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[http3]
+/// async fn standalone_http3_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn http3(_attr: TokenStream, item: TokenStream) -> TokenStream {
     http3_macro(item, Position::Prologue)
@@ -11509,14 +14412,29 @@ pub fn http3(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[tls]
-/// async fn handle_secure(ctx: Context) {
-///     // Handle TLS-encrypted requests only
+/// #[route("/tls")]
+/// struct Tls;
+///
+/// impl ServerHook for Tls {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(tls, response_body("tls"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Tls {
+///     #[tls]
+///     async fn tls_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[tls]
+/// async fn standalone_tls_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn tls(_attr: TokenStream, item: TokenStream) -> TokenStream {
     tls_macro(item, Position::Prologue)
@@ -11532,9 +14450,19 @@ pub fn tls(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[filter(ctx.get_request().await.is_ws())]
-/// async fn handle_ws(ctx: Context) {
-///     // This code will only run for WebSocket requests.
+/// #[route("/unknown_method")]
+/// struct UnknownMethod;
+///
+/// impl ServerHook for UnknownMethod {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         filter(ctx.get_request().await.is_unknown_method()),
+///         response_body("unknown_method")
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -11552,9 +14480,18 @@ pub fn filter(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[reject(ctx.get_request().await.is_http())]
-/// async fn handle_non_http(ctx: Context) {
-///     // This code will not run for HTTP requests.
+/// #[response_middleware(2)]
+/// struct ResponseMiddleware2;
+///
+/// impl ServerHook for ResponseMiddleware2 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         reject(ctx.get_request().await.is_ws())
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -11573,19 +14510,30 @@ pub fn reject(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[host("localhost")]
-/// async fn handle_example_com(ctx: Context) {
-///     // Function body for localhost requests
+/// #[route("/host")]
+/// struct Host;
+///
+/// impl ServerHook for Host {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[host("localhost")]
+///     #[prologue_macros(response_body("host string literal: localhost"), send)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// #[host("api.localhost")]
-/// async fn handle_api_subdomain(ctx: Context) {
-///     // Function body for api.localhost requests
+/// impl Host {
+///     #[host("localhost")]
+///     async fn host_with_ref_self(&self, ctx: &Context) {}
 /// }
+///
+/// #[host("localhost")]
+/// async fn standalone_host_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a string literal specifying the expected host value and should be
-/// applied to async functions that accept a `Context` parameter.
+/// applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn host(attr: TokenStream, item: TokenStream) -> TokenStream {
     host_macro(attr, item, Position::Prologue)
@@ -11602,14 +14550,32 @@ pub fn host(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[reject_host("localhost")]
-/// async fn handle_with_host(ctx: Context) {
-///     // Function body for requests with host header
+/// #[route("/reject_host")]
+/// struct RejectHost;
+///
+/// impl ServerHook for RejectHost {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         reject_host("filter.localhost"),
+///         response_body("host filter string literal")
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RejectHost {
+///     #[reject_host("filter.localhost")]
+///     async fn reject_host_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[reject_host("filter.localhost")]
+/// async fn standalone_reject_host_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro takes no parameters and should be applied directly to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn reject_host(attr: TokenStream, item: TokenStream) -> TokenStream {
     reject_host_macro(attr, item, Position::Prologue)
@@ -11626,19 +14592,32 @@ pub fn reject_host(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[referer("http://localhost")]
-/// async fn handle_example_referer(ctx: Context) {
-///     // Function body for requests from localhost
+/// #[route("/referer")]
+/// struct Referer;
+///
+/// impl ServerHook for Referer {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         referer("http://localhost"),
+///         response_body("referer string literal: http://localhost")
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// #[referer("https://api.localhost")]
-/// async fn handle_api_referer(ctx: Context) {
-///     // Function body for requests from api.localhost
+/// impl Referer {
+///     #[referer("http://localhost")]
+///     async fn referer_with_ref_self(&self, ctx: &Context) {}
 /// }
+///
+/// #[referer("http://localhost")]
+/// async fn standalone_referer_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a string literal specifying the expected referer value and should be
-/// applied to async functions that accept a `Context` parameter.
+/// applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn referer(attr: TokenStream, item: TokenStream) -> TokenStream {
     referer_macro(attr, item, Position::Prologue)
@@ -11655,14 +14634,32 @@ pub fn referer(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[reject_referer("http://localhost")]
-/// async fn handle_without_spam_referer(ctx: Context) {
-///     // Function body for requests not from localhost
+/// #[route("/reject_referer")]
+/// struct RejectReferer;
+///
+/// impl ServerHook for RejectReferer {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         reject_referer("http://localhost"),
+///         response_body("referer filter string literal")
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RejectReferer {
+///     #[reject_referer("http://localhost")]
+///     async fn reject_referer_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[reject_referer("http://localhost")]
+/// async fn standalone_reject_referer_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a string literal specifying the referer value to filter out and should be
-/// applied to async functions that accept a `Context` parameter.
+/// applied to async functions that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
     reject_referer_macro(attr, item, Position::Prologue)
@@ -11679,19 +14676,34 @@ pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[get]
-/// async fn prologue_handler1(ctx: Context) {
-///     // First pre-execution logic
+/// struct PrologueHooks;
+///
+/// impl ServerHook for PrologueHooks {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[get]
+///     #[http]
+///     async fn handle(self, _ctx: &Context) {}
 /// }
 ///
-/// #[http]
-/// async fn prologue_handler2(ctx: Context) {
-///     // Second pre-execution logic
+/// async fn prologue_hooks_fn(ctx: Context) {
+///     let hook = PrologueHooks::new(&ctx).await;
+///     hook.handle(&ctx).await;
 /// }
 ///
-/// #[prologue_hooks(prologue_handler1, prologue_handler2)]
-/// async fn main_handler(ctx: Context) {
-///     // Main function logic (runs after prologue_handler1 and prologue_handler2)
+/// #[route("/hook")]
+/// struct Hook;
+///
+/// impl ServerHook for Hook {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_hooks(prologue_hooks_fn)]
+///     #[response_body("Testing hook macro")]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
@@ -11714,19 +14726,33 @@ pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[send]
-/// async fn epilogue_handler1(ctx: Context) {
-///     // First post-execution logic
+/// struct EpilogueHooks;
+///
+/// impl ServerHook for EpilogueHooks {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_status_code(200)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// #[flush]
-/// async fn epilogue_handler2(ctx: Context) {
-///     // Second post-execution logic
+/// async fn epilogue_hooks_fn(ctx: Context) {
+///     let hook = EpilogueHooks::new(&ctx).await;
+///     hook.handle(&ctx).await;
 /// }
 ///
-/// #[epilogue_hooks(epilogue_handler1, epilogue_handler2)]
-/// async fn main_handler(ctx: Context) {
-///     // Main function logic (runs before epilogue_handler1 and epilogue_handler2)
+/// #[route("/hook")]
+/// struct Hook;
+///
+/// impl ServerHook for Hook {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_hooks(epilogue_hooks_fn)]
+///     #[response_body("Testing hook macro")]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
@@ -11749,11 +14775,26 @@ pub fn epilogue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[request_body(raw_body)]
-/// async fn handle_raw_body(ctx: Context) {
-///     // Use the raw request body
-///     let body_content = raw_body;
+/// #[route("/request_body")]
+/// struct RequestBodyRoute;
+///
+/// impl ServerHook for RequestBodyRoute {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("raw body: {raw_body:?}"))]
+///     #[request_body(raw_body)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RequestBodyRoute {
+///     #[request_body(raw_body)]
+///     async fn request_body_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_body(raw_body)]
+/// async fn standalone_request_body_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts only a variable name. The variable will be available
@@ -11773,20 +14814,34 @@ pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
-/// use serde::Deserialize;
+/// use serde::{Deserialize, Serialize};
 ///
-/// #[derive(Deserialize, Clone)]
-/// struct UserData {
+/// #[derive(Debug, Serialize, Deserialize, Clone)]
+/// struct TestData {
 ///     name: String,
 ///     age: u32,
 /// }
 ///
-/// #[request_body_json(user_data: UserData)]
-/// async fn handle_user(ctx: Context) {
-///     if let Ok(data) = user_data {
-///         // Use the parsed user data
+/// #[route("/request_body_json")]
+/// struct RequestBodyJson;
+///
+/// impl ServerHook for RequestBodyJson {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[response_body(&format!("request data: {request_data_result:?}"))]
+///     #[request_body_json(request_data_result: TestData)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RequestBodyJson {
+///     #[request_body_json(request_data_result: TestData)]
+///     async fn request_body_json_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_body_json(request_data_result: TestData)]
+/// async fn standalone_request_body_json_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a variable name and type in the format `variable_name: Type`.
@@ -11806,22 +14861,36 @@ pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
-/// use serde::Deserialize;
+/// use serde::{Deserialize, Serialize};
 ///
-/// const USER_KEY: &str = "user_data";
+/// const TEST_ATTRIBUTE_KEY: &str = "test_attribute_key";
 ///
-/// #[derive(Deserialize, Clone)]
-/// struct User {
-///     id: u64,
+/// #[derive(Debug, Serialize, Deserialize, Clone)]
+/// struct TestData {
 ///     name: String,
+///     age: u32,
 /// }
 ///
-/// #[attribute(USER_KEY => user: User)]
-/// async fn handle_with_attribute(ctx: Context) {
-///     if let Some(user_data) = user {
-///         // Use the extracted attribute
+/// #[route("/attribute")]
+/// struct Attribute;
+///
+/// impl ServerHook for Attribute {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
+///     #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Attribute {
+///     #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+///     async fn attribute_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+/// async fn standalone_attribute_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a key-to-variable mapping in the format `key => variable_name: Type`.
@@ -11842,12 +14911,26 @@ pub fn attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[attributes(all_attrs)]
-/// async fn handle_with_all_attributes(ctx: Context) {
-///     for (key, value) in all_attrs {
-///         // Process each attribute
+/// #[route("/attributes")]
+/// struct Attributes;
+///
+/// impl ServerHook for Attributes {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[response_body(&format!("request attributes: {request_attributes:?}"))]
+///     #[attributes(request_attributes)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Attributes {
+///     #[attributes(request_attributes)]
+///     async fn attributes_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[attributes(request_attributes)]
+/// async fn standalone_attributes_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a variable name that will contain a HashMap of all attributes.
@@ -11868,13 +14951,26 @@ pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// // For route like "/users/{id}"
-/// #[route_param("id" => user_id)]
-/// async fn get_user(ctx: Context) {
-///     if let Some(id) = user_id {
-///         // Use the route parameter
+/// #[route("/route_param/:test")]
+/// struct RouteParam;
+///
+/// impl ServerHook for RouteParam {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[response_body(&format!("route param: {request_route_param:?}"))]
+///     #[route_param("test" => request_route_param)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RouteParam {
+///     #[route_param("test" => request_route_param)]
+///     async fn route_param_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[route_param("test" => request_route_param)]
+/// async fn standalone_route_param_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a key-to-variable mapping in the format `"key" => variable_name`.
@@ -11895,13 +14991,26 @@ pub fn route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// // For route like "/users/{id}/posts/{epilogue_id}"
-/// #[route_params(params)]
-/// async fn handle_nested_route(ctx: Context) {
-///     for (key, value) in params {
-///         // Process each route parameter
+/// #[route("/route_params/:test")]
+/// struct RouteParams;
+///
+/// impl ServerHook for RouteParams {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[response_body(&format!("request route params: {request_route_params:?}"))]
+///     #[route_params(request_route_params)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RouteParams {
+///     #[route_params(request_route_params)]
+///     async fn route_params_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[route_params(request_route_params)]
+/// async fn standalone_route_params_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a variable name that will contain all route parameters.
@@ -11922,13 +15031,29 @@ pub fn route_params(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// // For URL like "/search?q=rust&limit=10"
-/// #[request_query("q" => search_term)]
-/// async fn search(ctx: Context) {
-///     if let Some(term) = search_term {
-///         // Use the request query parameter
+/// #[route("/request_query")]
+/// struct RequestQuery;
+///
+/// impl ServerHook for RequestQuery {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[prologue_macros(
+///         request_query("test" => request_query_option),
+///         response_body(&format!("request query: {request_query_option:?}")),
+///         send
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RequestQuery {
+///     #[request_query("test" => request_query_option)]
+///     async fn request_query_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_query("test" => request_query_option)]
+/// async fn standalone_request_query_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a key-to-variable mapping in the format `"key" => variable_name`.
@@ -11949,13 +15074,29 @@ pub fn request_query(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// // For URL like "/search?q=rust&limit=10&sort=date"
-/// #[request_querys(all_params)]
-/// async fn search_with_params(ctx: Context) {
-///     for (key, value) in all_params {
-///         // Process each request query parameter
+/// #[route("/request_querys")]
+/// struct RequestQuerys;
+///
+/// impl ServerHook for RequestQuerys {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[prologue_macros(
+///         request_querys(request_querys),
+///         response_body(&format!("request querys: {request_querys:?}")),
+///         send
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RequestQuerys {
+///     #[request_querys(request_querys)]
+///     async fn request_querys_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_querys(request_querys)]
+/// async fn standalone_request_querys_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a variable name that will contain all request query parameters.
@@ -11976,19 +15117,29 @@ pub fn request_querys(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[request_header(HOST => host_request_header)]
-/// async fn handle_with_host(ctx: Context) {
-///     if let Some(host) = host_request_header {
-///         // Use the host request_header value
+/// #[route("/request_header")]
+/// struct RequestHeader;
+///
+/// impl ServerHook for RequestHeader {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[prologue_macros(
+///         request_header(HOST => request_header_option),
+///         response_body(&format!("request header: {request_header_option:?}")),
+///         send
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// #[request_header("Content-Type" => content_type)]
-/// async fn handle_with_content_type(ctx: Context) {
-///     if let Some(ct) = content_type {
-///         // Use the content type request_header
-///     }
+/// impl RequestHeader {
+///     #[request_header(HOST => request_header_option)]
+///     async fn request_header_with_ref_self(&self, ctx: &Context) {}
 /// }
+///
+/// #[request_header(HOST => request_header_option)]
+/// async fn standalone_request_header_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a request header name-to-variable mapping in the format `HEADER_NAME => variable_name`
@@ -12009,12 +15160,29 @@ pub fn request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[request_headers(all_request_headers)]
-/// async fn handle_with_all_request_headers(ctx: Context) {
-///     for (name, value) in all_request_headers {
-///         // Process each request_header
+/// #[route("/request_headers")]
+/// struct RequestHeaders;
+///
+/// impl ServerHook for RequestHeaders {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[prologue_macros(
+///         request_headers(request_headers),
+///         response_body(&format!("request headers: {request_headers:?}")),
+///         send
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RequestHeaders {
+///     #[request_headers(request_headers)]
+///     async fn request_headers_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_headers(request_headers)]
+/// async fn standalone_request_headers_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a variable name that will contain all HTTP request headers.
@@ -12036,12 +15204,26 @@ pub fn request_headers(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[request_cookie("session_id" => session_cookie_opt)]
-/// async fn handle_with_session(ctx: Context) {
-///     if let Some(session) = session_cookie_opt {
-///         // Use the session cookie value
+/// #[route("/cookie")]
+/// struct Cookie;
+///
+/// impl ServerHook for Cookie {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[response_body(&format!("Session cookie: {session_cookie_opt:?}"))]
+///     #[request_cookie("test" => session_cookie_opt)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Cookie {
+///     #[request_cookie("test" => session_cookie_opt)]
+///     async fn request_cookie_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_cookie("test" => session_cookie_opt)]
+/// async fn standalone_request_cookie_handler(ctx: &Context) {}
 /// ```
 ///
 /// For specific cookie extraction, the variable will be available as `Option<String>`.
@@ -12062,13 +15244,26 @@ pub fn request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[request_cookies(cookie_value)]
-/// async fn handle_with_cookies(ctx: Context) {
-///     // Use the cookie value
-///     if !cookie_value.is_empty() {
-///         // Process cookie data
+/// #[route("/cookies")]
+/// struct Cookies;
+///
+/// impl ServerHook for Cookies {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[response_body(&format!("All cookies: {cookie_value:?}"))]
+///     #[request_cookies(cookie_value)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl Cookies {
+///     #[request_cookies(cookie_value)]
+///     async fn request_cookies_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_cookies(cookie_value)]
+/// async fn standalone_request_cookies_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a variable name that will contain the Cookie header value.
@@ -12089,10 +15284,26 @@ pub fn request_cookies(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[request_version(http_version)]
-/// async fn handle_with_version(ctx: Context) {
-///     // Use the HTTP version
+/// #[route("/request_version")]
+/// struct RequestVersionTest;
+///
+/// impl ServerHook for RequestVersionTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("HTTP Version: {http_version}"))]
+///     #[request_version(http_version)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RequestVersionTest {
+///     #[request_version(http_version)]
+///     async fn request_version_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_version(http_version)]
+/// async fn standalone_request_version_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a variable name that will contain the HTTP request version.
@@ -12113,13 +15324,26 @@ pub fn request_version(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[request_path(request_path)]
-/// async fn handle_with_path(ctx: Context) {
-///     // Use the request path
-///     if request_path.starts_with("/api/") {
-///         // Handle API requests
+/// #[route("/request_path")]
+/// struct RequestPathTest;
+///
+/// impl ServerHook for RequestPathTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
 ///     }
+///
+///     #[response_body(&format!("Request Path: {request_path}"))]
+///     #[request_path(request_path)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
+///
+/// impl RequestPathTest {
+///     #[request_path(request_path)]
+///     async fn request_path_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_path(request_path)]
+/// async fn standalone_request_path_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a variable name that will contain the HTTP request path.
@@ -12135,15 +15359,18 @@ pub fn request_path(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Usage
 ///
-/// ```rust
+/// ```rust,no_run
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
 /// #[hyperlane(server: Server)]
+/// #[hyperlane(config: ServerConfig)]
 /// #[tokio::main]
 /// async fn main() {
-///     // `server` is now available as: `let server: Server = Server::new().await;`
-///     // The function body can now use `server`.
+///     config.disable_nodelay().await;
+///     server.config(config).await;
+///     let server_hook: ServerControlHook = server.run().await.unwrap_or_default();
+///     server_hook.wait().await;
 /// }
 /// ```
 ///
@@ -12165,9 +15392,16 @@ pub fn hyperlane(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/")]
-/// async fn route(ctx: Context) {
-///     // function body
+/// #[route("/response")]
+/// struct Response;
+///
+/// impl ServerHook for Response {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body("response")]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
@@ -12199,10 +15433,19 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane_macros::*;
 ///
 /// #[request_middleware]
-/// #[request_middleware(1)]
-/// #[request_middleware("2")]
-/// async fn log_request(ctx: Context) {
-///     // Middleware logic
+/// struct RequestMiddleware;
+///
+/// impl ServerHook for RequestMiddleware {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(
+///         response_status_code(200),
+///         response_version(HttpVersion::HTTP1_1),
+///         response_header(SERVER => HYPERLANE)
+///     )]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
@@ -12230,10 +15473,14 @@ pub fn request_middleware(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane_macros::*;
 ///
 /// #[response_middleware]
-/// #[response_middleware(1)]
-/// #[response_middleware("2")]
-/// async fn add_custom_header(ctx: Context) {
-///     // Middleware logic
+/// struct ResponseMiddleware1;
+///
+/// impl ServerHook for ResponseMiddleware1 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
@@ -12263,8 +15510,15 @@ pub fn response_middleware(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// #[panic_hook]
 /// #[panic_hook(1)]
 /// #[panic_hook("2")]
-/// async fn handle_panic(ctx: Context) {
-///     // Panic handling logic
+/// struct PanicHook;
+///
+/// impl ServerHook for PanicHook {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(response_body("panic_hook"), send)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
@@ -12287,9 +15541,16 @@ pub fn panic_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[prologue_macros(post, send)]
-/// async fn handler(ctx: Context) {
-///     // ...
+/// #[route("/post")]
+/// struct Post;
+///
+/// impl ServerHook for Post {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(post, response_body("post"), send_once)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -12308,9 +15569,16 @@ pub fn prologue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[epilogue_macros(post, send)]
-/// async fn handler(ctx: Context) {
-///     // ...
+/// #[response_middleware(2)]
+/// struct ResponseMiddleware2;
+///
+/// impl ServerHook for ResponseMiddleware2 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(send, flush)]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -12330,14 +15598,21 @@ pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[send_body_with_data("Response body content")]
-/// async fn send_body_with_data_handler(ctx: Context) {
-///     // Response body is automatically sent with the specified data after function returns
+/// #[route("/send_body_with_data")]
+/// struct SendBodyWithData;
+///
+/// impl ServerHook for SendBodyWithData {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(send_body_with_data("Response body content"))]
+///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
 /// The macro accepts data to send and should be applied to async functions
-/// that accept a `Context` parameter.
+/// that accept a `&Context` parameter.
 #[proc_macro_attribute]
 pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream {
     send_body_with_data_macro(attr, item, Position::Epilogue)
@@ -12369,54 +15644,122 @@ pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[http_from_stream]
-/// async fn handle_data(ctx: Context) {
-///     // Process data from HTTP stream with default buffer size
+/// #[route("/ws1")]
+/// struct Websocket1;
+///
+/// impl ServerHook for Websocket1 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[ws]
+///     #[ws_from_stream]
+///     async fn handle(self, ctx: &Context) {
+///         let body: RequestBody = ctx.get_request_body().await;
+///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+///         ctx.send_body_list_with_data(&body_list).await.unwrap();
+///     }
 /// }
 /// ```
 ///
-/// Basic usage with buffer size:
+/// Using only buffer size:
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[ws_from_stream(1024)]
-/// async fn handle_data(ctx: Context) {
-///     // Process data from stream with 1024 byte buffer
+/// #[route("/ws5")]
+/// struct Websocket5;
+///
+/// impl ServerHook for Websocket5 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[ws]
+///     #[ws_from_stream(1024)]
+///     async fn handle(self, ctx: &Context) {
+///         let body: RequestBody = ctx.get_request_body().await;
+///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+///         ctx.send_body_list_with_data(&body_list).await.unwrap();
+///     }
 /// }
 /// ```
 ///
-/// Using a variable name for the data:
+/// Using variable name to store request data:
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[ws_from_stream(data)]
-/// async fn handle_data(ctx: Context) {
-///     // Data will be available in the `data` variable
+/// #[route("/ws2")]
+/// struct Websocket2;
+///
+/// impl ServerHook for Websocket2 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[ws]
+///     #[ws_from_stream(request)]
+///     async fn handle(self, ctx: &Context) {
+///         let body: &RequestBody = &request.get_body();
+///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+///         ctx.send_body_list_with_data(&body_list).await.unwrap();
+///     }
 /// }
 /// ```
 ///
-/// Using both buffer size and variable name:
+/// Using buffer size and variable name:
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[ws_from_stream(1024, payload)]
-/// async fn handle_large_data(ctx: Context) {
-///     // Process large data with 1024 byte buffer, available in `payload` variable
+/// #[route("/ws3")]
+/// struct Websocket3;
+///
+/// impl ServerHook for Websocket3 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[ws]
+///     #[ws_from_stream(1024, request)]
+///     async fn handle(self, ctx: &Context) {
+///         let body: &RequestBody = request.get_body();
+///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+///         ctx.send_body_list_with_data(&body_list).await.unwrap();
+///     }
 /// }
 /// ```
 ///
-/// Reversing buffer size and variable name:
+/// Using variable name and buffer size (reversed order):
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[ws_from_stream(payload, 1024)]
-/// async fn handle_reversed_data(ctx: Context) {
-///     // Process data with 1024 byte buffer, available in `payload` variable
+/// #[route("/ws4")]
+/// struct Websocket4;
+///
+/// impl ServerHook for Websocket4 {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[ws]
+///     #[ws_from_stream(request, 1024)]
+///     async fn handle(self, ctx: &Context) {
+///         let body: &RequestBody = request.get_body();
+///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+///         ctx.send_body_list_with_data(&body_list).await.unwrap();
+///     }
 /// }
+///
+/// impl Websocket4 {
+///     #[ws_from_stream(request)]
+///     async fn ws_from_stream_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[ws_from_stream]
+/// async fn standalone_ws_from_stream_handler(ctx: &Context) {}
 /// ```
 #[proc_macro_attribute]
 pub fn ws_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -12444,48 +15787,55 @@ pub fn ws_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// Using no parameters (default buffer size):
+/// Using with epilogue_macros:
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
+///
+/// #[route("/request_query")]
+/// struct RequestQuery;
+///
+/// impl ServerHook for RequestQuery {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(
+///         request_query("test" => request_query_option),
+///         response_body(&format!("request query: {request_query_option:?}")),
+///         send,
+///         http_from_stream(1024)
+///     )]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+/// ```
+///
+/// Using with variable name:
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+///
+/// #[route("/http_from_stream")]
+/// struct HttpFromStreamTest;
+///
+/// impl ServerHook for HttpFromStreamTest {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[epilogue_macros(
+///         http_from_stream(_request)
+///     )]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl HttpFromStreamTest {
+///     #[http_from_stream(_request)]
+///     async fn http_from_stream_with_ref_self(&self, ctx: &Context) {}
+/// }
 ///
 /// #[http_from_stream]
-/// async fn handle_data(ctx: Context) {
-///     // Process data from HTTP stream with default buffer size
-/// }
-/// ```
-///
-/// Basic usage with buffer size:
-/// ```rust
-/// use hyperlane::*;
-/// use hyperlane_macros::*;
-///
-/// #[http_from_stream(1024)]
-/// async fn handle_data(ctx: Context) {
-///     // Process data from stream with 1024 byte buffer
-/// }
-/// ```
-///
-/// Using a variable name for the data:
-/// ```rust
-/// use hyperlane::*;
-/// use hyperlane_macros::*;
-///
-/// #[http_from_stream(data)]
-/// async fn handle_data(ctx: Context) {
-///     // Data will be available in the `data` variable
-/// }
-/// ```
-///
-/// Using both buffer size and variable name:
-/// ```rust
-/// use hyperlane::*;
-/// use hyperlane_macros::*;
-///
-/// #[http_from_stream(1024, payload)]
-/// async fn handle_large_data(ctx: Context) {
-///     // Process large data with 1024 byte buffer, available in `payload` variable
-/// }
+/// async fn standalone_http_from_stream_handler(ctx: &Context) {}
 /// ```
 #[proc_macro_attribute]
 pub fn http_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -12494,7 +15844,7 @@ pub fn http_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 ```
 
-### 📄 File #274 - `fn.rs`
+### 📄 File #353 - `fn.rs`
 - **Path**: `hyperlane-macros\src\aborted\fn.rs`
 - **Size**: `908 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12536,7 +15886,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #275 - `mod.rs`
+### 📄 File #354 - `mod.rs`
 - **Path**: `hyperlane-macros\src\aborted\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12550,7 +15900,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #276 - `fn.rs`
+### 📄 File #355 - `fn.rs`
 - **Path**: `hyperlane-macros\src\closed\fn.rs`
 - **Size**: `900 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12592,7 +15942,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #277 - `mod.rs`
+### 📄 File #356 - `mod.rs`
 - **Path**: `hyperlane-macros\src\closed\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12606,7 +15956,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #278 - `enum.rs`
+### 📄 File #357 - `enum.rs`
 - **Path**: `hyperlane-macros\src\common\enum.rs`
 - **Size**: `1,838 B`
 - **Modified Time**: `2025-09-15T22:37:29.400036`
@@ -12653,17 +16003,17 @@ pub(crate) enum Position {
 
 ```
 
-### 📄 File #279 - `fn.rs`
+### 📄 File #358 - `fn.rs`
 - **Path**: `hyperlane-macros\src\common\fn.rs`
-- **Size**: `5,783 B`
-- **Modified Time**: `2025-09-15T22:37:29.400831`
+- **Size**: `11,385 B`
+- **Modified Time**: `2025-10-21T08:11:52.872648`
 
 #### Content Preview
 
 ```rust
 use crate::*;
 
-/// Expands macro with code inserted before function body.
+/// Expands macro with code inserted before method body.
 ///
 /// # Arguments
 ///
@@ -12682,7 +16032,7 @@ fn inject_at_start(
     let sig: &Signature = &input_fn.sig;
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_fn(sig) {
+    match parse_context_from_signature(sig) {
         Ok(context) => {
             let before_code: TokenStream2 = before_fn(context);
             let stmts: &Vec<Stmt> = &block.stmts;
@@ -12699,19 +16049,19 @@ fn inject_at_start(
     }
 }
 
-/// Expands macro with code inserted after function body.
+/// Expands macro with code inserted after method body.
 ///
 /// # Arguments
 ///
 /// - `TokenStream` - The input `TokenStream` to process.
-/// - `impl FnOnce(&Ident) -> TokenStream2` - A closure that takes a context identifier and returns a `TokenStream` to be inserted at the end of the function.
+/// - `impl FnOnce(&Ident) -> TokenStream2` - A closure that takes a context identifier and returns a `TokenStream` to be inserted at the end of the method.
 fn inject_at_end(input: TokenStream, after_fn: impl FnOnce(&Ident) -> TokenStream2) -> TokenStream {
     let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
     let sig: &Signature = &input_fn.sig;
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_fn(sig) {
+    match parse_context_from_signature(sig) {
         Ok(context) => {
             let after_code: TokenStream2 = after_fn(context);
             let stmts: &Vec<Stmt> = &block.stmts;
@@ -12728,13 +16078,13 @@ fn inject_at_end(input: TokenStream, after_fn: impl FnOnce(&Ident) -> TokenStrea
     }
 }
 
-/// Injects code into a function at a specified position.
+/// Injects code into a method at a specified position.
 ///
 /// # Arguments
 ///
 /// - `Position` - The position at which to inject the code (`Prologue` or `Epilogue`).
-/// - `TokenStream` - The input `TokenStream` of the function to modify.
-/// - `impl FnOnce(&Ident) -> TokenStream2` - A closure that generates the code to be injected, based on the function's context identifier.
+/// - `TokenStream` - The input `TokenStream` of the method to modify.
+/// - `impl FnOnce(&Ident) -> TokenStream2` - A closure that generates the code to be injected, based on the method's context identifier.
 ///
 /// # Returns
 ///
@@ -12759,6 +16109,7 @@ pub(crate) fn inject(
 /// # Returns
 ///
 /// - `syn::Result<&Ident>` - Returns a `syn::Result` containing the context identifier if successful, or an error otherwise.
+#[allow(dead_code)]
 pub(crate) fn parse_context_from_fn(sig: &Signature) -> syn::Result<&Ident> {
     match sig.inputs.first() {
         Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
@@ -12777,6 +16128,117 @@ pub(crate) fn parse_context_from_fn(sig: &Signature) -> syn::Result<&Ident> {
             "expected at least one argument",
         )),
     }
+}
+
+/// Parses self from method signature and returns the context identifier (second parameter).
+///
+/// # Arguments
+///
+/// - `&Signature` - The method signature to parse.
+///
+/// # Returns
+///
+/// - `syn::Result<&Ident>` - Returns the context identifier from the second parameter.
+#[allow(dead_code)]
+pub(crate) fn parse_self_from_method(sig: &Signature) -> syn::Result<&Ident> {
+    match sig.inputs.first() {
+        Some(FnArg::Receiver(_)) => match sig.inputs.iter().nth(1) {
+            Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
+                Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
+                Pat::Wild(wild) => Err(syn::Error::new_spanned(
+                    wild,
+                    "The context argument cannot be anonymous `_`, please use a named identifier",
+                )),
+                _ => Err(syn::Error::new_spanned(
+                    &pat_type.pat,
+                    "expected identifier as second argument (context)",
+                )),
+            },
+            _ => Err(syn::Error::new_spanned(
+                &sig.inputs,
+                "expected context as second argument",
+            )),
+        },
+        _ => Err(syn::Error::new_spanned(
+            &sig.inputs,
+            "expected self as first argument for method",
+        )),
+    }
+}
+
+/// Checks if a type matches `::hyperlane::Context`.
+///
+/// This function checks if the given type is a reference to `::hyperlane::Context`.
+///
+/// # Arguments
+///
+/// - `&Type` - The type to check.
+///
+/// # Returns
+///
+/// - `bool` - Returns `true` if the type is `&::hyperlane::Context` or `&Context`, `false` otherwise.
+fn is_context_type(ty: &Type) -> bool {
+    if let Type::Reference(type_ref) = ty {
+        if let Type::Path(type_path) = &*type_ref.elem {
+            let path: &Path = &type_path.path;
+            if path.segments.len() >= 2 {
+                let segments: Vec<_> = path.segments.iter().collect();
+                if segments.len() >= 2 {
+                    let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
+                    if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
+                        return true;
+                    }
+                }
+            }
+            if path.segments.len() == 1 && path.segments[0].ident == "Context" {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Parses context identifier from function signature by searching all parameters.
+///
+/// This function iterates through all function parameters and returns the first one
+/// that has type `::hyperlane::Context`. It supports:
+/// 1. Methods with self: Searches from the second parameter onwards
+/// 2. Functions without self: Searches from the first parameter onwards
+/// 3. Context parameter can be at any position
+///
+/// # Arguments
+///
+/// - `&Signature` - The function signature to parse.
+///
+/// # Returns
+///
+/// - `syn::Result<&Ident>` - Returns the context identifier.
+pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<&Ident> {
+    for arg in sig.inputs.iter() {
+        if let FnArg::Typed(pat_type) = arg {
+            if is_context_type(&pat_type.ty) {
+                match &*pat_type.pat {
+                    Pat::Ident(pat_ident) => return Ok(&pat_ident.ident),
+                    Pat::Wild(wild) => {
+                        return Err(syn::Error::new_spanned(
+                            wild,
+                            "The context argument cannot be anonymous `_`, please use a named identifier",
+                        ));
+                    }
+                    _ => {
+                        return Err(syn::Error::new_spanned(
+                            &pat_type.pat,
+                            "expected identifier for context parameter",
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Err(syn::Error::new_spanned(
+        &sig.inputs,
+        "expected at least one parameter of type &::hyperlane::Context",
+    ))
 }
 
 /// Convert an optional expression into an `Option<isize>` token stream.
@@ -12836,9 +16298,52 @@ pub(crate) fn is_integer_literal(expr: &Expr) -> bool {
     )
 }
 
+/// Handles macros that can be applied to either structs or functions.
+/// Generates a factory function name based on prefix, struct name, and optional order.
+///
+/// This function creates a valid Rust identifier for factory functions by:
+/// - Using only the prefix and struct name when order is None
+/// - Extracting the numeric value from order expression and appending it when order is Some
+///
+/// # Arguments
+///
+/// - `prefix` - The prefix for the factory function name (e.g., "__panic_hook_factory").
+/// - `struct_name` - The identifier of the struct.
+/// - `order_expr` - Optional expression representing the order value.
+///
+/// # Returns
+///
+/// - `Ident` - A valid Rust identifier for the factory function.
+pub(crate) fn generate_factory_fn_name(
+    prefix: &str,
+    struct_name: &Ident,
+    order_expr: &Option<Expr>,
+) -> Ident {
+    match order_expr {
+        None => Ident::new(&format!("{prefix}_{struct_name}"), struct_name.span()),
+        Some(expr) => {
+            let order_suffix = match expr {
+                Expr::Lit(ExprLit {
+                    lit: Lit::Int(lit_int),
+                    ..
+                }) => lit_int.base10_digits().to_string(),
+                Expr::Lit(ExprLit {
+                    lit: Lit::Str(lit_str),
+                    ..
+                }) => lit_str.value(),
+                _ => "custom".to_string(),
+            };
+            Ident::new(
+                &format!("{prefix}_{struct_name}_{order_suffix}"),
+                struct_name.span(),
+            )
+        }
+    }
+}
+
 ```
 
-### 📄 File #280 - `impl.rs`
+### 📄 File #359 - `impl.rs`
 - **Path**: `hyperlane-macros\src\common\impl.rs`
 - **Size**: `751 B`
 - **Modified Time**: `2025-09-15T22:37:29.400831`
@@ -12874,7 +16379,7 @@ impl Parse for OrderAttr {
 
 ```
 
-### 📄 File #281 - `mod.rs`
+### 📄 File #360 - `mod.rs`
 - **Path**: `hyperlane-macros\src\common\mod.rs`
 - **Size**: `165 B`
 - **Modified Time**: `2025-09-15T22:37:29.400831`
@@ -12895,7 +16400,7 @@ pub(crate) use r#type::*;
 
 ```
 
-### 📄 File #282 - `struct.rs`
+### 📄 File #361 - `struct.rs`
 - **Path**: `hyperlane-macros\src\common\struct.rs`
 - **Size**: `722 B`
 - **Modified Time**: `2025-09-15T22:37:29.400831`
@@ -12927,7 +16432,7 @@ pub(crate) struct InjectableMacro {
 
 ```
 
-### 📄 File #283 - `type.rs`
+### 📄 File #362 - `type.rs`
 - **Path**: `hyperlane-macros\src\common\type.rs`
 - **Size**: `860 B`
 - **Modified Time**: `2025-09-15T22:37:29.401339`
@@ -12956,7 +16461,7 @@ pub(crate) type MacroHandlerWithAttrPosition =
 
 ```
 
-### 📄 File #284 - `fn.rs`
+### 📄 File #363 - `fn.rs`
 - **Path**: `hyperlane-macros\src\filter\fn.rs`
 - **Size**: `1,060 B`
 - **Modified Time**: `2025-09-15T22:37:29.401339`
@@ -13005,7 +16510,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #285 - `mod.rs`
+### 📄 File #364 - `mod.rs`
 - **Path**: `hyperlane-macros\src\filter\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.401339`
@@ -13019,7 +16524,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #286 - `fn.rs`
+### 📄 File #365 - `fn.rs`
 - **Path**: `hyperlane-macros\src\flush\fn.rs`
 - **Size**: `614 B`
 - **Modified Time**: `2025-09-15T22:37:29.401339`
@@ -13056,7 +16561,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #287 - `mod.rs`
+### 📄 File #366 - `mod.rs`
 - **Path**: `hyperlane-macros\src\flush\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.401845`
@@ -13070,7 +16575,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #288 - `impl.rs`
+### 📄 File #367 - `impl.rs`
 - **Path**: `hyperlane-macros\src\from_stream\impl.rs`
 - **Size**: `4,623 B`
 - **Modified Time**: `2025-09-15T22:37:29.401845`
@@ -13192,7 +16697,7 @@ impl Parse for FromStreamData {
 
 ```
 
-### 📄 File #289 - `mod.rs`
+### 📄 File #368 - `mod.rs`
 - **Path**: `hyperlane-macros\src\from_stream\mod.rs`
 - **Size**: `55 B`
 - **Modified Time**: `2025-09-15T22:37:29.401845`
@@ -13207,7 +16712,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #290 - `struct.rs`
+### 📄 File #369 - `struct.rs`
 - **Path**: `hyperlane-macros\src\from_stream\struct.rs`
 - **Size**: `348 B`
 - **Modified Time**: `2025-09-15T22:37:29.401845`
@@ -13229,10 +16734,10 @@ pub(crate) struct FromStreamData {
 
 ```
 
-### 📄 File #291 - `fn.rs`
+### 📄 File #370 - `fn.rs`
 - **Path**: `hyperlane-macros\src\hook\fn.rs`
-- **Size**: `3,522 B`
-- **Modified Time**: `2025-10-01T21:58:50.927240`
+- **Size**: `4,088 B`
+- **Modified Time**: `2025-10-21T08:11:52.872648`
 
 #### Content Preview
 
@@ -13259,14 +16764,27 @@ use crate::*;
 pub(crate) fn panic_hook_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let fn_name: &Ident = &input_fn.sig.ident;
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let factory_fn_name: Ident =
+        generate_factory_fn_name("__panic_hook_factory", struct_name, &attr_args.order);
     let gen_code: TokenStream2 = quote! {
-        #input_fn
+        #input_struct
+        #[inline]
+        #[allow(non_snake_case)]
+        fn #factory_fn_name() -> ::hyperlane::ServerHookHandler {
+            ::std::sync::Arc::new(|ctx: &::hyperlane::Context| {
+                let ctx = ctx.clone();
+                ::std::boxed::Box::pin(async move {
+                    let hook = #struct_name::new(&ctx).await;
+                    hook.handle(&ctx).await;
+                })
+            })
+        }
         inventory::submit! {
             ::hyperlane::HookMacro {
                 hook_type: ::hyperlane::HookType::PanicHook(#order),
-                handler: |ctx: ::hyperlane::Context| Box::pin(#fn_name(ctx)),
+                handler: ::hyperlane::HookHandler::Factory(#factory_fn_name),
             }
         }
     };
@@ -13356,7 +16874,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #292 - `mod.rs`
+### 📄 File #371 - `mod.rs`
 - **Path**: `hyperlane-macros\src\hook\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.402351`
@@ -13370,10 +16888,10 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #293 - `fn.rs`
+### 📄 File #372 - `fn.rs`
 - **Path**: `hyperlane-macros\src\host\fn.rs`
-- **Size**: `1,923 B`
-- **Modified Time**: `2025-09-15T22:37:29.402351`
+- **Size**: `1,917 B`
+- **Modified Time**: `2025-10-21T08:11:52.873148`
 
 #### Content Preview
 
@@ -13397,7 +16915,7 @@ pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Positio
     inject(position, item, |context| {
         quote! {
             let request_host: ::hyperlane::RequestHost = #context.get_request_host().await;
-            if request_host != #host_value.to_string() {
+            if request_host.as_str() != #host_value {
                 return;
             }
         }
@@ -13432,7 +16950,7 @@ pub(crate) fn reject_host_macro(
     inject(position, item, |context| {
         quote! {
             let request_host: ::hyperlane::RequestHost = #context.get_request_host().await;
-            if request_host == #host_value.to_string() {
+            if request_host.as_str() == #host_value {
                 return;
             }
         }
@@ -13448,7 +16966,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #294 - `impl.rs`
+### 📄 File #373 - `impl.rs`
 - **Path**: `hyperlane-macros\src\host\impl.rs`
 - **Size**: `442 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -13478,7 +16996,7 @@ impl Parse for HostData {
 
 ```
 
-### 📄 File #295 - `mod.rs`
+### 📄 File #374 - `mod.rs`
 - **Path**: `hyperlane-macros\src\host\mod.rs`
 - **Size**: `122 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -13495,7 +17013,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #296 - `struct.rs`
+### 📄 File #375 - `struct.rs`
 - **Path**: `hyperlane-macros\src\host\struct.rs`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -13515,10 +17033,10 @@ pub(crate) struct HostData {
 
 ```
 
-### 📄 File #297 - `fn.rs`
+### 📄 File #376 - `fn.rs`
 - **Path**: `hyperlane-macros\src\http\fn.rs`
-- **Size**: `4,380 B`
-- **Modified Time**: `2025-09-15T22:37:29.402858`
+- **Size**: `3,800 B`
+- **Modified Time**: `2025-10-21T08:11:52.873148`
 
 #### Content Preview
 
@@ -13556,31 +17074,14 @@ macro_rules! impl_http_method_macro {
     };
 }
 
-// Generates a handler that checks if the HTTP method is GET.
 impl_http_method_macro!(get_handler, "get");
-
-// Generates a handler that checks if the HTTP method is POST.
 impl_http_method_macro!(epilogue_handler, "post");
-
-// Generates a handler that checks if the HTTP method is PUT.
 impl_http_method_macro!(put_handler, "put");
-
-// Generates a handler that checks if the HTTP method is DELETE.
 impl_http_method_macro!(delete_handler, "delete");
-
-// Generates a handler that checks if the HTTP method is PATCH.
 impl_http_method_macro!(patch_handler, "patch");
-
-// Generates a handler that checks if the HTTP method is HEAD.
 impl_http_method_macro!(head_handler, "head");
-
-// Generates a handler that checks if the HTTP method is OPTIONS.
 impl_http_method_macro!(options_handler, "options");
-
-// Generates a handler that checks if the HTTP method is CONNECT.
 impl_http_method_macro!(connect_handler, "connect");
-
-// Generates a handler that checks if the HTTP method is TRACE.
 impl_http_method_macro!(trace_handler, "trace");
 
 /// Creates a method check function for HTTP request validation.
@@ -13597,7 +17098,7 @@ pub(crate) fn create_method_check(
     method_name: &str,
     span: proc_macro2::Span,
 ) -> impl FnOnce(&Ident) -> TokenStream2 {
-    let check_method: Ident = Ident::new(&format!("is_{}", method_name), span);
+    let check_method: Ident = Ident::new(&format!("is_{method_name}"), span);
     move |context| {
         quote! {
             if !#context.get_request().await.#check_method() {
@@ -13630,10 +17131,10 @@ pub(crate) fn methods_macro(
     let methods: RequestMethods = parse_macro_input!(attr as RequestMethods);
     let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
     let sig: &Signature = &input_fn.sig;
-    match parse_context_from_fn(sig) {
+    match parse_context_from_signature(sig) {
         Ok(context) => {
             let method_checks = methods.methods.iter().map(|method| {
-                let check_fn: Ident = Ident::new(&format!("is_{}", method), method.span());
+                let check_fn: Ident = Ident::new(&format!("is_{method}"), method.span());
                 quote! {
                     #context.get_request().await.#check_fn()
                 }
@@ -13659,7 +17160,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #298 - `mod.rs`
+### 📄 File #377 - `mod.rs`
 - **Path**: `hyperlane-macros\src\http\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.402858`
@@ -13673,7 +17174,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #299 - `fn.rs`
+### 📄 File #378 - `fn.rs`
 - **Path**: `hyperlane-macros\src\hyperlane\fn.rs`
 - **Size**: `2,078 B`
 - **Modified Time**: `2025-09-15T22:37:29.403364`
@@ -13741,7 +17242,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #300 - `impl.rs`
+### 📄 File #379 - `impl.rs`
 - **Path**: `hyperlane-macros\src\hyperlane\impl.rs`
 - **Size**: `623 B`
 - **Modified Time**: `2025-09-15T22:37:29.403364`
@@ -13775,7 +17276,7 @@ impl Parse for HyperlaneAttr {
 
 ```
 
-### 📄 File #301 - `mod.rs`
+### 📄 File #380 - `mod.rs`
 - **Path**: `hyperlane-macros\src\hyperlane\mod.rs`
 - **Size**: `122 B`
 - **Modified Time**: `2025-09-15T22:37:29.403871`
@@ -13792,7 +17293,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #302 - `struct.rs`
+### 📄 File #381 - `struct.rs`
 - **Path**: `hyperlane-macros\src\hyperlane\struct.rs`
 - **Size**: `466 B`
 - **Modified Time**: `2025-09-15T22:37:29.403871`
@@ -13816,10 +17317,10 @@ pub(crate) struct HyperlaneAttr {
 
 ```
 
-### 📄 File #303 - `fn.rs`
+### 📄 File #382 - `fn.rs`
 - **Path**: `hyperlane-macros\src\inject\fn.rs`
-- **Size**: `3,828 B`
-- **Modified Time**: `2025-10-01T21:58:50.931329`
+- **Size**: `3,810 B`
+- **Modified Time**: `2025-10-21T08:11:52.873648`
 
 #### Content Preview
 
@@ -13869,7 +17370,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
                 Handler::WithAttr(handler) => handler(macro_attr, item_stream),
                 Handler::NoAttrPosition(handler) => {
                     if !macro_attr.is_empty() {
-                        panic!("Macro {} does not take attributes", macro_name);
+                        panic!("Macro {macro_name} does not take attributes");
                     }
                     handler(item_stream, position)
                 }
@@ -13877,7 +17378,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
             };
         }
     }
-    panic!("Unsupported macro: {}", macro_name);
+    panic!("Unsupported macro: {macro_name}");
 }
 
 /// Injects a list of macros before the decorated function.
@@ -13895,7 +17396,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
 /// The resulting token stream after applying all the prologue hooks.
 pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse(attr.into())
+        .parse(attr)
         .expect("Failed to parse macro attributes");
     let mut current_stream: TokenStream = item;
     for meta in metas.iter().rev() {
@@ -13919,7 +17420,7 @@ pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 /// The resulting token stream after applying all the epilogue hooks.
 pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse(attr.into())
+        .parse(attr)
         .expect("Failed to parse macro attributes");
     let mut current_stream: TokenStream = item;
     for meta in metas.iter() {
@@ -13930,7 +17431,7 @@ pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 
 ```
 
-### 📄 File #304 - `mod.rs`
+### 📄 File #383 - `mod.rs`
 - **Path**: `hyperlane-macros\src\inject\mod.rs`
 - **Size**: `46 B`
 - **Modified Time**: `2025-09-15T22:37:29.404385`
@@ -13944,10 +17445,10 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #305 - `fn.rs`
+### 📄 File #384 - `fn.rs`
 - **Path**: `hyperlane-macros\src\protocol\fn.rs`
-- **Size**: `3,699 B`
-- **Modified Time**: `2025-09-15T22:37:29.404385`
+- **Size**: `3,320 B`
+- **Modified Time**: `2025-10-21T08:11:52.874148`
 
 #### Content Preview
 
@@ -14049,37 +17550,22 @@ macro_rules! impl_protocol_check_macro {
     };
 }
 
-// Checks if the request is H2C protocol.
 impl_protocol_check_macro!(h2c_macro, is_h2c, "h2c");
-
-// Checks if the request is HTTP/0.9 protocol.
 impl_protocol_check_macro!(http0_9_macro, is_http0_9, "http0_9");
-
-// Checks if the request is HTTP/1.0 protocol.
 impl_protocol_check_macro!(http1_0_macro, is_http1_0, "http1_0");
-
-// Checks if the request is HTTP/1.1 protocol.
 impl_protocol_check_macro!(http1_1_macro, is_http1_1, "http1_1");
-
-// Checks if the request is HTTP/1.1 or higher protocol.
 impl_protocol_check_macro!(
     http1_1_or_higher_macro,
     is_http1_1_or_higher,
     "http1_1_or_higher"
 );
-
-// Checks if the request is HTTP/2 protocol.
 impl_protocol_check_macro!(http2_macro, is_http2, "http2");
-
-// Checks if the request is HTTP/3 protocol.
 impl_protocol_check_macro!(http3_macro, is_http3, "http3");
-
-// Checks if the request is TLS protocol.
 impl_protocol_check_macro!(tls_macro, is_tls, "tls");
 
 ```
 
-### 📄 File #306 - `mod.rs`
+### 📄 File #385 - `mod.rs`
 - **Path**: `hyperlane-macros\src\protocol\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.404896`
@@ -14093,7 +17579,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #307 - `fn.rs`
+### 📄 File #386 - `fn.rs`
 - **Path**: `hyperlane-macros\src\referer\fn.rs`
 - **Size**: `2,267 B`
 - **Modified Time**: `2025-09-15T22:37:29.404896`
@@ -14181,7 +17667,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #308 - `impl.rs`
+### 📄 File #387 - `impl.rs`
 - **Path**: `hyperlane-macros\src\referer\impl.rs`
 - **Size**: `466 B`
 - **Modified Time**: `2025-09-15T22:37:29.404896`
@@ -14211,7 +17697,7 @@ impl Parse for RefererData {
 
 ```
 
-### 📄 File #309 - `mod.rs`
+### 📄 File #388 - `mod.rs`
 - **Path**: `hyperlane-macros\src\referer\mod.rs`
 - **Size**: `89 B`
 - **Modified Time**: `2025-09-15T22:37:29.404896`
@@ -14228,7 +17714,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #310 - `struct.rs`
+### 📄 File #389 - `struct.rs`
 - **Path**: `hyperlane-macros\src\referer\struct.rs`
 - **Size**: `265 B`
 - **Modified Time**: `2025-09-15T22:37:29.405406`
@@ -14248,7 +17734,7 @@ pub(crate) struct RefererData {
 
 ```
 
-### 📄 File #311 - `fn.rs`
+### 📄 File #390 - `fn.rs`
 - **Path**: `hyperlane-macros\src\reject\fn.rs`
 - **Size**: `1,041 B`
 - **Modified Time**: `2025-09-15T22:37:29.405406`
@@ -14297,7 +17783,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #312 - `mod.rs`
+### 📄 File #391 - `mod.rs`
 - **Path**: `hyperlane-macros\src\reject\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.405406`
@@ -14311,10 +17797,10 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #313 - `fn.rs`
+### 📄 File #392 - `fn.rs`
 - **Path**: `hyperlane-macros\src\request\fn.rs`
-- **Size**: `13,253 B`
-- **Modified Time**: `2025-09-15T22:37:29.405406`
+- **Size**: `13,256 B`
+- **Modified Time**: `2025-10-21T08:11:52.874648`
 
 #### Content Preview
 
@@ -14440,7 +17926,7 @@ pub(crate) fn attributes_macro(
     let variable: Ident = attributes.variable;
     inject(position, item, |context| {
         quote! {
-            let #variable: ::hyperlane::HashMapArcAnySendSync = #context.get_attributes().await;
+            let #variable: ::hyperlane::ThreadSafeAttributeStore = #context.get_attributes().await;
         }
     })
 }
@@ -14778,7 +18264,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #314 - `impl.rs`
+### 📄 File #393 - `impl.rs`
 - **Path**: `hyperlane-macros\src\request\impl.rs`
 - **Size**: `7,571 B`
 - **Modified Time**: `2025-09-15T22:37:29.405922`
@@ -15082,7 +18568,7 @@ impl Parse for RequestPathData {
 
 ```
 
-### 📄 File #315 - `mod.rs`
+### 📄 File #394 - `mod.rs`
 - **Path**: `hyperlane-macros\src\request\mod.rs`
 - **Size**: `89 B`
 - **Modified Time**: `2025-09-15T22:37:29.405922`
@@ -15099,7 +18585,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #316 - `struct.rs`
+### 📄 File #395 - `struct.rs`
 - **Path**: `hyperlane-macros\src\request\struct.rs`
 - **Size**: `4,044 B`
 - **Modified Time**: `2025-09-15T22:37:29.405922`
@@ -15245,10 +18731,10 @@ pub(crate) struct RequestPathData {
 
 ```
 
-### 📄 File #317 - `fn.rs`
+### 📄 File #396 - `fn.rs`
 - **Path**: `hyperlane-macros\src\request_middleware\fn.rs`
-- **Size**: `1,495 B`
-- **Modified Time**: `2025-09-15T22:37:29.405922`
+- **Size**: `2,092 B`
+- **Modified Time**: `2025-10-21T08:11:52.874648`
 
 #### Content Preview
 
@@ -15275,14 +18761,30 @@ use crate::*;
 pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let fn_name: &Ident = &input_fn.sig.ident;
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let factory_fn_name: Ident = generate_factory_fn_name(
+        "__request_middleware_factory",
+        struct_name,
+        &attr_args.order,
+    );
     let gen_code: TokenStream2 = quote! {
-        #input_fn
+        #input_struct
+        #[inline]
+        #[allow(non_snake_case)]
+        fn #factory_fn_name() -> ::hyperlane::ServerHookHandler {
+            ::std::sync::Arc::new(|ctx: &::hyperlane::Context| {
+                let ctx = ctx.clone();
+                ::std::boxed::Box::pin(async move {
+                    let hook = #struct_name::new(&ctx).await;
+                    hook.handle(&ctx).await;
+                })
+            })
+        }
         inventory::submit! {
             ::hyperlane::HookMacro {
                 hook_type: ::hyperlane::HookType::RequestMiddleware(#order),
-                handler: |ctx: ::hyperlane::Context| Box::pin(#fn_name(ctx)),
+                handler: ::hyperlane::HookHandler::Factory(#factory_fn_name),
             }
         }
     };
@@ -15298,7 +18800,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #318 - `mod.rs`
+### 📄 File #397 - `mod.rs`
 - **Path**: `hyperlane-macros\src\request_middleware\mod.rs`
 - **Size**: `46 B`
 - **Modified Time**: `2025-09-15T22:37:29.406432`
@@ -15312,7 +18814,7 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #319 - `enum.rs`
+### 📄 File #398 - `enum.rs`
 - **Path**: `hyperlane-macros\src\response\enum.rs`
 - **Size**: `260 B`
 - **Modified Time**: `2025-09-15T22:37:29.406432`
@@ -15330,7 +18832,7 @@ pub(crate) enum HeaderOperation {
 
 ```
 
-### 📄 File #320 - `fn.rs`
+### 📄 File #399 - `fn.rs`
 - **Path**: `hyperlane-macros\src\response\fn.rs`
 - **Size**: `5,453 B`
 - **Modified Time**: `2025-10-01T21:58:50.938057`
@@ -15543,7 +19045,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #321 - `impl.rs`
+### 📄 File #400 - `impl.rs`
 - **Path**: `hyperlane-macros\src\response\impl.rs`
 - **Size**: `1,173 B`
 - **Modified Time**: `2025-09-15T22:37:29.406432`
@@ -15592,7 +19094,7 @@ impl Parse for ResponseBodyData {
 
 ```
 
-### 📄 File #322 - `mod.rs`
+### 📄 File #401 - `mod.rs`
 - **Path**: `hyperlane-macros\src\response\mod.rs`
 - **Size**: `127 B`
 - **Modified Time**: `2025-09-15T22:37:29.406944`
@@ -15611,7 +19113,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #323 - `struct.rs`
+### 📄 File #402 - `struct.rs`
 - **Path**: `hyperlane-macros\src\response\struct.rs`
 - **Size**: `185 B`
 - **Modified Time**: `2025-09-15T22:37:29.406944`
@@ -15631,10 +19133,10 @@ pub(crate) struct SendData {
 
 ```
 
-### 📄 File #324 - `fn.rs`
+### 📄 File #403 - `fn.rs`
 - **Path**: `hyperlane-macros\src\response_middleware\fn.rs`
-- **Size**: `1,532 B`
-- **Modified Time**: `2025-09-15T22:37:29.406944`
+- **Size**: `2,130 B`
+- **Modified Time**: `2025-10-21T08:11:52.875147`
 
 #### Content Preview
 
@@ -15661,14 +19163,30 @@ use crate::*;
 pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let fn_name: &Ident = &input_fn.sig.ident;
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let factory_fn_name: Ident = generate_factory_fn_name(
+        "__response_middleware_factory",
+        struct_name,
+        &attr_args.order,
+    );
     let gen_code: TokenStream2 = quote! {
-        #input_fn
+        #input_struct
+        #[inline]
+        #[allow(non_snake_case)]
+        fn #factory_fn_name() -> ::hyperlane::ServerHookHandler {
+            ::std::sync::Arc::new(|ctx: &::hyperlane::Context| {
+                let ctx = ctx.clone();
+                ::std::boxed::Box::pin(async move {
+                    let hook = #struct_name::new(&ctx).await;
+                    hook.handle(&ctx).await;
+                })
+            })
+        }
         inventory::submit! {
             ::hyperlane::HookMacro {
                 hook_type: ::hyperlane::HookType::ResponseMiddleware(#order),
-                handler: |ctx: ::hyperlane::Context| Box::pin(#fn_name(ctx)),
+                handler: ::hyperlane::HookHandler::Factory(#factory_fn_name),
             }
         }
     };
@@ -15684,7 +19202,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #325 - `mod.rs`
+### 📄 File #404 - `mod.rs`
 - **Path**: `hyperlane-macros\src\response_middleware\mod.rs`
 - **Size**: `46 B`
 - **Modified Time**: `2025-09-15T22:37:29.406944`
@@ -15698,10 +19216,10 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #326 - `fn.rs`
+### 📄 File #405 - `fn.rs`
 - **Path**: `hyperlane-macros\src\route\fn.rs`
-- **Size**: `1,524 B`
-- **Modified Time**: `2025-09-15T22:37:29.407503`
+- **Size**: `2,071 B`
+- **Modified Time**: `2025-10-21T08:11:52.875147`
 
 #### Content Preview
 
@@ -15731,14 +19249,28 @@ use crate::*;
 pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let route_attr: RouteAttr = parse_macro_input!(attr as RouteAttr);
     let path: &Expr = &route_attr.path;
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let fn_name: &Ident = &input_fn.sig.ident;
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let factory_fn_name: Ident = Ident::new(
+        &format!("__route_factory_{struct_name}"),
+        struct_name.span(),
+    );
     let gen_code: TokenStream2 = quote! {
-        #input_fn
-        inventory::submit! {
+        #input_struct
+        #[inline]
+        #[allow(non_snake_case)]
+        fn #factory_fn_name() -> ::hyperlane::ServerHookHandler {
+            ::std::sync::Arc::new(|ctx: &::hyperlane::Context| {
+                let ctx = ctx.clone();
+                ::std::boxed::Box::pin(async move {
+                    #struct_name::new(&ctx).await.handle(&ctx).await;
+                })
+            })
+        }
+        ::hyperlane::server_submit! {
             ::hyperlane::HookMacro {
                 hook_type: ::hyperlane::HookType::Route(#path),
-                handler: |ctx: ::hyperlane::Context| Box::pin(#fn_name(ctx)),
+                handler: ::hyperlane::HookHandler::Factory(#factory_fn_name),
             }
         }
     };
@@ -15754,7 +19286,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #327 - `impl.rs`
+### 📄 File #406 - `impl.rs`
 - **Path**: `hyperlane-macros\src\route\impl.rs`
 - **Size**: `384 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15777,7 +19309,7 @@ impl Parse for RouteAttr {
 
 ```
 
-### 📄 File #328 - `mod.rs`
+### 📄 File #407 - `mod.rs`
 - **Path**: `hyperlane-macros\src\route\mod.rs`
 - **Size**: `122 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15794,7 +19326,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #329 - `struct.rs`
+### 📄 File #408 - `struct.rs`
 - **Path**: `hyperlane-macros\src\route\struct.rs`
 - **Size**: `293 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -15815,7 +19347,7 @@ pub(crate) struct RouteAttr {
 
 ```
 
-### 📄 File #330 - `fn.rs`
+### 📄 File #409 - `fn.rs`
 - **Path**: `hyperlane-macros\src\send\fn.rs`
 - **Size**: `5,213 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -16023,7 +19555,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #331 - `impl.rs`
+### 📄 File #410 - `impl.rs`
 - **Path**: `hyperlane-macros\src\send\impl.rs`
 - **Size**: `276 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -16045,7 +19577,7 @@ impl Parse for SendData {
 
 ```
 
-### 📄 File #332 - `mod.rs`
+### 📄 File #411 - `mod.rs`
 - **Path**: `hyperlane-macros\src\send\mod.rs`
 - **Size**: `89 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -16062,7 +19594,7 @@ pub(crate) use r#struct::*;
 
 ```
 
-### 📄 File #333 - `struct.rs`
+### 📄 File #412 - `struct.rs`
 - **Path**: `hyperlane-macros\src\send\struct.rs`
 - **Size**: `596 B`
 - **Modified Time**: `2025-09-15T22:37:29.407503`
@@ -16094,10 +19626,10 @@ pub(crate) struct ResponseBodyData {
 
 ```
 
-### 📄 File #334 - `fn.rs`
+### 📄 File #413 - `fn.rs`
 - **Path**: `hyperlane-macros\src\stream\fn.rs`
-- **Size**: `4,988 B`
-- **Modified Time**: `2025-09-15T22:37:29.407503`
+- **Size**: `5,000 B`
+- **Modified Time**: `2025-10-21T08:11:52.875648`
 
 #### Content Preview
 
@@ -16181,11 +19713,11 @@ pub(crate) fn http_from_stream_macro(attr: TokenStream, item: TokenStream) -> To
     let sig: &Signature = &input_fn.sig;
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_fn(sig) {
+    match parse_context_from_signature(sig) {
         Ok(context) => {
             let stmts: &Vec<Stmt> = &block.stmts;
             let loop_stream: TokenStream2 =
-                generate_stream(&context, "http_from_stream", &data, stmts);
+                generate_stream(context, "http_from_stream", &data, stmts);
             quote! {
                 #(#attrs)*
                 #vis #sig {
@@ -16226,11 +19758,11 @@ pub(crate) fn ws_from_stream_macro(attr: TokenStream, item: TokenStream) -> Toke
     let sig: &Signature = &input_fn.sig;
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_fn(sig) {
+    match parse_context_from_signature(sig) {
         Ok(context) => {
             let stmts: &Vec<Stmt> = &block.stmts;
             let loop_stream: TokenStream2 =
-                generate_stream(&context, "ws_from_stream", &data, stmts);
+                generate_stream(context, "ws_from_stream", &data, stmts);
             quote! {
                 #(#attrs)*
                 #vis #sig {
@@ -16252,7 +19784,7 @@ inventory::submit! {
 
 ```
 
-### 📄 File #335 - `mod.rs`
+### 📄 File #414 - `mod.rs`
 - **Path**: `hyperlane-macros\src\stream\mod.rs`
 - **Size**: `35 B`
 - **Modified Time**: `2025-09-15T22:37:29.408506`
@@ -16266,25 +19798,25 @@ pub(crate) use r#fn::*;
 
 ```
 
-### 📄 File #336 - `.gitignore`
+### 📄 File #415 - `.gitignore`
 - **Path**: `hyperlane-plugin-websocket\.gitignore`
-- **Size**: `30 B`
-- **Modified Time**: `2025-09-15T22:37:26.967372`
+- **Size**: `37 B`
+- **Modified Time**: `2025-10-21T08:11:50.995894`
 
 #### Content Preview
 
 
 
-### 📄 File #337 - `Cargo.toml`
+### 📄 File #416 - `Cargo.toml`
 - **Path**: `hyperlane-plugin-websocket\Cargo.toml`
 - **Size**: `865 B`
-- **Modified Time**: `2025-10-01T21:58:44.941996`
+- **Modified Time**: `2025-10-21T08:11:50.999894`
 
 #### Content Preview
 
 
 
-### 📄 File #338 - `LICENSE`
+### 📄 File #417 - `LICENSE`
 - **Path**: `hyperlane-plugin-websocket\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:26.968377`
@@ -16293,10 +19825,10 @@ pub(crate) use r#fn::*;
 
 
 
-### 📄 File #339 - `README.md`
+### 📄 File #418 - `README.md`
 - **Path**: `hyperlane-plugin-websocket\README.md`
-- **Size**: `9,289 B`
-- **Modified Time**: `2025-09-15T22:37:26.968377`
+- **Size**: `11,244 B`
+- **Modified Time**: `2025-10-21T08:11:51.007904`
 
 #### Content Preview
 
@@ -16333,174 +19865,247 @@ cargo add hyperlane-plugin-websocket
 use hyperlane::*;
 use hyperlane_plugin_websocket::*;
 
+struct RequestMiddleware;
+struct UpgradeHook;
+struct ConnectedHook;
+struct GroupChat;
+struct PrivateChat;
+struct PrivateClosedHook;
+struct SendedHook;
+struct GroupChatRequestHook;
+struct GroupClosedHook;
+struct PrivateChatRequestHook;
+
 static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
 
 fn get_broadcast_map() -> &'static WebSocket {
     BROADCAST_MAP.get_or_init(|| WebSocket::new())
 }
 
-async fn request_middleware(ctx: Context) {
-    let socket_addr: String = ctx.get_socket_addr_string().await;
-    ctx.set_response_version(HttpVersion::HTTP1_1)
-        .await
-        .set_response_status_code(200)
-        .await
-        .set_response_header(SERVER, HYPERLANE)
-        .await
-        .set_response_header(CONNECTION, KEEP_ALIVE)
-        .await
-        .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-        .await
-        .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-        .await
-        .set_response_header("SocketAddr", &socket_addr)
-        .await;
-}
-
-async fn upgrade_hook(ctx: Context) {
-    if !ctx.get_request().await.is_ws() {
-        return;
+impl ServerHook for RequestMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
     }
-    if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-        let accept_key: String = WebSocketFrame::generate_accept_key(key);
-        ctx.set_response_status_code(101)
+
+    async fn handle(self, ctx: &Context) {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        ctx.set_response_version(HttpVersion::HTTP1_1)
             .await
-            .set_response_header(UPGRADE, WEBSOCKET)
+            .set_response_status_code(200)
             .await
-            .set_response_header(CONNECTION, UPGRADE)
+            .set_response_header(SERVER, HYPERLANE)
             .await
-            .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+            .set_response_header(CONNECTION, KEEP_ALIVE)
             .await
-            .set_response_body(&vec![])
+            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
             .await
-            .send()
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
             .await
-            .unwrap();
+            .set_response_header("SocketAddr", &socket_addr)
+            .await;
     }
 }
 
-async fn connected_hook(ctx: Context) {
-    let group_name: String = ctx
-        .try_get_route_param("group_name")
-        .await
-        .unwrap_or_default();
-    let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-    let receiver_count: ReceiverCount =
-        get_broadcast_map().receiver_count_after_increment(group_broadcast_type.clone());
-    let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
-    let your_name: String = ctx
-        .try_get_route_param("your_name")
-        .await
-        .unwrap_or_default();
-    let private_broadcast_type: BroadcastType<String> =
-        BroadcastType::PointToPoint(my_name, your_name);
-    let data: String = format!("receiver_count => {:?}", receiver_count).into();
-    tokio::spawn(async move {
-        tokio::task::yield_now().await;
-        get_broadcast_map()
-            .send(group_broadcast_type, data.clone())
-            .unwrap_or_else(|err| {
-                println!("[connected_hook]send group error => {:?}", err.to_string());
-                None
-            });
-        get_broadcast_map()
-            .send(private_broadcast_type, data)
-            .unwrap_or_else(|err| {
-                println!(
-                    "[connected_hook]send private error => {:?}",
-                    err.to_string()
-                );
-                None
-            });
-    });
-    println!("[connected_hook]receiver_count => {:?}", receiver_count);
-    let _ = std::io::Write::flush(&mut std::io::stdout());
-}
-
-async fn group_chat_hook(ws_ctx: Context) {
-    let group_name: String = ws_ctx.try_get_route_param("group_name").await.unwrap();
-    let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-    let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-    let mut body: RequestBody = ws_ctx.get_request_body().await;
-    if body.is_empty() {
-        receiver_count = get_broadcast_map().receiver_count_after_decrement(key);
-        body = format!("receiver_count => {:?}", receiver_count).into();
+impl ServerHook for UpgradeHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
     }
-    ws_ctx.set_response_body(&body).await;
-    println!("[group_chat]receiver_count => {:?}", receiver_count);
-    let _ = std::io::Write::flush(&mut std::io::stdout());
-}
 
-async fn group_closed(ctx: Context) {
-    let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-    let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-    let receiver_count: ReceiverCount =
-        get_broadcast_map().receiver_count_after_decrement(key.clone());
-    let body: String = format!("receiver_count => {:?}", receiver_count);
-    ctx.set_response_body(&body).await;
-    println!("[group_closed]receiver_count => {:?}", receiver_count);
-    let _ = std::io::Write::flush(&mut std::io::stdout());
-}
-
-async fn private_chat_hook(ctx: Context) {
-    let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-    let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-    let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-    let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-    let mut body: RequestBody = ctx.get_request_body().await;
-    if body.is_empty() {
-        receiver_count = get_broadcast_map().receiver_count_after_decrement(key);
-        body = format!("receiver_count => {:?}", receiver_count).into();
+    async fn handle(self, ctx: &Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            ctx.set_response_status_code(101)
+                .await
+                .set_response_header(UPGRADE, WEBSOCKET)
+                .await
+                .set_response_header(CONNECTION, UPGRADE)
+                .await
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .await
+                .set_response_body(&vec![])
+                .await
+                .send()
+                .await
+                .unwrap();
+        }
     }
-    ctx.set_response_body(&body).await;
-    println!("[private_chat]receiver_count => {:?}", receiver_count);
-    let _ = std::io::Write::flush(&mut std::io::stdout());
 }
 
-async fn private_closed(ctx: Context) {
-    let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-    let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-    let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-    let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_decrement(key);
-    let body: String = format!("receiver_count => {:?}", receiver_count);
-    ctx.set_response_body(&body).await;
-    println!("[private_closed]receiver_count => {:?}", receiver_count);
-    let _ = std::io::Write::flush(&mut std::io::stdout());
+impl ServerHook for ConnectedHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let group_name: String = ctx
+            .try_get_route_param("group_name")
+            .await
+            .unwrap_or_default();
+        let group_broadcast_type: BroadcastType<String> =
+            BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count_after_increment(group_broadcast_type.clone());
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
+        let your_name: String = ctx
+            .try_get_route_param("your_name")
+            .await
+            .unwrap_or_default();
+        let private_broadcast_type: BroadcastType<String> =
+            BroadcastType::PointToPoint(my_name, your_name);
+        let data: String = format!("receiver_count => {:?}", receiver_count).into();
+        tokio::spawn(async move {
+            tokio::task::yield_now().await;
+            get_broadcast_map()
+                .send(group_broadcast_type, data.clone())
+                .unwrap_or_else(|err| {
+                    println!("[connected_hook]send group error => {:?}", err.to_string());
+                    None
+                });
+            get_broadcast_map()
+                .send(private_broadcast_type, data)
+                .unwrap_or_else(|err| {
+                    println!(
+                        "[connected_hook]send private error => {:?}",
+                        err.to_string()
+                    );
+                    None
+                });
+        });
+        println!("[connected_hook]receiver_count => {:?}", receiver_count);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
 }
 
-async fn sended(ctx: Context) {
-    let msg: String = ctx.get_response_body_string().await;
-    println!("[sended_hook]msg => {}", msg);
-    let _ = std::io::Write::flush(&mut std::io::stdout());
+impl ServerHook for GroupChatRequestHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request_body().await;
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_decrement(key);
+            body = format!("receiver_count => {:?}", receiver_count).into();
+        }
+        ctx.set_response_body(&body).await;
+        println!("[group_chat]receiver_count => {:?}", receiver_count);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
 }
 
-async fn private_chat(ctx: Context) {
-    let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-    let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-    let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-    let config: WebSocketConfig<String> = WebSocketConfig::new()
-        .set_context(ctx.clone())
-        .set_broadcast_type(key)
-        .set_buffer_size(4096)
-        .set_capacity(1024)
-        .set_request_hook(private_chat_hook)
-        .set_sended_hook(sended)
-        .set_closed_hook(private_closed);
-    get_broadcast_map().run(config).await;
+impl ServerHook for GroupClosedHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count_after_decrement(key.clone());
+        let body: String = format!("receiver_count => {:?}", receiver_count);
+        ctx.set_response_body(&body).await;
+        println!("[group_closed]receiver_count => {:?}", receiver_count);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
 }
 
-async fn group_chat(ctx: Context) {
-    let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-    let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-    let config: WebSocketConfig<String> = WebSocketConfig::new()
-        .set_context(ctx.clone())
-        .set_broadcast_type(key)
-        .set_buffer_size(4096)
-        .set_capacity(1024)
-        .set_request_hook(group_chat_hook)
-        .set_sended_hook(sended)
-        .set_closed_hook(group_closed);
-    get_broadcast_map().run(config).await;
+impl ServerHook for PrivateChatRequestHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request_body().await;
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_decrement(key);
+            body = format!("receiver_count => {:?}", receiver_count).into();
+        }
+        ctx.set_response_body(&body).await;
+        println!("[private_chat]receiver_count => {:?}", receiver_count);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+
+impl ServerHook for PrivateClosedHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count_after_decrement(key);
+        let body: String = format!("receiver_count => {:?}", receiver_count);
+        ctx.set_response_body(&body).await;
+        println!("[private_closed]receiver_count => {:?}", receiver_count);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+
+impl ServerHook for SendedHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let msg: String = ctx.get_response_body_string().await;
+        println!("[sended_hook]msg => {}", msg);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+
+impl ServerHook for PrivateChat {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_buffer_size(4096)
+            .set_capacity(1024)
+            .set_request_hook::<PrivateChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<PrivateClosedHook>();
+        get_broadcast_map().run(config).await;
+    }
+}
+
+impl ServerHook for GroupChat {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_buffer_size(4096)
+            .set_capacity(1024)
+            .set_request_hook::<GroupChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<GroupClosedHook>();
+        get_broadcast_map().run(config).await;
+    }
 }
 
 #[tokio::main]
@@ -16513,12 +20118,12 @@ async fn main() {
     config.disable_linger().await;
     config.disable_nodelay().await;
     server.config(config).await;
-    server.route("/{group_name}", group_chat).await;
-    server.route("/{my_name}/{your_name}", private_chat).await;
-    server.request_middleware(request_middleware).await;
-    server.request_middleware(upgrade_hook).await;
-    server.request_middleware(connected_hook).await;
-    let server_hook: ServerHook = server.run().await.unwrap_or_default();
+    server.request_middleware::<RequestMiddleware>().await;
+    server.request_middleware::<UpgradeHook>().await;
+    server.request_middleware::<ConnectedHook>().await;
+    server.route::<GroupChat>("/{group_name}").await;
+    server.route::<PrivateChat>("/{my_name}/{your_name}").await;
+    let server_hook: ServerControlHook = server.run().await.unwrap_or_default();
     server_hook.wait().await;
 }
 ```
@@ -16537,7 +20142,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #340 - `config`
+### 📄 File #419 - `config`
 - **Path**: `hyperlane-plugin-websocket\.git\config`
 - **Size**: `336 B`
 - **Modified Time**: `2025-09-15T22:37:26.959662`
@@ -16546,7 +20151,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #341 - `description`
+### 📄 File #420 - `description`
 - **Path**: `hyperlane-plugin-websocket\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:22.216632`
@@ -16555,16 +20160,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #342 - `FETCH_HEAD`
+### 📄 File #421 - `FETCH_HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\FETCH_HEAD`
-- **Size**: `253 B`
-- **Modified Time**: `2025-10-01T21:58:44.904393`
+- **Size**: `1,433 B`
+- **Modified Time**: `2025-10-21T08:11:50.943286`
 
 #### Content Preview
 
 
 
-### 📄 File #343 - `HEAD`
+### 📄 File #422 - `HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:26.951946`
@@ -16573,25 +20178,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #344 - `index`
+### 📄 File #423 - `index`
 - **Path**: `hyperlane-plugin-websocket\.git\index`
 - **Size**: `1,392 B`
-- **Modified Time**: `2025-10-01T21:58:44.941996`
+- **Modified Time**: `2025-10-21T08:11:51.023412`
 
 #### Content Preview
 
 
 
-### 📄 File #345 - `ORIG_HEAD`
+### 📄 File #424 - `ORIG_HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\ORIG_HEAD`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:44:20.979455`
+- **Modified Time**: `2025-10-21T08:11:50.987387`
 
 #### Content Preview
 
 
 
-### 📄 File #346 - `packed-refs`
+### 📄 File #425 - `packed-refs`
 - **Path**: `hyperlane-plugin-websocket\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:26.941218`
@@ -16600,7 +20205,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #347 - `shallow`
+### 📄 File #426 - `shallow`
 - **Path**: `hyperlane-plugin-websocket\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:26.875105`
@@ -16609,7 +20214,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #348 - `applypatch-msg.sample`
+### 📄 File #427 - `applypatch-msg.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:22.217633`
@@ -16618,7 +20223,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #349 - `commit-msg.sample`
+### 📄 File #428 - `commit-msg.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:22.217633`
@@ -16627,7 +20232,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #350 - `fsmonitor-watchman.sample`
+### 📄 File #429 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:22.217633`
@@ -16636,7 +20241,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #351 - `post-update.sample`
+### 📄 File #430 - `post-update.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:22.217633`
@@ -16645,7 +20250,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #352 - `pre-applypatch.sample`
+### 📄 File #431 - `pre-applypatch.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:22.218633`
@@ -16654,7 +20259,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #353 - `pre-commit.sample`
+### 📄 File #432 - `pre-commit.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:22.218633`
@@ -16663,7 +20268,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #354 - `pre-merge-commit.sample`
+### 📄 File #433 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:22.218633`
@@ -16672,7 +20277,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #355 - `pre-push.sample`
+### 📄 File #434 - `pre-push.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16681,7 +20286,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #356 - `pre-rebase.sample`
+### 📄 File #435 - `pre-rebase.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16690,7 +20295,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #357 - `pre-receive.sample`
+### 📄 File #436 - `pre-receive.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16699,7 +20304,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #358 - `prepare-commit-msg.sample`
+### 📄 File #437 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16708,7 +20313,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #359 - `push-to-checkout.sample`
+### 📄 File #438 - `push-to-checkout.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:22.219235`
@@ -16717,7 +20322,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #360 - `sendemail-validate.sample`
+### 📄 File #439 - `sendemail-validate.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:22.220242`
@@ -16726,7 +20331,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #361 - `update.sample`
+### 📄 File #440 - `update.sample`
 - **Path**: `hyperlane-plugin-websocket\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:22.220242`
@@ -16735,7 +20340,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #362 - `exclude`
+### 📄 File #441 - `exclude`
 - **Path**: `hyperlane-plugin-websocket\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:22.220242`
@@ -16744,25 +20349,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #363 - `HEAD`
+### 📄 File #442 - `HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\logs\HEAD`
-- **Size**: `354 B`
-- **Modified Time**: `2025-10-01T21:58:44.952992`
+- **Size**: `507 B`
+- **Modified Time**: `2025-10-21T08:11:51.024412`
 
 #### Content Preview
 
 
 
-### 📄 File #364 - `master`
+### 📄 File #443 - `master`
 - **Path**: `hyperlane-plugin-websocket\.git\logs\refs\heads\master`
-- **Size**: `354 B`
-- **Modified Time**: `2025-10-01T21:58:44.952992`
+- **Size**: `507 B`
+- **Modified Time**: `2025-10-21T08:11:51.024412`
 
 #### Content Preview
 
 
 
-### 📄 File #365 - `HEAD`
+### 📄 File #444 - `HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `201 B`
 - **Modified Time**: `2025-09-15T22:37:26.951442`
@@ -16771,16 +20376,151 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #366 - `master`
+### 📄 File #445 - `master`
 - **Path**: `hyperlane-plugin-websocket\.git\logs\refs\remotes\origin\master`
-- **Size**: `153 B`
-- **Modified Time**: `2025-10-01T21:58:44.895381`
+- **Size**: `306 B`
+- **Modified Time**: `2025-10-21T08:11:50.876272`
 
 #### Content Preview
 
 
 
-### 📄 File #367 - `1ebda971d1d3c8b4d205161947f4443db69fc2`
+### 📄 File #446 - `b38db8dc8c97ad8abe207e3c6c3d131b6f374b`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\05\b38db8dc8c97ad8abe207e3c6c3d131b6f374b`
+- **Size**: `2,474 B`
+- **Modified Time**: `2025-10-21T08:11:50.731755`
+
+#### Content Preview
+
+
+
+### 📄 File #447 - `a112327d38979490dbb8c23494c069c4b7fa74`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\07\a112327d38979490dbb8c23494c069c4b7fa74`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:50.686253`
+
+#### Content Preview
+
+
+
+### 📄 File #448 - `c88c738731ac32e2fdf03e90b941e3ff77d34e`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\0d\c88c738731ac32e2fdf03e90b941e3ff77d34e`
+- **Size**: `484 B`
+- **Modified Time**: `2025-10-21T08:11:50.719742`
+
+#### Content Preview
+
+
+
+### 📄 File #449 - `809bbaf00e1a7a1da86fbec8cb709d9ef495b0`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\15\809bbaf00e1a7a1da86fbec8cb709d9ef495b0`
+- **Size**: `116 B`
+- **Modified Time**: `2025-10-21T08:11:50.675468`
+
+#### Content Preview
+
+
+
+### 📄 File #450 - `e80298b39cfe51b451a55fc590bda87b552311`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\15\e80298b39cfe51b451a55fc590bda87b552311`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:50.767333`
+
+#### Content Preview
+
+
+
+### 📄 File #451 - `cb70cc459481f23ecef0a2902a088a5cf74bc0`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\19\cb70cc459481f23ecef0a2902a088a5cf74bc0`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:50.761596`
+
+#### Content Preview
+
+
+
+### 📄 File #452 - `6baee777d1506031261be7d2edd75d87ae6fd7`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\1c\6baee777d1506031261be7d2edd75d87ae6fd7`
+- **Size**: `485 B`
+- **Modified Time**: `2025-10-21T08:11:50.703496`
+
+#### Content Preview
+
+
+
+### 📄 File #453 - `044a57484b2ed7db5b045f91a857dc75da3e56`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\20\044a57484b2ed7db5b045f91a857dc75da3e56`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:50.652493`
+
+#### Content Preview
+
+
+
+### 📄 File #454 - `a5e335bfe20d9b4f9c8b76581a1151ddcd8f45`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\21\a5e335bfe20d9b4f9c8b76581a1151ddcd8f45`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-21T08:11:50.648993`
+
+#### Content Preview
+
+
+
+### 📄 File #455 - `7d41e3a85dcff118ee3ddd3040ded68736fbf0`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\23\7d41e3a85dcff118ee3ddd3040ded68736fbf0`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:50.673462`
+
+#### Content Preview
+
+
+
+### 📄 File #456 - `284c7c2e4b2345c1c3196b8a56e8f0b34eb9ce`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\28\284c7c2e4b2345c1c3196b8a56e8f0b34eb9ce`
+- **Size**: `482 B`
+- **Modified Time**: `2025-10-21T08:11:50.696995`
+
+#### Content Preview
+
+
+
+### 📄 File #457 - `05bfe21b639bf3408a11060d44ddb3fbef64d2`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\29\05bfe21b639bf3408a11060d44ddb3fbef64d2`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:50.687751`
+
+#### Content Preview
+
+
+
+### 📄 File #458 - `3d895391bb256772f6a0d15700dc5c8eb1c8d9`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\2f\3d895391bb256772f6a0d15700dc5c8eb1c8d9`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:50.647492`
+
+#### Content Preview
+
+
+
+### 📄 File #459 - `8314034647e48a92e0d855b89a2e58f6171799`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\34\8314034647e48a92e0d855b89a2e58f6171799`
+- **Size**: `484 B`
+- **Modified Time**: `2025-10-21T08:11:50.730248`
+
+#### Content Preview
+
+
+
+### 📄 File #460 - `65734ec26e596bb9de573d83b7a5ca6b5b6260`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\3a\65734ec26e596bb9de573d83b7a5ca6b5b6260`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-21T08:11:50.642985`
+
+#### Content Preview
+
+
+
+### 📄 File #461 - `1ebda971d1d3c8b4d205161947f4443db69fc2`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\3b\1ebda971d1d3c8b4d205161947f4443db69fc2`
 - **Size**: `483 B`
 - **Modified Time**: `2025-10-01T21:58:44.861316`
@@ -16789,7 +20529,223 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #368 - `02374d2dd7a71741b253bd66472f5871f583c4`
+### 📄 File #462 - `86da78ede3e13dcf48d6aca0b0ad5f6fc2626f`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\3e\86da78ede3e13dcf48d6aca0b0ad5f6fc2626f`
+- **Size**: `485 B`
+- **Modified Time**: `2025-10-21T08:11:50.710004`
+
+#### Content Preview
+
+
+
+### 📄 File #463 - `cc168fbabd52c01a3af32e0cfe2db0e4180071`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\44\cc168fbabd52c01a3af32e0cfe2db0e4180071`
+- **Size**: `199 B`
+- **Modified Time**: `2025-10-21T08:11:50.744405`
+
+#### Content Preview
+
+
+
+### 📄 File #464 - `ff6910cc228b928073bd43ed839d78d61d6b2a`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\48\ff6910cc228b928073bd43ed839d78d61d6b2a`
+- **Size**: `199 B`
+- **Modified Time**: `2025-10-21T08:11:50.655453`
+
+#### Content Preview
+
+
+
+### 📄 File #465 - `652fe58942d8bd784ab5f64ad7a26e543d84c8`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\4e\652fe58942d8bd784ab5f64ad7a26e543d84c8`
+- **Size**: `484 B`
+- **Modified Time**: `2025-10-21T08:11:50.725241`
+
+#### Content Preview
+
+
+
+### 📄 File #466 - `792e9f3732946bfc4cecc45c68365f7e0433de`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\53\792e9f3732946bfc4cecc45c68365f7e0433de`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:50.643990`
+
+#### Content Preview
+
+
+
+### 📄 File #467 - `b54e7f3b6c8b3fa8171e750687ea8ee6af6ad5`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\56\b54e7f3b6c8b3fa8171e750687ea8ee6af6ad5`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:50.664963`
+
+#### Content Preview
+
+
+
+### 📄 File #468 - `bff2fe1f4f7fc9d1eaee8237dd035fa419b92d`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\59\bff2fe1f4f7fc9d1eaee8237dd035fa419b92d`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:50.666461`
+
+#### Content Preview
+
+
+
+### 📄 File #469 - `85b19b4f57445a98900a6f39ef8d6ca2996e80`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\5d\85b19b4f57445a98900a6f39ef8d6ca2996e80`
+- **Size**: `4,766 B`
+- **Modified Time**: `2025-10-21T08:11:50.750914`
+
+#### Content Preview
+
+
+
+### 📄 File #470 - `48a8e24b6b0f9f34b085a889fc66c697f81709`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\65\48a8e24b6b0f9f34b085a889fc66c697f81709`
+- **Size**: `811 B`
+- **Modified Time**: `2025-10-21T08:11:50.760019`
+
+#### Content Preview
+
+
+
+### 📄 File #471 - `56aa39f9775d151ed68bc92dfff51227f732e7`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\6a\56aa39f9775d151ed68bc92dfff51227f732e7`
+- **Size**: `4,767 B`
+- **Modified Time**: `2025-10-21T08:11:50.759378`
+
+#### Content Preview
+
+
+
+### 📄 File #472 - `5e8db99f38146891266b67c18035e8e74c5363`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\6c\5e8db99f38146891266b67c18035e8e74c5363`
+- **Size**: `116 B`
+- **Modified Time**: `2025-10-21T08:11:50.736065`
+
+#### Content Preview
+
+
+
+### 📄 File #473 - `74d00a3d18bf3f65409736fb3f26a6cd98367b`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\6f\74d00a3d18bf3f65409736fb3f26a6cd98367b`
+- **Size**: `2,014 B`
+- **Modified Time**: `2025-10-21T08:11:50.737751`
+
+#### Content Preview
+
+
+
+### 📄 File #474 - `00abf6199632a6c509d28ebda7493f718d9a23`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\72\00abf6199632a6c509d28ebda7493f718d9a23`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:50.679747`
+
+#### Content Preview
+
+
+
+### 📄 File #475 - `74cdacda0551f952be3f8fe08801ad19dd0d91`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\78\74cdacda0551f952be3f8fe08801ad19dd0d91`
+- **Size**: `2,032 B`
+- **Modified Time**: `2025-10-21T08:11:50.743405`
+
+#### Content Preview
+
+
+
+### 📄 File #476 - `8ae8693549504edd852614a576d2cf5ef95f18`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\7a\8ae8693549504edd852614a576d2cf5ef95f18`
+- **Size**: `2,032 B`
+- **Modified Time**: `2025-10-21T08:11:50.742405`
+
+#### Content Preview
+
+
+
+### 📄 File #477 - `d5b0e90027ce9c16152e28e0d4e67eddbc8ef3`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\7b\d5b0e90027ce9c16152e28e0d4e67eddbc8ef3`
+- **Size**: `484 B`
+- **Modified Time**: `2025-10-21T08:11:50.713155`
+
+#### Content Preview
+
+
+
+### 📄 File #478 - `55fb9b11b5309ad306effdd8b553139462a441`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\80\55fb9b11b5309ad306effdd8b553139462a441`
+- **Size**: `163 B`
+- **Modified Time**: `2025-10-21T08:11:50.635848`
+
+#### Content Preview
+
+
+
+### 📄 File #479 - `9d2d974a6a2c6726087c9106fa1ec22924ad7e`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\86\9d2d974a6a2c6726087c9106fa1ec22924ad7e`
+- **Size**: `484 B`
+- **Modified Time**: `2025-10-21T08:11:50.711835`
+
+#### Content Preview
+
+
+
+### 📄 File #480 - `c6deb0e8bf9c2d7eec13753f2cae107774d83b`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\90\c6deb0e8bf9c2d7eec13753f2cae107774d83b`
+- **Size**: `4,632 B`
+- **Modified Time**: `2025-10-21T08:11:50.752414`
+
+#### Content Preview
+
+
+
+### 📄 File #481 - `38b5ea02e4bac9a9b4675bd7dc590b3d8f73e1`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\99\38b5ea02e4bac9a9b4675bd7dc590b3d8f73e1`
+- **Size**: `116 B`
+- **Modified Time**: `2025-10-21T08:11:50.667461`
+
+#### Content Preview
+
+
+
+### 📄 File #482 - `b5b28af44e188d022a70b613de97b00925bf20`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\9a\b5b28af44e188d022a70b613de97b00925bf20`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:50.638482`
+
+#### Content Preview
+
+
+
+### 📄 File #483 - `2316a348c527b837eb06f66ab6035e1a52426a`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\9d\2316a348c527b837eb06f66ab6035e1a52426a`
+- **Size**: `485 B`
+- **Modified Time**: `2025-10-21T08:11:50.695495`
+
+#### Content Preview
+
+
+
+### 📄 File #484 - `6fb844a0657311c8564c21554e19dcdfc6f36b`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\9d\6fb844a0657311c8564c21554e19dcdfc6f36b`
+- **Size**: `482 B`
+- **Modified Time**: `2025-10-21T08:11:50.714233`
+
+#### Content Preview
+
+
+
+### 📄 File #485 - `4aa6ca6c761402b9e315a391c7122ba2e8d7ab`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\a5\4aa6ca6c761402b9e315a391c7122ba2e8d7ab`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:50.641483`
+
+#### Content Preview
+
+
+
+### 📄 File #486 - `02374d2dd7a71741b253bd66472f5871f583c4`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\ac\02374d2dd7a71741b253bd66472f5871f583c4`
 - **Size**: `211 B`
 - **Modified Time**: `2025-10-01T21:58:44.859311`
@@ -16798,7 +20754,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #369 - `1ec4265467905506ee79fcf99353ecbfa518a7`
+### 📄 File #487 - `d5a0965abcb5e35d05905e2f24b8c47899d600`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\ac\d5a0965abcb5e35d05905e2f24b8c47899d600`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:50.636978`
+
+#### Content Preview
+
+
+
+### 📄 File #488 - `1dacae7da7456604aa8fd56290479bf95c4799`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\bd\1dacae7da7456604aa8fd56290479bf95c4799`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:50.692752`
+
+#### Content Preview
+
+
+
+### 📄 File #489 - `1ec4265467905506ee79fcf99353ecbfa518a7`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\cb\1ec4265467905506ee79fcf99353ecbfa518a7`
 - **Size**: `167 B`
 - **Modified Time**: `2025-10-01T21:58:44.857924`
@@ -16807,7 +20781,106 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #370 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.idx`
+### 📄 File #490 - `ddb3dfb633414138f079bb00d7e77ba108b611`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\cd\ddb3dfb633414138f079bb00d7e77ba108b611`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-21T08:11:50.650492`
+
+#### Content Preview
+
+
+
+### 📄 File #491 - `32fbcb97ba571f5c41fe91eb6621e8f0ad98f4`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\d7\32fbcb97ba571f5c41fe91eb6621e8f0ad98f4`
+- **Size**: `484 B`
+- **Modified Time**: `2025-10-21T08:11:50.697995`
+
+#### Content Preview
+
+
+
+### 📄 File #492 - `f6c377d60276d09b25c2406eb46a85fb3064fd`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\da\f6c377d60276d09b25c2406eb46a85fb3064fd`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:50.639983`
+
+#### Content Preview
+
+
+
+### 📄 File #493 - `3f78c19b60bef4dd7e3bd2769e137b71b7579d`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\dc\3f78c19b60bef4dd7e3bd2769e137b71b7579d`
+- **Size**: `199 B`
+- **Modified Time**: `2025-10-21T08:11:50.748915`
+
+#### Content Preview
+
+
+
+### 📄 File #494 - `02d129f200d43dcbc8aaa27913e74a8f1c4181`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\e6\02d129f200d43dcbc8aaa27913e74a8f1c4181`
+- **Size**: `49 B`
+- **Modified Time**: `2025-10-21T08:11:50.693989`
+
+#### Content Preview
+
+
+
+### 📄 File #495 - `8a1847312b4017cdcd9bda40c7d03b7cada12e`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\e9\8a1847312b4017cdcd9bda40c7d03b7cada12e`
+- **Size**: `116 B`
+- **Modified Time**: `2025-10-21T08:11:50.653880`
+
+#### Content Preview
+
+
+
+### 📄 File #496 - `6b8691cc7cc512fa13fd2b76df33f2235fb9b4`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\ee\6b8691cc7cc512fa13fd2b76df33f2235fb9b4`
+- **Size**: `164 B`
+- **Modified Time**: `2025-10-21T08:11:50.645994`
+
+#### Content Preview
+
+
+
+### 📄 File #497 - `2824112c7b2fd7c259ad52ee53e52e8d221d0b`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\f1\2824112c7b2fd7c259ad52ee53e52e8d221d0b`
+- **Size**: `79 B`
+- **Modified Time**: `2025-10-21T08:11:50.651492`
+
+#### Content Preview
+
+
+
+### 📄 File #498 - `811ed0f99282a941768f6c59eb81ff1d2e3c38`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\f9\811ed0f99282a941768f6c59eb81ff1d2e3c38`
+- **Size**: `79 B`
+- **Modified Time**: `2025-10-21T08:11:50.668961`
+
+#### Content Preview
+
+
+
+### 📄 File #499 - `24eb66e775359062f92d88755882834c0aed15`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\fa\24eb66e775359062f92d88755882834c0aed15`
+- **Size**: `79 B`
+- **Modified Time**: `2025-10-21T08:11:50.676718`
+
+#### Content Preview
+
+
+
+### 📄 File #500 - `28396da12b6db7fcfc71c5e8f0808f04c624f7`
+- **Path**: `hyperlane-plugin-websocket\.git\objects\fc\28396da12b6db7fcfc71c5e8f0808f04c624f7`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:50.678247`
+
+#### Content Preview
+
+
+
+### 📄 File #501 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.idx`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\pack\pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.idx`
 - **Size**: `1,660 B`
 - **Modified Time**: `2025-09-15T22:37:26.906923`
@@ -16816,7 +20889,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #371 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.pack`
+### 📄 File #502 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.pack`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\pack\pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.pack`
 - **Size**: `12,964 B`
 - **Modified Time**: `2025-09-15T22:37:26.906410`
@@ -16825,7 +20898,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #372 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.rev`
+### 📄 File #503 - `pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.rev`
 - **Path**: `hyperlane-plugin-websocket\.git\objects\pack\pack-b689ea47ecc3a85a58f612de92d096d3fa73fd1c.rev`
 - **Size**: `136 B`
 - **Modified Time**: `2025-09-15T22:37:26.907950`
@@ -16834,16 +20907,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #373 - `master`
+### 📄 File #504 - `master`
 - **Path**: `hyperlane-plugin-websocket\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:44.952394`
+- **Modified Time**: `2025-10-21T08:11:51.024412`
 
 #### Content Preview
 
 
 
-### 📄 File #374 - `HEAD`
+### 📄 File #505 - `HEAD`
 - **Path**: `hyperlane-plugin-websocket\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:26.950418`
@@ -16852,16 +20925,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #375 - `master`
+### 📄 File #506 - `master`
 - **Path**: `hyperlane-plugin-websocket\.git\refs\remotes\origin\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:44.894357`
+- **Modified Time**: `2025-10-21T08:11:50.876272`
 
 #### Content Preview
 
 
 
-### 📄 File #376 - `v2.2.63`
+### 📄 File #507 - `v2.2.63`
 - **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v2.2.63`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:26.949404`
@@ -16870,7 +20943,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #377 - `v2.2.64`
+### 📄 File #508 - `v2.2.64`
 - **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v2.2.64`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:44.895984`
@@ -16879,7 +20952,97 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #378 - `rust.yml`
+### 📄 File #509 - `v2.2.65`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v2.2.65`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.934278`
+
+#### Content Preview
+
+
+
+### 📄 File #510 - `v2.2.66`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v2.2.66`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.934778`
+
+#### Content Preview
+
+
+
+### 📄 File #511 - `v3.0.0`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v3.0.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.935778`
+
+#### Content Preview
+
+
+
+### 📄 File #512 - `v3.0.1`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v3.0.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.936278`
+
+#### Content Preview
+
+
+
+### 📄 File #513 - `v3.0.2`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v3.0.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.936778`
+
+#### Content Preview
+
+
+
+### 📄 File #514 - `v3.0.3`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v3.0.3`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.937279`
+
+#### Content Preview
+
+
+
+### 📄 File #515 - `v3.0.4`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v3.0.4`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.938282`
+
+#### Content Preview
+
+
+
+### 📄 File #516 - `v3.0.5`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v3.0.5`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.938705`
+
+#### Content Preview
+
+
+
+### 📄 File #517 - `v3.0.6`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v3.0.6`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.939285`
+
+#### Content Preview
+
+
+
+### 📄 File #518 - `v3.0.7`
+- **Path**: `hyperlane-plugin-websocket\.git\refs\tags\v3.0.7`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:50.877273`
+
+#### Content Preview
+
+
+
+### 📄 File #519 - `rust.yml`
 - **Path**: `hyperlane-plugin-websocket\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:26.967372`
@@ -17142,7 +21305,7 @@ jobs:
 
 ```
 
-### 📄 File #379 - `lib.rs`
+### 📄 File #520 - `lib.rs`
 - **Path**: `hyperlane-plugin-websocket\src\lib.rs`
 - **Size**: `850 B`
 - **Modified Time**: `2025-09-15T22:37:26.968880`
@@ -17181,10 +21344,10 @@ pub(crate) use std::sync::OnceLock;
 
 ```
 
-### 📄 File #380 - `cfg.rs`
+### 📄 File #521 - `cfg.rs`
 - **Path**: `hyperlane-plugin-websocket\src\tests\cfg.rs`
-- **Size**: `8,850 B`
-- **Modified Time**: `2025-09-15T22:37:26.969414`
+- **Size**: `11,001 B`
+- **Modified Time**: `2025-10-21T08:11:51.012903`
 
 #### Content Preview
 
@@ -17192,175 +21355,248 @@ pub(crate) use std::sync::OnceLock;
 use crate::*;
 
 #[tokio::test]
-async fn test() {
+async fn test_server() {
+    struct RequestMiddleware;
+    struct UpgradeHook;
+    struct ConnectedHook;
+    struct GroupChat;
+    struct PrivateChat;
+    struct PrivateClosedHook;
+    struct SendedHook;
+    struct GroupChatRequestHook;
+    struct GroupClosedHook;
+    struct PrivateChatRequestHook;
+
     static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
 
     fn get_broadcast_map() -> &'static WebSocket {
         BROADCAST_MAP.get_or_init(|| WebSocket::new())
     }
 
-    async fn request_middleware(ctx: Context) {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
-        ctx.set_response_version(HttpVersion::HTTP1_1)
-            .await
-            .set_response_status_code(200)
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONNECTION, KEEP_ALIVE)
-            .await
-            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-            .await
-            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .await
-            .set_response_header("SocketAddr", &socket_addr)
-            .await;
-    }
-
-    async fn upgrade_hook(ctx: Context) {
-        if !ctx.get_request().await.is_ws() {
-            return;
+    impl ServerHook for RequestMiddleware {
+        async fn new(_ctx: &Context) -> Self {
+            Self
         }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_status_code(101)
+
+        async fn handle(self, ctx: &Context) {
+            let socket_addr: String = ctx.get_socket_addr_string().await;
+            ctx.set_response_version(HttpVersion::HTTP1_1)
                 .await
-                .set_response_header(UPGRADE, WEBSOCKET)
+                .set_response_status_code(200)
                 .await
-                .set_response_header(CONNECTION, UPGRADE)
+                .set_response_header(SERVER, HYPERLANE)
                 .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .set_response_header(CONNECTION, KEEP_ALIVE)
                 .await
-                .set_response_body(&vec![])
+                .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
                 .await
-                .send()
+                .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
                 .await
-                .unwrap();
+                .set_response_header("SocketAddr", &socket_addr)
+                .await;
         }
     }
 
-    async fn connected_hook(ctx: Context) {
-        let group_name: String = ctx
-            .try_get_route_param("group_name")
-            .await
-            .unwrap_or_default();
-        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count_after_increment(group_broadcast_type.clone());
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
-        let your_name: String = ctx
-            .try_get_route_param("your_name")
-            .await
-            .unwrap_or_default();
-        let private_broadcast_type: BroadcastType<String> =
-            BroadcastType::PointToPoint(my_name, your_name);
-        let data: String = format!("receiver_count => {:?}", receiver_count).into();
-        tokio::spawn(async move {
-            tokio::task::yield_now().await;
-            get_broadcast_map()
-                .send(group_broadcast_type, data.clone())
-                .unwrap_or_else(|err| {
-                    println!("[connected_hook]send group error => {:?}", err.to_string());
-                    None
-                });
-            get_broadcast_map()
-                .send(private_broadcast_type, data)
-                .unwrap_or_else(|err| {
-                    println!(
-                        "[connected_hook]send private error => {:?}",
-                        err.to_string()
-                    );
-                    None
-                });
-        });
-        println!("[connected_hook]receiver_count => {:?}", receiver_count);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
-    }
-
-    async fn group_chat_hook(ws_ctx: Context) {
-        let group_name: String = ws_ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ws_ctx.get_request_body().await;
-        if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_decrement(key);
-            body = format!("receiver_count => {:?}", receiver_count).into();
+    impl ServerHook for UpgradeHook {
+        async fn new(_ctx: &Context) -> Self {
+            Self
         }
-        ws_ctx.set_response_body(&body).await;
-        println!("[group_chat]receiver_count => {:?}", receiver_count);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
-    }
 
-    async fn group_closed(ctx: Context) {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count_after_decrement(key.clone());
-        let body: String = format!("receiver_count => {:?}", receiver_count);
-        ctx.set_response_body(&body).await;
-        println!("[group_closed]receiver_count => {:?}", receiver_count);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
-    }
-
-    async fn private_chat_hook(ctx: Context) {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request_body().await;
-        if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_decrement(key);
-            body = format!("receiver_count => {:?}", receiver_count).into();
+        async fn handle(self, ctx: &Context) {
+            if !ctx.get_request().await.is_ws() {
+                return;
+            }
+            if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+                let accept_key: String = WebSocketFrame::generate_accept_key(key);
+                ctx.set_response_status_code(101)
+                    .await
+                    .set_response_header(UPGRADE, WEBSOCKET)
+                    .await
+                    .set_response_header(CONNECTION, UPGRADE)
+                    .await
+                    .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                    .await
+                    .set_response_body(&vec![])
+                    .await
+                    .send()
+                    .await
+                    .unwrap();
+            }
         }
-        ctx.set_response_body(&body).await;
-        println!("[private_chat]receiver_count => {:?}", receiver_count);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
     }
 
-    async fn private_closed(ctx: Context) {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_decrement(key);
-        let body: String = format!("receiver_count => {:?}", receiver_count);
-        ctx.set_response_body(&body).await;
-        println!("[private_closed]receiver_count => {:?}", receiver_count);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+    impl ServerHook for ConnectedHook {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let group_name: String = ctx
+                .try_get_route_param("group_name")
+                .await
+                .unwrap_or_default();
+            let group_broadcast_type: BroadcastType<String> =
+                BroadcastType::PointToGroup(group_name);
+            let receiver_count: ReceiverCount =
+                get_broadcast_map().receiver_count_after_increment(group_broadcast_type.clone());
+            let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
+            let your_name: String = ctx
+                .try_get_route_param("your_name")
+                .await
+                .unwrap_or_default();
+            let private_broadcast_type: BroadcastType<String> =
+                BroadcastType::PointToPoint(my_name, your_name);
+            let data: String = format!("receiver_count => {:?}", receiver_count).into();
+            tokio::spawn(async move {
+                tokio::task::yield_now().await;
+                get_broadcast_map()
+                    .send(group_broadcast_type, data.clone())
+                    .unwrap_or_else(|err| {
+                        println!("[connected_hook]send group error => {:?}", err.to_string());
+                        None
+                    });
+                get_broadcast_map()
+                    .send(private_broadcast_type, data)
+                    .unwrap_or_else(|err| {
+                        println!(
+                            "[connected_hook]send private error => {:?}",
+                            err.to_string()
+                        );
+                        None
+                    });
+            });
+            println!("[connected_hook]receiver_count => {:?}", receiver_count);
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
     }
 
-    async fn sended(ctx: Context) {
-        let msg: String = ctx.get_response_body_string().await;
-        println!("[sended_hook]msg => {}", msg);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+    impl ServerHook for GroupChatRequestHook {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+            let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+            let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+            let mut body: RequestBody = ctx.get_request_body().await;
+            if body.is_empty() {
+                receiver_count = get_broadcast_map().receiver_count_after_decrement(key);
+                body = format!("receiver_count => {:?}", receiver_count).into();
+            }
+            ctx.set_response_body(&body).await;
+            println!("[group_chat]receiver_count => {:?}", receiver_count);
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
     }
 
-    async fn private_chat(ctx: Context) {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
-            .set_context(ctx.clone())
-            .set_broadcast_type(key)
-            .set_buffer_size(4096)
-            .set_capacity(1024)
-            .set_request_hook(private_chat_hook)
-            .set_sended_hook(sended)
-            .set_closed_hook(private_closed);
-        get_broadcast_map().run(config).await;
+    impl ServerHook for GroupClosedHook {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+            let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+            let receiver_count: ReceiverCount =
+                get_broadcast_map().receiver_count_after_decrement(key.clone());
+            let body: String = format!("receiver_count => {:?}", receiver_count);
+            ctx.set_response_body(&body).await;
+            println!("[group_closed]receiver_count => {:?}", receiver_count);
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
     }
 
-    async fn group_chat(ctx: Context) {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
-            .set_context(ctx.clone())
-            .set_broadcast_type(key)
-            .set_buffer_size(4096)
-            .set_capacity(1024)
-            .set_request_hook(group_chat_hook)
-            .set_sended_hook(sended)
-            .set_closed_hook(group_closed);
-        get_broadcast_map().run(config).await;
+    impl ServerHook for PrivateChatRequestHook {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+            let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+            let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+            let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+            let mut body: RequestBody = ctx.get_request_body().await;
+            if body.is_empty() {
+                receiver_count = get_broadcast_map().receiver_count_after_decrement(key);
+                body = format!("receiver_count => {:?}", receiver_count).into();
+            }
+            ctx.set_response_body(&body).await;
+            println!("[private_chat]receiver_count => {:?}", receiver_count);
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
+    }
+
+    impl ServerHook for PrivateClosedHook {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+            let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+            let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+            let receiver_count: ReceiverCount =
+                get_broadcast_map().receiver_count_after_decrement(key);
+            let body: String = format!("receiver_count => {:?}", receiver_count);
+            ctx.set_response_body(&body).await;
+            println!("[private_closed]receiver_count => {:?}", receiver_count);
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
+    }
+
+    impl ServerHook for SendedHook {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let msg: String = ctx.get_response_body_string().await;
+            println!("[sended_hook]msg => {}", msg);
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
+    }
+
+    impl ServerHook for PrivateChat {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+            let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+            let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+            let config: WebSocketConfig<String> = WebSocketConfig::new()
+                .set_context(ctx.clone())
+                .set_broadcast_type(key)
+                .set_buffer_size(4096)
+                .set_capacity(1024)
+                .set_request_hook::<PrivateChatRequestHook>()
+                .set_sended_hook::<SendedHook>()
+                .set_closed_hook::<PrivateClosedHook>();
+            get_broadcast_map().run(config).await;
+        }
+    }
+
+    impl ServerHook for GroupChat {
+        async fn new(_ctx: &Context) -> Self {
+            Self
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+            let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+            let config: WebSocketConfig<String> = WebSocketConfig::new()
+                .set_context(ctx.clone())
+                .set_broadcast_type(key)
+                .set_buffer_size(4096)
+                .set_capacity(1024)
+                .set_request_hook::<GroupChatRequestHook>()
+                .set_sended_hook::<SendedHook>()
+                .set_closed_hook::<GroupClosedHook>();
+            get_broadcast_map().run(config).await;
+        }
     }
 
     async fn main() {
@@ -17372,13 +21608,13 @@ async fn test() {
         config.disable_linger().await;
         config.disable_nodelay().await;
         server.config(config).await;
-        server.route("/{group_name}", group_chat).await;
-        server.route("/{my_name}/{your_name}", private_chat).await;
-        server.request_middleware(request_middleware).await;
-        server.request_middleware(upgrade_hook).await;
-        server.request_middleware(connected_hook).await;
-        let server_hook: ServerHook = server.run().await.unwrap_or_default();
-        let server_hook_clone: ServerHook = server_hook.clone();
+        server.request_middleware::<RequestMiddleware>().await;
+        server.request_middleware::<UpgradeHook>().await;
+        server.request_middleware::<ConnectedHook>().await;
+        server.route::<GroupChat>("/{group_name}").await;
+        server.route::<PrivateChat>("/{my_name}/{your_name}").await;
+        let server_hook: ServerControlHook = server.run().await.unwrap_or_default();
+        let server_hook_clone: ServerControlHook = server_hook.clone();
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
             server_hook.shutdown().await;
@@ -17386,12 +21622,12 @@ async fn test() {
         server_hook_clone.wait().await;
     }
 
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(60), main()).await;
+    main().await;
 }
 
 ```
 
-### 📄 File #381 - `mod.rs`
+### 📄 File #522 - `mod.rs`
 - **Path**: `hyperlane-plugin-websocket\src\tests\mod.rs`
 - **Size**: `9 B`
 - **Modified Time**: `2025-09-15T22:37:26.969414`
@@ -17403,7 +21639,7 @@ mod cfg;
 
 ```
 
-### 📄 File #382 - `const.rs`
+### 📄 File #523 - `const.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\const.rs`
 - **Size**: `418 B`
 - **Modified Time**: `2025-09-15T22:37:26.969414`
@@ -17422,7 +21658,7 @@ pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
 
 ```
 
-### 📄 File #383 - `enum.rs`
+### 📄 File #524 - `enum.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\enum.rs`
 - **Size**: `971 B`
 - **Modified Time**: `2025-09-15T22:37:26.969929`
@@ -17458,10 +21694,10 @@ pub enum BroadcastType<T: BroadcastTypeTrait> {
 
 ```
 
-### 📄 File #384 - `impl.rs`
+### 📄 File #525 - `impl.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\impl.rs`
-- **Size**: `25,945 B`
-- **Modified Time**: `2025-09-15T22:37:26.969929`
+- **Size**: `26,808 B`
+- **Modified Time**: `2025-10-21T08:11:51.017912`
 
 #### Content Preview
 
@@ -17677,6 +21913,7 @@ impl<B: BroadcastTypeTrait> BroadcastType<B> {
     /// # Returns
     ///
     /// - `String` - The unique key string for the broadcast type.
+    #[inline]
     pub fn get_key(broadcast_type: BroadcastType<B>) -> String {
         match broadcast_type {
             BroadcastType::PointToPoint(key1, key2) => {
@@ -17703,14 +21940,14 @@ impl<B: BroadcastTypeTrait> BroadcastType<B> {
 /// Implements the `Default` trait for `WebSocketConfig`.
 ///
 /// Provides a default configuration for WebSocket connections, including
-/// default hook functions that do nothing.
+/// default hook types that do nothing.
 ///
 /// # Type Parameters
 ///
 /// - `B`: The type parameter for `WebSocketConfig`, which must implement `BroadcastTypeTrait`.
 impl<B: BroadcastTypeTrait> Default for WebSocketConfig<B> {
     fn default() -> Self {
-        let default_hook: ArcFnContextPinBoxSendSync<()> = Arc::new(move |_| Box::pin(async {}));
+        let default_hook: ServerHookHandler = Arc::new(|_ctx| Box::pin(async {}));
         Self {
             context: Context::default(),
             buffer_size: DEFAULT_BUFFER_SIZE,
@@ -17729,10 +21966,13 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `WebSocketConfig<B>` - A new WebSocket configuration instance.
+    #[inline]
     pub fn new() -> Self {
         Self::default()
     }
+}
 
+impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// Sets the buffer size for the WebSocket connection.
     ///
     /// # Arguments
@@ -17742,6 +21982,7 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `WebSocketConfig<B>` - The modified WebSocket configuration instance.
+    #[inline]
     pub fn set_buffer_size(mut self, buffer_size: usize) -> Self {
         self.buffer_size = buffer_size;
         self
@@ -17756,6 +21997,7 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `WebSocketConfig<B>` - The modified WebSocket configuration instance.
+    #[inline]
     pub fn set_capacity(mut self, capacity: Capacity) -> Self {
         self.capacity = capacity;
         self
@@ -17770,6 +22012,7 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `WebSocketConfig<B>` - The modified WebSocket configuration instance.
+    #[inline]
     pub fn set_context(mut self, context: Context) -> Self {
         self.context = context;
         self
@@ -17784,83 +22027,9 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `WebSocketConfig<B>` - The modified WebSocket configuration instance.
+    #[inline]
     pub fn set_broadcast_type(mut self, broadcast_type: BroadcastType<B>) -> Self {
         self.broadcast_type = broadcast_type;
-        self
-    }
-
-    /// Sets the request hook function.
-    ///
-    /// This hook is executed when a new request is received.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `F`: The type of the function, which must be `Fn(Context) -> Fut + Send + Sync + 'static`.
-    /// - `Fut`: The future returned by the function, which must be `Future<Output = ()> + Send + 'static`.
-    ///
-    /// # Arguments
-    ///
-    /// - `hook` - The function to be used as the request hook.
-    ///
-    /// # Returns
-    ///
-    /// The modified WebSocket configuration instance.
-    pub fn set_request_hook<F, Fut>(mut self, hook: F) -> Self
-    where
-        F: Fn(Context) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        self.request_hook = Arc::new(move |ctx| Box::pin(hook(ctx)));
-        self
-    }
-
-    /// Sets the sended hook function.
-    ///
-    /// This hook is executed after a message has been sent.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `F`: The type of the function, which must be `Fn(Context) -> Fut + Send + Sync + 'static`.
-    /// - `Fut`: The future returned by the function, which must be `Future<Output = ()> + Send + 'static`.
-    ///
-    /// # Arguments
-    ///
-    /// - `hook` - The function to be used as the sended hook.
-    ///
-    /// # Returns
-    ///
-    /// The modified WebSocket configuration instance.
-    pub fn set_sended_hook<F, Fut>(mut self, hook: F) -> Self
-    where
-        F: Fn(Context) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        self.sended_hook = Arc::new(move |ctx| Box::pin(hook(ctx)));
-        self
-    }
-
-    /// Sets the closed hook function.
-    ///
-    /// This hook is executed when the WebSocket connection is closed.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `F`: The type of the function, which must be `Fn(Context) -> Fut + Send + Sync + 'static`.
-    /// - `Fut`: The future returned by the function, which must be `Future<Output = ()> + Send + 'static`.
-    ///
-    /// # Arguments
-    ///
-    /// - `hook` - The function to be used as the closed hook.
-    ///
-    /// # Returns
-    ///
-    /// The modified WebSocket configuration instance.
-    pub fn set_closed_hook<F, Fut>(mut self, hook: F) -> Self
-    where
-        F: Fn(Context) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        self.closed_hook = Arc::new(move |ctx| Box::pin(hook(ctx)));
         self
     }
 
@@ -17869,6 +22038,7 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `&Context` - A reference to the context object.
+    #[inline]
     pub fn get_context(&self) -> &Context {
         &self.context
     }
@@ -17878,6 +22048,7 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `usize` - The buffer size in bytes.
+    #[inline]
     pub fn get_buffer_size(&self) -> usize {
         self.buffer_size
     }
@@ -17887,6 +22058,7 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `Capacity` - The capacity.
+    #[inline]
     pub fn get_capacity(&self) -> Capacity {
         self.capacity
     }
@@ -17896,34 +22068,155 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
     /// # Returns
     ///
     /// - `&BroadcastType<B>` - A reference to the broadcast type object.
+    #[inline]
     pub fn get_broadcast_type(&self) -> &BroadcastType<B> {
         &self.broadcast_type
     }
 
-    /// Retrieves a reference to the request hook function.
+    /// Sets the request hook handler.
+    ///
+    /// This hook is executed when a new request is received on the WebSocket.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `S`: The hook type, which must implement `ServerHook`.
     ///
     /// # Returns
     ///
-    /// - `&ArcFnContextPinBoxSendSync<()>` - A reference to the request hook.
-    pub fn get_request_hook(&self) -> &ArcFnContextPinBoxSendSync<()> {
+    /// The modified `WebSocketConfig` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// struct MyRequestHook;
+    /// impl ServerHook for MyRequestHook {
+    ///     async fn new(_ctx: &Context) -> Self { Self }
+    ///     async fn handle(self, ctx: &Context) { /* ... */ }
+    /// }
+    ///
+    /// let config = WebSocketConfig::new()
+    ///     .set_request_hook::<MyRequestHook>();
+    /// ```
+    #[inline]
+    pub fn set_request_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.request_hook = Arc::new(|ctx| {
+            let ctx: Context = ctx.clone();
+            Box::pin(async move {
+                let hook = S::new(&ctx).await;
+                hook.handle(&ctx).await;
+            })
+        });
+        self
+    }
+
+    /// Sets the sended hook handler.
+    ///
+    /// This hook is executed after a message has been successfully sent over the WebSocket.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `S`: The hook type, which must implement `ServerHook`.
+    ///
+    /// # Returns
+    ///
+    /// The modified `WebSocketConfig` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// struct MySendedHook;
+    /// impl ServerHook for MySendedHook {
+    ///     async fn new(_ctx: &Context) -> Self { Self }
+    ///     async fn handle(self, ctx: &Context) { /* ... */ }
+    /// }
+    ///
+    /// let config = WebSocketConfig::new()
+    ///     .set_sended_hook::<MySendedHook>();
+    /// ```
+    #[inline]
+    pub fn set_sended_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.sended_hook = Arc::new(|ctx| {
+            let ctx: Context = ctx.clone();
+            Box::pin(async move {
+                let hook = S::new(&ctx).await;
+                hook.handle(&ctx).await;
+            })
+        });
+        self
+    }
+
+    /// Sets the closed hook handler.
+    ///
+    /// This hook is executed when the WebSocket connection is closed.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `S`: The hook type, which must implement `ServerHook`.
+    ///
+    /// # Returns
+    ///
+    /// The modified `WebSocketConfig` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// struct MyClosedHook;
+    /// impl ServerHook for MyClosedHook {
+    ///     async fn new(_ctx: &Context) -> Self { Self }
+    ///     async fn handle(self, ctx: &Context) { /* ... */ }
+    /// }
+    ///
+    /// let config = WebSocketConfig::new()
+    ///     .set_closed_hook::<MyClosedHook>();
+    /// ```
+    #[inline]
+    pub fn set_closed_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.closed_hook = Arc::new(|ctx| {
+            let ctx: Context = ctx.clone();
+            Box::pin(async move {
+                let hook = S::new(&ctx).await;
+                hook.handle(&ctx).await;
+            })
+        });
+        self
+    }
+
+    /// Retrieves a reference to the request hook handler.
+    ///
+    /// # Returns
+    ///
+    /// - `&ServerHookHandler` - A reference to the request hook handler.
+    #[inline]
+    pub fn get_request_hook(&self) -> &ServerHookHandler {
         &self.request_hook
     }
 
-    /// Retrieves a reference to the sended hook function.
+    /// Retrieves a reference to the sended hook handler.
     ///
     /// # Returns
     ///
-    /// - `&ArcFnContextPinBoxSendSync<()>` - A reference to the sended hook.
-    pub fn get_sended_hook(&self) -> &ArcFnContextPinBoxSendSync<()> {
+    /// - `&ServerHookHandler` - A reference to the sended hook handler.
+    #[inline]
+    pub fn get_sended_hook(&self) -> &ServerHookHandler {
         &self.sended_hook
     }
 
-    /// Retrieves a reference to the closed hook function.
+    /// Retrieves a reference to the closed hook handler.
     ///
     /// # Returns
     ///
-    /// - `&ArcFnContextPinBoxSendSync<()>` - A reference to the closed hook.
-    pub fn get_closed_hook(&self) -> &ArcFnContextPinBoxSendSync<()> {
+    /// - `&ServerHookHandler` - A reference to the closed hook handler.
+    #[inline]
+    pub fn get_closed_hook(&self) -> &ServerHookHandler {
         &self.closed_hook
     }
 }
@@ -17936,10 +22229,9 @@ impl WebSocket {
     /// # Returns
     ///
     /// - `WebSocket` - A new WebSocket instance.
+    #[inline]
     pub fn new() -> Self {
-        Self {
-            broadcast_map: BroadcastMap::default(),
-        }
+        Self::default()
     }
 
     /// Subscribes to a broadcast type or inserts a new one if it doesn't exist.
@@ -17956,6 +22248,7 @@ impl WebSocket {
     /// # Returns
     ///
     /// - `BroadcastMapReceiver<Vec<u8>>` - A broadcast map receiver for the specified broadcast type.
+    #[inline]
     fn subscribe_unwrap_or_insert<B: BroadcastTypeTrait>(
         &self,
         broadcast_type: BroadcastType<B>,
@@ -17980,6 +22273,7 @@ impl WebSocket {
     /// # Returns
     ///
     /// - `BroadcastMapReceiver<Vec<u8>>` - A broadcast map receiver for the point-to-point broadcast.
+    #[inline]
     fn point_to_point<B: BroadcastTypeTrait>(
         &self,
         key1: &B,
@@ -18006,6 +22300,7 @@ impl WebSocket {
     /// # Returns
     ///
     /// - `BroadcastMapReceiver<Vec<u8>>` - A broadcast map receiver for the point-to-group broadcast.
+    #[inline]
     fn point_to_group<B: BroadcastTypeTrait>(
         &self,
         key: &B,
@@ -18027,7 +22322,8 @@ impl WebSocket {
     /// # Returns
     ///
     /// - `ReceiverCount` - The number of active receivers for the broadcast type, or 0 if not found.
-    pub fn receiver_count<'a, B: BroadcastTypeTrait>(
+    #[inline]
+    pub fn receiver_count<B: BroadcastTypeTrait>(
         &self,
         broadcast_type: BroadcastType<B>,
     ) -> ReceiverCount {
@@ -18050,12 +22346,13 @@ impl WebSocket {
     /// # Returns
     ///
     /// - `ReceiverCount` - The incremented receiver count.
+    #[inline]
     pub fn receiver_count_after_increment<B: BroadcastTypeTrait>(
         &self,
         broadcast_type: BroadcastType<B>,
     ) -> ReceiverCount {
         let count: ReceiverCount = self.receiver_count(broadcast_type);
-        count.max(0).min(ReceiverCount::MAX - 1) + 1
+        count.clamp(0, ReceiverCount::MAX - 1) + 1
     }
 
     /// Calculates the receiver count after decrementing it.
@@ -18073,12 +22370,13 @@ impl WebSocket {
     /// # Returns
     ///
     /// - `ReceiverCount` - The decremented receiver count.
+    #[inline]
     pub fn receiver_count_after_decrement<B: BroadcastTypeTrait>(
         &self,
         broadcast_type: BroadcastType<B>,
     ) -> ReceiverCount {
         let count: ReceiverCount = self.receiver_count(broadcast_type);
-        count.max(1).min(ReceiverCount::MAX) - 1
+        count.clamp(1, ReceiverCount::MAX) - 1
     }
 
     /// Sends data to all active receivers for a given broadcast type.
@@ -18096,6 +22394,7 @@ impl WebSocket {
     /// # Returns
     ///
     /// - `BroadcastMapSendResult<Vec<u8>>` - A result indicating the success or failure of the send operation.
+    #[inline]
     pub fn send<T, B>(
         &self,
         broadcast_type: BroadcastType<B>,
@@ -18149,14 +22448,14 @@ impl WebSocket {
                 request_res = ctx.ws_from_stream(buffer_size) => {
                     let mut need_break = false;
                     if request_res.is_ok() {
-                        config.get_request_hook()(ctx.clone()).await;
+                        config.get_request_hook()(&ctx).await;
                     } else {
                         need_break = true;
-                        config.get_closed_hook()(ctx.clone()).await;
+                        config.get_closed_hook()(&ctx).await;
                     }
                     let body: ResponseBody = ctx.get_response_body().await;
                     let is_err: bool = self.broadcast_map.send(&key, body).is_err();
-                    config.get_sended_hook()(ctx.clone()).await;
+                    config.get_sended_hook()(&ctx).await;
                     if need_break || is_err {
                         break;
                     }
@@ -18178,7 +22477,7 @@ impl WebSocket {
 
 ```
 
-### 📄 File #385 - `mod.rs`
+### 📄 File #526 - `mod.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\mod.rs`
 - **Size**: `119 B`
 - **Modified Time**: `2025-09-15T22:37:26.969929`
@@ -18194,10 +22493,10 @@ pub(crate) mod r#trait;
 
 ```
 
-### 📄 File #386 - `struct.rs`
+### 📄 File #527 - `struct.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\struct.rs`
-- **Size**: `2,098 B`
-- **Modified Time**: `2025-09-15T22:37:26.970439`
+- **Size**: `2,056 B`
+- **Modified Time**: `2025-10-21T08:11:51.023412`
 
 #### Content Preview
 
@@ -18208,7 +22507,7 @@ use crate::*;
 ///
 /// This struct manages broadcast capabilities and holds the internal broadcast map
 /// responsible for handling message distribution to various WebSocket connections.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct WebSocket {
     /// The internal broadcast map.
     ///
@@ -18220,7 +22519,7 @@ pub struct WebSocket {
 ///
 /// This struct encapsulates all necessary parameters for setting up and managing
 /// a WebSocket connection, including context, buffer sizes, capacity, broadcast type,
-/// and various hook functions for different lifecycle events.
+/// and hook handlers for different lifecycle events.
 ///
 /// # Type Parameters
 ///
@@ -18244,23 +22543,23 @@ pub struct WebSocketConfig<B: BroadcastTypeTrait> {
     /// This defines the type of broadcast this WebSocket connection will participate in
     /// (point-to-point or point-to-group).
     pub(super) broadcast_type: BroadcastType<B>,
-    /// The request hook function.
+    /// The request hook handler.
     ///
     /// This hook is executed when a new request is received on the WebSocket.
-    pub(super) request_hook: ArcFnContextPinBoxSendSync<()>,
-    /// The sended hook function.
+    pub(super) request_hook: ServerHookHandler,
+    /// The sended hook handler.
     ///
     /// This hook is executed after a message has been successfully sent over the WebSocket.
-    pub(super) sended_hook: ArcFnContextPinBoxSendSync<()>,
-    /// The closed hook function.
+    pub(super) sended_hook: ServerHookHandler,
+    /// The closed hook handler.
     ///
     /// This hook is executed when the WebSocket connection is closed.
-    pub(super) closed_hook: ArcFnContextPinBoxSendSync<()>,
+    pub(super) closed_hook: ServerHookHandler,
 }
 
 ```
 
-### 📄 File #387 - `trait.rs`
+### 📄 File #528 - `trait.rs`
 - **Path**: `hyperlane-plugin-websocket\src\websocket\trait.rs`
 - **Size**: `245 B`
 - **Modified Time**: `2025-09-15T22:37:26.970439`
@@ -18276,34 +22575,34 @@ pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 
 ```
 
-### 📄 File #388 - `.gitignore`
+### 📄 File #529 - `.gitignore`
 - **Path**: `hyperlane-quick-start\.gitignore`
-- **Size**: `50 B`
-- **Modified Time**: `2025-09-15T22:37:17.324739`
+- **Size**: `56 B`
+- **Modified Time**: `2025-10-21T08:11:45.318773`
 
 #### Content Preview
 
 
 
-### 📄 File #389 - `Cargo.lock`
+### 📄 File #530 - `Cargo.lock`
 - **Path**: `hyperlane-quick-start\Cargo.lock`
-- **Size**: `58,324 B`
-- **Modified Time**: `2025-10-01T21:58:37.485286`
+- **Size**: `103,691 B`
+- **Modified Time**: `2025-10-21T08:11:45.319773`
 
 #### Content Preview
 
 
 
-### 📄 File #390 - `Cargo.toml`
+### 📄 File #531 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\Cargo.toml`
-- **Size**: `1,497 B`
-- **Modified Time**: `2025-10-01T21:58:37.503267`
+- **Size**: `1,516 B`
+- **Modified Time**: `2025-10-21T08:11:45.319773`
 
 #### Content Preview
 
 
 
-### 📄 File #391 - `LICENSE`
+### 📄 File #532 - `LICENSE`
 - **Path**: `hyperlane-quick-start\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:17.325739`
@@ -18312,10 +22611,10 @@ pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 
 
 
-### 📄 File #392 - `README.md`
+### 📄 File #533 - `README.md`
 - **Path**: `hyperlane-quick-start\README.md`
-- **Size**: `2,129 B`
-- **Modified Time**: `2025-09-15T22:37:17.325739`
+- **Size**: `2,481 B`
+- **Modified Time**: `2025-10-21T08:11:45.320278`
 
 #### Content Preview
 
@@ -18388,11 +22687,19 @@ cargo run restart -d
 
 ### WeChat Pay
 
-<img src="https://docs.ltpp.vip/img/wechat-pay.png" width="200">
+<img src="https://docs.ltpp.vip/img/wechatpay.png" width="200">
 
 ### Alipay
 
-<img src="https://docs.ltpp.vip/img/alipay-pay.jpg" width="200">
+<img src="https://docs.ltpp.vip/img/alipay.png" width="200">
+
+### Virtual Currency Pay
+
+| Virtual Currency | Virtual Currency Address                   |
+| ---------------- | ------------------------------------------ |
+| BTC              | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
+| ETH              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
+| BSC              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 
 ## License
 
@@ -18408,10 +22715,10 @@ If you have any questions, please contact the author: [root@ltpp.vip](mailto:roo
 
 ```
 
-### 📄 File #393 - `README.ZH-CN.md`
+### 📄 File #534 - `README.ZH-CN.md`
 - **Path**: `hyperlane-quick-start\README.ZH-CN.md`
-- **Size**: `2,056 B`
-- **Modified Time**: `2025-09-15T22:37:17.325739`
+- **Size**: `2,376 B`
+- **Modified Time**: `2025-10-21T08:11:45.320278`
 
 #### Content Preview
 
@@ -18484,11 +22791,19 @@ cargo run restart -d
 
 ### 微信支付
 
-<img src="https://docs.ltpp.vip/img/wechat-pay.png" width="200">
+<img src="https://docs.ltpp.vip/img/wechatpay.png" width="200">
 
 ### 支付宝支付
 
-<img src="https://docs.ltpp.vip/img/alipay-pay.jpg" width="200">
+<img src="https://docs.ltpp.vip/img/alipay.png" width="200">
+
+### 虚拟货币支付
+
+| 虚拟货币 | 虚拟货币地址                               |
+| -------- | ------------------------------------------ |
+| BTC      | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
+| ETH      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
+| BSC      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 
 ## 许可证
 
@@ -18504,7 +22819,7 @@ cargo run restart -d
 
 ```
 
-### 📄 File #394 - `config`
+### 📄 File #535 - `config`
 - **Path**: `hyperlane-quick-start\.git\config`
 - **Size**: `331 B`
 - **Modified Time**: `2025-09-15T22:37:17.317739`
@@ -18513,7 +22828,7 @@ cargo run restart -d
 
 
 
-### 📄 File #395 - `description`
+### 📄 File #536 - `description`
 - **Path**: `hyperlane-quick-start\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:15.228194`
@@ -18522,16 +22837,16 @@ cargo run restart -d
 
 
 
-### 📄 File #396 - `FETCH_HEAD`
+### 📄 File #537 - `FETCH_HEAD`
 - **Path**: `hyperlane-quick-start\.git\FETCH_HEAD`
-- **Size**: `242 B`
-- **Modified Time**: `2025-10-01T21:58:37.431512`
+- **Size**: `620 B`
+- **Modified Time**: `2025-10-21T08:11:45.268925`
 
 #### Content Preview
 
 
 
-### 📄 File #397 - `HEAD`
+### 📄 File #538 - `HEAD`
 - **Path**: `hyperlane-quick-start\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:17.309951`
@@ -18540,25 +22855,25 @@ cargo run restart -d
 
 
 
-### 📄 File #398 - `index`
+### 📄 File #539 - `index`
 - **Path**: `hyperlane-quick-start\.git\index`
-- **Size**: `9,650 B`
-- **Modified Time**: `2025-10-01T21:58:37.583193`
+- **Size**: `10,383 B`
+- **Modified Time**: `2025-10-21T08:11:45.333279`
 
 #### Content Preview
 
 
 
-### 📄 File #399 - `ORIG_HEAD`
+### 📄 File #540 - `ORIG_HEAD`
 - **Path**: `hyperlane-quick-start\.git\ORIG_HEAD`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:44:15.407859`
+- **Modified Time**: `2025-10-21T08:11:45.309988`
 
 #### Content Preview
 
 
 
-### 📄 File #400 - `packed-refs`
+### 📄 File #541 - `packed-refs`
 - **Path**: `hyperlane-quick-start\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:17.298243`
@@ -18567,7 +22882,7 @@ cargo run restart -d
 
 
 
-### 📄 File #401 - `shallow`
+### 📄 File #542 - `shallow`
 - **Path**: `hyperlane-quick-start\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:17.201798`
@@ -18576,7 +22891,7 @@ cargo run restart -d
 
 
 
-### 📄 File #402 - `applypatch-msg.sample`
+### 📄 File #543 - `applypatch-msg.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:15.228194`
@@ -18585,7 +22900,7 @@ cargo run restart -d
 
 
 
-### 📄 File #403 - `commit-msg.sample`
+### 📄 File #544 - `commit-msg.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:15.228194`
@@ -18594,7 +22909,7 @@ cargo run restart -d
 
 
 
-### 📄 File #404 - `fsmonitor-watchman.sample`
+### 📄 File #545 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18603,7 +22918,7 @@ cargo run restart -d
 
 
 
-### 📄 File #405 - `post-update.sample`
+### 📄 File #546 - `post-update.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18612,7 +22927,7 @@ cargo run restart -d
 
 
 
-### 📄 File #406 - `pre-applypatch.sample`
+### 📄 File #547 - `pre-applypatch.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18621,7 +22936,7 @@ cargo run restart -d
 
 
 
-### 📄 File #407 - `pre-commit.sample`
+### 📄 File #548 - `pre-commit.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18630,7 +22945,7 @@ cargo run restart -d
 
 
 
-### 📄 File #408 - `pre-merge-commit.sample`
+### 📄 File #549 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18639,7 +22954,7 @@ cargo run restart -d
 
 
 
-### 📄 File #409 - `pre-push.sample`
+### 📄 File #550 - `pre-push.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:15.229194`
@@ -18648,7 +22963,7 @@ cargo run restart -d
 
 
 
-### 📄 File #410 - `pre-rebase.sample`
+### 📄 File #551 - `pre-rebase.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18657,7 +22972,7 @@ cargo run restart -d
 
 
 
-### 📄 File #411 - `pre-receive.sample`
+### 📄 File #552 - `pre-receive.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18666,7 +22981,7 @@ cargo run restart -d
 
 
 
-### 📄 File #412 - `prepare-commit-msg.sample`
+### 📄 File #553 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18675,7 +22990,7 @@ cargo run restart -d
 
 
 
-### 📄 File #413 - `push-to-checkout.sample`
+### 📄 File #554 - `push-to-checkout.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18684,7 +22999,7 @@ cargo run restart -d
 
 
 
-### 📄 File #414 - `sendemail-validate.sample`
+### 📄 File #555 - `sendemail-validate.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:15.230194`
@@ -18693,7 +23008,7 @@ cargo run restart -d
 
 
 
-### 📄 File #415 - `update.sample`
+### 📄 File #556 - `update.sample`
 - **Path**: `hyperlane-quick-start\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:15.231194`
@@ -18702,7 +23017,7 @@ cargo run restart -d
 
 
 
-### 📄 File #416 - `exclude`
+### 📄 File #557 - `exclude`
 - **Path**: `hyperlane-quick-start\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:15.231194`
@@ -18711,25 +23026,25 @@ cargo run restart -d
 
 
 
-### 📄 File #417 - `HEAD`
+### 📄 File #558 - `HEAD`
 - **Path**: `hyperlane-quick-start\.git\logs\HEAD`
-- **Size**: `349 B`
-- **Modified Time**: `2025-10-01T21:58:37.584757`
+- **Size**: `502 B`
+- **Modified Time**: `2025-10-21T08:11:45.334279`
 
 #### Content Preview
 
 
 
-### 📄 File #418 - `master`
+### 📄 File #559 - `master`
 - **Path**: `hyperlane-quick-start\.git\logs\refs\heads\master`
-- **Size**: `349 B`
-- **Modified Time**: `2025-10-01T21:58:37.584757`
+- **Size**: `502 B`
+- **Modified Time**: `2025-10-21T08:11:45.334779`
 
 #### Content Preview
 
 
 
-### 📄 File #419 - `HEAD`
+### 📄 File #560 - `HEAD`
 - **Path**: `hyperlane-quick-start\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `196 B`
 - **Modified Time**: `2025-09-15T22:37:17.308951`
@@ -18738,16 +23053,16 @@ cargo run restart -d
 
 
 
-### 📄 File #420 - `master`
+### 📄 File #561 - `master`
 - **Path**: `hyperlane-quick-start\.git\logs\refs\remotes\origin\master`
-- **Size**: `153 B`
-- **Modified Time**: `2025-10-01T21:58:37.366450`
+- **Size**: `306 B`
+- **Modified Time**: `2025-10-21T08:11:45.208979`
 
 #### Content Preview
 
 
 
-### 📄 File #421 - `54822384d766ce6ee631d890def4e46ba79d8c`
+### 📄 File #562 - `54822384d766ce6ee631d890def4e46ba79d8c`
 - **Path**: `hyperlane-quick-start\.git\objects\00\54822384d766ce6ee631d890def4e46ba79d8c`
 - **Size**: `78 B`
 - **Modified Time**: `2025-10-01T21:58:36.992006`
@@ -18756,7 +23071,7 @@ cargo run restart -d
 
 
 
-### 📄 File #422 - `6a150fdc67b73bc4212f336e5c23af9933b057`
+### 📄 File #563 - `6a150fdc67b73bc4212f336e5c23af9933b057`
 - **Path**: `hyperlane-quick-start\.git\objects\10\6a150fdc67b73bc4212f336e5c23af9933b057`
 - **Size**: `116 B`
 - **Modified Time**: `2025-10-01T21:58:36.992006`
@@ -18765,7 +23080,7 @@ cargo run restart -d
 
 
 
-### 📄 File #423 - `90f492cd7fdb1010952e7a3a4a30d8a87d968e`
+### 📄 File #564 - `90f492cd7fdb1010952e7a3a4a30d8a87d968e`
 - **Path**: `hyperlane-quick-start\.git\objects\12\90f492cd7fdb1010952e7a3a4a30d8a87d968e`
 - **Size**: `164 B`
 - **Modified Time**: `2025-10-01T21:58:36.986875`
@@ -18774,7 +23089,7 @@ cargo run restart -d
 
 
 
-### 📄 File #424 - `5ab91ae5c9cdb5a06a916525dee765e6211d61`
+### 📄 File #565 - `5ab91ae5c9cdb5a06a916525dee765e6211d61`
 - **Path**: `hyperlane-quick-start\.git\objects\13\5ab91ae5c9cdb5a06a916525dee765e6211d61`
 - **Size**: `678 B`
 - **Modified Time**: `2025-10-01T21:58:37.065431`
@@ -18783,7 +23098,7 @@ cargo run restart -d
 
 
 
-### 📄 File #425 - `f8ce4b0a44372820420b5158a08b27a3404c2e`
+### 📄 File #566 - `f8ce4b0a44372820420b5158a08b27a3404c2e`
 - **Path**: `hyperlane-quick-start\.git\objects\15\f8ce4b0a44372820420b5158a08b27a3404c2e`
 - **Size**: `109 B`
 - **Modified Time**: `2025-10-01T21:58:37.012248`
@@ -18792,7 +23107,7 @@ cargo run restart -d
 
 
 
-### 📄 File #426 - `5c6629985f2e0b3a49995306bdd6b0286b6f41`
+### 📄 File #567 - `5c6629985f2e0b3a49995306bdd6b0286b6f41`
 - **Path**: `hyperlane-quick-start\.git\objects\22\5c6629985f2e0b3a49995306bdd6b0286b6f41`
 - **Size**: `393 B`
 - **Modified Time**: `2025-10-01T21:58:37.022772`
@@ -18801,7 +23116,7 @@ cargo run restart -d
 
 
 
-### 📄 File #427 - `b8559eacc9f2458f2afb02f37abdc146c5c85e`
+### 📄 File #568 - `b8559eacc9f2458f2afb02f37abdc146c5c85e`
 - **Path**: `hyperlane-quick-start\.git\objects\22\b8559eacc9f2458f2afb02f37abdc146c5c85e`
 - **Size**: `679 B`
 - **Modified Time**: `2025-10-01T21:58:37.084678`
@@ -18810,7 +23125,7 @@ cargo run restart -d
 
 
 
-### 📄 File #428 - `a250a9d9c3485e283e66646ebc496b82f181e5`
+### 📄 File #569 - `a250a9d9c3485e283e66646ebc496b82f181e5`
 - **Path**: `hyperlane-quick-start\.git\objects\27\a250a9d9c3485e283e66646ebc496b82f181e5`
 - **Size**: `59 B`
 - **Modified Time**: `2025-10-01T21:58:37.119726`
@@ -18819,7 +23134,7 @@ cargo run restart -d
 
 
 
-### 📄 File #429 - `f555398305b31f3386b093c4db4dcbd49cf2e6`
+### 📄 File #570 - `f555398305b31f3386b093c4db4dcbd49cf2e6`
 - **Path**: `hyperlane-quick-start\.git\objects\27\f555398305b31f3386b093c4db4dcbd49cf2e6`
 - **Size**: `392 B`
 - **Modified Time**: `2025-10-01T21:58:37.022772`
@@ -18828,7 +23143,7 @@ cargo run restart -d
 
 
 
-### 📄 File #430 - `ed63df6d88585f1103dde2f099d2322dea88ca`
+### 📄 File #571 - `ed63df6d88585f1103dde2f099d2322dea88ca`
 - **Path**: `hyperlane-quick-start\.git\objects\2d\ed63df6d88585f1103dde2f099d2322dea88ca`
 - **Size**: `679 B`
 - **Modified Time**: `2025-10-01T21:58:37.065431`
@@ -18837,7 +23152,7 @@ cargo run restart -d
 
 
 
-### 📄 File #431 - `a8cf67216bd3c2b97ceed09696b4c06ce0852e`
+### 📄 File #572 - `a8cf67216bd3c2b97ceed09696b4c06ce0852e`
 - **Path**: `hyperlane-quick-start\.git\objects\2f\a8cf67216bd3c2b97ceed09696b4c06ce0852e`
 - **Size**: `660 B`
 - **Modified Time**: `2025-10-01T21:58:37.132122`
@@ -18846,7 +23161,7 @@ cargo run restart -d
 
 
 
-### 📄 File #432 - `0d28dfbcbc1dcb97ba4c9e932efffb0636cdd0`
+### 📄 File #573 - `0d28dfbcbc1dcb97ba4c9e932efffb0636cdd0`
 - **Path**: `hyperlane-quick-start\.git\objects\30\0d28dfbcbc1dcb97ba4c9e932efffb0636cdd0`
 - **Size**: `78 B`
 - **Modified Time**: `2025-10-01T21:58:36.992006`
@@ -18855,7 +23170,7 @@ cargo run restart -d
 
 
 
-### 📄 File #433 - `2608accffd421b27efeadbd1808db4235cd6bc`
+### 📄 File #574 - `2608accffd421b27efeadbd1808db4235cd6bc`
 - **Path**: `hyperlane-quick-start\.git\objects\31\2608accffd421b27efeadbd1808db4235cd6bc`
 - **Size**: `67 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -18864,7 +23179,7 @@ cargo run restart -d
 
 
 
-### 📄 File #434 - `27cd89e2629a5181ae250fd6316c5f2775bc00`
+### 📄 File #575 - `27cd89e2629a5181ae250fd6316c5f2775bc00`
 - **Path**: `hyperlane-quick-start\.git\objects\33\27cd89e2629a5181ae250fd6316c5f2775bc00`
 - **Size**: `112 B`
 - **Modified Time**: `2025-10-01T21:58:37.022772`
@@ -18873,7 +23188,7 @@ cargo run restart -d
 
 
 
-### 📄 File #435 - `4b16ecc3dde7d279b3b3a7d6570e045c868a95`
+### 📄 File #576 - `4b16ecc3dde7d279b3b3a7d6570e045c868a95`
 - **Path**: `hyperlane-quick-start\.git\objects\40\4b16ecc3dde7d279b3b3a7d6570e045c868a95`
 - **Size**: `82 B`
 - **Modified Time**: `2025-10-01T21:58:37.015493`
@@ -18882,7 +23197,7 @@ cargo run restart -d
 
 
 
-### 📄 File #436 - `0b8c4d48c905d6f8e9b5f1ae7eb95180c9c5a6`
+### 📄 File #577 - `0b8c4d48c905d6f8e9b5f1ae7eb95180c9c5a6`
 - **Path**: `hyperlane-quick-start\.git\objects\43\0b8c4d48c905d6f8e9b5f1ae7eb95180c9c5a6`
 - **Size**: `79 B`
 - **Modified Time**: `2025-10-01T21:58:36.992006`
@@ -18891,7 +23206,7 @@ cargo run restart -d
 
 
 
-### 📄 File #437 - `214f3861f80d366e88edfcacf9e9abc8ae937a`
+### 📄 File #578 - `214f3861f80d366e88edfcacf9e9abc8ae937a`
 - **Path**: `hyperlane-quick-start\.git\objects\48\214f3861f80d366e88edfcacf9e9abc8ae937a`
 - **Size**: `105 B`
 - **Modified Time**: `2025-10-01T21:58:37.123610`
@@ -18900,7 +23215,7 @@ cargo run restart -d
 
 
 
-### 📄 File #438 - `34d31fc11eb7debbe5c7f06dadab88eb192af6`
+### 📄 File #579 - `34d31fc11eb7debbe5c7f06dadab88eb192af6`
 - **Path**: `hyperlane-quick-start\.git\objects\48\34d31fc11eb7debbe5c7f06dadab88eb192af6`
 - **Size**: `81 B`
 - **Modified Time**: `2025-10-01T21:58:37.011296`
@@ -18909,7 +23224,7 @@ cargo run restart -d
 
 
 
-### 📄 File #439 - `50ce1c515dd2247f606d3e920ee5e4d130433c`
+### 📄 File #580 - `50ce1c515dd2247f606d3e920ee5e4d130433c`
 - **Path**: `hyperlane-quick-start\.git\objects\49\50ce1c515dd2247f606d3e920ee5e4d130433c`
 - **Size**: `107 B`
 - **Modified Time**: `2025-10-01T21:58:37.148859`
@@ -18918,7 +23233,7 @@ cargo run restart -d
 
 
 
-### 📄 File #440 - `7e7bd50ff79b8b70899c7ddb2b67445bee3d61`
+### 📄 File #581 - `7e7bd50ff79b8b70899c7ddb2b67445bee3d61`
 - **Path**: `hyperlane-quick-start\.git\objects\49\7e7bd50ff79b8b70899c7ddb2b67445bee3d61`
 - **Size**: `314 B`
 - **Modified Time**: `2025-10-01T21:58:37.091820`
@@ -18927,7 +23242,7 @@ cargo run restart -d
 
 
 
-### 📄 File #441 - `83dba23be6c95595edaa65c30e7529e84e66e5`
+### 📄 File #582 - `83dba23be6c95595edaa65c30e7529e84e66e5`
 - **Path**: `hyperlane-quick-start\.git\objects\4a\83dba23be6c95595edaa65c30e7529e84e66e5`
 - **Size**: `78 B`
 - **Modified Time**: `2025-10-01T21:58:36.992006`
@@ -18936,7 +23251,7 @@ cargo run restart -d
 
 
 
-### 📄 File #442 - `eb508a34daebbd0220a600b37f26067bb7ab0b`
+### 📄 File #583 - `eb508a34daebbd0220a600b37f26067bb7ab0b`
 - **Path**: `hyperlane-quick-start\.git\objects\4c\eb508a34daebbd0220a600b37f26067bb7ab0b`
 - **Size**: `279 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -18945,7 +23260,7 @@ cargo run restart -d
 
 
 
-### 📄 File #443 - `3b39e1611a66369743526c0990c3e0ea1f13d5`
+### 📄 File #584 - `3b39e1611a66369743526c0990c3e0ea1f13d5`
 - **Path**: `hyperlane-quick-start\.git\objects\4d\3b39e1611a66369743526c0990c3e0ea1f13d5`
 - **Size**: `16,603 B`
 - **Modified Time**: `2025-10-01T21:58:37.036698`
@@ -18954,7 +23269,7 @@ cargo run restart -d
 
 
 
-### 📄 File #444 - `a3fd145164ba0be2f0b975cdd129a32becb68f`
+### 📄 File #585 - `a3fd145164ba0be2f0b975cdd129a32becb68f`
 - **Path**: `hyperlane-quick-start\.git\objects\4f\a3fd145164ba0be2f0b975cdd129a32becb68f`
 - **Size**: `81 B`
 - **Modified Time**: `2025-10-01T21:58:37.005793`
@@ -18963,7 +23278,7 @@ cargo run restart -d
 
 
 
-### 📄 File #445 - `0ee3ab08804c8a6406bff9833c3ccce4b01504`
+### 📄 File #586 - `0ee3ab08804c8a6406bff9833c3ccce4b01504`
 - **Path**: `hyperlane-quick-start\.git\objects\51\0ee3ab08804c8a6406bff9833c3ccce4b01504`
 - **Size**: `78 B`
 - **Modified Time**: `2025-10-01T21:58:36.992006`
@@ -18972,7 +23287,7 @@ cargo run restart -d
 
 
 
-### 📄 File #446 - `9aa533f1cbeafb3559a76be8a1baf1ef38ddf8`
+### 📄 File #587 - `9aa533f1cbeafb3559a76be8a1baf1ef38ddf8`
 - **Path**: `hyperlane-quick-start\.git\objects\52\9aa533f1cbeafb3559a76be8a1baf1ef38ddf8`
 - **Size**: `678 B`
 - **Modified Time**: `2025-10-01T21:58:37.065431`
@@ -18981,7 +23296,7 @@ cargo run restart -d
 
 
 
-### 📄 File #447 - `ec1719125d40680e7185dd8252fbcec3a9fee1`
+### 📄 File #588 - `ec1719125d40680e7185dd8252fbcec3a9fee1`
 - **Path**: `hyperlane-quick-start\.git\objects\52\ec1719125d40680e7185dd8252fbcec3a9fee1`
 - **Size**: `147 B`
 - **Modified Time**: `2025-10-01T21:58:37.015493`
@@ -18990,7 +23305,7 @@ cargo run restart -d
 
 
 
-### 📄 File #448 - `a480ed9211ef8f30fdd8d81dfce3de94c9db35`
+### 📄 File #589 - `a480ed9211ef8f30fdd8d81dfce3de94c9db35`
 - **Path**: `hyperlane-quick-start\.git\objects\54\a480ed9211ef8f30fdd8d81dfce3de94c9db35`
 - **Size**: `47 B`
 - **Modified Time**: `2025-10-01T21:58:37.022772`
@@ -18999,7 +23314,7 @@ cargo run restart -d
 
 
 
-### 📄 File #449 - `48cfad83eb58346dc8b84c4f08af91218044ac`
+### 📄 File #590 - `48cfad83eb58346dc8b84c4f08af91218044ac`
 - **Path**: `hyperlane-quick-start\.git\objects\55\48cfad83eb58346dc8b84c4f08af91218044ac`
 - **Size**: `98 B`
 - **Modified Time**: `2025-10-01T21:58:37.120730`
@@ -19008,7 +23323,7 @@ cargo run restart -d
 
 
 
-### 📄 File #450 - `20d6c18c5877978a0cbee2e6badf21b4c5ee42`
+### 📄 File #591 - `20d6c18c5877978a0cbee2e6badf21b4c5ee42`
 - **Path**: `hyperlane-quick-start\.git\objects\56\20d6c18c5877978a0cbee2e6badf21b4c5ee42`
 - **Size**: `359 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -19017,7 +23332,7 @@ cargo run restart -d
 
 
 
-### 📄 File #451 - `d15266d60b7c1466fecefb1822af05c233b5cf`
+### 📄 File #592 - `d15266d60b7c1466fecefb1822af05c233b5cf`
 - **Path**: `hyperlane-quick-start\.git\objects\62\d15266d60b7c1466fecefb1822af05c233b5cf`
 - **Size**: `175 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -19026,7 +23341,7 @@ cargo run restart -d
 
 
 
-### 📄 File #452 - `65615b924029e2a7e53212fd5ba815cb46575a`
+### 📄 File #593 - `65615b924029e2a7e53212fd5ba815cb46575a`
 - **Path**: `hyperlane-quick-start\.git\objects\65\65615b924029e2a7e53212fd5ba815cb46575a`
 - **Size**: `55 B`
 - **Modified Time**: `2025-10-01T21:58:37.015493`
@@ -19035,7 +23350,7 @@ cargo run restart -d
 
 
 
-### 📄 File #453 - `545319a2d8e86c21e3549bfdc02abc1d506405`
+### 📄 File #594 - `545319a2d8e86c21e3549bfdc02abc1d506405`
 - **Path**: `hyperlane-quick-start\.git\objects\6a\545319a2d8e86c21e3549bfdc02abc1d506405`
 - **Size**: `154 B`
 - **Modified Time**: `2025-10-01T21:58:37.150270`
@@ -19044,7 +23359,7 @@ cargo run restart -d
 
 
 
-### 📄 File #454 - `9ab9c109fc482abdbf626f3746f9bc45ba2338`
+### 📄 File #595 - `9ab9c109fc482abdbf626f3746f9bc45ba2338`
 - **Path**: `hyperlane-quick-start\.git\objects\6b\9ab9c109fc482abdbf626f3746f9bc45ba2338`
 - **Size**: `314 B`
 - **Modified Time**: `2025-10-01T21:58:37.101808`
@@ -19053,7 +23368,7 @@ cargo run restart -d
 
 
 
-### 📄 File #455 - `21b78e9a4050df1fb6255fe935a882dc45638a`
+### 📄 File #596 - `21b78e9a4050df1fb6255fe935a882dc45638a`
 - **Path**: `hyperlane-quick-start\.git\objects\71\21b78e9a4050df1fb6255fe935a882dc45638a`
 - **Size**: `166 B`
 - **Modified Time**: `2025-10-01T21:58:36.986875`
@@ -19062,7 +23377,7 @@ cargo run restart -d
 
 
 
-### 📄 File #456 - `3cccb763d62c6d5d49181726557b707bb4b808`
+### 📄 File #597 - `3cccb763d62c6d5d49181726557b707bb4b808`
 - **Path**: `hyperlane-quick-start\.git\objects\71\3cccb763d62c6d5d49181726557b707bb4b808`
 - **Size**: `170 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -19071,7 +23386,7 @@ cargo run restart -d
 
 
 
-### 📄 File #457 - `5fdf93e1cce1b3865e8b9ee763c2b5e2fa4b0e`
+### 📄 File #598 - `5fdf93e1cce1b3865e8b9ee763c2b5e2fa4b0e`
 - **Path**: `hyperlane-quick-start\.git\objects\72\5fdf93e1cce1b3865e8b9ee763c2b5e2fa4b0e`
 - **Size**: `679 B`
 - **Modified Time**: `2025-10-01T21:58:37.065431`
@@ -19080,7 +23395,7 @@ cargo run restart -d
 
 
 
-### 📄 File #458 - `094932d6587d087e45c36e5a96958b5b5256d9`
+### 📄 File #599 - `094932d6587d087e45c36e5a96958b5b5256d9`
 - **Path**: `hyperlane-quick-start\.git\objects\74\094932d6587d087e45c36e5a96958b5b5256d9`
 - **Size**: `16,598 B`
 - **Modified Time**: `2025-10-01T21:58:37.054503`
@@ -19089,7 +23404,7 @@ cargo run restart -d
 
 
 
-### 📄 File #459 - `e10753b5318a539ca2253a1b96c3db1f3c5f61`
+### 📄 File #600 - `e10753b5318a539ca2253a1b96c3db1f3c5f61`
 - **Path**: `hyperlane-quick-start\.git\objects\74\e10753b5318a539ca2253a1b96c3db1f3c5f61`
 - **Size**: `183 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -19098,7 +23413,7 @@ cargo run restart -d
 
 
 
-### 📄 File #460 - `ba2a490553300308a2c4345f9fb6a16a67b10e`
+### 📄 File #601 - `ba2a490553300308a2c4345f9fb6a16a67b10e`
 - **Path**: `hyperlane-quick-start\.git\objects\75\ba2a490553300308a2c4345f9fb6a16a67b10e`
 - **Size**: `150 B`
 - **Modified Time**: `2025-10-01T21:58:37.022772`
@@ -19107,7 +23422,7 @@ cargo run restart -d
 
 
 
-### 📄 File #461 - `41206b87dc1306c59c955a2559f4760ebf2fb5`
+### 📄 File #602 - `41206b87dc1306c59c955a2559f4760ebf2fb5`
 - **Path**: `hyperlane-quick-start\.git\objects\76\41206b87dc1306c59c955a2559f4760ebf2fb5`
 - **Size**: `678 B`
 - **Modified Time**: `2025-10-01T21:58:37.086672`
@@ -19116,7 +23431,7 @@ cargo run restart -d
 
 
 
-### 📄 File #462 - `a1e27fecfe5f2f43ecf02f7bab725a31979d37`
+### 📄 File #603 - `a1e27fecfe5f2f43ecf02f7bab725a31979d37`
 - **Path**: `hyperlane-quick-start\.git\objects\78\a1e27fecfe5f2f43ecf02f7bab725a31979d37`
 - **Size**: `71 B`
 - **Modified Time**: `2025-10-01T21:58:37.125590`
@@ -19125,7 +23440,7 @@ cargo run restart -d
 
 
 
-### 📄 File #463 - `0e9f911caa19cb8d553ed5b1f343166126f063`
+### 📄 File #604 - `0e9f911caa19cb8d553ed5b1f343166126f063`
 - **Path**: `hyperlane-quick-start\.git\objects\7b\0e9f911caa19cb8d553ed5b1f343166126f063`
 - **Size**: `16,606 B`
 - **Modified Time**: `2025-10-01T21:58:37.052457`
@@ -19134,7 +23449,7 @@ cargo run restart -d
 
 
 
-### 📄 File #464 - `c5699b50da97afc5af132dd09c2a768b8e612b`
+### 📄 File #605 - `c5699b50da97afc5af132dd09c2a768b8e612b`
 - **Path**: `hyperlane-quick-start\.git\objects\7c\c5699b50da97afc5af132dd09c2a768b8e612b`
 - **Size**: `192 B`
 - **Modified Time**: `2025-10-01T21:58:37.030787`
@@ -19143,7 +23458,7 @@ cargo run restart -d
 
 
 
-### 📄 File #465 - `05db84f55921ac2aec694a973c463e926ab73e`
+### 📄 File #606 - `05db84f55921ac2aec694a973c463e926ab73e`
 - **Path**: `hyperlane-quick-start\.git\objects\83\05db84f55921ac2aec694a973c463e926ab73e`
 - **Size**: `87 B`
 - **Modified Time**: `2025-10-01T21:58:37.127806`
@@ -19152,7 +23467,7 @@ cargo run restart -d
 
 
 
-### 📄 File #466 - `b06bf134250a25c82a0f06e326a2533c0671f5`
+### 📄 File #607 - `b06bf134250a25c82a0f06e326a2533c0671f5`
 - **Path**: `hyperlane-quick-start\.git\objects\86\b06bf134250a25c82a0f06e326a2533c0671f5`
 - **Size**: `680 B`
 - **Modified Time**: `2025-10-01T21:58:37.065431`
@@ -19161,7 +23476,7 @@ cargo run restart -d
 
 
 
-### 📄 File #467 - `f970861b358ab4f4a4c958675ea0715d47f33f`
+### 📄 File #608 - `f970861b358ab4f4a4c958675ea0715d47f33f`
 - **Path**: `hyperlane-quick-start\.git\objects\89\f970861b358ab4f4a4c958675ea0715d47f33f`
 - **Size**: `231 B`
 - **Modified Time**: `2025-10-01T21:58:37.124609`
@@ -19170,7 +23485,7 @@ cargo run restart -d
 
 
 
-### 📄 File #468 - `21904cd3b97aa45fed6fdd67147d208c7d2d1e`
+### 📄 File #609 - `21904cd3b97aa45fed6fdd67147d208c7d2d1e`
 - **Path**: `hyperlane-quick-start\.git\objects\94\21904cd3b97aa45fed6fdd67147d208c7d2d1e`
 - **Size**: `199 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -19179,7 +23494,7 @@ cargo run restart -d
 
 
 
-### 📄 File #469 - `f00db2f5dd3614b2d249f417a63b6e734acf4c`
+### 📄 File #610 - `f00db2f5dd3614b2d249f417a63b6e734acf4c`
 - **Path**: `hyperlane-quick-start\.git\objects\9f\f00db2f5dd3614b2d249f417a63b6e734acf4c`
 - **Size**: `148 B`
 - **Modified Time**: `2025-10-01T21:58:36.991497`
@@ -19188,7 +23503,7 @@ cargo run restart -d
 
 
 
-### 📄 File #470 - `09e33a57ef773cd82907a8ec686043131cc17d`
+### 📄 File #611 - `09e33a57ef773cd82907a8ec686043131cc17d`
 - **Path**: `hyperlane-quick-start\.git\objects\a0\09e33a57ef773cd82907a8ec686043131cc17d`
 - **Size**: `181 B`
 - **Modified Time**: `2025-10-01T21:58:37.153576`
@@ -19197,7 +23512,7 @@ cargo run restart -d
 
 
 
-### 📄 File #471 - `ce85df7a45c00c753e9c62faa0a0bed6c92c69`
+### 📄 File #612 - `ce85df7a45c00c753e9c62faa0a0bed6c92c69`
 - **Path**: `hyperlane-quick-start\.git\objects\a2\ce85df7a45c00c753e9c62faa0a0bed6c92c69`
 - **Size**: `181 B`
 - **Modified Time**: `2025-10-01T21:58:37.002871`
@@ -19206,7 +23521,7 @@ cargo run restart -d
 
 
 
-### 📄 File #472 - `218d4668de7760aacec67ef07760af2a1199dc`
+### 📄 File #613 - `218d4668de7760aacec67ef07760af2a1199dc`
 - **Path**: `hyperlane-quick-start\.git\objects\a8\218d4668de7760aacec67ef07760af2a1199dc`
 - **Size**: `392 B`
 - **Modified Time**: `2025-10-01T21:58:37.152346`
@@ -19215,7 +23530,7 @@ cargo run restart -d
 
 
 
-### 📄 File #473 - `f9ff56624159dd922dcfafcc8598be6fbd80da`
+### 📄 File #614 - `f9ff56624159dd922dcfafcc8598be6fbd80da`
 - **Path**: `hyperlane-quick-start\.git\objects\ab\f9ff56624159dd922dcfafcc8598be6fbd80da`
 - **Size**: `392 B`
 - **Modified Time**: `2025-10-01T21:58:37.153576`
@@ -19224,7 +23539,7 @@ cargo run restart -d
 
 
 
-### 📄 File #474 - `faf493260a821249be6870f7bd9fa920c7f9eb`
+### 📄 File #615 - `faf493260a821249be6870f7bd9fa920c7f9eb`
 - **Path**: `hyperlane-quick-start\.git\objects\b2\faf493260a821249be6870f7bd9fa920c7f9eb`
 - **Size**: `51 B`
 - **Modified Time**: `2025-10-01T21:58:37.015493`
@@ -19233,7 +23548,7 @@ cargo run restart -d
 
 
 
-### 📄 File #475 - `8da5bb90af26404909756041c14ddb88470902`
+### 📄 File #616 - `8da5bb90af26404909756041c14ddb88470902`
 - **Path**: `hyperlane-quick-start\.git\objects\b3\8da5bb90af26404909756041c14ddb88470902`
 - **Size**: `16,590 B`
 - **Modified Time**: `2025-10-01T21:58:37.036698`
@@ -19242,7 +23557,7 @@ cargo run restart -d
 
 
 
-### 📄 File #476 - `9257c2b8d3f0cba0ef1486284b6d21e6909101`
+### 📄 File #617 - `9257c2b8d3f0cba0ef1486284b6d21e6909101`
 - **Path**: `hyperlane-quick-start\.git\objects\b4\9257c2b8d3f0cba0ef1486284b6d21e6909101`
 - **Size**: `150 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -19251,7 +23566,7 @@ cargo run restart -d
 
 
 
-### 📄 File #477 - `afbd878670485e5788ea33e904eef72a6b99bf`
+### 📄 File #618 - `afbd878670485e5788ea33e904eef72a6b99bf`
 - **Path**: `hyperlane-quick-start\.git\objects\b5\afbd878670485e5788ea33e904eef72a6b99bf`
 - **Size**: `153 B`
 - **Modified Time**: `2025-10-01T21:58:37.022772`
@@ -19260,7 +23575,7 @@ cargo run restart -d
 
 
 
-### 📄 File #478 - `0c5d3e17feda11c278f0289f8f70cfa9f53ea1`
+### 📄 File #619 - `0c5d3e17feda11c278f0289f8f70cfa9f53ea1`
 - **Path**: `hyperlane-quick-start\.git\objects\bd\0c5d3e17feda11c278f0289f8f70cfa9f53ea1`
 - **Size**: `393 B`
 - **Modified Time**: `2025-10-01T21:58:37.035498`
@@ -19269,7 +23584,7 @@ cargo run restart -d
 
 
 
-### 📄 File #479 - `4dcc6f4f675052cee07b3634ff68c4fbf84268`
+### 📄 File #620 - `4dcc6f4f675052cee07b3634ff68c4fbf84268`
 - **Path**: `hyperlane-quick-start\.git\objects\c0\4dcc6f4f675052cee07b3634ff68c4fbf84268`
 - **Size**: `155 B`
 - **Modified Time**: `2025-10-01T21:58:37.132122`
@@ -19278,7 +23593,7 @@ cargo run restart -d
 
 
 
-### 📄 File #480 - `073b9828073442ce38662a864702db1547585b`
+### 📄 File #621 - `073b9828073442ce38662a864702db1547585b`
 - **Path**: `hyperlane-quick-start\.git\objects\c8\073b9828073442ce38662a864702db1547585b`
 - **Size**: `16,615 B`
 - **Modified Time**: `2025-10-01T21:58:37.065431`
@@ -19287,7 +23602,7 @@ cargo run restart -d
 
 
 
-### 📄 File #481 - `a1e8052532377599d045617208bba1ba266bb4`
+### 📄 File #622 - `a1e8052532377599d045617208bba1ba266bb4`
 - **Path**: `hyperlane-quick-start\.git\objects\ca\a1e8052532377599d045617208bba1ba266bb4`
 - **Size**: `81 B`
 - **Modified Time**: `2025-10-01T21:58:37.003591`
@@ -19296,7 +23611,7 @@ cargo run restart -d
 
 
 
-### 📄 File #482 - `d9869251780fb511597347f39ff87d702f44e9`
+### 📄 File #623 - `d9869251780fb511597347f39ff87d702f44e9`
 - **Path**: `hyperlane-quick-start\.git\objects\ca\d9869251780fb511597347f39ff87d702f44e9`
 - **Size**: `109 B`
 - **Modified Time**: `2025-10-01T21:58:37.103302`
@@ -19305,7 +23620,7 @@ cargo run restart -d
 
 
 
-### 📄 File #483 - `90878a24c714f3d5231d4a8db03f637c264f95`
+### 📄 File #624 - `90878a24c714f3d5231d4a8db03f637c264f95`
 - **Path**: `hyperlane-quick-start\.git\objects\cc\90878a24c714f3d5231d4a8db03f637c264f95`
 - **Size**: `81 B`
 - **Modified Time**: `2025-10-01T21:58:37.008554`
@@ -19314,7 +23629,7 @@ cargo run restart -d
 
 
 
-### 📄 File #484 - `efaac99b48e134655b4b4e6f7ca5ca8ec0d030`
+### 📄 File #625 - `efaac99b48e134655b4b4e6f7ca5ca8ec0d030`
 - **Path**: `hyperlane-quick-start\.git\objects\d1\efaac99b48e134655b4b4e6f7ca5ca8ec0d030`
 - **Size**: `87 B`
 - **Modified Time**: `2025-10-01T21:58:36.992006`
@@ -19323,7 +23638,7 @@ cargo run restart -d
 
 
 
-### 📄 File #485 - `76e0369515394f9abc8c45c56ae9df4b4107d7`
+### 📄 File #626 - `76e0369515394f9abc8c45c56ae9df4b4107d7`
 - **Path**: `hyperlane-quick-start\.git\objects\d2\76e0369515394f9abc8c45c56ae9df4b4107d7`
 - **Size**: `64 B`
 - **Modified Time**: `2025-10-01T21:58:37.132122`
@@ -19332,7 +23647,7 @@ cargo run restart -d
 
 
 
-### 📄 File #486 - `21484dc2b2f513703030862c973cf3d3d56f99`
+### 📄 File #627 - `21484dc2b2f513703030862c973cf3d3d56f99`
 - **Path**: `hyperlane-quick-start\.git\objects\d6\21484dc2b2f513703030862c973cf3d3d56f99`
 - **Size**: `164 B`
 - **Modified Time**: `2025-10-01T21:58:36.981554`
@@ -19341,7 +23656,7 @@ cargo run restart -d
 
 
 
-### 📄 File #487 - `56cd4f53009e177c6b12252614b13369382bcf`
+### 📄 File #628 - `56cd4f53009e177c6b12252614b13369382bcf`
 - **Path**: `hyperlane-quick-start\.git\objects\d9\56cd4f53009e177c6b12252614b13369382bcf`
 - **Size**: `178 B`
 - **Modified Time**: `2025-10-01T21:58:37.132122`
@@ -19350,7 +23665,7 @@ cargo run restart -d
 
 
 
-### 📄 File #488 - `ae3e6d670fc370b2d76cd5315b5ade939657a8`
+### 📄 File #629 - `ae3e6d670fc370b2d76cd5315b5ade939657a8`
 - **Path**: `hyperlane-quick-start\.git\objects\d9\ae3e6d670fc370b2d76cd5315b5ade939657a8`
 - **Size**: `77 B`
 - **Modified Time**: `2025-10-01T21:58:37.015493`
@@ -19359,7 +23674,7 @@ cargo run restart -d
 
 
 
-### 📄 File #489 - `79d07f971826e79738f914e03ad756e71d46d1`
+### 📄 File #630 - `79d07f971826e79738f914e03ad756e71d46d1`
 - **Path**: `hyperlane-quick-start\.git\objects\da\79d07f971826e79738f914e03ad756e71d46d1`
 - **Size**: `164 B`
 - **Modified Time**: `2025-10-01T21:58:36.986875`
@@ -19368,7 +23683,7 @@ cargo run restart -d
 
 
 
-### 📄 File #490 - `343c64d8daaa5084e9670592aeca01ef6520cf`
+### 📄 File #631 - `343c64d8daaa5084e9670592aeca01ef6520cf`
 - **Path**: `hyperlane-quick-start\.git\objects\db\343c64d8daaa5084e9670592aeca01ef6520cf`
 - **Size**: `112 B`
 - **Modified Time**: `2025-10-01T21:58:37.132122`
@@ -19377,7 +23692,7 @@ cargo run restart -d
 
 
 
-### 📄 File #491 - `6afbbe5839c681489f15800d83af6aa9f1e72d`
+### 📄 File #632 - `6afbbe5839c681489f15800d83af6aa9f1e72d`
 - **Path**: `hyperlane-quick-start\.git\objects\dd\6afbbe5839c681489f15800d83af6aa9f1e72d`
 - **Size**: `80 B`
 - **Modified Time**: `2025-10-01T21:58:37.009295`
@@ -19386,7 +23701,7 @@ cargo run restart -d
 
 
 
-### 📄 File #492 - `e125cf1cdb5d1a83dbbc7017133f5135932428`
+### 📄 File #633 - `e125cf1cdb5d1a83dbbc7017133f5135932428`
 - **Path**: `hyperlane-quick-start\.git\objects\df\e125cf1cdb5d1a83dbbc7017133f5135932428`
 - **Size**: `191 B`
 - **Modified Time**: `2025-10-01T21:58:37.153576`
@@ -19395,7 +23710,7 @@ cargo run restart -d
 
 
 
-### 📄 File #493 - `572418295d04c05594f8428777fa22d596ea71`
+### 📄 File #634 - `572418295d04c05594f8428777fa22d596ea71`
 - **Path**: `hyperlane-quick-start\.git\objects\e0\572418295d04c05594f8428777fa22d596ea71`
 - **Size**: `165 B`
 - **Modified Time**: `2025-10-01T21:58:37.132122`
@@ -19404,7 +23719,7 @@ cargo run restart -d
 
 
 
-### 📄 File #494 - `a13cde65b50e505d19dadd3fe66e5484c588bc`
+### 📄 File #635 - `a13cde65b50e505d19dadd3fe66e5484c588bc`
 - **Path**: `hyperlane-quick-start\.git\objects\e1\a13cde65b50e505d19dadd3fe66e5484c588bc`
 - **Size**: `16,615 B`
 - **Modified Time**: `2025-10-01T21:58:37.036698`
@@ -19413,7 +23728,7 @@ cargo run restart -d
 
 
 
-### 📄 File #495 - `e2fdb7411125c1d98d5e1d48c881cd8113ec85`
+### 📄 File #636 - `e2fdb7411125c1d98d5e1d48c881cd8113ec85`
 - **Path**: `hyperlane-quick-start\.git\objects\e2\e2fdb7411125c1d98d5e1d48c881cd8113ec85`
 - **Size**: `392 B`
 - **Modified Time**: `2025-10-01T21:58:37.036698`
@@ -19422,7 +23737,7 @@ cargo run restart -d
 
 
 
-### 📄 File #496 - `691a87cebb3164785c8577f4f79294bb270b6a`
+### 📄 File #637 - `691a87cebb3164785c8577f4f79294bb270b6a`
 - **Path**: `hyperlane-quick-start\.git\objects\e3\691a87cebb3164785c8577f4f79294bb270b6a`
 - **Size**: `81 B`
 - **Modified Time**: `2025-10-01T21:58:37.006934`
@@ -19431,7 +23746,7 @@ cargo run restart -d
 
 
 
-### 📄 File #497 - `1d1d948f1653289708f5bbda30883679905cfc`
+### 📄 File #638 - `1d1d948f1653289708f5bbda30883679905cfc`
 - **Path**: `hyperlane-quick-start\.git\objects\e4\1d1d948f1653289708f5bbda30883679905cfc`
 - **Size**: `165 B`
 - **Modified Time**: `2025-10-01T21:58:36.985631`
@@ -19440,7 +23755,7 @@ cargo run restart -d
 
 
 
-### 📄 File #498 - `dbe242fdf50e77b33c66b1cc058efe5ab364b6`
+### 📄 File #639 - `dbe242fdf50e77b33c66b1cc058efe5ab364b6`
 - **Path**: `hyperlane-quick-start\.git\objects\e4\dbe242fdf50e77b33c66b1cc058efe5ab364b6`
 - **Size**: `166 B`
 - **Modified Time**: `2025-10-01T21:58:36.984783`
@@ -19449,7 +23764,7 @@ cargo run restart -d
 
 
 
-### 📄 File #499 - `122b5214665c1fc209ab9bc914587bf604a108`
+### 📄 File #640 - `122b5214665c1fc209ab9bc914587bf604a108`
 - **Path**: `hyperlane-quick-start\.git\objects\e5\122b5214665c1fc209ab9bc914587bf604a108`
 - **Size**: `16,605 B`
 - **Modified Time**: `2025-10-01T21:58:37.060400`
@@ -19458,7 +23773,7 @@ cargo run restart -d
 
 
 
-### 📄 File #500 - `9c073963ca8b7d607f5e15dbc6e70b8685e055`
+### 📄 File #641 - `9c073963ca8b7d607f5e15dbc6e70b8685e055`
 - **Path**: `hyperlane-quick-start\.git\objects\e6\9c073963ca8b7d607f5e15dbc6e70b8685e055`
 - **Size**: `391 B`
 - **Modified Time**: `2025-10-01T21:58:37.153576`
@@ -19467,7 +23782,7 @@ cargo run restart -d
 
 
 
-### 📄 File #501 - `24f83af145912a84d93d7020f00e14b61be916`
+### 📄 File #642 - `24f83af145912a84d93d7020f00e14b61be916`
 - **Path**: `hyperlane-quick-start\.git\objects\ee\24f83af145912a84d93d7020f00e14b61be916`
 - **Size**: `115 B`
 - **Modified Time**: `2025-10-01T21:58:37.122591`
@@ -19476,7 +23791,7 @@ cargo run restart -d
 
 
 
-### 📄 File #502 - `62843f8f25d44788a71a058521b4ff02cc4d97`
+### 📄 File #643 - `62843f8f25d44788a71a058521b4ff02cc4d97`
 - **Path**: `hyperlane-quick-start\.git\objects\f7\62843f8f25d44788a71a058521b4ff02cc4d97`
 - **Size**: `164 B`
 - **Modified Time**: `2025-10-01T21:58:36.982677`
@@ -19485,7 +23800,7 @@ cargo run restart -d
 
 
 
-### 📄 File #503 - `11d5e1175f952acb54e3761aade3dcd63313c3`
+### 📄 File #644 - `11d5e1175f952acb54e3761aade3dcd63313c3`
 - **Path**: `hyperlane-quick-start\.git\objects\ff\11d5e1175f952acb54e3761aade3dcd63313c3`
 - **Size**: `78 B`
 - **Modified Time**: `2025-10-01T21:58:37.013547`
@@ -19494,7 +23809,34 @@ cargo run restart -d
 
 
 
-### 📄 File #504 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.idx`
+### 📄 File #645 - `pack-0a1115a478312dc918e209b31bc51fe8ae686c2b.idx`
+- **Path**: `hyperlane-quick-start\.git\objects\pack\pack-0a1115a478312dc918e209b31bc51fe8ae686c2b.idx`
+- **Size**: `9,472 B`
+- **Modified Time**: `2025-10-21T08:11:45.102398`
+
+#### Content Preview
+
+
+
+### 📄 File #646 - `pack-0a1115a478312dc918e209b31bc51fe8ae686c2b.pack`
+- **Path**: `hyperlane-quick-start\.git\objects\pack\pack-0a1115a478312dc918e209b31bc51fe8ae686c2b.pack`
+- **Size**: `70,015 B`
+- **Modified Time**: `2025-10-21T08:11:45.101897`
+
+#### Content Preview
+
+
+
+### 📄 File #647 - `pack-0a1115a478312dc918e209b31bc51fe8ae686c2b.rev`
+- **Path**: `hyperlane-quick-start\.git\objects\pack\pack-0a1115a478312dc918e209b31bc51fe8ae686c2b.rev`
+- **Size**: `1,252 B`
+- **Modified Time**: `2025-10-21T08:11:45.103399`
+
+#### Content Preview
+
+
+
+### 📄 File #648 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.idx`
 - **Path**: `hyperlane-quick-start\.git\objects\pack\pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.idx`
 - **Size**: `3,984 B`
 - **Modified Time**: `2025-09-15T22:37:17.264239`
@@ -19503,7 +23845,7 @@ cargo run restart -d
 
 
 
-### 📄 File #505 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.pack`
+### 📄 File #649 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.pack`
 - **Path**: `hyperlane-quick-start\.git\objects\pack\pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.pack`
 - **Size**: `29,817 B`
 - **Modified Time**: `2025-10-01T21:58:37.149256`
@@ -19512,7 +23854,7 @@ cargo run restart -d
 
 
 
-### 📄 File #506 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.rev`
+### 📄 File #650 - `pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.rev`
 - **Path**: `hyperlane-quick-start\.git\objects\pack\pack-fb865eb06a18641a3fbfae3da92074cf9ad809bd.rev`
 - **Size**: `468 B`
 - **Modified Time**: `2025-09-15T22:37:17.265239`
@@ -19521,16 +23863,16 @@ cargo run restart -d
 
 
 
-### 📄 File #507 - `master`
+### 📄 File #651 - `master`
 - **Path**: `hyperlane-quick-start\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:37.584236`
+- **Modified Time**: `2025-10-21T08:11:45.334279`
 
 #### Content Preview
 
 
 
-### 📄 File #508 - `HEAD`
+### 📄 File #652 - `HEAD`
 - **Path**: `hyperlane-quick-start\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:17.307951`
@@ -19539,16 +23881,16 @@ cargo run restart -d
 
 
 
-### 📄 File #509 - `master`
+### 📄 File #653 - `master`
 - **Path**: `hyperlane-quick-start\.git\refs\remotes\origin\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:37.366450`
+- **Modified Time**: `2025-10-21T08:11:45.208479`
 
 #### Content Preview
 
 
 
-### 📄 File #510 - `v6.3.5`
+### 📄 File #654 - `v6.3.5`
 - **Path**: `hyperlane-quick-start\.git\refs\tags\v6.3.5`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:17.306951`
@@ -19557,7 +23899,7 @@ cargo run restart -d
 
 
 
-### 📄 File #511 - `v7.0.3`
+### 📄 File #655 - `v7.0.3`
 - **Path**: `hyperlane-quick-start\.git\refs\tags\v7.0.3`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:37.431512`
@@ -19566,25 +23908,62 @@ cargo run restart -d
 
 
 
-### 📄 File #512 - `Cargo.toml`
-- **Path**: `hyperlane-quick-start\app\Cargo.toml`
-- **Size**: `260 B`
-- **Modified Time**: `2025-09-15T22:37:17.326739`
+### 📄 File #656 - `v7.2.0`
+- **Path**: `hyperlane-quick-start\.git\refs\tags\v7.2.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:45.263921`
 
 #### Content Preview
 
 
 
-### 📄 File #513 - `lib.rs`
+### 📄 File #657 - `v7.3.0`
+- **Path**: `hyperlane-quick-start\.git\refs\tags\v7.3.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:45.264420`
+
+#### Content Preview
+
+
+
+### 📄 File #658 - `v7.3.3`
+- **Path**: `hyperlane-quick-start\.git\refs\tags\v7.3.3`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:45.264920`
+
+#### Content Preview
+
+
+
+### 📄 File #659 - `v7.4.1`
+- **Path**: `hyperlane-quick-start\.git\refs\tags\v7.4.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:45.265923`
+
+#### Content Preview
+
+
+
+### 📄 File #660 - `Cargo.toml`
+- **Path**: `hyperlane-quick-start\app\Cargo.toml`
+- **Size**: `289 B`
+- **Modified Time**: `2025-10-21T08:11:45.320773`
+
+#### Content Preview
+
+
+
+### 📄 File #661 - `lib.rs`
 - **Path**: `hyperlane-quick-start\app\lib.rs`
-- **Size**: `242 B`
-- **Modified Time**: `2025-09-15T22:37:17.328740`
+- **Size**: `258 B`
+- **Modified Time**: `2025-10-21T08:11:45.323273`
 
 #### Content Preview
 
 ```rust
 pub mod aspect;
 pub mod controller;
+pub mod domain;
 pub mod exception;
 pub mod filter;
 pub mod mapper;
@@ -19601,7 +23980,7 @@ use hyperlane_plugin::log::*;
 
 ```
 
-### 📄 File #514 - `mod.rs`
+### 📄 File #662 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\aspect\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.326739`
@@ -19613,15 +23992,14 @@ use hyperlane_plugin::log::*;
 
 ```
 
-### 📄 File #515 - `mod.rs`
+### 📄 File #663 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\controller\mod.rs`
-- **Size**: `66 B`
-- **Modified Time**: `2025-10-01T21:58:37.520759`
+- **Size**: `49 B`
+- **Modified Time**: `2025-10-21T08:11:45.321273`
 
 #### Content Preview
 
 ```rust
-pub mod favicon;
 pub mod hello;
 pub mod websocket;
 
@@ -19629,47 +24007,53 @@ use super::*;
 
 ```
 
-### 📄 File #516 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\controller\favicon\fn.rs`
-- **Size**: `179 B`
-- **Modified Time**: `2025-10-01T21:58:37.509446`
+### 📄 File #664 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\controller\hello\impl.rs`
+- **Size**: `326 B`
+- **Modified Time**: `2025-10-21T08:11:45.320773`
 
 #### Content Preview
 
 ```rust
 use super::*;
 
-#[route("/favicon.ico")]
-#[prologue_macros(
-  get,
-  response_status_code(301),
-  response_header(LOCATION => LOGO_IMG_URL)
-)]
-pub async fn handle(ctx: Context) {}
+impl ServerHook for HelloRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(
+      methods(get, post),
+      route_param(NAME_KEY => name_opt),
+      response_body(format!("Hello {}", name_opt.unwrap_or_default())),
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
 
 ```
 
-### 📄 File #517 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\controller\favicon\mod.rs`
-- **Size**: `88 B`
-- **Modified Time**: `2025-10-01T21:58:37.509446`
+### 📄 File #665 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\controller\hello\mod.rs`
+- **Size**: `108 B`
+- **Modified Time**: `2025-10-21T08:11:45.320773`
 
 #### Content Preview
 
 ```rust
-mod r#fn;
+mod r#impl;
+mod r#struct;
 
-pub use r#fn::*;
+pub use r#struct::*;
 
 use super::*;
-use hyperlane_config::business::logo_img::*;
+use hyperlane_config::application::hello::*;
 
 ```
 
-### 📄 File #518 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\controller\hello\fn.rs`
-- **Size**: `227 B`
-- **Modified Time**: `2025-10-01T21:58:37.517108`
+### 📄 File #666 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\controller\hello\struct.rs`
+- **Size**: `64 B`
+- **Modified Time**: `2025-10-21T08:11:45.321273`
 
 #### Content Preview
 
@@ -19677,88 +24061,206 @@ use hyperlane_config::business::logo_img::*;
 use super::*;
 
 #[route("/hello/{name}")]
-#[prologue_macros(
-  methods(get, post),
-  route_param(NAME_KEY => name_opt),
-  response_body(format!("Hello {}", name_opt.unwrap_or_default())),
-)]
-pub async fn handle(ctx: Context) {}
+pub struct HelloRoute;
 
 ```
 
-### 📄 File #519 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\controller\hello\mod.rs`
-- **Size**: `85 B`
-- **Modified Time**: `2025-09-15T22:37:17.327740`
-
-#### Content Preview
-
-```rust
-mod r#fn;
-
-pub use r#fn::*;
-
-use super::*;
-use hyperlane_config::business::hello::*;
-
-```
-
-### 📄 File #520 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\controller\websocket\fn.rs`
-- **Size**: `342 B`
-- **Modified Time**: `2025-09-15T22:37:17.327740`
+### 📄 File #667 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\controller\websocket\impl.rs`
+- **Size**: `579 B`
+- **Modified Time**: `2025-10-21T08:11:45.321273`
 
 #### Content Preview
 
 ```rust
 use super::*;
 
-#[ws]
-#[route("/websocket")]
-#[ws_from_stream(request)]
-pub async fn handle(ctx: Context) {
-    println_success!("WebSocket request received");
-    let request_body: &RequestBody = request.get_body();
-    let _ = ctx.set_response_body(&request_body).await;
-    ctx.try_get_send_body_hook().await.unwrap()(ctx.clone()).await;
+impl ServerHook for WebSocketRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[prologue_macros(ws, ws_from_stream(request))]
+    async fn handle(self, ctx: &Context) {
+        println_success!("WebSocket request received");
+        let request_body: WebSocketMessage = request.get_body_json().unwrap();
+        match get_response_body(&request_body) {
+            Ok(response) => ctx.set_response_body(&response).await,
+            Err(error) => ctx.set_response_body(&error).await,
+        };
+        send_body_hook(ctx).await;
+    }
 }
 
 ```
 
-### 📄 File #521 - `mod.rs`
+### 📄 File #668 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\controller\websocket\mod.rs`
-- **Size**: `43 B`
-- **Modified Time**: `2025-09-15T22:37:17.327740`
+- **Size**: `142 B`
+- **Modified Time**: `2025-10-21T08:11:45.321773`
 
 #### Content Preview
 
 ```rust
-mod r#fn;
+mod r#impl;
+mod r#struct;
 
-pub use r#fn::*;
+pub use r#struct::*;
+
+use super::*;
+use model::param::websocket::*;
+use service::websocket::*;
+use utils::send::*;
+
+```
+
+### 📄 File #669 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\controller\websocket\struct.rs`
+- **Size**: `65 B`
+- **Modified Time**: `2025-10-21T08:11:45.321773`
+
+#### Content Preview
+
+```rust
+use super::*;
+
+#[route("/websocket")]
+pub struct WebSocketRoute;
+
+```
+
+### 📄 File #670 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\domain\mod.rs`
+- **Size**: `34 B`
+- **Modified Time**: `2025-10-21T08:11:45.321773`
+
+#### Content Preview
+
+```rust
+pub mod websocket;
 
 use super::*;
 
 ```
 
-### 📄 File #522 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\exception\mod.rs`
-- **Size**: `34 B`
-- **Modified Time**: `2025-09-15T22:37:17.327740`
+### 📄 File #671 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\domain\websocket\impl.rs`
+- **Size**: `156 B`
+- **Modified Time**: `2025-10-21T08:11:45.322275`
 
 #### Content Preview
 
 ```rust
+use super::*;
+
+impl WebSocketMessage {
+    pub fn is_valid(&self) -> bool {
+        !self.name.trim().is_empty() && !self.message.trim().is_empty()
+    }
+}
+
+```
+
+### 📄 File #672 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\domain\websocket\mod.rs`
+- **Size**: `59 B`
+- **Modified Time**: `2025-10-21T08:11:45.322275`
+
+#### Content Preview
+
+```rust
+mod r#impl;
+
+use super::*;
+use model::param::websocket::*;
+
+```
+
+### 📄 File #673 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\exception\mod.rs`
+- **Size**: `78 B`
+- **Modified Time**: `2025-10-21T08:11:45.322773`
+
+#### Content Preview
+
+```rust
+pub mod application;
 pub mod framework;
 
+pub use framework::*;
+
 use super::*;
 
 ```
 
-### 📄 File #523 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\exception\framework\fn.rs`
-- **Size**: `621 B`
-- **Modified Time**: `2025-10-01T21:58:37.522858`
+### 📄 File #674 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\exception\application\mod.rs`
+- **Size**: `1 B`
+- **Modified Time**: `2025-10-21T08:11:45.322275`
+
+#### Content Preview
+
+```rust
+
+
+```
+
+### 📄 File #675 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\exception\framework\impl.rs`
+- **Size**: `771 B`
+- **Modified Time**: `2025-10-21T08:11:45.322275`
+
+#### Content Preview
+
+```rust
+use super::*;
+
+impl ServerHook for PanicHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        clear_response_headers,
+        response_status_code(500),
+        response_body(&response_body),
+        response_header(SERVER => HYPERLANE),
+        response_version(HttpVersion::HTTP1_1),
+        response_header(CONTENT_TYPE, &content_type),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        log_error(&response_body).await;
+        println_error!("{response_body}");
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+    }
+}
+
+```
+
+### 📄 File #676 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\exception\framework\mod.rs`
+- **Size**: `63 B`
+- **Modified Time**: `2025-10-21T08:11:45.322773`
+
+#### Content Preview
+
+```rust
+mod r#impl;
+mod r#struct;
+
+pub use r#struct::*;
+
+use super::*;
+
+```
+
+### 📄 File #677 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\exception\framework\struct.rs`
+- **Size**: `51 B`
+- **Modified Time**: `2025-10-21T08:11:45.322773`
 
 #### Content Preview
 
@@ -19766,42 +24268,11 @@ use super::*;
 use super::*;
 
 #[panic_hook]
-#[epilogue_macros(
-    clear_response_headers,
-    response_status_code(500),
-    response_body(&response_body),
-    response_header(SERVER => HYPERLANE),
-    response_version(HttpVersion::HTTP1_1),
-    response_header(CONTENT_TYPE, &content_type),
-    send
-)]
-pub async fn panic_hook(ctx: Context) {
-    let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-    let response_body: String = error.to_string();
-    log_error(&response_body).await;
-    println_error!(response_body);
-    let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-}
+pub struct PanicHook;
 
 ```
 
-### 📄 File #524 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\exception\framework\mod.rs`
-- **Size**: `43 B`
-- **Modified Time**: `2025-09-15T22:37:17.327740`
-
-#### Content Preview
-
-```rust
-mod r#fn;
-
-pub use r#fn::*;
-
-use super::*;
-
-```
-
-### 📄 File #525 - `mod.rs`
+### 📄 File #678 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\filter\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.328740`
@@ -19813,7 +24284,7 @@ use super::*;
 
 ```
 
-### 📄 File #526 - `mod.rs`
+### 📄 File #679 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\mapper\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.328740`
@@ -19825,7 +24296,7 @@ use super::*;
 
 ```
 
-### 📄 File #527 - `mod.rs`
+### 📄 File #680 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\mod.rs`
 - **Size**: `50 B`
 - **Modified Time**: `2025-09-15T22:37:17.328740`
@@ -19840,27 +24311,71 @@ use super::*;
 
 ```
 
-### 📄 File #528 - `mod.rs`
+### 📄 File #681 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\mod.rs`
-- **Size**: `79 B`
-- **Modified Time**: `2025-09-15T22:37:17.329739`
+- **Size**: `125 B`
+- **Modified Time**: `2025-10-21T08:11:45.323589`
 
 #### Content Preview
 
 ```rust
 pub mod cross;
 pub mod response;
-pub mod send;
 pub mod upgrade;
+
+pub use cross::*;
+pub use response::*;
+pub use upgrade::*;
 
 use super::*;
 
 ```
 
-### 📄 File #529 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\request\cross\fn.rs`
-- **Size**: `311 B`
-- **Modified Time**: `2025-09-15T22:37:17.329739`
+### 📄 File #682 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\request\cross\impl.rs`
+- **Size**: `413 B`
+- **Modified Time**: `2025-10-21T08:11:45.323589`
+
+#### Content Preview
+
+```rust
+use super::*;
+
+impl ServerHook for CrossMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_version(HttpVersion::HTTP1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
+    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
+    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+```
+
+### 📄 File #683 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\request\cross\mod.rs`
+- **Size**: `63 B`
+- **Modified Time**: `2025-10-21T08:11:45.323589`
+
+#### Content Preview
+
+```rust
+mod r#impl;
+mod r#struct;
+
+pub use r#struct::*;
+
+use super::*;
+
+```
+
+### 📄 File #684 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\request\cross\struct.rs`
+- **Size**: `68 B`
+- **Modified Time**: `2025-10-21T08:11:45.323589`
 
 #### Content Preview
 
@@ -19868,34 +24383,81 @@ use super::*;
 use super::*;
 
 #[request_middleware(1)]
-#[response_version(HttpVersion::HTTP1_1)]
-#[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
-#[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
-#[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
-pub async fn cross(ctx: Context) {}
+pub struct CrossMiddleware;
 
 ```
 
-### 📄 File #530 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\request\cross\mod.rs`
-- **Size**: `43 B`
-- **Modified Time**: `2025-09-15T22:37:17.329739`
+### 📄 File #685 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\request\response\impl.rs`
+- **Size**: `1,114 B`
+- **Modified Time**: `2025-10-21T08:11:45.324273`
 
 #### Content Preview
 
 ```rust
-mod r#fn;
-
-pub use r#fn::*;
-
 use super::*;
+
+impl ServerHook for ResponseHeaderMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_header(DATE => gmt())]
+    #[response_header(SERVER => HYPERLANE)]
+    #[response_header(CONNECTION => KEEP_ALIVE)]
+    #[response_header(CONTENT_TYPE => TEXT_HTML)]
+    async fn handle(self, ctx: &Context) {
+        let socket_addr_string: String = ctx.get_socket_addr_string().await;
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
+        ctx.set_response_header(CONTENT_TYPE, &content_type)
+            .await
+            .set_response_header("SocketAddr", &socket_addr_string)
+            .await;
+    }
+}
+
+impl ServerHook for ResponseStatusCodeMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_status_code(200)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+impl ServerHook for ResponseBodyMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(INDEX_HTML.replace("{{ time }}", &time()))]
+    async fn handle(self, ctx: &Context) {}
+}
 
 ```
 
-### 📄 File #531 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\request\response\fn.rs`
-- **Size**: `808 B`
-- **Modified Time**: `2025-09-15T22:37:17.329739`
+### 📄 File #686 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\request\response\mod.rs`
+- **Size**: `112 B`
+- **Modified Time**: `2025-10-21T08:11:45.324273`
+
+#### Content Preview
+
+```rust
+mod r#impl;
+mod r#struct;
+
+pub use r#struct::*;
+
+use super::*;
+use hyperlane_config::application::templates::*;
+
+```
+
+### 📄 File #687 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\request\response\struct.rs`
+- **Size**: `205 B`
+- **Modified Time**: `2025-10-21T08:11:45.324774`
 
 #### Content Preview
 
@@ -19903,125 +24465,81 @@ use super::*;
 use super::*;
 
 #[request_middleware(2)]
-#[response_header(DATE => gmt())]
-#[response_header(SERVER => HYPERLANE)]
-#[response_header(CONNECTION => KEEP_ALIVE)]
-#[response_header(CONTENT_TYPE => TEXT_HTML)]
-pub async fn response_header(ctx: Context) {
-    let socket_addr_string: String = ctx.get_socket_addr_string().await;
-    let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
-    ctx.set_response_header(CONTENT_TYPE, &content_type)
-        .await
-        .set_response_header("SocketAddr", &socket_addr_string)
-        .await;
-}
+pub struct ResponseHeaderMiddleware;
 
 #[request_middleware(3)]
-#[response_status_code(200)]
-pub async fn response_status_code(ctx: Context) {}
+pub struct ResponseStatusCodeMiddleware;
 
 #[request_middleware(4)]
-#[response_body(INDEX_HTML.replace("{{ time }}", &time()))]
-pub async fn response_body(ctx: Context) {}
+pub struct ResponseBodyMiddleware;
 
 ```
 
-### 📄 File #532 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\request\response\mod.rs`
-- **Size**: `89 B`
-- **Modified Time**: `2025-09-15T22:37:17.329739`
-
-#### Content Preview
-
-```rust
-mod r#fn;
-
-pub use r#fn::*;
-
-use super::*;
-use hyperlane_config::business::templates::*;
-
-```
-
-### 📄 File #533 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\request\send\fn.rs`
-- **Size**: `137 B`
-- **Modified Time**: `2025-09-15T22:37:17.329739`
+### 📄 File #688 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\request\upgrade\impl.rs`
+- **Size**: `532 B`
+- **Modified Time**: `2025-10-21T08:11:45.324774`
 
 #### Content Preview
 
 ```rust
 use super::*;
 
-#[ws]
-#[request_middleware(6)]
-pub async fn send_body(ctx: Context) {
-    ctx.set_send_body_hook(send_body_hook).await;
+impl ServerHook for UpgradeMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[ws]
+    #[epilogue_macros(
+        response_body(&vec![]),
+        response_status_code(101),
+        response_header(UPGRADE => WEBSOCKET),
+        response_header(CONNECTION => UPGRADE),
+        response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
 }
 
 ```
 
-### 📄 File #534 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\request\send\mod.rs`
-- **Size**: `65 B`
-- **Modified Time**: `2025-09-15T22:37:17.329739`
-
-#### Content Preview
-
-```rust
-mod r#fn;
-
-pub use r#fn::*;
-
-use super::*;
-use service::send::*;
-
-```
-
-### 📄 File #535 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\request\upgrade\fn.rs`
-- **Size**: `411 B`
-- **Modified Time**: `2025-10-01T21:58:37.527873`
-
-#### Content Preview
-
-```rust
-use super::*;
-
-#[ws]
-#[request_middleware(5)]
-#[epilogue_macros(
-    response_body(&vec![]),
-    response_status_code(101),
-    response_header(UPGRADE => WEBSOCKET),
-    response_header(CONNECTION => UPGRADE),
-    response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(&ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
-    send
-)]
-pub async fn upgrade(ctx: Context) {}
-
-```
-
-### 📄 File #536 - `mod.rs`
+### 📄 File #689 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\request\upgrade\mod.rs`
-- **Size**: `43 B`
-- **Modified Time**: `2025-09-15T22:37:17.330739`
+- **Size**: `63 B`
+- **Modified Time**: `2025-10-21T08:11:45.325274`
 
 #### Content Preview
 
 ```rust
-mod r#fn;
+mod r#impl;
+mod r#struct;
 
-pub use r#fn::*;
+pub use r#struct::*;
 
 use super::*;
 
 ```
 
-### 📄 File #537 - `mod.rs`
+### 📄 File #690 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\request\upgrade\struct.rs`
+- **Size**: `70 B`
+- **Modified Time**: `2025-10-21T08:11:45.325274`
+
+#### Content Preview
+
+```rust
+use super::*;
+
+#[request_middleware(5)]
+pub struct UpgradeMiddleware;
+
+```
+
+### 📄 File #691 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\middleware\response\mod.rs`
-- **Size**: `42 B`
-- **Modified Time**: `2025-09-15T22:37:17.330739`
+- **Size**: `76 B`
+- **Modified Time**: `2025-10-21T08:11:45.326274`
 
 #### Content Preview
 
@@ -20029,14 +24547,59 @@ use super::*;
 pub mod log;
 pub mod send;
 
+pub use log::*;
+pub use send::*;
+
 use super::*;
 
 ```
 
-### 📄 File #538 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\response\log\fn.rs`
-- **Size**: `264 B`
-- **Modified Time**: `2025-09-15T22:37:17.330739`
+### 📄 File #692 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\response\log\impl.rs`
+- **Size**: `369 B`
+- **Modified Time**: `2025-10-21T08:11:45.325774`
+
+#### Content Preview
+
+```rust
+use super::*;
+
+impl ServerHook for LogMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let request: String = ctx.get_request().await.get_string();
+        let response: String = ctx.get_response().await.get_string();
+        log_info(request).await;
+        log_info(response).await
+    }
+}
+
+```
+
+### 📄 File #693 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\response\log\mod.rs`
+- **Size**: `63 B`
+- **Modified Time**: `2025-10-21T08:11:45.325774`
+
+#### Content Preview
+
+```rust
+mod r#impl;
+mod r#struct;
+
+pub use r#struct::*;
+
+use super::*;
+
+```
+
+### 📄 File #694 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\response\log\struct.rs`
+- **Size**: `67 B`
+- **Modified Time**: `2025-10-21T08:11:45.326274`
 
 #### Content Preview
 
@@ -20044,35 +24607,52 @@ use super::*;
 use super::*;
 
 #[response_middleware(2)]
-pub async fn log(ctx: Context) {
-    let request: String = ctx.get_request().await.get_string();
-    let response: String = ctx.get_response().await.get_string();
-    log_info(request).await;
-    log_info(response).await
-}
+pub struct LogMiddleware;
 
 ```
 
-### 📄 File #539 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\response\log\mod.rs`
-- **Size**: `43 B`
-- **Modified Time**: `2025-09-15T22:37:17.330739`
+### 📄 File #695 - `impl.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\response\send\impl.rs`
+- **Size**: `250 B`
+- **Modified Time**: `2025-10-21T08:11:45.326274`
 
 #### Content Preview
 
 ```rust
-mod r#fn;
+use super::*;
 
-pub use r#fn::*;
+impl ServerHook for SendMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(http, reject(ctx.get_request_upgrade_type().await.is_ws()), send)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+```
+
+### 📄 File #696 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\response\send\mod.rs`
+- **Size**: `63 B`
+- **Modified Time**: `2025-10-21T08:11:45.326774`
+
+#### Content Preview
+
+```rust
+mod r#impl;
+mod r#struct;
+
+pub use r#struct::*;
 
 use super::*;
 
 ```
 
-### 📄 File #540 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\response\send\fn.rs`
-- **Size**: `161 B`
-- **Modified Time**: `2025-10-01T21:58:37.527873`
+### 📄 File #697 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\middleware\response\send\struct.rs`
+- **Size**: `68 B`
+- **Modified Time**: `2025-10-21T08:11:45.326774`
 
 #### Content Preview
 
@@ -20080,49 +24660,27 @@ use super::*;
 use super::*;
 
 #[response_middleware(1)]
-#[epilogue_macros(http, reject(ctx.get_request_upgrade_type().await.is_ws()), send)]
-pub async fn send(ctx: Context) {}
+pub struct SendMiddleware;
 
 ```
 
-### 📄 File #541 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\middleware\response\send\mod.rs`
-- **Size**: `43 B`
-- **Modified Time**: `2025-09-15T22:37:17.330739`
-
-#### Content Preview
-
-```rust
-mod r#fn;
-
-pub use r#fn::*;
-
-use super::*;
-
-```
-
-### 📄 File #542 - `mod.rs`
+### 📄 File #698 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\mod.rs`
-- **Size**: `176 B`
-- **Modified Time**: `2025-09-15T22:37:17.332739`
+- **Size**: `74 B`
+- **Modified Time**: `2025-10-21T08:11:45.327273`
 
 #### Content Preview
 
 ```rust
 pub mod application;
-pub mod bean;
-pub mod business;
-pub mod data;
-pub mod data_access;
 pub mod data_transfer;
-pub mod domain;
 pub mod param;
-pub mod persistent;
-pub mod view;
+
+use super::*;
 
 ```
 
-### 📄 File #543 - `mod.rs`
+### 📄 File #699 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\application\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.331741`
@@ -20134,118 +24692,162 @@ pub mod view;
 
 ```
 
-### 📄 File #544 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\model\bean\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.331741`
-
-#### Content Preview
-
-```rust
-
-
-```
-
-### 📄 File #545 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\model\business\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.331741`
-
-#### Content Preview
-
-```rust
-
-
-```
-
-### 📄 File #546 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\model\data\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.331741`
-
-#### Content Preview
-
-```rust
-
-
-```
-
-### 📄 File #547 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\model\data_access\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.331741`
-
-#### Content Preview
-
-```rust
-
-
-```
-
-### 📄 File #548 - `mod.rs`
+### 📄 File #700 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\data_transfer\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.331741`
+- **Size**: `34 B`
+- **Modified Time**: `2025-10-21T08:11:45.326774`
 
 #### Content Preview
 
 ```rust
+pub mod websocket;
 
+use super::*;
 
 ```
 
-### 📄 File #549 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\model\domain\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.332739`
+### 📄 File #701 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\model\data_transfer\websocket\mod.rs`
+- **Size**: `89 B`
+- **Modified Time**: `2025-10-21T08:11:45.327273`
 
 #### Content Preview
 
 ```rust
+mod r#struct;
 
+pub use r#struct::*;
+
+use super::*;
+
+use serde::{Deserialize, Serialize};
 
 ```
 
-### 📄 File #550 - `mod.rs`
+### 📄 File #702 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\model\data_transfer\websocket\struct.rs`
+- **Size**: `141 B`
+- **Modified Time**: `2025-10-21T08:11:45.327273`
+
+#### Content Preview
+
+```rust
+use super::*;
+
+#[derive(Debug, Default, Data, Serialize, Deserialize)]
+pub struct MessageResponse {
+    message: String,
+    time: String,
+}
+
+```
+
+### 📄 File #703 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\model\param\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.332739`
+- **Size**: `34 B`
+- **Modified Time**: `2025-10-21T08:11:45.327773`
 
 #### Content Preview
 
 ```rust
+pub mod websocket;
 
+use super::*;
 
 ```
 
-### 📄 File #551 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\model\persistent\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.332739`
+### 📄 File #704 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\model\param\websocket\mod.rs`
+- **Size**: `89 B`
+- **Modified Time**: `2025-10-21T08:11:45.327773`
 
 #### Content Preview
 
 ```rust
+mod r#struct;
 
+pub use r#struct::*;
+
+use super::*;
+
+use serde::{Deserialize, Serialize};
 
 ```
 
-### 📄 File #552 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\model\view\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.332739`
+### 📄 File #705 - `struct.rs`
+- **Path**: `hyperlane-quick-start\app\model\param\websocket\struct.rs`
+- **Size**: `157 B`
+- **Modified Time**: `2025-10-21T08:11:45.327773`
 
 #### Content Preview
 
 ```rust
+use super::*;
 
+#[derive(Debug, Clone, Default, Data, Deserialize, Serialize)]
+pub struct WebSocketMessage {
+    pub name: String,
+    pub message: String,
+}
 
 ```
 
-### 📄 File #553 - `mod.rs`
+### 📄 File #706 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\service\mod.rs`
+- **Size**: `34 B`
+- **Modified Time**: `2025-10-21T08:11:45.327773`
+
+#### Content Preview
+
+```rust
+pub mod websocket;
+
+use super::*;
+
+```
+
+### 📄 File #707 - `fn.rs`
+- **Path**: `hyperlane-quick-start\app\service\websocket\fn.rs`
+- **Size**: `382 B`
+- **Modified Time**: `2025-10-21T08:11:45.327773`
+
+#### Content Preview
+
+```rust
+use super::*;
+
+pub fn get_response_body(body: &WebSocketMessage) -> Result<String, String> {
+    if body.is_valid() {
+        return Err("Invalid message".to_string());
+    }
+    let mut response: MessageResponse = MessageResponse::default();
+    response.set_message(body.message.clone()).set_time(date());
+    serde_json::to_string(&response).map_err(|error| error.to_string())
+}
+
+```
+
+### 📄 File #708 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\service\websocket\mod.rs`
+- **Size**: `106 B`
+- **Modified Time**: `2025-10-21T08:11:45.327773`
+
+#### Content Preview
+
+```rust
+mod r#fn;
+
+pub use r#fn::*;
+
+use super::*;
+use model::{data_transfer::websocket::*, param::websocket::*};
+
+```
+
+### 📄 File #709 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\utils\mod.rs`
 - **Size**: `29 B`
-- **Modified Time**: `2025-09-15T22:37:17.333740`
+- **Modified Time**: `2025-10-21T08:11:45.328775`
 
 #### Content Preview
 
@@ -20256,17 +24858,17 @@ use super::*;
 
 ```
 
-### 📄 File #554 - `fn.rs`
-- **Path**: `hyperlane-quick-start\app\service\send\fn.rs`
-- **Size**: `371 B`
-- **Modified Time**: `2025-09-15T22:37:17.333740`
+### 📄 File #710 - `fn.rs`
+- **Path**: `hyperlane-quick-start\app\utils\send\fn.rs`
+- **Size**: `372 B`
+- **Modified Time**: `2025-10-21T08:11:45.328775`
 
 #### Content Preview
 
 ```rust
 use super::*;
 
-pub async fn send_body_hook(ctx: Context) {
+pub async fn send_body_hook(ctx: &Context) {
     let body: ResponseBody = ctx.get_response_body().await;
     if ctx.get_request().await.is_ws() {
         let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -20278,10 +24880,10 @@ pub async fn send_body_hook(ctx: Context) {
 
 ```
 
-### 📄 File #555 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\service\send\mod.rs`
+### 📄 File #711 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\utils\send\mod.rs`
 - **Size**: `43 B`
-- **Modified Time**: `2025-09-15T22:37:17.333740`
+- **Modified Time**: `2025-10-21T08:11:45.328775`
 
 #### Content Preview
 
@@ -20294,19 +24896,7 @@ use super::*;
 
 ```
 
-### 📄 File #556 - `mod.rs`
-- **Path**: `hyperlane-quick-start\app\utils\mod.rs`
-- **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.333740`
-
-#### Content Preview
-
-```rust
-
-
-```
-
-### 📄 File #557 - `mod.rs`
+### 📄 File #712 - `mod.rs`
 - **Path**: `hyperlane-quick-start\app\view\mod.rs`
 - **Size**: `1 B`
 - **Modified Time**: `2025-09-15T22:37:17.333740`
@@ -20318,7 +24908,44 @@ use super::*;
 
 ```
 
-### 📄 File #558 - `Cargo.toml`
+### 📄 File #713 - `fn.rs`
+- **Path**: `hyperlane-quick-start\app\view\favicon\fn.rs`
+- **Size**: `176 B`
+- **Modified Time**: `2025-10-21T08:11:45.328775`
+
+#### Content Preview
+
+```rust
+use super::*;
+
+#[route("/favicon.ico")]
+#[prologue_macros(
+  get,
+  response_status_code(301),
+  response_header(LOCATION => LOGO_IMG_URL)
+)]
+pub async fn ico(ctx: Context) {}
+
+```
+
+### 📄 File #714 - `mod.rs`
+- **Path**: `hyperlane-quick-start\app\view\favicon\mod.rs`
+- **Size**: `88 B`
+- **Modified Time**: `2025-10-21T08:11:45.329278`
+
+#### Content Preview
+
+```rust
+mod r#fn;
+
+pub use r#fn::*;
+
+use super::*;
+use hyperlane_config::business::logo_img::*;
+
+```
+
+### 📄 File #715 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\config\Cargo.toml`
 - **Size**: `182 B`
 - **Modified Time**: `2025-09-15T22:37:17.333740`
@@ -20327,26 +24954,25 @@ use super::*;
 
 
 
-### 📄 File #559 - `lib.rs`
+### 📄 File #716 - `lib.rs`
 - **Path**: `hyperlane-quick-start\config\lib.rs`
-- **Size**: `73 B`
-- **Modified Time**: `2025-10-01T21:58:37.543855`
+- **Size**: `59 B`
+- **Modified Time**: `2025-10-21T08:11:45.330779`
 
 #### Content Preview
 
 ```rust
-pub mod business;
+pub mod application;
 pub mod framework;
-pub mod process;
 
 use hyperlane::*;
 
 ```
 
-### 📄 File #560 - `mod.rs`
-- **Path**: `hyperlane-quick-start\config\business\mod.rs`
+### 📄 File #717 - `mod.rs`
+- **Path**: `hyperlane-quick-start\config\application\mod.rs`
 - **Size**: `71 B`
-- **Modified Time**: `2025-09-15T22:37:17.334894`
+- **Modified Time**: `2025-10-21T08:11:45.329778`
 
 #### Content Preview
 
@@ -20358,22 +24984,22 @@ pub mod templates;
 
 ```
 
-### 📄 File #561 - `const.rs`
-- **Path**: `hyperlane-quick-start\config\business\hello\const.rs`
-- **Size**: `43 B`
-- **Modified Time**: `2025-10-01T21:58:37.534840`
+### 📄 File #718 - `const.rs`
+- **Path**: `hyperlane-quick-start\config\application\hello\const.rs`
+- **Size**: `35 B`
+- **Modified Time**: `2025-10-21T08:11:45.329278`
 
 #### Content Preview
 
 ```rust
-pub const NAME_KEY: &'static str = "name";
+pub const NAME_KEY: &str = "name";
 
 ```
 
-### 📄 File #562 - `mod.rs`
-- **Path**: `hyperlane-quick-start\config\business\hello\mod.rs`
+### 📄 File #719 - `mod.rs`
+- **Path**: `hyperlane-quick-start\config\application\hello\mod.rs`
 - **Size**: `34 B`
-- **Modified Time**: `2025-09-15T22:37:17.334894`
+- **Modified Time**: `2025-10-21T08:11:45.329278`
 
 #### Content Preview
 
@@ -20384,22 +25010,22 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #563 - `const.rs`
-- **Path**: `hyperlane-quick-start\config\business\logo_img\const.rs`
-- **Size**: `82 B`
-- **Modified Time**: `2025-10-01T21:58:37.534840`
+### 📄 File #720 - `const.rs`
+- **Path**: `hyperlane-quick-start\config\application\logo_img\const.rs`
+- **Size**: `74 B`
+- **Modified Time**: `2025-10-21T08:11:45.329778`
 
 #### Content Preview
 
 ```rust
-pub const LOGO_IMG_URL: &'static str = "https://docs.ltpp.vip/img/hyperlane.png";
+pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
 
 ```
 
-### 📄 File #564 - `mod.rs`
-- **Path**: `hyperlane-quick-start\config\business\logo_img\mod.rs`
+### 📄 File #721 - `mod.rs`
+- **Path**: `hyperlane-quick-start\config\application\logo_img\mod.rs`
 - **Size**: `34 B`
-- **Modified Time**: `2025-09-15T22:37:17.334894`
+- **Modified Time**: `2025-10-21T08:11:45.329778`
 
 #### Content Preview
 
@@ -20410,23 +25036,22 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #565 - `const.rs`
-- **Path**: `hyperlane-quick-start\config\business\not_found\const.rs`
-- **Size**: `109 B`
-- **Modified Time**: `2025-10-01T21:58:37.543855`
+### 📄 File #722 - `const.rs`
+- **Path**: `hyperlane-quick-start\config\application\not_found\const.rs`
+- **Size**: `97 B`
+- **Modified Time**: `2025-10-21T08:11:45.329778`
 
 #### Content Preview
 
 ```rust
-pub const NOT_FOUND_HTML: &'static str =
-    include_str!("../../../resources/static/not_found/index.html");
+pub const NOT_FOUND_HTML: &str = include_str!("../../../resources/static/not_found/index.html");
 
 ```
 
-### 📄 File #566 - `mod.rs`
-- **Path**: `hyperlane-quick-start\config\business\not_found\mod.rs`
+### 📄 File #723 - `mod.rs`
+- **Path**: `hyperlane-quick-start\config\application\not_found\mod.rs`
 - **Size**: `34 B`
-- **Modified Time**: `2025-09-15T22:37:17.334894`
+- **Modified Time**: `2025-10-21T08:11:45.329778`
 
 #### Content Preview
 
@@ -20437,22 +25062,22 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #567 - `const.rs`
-- **Path**: `hyperlane-quick-start\config\business\templates\const.rs`
-- **Size**: `100 B`
-- **Modified Time**: `2025-10-01T21:58:37.543855`
+### 📄 File #724 - `const.rs`
+- **Path**: `hyperlane-quick-start\config\application\templates\const.rs`
+- **Size**: `92 B`
+- **Modified Time**: `2025-10-21T08:11:45.330278`
 
 #### Content Preview
 
 ```rust
-pub const INDEX_HTML: &'static str = include_str!("../../../resources/templates/index/index.html");
+pub const INDEX_HTML: &str = include_str!("../../../resources/templates/index/index.html");
 
 ```
 
-### 📄 File #568 - `mod.rs`
-- **Path**: `hyperlane-quick-start\config\business\templates\mod.rs`
+### 📄 File #725 - `mod.rs`
+- **Path**: `hyperlane-quick-start\config\application\templates\mod.rs`
 - **Size**: `34 B`
-- **Modified Time**: `2025-09-15T22:37:17.335894`
+- **Modified Time**: `2025-10-21T08:11:45.330278`
 
 #### Content Preview
 
@@ -20463,10 +25088,10 @@ pub use r#const::*;
 
 ```
 
-### 📄 File #569 - `const.rs`
+### 📄 File #726 - `const.rs`
 - **Path**: `hyperlane-quick-start\config\framework\const.rs`
-- **Size**: `449 B`
-- **Modified Time**: `2025-10-01T21:58:37.543855`
+- **Size**: `503 B`
+- **Modified Time**: `2025-10-21T08:11:45.330779`
 
 #### Content Preview
 
@@ -20474,19 +25099,20 @@ pub use r#const::*;
 use super::*;
 
 pub const SERVER_PORT: usize = 60000;
-pub const SERVER_HOST: &'static str = "0.0.0.0";
+pub const SERVER_HOST: &str = "0.0.0.0";
 pub const SERVER_BUFFER: usize = 4096;
 pub const SERVER_LOG_SIZE: usize = 100_024_000;
-pub const SERVER_LOG_DIR: &'static str = "./tmp/logs";
+pub const SERVER_LOG_DIR: &str = "./tmp/logs";
 pub const SERVER_INNER_PRINT: bool = true;
 pub const SERVER_INNER_LOG: bool = true;
 pub const SERVER_NODELAY: bool = false;
 pub const SERVER_LINGER: OptionDuration = None;
 pub const SERVER_TTI: u32 = 128;
+pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
 
 ```
 
-### 📄 File #570 - `mod.rs`
+### 📄 File #727 - `mod.rs`
 - **Path**: `hyperlane-quick-start\config\framework\mod.rs`
 - **Size**: `49 B`
 - **Modified Time**: `2025-09-15T22:37:17.335894`
@@ -20502,33 +25128,7 @@ use super::*;
 
 ```
 
-### 📄 File #571 - `const.rs`
-- **Path**: `hyperlane-quick-start\config\process\const.rs`
-- **Size**: `71 B`
-- **Modified Time**: `2025-10-01T21:58:37.560829`
-
-#### Content Preview
-
-```rust
-pub const PID_FILE_PATH: &'static str = "./tmp/process/hyperlane.pid";
-
-```
-
-### 📄 File #572 - `mod.rs`
-- **Path**: `hyperlane-quick-start\config\process\mod.rs`
-- **Size**: `34 B`
-- **Modified Time**: `2025-10-01T21:58:37.561336`
-
-#### Content Preview
-
-```rust
-mod r#const;
-
-pub use r#const::*;
-
-```
-
-### 📄 File #573 - `Cargo.toml`
+### 📄 File #728 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\init\Cargo.toml`
 - **Size**: `298 B`
 - **Modified Time**: `2025-09-15T22:37:17.335894`
@@ -20537,15 +25137,15 @@ pub use r#const::*;
 
 
 
-### 📄 File #574 - `lib.rs`
+### 📄 File #729 - `lib.rs`
 - **Path**: `hyperlane-quick-start\init\lib.rs`
-- **Size**: `80 B`
-- **Modified Time**: `2025-09-15T22:37:17.336894`
+- **Size**: `83 B`
+- **Modified Time**: `2025-10-21T08:11:45.331779`
 
 #### Content Preview
 
 ```rust
-pub mod business;
+pub mod application;
 pub mod framework;
 
 use hyperlane::*;
@@ -20553,10 +25153,10 @@ use hyperlane_utils::*;
 
 ```
 
-### 📄 File #575 - `mod.rs`
-- **Path**: `hyperlane-quick-start\init\business\mod.rs`
+### 📄 File #730 - `mod.rs`
+- **Path**: `hyperlane-quick-start\init\application\mod.rs`
 - **Size**: `1 B`
-- **Modified Time**: `2025-09-15T22:37:17.335894`
+- **Modified Time**: `2025-10-21T08:11:45.331279`
 
 #### Content Preview
 
@@ -20565,7 +25165,7 @@ use hyperlane_utils::*;
 
 ```
 
-### 📄 File #576 - `mod.rs`
+### 📄 File #731 - `mod.rs`
 - **Path**: `hyperlane-quick-start\init\framework\mod.rs`
 - **Size**: `47 B`
 - **Modified Time**: `2025-09-15T22:37:17.336894`
@@ -20580,21 +25180,21 @@ use super::*;
 
 ```
 
-### 📄 File #577 - `fn.rs`
+### 📄 File #732 - `fn.rs`
 - **Path**: `hyperlane-quick-start\init\framework\shutdown\fn.rs`
-- **Size**: `251 B`
-- **Modified Time**: `2025-10-01T21:58:37.565503`
+- **Size**: `253 B`
+- **Modified Time**: `2025-10-21T08:11:45.331279`
 
 #### Content Preview
 
 ```rust
 use super::*;
 
-pub fn set_shutdown(shutdown: ArcFnPinBoxFutureSend<()>) {
+pub fn set_shutdown(shutdown: SharedAsyncTaskFactory<()>) {
     let _ = SHUTDOWN.set(shutdown);
 }
 
-pub fn shutdown() -> ArcFnPinBoxFutureSend<()> {
+pub fn shutdown() -> SharedAsyncTaskFactory<()> {
     SHUTDOWN
         .get_or_init(|| Arc::new(|| Box::pin(async {})))
         .clone()
@@ -20602,7 +25202,7 @@ pub fn shutdown() -> ArcFnPinBoxFutureSend<()> {
 
 ```
 
-### 📄 File #578 - `mod.rs`
+### 📄 File #733 - `mod.rs`
 - **Path**: `hyperlane-quick-start\init\framework\shutdown\mod.rs`
 - **Size**: `107 B`
 - **Modified Time**: `2025-09-15T22:37:17.336894`
@@ -20622,24 +25222,24 @@ use std::sync::{Arc, OnceLock};
 
 ```
 
-### 📄 File #579 - `static.rs`
+### 📄 File #734 - `static.rs`
 - **Path**: `hyperlane-quick-start\init\framework\shutdown\static.rs`
-- **Size**: `98 B`
-- **Modified Time**: `2025-09-15T22:37:17.336894`
+- **Size**: `99 B`
+- **Modified Time**: `2025-10-21T08:11:45.331279`
 
 #### Content Preview
 
 ```rust
 use super::*;
 
-pub(super) static SHUTDOWN: OnceLock<ArcFnPinBoxFutureSend<()>> = OnceLock::new();
+pub(super) static SHUTDOWN: OnceLock<SharedAsyncTaskFactory<()>> = OnceLock::new();
 
 ```
 
-### 📄 File #580 - `fn.rs`
+### 📄 File #735 - `fn.rs`
 - **Path**: `hyperlane-quick-start\init\framework\wait\fn.rs`
-- **Size**: `1,403 B`
-- **Modified Time**: `2025-10-01T21:58:37.569735`
+- **Size**: `1,392 B`
+- **Modified Time**: `2025-10-21T08:11:45.331779`
 
 #### Content Preview
 
@@ -20647,7 +25247,7 @@ pub(super) static SHUTDOWN: OnceLock<ArcFnPinBoxFutureSend<()>> = OnceLock::new(
 use super::*;
 
 #[hyperlane(config: ServerConfig)]
-async fn configure_config(server: &Server) {
+async fn init_config(server: &Server) {
     config.host(SERVER_HOST).await;
     config.port(SERVER_PORT).await;
     config.ttl(SERVER_TTI).await;
@@ -20670,31 +25270,31 @@ fn runtime() -> Runtime {
 
 #[hyperlane(server: Server)]
 async fn create_server() {
-    configure_config(&server).await;
+    init_config(&server).await;
     println_success!("Server initialization successful");
-    let server_result: ServerResult<ServerHook> = server.run().await;
+    let server_result: ServerResult<ServerControlHook> = server.run().await;
     match server_result {
         Ok(server_hook) => {
             let host_port: String = format!("{SERVER_HOST}:{SERVER_PORT}");
-            println_success!("Server listen in: ", host_port);
-            let shutdown: ArcFnPinBoxFutureSend<()> = server_hook.get_shutdown_hook().clone();
+            println_success!("Server listen in: {host_port}");
+            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();
             set_shutdown(shutdown);
             server_hook.wait().await;
         }
-        Err(server_error) => println_error!("Server run error: ", server_error),
+        Err(server_error) => println_error!("Server run error: {server_error}"),
     }
 }
 
 pub fn run() {
-    runtime().block_on(process::create(create_server));
+    runtime().block_on(create(create_server));
 }
 
 ```
 
-### 📄 File #581 - `mod.rs`
+### 📄 File #736 - `mod.rs`
 - **Path**: `hyperlane-quick-start\init\framework\wait\mod.rs`
-- **Size**: `213 B`
-- **Modified Time**: `2025-10-01T21:58:37.570259`
+- **Size**: `216 B`
+- **Modified Time**: `2025-10-21T08:11:45.331779`
 
 #### Content Preview
 
@@ -20707,13 +25307,13 @@ use super::{shutdown::*, *};
 #[allow(unused_imports)]
 use hyperlane_app::*;
 use hyperlane_config::framework::*;
-use hyperlane_plugin::process;
+use hyperlane_plugin::process::*;
 
 use tokio::runtime::{Builder, Runtime};
 
 ```
 
-### 📄 File #582 - `Cargo.toml`
+### 📄 File #737 - `Cargo.toml`
 - **Path**: `hyperlane-quick-start\plugin\Cargo.toml`
 - **Size**: `223 B`
 - **Modified Time**: `2025-09-15T22:37:17.336894`
@@ -20722,7 +25322,7 @@ use tokio::runtime::{Builder, Runtime};
 
 
 
-### 📄 File #583 - `lib.rs`
+### 📄 File #738 - `lib.rs`
 - **Path**: `hyperlane-quick-start\plugin\lib.rs`
 - **Size**: `55 B`
 - **Modified Time**: `2025-10-01T21:58:37.577576`
@@ -20737,7 +25337,7 @@ use hyperlane_utils::*;
 
 ```
 
-### 📄 File #584 - `fn.rs`
+### 📄 File #739 - `fn.rs`
 - **Path**: `hyperlane-quick-start\plugin\log\fn.rs`
 - **Size**: `345 B`
 - **Modified Time**: `2025-09-15T22:37:17.337896`
@@ -20770,7 +25370,7 @@ where
 
 ```
 
-### 📄 File #585 - `mod.rs`
+### 📄 File #740 - `mod.rs`
 - **Path**: `hyperlane-quick-start\plugin\log\mod.rs`
 - **Size**: `158 B`
 - **Modified Time**: `2025-09-15T22:37:17.337896`
@@ -20790,7 +25390,7 @@ use hyperlane_utils::once_cell::sync::Lazy;
 
 ```
 
-### 📄 File #586 - `static.rs`
+### 📄 File #741 - `static.rs`
 - **Path**: `hyperlane-quick-start\plugin\log\static.rs`
 - **Size**: `181 B`
 - **Modified Time**: `2025-09-15T22:37:17.337896`
@@ -20809,10 +25409,10 @@ pub static LOG: Lazy<Log> = Lazy::new(|| {
 
 ```
 
-### 📄 File #587 - `fn.rs`
+### 📄 File #742 - `fn.rs`
 - **Path**: `hyperlane-quick-start\plugin\process\fn.rs`
-- **Size**: `1,975 B`
-- **Modified Time**: `2025-10-01T21:58:37.578093`
+- **Size**: `2,009 B`
+- **Modified Time**: `2025-10-21T08:11:45.332279`
 
 #### Content Preview
 
@@ -20827,14 +25427,16 @@ where
     let args: Vec<String> = args().collect();
     let mut manager: ServerManager = ServerManager::new();
     manager
-        .set_pid_file(PID_FILE_PATH)
+        .set_pid_file(SERVER_PID_FILE_PATH)
         .set_server_hook(server_hook);
     let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == "-d";
     let start_server = || async {
         if is_daemon {
             match manager.start_daemon().await {
                 Ok(_) => println_success!("Server started in background successfully"),
-                Err(e) => println_error!(format!("Error starting server in background: {e}")),
+                Err(error) => {
+                    println_error!("Error starting server in background: {error}")
+                }
             };
         } else {
             println_success!("Server started successfully");
@@ -20844,7 +25446,7 @@ where
     let stop_server = || async {
         match manager.stop().await {
             Ok(_) => println_success!("Server stopped successfully"),
-            Err(e) => println_error!(format!("Error stopping server: {e}")),
+            Err(error) => println_error!("Error stopping server: {error}"),
         };
     };
     let hot_restart_server = || async {
@@ -20853,7 +25455,7 @@ where
             .await
         {
             Ok(_) => println_success!("Server started successfully"),
-            Err(e) => println_error!(format!("Error starting server in background: {e}")),
+            Err(error) => println_error!("Error starting server in background: {error}"),
         }
     };
     let restart_server = || async {
@@ -20871,17 +25473,17 @@ where
         "restart" => restart_server().await,
         "hot" => hot_restart_server().await,
         _ => {
-            println_error!(format!("Invalid command: {command}"));
+            println_error!("Invalid command: {command}");
         }
     }
 }
 
 ```
 
-### 📄 File #588 - `mod.rs`
+### 📄 File #743 - `mod.rs`
 - **Path**: `hyperlane-quick-start\plugin\process\mod.rs`
-- **Size**: `116 B`
-- **Modified Time**: `2025-10-01T21:58:37.581639`
+- **Size**: `118 B`
+- **Modified Time**: `2025-10-21T08:11:45.332279`
 
 #### Content Preview
 
@@ -20891,13 +25493,13 @@ mod r#fn;
 pub use r#fn::*;
 
 use super::*;
-use hyperlane_config::process::*;
+use hyperlane_config::framework::*;
 
 use std::{env::args, future::Future};
 
 ```
 
-### 📄 File #589 - `index.html`
+### 📄 File #744 - `index.html`
 - **Path**: `hyperlane-quick-start\resources\static\not_found\index.html`
 - **Size**: `788 B`
 - **Modified Time**: `2025-10-01T21:58:37.582152`
@@ -20943,7 +25545,7 @@ use std::{env::args, future::Future};
 
 ```
 
-### 📄 File #590 - `index.html`
+### 📄 File #745 - `index.html`
 - **Path**: `hyperlane-quick-start\resources\templates\index\index.html`
 - **Size**: `798 B`
 - **Modified Time**: `2025-10-01T21:58:37.582673`
@@ -20989,23 +25591,21 @@ use std::{env::args, future::Future};
 
 ```
 
-### 📄 File #591 - `main.rs`
+### 📄 File #746 - `main.rs`
 - **Path**: `hyperlane-quick-start\src\main.rs`
-- **Size**: `79 B`
-- **Modified Time**: `2025-09-15T22:37:17.338894`
+- **Size**: `58 B`
+- **Modified Time**: `2025-10-21T08:11:45.332779`
 
 #### Content Preview
 
 ```rust
-use hyperlane_init;
-
 fn main() {
     hyperlane_init::framework::wait::run();
 }
 
 ```
 
-### 📄 File #592 - `.gitignore`
+### 📄 File #747 - `.gitignore`
 - **Path**: `hyperlane-time\.gitignore`
 - **Size**: `18 B`
 - **Modified Time**: `2025-09-15T22:37:15.186780`
@@ -21014,16 +25614,16 @@ fn main() {
 
 
 
-### 📄 File #593 - `Cargo.toml`
+### 📄 File #748 - `Cargo.toml`
 - **Path**: `hyperlane-time\Cargo.toml`
-- **Size**: `746 B`
-- **Modified Time**: `2025-09-15T22:37:15.186780`
+- **Size**: `747 B`
+- **Modified Time**: `2025-10-21T08:11:43.240178`
 
 #### Content Preview
 
 
 
-### 📄 File #594 - `LICENSE`
+### 📄 File #749 - `LICENSE`
 - **Path**: `hyperlane-time\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:15.186780`
@@ -21032,7 +25632,7 @@ fn main() {
 
 
 
-### 📄 File #595 - `README.md`
+### 📄 File #750 - `README.md`
 - **Path**: `hyperlane-time\README.md`
 - **Size**: `2,085 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -21106,7 +25706,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #596 - `config`
+### 📄 File #751 - `config`
 - **Path**: `hyperlane-time\.git\config`
 - **Size**: `324 B`
 - **Modified Time**: `2025-09-15T22:37:15.180588`
@@ -21115,7 +25715,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #597 - `description`
+### 📄 File #752 - `description`
 - **Path**: `hyperlane-time\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:12.972096`
@@ -21124,16 +25724,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #598 - `FETCH_HEAD`
+### 📄 File #753 - `FETCH_HEAD`
 - **Path**: `hyperlane-time\.git\FETCH_HEAD`
-- **Size**: `109 B`
-- **Modified Time**: `2025-10-01T21:58:34.908391`
+- **Size**: `588 B`
+- **Modified Time**: `2025-10-21T08:11:43.189239`
 
 #### Content Preview
 
 
 
-### 📄 File #599 - `HEAD`
+### 📄 File #754 - `HEAD`
 - **Path**: `hyperlane-time\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:15.173589`
@@ -21142,16 +25742,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #600 - `index`
+### 📄 File #755 - `index`
 - **Path**: `hyperlane-time\.git\index`
 - **Size**: `989 B`
-- **Modified Time**: `2025-09-15T22:44:11.387195`
+- **Modified Time**: `2025-10-21T08:11:43.252525`
 
 #### Content Preview
 
 
 
-### 📄 File #601 - `ORIG_HEAD`
+### 📄 File #756 - `ORIG_HEAD`
 - **Path**: `hyperlane-time\.git\ORIG_HEAD`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:44:12.969263`
@@ -21160,7 +25760,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #602 - `packed-refs`
+### 📄 File #757 - `packed-refs`
 - **Path**: `hyperlane-time\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:15.164995`
@@ -21169,7 +25769,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #603 - `shallow`
+### 📄 File #758 - `shallow`
 - **Path**: `hyperlane-time\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:15.106441`
@@ -21178,7 +25778,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #604 - `applypatch-msg.sample`
+### 📄 File #759 - `applypatch-msg.sample`
 - **Path**: `hyperlane-time\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:12.972096`
@@ -21187,7 +25787,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #605 - `commit-msg.sample`
+### 📄 File #760 - `commit-msg.sample`
 - **Path**: `hyperlane-time\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:12.972096`
@@ -21196,7 +25796,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #606 - `fsmonitor-watchman.sample`
+### 📄 File #761 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-time\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:12.972096`
@@ -21205,7 +25805,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #607 - `post-update.sample`
+### 📄 File #762 - `post-update.sample`
 - **Path**: `hyperlane-time\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:12.973096`
@@ -21214,7 +25814,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #608 - `pre-applypatch.sample`
+### 📄 File #763 - `pre-applypatch.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:12.973096`
@@ -21223,7 +25823,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #609 - `pre-commit.sample`
+### 📄 File #764 - `pre-commit.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:12.973096`
@@ -21232,7 +25832,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #610 - `pre-merge-commit.sample`
+### 📄 File #765 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:12.973096`
@@ -21241,7 +25841,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #611 - `pre-push.sample`
+### 📄 File #766 - `pre-push.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -21250,7 +25850,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #612 - `pre-rebase.sample`
+### 📄 File #767 - `pre-rebase.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -21259,7 +25859,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #613 - `pre-receive.sample`
+### 📄 File #768 - `pre-receive.sample`
 - **Path**: `hyperlane-time\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -21268,7 +25868,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #614 - `prepare-commit-msg.sample`
+### 📄 File #769 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-time\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -21277,7 +25877,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #615 - `push-to-checkout.sample`
+### 📄 File #770 - `push-to-checkout.sample`
 - **Path**: `hyperlane-time\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -21286,7 +25886,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #616 - `sendemail-validate.sample`
+### 📄 File #771 - `sendemail-validate.sample`
 - **Path**: `hyperlane-time\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:12.974097`
@@ -21295,7 +25895,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #617 - `update.sample`
+### 📄 File #772 - `update.sample`
 - **Path**: `hyperlane-time\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:12.975098`
@@ -21304,7 +25904,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #618 - `exclude`
+### 📄 File #773 - `exclude`
 - **Path**: `hyperlane-time\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:12.975098`
@@ -21313,25 +25913,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #619 - `HEAD`
+### 📄 File #774 - `HEAD`
 - **Path**: `hyperlane-time\.git\logs\HEAD`
-- **Size**: `189 B`
-- **Modified Time**: `2025-09-15T22:37:15.174588`
+- **Size**: `342 B`
+- **Modified Time**: `2025-10-21T08:11:43.254385`
 
 #### Content Preview
 
 
 
-### 📄 File #620 - `master`
+### 📄 File #775 - `master`
 - **Path**: `hyperlane-time\.git\logs\refs\heads\master`
-- **Size**: `189 B`
-- **Modified Time**: `2025-09-15T22:37:15.175589`
+- **Size**: `342 B`
+- **Modified Time**: `2025-10-21T08:11:43.254385`
 
 #### Content Preview
 
 
 
-### 📄 File #621 - `HEAD`
+### 📄 File #776 - `HEAD`
 - **Path**: `hyperlane-time\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:15.172589`
@@ -21340,7 +25940,241 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #622 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.idx`
+### 📄 File #777 - `master`
+- **Path**: `hyperlane-time\.git\logs\refs\remotes\origin\master`
+- **Size**: `153 B`
+- **Modified Time**: `2025-10-21T08:11:43.133204`
+
+#### Content Preview
+
+
+
+### 📄 File #778 - `b71a0e50166e378093d7d133b4b2606f38646b`
+- **Path**: `hyperlane-time\.git\objects\13\b71a0e50166e378093d7d133b4b2606f38646b`
+- **Size**: `407 B`
+- **Modified Time**: `2025-10-21T08:11:43.032672`
+
+#### Content Preview
+
+
+
+### 📄 File #779 - `8f847ee8673d3896972be49a4cd2503f8433c8`
+- **Path**: `hyperlane-time\.git\objects\16\8f847ee8673d3896972be49a4cd2503f8433c8`
+- **Size**: `82 B`
+- **Modified Time**: `2025-10-21T08:11:43.015593`
+
+#### Content Preview
+
+
+
+### 📄 File #780 - `d0ea87a1c68b674e72507d846881a8ec8ad252`
+- **Path**: `hyperlane-time\.git\objects\1d\d0ea87a1c68b674e72507d846881a8ec8ad252`
+- **Size**: `136 B`
+- **Modified Time**: `2025-10-21T08:11:43.020593`
+
+#### Content Preview
+
+
+
+### 📄 File #781 - `2e29b1a92e695dad15ca28831b5b841c348529`
+- **Path**: `hyperlane-time\.git\objects\34\2e29b1a92e695dad15ca28831b5b841c348529`
+- **Size**: `136 B`
+- **Modified Time**: `2025-10-21T08:11:43.012086`
+
+#### Content Preview
+
+
+
+### 📄 File #782 - `93c0ccc062adaf34fe3084d172b721873e8b48`
+- **Path**: `hyperlane-time\.git\objects\35\93c0ccc062adaf34fe3084d172b721873e8b48`
+- **Size**: `406 B`
+- **Modified Time**: `2025-10-21T08:11:43.035177`
+
+#### Content Preview
+
+
+
+### 📄 File #783 - `cc8d26cee1626c4a8a54a43cf8ad333b298761`
+- **Path**: `hyperlane-time\.git\objects\39\cc8d26cee1626c4a8a54a43cf8ad333b298761`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:43.022094`
+
+#### Content Preview
+
+
+
+### 📄 File #784 - `c89cfb0ae0235b1c9ca7dc6b31740b426290c7`
+- **Path**: `hyperlane-time\.git\objects\3d\c89cfb0ae0235b1c9ca7dc6b31740b426290c7`
+- **Size**: `81 B`
+- **Modified Time**: `2025-10-21T08:11:43.011586`
+
+#### Content Preview
+
+
+
+### 📄 File #785 - `c9b648488f6288e7e1f0b41bce70d660ccca4e`
+- **Path**: `hyperlane-time\.git\objects\47\c9b648488f6288e7e1f0b41bce70d660ccca4e`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:43.007088`
+
+#### Content Preview
+
+
+
+### 📄 File #786 - `b6819f2d295fab0230f3787466c9bf8fc36440`
+- **Path**: `hyperlane-time\.git\objects\48\b6819f2d295fab0230f3787466c9bf8fc36440`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:43.008587`
+
+#### Content Preview
+
+
+
+### 📄 File #787 - `280c99274b51104ba1c5099787ff6db9b6cc8d`
+- **Path**: `hyperlane-time\.git\objects\4a\280c99274b51104ba1c5099787ff6db9b6cc8d`
+- **Size**: `2,183 B`
+- **Modified Time**: `2025-10-21T08:11:43.054845`
+
+#### Content Preview
+
+
+
+### 📄 File #788 - `874845f5b9b928faa2b81695b4112a8fe24fe7`
+- **Path**: `hyperlane-time\.git\objects\57\874845f5b9b928faa2b81695b4112a8fe24fe7`
+- **Size**: `407 B`
+- **Modified Time**: `2025-10-21T08:11:43.045688`
+
+#### Content Preview
+
+
+
+### 📄 File #789 - `bb7a3861c09fbc9720bf9dc8eee02ae442ccc6`
+- **Path**: `hyperlane-time\.git\objects\5f\bb7a3861c09fbc9720bf9dc8eee02ae442ccc6`
+- **Size**: `2,190 B`
+- **Modified Time**: `2025-10-21T08:11:43.048341`
+
+#### Content Preview
+
+
+
+### 📄 File #790 - `1ac5781c130e575300e88083262358d1754e67`
+- **Path**: `hyperlane-time\.git\objects\60\1ac5781c130e575300e88083262358d1754e67`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:43.014094`
+
+#### Content Preview
+
+
+
+### 📄 File #791 - `8ebeef36f49f7aa60ed1743f6b8238f28f247c`
+- **Path**: `hyperlane-time\.git\objects\6d\8ebeef36f49f7aa60ed1743f6b8238f28f247c`
+- **Size**: `81 B`
+- **Modified Time**: `2025-10-21T08:11:43.019093`
+
+#### Content Preview
+
+
+
+### 📄 File #792 - `b488b60744d747026369565d5350a6a82bb36a`
+- **Path**: `hyperlane-time\.git\objects\80\b488b60744d747026369565d5350a6a82bb36a`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:43.031169`
+
+#### Content Preview
+
+
+
+### 📄 File #793 - `2c386b4be1166c9dceff3698476fe30d35d564`
+- **Path**: `hyperlane-time\.git\objects\91\2c386b4be1166c9dceff3698476fe30d35d564`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:43.018093`
+
+#### Content Preview
+
+
+
+### 📄 File #794 - `f1c89d723fd75209588f3e2540c717d290bab2`
+- **Path**: `hyperlane-time\.git\objects\a9\f1c89d723fd75209588f3e2540c717d290bab2`
+- **Size**: `2,179 B`
+- **Modified Time**: `2025-10-21T08:11:43.065142`
+
+#### Content Preview
+
+
+
+### 📄 File #795 - `86b17a19071e0a687117856dcbde74ae613f67`
+- **Path**: `hyperlane-time\.git\objects\ac\86b17a19071e0a687117856dcbde74ae613f67`
+- **Size**: `82 B`
+- **Modified Time**: `2025-10-21T08:11:43.022593`
+
+#### Content Preview
+
+
+
+### 📄 File #796 - `5d0710af618115b49cb2c5cd4c9be05da391a7`
+- **Path**: `hyperlane-time\.git\objects\c6\5d0710af618115b49cb2c5cd4c9be05da391a7`
+- **Size**: `136 B`
+- **Modified Time**: `2025-10-21T08:11:43.016593`
+
+#### Content Preview
+
+
+
+### 📄 File #797 - `1a7bdb38b2dd689f57b2bcc2c420a38e54d4aa`
+- **Path**: `hyperlane-time\.git\objects\cb\1a7bdb38b2dd689f57b2bcc2c420a38e54d4aa`
+- **Size**: `407 B`
+- **Modified Time**: `2025-10-21T08:11:43.034177`
+
+#### Content Preview
+
+
+
+### 📄 File #798 - `29548889bafd405b7b6d5da7aeef1b0e2adeac`
+- **Path**: `hyperlane-time\.git\objects\d2\29548889bafd405b7b6d5da7aeef1b0e2adeac`
+- **Size**: `2,101 B`
+- **Modified Time**: `2025-10-21T08:11:43.047341`
+
+#### Content Preview
+
+
+
+### 📄 File #799 - `c3f0fe44591ed2f9e14cccd086a34cddf556aa`
+- **Path**: `hyperlane-time\.git\objects\d7\c3f0fe44591ed2f9e14cccd086a34cddf556aa`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:43.005080`
+
+#### Content Preview
+
+
+
+### 📄 File #800 - `2efce8ac5e9b69ad33e722ba5f36297041ab7e`
+- **Path**: `hyperlane-time\.git\objects\e2\2efce8ac5e9b69ad33e722ba5f36297041ab7e`
+- **Size**: `136 B`
+- **Modified Time**: `2025-10-21T08:11:43.024639`
+
+#### Content Preview
+
+
+
+### 📄 File #801 - `b04726a1667e99bd92f5fce06e66720f417d37`
+- **Path**: `hyperlane-time\.git\objects\e6\b04726a1667e99bd92f5fce06e66720f417d37`
+- **Size**: `2,179 B`
+- **Modified Time**: `2025-10-21T08:11:43.060352`
+
+#### Content Preview
+
+
+
+### 📄 File #802 - `ee79dc19ca1512711f35a8f92ac9df6a0424e5`
+- **Path**: `hyperlane-time\.git\objects\ec\ee79dc19ca1512711f35a8f92ac9df6a0424e5`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:43.010088`
+
+#### Content Preview
+
+
+
+### 📄 File #803 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.idx`
 - **Path**: `hyperlane-time\.git\objects\pack\pack-6e08451308d3bfead0713de09bb80ca471015a9b.idx`
 - **Size**: `1,520 B`
 - **Modified Time**: `2025-09-15T22:37:15.126243`
@@ -21349,7 +26183,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #623 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.pack`
+### 📄 File #804 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.pack`
 - **Path**: `hyperlane-time\.git\objects\pack\pack-6e08451308d3bfead0713de09bb80ca471015a9b.pack`
 - **Size**: `9,141 B`
 - **Modified Time**: `2025-09-15T22:37:15.125739`
@@ -21358,7 +26192,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #624 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.rev`
+### 📄 File #805 - `pack-6e08451308d3bfead0713de09bb80ca471015a9b.rev`
 - **Path**: `hyperlane-time\.git\objects\pack\pack-6e08451308d3bfead0713de09bb80ca471015a9b.rev`
 - **Size**: `116 B`
 - **Modified Time**: `2025-09-15T22:37:15.127246`
@@ -21367,16 +26201,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #625 - `master`
+### 📄 File #806 - `master`
 - **Path**: `hyperlane-time\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:37:15.174588`
+- **Modified Time**: `2025-10-21T08:11:43.253525`
 
 #### Content Preview
 
 
 
-### 📄 File #626 - `HEAD`
+### 📄 File #807 - `HEAD`
 - **Path**: `hyperlane-time\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:15.171588`
@@ -21385,7 +26219,43 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #627 - `v0.7.8`
+### 📄 File #808 - `master`
+- **Path**: `hyperlane-time\.git\refs\remotes\origin\master`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:43.133204`
+
+#### Content Preview
+
+
+
+### 📄 File #809 - `v0.7.10`
+- **Path**: `hyperlane-time\.git\refs\tags\v0.7.10`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:43.184738`
+
+#### Content Preview
+
+
+
+### 📄 File #810 - `v0.7.11`
+- **Path**: `hyperlane-time\.git\refs\tags\v0.7.11`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:43.185739`
+
+#### Content Preview
+
+
+
+### 📄 File #811 - `v0.7.12`
+- **Path**: `hyperlane-time\.git\refs\tags\v0.7.12`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:43.134710`
+
+#### Content Preview
+
+
+
+### 📄 File #812 - `v0.7.8`
 - **Path**: `hyperlane-time\.git\refs\tags\v0.7.8`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:15.170587`
@@ -21394,7 +26264,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #628 - `rust.yml`
+### 📄 File #813 - `v0.7.9`
+- **Path**: `hyperlane-time\.git\refs\tags\v0.7.9`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:43.186238`
+
+#### Content Preview
+
+
+
+### 📄 File #814 - `rust.yml`
 - **Path**: `hyperlane-time\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:15.186780`
@@ -21657,7 +26536,7 @@ jobs:
 
 ```
 
-### 📄 File #629 - `lib.rs`
+### 📄 File #815 - `lib.rs`
 - **Path**: `hyperlane-time\src\lib.rs`
 - **Size**: `316 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -21684,7 +26563,7 @@ pub(crate) use std::{
 
 ```
 
-### 📄 File #630 - `cfg.rs`
+### 📄 File #816 - `cfg.rs`
 - **Path**: `hyperlane-time\src\time\cfg.rs`
 - **Size**: `1,211 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -21731,10 +26610,10 @@ fn test_methods() {
 
 ```
 
-### 📄 File #631 - `enum.rs`
+### 📄 File #817 - `enum.rs`
 - **Path**: `hyperlane-time\src\time\enum.rs`
-- **Size**: `5,784 B`
-- **Modified Time**: `2025-09-15T22:37:15.187787`
+- **Size**: `5,782 B`
+- **Modified Time**: `2025-10-21T08:11:43.247523`
 
 #### Content Preview
 
@@ -21814,7 +26693,7 @@ impl fmt::Display for Lang {
             Lang::SvSeUtf8 => "Svenska (Sverige)",
             Lang::FiFiUtf8 => "Suomi (Suomi)",
         };
-        write!(f, "{}", lang_str)
+        write!(f, "{lang_str}")
     }
 }
 impl Lang {
@@ -21921,10 +26800,10 @@ pub fn from_env_var() -> Lang {
 
 ```
 
-### 📄 File #632 - `fn.rs`
+### 📄 File #818 - `fn.rs`
 - **Path**: `hyperlane-time\src\time\fn.rs`
-- **Size**: `8,755 B`
-- **Modified Time**: `2025-09-15T22:37:15.187787`
+- **Size**: `8,685 B`
+- **Modified Time**: `2025-10-21T08:11:43.252024`
 
 #### Content Preview
 
@@ -21951,8 +26830,9 @@ pub const MONTHS: [&str; 12] = [
 /// # Returns
 ///
 /// - `bool` - Whether the year is a leap year.
+#[inline]
 pub fn is_leap_year(year: u64) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 /// Gets the current time, including the date and time.
@@ -21965,8 +26845,7 @@ pub fn time() -> String {
     let mut date_time: String = String::new();
     write!(
         &mut date_time,
-        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-        year, month, day, hour, minute, second
+        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}"
     )
     .unwrap_or_default();
     date_time
@@ -21980,7 +26859,7 @@ pub fn time() -> String {
 pub fn date() -> String {
     let (year, month, day, _, _, _, _, _) = calculate_time();
     let mut date_time: String = String::new();
-    write!(&mut date_time, "{:04}-{:02}-{:02}", year, month, day).unwrap_or_default();
+    write!(&mut date_time, "{year:04}-{month:02}-{day:02}").unwrap_or_default();
     date_time
 }
 
@@ -22012,7 +26891,7 @@ pub fn compute_date(mut days_since_epoch: u64) -> (u64, u64, u64) {
         };
         if days_since_epoch < days_in_month as u64 {
             month = i as u64 + 1;
-            return (year, month, (days_since_epoch + 1) as u64);
+            return (year, month, days_since_epoch + 1);
         }
         days_since_epoch -= days_in_month as u64;
     }
@@ -22032,9 +26911,9 @@ pub fn gmt() -> String {
     let seconds_in_day: u64 = 86_400;
     let days_since_epoch: u64 = timestamp / seconds_in_day;
     let seconds_of_day: u64 = timestamp % seconds_in_day;
-    let hours: u64 = (seconds_of_day / 3600) as u64;
-    let minutes: u64 = ((seconds_of_day % 3600) / 60) as u64;
-    let seconds: u64 = (seconds_of_day % 60) as u64;
+    let hours: u64 = seconds_of_day / 3600;
+    let minutes: u64 = (seconds_of_day % 3600) / 60;
+    let seconds: u64 = seconds_of_day % 60;
     let (year, month, day) = compute_date(days_since_epoch);
     let weekday: usize = ((days_since_epoch + 4) % 7) as usize;
     format!(
@@ -22185,8 +27064,7 @@ pub fn time_millis() -> String {
     let mut date_time: String = String::new();
     write!(
         &mut date_time,
-        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
-        year, month, day, hour, minute, second, millisecond
+        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{millisecond:03}"
     )
     .unwrap_or_default();
     date_time
@@ -22202,8 +27080,7 @@ pub fn time_micros() -> String {
     let mut date_time: String = String::new();
     write!(
         &mut date_time,
-        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:06}",
-        year, month, day, hour, minute, second, microseconds
+        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{microseconds:06}"
     )
     .unwrap_or_default();
     date_time
@@ -22248,7 +27125,7 @@ pub fn timestamp_micros() -> u64 {
 
 ```
 
-### 📄 File #633 - `mod.rs`
+### 📄 File #819 - `mod.rs`
 - **Path**: `hyperlane-time\src\time\mod.rs`
 - **Size**: `64 B`
 - **Modified Time**: `2025-09-15T22:37:15.187787`
@@ -22262,7 +27139,7 @@ pub(crate) mod r#fn;
 
 ```
 
-### 📄 File #634 - `.gitignore`
+### 📄 File #820 - `.gitignore`
 - **Path**: `hyperlane-utils\.gitignore`
 - **Size**: `18 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -22271,16 +27148,16 @@ pub(crate) mod r#fn;
 
 
 
-### 📄 File #635 - `Cargo.toml`
+### 📄 File #821 - `Cargo.toml`
 - **Path**: `hyperlane-utils\Cargo.toml`
-- **Size**: `1,705 B`
-- **Modified Time**: `2025-10-01T21:58:43.209529`
+- **Size**: `2,211 B`
+- **Modified Time**: `2025-10-21T08:11:48.920306`
 
 #### Content Preview
 
 
 
-### 📄 File #636 - `LICENSE`
+### 📄 File #822 - `LICENSE`
 - **Path**: `hyperlane-utils\LICENSE`
 - **Size**: `1,066 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -22289,7 +27166,7 @@ pub(crate) mod r#fn;
 
 
 
-### 📄 File #637 - `README.md`
+### 📄 File #823 - `README.md`
 - **Path**: `hyperlane-utils\README.md`
 - **Size**: `1,186 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -22343,7 +27220,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 ```
 
-### 📄 File #638 - `config`
+### 📄 File #824 - `config`
 - **Path**: `hyperlane-utils\.git\config`
 - **Size**: `325 B`
 - **Modified Time**: `2025-09-15T22:37:22.166642`
@@ -22352,7 +27229,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #639 - `description`
+### 📄 File #825 - `description`
 - **Path**: `hyperlane-utils\.git\description`
 - **Size**: `73 B`
 - **Modified Time**: `2025-09-15T22:37:19.442179`
@@ -22361,16 +27238,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #640 - `FETCH_HEAD`
+### 📄 File #826 - `FETCH_HEAD`
 - **Path**: `hyperlane-utils\.git\FETCH_HEAD`
-- **Size**: `473 B`
-- **Modified Time**: `2025-10-01T21:58:43.162923`
+- **Size**: `1,804 B`
+- **Modified Time**: `2025-10-21T08:11:48.867913`
 
 #### Content Preview
 
 
 
-### 📄 File #641 - `HEAD`
+### 📄 File #827 - `HEAD`
 - **Path**: `hyperlane-utils\.git\HEAD`
 - **Size**: `23 B`
 - **Modified Time**: `2025-09-15T22:37:22.158642`
@@ -22379,25 +27256,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #642 - `index`
+### 📄 File #828 - `index`
 - **Path**: `hyperlane-utils\.git\index`
 - **Size**: `639 B`
-- **Modified Time**: `2025-10-01T21:58:43.209529`
+- **Modified Time**: `2025-10-21T08:11:48.924811`
 
 #### Content Preview
 
 
 
-### 📄 File #643 - `ORIG_HEAD`
+### 📄 File #829 - `ORIG_HEAD`
 - **Path**: `hyperlane-utils\.git\ORIG_HEAD`
 - **Size**: `41 B`
-- **Modified Time**: `2025-09-15T22:44:19.087178`
+- **Modified Time**: `2025-10-21T08:11:48.913306`
 
 #### Content Preview
 
 
 
-### 📄 File #644 - `packed-refs`
+### 📄 File #830 - `packed-refs`
 - **Path**: `hyperlane-utils\.git\packed-refs`
 - **Size**: `114 B`
 - **Modified Time**: `2025-09-15T22:37:22.148643`
@@ -22406,7 +27283,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #645 - `shallow`
+### 📄 File #831 - `shallow`
 - **Path**: `hyperlane-utils\.git\shallow`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:22.041021`
@@ -22415,7 +27292,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #646 - `applypatch-msg.sample`
+### 📄 File #832 - `applypatch-msg.sample`
 - **Path**: `hyperlane-utils\.git\hooks\applypatch-msg.sample`
 - **Size**: `478 B`
 - **Modified Time**: `2025-09-15T22:37:19.442179`
@@ -22424,7 +27301,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #647 - `commit-msg.sample`
+### 📄 File #833 - `commit-msg.sample`
 - **Path**: `hyperlane-utils\.git\hooks\commit-msg.sample`
 - **Size**: `896 B`
 - **Modified Time**: `2025-09-15T22:37:19.442179`
@@ -22433,7 +27310,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #648 - `fsmonitor-watchman.sample`
+### 📄 File #834 - `fsmonitor-watchman.sample`
 - **Path**: `hyperlane-utils\.git\hooks\fsmonitor-watchman.sample`
 - **Size**: `4,726 B`
 - **Modified Time**: `2025-09-15T22:37:19.442179`
@@ -22442,7 +27319,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #649 - `post-update.sample`
+### 📄 File #835 - `post-update.sample`
 - **Path**: `hyperlane-utils\.git\hooks\post-update.sample`
 - **Size**: `189 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -22451,7 +27328,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #650 - `pre-applypatch.sample`
+### 📄 File #836 - `pre-applypatch.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-applypatch.sample`
 - **Size**: `424 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -22460,7 +27337,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #651 - `pre-commit.sample`
+### 📄 File #837 - `pre-commit.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-commit.sample`
 - **Size**: `1,649 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -22469,7 +27346,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #652 - `pre-merge-commit.sample`
+### 📄 File #838 - `pre-merge-commit.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-merge-commit.sample`
 - **Size**: `416 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -22478,7 +27355,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #653 - `pre-push.sample`
+### 📄 File #839 - `pre-push.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-push.sample`
 - **Size**: `1,374 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -22487,7 +27364,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #654 - `pre-rebase.sample`
+### 📄 File #840 - `pre-rebase.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-rebase.sample`
 - **Size**: `4,898 B`
 - **Modified Time**: `2025-09-15T22:37:19.443183`
@@ -22496,7 +27373,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #655 - `pre-receive.sample`
+### 📄 File #841 - `pre-receive.sample`
 - **Path**: `hyperlane-utils\.git\hooks\pre-receive.sample`
 - **Size**: `544 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -22505,7 +27382,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #656 - `prepare-commit-msg.sample`
+### 📄 File #842 - `prepare-commit-msg.sample`
 - **Path**: `hyperlane-utils\.git\hooks\prepare-commit-msg.sample`
 - **Size**: `1,492 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -22514,7 +27391,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #657 - `push-to-checkout.sample`
+### 📄 File #843 - `push-to-checkout.sample`
 - **Path**: `hyperlane-utils\.git\hooks\push-to-checkout.sample`
 - **Size**: `2,783 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -22523,7 +27400,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #658 - `sendemail-validate.sample`
+### 📄 File #844 - `sendemail-validate.sample`
 - **Path**: `hyperlane-utils\.git\hooks\sendemail-validate.sample`
 - **Size**: `2,308 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -22532,7 +27409,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #659 - `update.sample`
+### 📄 File #845 - `update.sample`
 - **Path**: `hyperlane-utils\.git\hooks\update.sample`
 - **Size**: `3,650 B`
 - **Modified Time**: `2025-09-15T22:37:19.444184`
@@ -22541,7 +27418,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #660 - `exclude`
+### 📄 File #846 - `exclude`
 - **Path**: `hyperlane-utils\.git\info\exclude`
 - **Size**: `240 B`
 - **Modified Time**: `2025-09-15T22:37:19.445184`
@@ -22550,25 +27427,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #661 - `HEAD`
+### 📄 File #847 - `HEAD`
 - **Path**: `hyperlane-utils\.git\logs\HEAD`
-- **Size**: `343 B`
-- **Modified Time**: `2025-10-01T21:58:43.216333`
+- **Size**: `496 B`
+- **Modified Time**: `2025-10-21T08:11:48.926811`
 
 #### Content Preview
 
 
 
-### 📄 File #662 - `master`
+### 📄 File #848 - `master`
 - **Path**: `hyperlane-utils\.git\logs\refs\heads\master`
-- **Size**: `343 B`
-- **Modified Time**: `2025-10-01T21:58:43.217059`
+- **Size**: `496 B`
+- **Modified Time**: `2025-10-21T08:11:48.926811`
 
 #### Content Preview
 
 
 
-### 📄 File #663 - `HEAD`
+### 📄 File #849 - `HEAD`
 - **Path**: `hyperlane-utils\.git\logs\refs\remotes\origin\HEAD`
 - **Size**: `190 B`
 - **Modified Time**: `2025-09-15T22:37:22.158642`
@@ -22577,16 +27454,34 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #664 - `master`
+### 📄 File #850 - `master`
 - **Path**: `hyperlane-utils\.git\logs\refs\remotes\origin\master`
-- **Size**: `153 B`
-- **Modified Time**: `2025-10-01T21:58:43.102881`
+- **Size**: `306 B`
+- **Modified Time**: `2025-10-21T08:11:48.795886`
 
 #### Content Preview
 
 
 
-### 📄 File #665 - `f3eb9bddac6b16cedc6f87996a3d4e7f946578`
+### 📄 File #851 - `0c3e714f5233744a26b1af52ea65286304de85`
+- **Path**: `hyperlane-utils\.git\objects\00\0c3e714f5233744a26b1af52ea65286304de85`
+- **Size**: `401 B`
+- **Modified Time**: `2025-10-21T08:11:48.694691`
+
+#### Content Preview
+
+
+
+### 📄 File #852 - `00035060a6a632f8965081f9c6cfffd72a75f4`
+- **Path**: `hyperlane-utils\.git\objects\08\00035060a6a632f8965081f9c6cfffd72a75f4`
+- **Size**: `50 B`
+- **Modified Time**: `2025-10-21T08:11:48.608221`
+
+#### Content Preview
+
+
+
+### 📄 File #853 - `f3eb9bddac6b16cedc6f87996a3d4e7f946578`
 - **Path**: `hyperlane-utils\.git\objects\0c\f3eb9bddac6b16cedc6f87996a3d4e7f946578`
 - **Size**: `167 B`
 - **Modified Time**: `2025-10-01T21:58:43.035397`
@@ -22595,7 +27490,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #666 - `2f8d9a1b3db3bdb1b7db067b437b28b5fd6797`
+### 📄 File #854 - `2f8d9a1b3db3bdb1b7db067b437b28b5fd6797`
 - **Path**: `hyperlane-utils\.git\objects\11\2f8d9a1b3db3bdb1b7db067b437b28b5fd6797`
 - **Size**: `211 B`
 - **Modified Time**: `2025-10-01T21:58:43.045009`
@@ -22604,7 +27499,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #667 - `efaf3ab811cdbc2c4d35a227e3580ef7e9b037`
+### 📄 File #855 - `eae6e72a679f6f79839a26b8b01246b42e1e03`
+- **Path**: `hyperlane-utils\.git\objects\11\eae6e72a679f6f79839a26b8b01246b42e1e03`
+- **Size**: `1,058 B`
+- **Modified Time**: `2025-10-21T08:11:48.678157`
+
+#### Content Preview
+
+
+
+### 📄 File #856 - `efaf3ab811cdbc2c4d35a227e3580ef7e9b037`
 - **Path**: `hyperlane-utils\.git\objects\13\efaf3ab811cdbc2c4d35a227e3580ef7e9b037`
 - **Size**: `211 B`
 - **Modified Time**: `2025-10-01T21:58:43.038516`
@@ -22613,7 +27517,52 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #668 - `9d2e65453f76916c714ebafe77f666ec99cf6c`
+### 📄 File #857 - `a72e08c8dc9b4d5790ce2595b8d200b33832d5`
+- **Path**: `hyperlane-utils\.git\objects\16\a72e08c8dc9b4d5790ce2595b8d200b33832d5`
+- **Size**: `50 B`
+- **Modified Time**: `2025-10-21T08:11:48.591695`
+
+#### Content Preview
+
+
+
+### 📄 File #858 - `4cd8770446b620fc987d95c3a210015fef99f0`
+- **Path**: `hyperlane-utils\.git\objects\17\4cd8770446b620fc987d95c3a210015fef99f0`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:48.582987`
+
+#### Content Preview
+
+
+
+### 📄 File #859 - `c85aef6387e245b537cd8536e53848327f8e17`
+- **Path**: `hyperlane-utils\.git\objects\1c\c85aef6387e245b537cd8536e53848327f8e17`
+- **Size**: `1,084 B`
+- **Modified Time**: `2025-10-21T08:11:48.651353`
+
+#### Content Preview
+
+
+
+### 📄 File #860 - `2bafeec341323d9b958ffcee9548ff0850a686`
+- **Path**: `hyperlane-utils\.git\objects\21\2bafeec341323d9b958ffcee9548ff0850a686`
+- **Size**: `1,080 B`
+- **Modified Time**: `2025-10-21T08:11:48.643847`
+
+#### Content Preview
+
+
+
+### 📄 File #861 - `0d5f0a5511c18f1f5129eecf8bf2f5b860d66d`
+- **Path**: `hyperlane-utils\.git\objects\22\0d5f0a5511c18f1f5129eecf8bf2f5b860d66d`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:48.580487`
+
+#### Content Preview
+
+
+
+### 📄 File #862 - `9d2e65453f76916c714ebafe77f666ec99cf6c`
 - **Path**: `hyperlane-utils\.git\objects\22\9d2e65453f76916c714ebafe77f666ec99cf6c`
 - **Size**: `166 B`
 - **Modified Time**: `2025-10-01T21:58:43.033816`
@@ -22622,7 +27571,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #669 - `42b4648037f4e680a6ac00f8493832087343d4`
+### 📄 File #863 - `42b4648037f4e680a6ac00f8493832087343d4`
 - **Path**: `hyperlane-utils\.git\objects\25\42b4648037f4e680a6ac00f8493832087343d4`
 - **Size**: `167 B`
 - **Modified Time**: `2025-10-01T21:58:43.036982`
@@ -22631,7 +27580,106 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #670 - `de6f85aa5602241a9209f14557a546dfefd89d`
+### 📄 File #864 - `a7e299724f6b6540b1cbfa93a6bc4e88049b00`
+- **Path**: `hyperlane-utils\.git\objects\28\a7e299724f6b6540b1cbfa93a6bc4e88049b00`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.600194`
+
+#### Content Preview
+
+
+
+### 📄 File #865 - `c7d8a01959c69dd221213a0cce848713c3e739`
+- **Path**: `hyperlane-utils\.git\objects\2a\c7d8a01959c69dd221213a0cce848713c3e739`
+- **Size**: `394 B`
+- **Modified Time**: `2025-10-21T08:11:48.689687`
+
+#### Content Preview
+
+
+
+### 📄 File #866 - `be932a5b9b05de025e7016b296b17e1d82aa7c`
+- **Path**: `hyperlane-utils\.git\objects\38\be932a5b9b05de025e7016b296b17e1d82aa7c`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:48.585489`
+
+#### Content Preview
+
+
+
+### 📄 File #867 - `db34a69787c5cbb08bdc3bcb77d8ad19739256`
+- **Path**: `hyperlane-utils\.git\objects\38\db34a69787c5cbb08bdc3bcb77d8ad19739256`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.636869`
+
+#### Content Preview
+
+
+
+### 📄 File #868 - `27b80f1bbb78e5be5cf3fe5e4d6f054995b5fd`
+- **Path**: `hyperlane-utils\.git\objects\3a\27b80f1bbb78e5be5cf3fe5e4d6f054995b5fd`
+- **Size**: `1,046 B`
+- **Modified Time**: `2025-10-21T08:11:48.668652`
+
+#### Content Preview
+
+
+
+### 📄 File #869 - `5f64148a001766dc4241fb5d20eefef2b65748`
+- **Path**: `hyperlane-utils\.git\objects\4b\5f64148a001766dc4241fb5d20eefef2b65748`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:48.615678`
+
+#### Content Preview
+
+
+
+### 📄 File #870 - `b1dc1482a0ae7ff002565abac8809971a51ac6`
+- **Path**: `hyperlane-utils\.git\objects\4b\b1dc1482a0ae7ff002565abac8809971a51ac6`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.601696`
+
+#### Content Preview
+
+
+
+### 📄 File #871 - `adcb921b99b5d6c0f303d2c49377d7a4181e4a`
+- **Path**: `hyperlane-utils\.git\objects\4f\adcb921b99b5d6c0f303d2c49377d7a4181e4a`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:48.578986`
+
+#### Content Preview
+
+
+
+### 📄 File #872 - `73cc41018701ebf6e94610a53c8140c500aee8`
+- **Path**: `hyperlane-utils\.git\objects\54\73cc41018701ebf6e94610a53c8140c500aee8`
+- **Size**: `1,083 B`
+- **Modified Time**: `2025-10-21T08:11:48.667861`
+
+#### Content Preview
+
+
+
+### 📄 File #873 - `adffe380dc4c91321880aa6f692c09116df5c0`
+- **Path**: `hyperlane-utils\.git\objects\55\adffe380dc4c91321880aa6f692c09116df5c0`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:48.588989`
+
+#### Content Preview
+
+
+
+### 📄 File #874 - `d471c15712658705196ee769a80a80bbe49d91`
+- **Path**: `hyperlane-utils\.git\objects\57\d471c15712658705196ee769a80a80bbe49d91`
+- **Size**: `1,001 B`
+- **Modified Time**: `2025-10-21T08:11:48.684532`
+
+#### Content Preview
+
+
+
+### 📄 File #875 - `de6f85aa5602241a9209f14557a546dfefd89d`
 - **Path**: `hyperlane-utils\.git\objects\57\de6f85aa5602241a9209f14557a546dfefd89d`
 - **Size**: `212 B`
 - **Modified Time**: `2025-10-01T21:58:43.039884`
@@ -22640,7 +27688,25 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #671 - `32acfb7f82699cd6a6459e688ee23e3c6b810f`
+### 📄 File #876 - `a0d81aed1f84a270acc3054724cba44708f661`
+- **Path**: `hyperlane-utils\.git\objects\58\a0d81aed1f84a270acc3054724cba44708f661`
+- **Size**: `1,003 B`
+- **Modified Time**: `2025-10-21T08:11:48.683164`
+
+#### Content Preview
+
+
+
+### 📄 File #877 - `472ab406f799d433a988f53aafd01f625cef23`
+- **Path**: `hyperlane-utils\.git\objects\5c\472ab406f799d433a988f53aafd01f625cef23`
+- **Size**: `167 B`
+- **Modified Time**: `2025-10-21T08:11:48.576090`
+
+#### Content Preview
+
+
+
+### 📄 File #878 - `32acfb7f82699cd6a6459e688ee23e3c6b810f`
 - **Path**: `hyperlane-utils\.git\objects\67\32acfb7f82699cd6a6459e688ee23e3c6b810f`
 - **Size**: `858 B`
 - **Modified Time**: `2025-10-01T21:58:43.045009`
@@ -22649,7 +27715,61 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #672 - `15af91ad27fd2d1487f7e43b63cedad7a149b8`
+### 📄 File #879 - `587ffa71861216100c0b4d2313326b6327efe0`
+- **Path**: `hyperlane-utils\.git\objects\67\587ffa71861216100c0b4d2313326b6327efe0`
+- **Size**: `1,079 B`
+- **Modified Time**: `2025-10-21T08:11:48.657855`
+
+#### Content Preview
+
+
+
+### 📄 File #880 - `19b90738ed81df6e1989481a1c333d965f0190`
+- **Path**: `hyperlane-utils\.git\objects\71\19b90738ed81df6e1989481a1c333d965f0190`
+- **Size**: `386 B`
+- **Modified Time**: `2025-10-21T08:11:48.685188`
+
+#### Content Preview
+
+
+
+### 📄 File #881 - `c99113c1ed13cea5f5c8094afdee878925219d`
+- **Path**: `hyperlane-utils\.git\objects\85\c99113c1ed13cea5f5c8094afdee878925219d`
+- **Size**: `1,081 B`
+- **Modified Time**: `2025-10-21T08:11:48.663359`
+
+#### Content Preview
+
+
+
+### 📄 File #882 - `6f3108367d4183f8ca2d88aebf29f3db9c5534`
+- **Path**: `hyperlane-utils\.git\objects\87\6f3108367d4183f8ca2d88aebf29f3db9c5534`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.614300`
+
+#### Content Preview
+
+
+
+### 📄 File #883 - `12bd1d7c10296ac6d288d76df47d0fdf0e4f0e`
+- **Path**: `hyperlane-utils\.git\objects\8a\12bd1d7c10296ac6d288d76df47d0fdf0e4f0e`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.627695`
+
+#### Content Preview
+
+
+
+### 📄 File #884 - `a253b9694969767f2b46807dfc1644914d8481`
+- **Path**: `hyperlane-utils\.git\objects\8d\a253b9694969767f2b46807dfc1644914d8481`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.606696`
+
+#### Content Preview
+
+
+
+### 📄 File #885 - `15af91ad27fd2d1487f7e43b63cedad7a149b8`
 - **Path**: `hyperlane-utils\.git\objects\9e\15af91ad27fd2d1487f7e43b63cedad7a149b8`
 - **Size**: `858 B`
 - **Modified Time**: `2025-10-01T21:58:43.045009`
@@ -22658,7 +27778,52 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #673 - `f0d36334794774236f41b59168e2686aeae332`
+### 📄 File #886 - `c3f8fa1fc891515a3a08fb0220040b06f613f1`
+- **Path**: `hyperlane-utils\.git\objects\a2\c3f8fa1fc891515a3a08fb0220040b06f613f1`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:48.590197`
+
+#### Content Preview
+
+
+
+### 📄 File #887 - `576d6a5530a5917f1c0e655711ba1be9141fca`
+- **Path**: `hyperlane-utils\.git\objects\b1\576d6a5530a5917f1c0e655711ba1be9141fca`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:48.583985`
+
+#### Content Preview
+
+
+
+### 📄 File #888 - `810758dded9478570929a521741c3f135aa472`
+- **Path**: `hyperlane-utils\.git\objects\b3\810758dded9478570929a521741c3f135aa472`
+- **Size**: `1,087 B`
+- **Modified Time**: `2025-10-21T08:11:48.652353`
+
+#### Content Preview
+
+
+
+### 📄 File #889 - `ad01cbe2d934e037006fbbe5f8b46b3e1a2a79`
+- **Path**: `hyperlane-utils\.git\objects\b4\ad01cbe2d934e037006fbbe5f8b46b3e1a2a79`
+- **Size**: `1,047 B`
+- **Modified Time**: `2025-10-21T08:11:48.670658`
+
+#### Content Preview
+
+
+
+### 📄 File #890 - `20b362648841185e5740595589a41c87f81946`
+- **Path**: `hyperlane-utils\.git\objects\bb\20b362648841185e5740595589a41c87f81946`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.632198`
+
+#### Content Preview
+
+
+
+### 📄 File #891 - `f0d36334794774236f41b59168e2686aeae332`
 - **Path**: `hyperlane-utils\.git\objects\bb\f0d36334794774236f41b59168e2686aeae332`
 - **Size**: `857 B`
 - **Modified Time**: `2025-10-01T21:58:43.055554`
@@ -22667,7 +27832,151 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #674 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.idx`
+### 📄 File #892 - `1fdc941d5dbd3254e70e0ee37c71eddf288efe`
+- **Path**: `hyperlane-utils\.git\objects\bc\1fdc941d5dbd3254e70e0ee37c71eddf288efe`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.604195`
+
+#### Content Preview
+
+
+
+### 📄 File #893 - `a95b29be663f57d5e527e9c3128591a25589e5`
+- **Path**: `hyperlane-utils\.git\objects\bf\a95b29be663f57d5e527e9c3128591a25589e5`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.603194`
+
+#### Content Preview
+
+
+
+### 📄 File #894 - `4580ab2b54c6493cea87514895a0b0536dbbb4`
+- **Path**: `hyperlane-utils\.git\objects\c3\4580ab2b54c6493cea87514895a0b0536dbbb4`
+- **Size**: `1,081 B`
+- **Modified Time**: `2025-10-21T08:11:48.650353`
+
+#### Content Preview
+
+
+
+### 📄 File #895 - `af0c2621c1979e44e2709131ea429dd7e646df`
+- **Path**: `hyperlane-utils\.git\objects\c4\af0c2621c1979e44e2709131ea429dd7e646df`
+- **Size**: `168 B`
+- **Modified Time**: `2025-10-21T08:11:48.586489`
+
+#### Content Preview
+
+
+
+### 📄 File #896 - `bfac1b691f97f3182c8834f91f301574721097`
+- **Path**: `hyperlane-utils\.git\objects\c5\bfac1b691f97f3182c8834f91f301574721097`
+- **Size**: `1,002 B`
+- **Modified Time**: `2025-10-21T08:11:48.671659`
+
+#### Content Preview
+
+
+
+### 📄 File #897 - `b33a780b8666466635c197e072e6692f51b023`
+- **Path**: `hyperlane-utils\.git\objects\c7\b33a780b8666466635c197e072e6692f51b023`
+- **Size**: `1,082 B`
+- **Modified Time**: `2025-10-21T08:11:48.649350`
+
+#### Content Preview
+
+
+
+### 📄 File #898 - `94371ef8e8e46fd8e170e4f4daccf9c1811ae5`
+- **Path**: `hyperlane-utils\.git\objects\c9\94371ef8e8e46fd8e170e4f4daccf9c1811ae5`
+- **Size**: `51 B`
+- **Modified Time**: `2025-10-21T08:11:48.605194`
+
+#### Content Preview
+
+
+
+### 📄 File #899 - `b1281ca3a6d74d0cb08be0c0af60fc26dd784b`
+- **Path**: `hyperlane-utils\.git\objects\d2\b1281ca3a6d74d0cb08be0c0af60fc26dd784b`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:48.572932`
+
+#### Content Preview
+
+
+
+### 📄 File #900 - `205c5a68a2ab553fde3c99763c3d7778bdeb29`
+- **Path**: `hyperlane-utils\.git\objects\da\205c5a68a2ab553fde3c99763c3d7778bdeb29`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:48.574588`
+
+#### Content Preview
+
+
+
+### 📄 File #901 - `7e2d99434cac16069039776f4f8d160df58784`
+- **Path**: `hyperlane-utils\.git\objects\e3\7e2d99434cac16069039776f4f8d160df58784`
+- **Size**: `165 B`
+- **Modified Time**: `2025-10-21T08:11:48.587489`
+
+#### Content Preview
+
+
+
+### 📄 File #902 - `0888db045c792d8491e414cb93668924d65a2f`
+- **Path**: `hyperlane-utils\.git\objects\e4\0888db045c792d8491e414cb93668924d65a2f`
+- **Size**: `211 B`
+- **Modified Time**: `2025-10-21T08:11:48.622185`
+
+#### Content Preview
+
+
+
+### 📄 File #903 - `78217a0830d281502d3e9b5e27645725c002a8`
+- **Path**: `hyperlane-utils\.git\objects\e7\78217a0830d281502d3e9b5e27645725c002a8`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.642346`
+
+#### Content Preview
+
+
+
+### 📄 File #904 - `ac9fad7cfe0393d5bfaa70a90f457058644221`
+- **Path**: `hyperlane-utils\.git\objects\e7\ac9fad7cfe0393d5bfaa70a90f457058644221`
+- **Size**: `166 B`
+- **Modified Time**: `2025-10-21T08:11:48.581486`
+
+#### Content Preview
+
+
+
+### 📄 File #905 - `d20233f33e3bbfd0de24a955f21087a723ad67`
+- **Path**: `hyperlane-utils\.git\objects\ed\d20233f33e3bbfd0de24a955f21087a723ad67`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.593196`
+
+#### Content Preview
+
+
+
+### 📄 File #906 - `8733f666b71ba4a12e1063c031d86bce694425`
+- **Path**: `hyperlane-utils\.git\objects\f3\8733f666b71ba4a12e1063c031d86bce694425`
+- **Size**: `167 B`
+- **Modified Time**: `2025-10-21T08:11:48.577486`
+
+#### Content Preview
+
+
+
+### 📄 File #907 - `73d7c48f666033e826d93537622b97d51432c7`
+- **Path**: `hyperlane-utils\.git\objects\f9\73d7c48f666033e826d93537622b97d51432c7`
+- **Size**: `212 B`
+- **Modified Time**: `2025-10-21T08:11:48.616178`
+
+#### Content Preview
+
+
+
+### 📄 File #908 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.idx`
 - **Path**: `hyperlane-utils\.git\objects\pack\pack-78110a727ebec78f36ff99029a073b184aa2d39d.idx`
 - **Size**: `1,380 B`
 - **Modified Time**: `2025-09-15T22:37:22.095720`
@@ -22676,7 +27985,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #675 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.pack`
+### 📄 File #909 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.pack`
 - **Path**: `hyperlane-utils\.git\objects\pack\pack-78110a727ebec78f36ff99029a073b184aa2d39d.pack`
 - **Size**: `5,003 B`
 - **Modified Time**: `2025-09-15T22:37:22.095720`
@@ -22685,7 +27994,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #676 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.rev`
+### 📄 File #910 - `pack-78110a727ebec78f36ff99029a073b184aa2d39d.rev`
 - **Path**: `hyperlane-utils\.git\objects\pack\pack-78110a727ebec78f36ff99029a073b184aa2d39d.rev`
 - **Size**: `96 B`
 - **Modified Time**: `2025-09-15T22:37:22.096749`
@@ -22694,16 +28003,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #677 - `master`
+### 📄 File #911 - `master`
 - **Path**: `hyperlane-utils\.git\refs\heads\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:43.216333`
+- **Modified Time**: `2025-10-21T08:11:48.926311`
 
 #### Content Preview
 
 
 
-### 📄 File #678 - `HEAD`
+### 📄 File #912 - `HEAD`
 - **Path**: `hyperlane-utils\.git\refs\remotes\origin\HEAD`
 - **Size**: `32 B`
 - **Modified Time**: `2025-09-15T22:37:22.157643`
@@ -22712,16 +28021,16 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #679 - `master`
+### 📄 File #913 - `master`
 - **Path**: `hyperlane-utils\.git\refs\remotes\origin\master`
 - **Size**: `41 B`
-- **Modified Time**: `2025-10-01T21:58:43.102881`
+- **Modified Time**: `2025-10-21T08:11:48.795381`
 
 #### Content Preview
 
 
 
-### 📄 File #680 - `v10.3.8`
+### 📄 File #914 - `v10.3.8`
 - **Path**: `hyperlane-utils\.git\refs\tags\v10.3.8`
 - **Size**: `41 B`
 - **Modified Time**: `2025-09-15T22:37:22.155643`
@@ -22730,7 +28039,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #681 - `v11.0.0`
+### 📄 File #915 - `v11.0.0`
 - **Path**: `hyperlane-utils\.git\refs\tags\v11.0.0`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:43.160923`
@@ -22739,7 +28048,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #682 - `v11.0.1`
+### 📄 File #916 - `v11.0.1`
 - **Path**: `hyperlane-utils\.git\refs\tags\v11.0.1`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:43.161923`
@@ -22748,7 +28057,7 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #683 - `v11.0.2`
+### 📄 File #917 - `v11.0.2`
 - **Path**: `hyperlane-utils\.git\refs\tags\v11.0.2`
 - **Size**: `41 B`
 - **Modified Time**: `2025-10-01T21:58:43.102881`
@@ -22757,7 +28066,133 @@ For any inquiries, please reach out to the author at [root@ltpp.vip](mailto:root
 
 
 
-### 📄 File #684 - `rust.yml`
+### 📄 File #918 - `v11.1.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.1.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.854406`
+
+#### Content Preview
+
+
+
+### 📄 File #919 - `v11.2.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.2.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.855905`
+
+#### Content Preview
+
+
+
+### 📄 File #920 - `v11.3.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.3.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.856405`
+
+#### Content Preview
+
+
+
+### 📄 File #921 - `v11.4.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.4.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.857406`
+
+#### Content Preview
+
+
+
+### 📄 File #922 - `v11.5.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.5.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.857406`
+
+#### Content Preview
+
+
+
+### 📄 File #923 - `v11.6.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.6.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.858409`
+
+#### Content Preview
+
+
+
+### 📄 File #924 - `v11.7.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.7.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.859412`
+
+#### Content Preview
+
+
+
+### 📄 File #925 - `v11.8.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v11.8.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.859912`
+
+#### Content Preview
+
+
+
+### 📄 File #926 - `v12.0.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v12.0.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.860912`
+
+#### Content Preview
+
+
+
+### 📄 File #927 - `v12.1.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v12.1.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.861412`
+
+#### Content Preview
+
+
+
+### 📄 File #928 - `v12.1.1`
+- **Path**: `hyperlane-utils\.git\refs\tags\v12.1.1`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.862413`
+
+#### Content Preview
+
+
+
+### 📄 File #929 - `v12.1.2`
+- **Path**: `hyperlane-utils\.git\refs\tags\v12.1.2`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.863412`
+
+#### Content Preview
+
+
+
+### 📄 File #930 - `v12.1.3`
+- **Path**: `hyperlane-utils\.git\refs\tags\v12.1.3`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.864413`
+
+#### Content Preview
+
+
+
+### 📄 File #931 - `v12.2.0`
+- **Path**: `hyperlane-utils\.git\refs\tags\v12.2.0`
+- **Size**: `41 B`
+- **Modified Time**: `2025-10-21T08:11:48.796386`
+
+#### Content Preview
+
+
+
+### 📄 File #932 - `rust.yml`
 - **Path**: `hyperlane-utils\.github\workflows\rust.yml`
 - **Size**: `9,636 B`
 - **Modified Time**: `2025-09-15T22:37:22.172645`
@@ -23020,10 +28455,10 @@ jobs:
 
 ```
 
-### 📄 File #685 - `lib.rs`
+### 📄 File #933 - `lib.rs`
 - **Path**: `hyperlane-utils\src\lib.rs`
-- **Size**: `861 B`
-- **Modified Time**: `2025-09-15T22:37:22.172645`
+- **Size**: `1,028 B`
+- **Modified Time**: `2025-10-21T08:11:48.924811`
 
 #### Content Preview
 
@@ -23040,6 +28475,7 @@ pub use compare_version::*;
 pub use file_operation::*;
 pub use future_fn::*;
 pub use hot_restart::*;
+pub use http_request::*;
 pub use hyperlane_broadcast::*;
 pub use hyperlane_log::*;
 pub use hyperlane_macros::*;
@@ -23051,25 +28487,34 @@ pub use server_manager::*;
 pub use std_macro_extensions::*;
 
 pub use ahash;
+pub use bytemuck_derive;
+pub use chrono;
 pub use futures;
+pub use hex;
 pub use inventory;
 pub use log;
 pub use num_cpus;
 pub use once_cell;
+pub use redis;
+pub use regex;
+pub use sea_orm;
 pub use serde;
 pub use serde_json;
 pub use serde_urlencoded;
 pub use serde_xml_rs;
 pub use simd_json;
+pub use sqlx;
 pub use twox_hash;
+pub use url;
 pub use urlencoding;
 pub use utoipa;
 pub use utoipa_rapidoc;
 pub use utoipa_swagger_ui;
+pub use uuid;
 
 ```
 
-### 📄 File #686 - `appreciate.md`
+### 📄 File #934 - `appreciate.md`
 - **Path**: `ltpp-docs\src\appreciate.md`
 - **Size**: `292 B`
 - **Modified Time**: `2025-09-15T22:37:47.184462`
@@ -23104,7 +28549,7 @@ sidebar: false
 
 ```
 
-### 📄 File #687 - `catalog.md`
+### 📄 File #935 - `catalog.md`
 - **Path**: `ltpp-docs\src\catalog.md`
 - **Size**: `294 B`
 - **Modified Time**: `2025-09-15T22:37:47.185463`
@@ -23139,7 +28584,7 @@ sidebar: false
 
 ```
 
-### 📄 File #688 - `README.md`
+### 📄 File #936 - `README.md`
 - **Path**: `ltpp-docs\src\README.md`
 - **Size**: `3,848 B`
 - **Modified Time**: `2025-09-15T22:37:47.184462`
@@ -23345,7 +28790,7 @@ features:
 
 ```
 
-### 📄 File #689 - `license.md`
+### 📄 File #937 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane\license.md`
 - **Size**: `1,226 B`
 - **Modified Time**: `2025-09-15T22:37:47.198100`
@@ -23393,7 +28838,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #690 - `README.md`
+### 📄 File #938 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\README.md`
 - **Size**: `6,821 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -23619,7 +29064,7 @@ async fn main() {
 
 ```
 
-### 📄 File #691 - `config.md`
+### 📄 File #939 - `config.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\config.md`
 - **Size**: `3,725 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -23810,7 +29255,7 @@ server.config(config).await;
 
 ```
 
-### 📄 File #692 - `middleware.md`
+### 📄 File #940 - `middleware.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\middleware.md`
 - **Size**: `1,548 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -23904,7 +29349,7 @@ server.response_middleware(|ctx: Context| async move {
 
 ```
 
-### 📄 File #693 - `panic-hook.md`
+### 📄 File #941 - `panic-hook.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\panic-hook.md`
 - **Size**: `822 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -23948,7 +29393,7 @@ server.panic_hook(|cxt: Context| {
 
 ```
 
-### 📄 File #694 - `README.md`
+### 📄 File #942 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\README.md`
 - **Size**: `219 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -23975,7 +29420,7 @@ dir:
 
 ```
 
-### 📄 File #695 - `route.md`
+### 📄 File #943 - `route.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\route.md`
 - **Size**: `736 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -24021,7 +29466,7 @@ server.route("路由名称", |ctx: Context| async move {
 
 ```
 
-### 📄 File #696 - `runtime.md`
+### 📄 File #944 - `runtime.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\runtime.md`
 - **Size**: `902 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -24080,7 +29525,7 @@ fn main() {
 
 ```
 
-### 📄 File #697 - `server.md`
+### 📄 File #945 - `server.md`
 - **Path**: `ltpp-docs\src\hyperlane\config\server.md`
 - **Size**: `1,162 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -24139,7 +29584,7 @@ let _ = std::io::Write::flush(&mut std::io::stderr());
 
 ```
 
-### 📄 File #698 - `async.md`
+### 📄 File #946 - `async.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\async.md`
 - **Size**: `418 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -24175,7 +29620,7 @@ order: 3
 
 ```
 
-### 📄 File #699 - `build.md`
+### 📄 File #947 - `build.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\build.md`
 - **Size**: `900 B`
 - **Modified Time**: `2025-09-15T22:37:47.196978`
@@ -24226,7 +29671,7 @@ docker run --rm -v "${pwd}:/tmp/cargo_build" ccr.ccs.tencentyun.com/linux_enviro
 
 ```
 
-### 📄 File #700 - `explain.md`
+### 📄 File #948 - `explain.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\explain.md`
 - **Size**: `686 B`
 - **Modified Time**: `2025-09-15T22:37:47.196978`
@@ -24268,7 +29713,7 @@ order: 1
 
 ```
 
-### 📄 File #701 - `flamegraph.md`
+### 📄 File #949 - `flamegraph.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\flamegraph.md`
 - **Size**: `520 B`
 - **Modified Time**: `2025-09-15T22:37:47.196978`
@@ -24315,7 +29760,7 @@ CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --release
 
 ```
 
-### 📄 File #702 - `install.md`
+### 📄 File #950 - `install.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\install.md`
 - **Size**: `440 B`
 - **Modified Time**: `2025-09-15T22:37:47.197598`
@@ -24358,7 +29803,7 @@ cargo add hyperlane;
 
 ```
 
-### 📄 File #703 - `README.md`
+### 📄 File #951 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\help\README.md`
 - **Size**: `229 B`
 - **Modified Time**: `2025-09-15T22:37:47.195978`
@@ -24386,7 +29831,7 @@ dir:
 
 ```
 
-### 📄 File #704 - `plaintext_flamegraph.svg`
+### 📄 File #952 - `plaintext_flamegraph.svg`
 - **Path**: `ltpp-docs\src\hyperlane\markdown-images\plaintext_flamegraph.svg`
 - **Size**: `519,722 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -24395,7 +29840,7 @@ dir:
 
 
 
-### 📄 File #705 - `auth.md`
+### 📄 File #953 - `auth.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\auth.md`
 - **Size**: `1,392 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -24482,7 +29927,7 @@ async fn main() {
 
 ```
 
-### 📄 File #706 - `cross.md`
+### 📄 File #954 - `cross.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\cross.md`
 - **Size**: `1,156 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -24555,7 +30000,7 @@ async fn main() {
 
 ```
 
-### 📄 File #707 - `README.md`
+### 📄 File #955 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\README.md`
 - **Size**: `228 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -24582,7 +30027,7 @@ dir:
 
 ```
 
-### 📄 File #708 - `static-file.md`
+### 📄 File #956 - `static-file.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\static-file.md`
 - **Size**: `1,966 B`
 - **Modified Time**: `2025-09-15T22:37:47.199103`
@@ -24668,7 +30113,7 @@ async fn main() {
 
 ```
 
-### 📄 File #709 - `timeout.md`
+### 📄 File #957 - `timeout.md`
 - **Path**: `ltpp-docs\src\hyperlane\middleware\timeout.md`
 - **Size**: `1,554 B`
 - **Modified Time**: `2025-09-15T22:37:47.200103`
@@ -24763,7 +30208,7 @@ async fn main() {
 
 ```
 
-### 📄 File #710 - `directory.md`
+### 📄 File #958 - `directory.md`
 - **Path**: `ltpp-docs\src\hyperlane\quick-start\directory.md`
 - **Size**: `9,126 B`
 - **Modified Time**: `2025-09-15T22:37:47.200103`
@@ -25006,7 +30451,7 @@ order: 1
 
 ```
 
-### 📄 File #711 - `README.md`
+### 📄 File #959 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\quick-start\README.md`
 - **Size**: `1,063 B`
 - **Modified Time**: `2025-09-15T22:37:47.200103`
@@ -25098,7 +30543,7 @@ cargo run hot
 
 ```
 
-### 📄 File #712 - `close-keep-alive.md`
+### 📄 File #960 - `close-keep-alive.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\close-keep-alive.md`
 - **Size**: `10,868 B`
 - **Modified Time**: `2025-09-15T22:37:47.201103`
@@ -25539,7 +30984,7 @@ Percentage of the requests served within a certain time (ms)
 
 ```
 
-### 📄 File #713 - `env.md`
+### 📄 File #961 - `env.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\env.md`
 - **Size**: `2,058 B`
 - **Modified Time**: `2025-09-15T22:37:47.201103`
@@ -25626,7 +31071,7 @@ RUSTFLAGS="-C target-cpu=native -C link-arg=-fuse-ld=lld" cargo run --release
 
 ```
 
-### 📄 File #714 - `flamegraph.md`
+### 📄 File #962 - `flamegraph.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\flamegraph.md`
 - **Size**: `271 B`
 - **Modified Time**: `2025-09-15T22:37:47.201606`
@@ -25659,7 +31104,7 @@ order: 5
 
 ```
 
-### 📄 File #715 - `open-keep-alive.md`
+### 📄 File #963 - `open-keep-alive.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\open-keep-alive.md`
 - **Size**: `11,086 B`
 - **Modified Time**: `2025-09-15T22:37:47.201606`
@@ -26107,7 +31552,7 @@ Percentage of the requests served within a certain time (ms)
 
 ```
 
-### 📄 File #716 - `README.md`
+### 📄 File #964 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\README.md`
 - **Size**: `227 B`
 - **Modified Time**: `2025-09-15T22:37:47.200103`
@@ -26134,7 +31579,7 @@ dir:
 
 ```
 
-### 📄 File #717 - `request-time.md`
+### 📄 File #965 - `request-time.md`
 - **Path**: `ltpp-docs\src\hyperlane\speed\request-time.md`
 - **Size**: `630 B`
 - **Modified Time**: `2025-09-15T22:37:47.201606`
@@ -26177,7 +31622,7 @@ order: 2
 
 ```
 
-### 📄 File #718 - `addr.md`
+### 📄 File #966 - `addr.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\addr.md`
 - **Size**: `848 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -26250,7 +31695,7 @@ ctx.try_get_socket_port().await;
 
 ```
 
-### 📄 File #719 - `async.md`
+### 📄 File #967 - `async.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\async.md`
 - **Size**: `1,862 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -26350,7 +31795,7 @@ server.route("/test/async", func).await;
 
 ```
 
-### 📄 File #720 - `attribute.md`
+### 📄 File #968 - `attribute.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\attribute.md`
 - **Size**: `1,349 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -26430,7 +31875,7 @@ println_hyperlane("test");
 
 ```
 
-### 📄 File #721 - `connection.md`
+### 📄 File #969 - `connection.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\connection.md`
 - **Size**: `1,467 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -26528,7 +31973,7 @@ while !ctx.get_closed().await && !ctx.get_aborted().await {
 
 ```
 
-### 📄 File #722 - `cookie.md`
+### 📄 File #970 - `cookie.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\cookie.md`
 - **Size**: `2,890 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -26685,7 +32130,7 @@ ctx.set_response_header(SET_COOKIE, clear_cookie).await;
 
 ```
 
-### 📄 File #723 - `multi-server.md`
+### 📄 File #971 - `multi-server.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\multi-server.md`
 - **Size**: `1,173 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -26747,7 +32192,7 @@ let _ = tokio::join!(app1, app2);
 
 ```
 
-### 📄 File #724 - `panic.md`
+### 📄 File #972 - `panic.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\panic.md`
 - **Size**: `1,203 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -26809,7 +32254,7 @@ server.panic_hook(default_panic_hook);
 
 ```
 
-### 📄 File #725 - `README.md`
+### 📄 File #973 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\README.md`
 - **Size**: `248 B`
 - **Modified Time**: `2025-09-15T22:37:47.202154`
@@ -26836,7 +32281,7 @@ dir:
 
 ```
 
-### 📄 File #726 - `request.md`
+### 📄 File #974 - `request.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\request.md`
 - **Size**: `3,763 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -27041,7 +32486,7 @@ let request_string: String = ctx.get_request_string().await;
 
 ```
 
-### 📄 File #727 - `response.md`
+### 📄 File #975 - `response.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\response.md`
 - **Size**: `4,895 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -27303,7 +32748,7 @@ let response_string: String = ctx.get_response_string().await;
 
 ```
 
-### 📄 File #728 - `route.md`
+### 📄 File #976 - `route.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\route.md`
 - **Size**: `1,656 B`
 - **Modified Time**: `2025-09-15T22:37:47.203158`
@@ -27384,7 +32829,7 @@ ctx.get_route_param("text").await;
 
 ```
 
-### 📄 File #729 - `send.md`
+### 📄 File #977 - `send.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\send.md`
 - **Size**: `4,192 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -27573,7 +33018,7 @@ pub async fn handle(ctx: Context) {
 
 ```
 
-### 📄 File #730 - `sse.md`
+### 📄 File #978 - `sse.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\sse.md`
 - **Size**: `2,773 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -27696,7 +33141,7 @@ eventSource.onerror = function (event) {
 
 ```
 
-### 📄 File #731 - `stream.md`
+### 📄 File #979 - `stream.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\stream.md`
 - **Size**: `1,182 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -27764,7 +33209,7 @@ ctx.closed().await;
 
 ```
 
-### 📄 File #732 - `websocket.md`
+### 📄 File #980 - `websocket.md`
 - **Path**: `ltpp-docs\src\hyperlane\usage-introduction\websocket.md`
 - **Size**: `1,809 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -27846,7 +33291,7 @@ ws.onclose = () => {
 
 ```
 
-### 📄 File #733 - `inner-utils.md`
+### 📄 File #981 - `inner-utils.md`
 - **Path**: `ltpp-docs\src\hyperlane\utils\inner-utils.md`
 - **Size**: `811 B`
 - **Modified Time**: `2025-09-15T22:37:47.205161`
@@ -27898,7 +33343,7 @@ order: 1
 
 ```
 
-### 📄 File #734 - `README.md`
+### 📄 File #982 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane\utils\README.md`
 - **Size**: `218 B`
 - **Modified Time**: `2025-09-15T22:37:47.204158`
@@ -27925,7 +33370,7 @@ dir:
 
 ```
 
-### 📄 File #735 - `recommend-utils.md`
+### 📄 File #983 - `recommend-utils.md`
 - **Path**: `ltpp-docs\src\hyperlane\utils\recommend-utils.md`
 - **Size**: `6,599 B`
 - **Modified Time**: `2025-09-15T22:37:47.205161`
@@ -28209,7 +33654,7 @@ async fn main() {
 
 ```
 
-### 📄 File #736 - `license.md`
+### 📄 File #984 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-ai\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.191474`
@@ -28256,7 +33701,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #737 - `README.md`
+### 📄 File #985 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-ai\README.md`
 - **Size**: `2,725 B`
 - **Modified Time**: `2025-09-15T22:37:47.191474`
@@ -28402,7 +33847,7 @@ OUTPUT_DIR=my_output
 
 ```
 
-### 📄 File #738 - `license.md`
+### 📄 File #986 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-broadcast\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.192474`
@@ -28449,7 +33894,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #739 - `README.md`
+### 📄 File #987 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-broadcast\README.md`
 - **Size**: `2,576 B`
 - **Modified Time**: `2025-09-15T22:37:47.192474`
@@ -28538,7 +33983,7 @@ assert_eq!(rec3.recv().await, Ok(10));
 
 ```
 
-### 📄 File #740 - `license.md`
+### 📄 File #988 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-log\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.192474`
@@ -28585,7 +34030,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #741 - `README.md`
+### 📄 File #989 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-log\README.md`
 - **Size**: `4,112 B`
 - **Modified Time**: `2025-09-15T22:37:47.192474`
@@ -28725,7 +34170,7 @@ let log: Log = Log::new("./logs", DISABLE_LOG_FILE_SIZE);
 
 ```
 
-### 📄 File #742 - `license.md`
+### 📄 File #990 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-macros\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -28772,7 +34217,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #743 - `README.md`
+### 📄 File #991 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-macros\README.md`
 - **Size**: `21,478 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -29415,7 +34860,7 @@ async fn main() {
 
 ```
 
-### 📄 File #744 - `license.md`
+### 📄 File #992 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-plugin-websocket\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -29462,7 +34907,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #745 - `README.md`
+### 📄 File #993 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-plugin-websocket\README.md`
 - **Size**: `6,326 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -29675,7 +35120,7 @@ async fn main() {
 
 ```
 
-### 📄 File #746 - `license.md`
+### 📄 File #994 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-time\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.194473`
@@ -29722,7 +35167,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #747 - `README.md`
+### 📄 File #995 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-time\README.md`
 - **Size**: `2,261 B`
 - **Modified Time**: `2025-09-15T22:37:47.193474`
@@ -29814,7 +35259,7 @@ println!("Current Time with Micros: {}", time_micros());
 
 ```
 
-### 📄 File #748 - `license.md`
+### 📄 File #996 - `license.md`
 - **Path**: `ltpp-docs\src\hyperlane-utils\license.md`
 - **Size**: `1,225 B`
 - **Modified Time**: `2025-09-15T22:37:47.194975`
@@ -29861,7 +35306,7 @@ SOFTWARE.
 
 ```
 
-### 📄 File #749 - `README.md`
+### 📄 File #997 - `README.md`
 - **Path**: `ltpp-docs\src\hyperlane-utils\README.md`
 - **Size**: `1,413 B`
 - **Modified Time**: `2025-09-15T22:37:47.194473`
