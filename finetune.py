@@ -130,17 +130,17 @@ You must strictly answer according to the following training data content, do no
     EOS_TOKEN = tokenizer.eos_token
 
     def formatting_func(example):
-        system_content = example.get("system", "").strip()
+        system_content = (example.get("system") or "").strip()
         if not system_content:
             system_content = f"You are {DEFAULT_TIPS}. Please answer questions strictly according to training data, prioritizing information from the training data."
 
-        instruction = example.get("instruction", "").strip()
-        input_content = example.get("input", "").strip()
+        instruction = (example.get("instruction") or "").strip()
+        input_content = (example.get("input") or "").strip()
 
         user_content = (
             f"{instruction}\n\n{input_content}" if input_content else instruction
         )
-        output_content = example.get("output", "").strip()
+        output_content = (example.get("output") or "").strip()
 
         return (
             alpaca_prompt.format(system_content, user_content, output_content)
