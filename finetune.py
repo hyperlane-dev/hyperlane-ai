@@ -215,8 +215,7 @@ training_args = TrainingArguments(
     logging_steps=5,
     optim="adamw_torch",  # Standard optimizer for CPU
     weight_decay=0.01,
-    lr_scheduler_type="cosine_with_restarts",  # Better for long training
-    scheduler_kwargs={"num_cycles": 3},  # Multiple learning cycles
+    lr_scheduler_type="cosine",  # Cosine annealing for smooth learning
     seed=3407,
     output_dir="outputs",
     save_steps=50,  # Save more frequently
@@ -227,11 +226,9 @@ training_args = TrainingArguments(
     num_train_epochs=8,  # More epochs for CPU training
     max_grad_norm=0.5,  # Gradient clipping for stability
     gradient_checkpointing=True,  # Save memory
-    eval_strategy="no",  # Skip eval to save time
     save_strategy="steps",
     load_best_model_at_end=False,
     report_to="none",  # Disable reporting for speed
-    ddp_find_unused_parameters=False,
 )
 
 
