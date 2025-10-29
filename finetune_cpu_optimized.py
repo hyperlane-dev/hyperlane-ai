@@ -164,10 +164,12 @@ def parse_args():
     parser.add_argument("--gradient_accumulation", type=int, default=8, help="梯度累积步数")
     return parser.parse_args()
 
-args = parse_args()
 
-# CPU优化的训练参数
-training_args = TrainingArguments(
+def main():
+    args = parse_args()
+    
+    # CPU优化的训练参数
+    training_args = TrainingArguments(
     output_dir="outputs",
     
     # 批次和累积设置
@@ -197,8 +199,8 @@ training_args = TrainingArguments(
     save_steps=100,
     save_total_limit=3,
     
-    # CPU优化
-    dataloader_num_workers=2,
+    # CPU优化 (Windows必须设为0)
+    dataloader_num_workers=0,
     dataloader_pin_memory=False,
     
     # 其他
@@ -208,31 +210,33 @@ training_args = TrainingArguments(
     gradient_checkpointing=False,  # CPU上可能不需要
 )
 
-# 初始化训练器
-print("🎯 初始化训练器...")
-trainer = SFTTrainer(
-    model=model,
-    args=training_args,
-    train_dataset=dataset,
-    formatting_func=formatting_func,
-    max_seq_length=512,  # 限制序列长度提升CPU速度
-    packing=False,
-)
+    # 初始化训练器
+    print("🎯 初始化训练器...")
+    trainer = SFTTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset,
+        formatting_func=formatting_func,
+    )
 
-# 开始训练
-print("🚀 开始训练...")
-print(f"   - 训练样本: {len(dataset)}")
-print(f"   - 训练轮数: {args.num_epochs}")
-print(f"   - 学习率: {args.learning_rate}")
-print(f"   - 批次大小: {args.batch_size}")
-print(f"   - 梯度累积: {args.gradient_accumulation}")
-print(f"   - 有效批次: {args.batch_size * args.gradient_accumulation}")
+    # 开始训练
+    print("🚀 开始训练...")
+    print(f"   - 训练样本: {len(dataset)}")
+    print(f"   - 训练轮数: {args.num_epochs}")
+    print(f"   - 学习率: {args.learning_rate}")
+    print(f"   - 批次大小: {args.batch_size}")
+    print(f"   - 梯度累积: {args.gradient_accumulation}")
+    print(f"   - 有效批次: {args.batch_size * args.gradient_accumulation}")
+    
+    trainer.train()
+    
+    # 保存模型
+    print("💾 保存模型...")
+    trainer.save_model(OUTPUT_DIR)
+    tokenizer.save_pretrained(OUTPUT_DIR)
+    
+    print(f"✅ 训练完成！模型已保存到: {OUTPUT_DIR}")
 
-trainer.train()
 
-# 保存模型
-print("💾 保存模型...")
-trainer.save_model(OUTPUT_DIR)
-tokenizer.save_pretrained(OUTPUT_DIR)
-
-print(f"✅ 训练完成！模型已保存到: {OUTPUT_DIR}")
+if __name__ == "__main__":
+    main()
