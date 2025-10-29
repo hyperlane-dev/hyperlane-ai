@@ -15,25 +15,27 @@ MODEL_NAME = os.getenv("MODEL_NAME")
 DATASET_PATH = os.getenv("DATASET_PATH")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR")
 
-# Load model and tokenizer
+# Load model and tokenizer with CPU optimizations
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
     trust_remote_code=True,
-    torch_dtype=(
-        torch.bfloat16
-        if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
-        else torch.float32
-    ),
+    torch_dtype=torch.float32,  # CPU works best with float32
+    low_cpu_mem_usage=True,  # Optimize CPU memory usage
 )
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+
+# Enable CPU optimizations
+if not torch.cuda.is_available():
+    torch.set_num_threads(os.cpu_count() or 4)  # Use all CPU cores
+    print(f"CPU mode enabled with {torch.get_num_threads()} threads")
 
 # Set pad token if it doesn't exist
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
-# Enhanced LoRA configuration for stronger knowledge override
+# Enhanced LoRA configuration optimized for CPU training
 lora_config = LoraConfig(
-    r=64,  # Increase rank to improve LoRA's expressive capability
+    r=32,  # Reduced rank for CPU efficiency while maintaining effectiveness
     target_modules=[
         "q_proj",
         "k_proj",
@@ -42,16 +44,12 @@ lora_config = LoraConfig(
         "gate_proj",
         "up_proj",
         "down_proj",
-        "embed_tokens",  # Add embedding layer
-        "lm_head",  # Add output layer
     ],
-    lora_alpha=128,  # Increase alpha value to strengthen LoRA's influence
-    lora_dropout=0.05,  # Moderate dropout to prevent overfitting
-    bias="lora_only",  # Train LoRA-related bias
-    modules_to_save=[
-        "embed_tokens",
-        "lm_head",
-    ],  # Save complete parameters of key layers
+    lora_alpha=64,  # Balanced alpha for stable CPU training
+    lora_dropout=0.1,  # Higher dropout to prevent overfitting on CPU
+    bias="none",  # Reduce parameters for CPU efficiency
+    task_type="CAUSAL_LM",
+    inference_mode=False,
 )
 
 # Check if there's a saved LoRA model to resume from
@@ -204,27 +202,36 @@ def parse_args():
 # Parse command line arguments
 args = parse_args()
 
-# Enhanced training arguments for stronger knowledge override
+# Optimized training arguments for CPU with better learning
 training_args = TrainingArguments(
     per_device_train_batch_size=1,
-    gradient_accumulation_steps=10,
-    warmup_steps=50,
+    gradient_accumulation_steps=16,  # Larger accumulation for stable gradients
+    warmup_steps=100,  # More warmup for stable CPU training
+    warmup_ratio=0.1,  # 10% of training for warmup
     max_steps=args.max_steps,
-    learning_rate=2e-4 * args.override_strength,
-    fp16=not torch.cuda.is_bf16_supported() if torch.cuda.is_available() else False,
-    bf16=torch.cuda.is_bf16_supported() if torch.cuda.is_available() else False,
-    logging_steps=10,
-    optim="adamw_torch",
+    learning_rate=3e-4 * args.override_strength,  # Higher LR for better learning
+    fp16=False,  # Disable fp16 on CPU
+    bf16=False,  # Disable bf16 on CPU
+    logging_steps=5,
+    optim="adamw_torch",  # Standard optimizer for CPU
     weight_decay=0.01,
-    lr_scheduler_type="cosine",
+    lr_scheduler_type="cosine_with_restarts",  # Better for long training
+    scheduler_kwargs={"num_cycles": 3},  # Multiple learning cycles
     seed=3407,
     output_dir="outputs",
-    save_steps=100,
-    save_total_limit=20,
-    dataloader_pin_memory=True,
-    dataloader_num_workers=0,
+    save_steps=50,  # Save more frequently
+    save_total_limit=5,  # Keep fewer checkpoints to save disk
+    dataloader_pin_memory=False,  # Disable for CPU
+    dataloader_num_workers=2,  # Use workers for data loading
     remove_unused_columns=False,
-    num_train_epochs=5,
+    num_train_epochs=8,  # More epochs for CPU training
+    max_grad_norm=0.5,  # Gradient clipping for stability
+    gradient_checkpointing=True,  # Save memory
+    eval_strategy="no",  # Skip eval to save time
+    save_strategy="steps",
+    load_best_model_at_end=False,
+    report_to="none",  # Disable reporting for speed
+    ddp_find_unused_parameters=False,
 )
 
 
@@ -256,12 +263,15 @@ class KnowledgeOverrideDataCollator:
         return batch
 
 
-# Initialize trainer with custom settings
+# Initialize trainer with CPU-optimized settings
 trainer = SFTTrainer(
     model=model,
     args=training_args,
     train_dataset=dataset,
     formatting_func=formatting_func,
+    max_seq_length=512,  # Limit sequence length for CPU efficiency
+    packing=False,  # Disable packing for better learning quality
+    dataset_text_field=None,  # Use formatting_func
 )
 
 
