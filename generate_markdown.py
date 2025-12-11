@@ -104,6 +104,132 @@ class ThreadSafeFileProcessor:
             "thread_stats": {},
         }
 
+    def filter_content(self, content):
+        """Filter out unwanted content sections"""
+        lines = content.split("\n")
+        filtered_lines = []
+        in_yaml_frontmatter = False
+        in_license_section = False
+        in_contributing_section = False
+        in_contact_section = False
+
+        for line in lines:
+            # Skip image syntax
+            if line.strip().startswith("<img") or line.strip().startswith("!["):
+                continue
+            # Skip badge shields
+            if (
+                "shields.io" in line
+                or "img.shields.io" in line
+                or "docs.rs" in line
+                and "badge.svg" in line
+            ):
+                continue
+            # Skip tip blocks
+            if "[!tip]" in line:
+                continue
+            # Skip GitHub workflow badges
+            if "github.com" in line and "badge.svg" in line:
+                continue
+
+            # Check for YAML frontmatter start/end
+            if line.strip() == "---":
+                in_yaml_frontmatter = not in_yaml_frontmatter
+                continue
+
+            # Skip content inside YAML frontmatter
+            if in_yaml_frontmatter:
+                continue
+
+            # Check for unwanted sections
+            line_lower = line.lower()
+            if any(
+                keyword in line_lower
+                for keyword in [
+                    "# 许可证",
+                    "## 许可证",
+                    "本项",
+                    "mit 许可证",
+                    "## license",
+                    "# license",
+                ]
+            ):
+                in_license_section = True
+                continue
+            if any(
+                keyword in line_lower
+                for keyword in [
+                    "# 贡献指南",
+                    "## 贡献指南",
+                    "## 贡献",
+                    "# 贡献",
+                    "欢迎贡献",
+                    "issue",
+                    "pull request",
+                    "## contributing",
+                    "# contributing",
+                ]
+            ):
+                in_contributing_section = True
+                continue
+            if any(
+                keyword in line_lower
+                for keyword in [
+                    "# 联系方式",
+                    "## 联系方式",
+                    "## 联系",
+                    "# 联系",
+                    "邮箱",
+                    "@",
+                    "mailto",
+                ]
+            ):
+                in_contact_section = True
+                continue
+
+            # Check if we encounter a new heading that ends the unwanted section
+            if (
+                in_license_section or in_contributing_section or in_contact_section
+            ) and line.strip().startswith("#"):
+                # Reset all section flags when encountering a new heading
+                in_license_section = False
+                in_contributing_section = False
+                in_contact_section = False
+
+            # Skip lines in unwanted sections
+            if in_license_section or in_contributing_section or in_contact_section:
+                continue
+
+            # Remove center tags but keep content
+            line = line.replace("<center>", "").replace("</center>", "")
+
+            # Skip Bottom tags completely
+            if "<Bottom" in line:
+                continue
+
+            # Skip Share tags completely
+            if "<Share" in line:
+                continue
+
+            # Skip lines that contain only ">"
+            if line.strip() == ">":
+                continue
+
+            filtered_lines.append(line)
+
+        # Remove consecutive empty lines at the end
+        result_lines = []
+        prev_empty = False
+
+        for line in filtered_lines:
+            is_empty = not line.strip()
+            if is_empty and prev_empty:
+                continue
+            result_lines.append(line)
+            prev_empty = is_empty
+
+        return "\n".join(result_lines)
+
     def read_text_file(self, file_path):
         """Read text file content - optimized version"""
         encodings = ["utf-8", "gbk", "gb2312", "latin1"]
@@ -206,8 +332,22 @@ class ThreadSafeFileProcessor:
 
         print(f"Scanning directory: {self.source_dir}")
         for root, dirs, files in os.walk(self.source_dir):
+            # Skip .git directory
+            if ".git" in dirs:
+                dirs.remove(".git")
+
             for file in files:
                 file_path = os.path.join(root, file)
+                # Skip LICENSE files, Cargo.toml, .gitignore, license.md and .yml files
+                if (
+                    file.upper() == "LICENSE"
+                    or file == "Cargo.toml"
+                    or file == ".gitignore"
+                    or file.lower() == "license.md"
+                    or file.endswith(".yml")
+                    or file.endswith(".yaml")
+                ):
+                    continue
                 all_files.append(file_path)
 
         self.total_files = len(all_files)
@@ -280,8 +420,6 @@ class ThreadSafeFileProcessor:
                 get_output_filepath(file_index), "w", encoding="utf-8"
             )
             current_file_size = 0
-            # Write header for new file
-            current_file_handle.write("## 🔍 File Content Details\n\n")
             print(f"Creating new output file: {get_output_filepath(file_index)}")
 
         # Open first file
@@ -297,23 +435,27 @@ class ThreadSafeFileProcessor:
 
                 # Format the content of one file entry
                 content_lines = []
-                content_lines.append(
-                    f"### 📄 File #{item['id']} - `{item['filename']}`\n"
-                )
-                content_lines.append(f"- **Path**: `{item['path']}`\n")
-                content_lines.append(f"- **Size**: `{item['file_info']['size']:,} B`\n")
-                content_lines.append(
-                    f"- **Modified Time**: `{item['file_info']['modified_time']}`\n"
-                )
-                content_lines.append("\n#### Content Preview\n\n")
+                content_lines.append(f"# Path: {item['path']}\n\n")
 
                 file_content = item.get("content", "")
-                if lang:
-                    content_lines.append(f"```{lang}\n")
-                    content_lines.append(file_content)
-                    content_lines.append("\n```\n\n")
+                # Filter out content between --- markers and unwanted sections
+                filtered_content = self.filter_content(file_content)
+
+                # Skip file entry if filtered content is empty
+                if not filtered_content.strip():
+                    continue
+
+                if lang and filtered_content:
+                    # Skip code block wrapping for markdown files
+                    if lang == "markdown":
+                        content_lines.append(filtered_content)
+                        content_lines.append("\n\n")
+                    else:
+                        content_lines.append(f"```{lang}\n")
+                        content_lines.append(filtered_content)
+                        content_lines.append("\n```\n\n")
                 else:
-                    content_lines.append(file_content)
+                    content_lines.append(filtered_content)
                     content_lines.append("\n\n")
 
                 # Calculate approximate size of this entry
