@@ -9,7 +9,7 @@ load_dotenv()
 # --- Configuration ---
 HUGGING_FACE_REPO_ID = os.getenv("HUGGING_FACE_REPO_ID")
 MODEL_DIR = os.getenv("OUTPUT_DIR")
-DATASET_REPO_ID = "hyperlane-dev/hyperlane-ai-training"
+REPO_ID = "hyperlane-dev/hyperlane-ai-training"
 DATASET_DIR = "dataset"
 
 
@@ -99,7 +99,7 @@ def upload_dataset_to_hub():
         print("Please ensure your token is valid.")
         return
 
-    repo_owner = DATASET_REPO_ID.split("/")[0]
+    repo_owner = REPO_ID.split("/")[0]
     if username != repo_owner:
         print(
             f"Warning: You are logged in as '{username}', but the repository owner is '{repo_owner}'."
@@ -108,16 +108,14 @@ def upload_dataset_to_hub():
             "Please make sure you have the necessary permissions to upload to this repository."
         )
 
-    print(
-        f"Preparing to upload the contents of '{DATASET_DIR}' to '{DATASET_REPO_ID}'..."
-    )
+    print(f"Preparing to upload the contents of '{DATASET_DIR}' to '{REPO_ID}'...")
 
     # Create the dataset repository on the Hub (if it doesn't exist). It will be public.
     try:
         api.create_repo(
-            repo_id=DATASET_REPO_ID, repo_type="dataset", exist_ok=True, token=token
+            repo_id=REPO_ID, repo_type="dataset", exist_ok=True, token=token
         )
-        print(f"Dataset repository '{DATASET_REPO_ID}' created or already exists.")
+        print(f"Dataset repository '{REPO_ID}' created or already exists.")
     except Exception as e:
         print(f"Error creating dataset repository: {e}")
         return
@@ -126,14 +124,12 @@ def upload_dataset_to_hub():
     try:
         api.upload_folder(
             folder_path=DATASET_DIR,
-            repo_id=DATASET_REPO_ID,
+            repo_id=REPO_ID,
             repo_type="dataset",
             token=token,
             commit_message=f"Upload training dataset from {DATASET_DIR}.",
         )
-        print(
-            f"Successfully uploaded the contents of '{DATASET_DIR}' to '{DATASET_REPO_ID}'."
-        )
+        print(f"Successfully uploaded the contents of '{DATASET_DIR}' to '{REPO_ID}'.")
     except Exception as e:
         print(f"Error uploading dataset folder: {e}")
 
