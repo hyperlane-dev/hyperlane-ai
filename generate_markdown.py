@@ -5,6 +5,7 @@ from pathlib import Path
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+import re
 
 
 class ThreadSafeFileProcessor:
@@ -401,29 +402,11 @@ class ThreadSafeFileProcessor:
         output_path = Path(self.output_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Constants
-        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-        file_index = 1
+        # 打开主文件一次性写入
+        current_file_handle = open(self.output_file, "w", encoding="utf-8")
+        # 初始化文件大小计数器
         current_file_size = 0
-        current_file_handle = None
-        base_name = output_path.stem
-        suffix = output_path.suffix
-
-        def get_output_filepath(index):
-            return output_path.parent / f"{base_name}_{index:03d}{suffix}"
-
-        def open_new_file():
-            nonlocal current_file_handle, current_file_size, file_index
-            if current_file_handle:
-                current_file_handle.close()
-            current_file_handle = open(
-                get_output_filepath(file_index), "w", encoding="utf-8"
-            )
-            current_file_size = 0
-            print(f"Creating new output file: {get_output_filepath(file_index)}")
-
-        # Open first file
-        open_new_file()
+        print(f"Creating output file: {self.output_file}")
 
         try:
             for item in sorted(self.dataset, key=lambda x: x.get("id", 0)):
@@ -458,27 +441,14 @@ class ThreadSafeFileProcessor:
                     content_lines.append(filtered_content)
                     content_lines.append("\n\n")
 
-                # Calculate approximate size of this entry
-                entry_size = sum(len(line.encode("utf-8")) for line in content_lines)
+                entry_content = "".join(content_lines)
+                entry_content = re.sub(
+                    r"(\n\\s*){2,}", "\n\n", entry_content, flags=re.MULTILINE
+                )
+                current_file_handle.write(entry_content)
+                current_file_size += len(entry_content.encode("utf-8"))
 
-                # Check if adding this entry would exceed the size limit
-                if (
-                    current_file_size + entry_size > MAX_FILE_SIZE
-                    and current_file_size > 0
-                ):
-                    # Close current file and open a new one
-                    current_file_handle.close()
-                    file_index += 1
-                    open_new_file()
-
-                # Write the entry to current file
-                for line in content_lines:
-                    current_file_handle.write(line)
-                current_file_size += entry_size
-
-            print(
-                f"\n✅ Markdown reports generated: {get_output_filepath(1)} to {get_output_filepath(file_index)}"
-            )
+            print(f"\n✅ Markdown report generated: {self.output_file}")
         finally:
             if current_file_handle:
                 current_file_handle.close()
