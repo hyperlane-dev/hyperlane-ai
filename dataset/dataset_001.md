@@ -289,7 +289,6 @@ pub use panic::*;
 pub use route::*;
 pub use server::*;
 
-pub use aho_corasick::AhoCorasick as RouteSearchEngine;
 pub use http_type::*;
 pub use inventory::{collect as server_collect, submit as server_submit};
 
@@ -3252,8 +3251,6 @@ impl Default for RouteMatcher {
             static_route: hash_map_xx_hash3_64(),
             dynamic_route: hash_map_xx_hash3_64(),
             regex_route: hash_map_xx_hash3_64(),
-            ac_automaton: None,
-            ac_pattern_map: hash_map_xx_hash3_64(),
         }
     }
 }
@@ -3706,13 +3703,7 @@ impl RouteMatcher {
     /// - `RouteMatcher` - A new RouteMatcher instance with empty route stores.
     #[inline(always)]
     pub(crate) fn new() -> Self {
-        Self {
-            static_route: hash_map_xx_hash3_64(),
-            dynamic_route: hash_map_xx_hash3_64(),
-            regex_route: hash_map_xx_hash3_64(),
-            ac_automaton: None,
-            ac_pattern_map: hash_map_xx_hash3_64(),
-        }
+        Self::default()
     }
 
     /// Counts the number of segments in a path.
@@ -3731,45 +3722,6 @@ impl RouteMatcher {
             return 0;
         }
         path.matches(DEFAULT_HTTP_PATH).count() + 1
-    }
-
-    /// Rebuilds the AC automaton for dynamic/regex route matching.
-    /// Extracts static segments from dynamic and regex routes for fast filtering.
-    fn rebuild_ac_automaton(&mut self) {
-        let mut patterns: Vec<String> = Vec::with_capacity(DEFAULT_BUFFER_SIZE);
-        let mut pattern_map: HashMapXxHash3_64<usize, (usize, usize, bool)> =
-            hash_map_xx_hash3_64();
-        for (segment_count, routes) in self.get_dynamic_route() {
-            for (route_idx, (pattern, _)) in routes.iter().enumerate() {
-                for segment in pattern.get_0() {
-                    if let RouteSegment::Static(static_seg) = segment {
-                        let pattern_idx: usize = patterns.len();
-                        patterns.push(static_seg.clone());
-                        pattern_map.insert(pattern_idx, (*segment_count, route_idx, false));
-                    }
-                }
-            }
-        }
-        for (segment_count, routes) in self.get_regex_route() {
-            for (route_idx, (pattern, _)) in routes.iter().enumerate() {
-                for segment in pattern.get_0() {
-                    if let RouteSegment::Static(static_seg) = segment {
-                        let pattern_idx: usize = patterns.len();
-                        patterns.push(static_seg.clone());
-                        pattern_map.insert(pattern_idx, (*segment_count, route_idx, true));
-                    }
-                }
-            }
-        }
-        self.set_ac_pattern_map(pattern_map);
-        if patterns.is_empty() {
-            self.set_ac_automaton(None);
-            return;
-        }
-        match RouteSearchEngine::new(&patterns) {
-            Ok(ac) => self.set_ac_automaton(Some(ac)),
-            Err(_) => self.set_ac_automaton(None),
-        };
     }
 
     /// Adds a new route and its handler to the matcher.
@@ -3813,7 +3765,6 @@ impl RouteMatcher {
             Ok(_) => return Err(RouteError::DuplicatePattern(pattern.to_owned())),
             Err(pos) => routes_for_count.insert(pos, (route_pattern, handler)),
         }
-        self.rebuild_ac_automaton();
         Ok(())
     }
 
@@ -3939,18 +3890,6 @@ pub struct RouteMatcher {
     #[get_mut(pub(super))]
     #[debug(skip)]
     pub(super) regex_route: ServerHookPatternRoute,
-    /// AC automaton for fast dynamic/regex route static segment matching.
-    /// Used to quickly filter candidate routes by matching static segments.
-    #[get]
-    #[set(pub(super))]
-    #[debug(skip)]
-    pub(super) ac_automaton: OptionRouteSearchEngine,
-    /// Static segment patterns extracted from dynamic/regex routes for AC automaton.
-    /// Maps pattern_idx to (segment_count, route_index, is_regex).
-    #[get]
-    #[set(pub(super))]
-    #[debug(skip)]
-    pub(super) ac_pattern_map: HashMapXxHash3_64<usize, (usize, usize, bool)>,
 }
 
 ```
@@ -3968,10 +3907,6 @@ pub type RouteParams = HashMapXxHash3_64<String, String>;
 ///
 /// This is used to represent a parsed route.
 pub type RouteSegmentList = Vec<RouteSegment>;
-/// A type alias for an optional AC automaton.
-///
-/// This is used to represent a parsed route.
-pub(crate) type OptionRouteSearchEngine = Option<RouteSearchEngine>;
 /// A type alias for a list of path components.
 ///
 /// This is often used for path components.
@@ -5269,24 +5204,6 @@ async fn get_route() {
 }
 
 #[tokio::test]
-async fn ac_automaton_dynamic_routes() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/api/users/{id}").await;
-    server.route::<TestRoute>("/api/posts/{id}").await;
-    server.route::<TestRoute>("/api/comments/{id}").await;
-    server.route::<TestRoute>("/static/files/{name}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for dynamic routes"
-    );
-    assert!(
-        !route_matcher.get_ac_pattern_map().is_empty(),
-        "AC pattern map should contain static segments"
-    );
-}
-
-#[tokio::test]
 async fn segment_count_optimization() {
     let server: Server = Server::new().await;
     server.route::<TestRoute>("/users/{id}").await;
@@ -5348,7 +5265,6 @@ async fn mixed_route_types() {
     assert_eq!(route_matcher.get_static_route().len(), 2);
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
     assert!(route_matcher.get_regex_route().contains_key(&2));
-    assert!(route_matcher.get_ac_automaton().is_some());
 }
 
 #[tokio::test]
@@ -5367,10 +5283,6 @@ async fn large_dynamic_routes() {
     );
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_dynamic_route().is_empty());
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for dynamic routes"
-    );
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -5404,10 +5316,6 @@ async fn large_regex_routes() {
     );
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_regex_route().is_empty());
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for regex routes"
-    );
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -5441,10 +5349,6 @@ async fn large_tail_regex_routes() {
     );
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_regex_route().is_empty());
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for tail regex routes"
-    );
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -5460,32 +5364,6 @@ async fn large_tail_regex_routes() {
         "Average per tail regex route match: {:?}",
         match_duration / ROUTE_COUNT as u32
     );
-}
-
-#[tokio::test]
-async fn ac_automaton_with_static_segments() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/users/{id}").await;
-    server.route::<TestRoute>("/posts/{slug}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for routes with static segments"
-    );
-    assert!(!route_matcher.get_ac_pattern_map().is_empty());
-}
-
-#[tokio::test]
-async fn ac_automaton_regex_routes() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
-    server.route::<TestRoute>("/files/{path:.*}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(
-        route_matcher.get_ac_automaton().is_some(),
-        "AC automaton should be built for regex routes"
-    );
-    assert!(!route_matcher.get_ac_pattern_map().is_empty());
 }
 
 ```
@@ -12679,21 +12557,21 @@ pub(crate) fn parse_self_from_method(sig: &Signature) -> syn::Result<&Ident> {
 ///
 /// - `bool` - Returns `true` if the type is `&::hyperlane::Context` or `&Context`, `false` otherwise.
 fn is_context_type(ty: &Type) -> bool {
-    if let Type::Reference(type_ref) = ty {
-        if let Type::Path(type_path) = &*type_ref.elem {
-            let path: &Path = &type_path.path;
-            if path.segments.len() >= 2 {
-                let segments: Vec<_> = path.segments.iter().collect();
-                if segments.len() >= 2 {
-                    let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
-                    if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
-                        return true;
-                    }
+    if let Type::Reference(type_ref) = ty
+        && let Type::Path(type_path) = &*type_ref.elem
+    {
+        let path: &Path = &type_path.path;
+        if path.segments.len() >= 2 {
+            let segments: Vec<_> = path.segments.iter().collect();
+            if segments.len() >= 2 {
+                let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
+                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
+                    return true;
                 }
             }
-            if path.segments.len() == 1 && path.segments[0].ident == "Context" {
-                return true;
-            }
+        }
+        if path.segments.len() == 1 && path.segments[0].ident == "Context" {
+            return true;
         }
     }
     false
@@ -12716,22 +12594,22 @@ fn is_context_type(ty: &Type) -> bool {
 /// - `syn::Result<&Ident>` - Returns the context identifier.
 pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<&Ident> {
     for arg in sig.inputs.iter() {
-        if let FnArg::Typed(pat_type) = arg {
-            if is_context_type(&pat_type.ty) {
-                match &*pat_type.pat {
-                    Pat::Ident(pat_ident) => return Ok(&pat_ident.ident),
-                    Pat::Wild(wild) => {
-                        return Err(syn::Error::new_spanned(
-                            wild,
-                            "The context argument cannot be anonymous `_`, please use a named identifier",
-                        ));
-                    }
-                    _ => {
-                        return Err(syn::Error::new_spanned(
-                            &pat_type.pat,
-                            "expected identifier for context parameter",
-                        ));
-                    }
+        if let FnArg::Typed(pat_type) = arg
+            && is_context_type(&pat_type.ty)
+        {
+            match &*pat_type.pat {
+                Pat::Ident(pat_ident) => return Ok(&pat_ident.ident),
+                Pat::Wild(wild) => {
+                    return Err(syn::Error::new_spanned(
+                        wild,
+                        "The context argument cannot be anonymous `_`, please use a named identifier",
+                    ));
+                }
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        &pat_type.pat,
+                        "expected identifier for context parameter",
+                    ));
                 }
             }
         }
@@ -17742,13 +17620,13 @@ pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
 
-## Api Docs
-
-- [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
-
 ## Official Documentation
 
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+
+## Api Docs
+
+- [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
 
 ## Run
 
@@ -17756,6 +17634,12 @@ pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 
 ```sh
 cargo run
+```
+
+### hot-restart
+
+```sh
+cargo run hot-restart
 ```
 
 ### started in background
@@ -17814,13 +17698,13 @@ cargo run restart -d
 
 > 这是一个轻量级、高性能且跨平台的 Rust HTTP 服务器库，基于 Tokio 构建。它通过提供中间件、WebSocket、服务器推送事件(SSE)和原始 TCP 通信的内置支持，简化了现代 Web 服务的开发。凭借在 Windows、Linux 和 macOS 上统一且符合人体工程学的 API，它使开发者能够以最小的开销和最大的灵活性构建强大、可扩展且事件驱动的网络应用程序。
 
-## API 文档
-
-- [API 文档](https://docs.rs/hyperlane/latest/hyperlane/)
-
 ## 官方文档
 
 - [官方文档](https://docs.ltpp.vip/hyperlane/)
+
+## API 文档
+
+- [API 文档](https://docs.rs/hyperlane/latest/hyperlane/)
 
 ## 运行
 
@@ -17828,6 +17712,12 @@ cargo run restart -d
 
 ```sh
 cargo run
+```
+
+### 热重启
+
+```sh
+cargo run hot-restart
 ```
 
 ### 在后台运行
@@ -18853,7 +18743,7 @@ where
         "start" => start_server().await,
         "stop" => stop_server().await,
         "restart" => restart_server().await,
-        "hot" => hot_restart_server().await,
+        "hot-restart" => hot_restart_server().await,
         _ => {
             println_error!("Invalid command: {command}");
         }
