@@ -58,7 +58,7 @@ impl ServerHook for SendBodyMiddleware {
     }
 
     async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::HTTP1_1)
+        ctx.set_response_version(HttpVersion::Http1_1)
             .await
             .set_response_status_code(200)
             .await
@@ -86,7 +86,9 @@ impl ServerHook for UpgradeMiddleware {
         }
         if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_status_code(101)
+            ctx.set_response_version(HttpVersion::Http1_1)
+                .await
+                .set_response_status_code(101)
                 .await
                 .set_response_header(UPGRADE, WEBSOCKET)
                 .await
@@ -157,10 +159,20 @@ impl ServerHook for WebsocketRoute {
     }
 
     async fn handle(self, ctx: &Context) {
-        while ctx.ws_from_stream(4096).await.is_ok() {
-            let request_body: Vec<u8> = ctx.get_request_body().await;
-            ctx.set_response_body(&request_body).await;
-            self.send_body_hook(ctx).await;
+        loop {
+            match ctx.ws_from_stream(RequestConfig::default()).await {
+                Ok(_) => {
+                    let request_body: Vec<u8> = ctx.get_request_body().await;
+                    ctx.set_response_body(&request_body).await;
+                    self.send_body_hook(ctx).await;
+                    continue;
+                }
+                Err(err) => {
+                    ctx.set_response_body(&err.to_string()).await;
+                    self.send_body_hook(ctx).await;
+                    break;
+                }
+            }
         }
     }
 }
@@ -214,6 +226,8 @@ impl ServerHook for ServerPanicHook {
 
     async fn handle(self, ctx: &Context) {
         let _ = ctx
+            .set_response_version(HttpVersion::Http1_1)
+            .await
             .set_response_status_code(500)
             .await
             .clear_response_headers()
@@ -229,12 +243,11 @@ impl ServerHook for ServerPanicHook {
     }
 }
 
-#[tokio::main]
 async fn main() {
     let config: ServerConfig = ServerConfig::new().await;
     config.host("0.0.0.0").await;
     config.port(60000).await;
-    config.buffer(4096).await;
+    config.request_config(RequestConfig::default()).await;
     config.disable_linger().await;
     config.disable_nodelay().await;
     let server: Server = Server::from(config).await;
@@ -290,7 +303,7 @@ pub use route::*;
 pub use server::*;
 
 pub use http_type::*;
-pub use inventory::{collect as server_collect, submit as server_submit};
+pub use inventory;
 
 pub(crate) use lifecycle::*;
 
@@ -301,13 +314,14 @@ pub(crate) use std::{
     collections::{HashMap, HashSet},
     future::Future,
     hash::{Hash, Hasher},
+    io::{self, Write, stderr, stdout},
     net::SocketAddr,
-    panic::Location,
     pin::Pin,
     sync::Arc,
     time::Duration,
 };
 
+pub(crate) use inventory::collect;
 pub(crate) use lombok_macros::*;
 pub(crate) use regex::Regex;
 pub(crate) use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -458,7 +472,7 @@ impl Default for ServerConfigInner {
         Self {
             host: DEFAULT_HOST.to_owned(),
             port: DEFAULT_WEB_PORT,
-            buffer: DEFAULT_BUFFER_SIZE,
+            request_config: RequestConfig::default(),
             nodelay: DEFAULT_NODELAY,
             linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
@@ -522,6 +536,7 @@ impl ServerConfig {
     /// # Returns
     ///
     /// - `Self` - A new `ServerConfig` instance.
+    #[inline(always)]
     pub async fn new() -> Self {
         Self::default()
     }
@@ -574,27 +589,27 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `usize`- The port number to set.
+    /// - `u16`- The port number to set.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn port(&self, port: usize) -> &Self {
+    pub async fn port(&self, port: u16) -> &Self {
         self.write().await.set_port(port);
         self
     }
 
-    /// Sets the HTTP buffer size.
+    /// Sets the HTTP request config.
     ///
     /// # Arguments
     ///
-    /// - `usize`- The HTTP buffer size to set.
+    /// - `RequestConfig`- The HTTP request config to set.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn buffer(&self, buffer: usize) -> &Self {
-        self.write().await.set_buffer(buffer);
+    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
+        self.write().await.set_request_config(request_config);
         self
     }
 
@@ -634,12 +649,12 @@ impl ServerConfig {
     ///
     /// # Arguments
     ///
-    /// - `OptionDuration`- The `Duration` value for `SO_LINGER`.
+    /// - `Option<Duration>`- The `Duration` value for `SO_LINGER`.
     ///
     /// # Returns
     ///
     /// - `&Self` - A reference to `Self` for method chaining.
-    pub async fn linger(&self, linger_opt: OptionDuration) -> &Self {
+    pub async fn linger(&self, linger_opt: Option<Duration>) -> &Self {
         self.write().await.set_linger(linger_opt);
         self
     }
@@ -690,7 +705,7 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
+    /// - `Result<ServerConfig, serde_json::Error>` - A `Result<ServerConfig, serde_json::Error>` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
     ///   Creates a `ServerConfig` from a JSON string.
     ///
     /// # Arguments
@@ -699,8 +714,8 @@ impl ServerConfig {
     ///
     /// # Returns
     ///
-    /// - `ConfigLoadResult` - A `ConfigLoadResult` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
-    pub fn from_json_str(config_str: &str) -> ConfigLoadResult {
+    /// - `Result<ServerConfig, serde_json::Error>` - A `Result<ServerConfig, serde_json::Error>` which is a `Result` containing either the `ServerConfig` or a `serde_json::Error`.
+    pub fn from_json_str(config_str: &str) -> Result<ServerConfig, serde_json::Error> {
         serde_json::from_str(config_str).map(|config: ServerConfigInner| Self(arc_rwlock(config)))
     }
 }
@@ -715,7 +730,8 @@ pub(crate) mod r#struct;
 pub(crate) mod r#type;
 
 pub use r#struct::*;
-pub use r#type::*;
+
+pub(super) use r#type::*;
 
 ```
 
@@ -740,27 +756,27 @@ pub(crate) struct ServerConfigInner {
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) port: usize,
-    /// The buffer size for HTTP connections.
+    pub(super) port: u16,
+    /// The configuration for HTTP request.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) buffer: usize,
+    pub(super) request_config: RequestConfig,
     /// The `TCP_NODELAY` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) nodelay: OptionBool,
+    pub(super) nodelay: Option<bool>,
     /// The `SO_LINGER` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) linger: OptionDuration,
+    pub(super) linger: Option<Duration>,
     /// The `IP_TTL` option for sockets.
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) ttl: OptionU32,
+    pub(super) ttl: Option<u32>,
 }
 
 /// Represents the thread-safe, shareable server configuration.
@@ -777,14 +793,11 @@ pub struct ServerConfig(#[get(pub(super))] pub(super) SharedServerConfig);
 ```rust
 use crate::*;
 
-/// A type alias for configuration loading result.
-///
-/// This is used for operations that can fail during `ServerConfig` deserialization.
-pub type ConfigLoadResult = Result<ServerConfig, serde_json::Error>;
 /// A type alias for configuration read guard.
 ///
 /// This provides read-only access to the `ServerConfigInner` wrapped in a `RwLock`.
 pub(crate) type ConfigReadGuard<'a> = RwLockReadGuard<'a, ServerConfigInner>;
+
 /// A type alias for configuration write guard.
 ///
 /// This provides mutable access to the `ServerConfigInner` wrapped in a `RwLock`.
@@ -797,9 +810,9 @@ pub(crate) type ConfigWriteGuard<'a> = RwLockWriteGuard<'a, ServerConfigInner>;
 ```rust
 use crate::*;
 
-/// Implementation of methods for `Context` structure.
-impl Context {
-    /// Creates a new `Context` from an internal context instance.
+/// Implementation of `From` trait for `Context`.
+impl From<ContextInner> for Context {
+    /// Converts a `ContextInner` into a `Context`.
     ///
     /// # Arguments
     ///
@@ -809,11 +822,14 @@ impl Context {
     ///
     /// - `Context` - The newly created context instance.
     #[inline(always)]
-    pub(crate) fn from_internal_context(ctx: ContextInner) -> Self {
+    fn from(ctx: ContextInner) -> Self {
         Self(arc_rwlock(ctx))
     }
+}
 
-    /// Creates a new `Context` for a given stream and request.
+/// Implementation of methods for `Context` structure.
+impl Context {
+    /// Creates a new `Context` with the provided network stream and HTTP request.
     ///
     /// # Arguments
     ///
@@ -824,14 +840,14 @@ impl Context {
     ///
     /// - `Context` - The newly created context.
     #[inline(always)]
-    pub(crate) fn create_context(stream: &ArcRwLockStream, request: &Request) -> Context {
+    pub(crate) fn new(stream: &ArcRwLockStream, request: &Request) -> Context {
         let mut internal_ctx: ContextInner = ContextInner::default();
         internal_ctx
             .set_stream(Some(stream.clone()))
             .set_request(request.clone())
             .get_mut_response()
             .set_version(request.get_version().clone());
-        Context::from_internal_context(internal_ctx)
+        internal_ctx.into()
     }
 
     /// Acquires a read lock on the inner context data.
@@ -938,7 +954,7 @@ impl Context {
         self
     }
 
-    /// Checks if the connection has been terminated (aborted and closed).
+    /// Checks if the connection has been terminated (aborted or closed).
     ///
     /// # Returns
     ///
@@ -951,17 +967,30 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionArcRwLockStream` - The thread-safe, shareable network stream if it exists.
-    pub async fn try_get_stream(&self) -> OptionArcRwLockStream {
+    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.
+    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {
         self.read().await.get_stream().clone()
+    }
+
+    /// Retrieves the underlying network stream.
+    ///
+    /// # Returns
+    ///
+    /// - `ArcRwLockStream` - The thread-safe, shareable network stream.
+    ///
+    /// # Panics
+    ///
+    /// - If the network stream is not found.
+    pub async fn get_stream(&self) -> ArcRwLockStream {
+        self.try_get_stream().await.unwrap()
     }
 
     /// Retrieves the remote socket address of the connection.
     ///
     /// # Returns
     ///
-    /// - `OptionSocketAddr` - The socket address of the remote peer if available.
-    pub async fn try_get_socket_addr(&self) -> OptionSocketAddr {
+    /// - `Option<SocketAddr>` - The socket address of the remote peer if available.
+    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {
         self.try_get_stream()
             .await
             .as_ref()?
@@ -971,40 +1000,39 @@ impl Context {
             .ok()
     }
 
-    /// Retrieves the remote socket address or a default value if unavailable.
+    /// Retrieves the remote socket address.
     ///
     /// # Returns
     ///
-    /// - `SocketAddr` - The socket address of the remote peer, or default if unavailable.
+    /// - `SocketAddr` - The socket address of the remote peer.
+    ///
+    /// # Panics
+    ///
+    /// - If the socket address is not found.
     pub async fn get_socket_addr(&self) -> SocketAddr {
-        let stream_result: OptionArcRwLockStream = self.try_get_stream().await;
-        if stream_result.is_none() {
-            return DEFAULT_SOCKET_ADDR;
-        }
-        stream_result
-            .unwrap()
-            .read()
-            .await
-            .peer_addr()
-            .unwrap_or(DEFAULT_SOCKET_ADDR)
+        self.try_get_socket_addr().await.unwrap()
     }
 
     /// Retrieves the remote socket address as a string.
     ///
     /// # Returns
     ///
-    /// - `OptionString` - The string representation of the socket address if available.
-    pub async fn try_get_socket_addr_string(&self) -> OptionString {
+    /// - `Option<String>` - The string representation of the socket address if available.
+    pub async fn try_get_socket_addr_string(&self) -> Option<String> {
         self.try_get_socket_addr()
             .await
             .map(|data| data.to_string())
     }
 
-    /// Retrieves the remote socket address as a string, or a default value if unavailable.
+    /// Retrieves the remote socket address as a string.
     ///
     /// # Returns
     ///
-    /// - `String` - The string representation of the socket address, or default if unavailable.
+    /// - `String` - The string representation of the socket address.
+    ///
+    /// # Panics
+    ///
+    /// - If the socket address is not found.
     pub async fn get_socket_addr_string(&self) -> String {
         self.get_socket_addr().await.to_string()
     }
@@ -1013,22 +1041,48 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionSocketHost` - The IP address of the remote peer if available.
-    pub async fn try_get_socket_host(&self) -> OptionSocketHost {
+    /// - `Option<SocketHost>` - The IP address of the remote peer.
+    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {
         self.try_get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.ip())
+    }
+
+    /// Retrieves the IP address part of the remote socket address.
+    ///
+    /// # Returns
+    ///
+    /// - `SocketHost` - The IP address of the remote peer.
+    ///
+    /// # Panics
+    ///
+    /// - If the socket address is not found.
+    pub async fn get_socket_host(&self) -> SocketHost {
+        self.try_get_socket_host().await.unwrap()
     }
 
     /// Retrieves the port number part of the remote socket address.
     ///
     /// # Returns
     ///
-    /// - `OptionSocketPort` - The port number of the remote peer if available.
-    pub async fn try_get_socket_port(&self) -> OptionSocketPort {
+    /// - `Option<SocketPort>` - The port number of the remote peer if available.
+    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {
         self.try_get_socket_addr()
             .await
             .map(|socket_addr: SocketAddr| socket_addr.port())
+    }
+
+    /// Retrieves the port number part of the remote socket address.
+    ///
+    /// # Returns
+    ///
+    /// - `SocketPort` - The port number of the remote peer.
+    ///
+    /// # Panics
+    ///
+    /// - If the socket address is not found.
+    pub async fn get_socket_port(&self) -> SocketPort {
+        self.try_get_socket_port().await.unwrap()
     }
 
     /// Retrieves the current HTTP request.
@@ -1127,7 +1181,7 @@ impl Context {
         self.read().await.get_request().get_querys().clone()
     }
 
-    /// Retrieves a specific query parameter by its key.
+    /// Attempts to retrieve a specific query parameter by its key.
     ///
     /// # Arguments
     ///
@@ -1135,12 +1189,32 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionRequestQuerysValue` - The query parameter value if exists.
-    pub async fn try_get_request_query<K>(&self, key: K) -> OptionRequestQuerysValue
+    /// - `Option<RequestQuerysValue>` - The query parameter value if exists.
+    pub async fn try_get_request_query<K>(&self, key: K) -> Option<RequestQuerysValue>
     where
         K: AsRef<str>,
     {
         self.read().await.get_request().try_get_query(key)
+    }
+
+    /// Retrieves a specific query parameter by its key, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The query parameter key.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestQuerysValue` - The query parameter value if exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the query parameter is not found.
+    pub async fn get_request_query<K>(&self, key: K) -> RequestQuerysValue
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().get_query(key)
     }
 
     /// Retrieves the body of the request.
@@ -1165,30 +1239,28 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResultJsonError<J>` - The deserialized type `J` or a JSON error.
-    pub async fn get_request_body_json<J>(&self) -> ResultJsonError<J>
+    /// - `Result<J, serde_json::Error>` - The deserialized type `J` or a JSON error.
+    pub async fn try_get_request_body_json<J>(&self) -> Result<J, serde_json::Error>
+    where
+        J: DeserializeOwned,
+    {
+        self.read().await.get_request().try_get_body_json()
+    }
+
+    /// Deserializes the request body from JSON into a specified type, panicking if not found.
+    ///
+    /// # Returns
+    ///
+    /// - `J` - The deserialized type `J`.
+    ///
+    /// # Panics
+    ///
+    /// - If deserialization fails.
+    pub async fn get_request_body_json<J>(&self) -> J
     where
         J: DeserializeOwned,
     {
         self.read().await.get_request().get_body_json()
-    }
-
-    /// Retrieves a specific request header by its key.
-    ///
-    /// Gets a request header by key.
-    ///
-    /// # Arguments
-    ///
-    /// - `AsRef<str>` - The header key.
-    ///
-    /// # Returns
-    ///
-    /// - `OptionRequestHeadersValue` - The header values if exists.
-    pub async fn try_get_request_header<K>(&self, key: K) -> OptionRequestHeadersValue
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header(key)
     }
 
     /// Retrieves all request headers.
@@ -1200,7 +1272,52 @@ impl Context {
         self.read().await.get_request().get_headers().clone()
     }
 
-    /// Retrieves the first value of a specific request header.
+    /// Retrieves the total number of request headers.
+    ///
+    /// # Returns
+    ///
+    /// - `usize` - The total number of headers in the request.
+    pub async fn get_request_headers_length(&self) -> usize {
+        self.read().await.get_request().get_headers_length()
+    }
+
+    /// Attempts to retrieve a specific request header by its key.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The header key.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<RequestHeadersValue>` - The header values if exists.
+    pub async fn try_get_request_header<K>(&self, key: K) -> Option<RequestHeadersValue>
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().try_get_header(key)
+    }
+
+    /// Retrieves a specific request header by its key, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestHeadersValue` - The header values if exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
+    pub async fn get_request_header<K>(&self, key: K) -> RequestHeadersValue
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().get_header(key)
+    }
+
+    /// Attempts to retrieve the first value of a specific request header.
     ///
     /// # Arguments
     ///
@@ -1208,15 +1325,15 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionRequestHeadersValueItem` - The first value of the header if it exists.
-    pub async fn try_get_request_header_front<K>(&self, key: K) -> OptionRequestHeadersValueItem
+    /// - `Option<RequestHeadersValueItem>` - The first value of the header if it exists.
+    pub async fn try_get_request_header_front<K>(&self, key: K) -> Option<RequestHeadersValueItem>
     where
         K: AsRef<str>,
     {
         self.read().await.get_request().try_get_header_front(key)
     }
 
-    /// Retrieves the last value of a specific request header.
+    /// Retrieves the first value of a specific request header, panicking if not found.
     ///
     /// # Arguments
     ///
@@ -1224,12 +1341,68 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionRequestHeadersValueItem` - The last value of the header if it exists.
-    pub async fn try_get_request_header_back<K>(&self, key: K) -> OptionRequestHeadersValueItem
+    /// - `RequestHeadersValueItem` - The first value of the header if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
+    pub async fn get_request_header_front<K>(&self, key: K) -> RequestHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().get_header_front(key)
+    }
+
+    /// Attempts to retrieve the last value of a specific request header.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<RequestHeadersValueItem>` - The last value of the header if it exists.
+    pub async fn try_get_request_header_back<K>(&self, key: K) -> Option<RequestHeadersValueItem>
     where
         K: AsRef<str>,
     {
         self.read().await.get_request().try_get_header_back(key)
+    }
+
+    /// Retrieves the last value of a specific request header, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `RequestHeadersValueItem` - The last value of the header if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
+    pub async fn get_request_header_back<K>(&self, key: K) -> RequestHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().get_header_back(key)
+    }
+
+    /// Attempts to retrieve the number of values for a specific request header.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<usize>` - The number of values for the specified header if it exists.
+    pub async fn try_get_request_header_len<K>(&self, key: K) -> Option<usize>
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_request().try_get_header_length(key)
     }
 
     /// Retrieves the number of values for a specific request header.
@@ -1241,6 +1414,10 @@ impl Context {
     /// # Returns
     ///
     /// - `usize` - The number of values for the specified header.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_request_header_len<K>(&self, key: K) -> usize
     where
         K: AsRef<str>,
@@ -1255,15 +1432,6 @@ impl Context {
     /// - `usize` - The total count of all values in all headers.
     pub async fn get_request_headers_values_length(&self) -> usize {
         self.read().await.get_request().get_headers_values_length()
-    }
-
-    /// Retrieves the total number of request headers.
-    ///
-    /// # Returns
-    ///
-    /// - `usize` - The total number of headers in the request.
-    pub async fn get_request_headers_length(&self) -> usize {
-        self.read().await.get_request().get_headers_length()
     }
 
     /// Checks if a specific request header exists.
@@ -1312,7 +1480,7 @@ impl Context {
             .unwrap_or_default()
     }
 
-    /// Retrieves a specific cookie by its name from the request.
+    /// Attempts to retrieve a specific cookie by its name from the request.
     ///
     /// # Arguments
     ///
@@ -1320,19 +1488,39 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionCookiesValue` - The cookie value if exists.
-    pub async fn try_get_request_cookie<K>(&self, key: K) -> OptionCookiesValue
+    /// - `Option<CookieValue>` - The cookie value if exists.
+    pub async fn try_get_request_cookie<K>(&self, key: K) -> Option<CookieValue>
     where
         K: AsRef<str>,
     {
         self.get_request_cookies().await.get(key.as_ref()).cloned()
     }
 
+    /// Retrieves a specific cookie by its name from the request, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The cookie name.
+    ///
+    /// # Returns
+    ///
+    /// - `CookieValue` - The cookie value if exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the cookie is not found.
+    pub async fn get_request_cookie<K>(&self, key: K) -> CookieValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_request_cookie(key).await.unwrap()
+    }
+
     /// Retrieves the upgrade type of the request.
     ///
     /// # Returns
     ///
-    /// - `UpgradeType` - Indicates if the request is for a WebSocket connection.
+    /// - `UpgradeType` - The upgrade type of the request.
     pub async fn get_request_upgrade_type(&self) -> UpgradeType {
         self.read().await.get_request().get_upgrade_type()
     }
@@ -1637,7 +1825,7 @@ impl Context {
         self.read().await.get_response().get_headers().clone()
     }
 
-    /// Retrieves a specific response header by its key.
+    /// Attempts to retrieve a specific response header by its key.
     ///
     /// # Arguments
     ///
@@ -1645,12 +1833,32 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionResponseHeadersValue` - The header values if the header exists.
-    pub async fn try_get_response_header<K>(&self, key: K) -> OptionResponseHeadersValue
+    /// - `Option<ResponseHeadersValue>` - The header values if the header exists.
+    pub async fn try_get_response_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
     where
         K: AsRef<str>,
     {
         self.read().await.get_response().try_get_header(key)
+    }
+
+    /// Retrieves a specific response header by its key, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `ResponseHeadersValue` - The header values if the header exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
+    pub async fn get_response_header<K>(&self, key: K) -> ResponseHeadersValue
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_response().get_header(key)
     }
 
     /// Sets a response header with a new value, removing any existing values.
@@ -1672,7 +1880,7 @@ impl Context {
         self
     }
 
-    /// Retrieves the first value of a specific response header.
+    /// Attempts to retrieve the first value of a specific response header.
     ///
     /// # Arguments
     ///
@@ -1680,15 +1888,15 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionResponseHeadersValueItem` - The first value of the header if it exists.
-    pub async fn try_get_response_header_front<K>(&self, key: K) -> OptionResponseHeadersValueItem
+    /// - `Option<ResponseHeadersValueItem>` - The first value of the header if it exists.
+    pub async fn try_get_response_header_front<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
     where
         K: AsRef<str>,
     {
         self.read().await.get_response().try_get_header_front(key)
     }
 
-    /// Retrieves the last value of a specific response header.
+    /// Retrieves the first value of a specific response header, panicking if not found.
     ///
     /// # Arguments
     ///
@@ -1696,12 +1904,52 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionResponseHeadersValueItem` - The last value of the header if it exists.
-    pub async fn try_get_response_header_back<K>(&self, key: K) -> OptionResponseHeadersValueItem
+    /// - `ResponseHeadersValueItem` - The first value of the header if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
+    pub async fn get_response_header_front<K>(&self, key: K) -> ResponseHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_response().get_header_front(key)
+    }
+
+    /// Attempts to retrieve the last value of a specific response header.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<ResponseHeadersValueItem>` - The last value of the header if it exists.
+    pub async fn try_get_response_header_back<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
     where
         K: AsRef<str>,
     {
         self.read().await.get_response().try_get_header_back(key)
+    }
+
+    /// Retrieves the last value of a specific response header, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `ResponseHeadersValueItem` - The last value of the header if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
+    pub async fn get_response_header_back<K>(&self, key: K) -> ResponseHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_response().get_header_back(key)
     }
 
     /// Checks if a specific response header exists.
@@ -1750,6 +1998,22 @@ impl Context {
         self.read().await.get_response().get_headers_length()
     }
 
+    /// Attempts to retrieve the number of values for a specific response header.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the header.
+    ///
+    /// # Returns
+    ///
+    /// - `Option<usize>` - The number of values for the specified header if it exists.
+    pub async fn try_get_response_header_length<K>(&self, key: K) -> Option<usize>
+    where
+        K: AsRef<str>,
+    {
+        self.read().await.get_response().try_get_header_length(key)
+    }
+
     /// Retrieves the number of values for a specific response header.
     ///
     /// # Arguments
@@ -1759,6 +2023,10 @@ impl Context {
     /// # Returns
     ///
     /// - `usize` - The number of values for the specified header.
+    ///
+    /// # Panics
+    ///
+    /// - If the header is not found.
     pub async fn get_response_header_length<K>(&self, key: K) -> usize
     where
         K: AsRef<str>,
@@ -1855,7 +2123,7 @@ impl Context {
             .unwrap_or_default()
     }
 
-    /// Retrieves a specific cookie by its name from the response.
+    /// Attempts to retrieve a specific cookie by its name from the response.
     ///
     /// # Arguments
     ///
@@ -1863,19 +2131,39 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionCookiesValue` - The cookie's value if it exists.
-    pub async fn try_get_response_cookie<K>(&self, key: K) -> OptionCookiesValue
+    /// - `Option<CookieValue>` - The cookie's value if it exists.
+    pub async fn try_get_response_cookie<K>(&self, key: K) -> Option<CookieValue>
     where
         K: AsRef<str>,
     {
         self.get_response_cookies().await.get(key.as_ref()).cloned()
     }
 
+    /// Retrieves a specific cookie by its name from the response, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The name of the cookie to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `CookieValue` - The cookie's value if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the cookie is not found.
+    pub async fn get_response_cookie<K>(&self, key: K) -> CookieValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_response_cookie(key).await.unwrap()
+    }
+
     /// Retrieves the body of the response.
     ///
     /// # Returns
     ///
-    /// - `ResponseBody` - A clone of the response's body.
+    /// - `ResponseBody` - The response body.
     pub async fn get_response_body(&self) -> ResponseBody {
         self.read().await.get_response().get_body().clone()
     }
@@ -1884,7 +2172,7 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `B` - The body to set for the response.
+    /// - `B` - The body data to set for the response.
     ///
     /// # Returns
     ///
@@ -1910,24 +2198,40 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResultJsonError<J>` - The deserialized type `J` or a JSON error.
-    pub async fn get_response_body_json<J>(&self) -> ResultJsonError<J>
+    /// - `Result<J, serde_json::Error>` - The deserialized type `J` or a JSON error.
+    pub async fn try_get_response_body_json<J>(&self) -> Result<J, serde_json::Error>
+    where
+        J: DeserializeOwned,
+    {
+        self.read().await.get_response().try_get_body_json()
+    }
+
+    /// Deserializes the response body from JSON into a specified type, panicking if not found.
+    ///
+    /// # Returns
+    ///
+    /// - `J` - The deserialized type `J`.
+    ///
+    /// # Panics
+    ///
+    /// - If deserialization fails.
+    pub async fn get_response_body_json<J>(&self) -> J
     where
         J: DeserializeOwned,
     {
         self.read().await.get_response().get_body_json()
     }
 
-    /// Retrieves the reason phrase of the response's status code.
+    /// Retrieves the reason phrase of the response status code.
     ///
     /// # Returns
     ///
-    /// - `ResponseReasonPhrase` - The reason phrase associated with the response's status code.
+    /// - `ResponseReasonPhrase` - The reason phrase associated with the response status code.
     pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
         self.read().await.get_response().get_reason_phrase().clone()
     }
 
-    /// Sets the reason phrase for the response's status code.
+    /// Sets the reason phrase for the response status code.
     ///
     /// # Arguments
     ///
@@ -1951,7 +2255,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// The status code of the response.
+    /// - `ResponseStatusCode` - The status code of the response.
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
         *self.read().await.get_response().get_status_code()
     }
@@ -1996,7 +2300,7 @@ impl Context {
         self
     }
 
-    /// Retrieves a specific route parameter by its name.
+    /// Attempts to retrieve a specific route parameter by its name.
     ///
     /// # Arguments
     ///
@@ -2004,8 +2308,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionString` - The value of the route parameter if it exists.
-    pub async fn try_get_route_param<T>(&self, name: T) -> OptionString
+    /// - `Option<String>` - The value of the route parameter if it exists.
+    pub async fn try_get_route_param<T>(&self, name: T) -> Option<String>
     where
         T: AsRef<str>,
     {
@@ -2014,6 +2318,26 @@ impl Context {
             .get_route_params()
             .get(name.as_ref())
             .cloned()
+    }
+
+    /// Retrieves a specific route parameter by its name, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The name of the route parameter to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `String` - The value of the route parameter if it exists.
+    ///
+    /// # Panics
+    ///
+    /// - If the route parameter is not found.
+    pub async fn get_route_param<T>(&self, name: T) -> String
+    where
+        T: AsRef<str>,
+    {
+        self.try_get_route_param(name).await.unwrap()
     }
 
     /// Retrieves all attributes stored in the context.
@@ -2025,7 +2349,7 @@ impl Context {
         self.read().await.get_attributes().clone()
     }
 
-    /// Retrieves a specific attribute by its key, casting it to the specified type.
+    /// Attempts to retrieve a specific attribute by its key, casting it to the specified type.
     ///
     /// # Arguments
     ///
@@ -2033,7 +2357,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `Option<V>` - The attribute's value if it exists and can be cast to the specified type.
+    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.
     pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>
     where
         K: AsRef<str>,
@@ -2045,6 +2369,27 @@ impl Context {
             .get(&Attribute::External(key.as_ref().to_owned()).to_string())
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
+    }
+
+    /// Retrieves a specific attribute by its key, casting it to the specified type, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `AsRef<str>` - The key of the attribute to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `V` - The attribute value if it exists and can be cast to the specified type.
+    ///
+    /// # Panics
+    ///
+    /// - If the attribute is not found.
+    pub async fn get_attribute<K, V>(&self, key: K) -> V
+    where
+        K: AsRef<str>,
+        V: AnySendSyncClone,
+    {
+        self.try_get_attribute(key).await.unwrap()
     }
 
     /// Sets an attribute in the context.
@@ -2107,7 +2452,7 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `Option<V>` - The attribute's value if it exists and can be cast to the specified type.
+    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.
     async fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
     where
         V: AnySendSyncClone,
@@ -2118,6 +2463,26 @@ impl Context {
             .get(&Attribute::Internal(key).to_string())
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
+    }
+
+    /// Retrieves an internal framework attribute.
+    ///
+    /// # Arguments
+    ///
+    /// - `InternalAttribute` - The internal attribute key to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// - `V` - The attribute value if it exists and can be cast to the specified type.
+    ///
+    /// # Panics
+    ///
+    /// - If the attribute is not found.
+    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
+    where
+        V: AnySendSyncClone,
+    {
+        self.try_get_internal_attribute(key).await.unwrap()
     }
 
     /// Sets an internal framework attribute.
@@ -2145,10 +2510,23 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionalPanicInfo` - The panic information if a panic was caught.
-    pub async fn try_get_panic(&self) -> OptionalPanicInfo {
+    /// - `Option<Panic>` - The panic information if a panic was caught.
+    pub async fn try_get_panic(&self) -> Option<Panic> {
         self.try_get_internal_attribute(InternalAttribute::Panic)
             .await
+    }
+
+    /// Retrieves panic information if a panic has occurred during handling.
+    ///
+    /// # Returns
+    ///
+    /// - `Panic` - The panic information if a panic was caught.
+    ///
+    /// # Panics
+    ///
+    /// - If the panic information is not found.
+    pub async fn get_panic(&self) -> Panic {
+        self.get_internal_attribute(InternalAttribute::Panic).await
     }
 
     /// Sets the panic information for the context.
@@ -2181,13 +2559,13 @@ impl Context {
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
-        let hook_fn: SharedHookHandler<()> =
+        let hook_fn: HookHandler<()> =
             Arc::new(move |ctx: Context| -> SendableAsyncTask<()> { Box::pin(hook(ctx)) });
         self.set_internal_attribute(InternalAttribute::Hook(key.to_string()), hook_fn)
             .await
     }
 
-    /// Retrieves a hook function if it has been set.
+    /// Attempts to retrieve a hook function if it has been set.
     ///
     /// # Arguments
     ///
@@ -2195,12 +2573,33 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `OptionalHookHandler<()>` - The hook function if it has been set.
-    pub async fn try_get_hook<K>(&self, key: K) -> OptionalHookHandler<()>
+    /// - `Option<HookHandler<()>>` - The hook function if it has been set.
+    pub async fn try_get_hook<K>(&self, key: K) -> Option<HookHandler<()>>
     where
         K: ToString,
     {
         self.try_get_internal_attribute(InternalAttribute::Hook(key.to_string()))
+            .await
+    }
+
+    /// Retrieves a hook function if it has been set, panicking if not found.
+    ///
+    /// # Arguments
+    ///
+    /// - `K: ToString` - The key to identify the hook.
+    ///
+    /// # Returns
+    ///
+    /// - `HookHandler<()>` - The hook function if it has been set.
+    ///
+    /// # Panics
+    ///
+    /// - If the hook function is not found.
+    pub async fn get_hook<K>(&self, key: K) -> HookHandler<()>
+    where
+        K: ToString,
+    {
+        self.get_internal_attribute(InternalAttribute::Hook(key.to_string()))
             .await
     }
 
@@ -2219,8 +2618,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send(&self) -> ResponseResult {
+    /// - `Result<(), ResponseError>` - The result of the send operation.
+    pub async fn send(&self) -> Result<(), ResponseError> {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
         }
@@ -2233,19 +2632,19 @@ impl Context {
 
     /// Sends only the response body to the client.
     ///
-    /// This is useful for streaming data or for responses where headers have already been sent.
+    /// This method is useful for streaming data or for responses where headers have already been sent.
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_body(&self) -> ResponseResult {
+    /// - `Result<(), ResponseError>` - The result of the send operation.
+    pub async fn send_body(&self) -> Result<(), ResponseError> {
         let response_body: ResponseBody = self.get_response_body().await;
         self.send_body_with_data(response_body).await
     }
 
     /// Sends only the response body to the client with additional data.
     ///
-    /// This is useful for streaming data or for responses where headers have already been sent.
+    /// This method is useful for streaming data or for responses where headers have already been sent.
     ///
     /// # Arguments
     ///
@@ -2253,8 +2652,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_body_with_data<D>(&self, data: D) -> ResponseResult
+    /// - `Result<(), ResponseError>` - The result of the send operation.
+    pub async fn send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
     where
         D: AsRef<[u8]>,
     {
@@ -2277,8 +2676,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the send operation.
-    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I) -> ResponseResult
+    /// - `Result<(), ResponseError>` - The result of the send operation.
+    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
     where
         I: IntoIterator<Item = D>,
         D: AsRef<[u8]>,
@@ -2296,8 +2695,8 @@ impl Context {
     ///
     /// # Returns
     ///
-    /// - `ResponseResult` - The outcome of the flush operation.
-    pub async fn flush(&self) -> ResponseResult {
+    /// - `Result<(), ResponseError>` - The result of the flush operation.
+    pub async fn flush(&self) -> Result<(), ResponseError> {
         if let Some(stream) = self.try_get_stream().await {
             stream.flush().await;
             return Ok(());
@@ -2309,43 +2708,49 @@ impl Context {
     ///
     /// # Arguments
     ///
-    /// - `usize` - The read buffer size.
+    /// - `RequestConfig` - The request config.
     ///
     /// # Returns
     ///
-    /// - `RequestReaderHandleResult` - The parsed request or error.
-    pub async fn http_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
+    /// - `Result<Request, RequestError>` - The parsed request or error.
+    pub async fn http_from_stream(
+        &self,
+        request_config: RequestConfig,
+    ) -> Result<Request, RequestError> {
         if self.get_aborted().await {
-            return Err(RequestError::RequestAborted);
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
         if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let request_res: RequestReaderHandleResult =
-                Request::http_from_stream(stream, buffer).await;
+            let request_res: Result<Request, RequestError> =
+                Request::http_from_stream(stream, &request_config).await;
             if let Ok(request) = request_res.as_ref() {
                 self.set_request(request).await;
             }
             return request_res;
         };
-        Err(RequestError::GetTcpStream)
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
 
     /// Reads a WebSocket frame from the underlying stream.
     ///
     /// # Arguments
     ///
-    /// - `usize` - The read buffer size.
+    /// - `RequestConfig` - The request config.
     ///
     /// # Returns
     ///
-    /// - `RequestReaderHandleResult` - The parsed frame or error.
-    pub async fn ws_from_stream(&self, buffer: usize) -> RequestReaderHandleResult {
+    /// - `Result<Request, RequestError>` - The parsed frame or error.
+    pub async fn ws_from_stream(
+        &self,
+        request_config: RequestConfig,
+    ) -> Result<Request, RequestError> {
         if self.get_aborted().await {
-            return Err(RequestError::RequestAborted);
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
         if let Some(stream) = self.try_get_stream().await.as_ref() {
             let mut last_request: Request = self.get_request().await;
-            let request_res: RequestReaderHandleResult =
-                Request::ws_from_stream(stream, buffer, &mut last_request).await;
+            let request_res: Result<Request, RequestError> =
+                last_request.ws_from_stream(stream, &request_config).await;
             match request_res.as_ref() {
                 Ok(request) => {
                     self.set_request(request).await;
@@ -2356,7 +2761,7 @@ impl Context {
             }
             return request_res;
         };
-        Err(RequestError::GetTcpStream)
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
 }
 
@@ -2400,7 +2805,7 @@ pub(crate) struct ContextInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    stream: OptionArcRwLockStream,
+    stream: Option<ArcRwLockStream>,
     /// The incoming HTTP request.
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -2441,6 +2846,7 @@ use crate::*;
 ///
 /// This provides exclusive, mutable access to the `ContextInner` data.
 pub(crate) type ContextWriteGuard<'a> = RwLockWriteGuard<'a, ContextInner>;
+
 /// A type alias for a read guard on the context data.
 ///
 /// This provides shared, immutable access to the `ContextInner` data.
@@ -2497,7 +2903,7 @@ use crate::*;
 
 /// Represents different handler types for hooks.
 #[derive(Clone)]
-pub enum HookHandler {
+pub enum HookHandlerSpec {
     /// Arc handler (used for request/response middleware and route)
     Handler(ServerHookHandler),
     /// Factory function that creates a handler when called
@@ -2673,14 +3079,14 @@ impl ServerControlHook {
     }
 }
 
-impl PartialEq for HookHandler {
+impl PartialEq for HookHandlerSpec {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (HookHandler::Handler(handler_a), HookHandler::Handler(handler_b)) => {
+            (HookHandlerSpec::Handler(handler_a), HookHandlerSpec::Handler(handler_b)) => {
                 Arc::ptr_eq(handler_a, handler_b)
             }
-            (HookHandler::Factory(factory_a), HookHandler::Factory(factory_b)) => {
+            (HookHandlerSpec::Factory(factory_a), HookHandlerSpec::Factory(factory_b)) => {
                 std::ptr::eq(factory_a as *const _, factory_b as *const _)
             }
             _ => false,
@@ -2688,7 +3094,7 @@ impl PartialEq for HookHandler {
     }
 }
 
-impl Eq for HookHandler {}
+impl Eq for HookHandlerSpec {}
 
 /// Implementation block for `HookType`.
 ///
@@ -2771,7 +3177,7 @@ pub struct HookMacro {
     /// Represents the asynchronous handler that is executed when
     /// the associated hook is triggered.
     #[debug(skip)]
-    pub handler: HookHandler,
+    pub handler: HookHandlerSpec,
     /// Represents the type of the hook that determines when the handler
     /// should be executed.
     pub hook_type: HookType,
@@ -2793,7 +3199,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn panic_hook<P: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(server_hook_factory::<P>),
+            handler: HookHandlerSpec::Factory(server_hook_factory::<P>),
             hook_type: HookType::PanicHook(order),
         }
     }
@@ -2813,7 +3219,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn request_middleware<M: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(server_hook_factory::<M>),
+            handler: HookHandlerSpec::Factory(server_hook_factory::<M>),
             hook_type: HookType::RequestMiddleware(order),
         }
     }
@@ -2833,7 +3239,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn response_middleware<M: ServerHook>(order: Option<isize>) -> Self {
         Self {
-            handler: HookHandler::Factory(server_hook_factory::<M>),
+            handler: HookHandlerSpec::Factory(server_hook_factory::<M>),
             hook_type: HookType::ResponseMiddleware(order),
         }
     }
@@ -2853,7 +3259,7 @@ impl HookMacro {
     /// - `Self` - The created HookMacro instance.
     pub fn route<R: ServerHook>(path: &'static str) -> Self {
         Self {
-            handler: HookHandler::Factory(server_hook_factory::<R>),
+            handler: HookHandlerSpec::Factory(server_hook_factory::<R>),
             hook_type: HookType::Route(path),
         }
     }
@@ -2872,12 +3278,14 @@ use crate::*;
 /// function that accepts a `Context`. It is used as a base for other, more
 /// specific function traits.
 pub trait FnContextSendSync<R>: Fn(Context) -> R + Send + Sync {}
+
 /// A trait for functions that return a pinned, boxed, sendable future.
 ///
 /// This trait is essential for creating type-erased async function pointers,
 /// which is a common pattern for storing and dynamically dispatching different
 /// asynchronous handlers in a collection.
 pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<SendableAsyncTask<T>> {}
+
 /// A trait for static, sendable, synchronous functions that return a future.
 ///
 /// This trait ensures that a handler function is safe to be sent across threads
@@ -2888,6 +3296,7 @@ where
     Fut: Future<Output = T> + Send,
 {
 }
+
 /// A trait for futures that are sendable and have a static lifetime.
 ///
 /// This marker trait simplifies generic bounds for asynchronous operations, ensuring
@@ -2902,53 +3311,53 @@ use crate::*;
 ///
 /// This type is used for storing handlers in a shared context, allowing multiple
 /// parts of the application to safely access and execute the same handler.
-pub type SharedHookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
-/// A type alias for an optional hook handler.
-///
-/// This is used when a handler may or may not be present, such as for optional
-/// middleware or hooks.
+pub type HookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
+
 /// A type alias for a hook handler chain.
 ///
 /// This type is used to represent a chain of middleware or hooks that can be
 /// executed sequentially.
+pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
+
 /// A type alias for an asynchronous task.
 ///
 /// This is a common return type for asynchronous handlers, providing a type-erased
 /// future that can be easily managed by the async runtime.
 pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+
 /// A type alias for a sendable asynchronous task with a generic output.
 ///
 /// This is often used to represent an asynchronous task that can be sent across threads.
 pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+
 /// A type alias for a shared asynchronous task factory.
 ///
 /// This is useful for creating and sharing asynchronous task factories.
 pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
+
 /// A type alias for a hook handler factory function.
 ///
 /// This function pointer type is used to create ServerHookHandler instances
 /// based on generic types. It allows delayed instantiation of hooks.
 pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
+
 /// Type alias for a shared server hook handler.
 ///
 /// This type allows storing handlers (route and middleware) of different concrete types
 /// in the same collection. The handler takes a `&Context` and returns
 /// a pinned, boxed future that resolves to `()`.
 pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Send + Sync>;
-/// Type alias for an optional server hook handler.
-///
-/// This type allows storing optional handlers of different concrete types in
-/// the same collection. The handler takes a `&Context` and returns
-/// a pinned, boxed future that resolves to `()`.
-pub type OptionalServerHookHandler = Option<ServerHookHandler>;
+
 /// Type alias for a list of server hooks.
 ///
 /// Used to store middleware handlers in the request/response processing pipeline.
 pub type ServerHookList = Vec<ServerHookHandler>;
+
 /// Type alias for a map of server hook handlers.
 ///
 /// Used for fast lookup of exact-match route.
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
+
 /// Type alias for a collection of pattern-based server hook route grouped by segment count.
 ///
 /// The outer HashMap uses segment count as key for fast filtering.
@@ -3073,18 +3482,18 @@ impl Panic {
     ///
     /// # Arguments
     ///
-    /// - `OptionString` - The panic message.
-    /// - `OptionString` - The source code location of the panic.
-    /// - `OptionString` - The panic payload.
+    /// - `Option<String>` - The panic message.
+    /// - `Option<String>` - The source code location of the panic.
+    /// - `Option<String>` - The panic payload.
     ///
     /// # Returns
     ///
     /// - `Panic` - A new panic instance.
     #[inline(always)]
     pub(crate) fn new(
-        message: OptionString,
-        location: OptionString,
-        payload: OptionString,
+        message: Option<String>,
+        location: Option<String>,
+        payload: Option<String>,
     ) -> Self {
         Self {
             message,
@@ -3103,9 +3512,9 @@ impl Panic {
     ///
     /// # Returns
     ///
-    /// - `OptionString` - The extracted message, or None if the payload is not a string type.
+    /// - `Option<String>` - The extracted message, or None if the payload is not a string type.
     #[inline(always)]
-    fn try_extract_panic_message(panic_payload: &dyn Any) -> OptionString {
+    fn try_extract_panic_message(panic_payload: &dyn Any) -> Option<String> {
         if let Some(s) = panic_payload.downcast_ref::<&str>() {
             Some(s.to_string())
         } else {
@@ -3127,7 +3536,8 @@ impl Panic {
     /// - `Panic` - A new panic instance with message from error.
     pub(crate) fn from_join_error(join_error: JoinError) -> Self {
         let default_message: String = join_error.to_string();
-        let mut message: OptionString = if let Ok(panic_join_error) = join_error.try_into_panic() {
+        let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
+        {
             Self::try_extract_panic_message(&panic_join_error)
         } else {
             None
@@ -3149,10 +3559,8 @@ impl Panic {
 ```rust
 pub(crate) mod r#impl;
 pub(crate) mod r#struct;
-pub(crate) mod r#type;
 
 pub use r#struct::*;
-pub use r#type::*;
 
 ```
 
@@ -3166,39 +3574,23 @@ use crate::*;
 /// This struct captures essential details about a panic, such as the message,
 /// source code location, and payload. It is used by the server's panic handling
 /// mechanism and passed to the configured panic hook for custom processing.
-#[derive(CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug)]
+#[derive(CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter)]
 pub struct Panic {
     /// The message associated with the panic.
     /// This is `None` if the panic payload is not a string.
     #[get(pub)]
-    pub(super) message: OptionString,
+    #[set(pub(crate))]
+    pub(super) message: Option<String>,
     /// The source code location where the panic occurred.
     #[get(pub)]
-    pub(super) location: OptionString,
+    #[set(pub(crate))]
+    pub(super) location: Option<String>,
     /// The payload of the panic, often a string literal.
     /// The handler attempts to downcast it to a `&str` or `String`.
     #[get(pub)]
-    pub(super) payload: OptionString,
+    #[set(pub(crate))]
+    pub(super) payload: Option<String>,
 }
-
-```
-
-# Path: hyperlane\src\panic\type.rs
-
-```rust
-use crate::*;
-
-/// A type alias for optional panic information.
-///
-/// This is used in contexts where a panic might not have occurred, allowing for
-/// graceful handling of both panic and non-panic scenarios.
-pub type OptionalPanicInfo = Option<Panic>;
-/// A type alias for an optional reference to a panic location.
-///
-/// The lifetimes `'a` and `'b` are tied to the `PanicHookInfo` from which the
-/// location information is sourced. This ensures that the reference does not
-/// outlive the panic information itself, preventing dangling pointers.
-pub type OptionalPanicLocation<'a, 'b> = Option<&'a Location<'b>>;
 
 ```
 
@@ -3236,7 +3628,7 @@ pub enum RouteSegment {
 use crate::*;
 
 // Associate a plugin registry with the specified type.
-server_collect!(HookMacro);
+collect!(HookMacro);
 
 /// Provides a default implementation for RouteMatcher.
 impl Default for RouteMatcher {
@@ -3513,7 +3905,7 @@ impl RoutePattern {
     /// # Returns
     ///
     /// - `Result<RoutePattern, RouteError>` - The parsed RoutePattern on success, or RouteError on failure.
-    pub(crate) fn new(route: &str) -> RoutePatternResult {
+    pub(crate) fn new(route: &str) -> Result<RoutePattern, RouteError> {
         Ok(Self(Self::parse_route(route)?))
     }
 
@@ -3527,8 +3919,8 @@ impl RoutePattern {
     ///
     /// # Returns
     ///
-    /// - `Result<Vec<RouteSegment>, RouteError>` - Vector of RouteSegments on success, or RouteError on failure.
-    fn parse_route(route: &str) -> RouteParseResult {
+    /// - `Result<RouteSegmentList, RouteError>` - Vector of RouteSegments on success, or RouteError on failure.
+    fn parse_route(route: &str) -> Result<RouteSegmentList, RouteError> {
         if route.is_empty() {
             return Err(RouteError::EmptyPattern);
         }
@@ -3573,8 +3965,8 @@ impl RoutePattern {
     ///
     /// # Returns
     ///
-    /// - `OptionRouteParams` - Some with parameters if matched, None otherwise.
-    pub(crate) fn try_match_path(&self, path: &str) -> OptionRouteParams {
+    /// - `Option<RouteParams>` - Some with parameters if matched, None otherwise.
+    pub(crate) fn try_match_path(&self, path: &str) -> Option<RouteParams> {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
         let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
@@ -3743,7 +4135,7 @@ impl RouteMatcher {
         &mut self,
         pattern: &str,
         handler: ServerHookHandler,
-    ) -> RouteRegistrationResult {
+    ) -> Result<(), RouteError> {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
             if self.get_static_route().contains_key(pattern) {
@@ -3780,12 +4172,12 @@ impl RouteMatcher {
     ///
     /// # Returns
     ///
-    /// - `OptionalServerHookHandler` - The matched route handler if found, None otherwise.
+    /// - `Option<ServerHookHandler>` - The matched route handler if found, None otherwise.
     pub(crate) async fn try_resolve_route(
         &self,
         ctx: &Context,
         path: &str,
-    ) -> OptionalServerHookHandler {
+    ) -> Option<ServerHookHandler> {
         if let Some(handler) = self.get_static_route().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
             return Some(handler.clone());
@@ -3903,30 +4295,16 @@ use crate::*;
 ///
 /// The key is the parameter name and the value is the captured string.
 pub type RouteParams = HashMapXxHash3_64<String, String>;
+
 /// A type alias for a list of route segments.
 ///
 /// This is used to represent a parsed route.
 pub type RouteSegmentList = Vec<RouteSegment>;
+
 /// A type alias for a list of path components.
 ///
 /// This is often used for path components.
 pub(crate) type PathComponentList<'a> = Vec<&'a str>;
-/// A type alias for route registration result.
-///
-/// This indicates success or a `RouteError`.
-pub(crate) type RouteRegistrationResult = Result<(), RouteError>;
-/// A type alias for route parsing result.
-///
-/// This yields a vector of `RouteSegment`s or a `RouteError`.
-pub(crate) type RouteParseResult = Result<RouteSegmentList, RouteError>;
-/// A type alias for route pattern creation result.
-///
-/// This can fail with a `RouteError`.
-pub(crate) type RoutePatternResult = Result<RoutePattern, RouteError>;
-/// A type alias for optional route parameters.
-///
-/// It is `Some` if a dynamic or regex route matches and captures parameters, and `None` otherwise.
-pub(crate) type OptionRouteParams = Option<RouteParams>;
 
 ```
 
@@ -4038,17 +4416,21 @@ impl HandlerState {
     ///
     /// - `&'a ArcRwLockStream` - The network stream.
     /// - `&'a Context` - The request context.
-    /// - `usize` - The buffer size for reading HTTP requests.
+    /// - `RequestConfig` - The request config.
     ///
     /// # Returns
     ///
     /// - `Self` - The newly created handler state.
     #[inline(always)]
-    pub(super) fn new(stream: ArcRwLockStream, ctx: Context, buffer: usize) -> Self {
+    pub(super) fn new(
+        stream: ArcRwLockStream,
+        ctx: Context,
+        request_config: RequestConfig,
+    ) -> Self {
         Self {
             stream,
             ctx,
-            buffer,
+            request_config,
         }
     }
 }
@@ -4120,45 +4502,45 @@ impl Server {
     /// - `HookMacro`- The `HookMacro` instance containing the `HookType` and its handler.
     pub async fn handle_hook(&self, hook: HookMacro) {
         match (hook.hook_type, hook.handler) {
-            (HookType::PanicHook(_), HookHandler::Handler(handler)) => {
+            (HookType::PanicHook(_), HookHandlerSpec::Handler(handler)) => {
                 self.write().await.get_mut_panic_hook().push(handler);
             }
-            (HookType::PanicHook(_), HookHandler::Factory(factory)) => {
+            (HookType::PanicHook(_), HookHandlerSpec::Factory(factory)) => {
                 self.write().await.get_mut_panic_hook().push(factory());
             }
-            (HookType::RequestMiddleware(_), HookHandler::Handler(handler)) => {
+            (HookType::RequestMiddleware(_), HookHandlerSpec::Handler(handler)) => {
                 self.write()
                     .await
                     .get_mut_request_middleware()
                     .push(handler);
             }
-            (HookType::RequestMiddleware(_), HookHandler::Factory(factory)) => {
+            (HookType::RequestMiddleware(_), HookHandlerSpec::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_request_middleware()
                     .push(factory());
             }
-            (HookType::Route(path), HookHandler::Handler(handler)) => {
+            (HookType::Route(path), HookHandlerSpec::Handler(handler)) => {
                 self.write()
                     .await
                     .get_mut_route_matcher()
                     .add(path, handler)
                     .unwrap();
             }
-            (HookType::Route(path), HookHandler::Factory(factory)) => {
+            (HookType::Route(path), HookHandlerSpec::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_route_matcher()
                     .add(path, factory())
                     .unwrap();
             }
-            (HookType::ResponseMiddleware(_), HookHandler::Handler(handler)) => {
+            (HookType::ResponseMiddleware(_), HookHandlerSpec::Handler(handler)) => {
                 self.write()
                     .await
                     .get_mut_response_middleware()
                     .push(handler);
             }
-            (HookType::ResponseMiddleware(_), HookHandler::Factory(factory)) => {
+            (HookType::ResponseMiddleware(_), HookHandlerSpec::Factory(factory)) => {
                 self.write()
                     .await
                     .get_mut_response_middleware()
@@ -4298,14 +4680,76 @@ impl Server {
     /// # Arguments
     ///
     /// - `H: ToString` - The host address.
-    /// - `usize` - The port number.
+    /// - `u16` - The port number.
     ///
     /// # Returns
     ///
     /// - `String` - The formatted address string.
     #[inline(always)]
-    pub fn format_host_port<H: ToString>(host: H, port: usize) -> String {
+    pub fn format_host_port<H: ToString>(host: H, port: u16) -> String {
         format!("{}{COLON}{port}", host.to_string())
+    }
+
+    /// Flushes the standard output stream.
+    ///
+    /// # Returns
+    ///
+    /// - `io::Result<()>` - The result of the flush operation.
+    #[inline(always)]
+    pub fn try_flush_stdout() -> io::Result<()> {
+        stdout().flush()
+    }
+
+    /// Flushes the standard error stream.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the flush operation fails.
+    #[inline(always)]
+    pub fn flush_stdout() {
+        stdout().flush().unwrap();
+    }
+
+    /// Flushes the standard error stream.
+    ///
+    /// # Returns
+    ///
+    /// - `io::Result<()>` - The result of the flush operation.
+    #[inline(always)]
+    pub fn try_flush_stderr() -> io::Result<()> {
+        stderr().flush()
+    }
+
+    /// Flushes the standard error stream.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the flush operation fails.
+    #[inline(always)]
+    pub fn flush_stderr() {
+        stderr().flush().unwrap();
+    }
+
+    /// Flushes both the standard output and error streams.
+    ///
+    /// # Returns
+    ///
+    /// - `io::Result<()>` - The result of the flush operation.
+    #[inline(always)]
+    pub fn try_flush_stdout_and_stderr() -> io::Result<()> {
+        Self::try_flush_stdout()?;
+        Self::try_flush_stderr()
+    }
+
+    /// Flushes both the standard output and error streams.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if either flush operation fails.
+    #[inline(always)]
+    pub fn flush_stdout_and_stderr() {
+        Self::flush_stdout();
+        Self::flush_stderr();
     }
 
     /// Handles a panic that has been captured and associated with a specific request `Context`.
@@ -4330,6 +4774,7 @@ impl Server {
                 && join_error.is_panic()
             {
                 eprintln!("Panic occurred in panic hook: {:?}", join_error);
+                let _ = Self::try_flush_stdout_and_stderr();
             }
             if ctx.get_aborted().await {
                 return;
@@ -4347,6 +4792,8 @@ impl Server {
     /// - `JoinError` - The `JoinError` returned from the panicked task.
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
         let panic: Panic = Panic::from_join_error(join_error);
+        ctx.set_response_status_code(HttpStatus::InternalServerError.code())
+            .await;
         self.handle_panic_with_context(ctx, &panic).await;
     }
 
@@ -4404,12 +4851,12 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// Returns a `ServerResult` containing the bound `TcpListener` on success,
-    /// or a `ServerError` on failure.
-    async fn create_tcp_listener(&self) -> ServerResult<TcpListener> {
+    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,
+    ///   or a `ServerError` on failure.
+    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
         let config: ServerConfigInner = self.read().await.get_config().clone();
         let host: String = config.get_host().clone();
-        let port: usize = *config.get_port();
+        let port: u16 = *config.get_port();
         let addr: String = Self::format_host_port(host, port);
         TcpListener::bind(&addr)
             .await
@@ -4424,9 +4871,9 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// - `ServerResult<()>` - A `ServerResult` which is typically `Ok(())` unless an unrecoverable
+    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable
     ///   error occurs.
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> ServerResult<()> {
+    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
@@ -4445,14 +4892,11 @@ impl Server {
     async fn configure_stream(&self, stream: &TcpStream) {
         let server_inner: ServerStateReadGuard = self.read().await;
         let config: &ServerConfigInner = server_inner.get_config();
-        let linger_opt: &OptionDuration = config.get_linger();
-        let nodelay_opt: &OptionBool = config.get_nodelay();
-        let ttl_opt: &OptionU32 = config.get_ttl();
-        let _ = stream.set_linger(*linger_opt);
-        if let Some(nodelay) = nodelay_opt {
+        stream.set_linger(*config.get_linger()).unwrap();
+        if let Some(nodelay) = config.get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
-        if let Some(ttl) = ttl_opt {
+        if let Some(ttl) = config.get_ttl() {
             let _ = stream.set_ttl(*ttl);
         }
     }
@@ -4464,9 +4908,9 @@ impl Server {
     /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
-        let buffer: usize = *self.read().await.get_config().get_buffer();
+        let request_config: RequestConfig = *self.read().await.get_config().get_request_config();
         spawn(async move {
-            server.handle_connection(stream, buffer).await;
+            server.handle_connection(stream, request_config).await;
         });
     }
 
@@ -4477,12 +4921,18 @@ impl Server {
     /// # Arguments
     ///
     /// - `ArcRwLockStream` - The stream for the client connection.
-    /// - `usize` - The buffer size to use for reading the initial HTTP request.
-    async fn handle_connection(&self, stream: ArcRwLockStream, buffer: usize) {
-        if let Ok(request) = Request::http_from_stream(&stream, buffer).await {
-            let ctx: Context = Context::create_context(&stream, &request);
-            let handler: HandlerState = HandlerState::new(stream, ctx, buffer);
-            self.handle_http_requests(&handler, &request).await;
+    /// - `request_config` - The request config to use for reading the initial HTTP request.
+    async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfig) {
+        match Request::http_from_stream(&stream, &request_config).await {
+            Ok(request) => {
+                let ctx: Context = Context::new(&stream, &request);
+                let handler: HandlerState = HandlerState::new(stream, ctx, request_config);
+                self.handle_http_requests(&handler, &request).await;
+            }
+            Err(err) => {
+                let ctx: Context = Context::new(&stream, &Request::default());
+                self.handle_http_requests_error(&ctx, &err).await;
+            }
         }
     }
 
@@ -4514,6 +4964,8 @@ impl Server {
             return lifecycle.keep_alive();
         }
         if let Some(panic) = ctx.try_get_panic().await {
+            ctx.set_response_status_code(HttpStatus::InternalServerError.code())
+                .await;
             self.handle_panic_with_context(ctx, &panic).await;
         }
         lifecycle.keep_alive()
@@ -4530,12 +4982,35 @@ impl Server {
             return;
         }
         let stream: &ArcRwLockStream = state.get_stream();
-        let buffer: usize = *state.get_buffer();
-        while let Ok(new_request) = &Request::http_from_stream(stream, buffer).await {
-            if !self.request_hook(state, new_request).await {
-                return;
+        let request_config: RequestConfig = *state.get_request_config();
+        loop {
+            match Request::http_from_stream(stream, &request_config).await {
+                Ok(new_request) => {
+                    if !self.request_hook(state, &new_request).await {
+                        return;
+                    }
+                }
+                Err(err) => {
+                    Self::flush_stdout_and_stderr();
+                    self.handle_http_requests_error(state.get_ctx(), &err).await;
+                    break;
+                }
             }
         }
+    }
+
+    /// Handles errors that occur while processing HTTP requests.
+    ///
+    /// # Arguments
+    ///
+    /// - `&Context` - The request context.
+    /// - `&RequestError` - The error that occurred.
+    pub async fn handle_http_requests_error(&self, ctx: &Context, err: &RequestError) {
+        let mut panic: Panic = Panic::default();
+        panic.set_message(Some(err.to_string()));
+        ctx.set_response_status_code(err.get_http_status_code())
+            .await;
+        self.handle_panic_with_context(ctx, &panic).await;
     }
 
     /// Executes trait-based request middleware in sequence.
@@ -4580,8 +5055,13 @@ impl Server {
         path: &str,
         lifecycle: &mut RequestLifecycle,
     ) -> bool {
-        let route_matcher: RouteMatcher = self.read().await.get_route_matcher().clone();
-        if let Some(handler) = route_matcher.try_resolve_route(ctx, path).await {
+        if let Some(handler) = self
+            .read()
+            .await
+            .get_route_matcher()
+            .try_resolve_route(ctx, path)
+            .await
+        {
             self.handle_route_matcher_with_lifecycle(ctx, lifecycle, &handler)
                 .await;
             if lifecycle.is_aborted() {
@@ -4623,10 +5103,10 @@ impl Server {
     ///
     /// # Returns
     ///
-    /// Returns a `ServerResult` containing a shutdown function on success.
+    /// Returns a `Result` containing a shutdown function on success.
     /// Calling this function will shut down the server by aborting its main task.
     /// Returns an error if the server fails to start.
-    pub async fn run(&self) -> ServerResult<ServerControlHook> {
+    pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
         let server: Server = self.clone();
         let (wait_sender, wait_receiver) = channel(());
@@ -4668,7 +5148,8 @@ pub(crate) mod r#struct;
 pub(crate) mod r#type;
 
 pub use r#struct::*;
-pub use r#type::*;
+
+pub(crate) use r#type::*;
 
 ```
 
@@ -4685,14 +5166,11 @@ use crate::*;
 #[derive(Clone, CustomDebug, DisplayDebug, Getter)]
 pub(crate) struct HandlerState {
     /// A reference to the underlying network stream for the connection.
-    /// This provides access to the raw TCP stream for reading and writing data.
     pub(super) stream: ArcRwLockStream,
     /// A reference to the context of the current request.
-    /// This contains request-specific information, such as headers, method, and URI.
     pub(super) ctx: Context,
-    /// The size of the buffer used for reading HTTP requests.
-    /// This is used to determine the maximum size of the request body.
-    pub(super) buffer: usize,
+    /// The request config for the current connection.
+    pub(super) request_config: RequestConfig,
 }
 
 /// Represents the internal, mutable state of the web server.
@@ -4749,26 +5227,21 @@ pub struct Server(#[get(pub(super))] pub(super) SharedServerState);
 ```rust
 use crate::*;
 
-/// A type alias for server operation result.
-///
-/// This is commonly used throughout the server's public-facing API.
-pub type ServerResult<T> = Result<T, ServerError>;
-/// A type alias for task join result.
-///
-/// This is used when waiting for asynchronous tasks to complete.
-pub type TaskJoinResult<T> = Result<T, JoinError>;
 /// A type alias for shared server state.
 ///
 /// This is the core mechanism for sharing server state across threads.
 pub(crate) type SharedServerState = ArcRwLock<ServerInner>;
+
 /// A type alias for shared server configuration.
 ///
 /// This is the core mechanism for sharing server config state across threads.
 pub(crate) type SharedServerConfig = ArcRwLock<ServerConfigInner>;
+
 /// A type alias for server state read guard.
 ///
 /// This provides read-only access to the server's internal state.
 pub(crate) type ServerStateReadGuard<'a> = RwLockReadGuard<'a, ServerInner>;
+
 /// A type alias for server state write guard.
 ///
 /// This provides mutable access to the server's internal state.
@@ -4832,9 +5305,7 @@ async fn run_set_func() {
     let ctx: Context = Context::default();
     const KEY: &str = "string";
     const PARAM: &str = "test";
-    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| {
-        return msg.to_string();
-    };
+    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
     ctx.set_attribute(KEY, func).await;
     let get_key: &(dyn Fn(&str) -> String + Send + Sync) =
         ctx.try_get_attribute(KEY).await.unwrap();
@@ -4864,7 +5335,21 @@ async fn config_from_str() {
         {
             "host": "0.0.0.0",
             "port": 80,           
-            "buffer": 4096,
+            "request_config": {
+                "buffer_size": 8192,
+                "max_request_line_length": 8192,
+                "max_path_length": 8192,
+                "max_query_length": 8192,
+                "max_header_line_length": 8192,
+                "max_header_count": 100,
+                "max_header_key_length": 8192,
+                "max_header_value_length": 8192,
+                "max_body_size": 2097152,
+                "max_ws_frame_size": 65536,
+                "max_ws_frames": 6000,
+                "http_read_timeout_ms": 6000,
+                "ws_read_timeout_ms": 6000
+            },
             "nodelay": true,
             "linger": { "secs": 64, "nanos": 0 },
             "ttl": 64
@@ -4874,7 +5359,7 @@ async fn config_from_str() {
     let new_config: ServerConfig = ServerConfig::new().await;
     new_config.host("0.0.0.0").await;
     new_config.port(80).await;
-    new_config.buffer(4096).await;
+    new_config.request_config(RequestConfig::default()).await;
     new_config.enable_nodelay().await;
     new_config.linger(Some(Duration::from_secs(64))).await;
     new_config.ttl(64).await;
@@ -4915,9 +5400,9 @@ async fn context_route_params() {
     let mut params: RouteParams = RouteParams::default();
     params.insert("id".to_string(), "123".to_string());
     ctx.set_route_params(params).await;
-    let id: OptionString = ctx.try_get_route_param("id").await;
+    let id: Option<String> = ctx.try_get_route_param("id").await;
     assert_eq!(id, Some("123".to_string()));
-    let name: OptionString = ctx.try_get_route_param("name").await;
+    let name: Option<String> = ctx.try_get_route_param("name").await;
     assert_eq!(name, None);
 }
 
@@ -5107,7 +5592,7 @@ where
     F: Fn() -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    let result: TaskJoinResult<_> = spawn(future_factory()).await;
+    let result: Result<(), JoinError> = spawn(future_factory()).await;
     assert!(
         result.is_err(),
         "Expected panic, but task completed successfully"
@@ -5118,7 +5603,7 @@ where
     }
     let panic_payload: Box<dyn Any + Send> = join_err.into_panic();
     let panic_msg: &str = if let Some(s) = panic_payload.downcast_ref::<&str>() {
-        *s
+        s
     } else if let Some(s) = panic_payload.downcast_ref::<String>() {
         s.as_str()
     } else {
@@ -5269,7 +5754,7 @@ async fn mixed_route_types() {
 
 #[tokio::test]
 async fn large_dynamic_routes() {
-    const ROUTE_COUNT: usize = 1000;
+    const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -5296,13 +5781,13 @@ async fn large_dynamic_routes() {
     );
     println!(
         "Average per dynamic route match: {:?}",
-        match_duration / ROUTE_COUNT as u32
+        match_duration / ROUTE_COUNT
     );
 }
 
 #[tokio::test]
 async fn large_regex_routes() {
-    const ROUTE_COUNT: usize = 1000;
+    const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -5329,13 +5814,13 @@ async fn large_regex_routes() {
     );
     println!(
         "Average per regex route match: {:?}",
-        match_duration / ROUTE_COUNT as u32
+        match_duration / ROUTE_COUNT
     );
 }
 
 #[tokio::test]
 async fn large_tail_regex_routes() {
-    const ROUTE_COUNT: usize = 1000;
+    const ROUTE_COUNT: u32 = 1000;
     let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
@@ -5362,7 +5847,7 @@ async fn large_tail_regex_routes() {
     );
     println!(
         "Average per tail regex route match: {:?}",
-        match_duration / ROUTE_COUNT as u32
+        match_duration / ROUTE_COUNT
     );
 }
 
@@ -5487,7 +5972,7 @@ async fn test_server() {
         }
 
         async fn handle(self, ctx: &Context) {
-            ctx.set_response_version(HttpVersion::HTTP1_1)
+            ctx.set_response_version(HttpVersion::Http1_1)
                 .await
                 .set_response_status_code(200)
                 .await
@@ -5515,7 +6000,9 @@ async fn test_server() {
             }
             if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
                 let accept_key: String = WebSocketFrame::generate_accept_key(key);
-                ctx.set_response_status_code(101)
+                ctx.set_response_version(HttpVersion::Http1_1)
+                    .await
+                    .set_response_status_code(101)
                     .await
                     .set_response_header(UPGRADE, WEBSOCKET)
                     .await
@@ -5586,10 +6073,20 @@ async fn test_server() {
         }
 
         async fn handle(self, ctx: &Context) {
-            while ctx.ws_from_stream(4096).await.is_ok() {
-                let request_body: Vec<u8> = ctx.get_request_body().await;
-                ctx.set_response_body(&request_body).await;
-                self.send_body_hook(ctx).await;
+            loop {
+                match ctx.ws_from_stream(RequestConfig::default()).await {
+                    Ok(_) => {
+                        let request_body: Vec<u8> = ctx.get_request_body().await;
+                        ctx.set_response_body(&request_body).await;
+                        self.send_body_hook(ctx).await;
+                        continue;
+                    }
+                    Err(err) => {
+                        ctx.set_response_body(&err.to_string()).await;
+                        self.send_body_hook(ctx).await;
+                        break;
+                    }
+                }
             }
         }
     }
@@ -5643,6 +6140,8 @@ async fn test_server() {
 
         async fn handle(self, ctx: &Context) {
             let _ = ctx
+                .set_response_version(HttpVersion::Http1_1)
+                .await
                 .set_response_status_code(500)
                 .await
                 .clear_response_headers()
@@ -5662,7 +6161,7 @@ async fn test_server() {
         let config: ServerConfig = ServerConfig::new().await;
         config.host("0.0.0.0").await;
         config.port(60000).await;
-        config.buffer(4096).await;
+        config.request_config(RequestConfig::default()).await;
         config.disable_linger().await;
         config.disable_nodelay().await;
         let server: Server = Server::from(config).await;
@@ -5935,14 +6434,19 @@ use crate::*;
 
 /// Represents the number of active receivers subscribed to a broadcast channel.
 pub type ReceiverCount = usize;
+
 /// Represents an error that occurs when attempting to send a message via broadcast.
 pub type BroadcastSendError<T> = SendError<T>;
+
 /// Represents the result of a broadcast send operation, indicating either success with the number of receivers or an error.
 pub type BroadcastSendResult<T> = Result<ReceiverCount, BroadcastSendError<T>>;
+
 /// Represents a receiver endpoint for a broadcast channel, allowing consumption of broadcasted messages.
 pub type BroadcastReceiver<T> = Receiver<T>;
+
 /// Represents a sender endpoint for a broadcast channel, used to dispatch messages to all subscribed receivers.
 pub type BroadcastSender<T> = Sender<T>;
+
 /// Represents the maximum capacity or buffer size of a broadcast channel.
 pub type Capacity = usize;
 
@@ -6148,20 +6652,28 @@ use crate::*;
 
 /// Represents an error that occurs when attempting to send a message via a broadcast channel within a map.
 pub type BroadcastMapSendError<T> = SendError<T>;
+
 /// Represents the result of a broadcast map send operation, indicating either success with an optional receiver count or an error.
 pub type BroadcastMapSendResult<T> = Result<Option<ReceiverCount>, BroadcastMapSendError<T>>;
+
 /// Represents a receiver endpoint for a broadcast channel within a map, allowing consumption of broadcasted messages.
 pub type BroadcastMapReceiver<T> = Receiver<T>;
+
 /// Represents an optional broadcast channel.
 pub type OptionBroadcast<T> = Option<Broadcast<T>>;
+
 /// Represents an optional receiver endpoint for a broadcast channel within a map.
 pub type OptionBroadcastMapReceiver<T> = Option<BroadcastMapReceiver<T>>;
+
 /// Represents a sender endpoint for a broadcast channel within a map, used to dispatch messages.
 pub type BroadcastMapSender<T> = Sender<T>;
+
 /// Represents an optional sender endpoint for a broadcast channel within a map.
 pub type OptionBroadcastMapSender<T> = Option<BroadcastMapSender<T>>;
+
 /// Represents an optional count of active receivers.
 pub type OptionReceiverCount = Option<ReceiverCount>;
+
 /// A concurrent, thread-safe map where keys are strings and values are broadcast channels.
 pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDefault<XxHash3_64>>;
 
@@ -6273,34 +6785,34 @@ async fn test() {
     let log: Log = Log::new("./logs", 1_024_000);
     let error_str: String = String::from("custom error message");
     log.error(error_str, |error| {
-        let write_data: String = format!("User error func => {:?}\n", error);
+        let write_data: String = format!("User error func => {error:?}\n");
         write_data
     });
     let info_str: String = String::from("custom info message");
     log.info(info_str, |info| {
-        let write_data: String = format!("User info func => {:?}\n", info);
+        let write_data: String = format!("User info func => {info:?}\n");
         write_data
     });
     let debug_str: String = String::from("custom debug message");
     log.debug(debug_str, |debug| {
-        let write_data: String = format!("User debug func => {:#?}\n", debug);
+        let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     });
     let async_error_str: String = String::from("custom async error message");
     log.async_error(async_error_str, |error| {
-        let write_data: String = format!("User error func => {:?}\n", error);
+        let write_data: String = format!("User error func => {error:?}\n");
         write_data
     })
     .await;
     let async_info_str: String = String::from("custom async info message");
     log.async_info(async_info_str, |info| {
-        let write_data: String = format!("User info func => {:?}\n", info);
+        let write_data: String = format!("User info func => {info:?}\n");
         write_data
     })
     .await;
     let async_debug_str: String = String::from("custom async debug message");
     log.async_debug(async_debug_str, |debug| {
-        let write_data: String = format!("User debug func => {:#?}\n", debug);
+        let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     })
     .await;
@@ -6312,29 +6824,29 @@ async fn test_more_log_first() {
     use crate::*;
     let log: Log = Log::new("./logs", DISABLE_LOG_FILE_SIZE);
     log.error("error data => ", |error| {
-        let write_data: String = format!("User error func => {:?}\n", error);
+        let write_data: String = format!("User error func => {error:?}\n");
         write_data
     });
     log.info("info data => ", |info| {
-        let write_data: String = format!("User info func => {:?}\n", info);
+        let write_data: String = format!("User info func => {info:?}\n");
         write_data
     });
     log.debug("debug data => ", |debug| {
-        let write_data: String = format!("User debug func => {:#?}\n", debug);
+        let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     });
     log.async_error("async error data => ", |error| {
-        let write_data: String = format!("User error func => {:?}\n", error);
+        let write_data: String = format!("User error func => {error:?}\n");
         write_data
     })
     .await;
     log.async_info("async info data => ", |info| {
-        let write_data: String = format!("User info func => {:?}\n", info);
+        let write_data: String = format!("User info func => {info:?}\n");
         write_data
     })
     .await;
     log.async_debug("async debug data => ", |debug| {
-        let write_data: String = format!("User debug func => {:#?}\n", debug);
+        let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     })
     .await;
@@ -6388,24 +6900,34 @@ pub(crate) use std::{
 ```rust
 /// Default directory path for storing log files.
 pub const DEFAULT_LOG_DIR: &str = "./logs";
+
 /// Subdirectory name for error logs.
 pub const ERROR_DIR: &str = "error";
+
 /// Subdirectory name for info logs.
 pub const INFO_DIR: &str = "info";
+
 /// Subdirectory name for debug logs.
 pub const DEBUG_DIR: &str = "debug";
+
 /// File extension for log files.
 pub const LOG_EXTENSION: &str = "log";
+
 /// Default starting index number for log files.
 pub const DEFAULT_LOG_FILE_START_IDX: usize = 1;
+
 /// Default maximum size limit for log files in bytes.
 pub const DEFAULT_LOG_FILE_SIZE: usize = 1_024_000_000;
+
 /// Special value indicating no size limit for log files.
 pub const DISABLE_LOG_FILE_SIZE: usize = 0;
+
 /// Root path symbol.
 pub(crate) const ROOT_PATH: &str = "/";
+
 /// Dot symbol.
 pub(crate) const POINT: &str = ".";
+
 /// Line break symbol.
 pub(crate) const BR: &str = "\n";
 
@@ -6860,14 +7382,19 @@ use crate::*;
 
 /// A collection of named log formatting functions.
 pub type ListLog<T> = Vec<(String, ArcLogFunc<T>)>;
+
 /// Thread-safe shared reference to a collection of log functions.
 pub type LogListArcLock<T> = Arc<RwLock<ListLog<T>>>;
+
 /// Thread-safe shared reference to a Log configuration instance.
 pub type LogArcLock = Arc<RwLock<Log>>;
+
 /// Trait object representing a log formatting function.
 pub type LogFunc<T> = dyn LogFuncTrait<T>;
+
 /// Thread-safe shared reference to a log formatting function.
 pub type ArcLogFunc<T> = Arc<LogFunc<T>>;
+
 /// Thread-safe shared reference to a Log configuration.
 pub type ArcLog = Arc<Log>;
 
@@ -6968,6 +7495,8 @@ cargo add hyperlane-macros
 
 ### Attribute Macros
 
+- `#[attribute_option(key => variable_name: type)]` - Extract a specific attribute by key into a typed variable
+- `#[attribute_option("key1" => var1: Type1, "key2" => var2: Type2, ...)]` - Supports multiple attribute extraction
 - `#[attribute(key => variable_name: type)]` - Extract a specific attribute by key into a typed variable
 - `#[attribute("key1" => var1: Type1, "key2" => var2: Type2, ...)]` - Supports multiple attribute extraction
 
@@ -6978,6 +7507,8 @@ cargo add hyperlane-macros
 
 ### Route Param Macros
 
+- `#[route_param_option(key => variable_name)]` - Extract a specific route parameter by key into a variable
+- `#[route_param_option("key1" => var1, "key2" => var2, ...)]` - Supports multiple route parameter extraction
 - `#[route_param(key => variable_name)]` - Extract a specific route parameter by key into a variable
 - `#[route_param("key1" => var1, "key2" => var2, ...)]` - Supports multiple route parameter extraction
 
@@ -6988,6 +7519,8 @@ cargo add hyperlane-macros
 
 ### Request Query Macros
 
+- `#[request_query_option(key => variable_name)]` - Extract a specific query parameter by key from the URL query string
+- `#[request_query_option("key1" => var1, "key2" => var2, ...)]` - Supports multiple query parameter extraction
 - `#[request_query(key => variable_name)]` - Extract a specific query parameter by key from the URL query string
 - `#[request_query("key1" => var1, "key2" => var2, ...)]` - Supports multiple query parameter extraction
 
@@ -6998,6 +7531,8 @@ cargo add hyperlane-macros
 
 ### Request Header Macros
 
+- `#[request_header_option(key => variable_name)]` - Extract a specific HTTP header by name from the request
+- `#[request_header_option(KEY1 => var1, KEY2 => var2, ...)]` - Supports multiple header extraction
 - `#[request_header(key => variable_name)]` - Extract a specific HTTP header by name from the request
 - `#[request_header(KEY1 => var1, KEY2 => var2, ...)]` - Supports multiple header extraction
 
@@ -7008,6 +7543,8 @@ cargo add hyperlane-macros
 
 ### Request Cookie Macros
 
+- `#[request_cookie_option(key => variable_name)]` - Extract a specific cookie value by key from the request cookie header
+- `#[request_cookie_option("key1" => var1, "key2" => var2, ...)]` - Supports multiple cookie extraction
 - `#[request_cookie(key => variable_name)]` - Extract a specific cookie value by key from the request cookie header
 - `#[request_cookie("key1" => var1, "key2" => var2, ...)]` - Supports multiple cookie extraction
 
@@ -7059,16 +7596,16 @@ cargo add hyperlane-macros
 
 ### Stream Processing Macros
 
-- `#[http_from_stream]` - Wraps function body with HTTP stream processing, using default buffer size. The function body only executes if data is successfully read from the HTTP stream.
-- `#[http_from_stream(buffer_size)]` - Wraps function body with HTTP stream processing using specified buffer size.
+- `#[http_from_stream]` - Wraps function body with HTTP stream processing, using default request config. The function body only executes if data is successfully read from the HTTP stream.
+- `#[http_from_stream(request_config)]` - Wraps function body with HTTP stream processing using specified request config.
 - `#[http_from_stream(variable_name)]` - Wraps function body with HTTP stream processing, storing data in specified variable name.
-- `#[http_from_stream(buffer_size, variable_name)]` - Wraps function body with HTTP stream processing using specified buffer size and variable name.
-- `#[http_from_stream(variable_name, buffer_size)]` - Wraps function body with HTTP stream processing using specified variable name and buffer size (reversed order).
-- `#[ws_from_stream]` - Wraps function body with WebSocket stream processing, using default buffer size. The function body only executes if data is successfully read from the WebSocket stream.
-- `#[ws_from_stream(buffer_size)]` - Wraps function body with WebSocket stream processing using specified buffer size.
+- `#[http_from_stream(request_config, variable_name)]` - Wraps function body with HTTP stream processing using specified request config and variable name.
+- `#[http_from_stream(variable_name, request_config)]` - Wraps function body with HTTP stream processing using specified variable name and request config (reversed order).
+- `#[ws_from_stream]` - Wraps function body with WebSocket stream processing, using default request config. The function body only executes if data is successfully read from the WebSocket stream.
+- `#[ws_from_stream(request_config)]` - Wraps function body with WebSocket stream processing using specified request config.
 - `#[ws_from_stream(variable_name)]` - Wraps function body with WebSocket stream processing, storing data in specified variable name.
-- `#[ws_from_stream(buffer_size, variable_name)]` - Wraps function body with WebSocket stream processing using specified buffer size and variable name.
-- `#[ws_from_stream(variable_name, buffer_size)]` - Wraps function body with WebSocket stream processing using specified variable name and buffer size (reversed order).
+- `#[ws_from_stream(request_config, variable_name)]` - Wraps function body with WebSocket stream processing using specified request config and variable name.
+- `#[ws_from_stream(variable_name, request_config)]` - Wraps function body with WebSocket stream processing using specified variable name and request config (reversed order).
 
 ### Response Header Macros
 
@@ -7121,7 +7658,12 @@ impl ServerHook for PanicHook {
         Self
     }
 
-    #[epilogue_macros(response_body("panic_hook"), send)]
+    #[epilogue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(500),
+        response_body("panic_hook"),
+        send
+    )]
     async fn handle(self, ctx: &Context) {}
 }
 
@@ -7134,8 +7676,8 @@ impl ServerHook for RequestMiddleware {
     }
 
     #[epilogue_macros(
+        response_version(HttpVersion::Http1_1),
         response_status_code(200),
-        response_version(HttpVersion::HTTP1_1),
         response_header(SERVER => HYPERLANE),
         response_header(CONNECTION => KEEP_ALIVE),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
@@ -7176,7 +7718,7 @@ impl ServerHook for ConnectedHook {
 
     #[response_status_code(200)]
     #[response_header(SERVER => HYPERLANE)]
-    #[response_version(HttpVersion::HTTP1_1)]
+    #[response_version(HttpVersion::Http1_1)]
     #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
     #[response_header(STEP => "connected_hook")]
     async fn handle(self, ctx: &Context) {}
@@ -7549,7 +8091,7 @@ impl ServerHook for Websocket3 {
     }
 
     #[ws]
-    #[ws_from_stream(1024, request)]
+    #[ws_from_stream(RequestConfig::default(), request)]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
@@ -7566,7 +8108,7 @@ impl ServerHook for Websocket4 {
     }
 
     #[ws]
-    #[ws_from_stream(request, 1024)]
+    #[ws_from_stream(request, RequestConfig::default())]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
@@ -7583,7 +8125,7 @@ impl ServerHook for Websocket5 {
     }
 
     #[ws]
-    #[ws_from_stream(1024)]
+    #[ws_from_stream(RequestConfig::default())]
     async fn handle(self, ctx: &Context) {
         let body: RequestBody = ctx.get_request_body().await;
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -7650,6 +8192,20 @@ impl ServerHook for RouteParams {
     async fn handle(self, ctx: &Context) {}
 }
 
+#[route("/route_param_option/:test")]
+struct RouteParamOption;
+
+impl ServerHook for RouteParamOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("route param: {request_route_param_option1:?} {request_route_param_option2:?} {request_route_param_option3:?}"))]
+    #[route_param_option("test1" => request_route_param_option1)]
+    #[route_param_option("test2" => request_route_param_option2, "test3" => request_route_param_option3)]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/route_param/:test")]
 struct RouteParam;
 
@@ -7658,9 +8214,9 @@ impl ServerHook for RouteParam {
         Self
     }
 
-    #[response_body(&format!("route param: {request_route_param:?} {request_route_param1:?} {request_route_param2:?}"))]
-    #[route_param("test" => request_route_param)]
-    #[route_param("test1" => request_route_param1, "test2" => request_route_param2)]
+    #[response_body(&format!("route param: {request_route_param1} {request_route_param2} {request_route_param3}"))]
+    #[route_param("test1" => request_route_param1)]
+    #[route_param("test2" => request_route_param2, "test3" => request_route_param3)]
     async fn handle(self, ctx: &Context) {}
 }
 
@@ -7682,6 +8238,28 @@ impl ServerHook for Host {
     async fn handle(self, ctx: &Context) {}
 }
 
+#[route("/request_query_option")]
+struct RequestQueryOption;
+
+impl ServerHook for RequestQueryOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_query_option("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send,
+        http_from_stream(RequestConfig::default())
+    )]
+    #[prologue_macros(
+        request_query_option("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/request_query")]
 struct RequestQuery;
 
@@ -7691,14 +8269,36 @@ impl ServerHook for RequestQuery {
     }
 
     #[epilogue_macros(
-        request_query("test" => request_query_option),
-        response_body(&format!("request query: {request_query_option:?}")),
+        request_query("test" => request_query),
+        response_body(&format!("request query: {request_query}")),
         send,
-        http_from_stream(1024)
+        http_from_stream(RequestConfig::default())
     )]
     #[prologue_macros(
-        request_query("test" => request_query_option),
-        response_body(&format!("request query: {request_query_option:?}")),
+        request_query("test" => request_query),
+        response_body(&format!("request query: {request_query}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+
+#[route("/request_header_option")]
+struct RequestHeaderOption;
+
+impl ServerHook for RequestHeaderOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_header_option(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
+        send,
+        http_from_stream(_request)
+    )]
+    #[prologue_macros(
+        request_header_option(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
         send
     )]
     async fn handle(self, ctx: &Context) {}
@@ -7713,14 +8313,14 @@ impl ServerHook for RequestHeader {
     }
 
     #[epilogue_macros(
-        request_header(HOST => request_header_option),
-        response_body(&format!("request header: {request_header_option:?}")),
+        request_header(HOST => request_header),
+        response_body(&format!("request header: {request_header}")),
         send,
         http_from_stream(_request)
     )]
     #[prologue_macros(
-        request_header(HOST => request_header_option),
-        response_body(&format!("request header: {request_header_option:?}")),
+        request_header(HOST => request_header),
+        response_body(&format!("request header: {request_header}")),
         send
     )]
     async fn handle(self, ctx: &Context) {}
@@ -7738,7 +8338,7 @@ impl ServerHook for RequestQuerys {
         request_querys(request_querys),
         response_body(&format!("request querys: {request_querys:?}")),
         send,
-        http_from_stream(1024, _request)
+        http_from_stream(RequestConfig::default(), _request)
     )]
     #[prologue_macros(
         request_querys(request_querys),
@@ -7760,7 +8360,7 @@ impl ServerHook for RequestHeaders {
         request_headers(request_headers),
         response_body(&format!("request headers: {request_headers:?}")),
         send,
-        http_from_stream(_request, 1024)
+        http_from_stream(_request, RequestConfig::default())
     )]
     #[prologue_macros(
         request_headers(request_headers),
@@ -7798,6 +8398,19 @@ impl ServerHook for RejectHost {
     async fn handle(self, ctx: &Context) {}
 }
 
+#[route("/attribute_option")]
+struct AttributeOption;
+
+impl ServerHook for AttributeOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
+    #[attribute_option(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/attribute")]
 struct Attribute;
 
@@ -7806,8 +8419,21 @@ impl ServerHook for Attribute {
         Self
     }
 
-    #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
-    #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+    #[response_body(&format!("request attribute: {request_attribute:?}"))]
+    #[attribute(TEST_ATTRIBUTE_KEY => request_attribute: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+#[route("/request_body_json_result")]
+struct RequestBodyJsonResult;
+
+impl ServerHook for RequestBodyJsonResult {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request data: {request_data_result:?}"))]
+    #[request_body_json_result(request_data_result: TestData)]
     async fn handle(self, ctx: &Context) {}
 }
 
@@ -7867,7 +8493,20 @@ impl ServerHook for Cookies {
     async fn handle(self, ctx: &Context) {}
 }
 
-#[route("/cookie")]
+#[route("/request_cookie_option")]
+struct CookieOption;
+
+impl ServerHook for CookieOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
+    #[request_cookie_option("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+#[route("/request_cookie")]
 struct Cookie;
 
 impl ServerHook for Cookie {
@@ -7875,8 +8514,8 @@ impl ServerHook for Cookie {
         Self
     }
 
-    #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
-    #[request_cookie("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
+    #[response_body(&format!("Session cookie: {session_cookie1}, {session_cookie2}"))]
+    #[request_cookie("test1" => session_cookie1, "test2" => session_cookie2)]
     async fn handle(self, ctx: &Context) {}
 }
 
@@ -8039,7 +8678,7 @@ impl ServerHook for InjectHttpStream {
 }
 
 impl InjectHttpStream {
-    #[http_from_stream(1024, _request)]
+    #[http_from_stream(RequestConfig::default(), _request)]
     async fn http_stream_handler_with_ref_self(&self, _ctx: &Context) {}
 }
 
@@ -8151,8 +8790,8 @@ impl ServerHook for User {
         request_body_json(user1: User, user2: User),
         response_body(format!(
             "user1: {:?}, user2: {:?}",
-            user1.unwrap().name,
-            user2.unwrap().name
+            user1.name,
+            user2.name
         )),
         send
     )]
@@ -8269,7 +8908,12 @@ impl ServerHook for PanicHook {
         Self
     }
 
-    #[epilogue_macros(response_body("panic_hook"), send)]
+    #[epilogue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(500),
+        response_body("panic_hook"),
+        send
+    )]
     async fn handle(self, ctx: &Context) {}
 }
 
@@ -8282,8 +8926,8 @@ impl ServerHook for RequestMiddleware {
     }
 
     #[epilogue_macros(
+        response_version(HttpVersion::Http1_1),
         response_status_code(200),
-        response_version(HttpVersion::HTTP1_1),
         response_header(SERVER => HYPERLANE),
         response_header(CONNECTION => KEEP_ALIVE),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
@@ -8324,7 +8968,7 @@ impl ServerHook for ConnectedHook {
 
     #[response_status_code(200)]
     #[response_header(SERVER => HYPERLANE)]
-    #[response_version(HttpVersion::HTTP1_1)]
+    #[response_version(HttpVersion::Http1_1)]
     #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
     #[response_header(STEP => "connected_hook")]
     async fn handle(self, ctx: &Context) {}
@@ -8697,7 +9341,7 @@ impl ServerHook for Websocket3 {
     }
 
     #[ws]
-    #[ws_from_stream(1024, request)]
+    #[ws_from_stream(RequestConfig::default(), request)]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
@@ -8714,7 +9358,7 @@ impl ServerHook for Websocket4 {
     }
 
     #[ws]
-    #[ws_from_stream(request, 1024)]
+    #[ws_from_stream(request, RequestConfig::default())]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
@@ -8731,7 +9375,7 @@ impl ServerHook for Websocket5 {
     }
 
     #[ws]
-    #[ws_from_stream(1024)]
+    #[ws_from_stream(RequestConfig::default())]
     async fn handle(self, ctx: &Context) {
         let body: RequestBody = ctx.get_request_body().await;
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -8798,6 +9442,20 @@ impl ServerHook for RouteParams {
     async fn handle(self, ctx: &Context) {}
 }
 
+#[route("/route_param_option/:test")]
+struct RouteParamOption;
+
+impl ServerHook for RouteParamOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("route param: {request_route_param_option1:?} {request_route_param_option2:?} {request_route_param_option3:?}"))]
+    #[route_param_option("test1" => request_route_param_option1)]
+    #[route_param_option("test2" => request_route_param_option2, "test3" => request_route_param_option3)]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/route_param/:test")]
 struct RouteParam;
 
@@ -8806,9 +9464,9 @@ impl ServerHook for RouteParam {
         Self
     }
 
-    #[response_body(&format!("route param: {request_route_param:?} {request_route_param1:?} {request_route_param2:?}"))]
-    #[route_param("test" => request_route_param)]
-    #[route_param("test1" => request_route_param1, "test2" => request_route_param2)]
+    #[response_body(&format!("route param: {request_route_param1} {request_route_param2} {request_route_param3}"))]
+    #[route_param("test1" => request_route_param1)]
+    #[route_param("test2" => request_route_param2, "test3" => request_route_param3)]
     async fn handle(self, ctx: &Context) {}
 }
 
@@ -8830,6 +9488,28 @@ impl ServerHook for Host {
     async fn handle(self, ctx: &Context) {}
 }
 
+#[route("/request_query_option")]
+struct RequestQueryOption;
+
+impl ServerHook for RequestQueryOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_query_option("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send,
+        http_from_stream(RequestConfig::default())
+    )]
+    #[prologue_macros(
+        request_query_option("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/request_query")]
 struct RequestQuery;
 
@@ -8839,14 +9519,36 @@ impl ServerHook for RequestQuery {
     }
 
     #[epilogue_macros(
-        request_query("test" => request_query_option),
-        response_body(&format!("request query: {request_query_option:?}")),
+        request_query("test" => request_query),
+        response_body(&format!("request query: {request_query}")),
         send,
-        http_from_stream(1024)
+        http_from_stream(RequestConfig::default())
     )]
     #[prologue_macros(
-        request_query("test" => request_query_option),
-        response_body(&format!("request query: {request_query_option:?}")),
+        request_query("test" => request_query),
+        response_body(&format!("request query: {request_query}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+
+#[route("/request_header_option")]
+struct RequestHeaderOption;
+
+impl ServerHook for RequestHeaderOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[epilogue_macros(
+        request_header_option(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
+        send,
+        http_from_stream(_request)
+    )]
+    #[prologue_macros(
+        request_header_option(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
         send
     )]
     async fn handle(self, ctx: &Context) {}
@@ -8861,14 +9563,14 @@ impl ServerHook for RequestHeader {
     }
 
     #[epilogue_macros(
-        request_header(HOST => request_header_option),
-        response_body(&format!("request header: {request_header_option:?}")),
+        request_header(HOST => request_header),
+        response_body(&format!("request header: {request_header}")),
         send,
         http_from_stream(_request)
     )]
     #[prologue_macros(
-        request_header(HOST => request_header_option),
-        response_body(&format!("request header: {request_header_option:?}")),
+        request_header(HOST => request_header),
+        response_body(&format!("request header: {request_header}")),
         send
     )]
     async fn handle(self, ctx: &Context) {}
@@ -8886,7 +9588,7 @@ impl ServerHook for RequestQuerys {
         request_querys(request_querys),
         response_body(&format!("request querys: {request_querys:?}")),
         send,
-        http_from_stream(1024, _request)
+        http_from_stream(RequestConfig::default(), _request)
     )]
     #[prologue_macros(
         request_querys(request_querys),
@@ -8908,7 +9610,7 @@ impl ServerHook for RequestHeaders {
         request_headers(request_headers),
         response_body(&format!("request headers: {request_headers:?}")),
         send,
-        http_from_stream(_request, 1024)
+        http_from_stream(_request, RequestConfig::default())
     )]
     #[prologue_macros(
         request_headers(request_headers),
@@ -8946,6 +9648,19 @@ impl ServerHook for RejectHost {
     async fn handle(self, ctx: &Context) {}
 }
 
+#[route("/attribute_option")]
+struct AttributeOption;
+
+impl ServerHook for AttributeOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
+    #[attribute_option(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
+
 #[route("/attribute")]
 struct Attribute;
 
@@ -8954,8 +9669,21 @@ impl ServerHook for Attribute {
         Self
     }
 
-    #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
-    #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+    #[response_body(&format!("request attribute: {request_attribute:?}"))]
+    #[attribute(TEST_ATTRIBUTE_KEY => request_attribute: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+#[route("/request_body_json_result")]
+struct RequestBodyJsonResult;
+
+impl ServerHook for RequestBodyJsonResult {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("request data: {request_data_result:?}"))]
+    #[request_body_json_result(request_data_result: TestData)]
     async fn handle(self, ctx: &Context) {}
 }
 
@@ -9015,7 +9743,20 @@ impl ServerHook for Cookies {
     async fn handle(self, ctx: &Context) {}
 }
 
-#[route("/cookie")]
+#[route("/request_cookie_option")]
+struct CookieOption;
+
+impl ServerHook for CookieOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+
+    #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
+    #[request_cookie_option("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
+    async fn handle(self, ctx: &Context) {}
+}
+
+#[route("/request_cookie")]
 struct Cookie;
 
 impl ServerHook for Cookie {
@@ -9023,8 +9764,8 @@ impl ServerHook for Cookie {
         Self
     }
 
-    #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
-    #[request_cookie("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
+    #[response_body(&format!("Session cookie: {session_cookie1}, {session_cookie2}"))]
+    #[request_cookie("test1" => session_cookie1, "test2" => session_cookie2)]
     async fn handle(self, ctx: &Context) {}
 }
 
@@ -9187,7 +9928,7 @@ impl ServerHook for InjectHttpStream {
 }
 
 impl InjectHttpStream {
-    #[http_from_stream(1024, _request)]
+    #[http_from_stream(RequestConfig::default(), _request)]
     async fn http_stream_handler_with_ref_self(&self, _ctx: &Context) {}
 }
 
@@ -9299,8 +10040,8 @@ impl ServerHook for User {
         request_body_json(user1: User, user2: User),
         response_body(format!(
             "user1: {:?}, user2: {:?}",
-            user1.unwrap().name,
-            user2.unwrap().name
+            user1.name,
+            user2.name
         )),
         send
     )]
@@ -9443,6 +10184,7 @@ pub(crate) use route::*;
 pub(crate) use send::*;
 pub(crate) use stream::*;
 
+pub(crate) use ::hyperlane::inventory;
 pub(crate) use proc_macro::TokenStream;
 pub(crate) use proc_macro2::TokenStream as TokenStream2;
 pub(crate) use quote::quote;
@@ -9946,10 +10688,10 @@ pub fn http(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// const CUSTOM_STATUS_CODE: i32 = 200;
 ///
-/// #[route("/response")]
-/// struct Response;
+/// #[route("/response_status_code")]
+/// struct ResponseStatusCode;
 ///
-/// impl ServerHook for Response {
+/// impl ServerHook for ResponseStatusCode {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -9958,7 +10700,7 @@ pub fn http(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// impl Response {
+/// impl ResponseStatusCode {
 ///     #[response_status_code(CUSTOM_STATUS_CODE)]
 ///     async fn response_status_code_with_ref_self(&self, ctx: &Context) {}
 /// }
@@ -9987,10 +10729,10 @@ pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream
 ///
 /// const CUSTOM_REASON: &str = "Accepted";
 ///
-/// #[route("/response")]
-/// struct Response;
+/// #[route("/response_reason")]
+/// struct ResponseReason;
 ///
-/// impl ServerHook for Response {
+/// impl ServerHook for ResponseReason {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -9999,7 +10741,7 @@ pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// impl Response {
+/// impl ResponseReason {
 ///     #[response_reason_phrase(CUSTOM_REASON)]
 ///     async fn response_reason_phrase_with_ref_self(&self, ctx: &Context) {}
 /// }
@@ -10030,10 +10772,10 @@ pub fn response_reason_phrase(attr: TokenStream, item: TokenStream) -> TokenStre
 /// const CUSTOM_HEADER_NAME: &str = "X-Custom-Header";
 /// const CUSTOM_HEADER_VALUE: &str = "custom-value";
 ///
-/// #[route("/response")]
-/// struct Response;
+/// #[route("/response_header")]
+/// struct ResponseHeader;
 ///
-/// impl ServerHook for Response {
+/// impl ServerHook for ResponseHeader {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -10042,7 +10784,7 @@ pub fn response_reason_phrase(attr: TokenStream, item: TokenStream) -> TokenStre
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// impl Response {
+/// impl ResponseHeader {
 ///     #[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
 ///     async fn response_header_with_ref_self(&self, ctx: &Context) {}
 /// }
@@ -10086,10 +10828,10 @@ pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// const RESPONSE_DATA: &str = "{\"status\": \"success\"}";
 ///
-/// #[route("/response")]
-/// struct Response;
+/// #[route("/response_body")]
+/// struct ResponseBody;
 ///
-/// impl ServerHook for Response {
+/// impl ServerHook for ResponseBody {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -10098,7 +10840,7 @@ pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// impl Response {
+/// impl ResponseBody {
 ///     #[response_body(&RESPONSE_DATA)]
 ///     async fn response_body_with_ref_self(&self, ctx: &Context) {}
 /// }
@@ -10124,10 +10866,10 @@ pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/unknown_method")]
-/// struct UnknownMethod;
+/// #[route("/clear_response_headers")]
+/// struct ClearResponseHeaders;
 ///
-/// impl ServerHook for UnknownMethod {
+/// impl ServerHook for ClearResponseHeaders {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -10135,12 +10877,12 @@ pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     #[prologue_macros(
 ///         clear_response_headers,
 ///         filter(ctx.get_request().await.is_unknown_method()),
-///         response_body("unknown_method")
+///         response_body("clear_response_headers")
 ///     )]
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
-/// impl UnknownMethod {
+/// impl ClearResponseHeaders {
 ///     #[clear_response_headers]
 ///     async fn clear_response_headers_with_ref_self(&self, ctx: &Context) {}
 /// }
@@ -10176,7 +10918,7 @@ pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStr
 ///
 ///     #[epilogue_macros(
 ///         response_status_code(200),
-///         response_version(HttpVersion::HTTP1_1),
+///         response_version(HttpVersion::Http1_1),
 ///         response_header(SERVER => HYPERLANE)
 ///     )]
 ///     async fn handle(self, ctx: &Context) {}
@@ -11081,10 +11823,90 @@ pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_body_macro(attr, item, Position::Prologue)
 }
 
-/// Parses the request body as JSON into a specified variable and type.
+/// Parses the request body as JSON into a specified variable and type with panic on parsing failure.
 ///
 /// This attribute macro extracts and deserializes the request body content as JSON into a variable
 /// with the specified type. The body content is parsed as JSON using serde.
+/// If the request body does not exist or JSON parsing fails, the function will panic with an error message.
+///
+/// # Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Debug, Serialize, Deserialize, Clone)]
+/// struct TestData {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// #[route("/request_body_json_result")]
+/// struct RequestBodyJson;
+///
+/// impl ServerHook for RequestBodyJson {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("request data: {request_data_result:?}"))]
+///     #[request_body_json_result(request_data_result: TestData)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl RequestBodyJson {
+///     #[request_body_json_result(request_data_result: TestData)]
+///     async fn request_body_json_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_body_json_result(request_data_result: TestData)]
+/// async fn standalone_request_body_json_handler(ctx: &Context) {}
+/// ```
+///
+/// # Multi-Parameter Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Debug, Serialize, Deserialize, Clone)]
+/// struct User {
+///     name: String,
+/// }
+///
+/// #[derive(Debug, Serialize, Deserialize, Clone)]
+/// struct Config {
+///     debug: bool,
+/// }
+///
+/// #[route("/request_body_json_result")]
+/// struct TestData;
+///
+/// impl ServerHook for TestData {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("user: {user:?}, config: {config:?}"))]
+///     #[request_body_json_result(user: User, config: Config)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+/// ```
+///
+/// The macro accepts one or more `variable_name: Type` pairs separated by commas.
+/// Each variable will be available in the function scope as a `Result<Type, serde_json::Error>`.
+#[proc_macro_attribute]
+pub fn request_body_json_result(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_body_json_result_macro(attr, item, Position::Prologue)
+}
+
+/// Parses the request body as JSON into a specified variable and type with panic on parsing failure.
+///
+/// This attribute macro extracts and deserializes the request body content as JSON into a variable
+/// with the specified type. The body content is parsed as JSON using serde.
+/// If the request body does not exist or JSON parsing fails, the function will panic with an error message.
 ///
 /// # Usage
 ///
@@ -11138,10 +11960,10 @@ pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     debug: bool,
 /// }
 ///
-/// #[route("/multi_json")]
-/// struct MultiJson;
+/// #[route("/request_body_json")]
+/// struct TestData;
 ///
-/// impl ServerHook for MultiJson {
+/// impl ServerHook for TestData {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -11153,16 +11975,93 @@ pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts one or more `variable_name: Type` pairs separated by commas.
-/// Each variable will be available in the function scope as a `Result<Type, JsonError>`.
+/// Each variable will be available in the function scope as a `Result<Type, serde_json::Error>`.
+///
+/// # Panics
+///
+/// This macro will panic if the request body does not exist or JSON parsing fails.
 #[proc_macro_attribute]
 pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_body_json_macro(attr, item, Position::Prologue)
 }
 
-/// Extracts a specific attribute value into a variable.
+/// Extracts a specific attribute value into a variable wrapped in Option type.
 ///
 /// This attribute macro retrieves a specific attribute by key and makes it available
-/// as a typed variable from the request context.
+/// as a typed Option variable from the request context. The extracted value is wrapped
+/// in an Option type to safely handle cases where the attribute may not exist.
+///
+/// # Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+/// use serde::{Deserialize, Serialize};
+///
+/// const TEST_ATTRIBUTE_KEY: &str = "test_attribute_key";
+///
+/// #[derive(Debug, Serialize, Deserialize, Clone)]
+/// struct TestData {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// #[route("/attribute_option")]
+/// struct Attribute;
+///
+/// impl ServerHook for Attribute {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
+///     #[attribute_option(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl Attribute {
+///     #[attribute_option(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+///     async fn attribute_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[attribute_option(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+/// async fn standalone_attribute_handler(ctx: &Context) {}
+/// ```
+///
+/// The macro accepts a key-to-variable mapping in the format `key => variable_name: Type`.
+/// The variable will be available as an `Option<Type>` in the function scope.
+///
+/// # Multi-Parameter Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+///
+/// #[route("/attribute_option")]
+/// struct MultiAttr;
+///
+/// impl ServerHook for MultiAttr {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("attrs: {attr1:?}, {attr2:?}"))]
+///     #[attribute_option("key1" => attr1: String, "key2" => attr2: i32)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+/// ```
+///
+/// The macro accepts multiple `key => variable_name: Type` tuples separated by commas.
+#[proc_macro_attribute]
+pub fn attribute_option(attr: TokenStream, item: TokenStream) -> TokenStream {
+    attribute_option_macro(attr, item, Position::Prologue)
+}
+
+/// Extracts a specific attribute value into a variable with panic on missing value.
+///
+/// This attribute macro retrieves a specific attribute by key and makes it available
+/// as a typed variable from the request context. If the attribute does not exist,
+/// the function will panic with an error message indicating the missing attribute.
 ///
 /// # Usage
 ///
@@ -11187,22 +12086,22 @@ pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///         Self
 ///     }
 ///
-///     #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
-///     #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+///     #[response_body(&format!("request attribute: {request_attribute:?}"))]
+///     #[attribute(TEST_ATTRIBUTE_KEY => request_attribute: TestData)]
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
 /// impl Attribute {
-///     #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+///     #[attribute(TEST_ATTRIBUTE_KEY => request_attribute: TestData)]
 ///     async fn attribute_with_ref_self(&self, ctx: &Context) {}
 /// }
 ///
-/// #[attribute(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+/// #[attribute(TEST_ATTRIBUTE_KEY => request_attribute: TestData)]
 /// async fn standalone_attribute_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a key-to-variable mapping in the format `key => variable_name: Type`.
-/// The variable will be available as an `Option<Type>` in the function scope.
+/// The variable will be available as an `Type` in the function scope.
 ///
 /// # Multi-Parameter Usage
 ///
@@ -11210,7 +12109,7 @@ pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/multi_attr")]
+/// #[route("/attribute")]
 /// struct MultiAttr;
 ///
 /// impl ServerHook for MultiAttr {
@@ -11218,22 +12117,26 @@ pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///         Self
 ///     }
 ///
-///     #[response_body(&format!("attrs: {attr1:?}, {attr2:?}"))]
+///     #[response_body(&format!("attrs: {attr1}, {attr2}"))]
 ///     #[attribute("key1" => attr1: String, "key2" => attr2: i32)]
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
 /// The macro accepts multiple `key => variable_name: Type` tuples separated by commas.
+///
+/// # Panics
+///
+/// This macro will panic if the requested attribute does not exist in the request context.
 #[proc_macro_attribute]
 pub fn attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
     attribute_macro(attr, item, Position::Prologue)
 }
 
-/// Extracts all attributes into a HashMap variable.
+/// Extracts all attributes into a ThreadSafeAttributeStore variable.
 ///
 /// This attribute macro retrieves all available attributes from the request context
-/// and makes them available as a HashMap for comprehensive attribute access.
+/// and makes them available as a ThreadSafeAttributeStore for comprehensive attribute access.
 ///
 /// # Usage
 ///
@@ -11292,10 +12195,74 @@ pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
     attributes_macro(attr, item, Position::Prologue)
 }
 
-/// Extracts a specific route parameter into a variable.
+/// Extracts a specific route parameter into a variable wrapped in Option type.
+///
+/// This attribute macro retrieves a specific route parameter by key and makes it
+/// available as an Option variable. Route parameters are extracted from the URL path segments
+/// and wrapped in an Option type to safely handle cases where the parameter may not exist.
+///
+/// # Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+///
+/// #[route("/route_param_option/:test")]
+/// struct RouteParam;
+///
+/// impl ServerHook for RouteParam {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("route param: {request_route_param:?}"))]
+///     #[route_param_option("test" => request_route_param)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl RouteParam {
+///     #[route_param_option("test" => request_route_param)]
+///     async fn route_param_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[route_param_option("test" => request_route_param)]
+/// async fn standalone_route_param_handler(ctx: &Context) {}
+/// ```
+///
+/// The macro accepts a key-to-variable mapping in the format `"key" => variable_name`.
+/// The variable will be available as an `Option<String>` in the function scope.
+///
+/// # Multi-Parameter Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+///
+/// #[route("/multi_param/:id/:name")]
+/// struct MultiParam;
+///
+/// impl ServerHook for MultiParam {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("id: {id:?}, name: {name:?}"))]
+///     #[route_param_option("id" => id, "name" => name)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+/// ```
+///
+/// The macro accepts multiple `"key" => variable_name` pairs separated by commas.
+#[proc_macro_attribute]
+pub fn route_param_option(attr: TokenStream, item: TokenStream) -> TokenStream {
+    route_param_option_macro(attr, item, Position::Prologue)
+}
+
+/// Extracts a specific route parameter into a variable with panic on missing value.
 ///
 /// This attribute macro retrieves a specific route parameter by key and makes it
 /// available as a variable. Route parameters are extracted from the URL path segments.
+/// If the requested route parameter does not exist, the function will panic with an error message.
 ///
 /// # Usage
 ///
@@ -11326,7 +12293,8 @@ pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts a key-to-variable mapping in the format `"key" => variable_name`.
-/// The variable will be available as an `Option<String>` in the function scope.
+/// The variable will be available as an `String` in the function scope.
+///
 ///
 /// # Multi-Parameter Usage
 ///
@@ -11349,6 +12317,10 @@ pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts multiple `"key" => variable_name` pairs separated by commas.
+///
+/// # Panics
+///
+/// This macro will panic if the requested route parameter does not exist in the URL path.
 #[proc_macro_attribute]
 pub fn route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
     route_param_macro(attr, item, Position::Prologue)
@@ -11388,7 +12360,7 @@ pub fn route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts a variable name that will contain all route parameters.
-/// The variable will be available as a collection in the function scope.
+/// The variable will be available as a RouteParams type in the function scope.
 ///
 /// # Multi-Parameter Usage
 ///
@@ -11416,10 +12388,57 @@ pub fn route_params(attr: TokenStream, item: TokenStream) -> TokenStream {
     route_params_macro(attr, item, Position::Prologue)
 }
 
-/// Extracts a specific request query parameter into a variable.
+/// Extracts a specific request query parameter into a variable wrapped in Option type.
+///
+/// This attribute macro retrieves a specific request query parameter by key and makes it
+/// available as an Option variable. Query parameters are extracted from the URL request query string
+/// and wrapped in an Option type to safely handle cases where the parameter may not exist.
+///
+/// # Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+///
+/// #[route("/request_query_option")]
+/// struct RequestQuery;
+///
+/// impl ServerHook for RequestQuery {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         request_query_option("test" => request_query_option),
+///         response_body(&format!("request query: {request_query_option:?}")),
+///         send
+///     )]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl RequestQuery {
+///     #[request_query_option("test" => request_query_option)]
+///     async fn request_query_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_query_option("test" => request_query_option)]
+/// async fn standalone_request_query_handler(ctx: &Context) {}
+/// ```
+///
+/// The macro accepts a key-to-variable mapping in the format `"key" => variable_name`.
+/// The variable will be available as an `Option<RequestQuerysValue>` in the function scope.
+///
+/// Supports multiple parameters: `#[request_query_option("k1" => v1, "k2" => v2)]`
+#[proc_macro_attribute]
+pub fn request_query_option(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_query_option_macro(attr, item, Position::Prologue)
+}
+
+/// Extracts a specific request query parameter into a variable with panic on missing value.
 ///
 /// This attribute macro retrieves a specific request query parameter by key and makes it
 /// available as a variable. Query parameters are extracted from the URL request query string.
+/// If the requested query parameter does not exist, the function will panic with an error message.
 ///
 /// # Usage
 ///
@@ -11436,35 +12455,39 @@ pub fn route_params(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 ///
 ///     #[prologue_macros(
-///         request_query("test" => request_query_option),
-///         response_body(&format!("request query: {request_query_option:?}")),
+///         request_query("test" => request_query),
+///         response_body(&format!("request query: {request_query}")),
 ///         send
 ///     )]
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
 /// impl RequestQuery {
-///     #[request_query("test" => request_query_option)]
+///     #[request_query("test" => request_query)]
 ///     async fn request_query_with_ref_self(&self, ctx: &Context) {}
 /// }
 ///
-/// #[request_query("test" => request_query_option)]
+/// #[request_query("test" => request_query)]
 /// async fn standalone_request_query_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a key-to-variable mapping in the format `"key" => variable_name`.
-/// The variable will be available as an `Option<String>` in the function scope.
+/// The variable will be available as an `RequestQuerysValue` in the function scope.
 ///
 /// Supports multiple parameters: `#[request_query("k1" => v1, "k2" => v2)]`
+///
+/// # Panics
+///
+/// This macro will panic if the requested query parameter does not exist in the URL query string.
 #[proc_macro_attribute]
 pub fn request_query(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_query_macro(attr, item, Position::Prologue)
 }
 
-/// Extracts all request query parameters into a collection variable.
+/// Extracts all request query parameters into a RequestQuerys variable.
 ///
 /// This attribute macro retrieves all available request query parameters from the URL request query string
-/// and makes them available as a collection for comprehensive request query parameter access.
+/// and makes them available as a RequestQuerys for comprehensive request query parameter access.
 ///
 /// # Usage
 ///
@@ -11506,10 +12529,55 @@ pub fn request_querys(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_querys_macro(attr, item, Position::Prologue)
 }
 
-/// Extracts a specific HTTP request header into a variable.
+/// Extracts a specific HTTP request header into a variable wrapped in Option type.
+///
+/// This attribute macro retrieves a specific HTTP request header by name and makes it
+/// available as an Option variable. Header values are extracted from the request request headers collection
+/// and wrapped in an Option type to safely handle cases where the header may not exist.
+///
+/// # Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+///
+/// #[route("/request_header_option")]
+/// struct RequestHeader;
+///
+/// impl ServerHook for RequestHeader {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[prologue_macros(
+///         request_header_option(HOST => request_header_option),
+///         response_body(&format!("request header: {request_header_option:?}")),
+///         send
+///     )]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl RequestHeader {
+///     #[request_header_option(HOST => request_header_option)]
+///     async fn request_header_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[request_header_option(HOST => request_header_option)]
+/// async fn standalone_request_header_handler(ctx: &Context) {}
+/// ```
+///
+/// The macro accepts a request header name-to-variable mapping in the format `HEADER_NAME => variable_name`
+/// or `"Header-Name" => variable_name`. The variable will be available as an `Option<RequestHeadersValueItem>`.
+#[proc_macro_attribute]
+pub fn request_header_option(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_header_option_macro(attr, item, Position::Prologue)
+}
+
+/// Extracts a specific HTTP request header into a variable with panic on missing value.
 ///
 /// This attribute macro retrieves a specific HTTP request header by name and makes it
 /// available as a variable. Header values are extracted from the request request headers collection.
+/// If the requested header does not exist, the function will panic with an error message.
 ///
 /// # Usage
 ///
@@ -11526,24 +12594,28 @@ pub fn request_querys(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 ///
 ///     #[prologue_macros(
-///         request_header(HOST => request_header_option),
-///         response_body(&format!("request header: {request_header_option:?}")),
+///         request_header(HOST => request_header),
+///         response_body(&format!("request header: {request_header}")),
 ///         send
 ///     )]
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
 /// impl RequestHeader {
-///     #[request_header(HOST => request_header_option)]
+///     #[request_header(HOST => request_header)]
 ///     async fn request_header_with_ref_self(&self, ctx: &Context) {}
 /// }
 ///
-/// #[request_header(HOST => request_header_option)]
+/// #[request_header(HOST => request_header)]
 /// async fn standalone_request_header_handler(ctx: &Context) {}
 /// ```
 ///
 /// The macro accepts a request header name-to-variable mapping in the format `HEADER_NAME => variable_name`
-/// or `"Header-Name" => variable_name`. The variable will be available as an `Option<String>`.
+/// or `"Header-Name" => variable_name`. The variable will be available as an `RequestHeadersValueItem`.
+///
+/// # Panics
+///
+/// This macro will panic if the requested header does not exist in the HTTP request headers.
 #[proc_macro_attribute]
 pub fn request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_header_macro(attr, item, Position::Prologue)
@@ -11586,17 +12658,17 @@ pub fn request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// The macro accepts a variable name that will contain all HTTP request headers.
-/// The variable will be available as a collection in the function scope.
+/// The variable will be available as a RequestHeaders type in the function scope.
 #[proc_macro_attribute]
 pub fn request_headers(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_headers_macro(attr, item, Position::Prologue)
 }
 
-/// Extracts a specific cookie value or all cookies into a variable.
+/// Extracts a specific cookie value or all cookies into a variable wrapped in Option type.
 ///
 /// This attribute macro supports two syntaxes:
-/// 1. `cookie(key => variable_name)` - Extract a specific cookie value by key
-/// 2. `cookie(variable_name)` - Extract all cookies as a raw string
+/// 1. `cookie(key => variable_name)` - Extract a specific cookie value by key, wrapped in Option
+/// 2. `cookie(variable_name)` - Extract all cookies as a raw string, wrapped in Option
 ///
 /// # Usage
 ///
@@ -11613,23 +12685,70 @@ pub fn request_headers(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 ///
 ///     #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
-///     #[request_cookie("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
+///     #[request_cookie_option("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 ///
 /// impl Cookie {
 ///     #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
-///     #[request_cookie("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
+///     #[request_cookie_option("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
 ///     async fn request_cookie_with_ref_self(&self, ctx: &Context) {}
 /// }
 ///
 /// #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
-/// #[request_cookie("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
+/// #[request_cookie_option("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
 /// async fn standalone_request_cookie_handler(ctx: &Context) {}
 /// ```
 ///
 /// For specific cookie extraction, the variable will be available as `Option<String>`.
 /// For all cookies extraction, the variable will be available as `String`.
+#[proc_macro_attribute]
+pub fn request_cookie_option(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_cookie_option_macro(attr, item, Position::Prologue)
+}
+
+/// Extracts a specific cookie value or all cookies into a variable with panic on missing value.
+///
+/// This attribute macro supports two syntaxes:
+/// 1. `cookie(key => variable_name)` - Extract a specific cookie value by key, panics if missing
+/// 2. `cookie(variable_name)` - Extract all cookies as a raw string, panics if missing
+///
+/// # Usage
+///
+/// ```rust
+/// use hyperlane::*;
+/// use hyperlane_macros::*;
+///
+/// #[route("/cookie")]
+/// struct Cookie;
+///
+/// impl ServerHook for Cookie {
+///     async fn new(_ctx: &Context) -> Self {
+///         Self
+///     }
+///
+///     #[response_body(&format!("Session cookie: {session_cookie1}, {session_cookie2}"))]
+///     #[request_cookie("test1" => session_cookie1, "test2" => session_cookie2)]
+///     async fn handle(self, ctx: &Context) {}
+/// }
+///
+/// impl Cookie {
+///     #[response_body(&format!("Session cookie: {session_cookie1}, {session_cookie2}"))]
+///     #[request_cookie("test1" => session_cookie1, "test2" => session_cookie2)]
+///     async fn request_cookie_with_ref_self(&self, ctx: &Context) {}
+/// }
+///
+/// #[response_body(&format!("Session cookie: {session_cookie1}, {session_cookie2}"))]
+/// #[request_cookie("test1" => session_cookie1, "test2" => session_cookie2)]
+/// async fn standalone_request_cookie_handler(ctx: &Context) {}
+/// ```
+///
+/// For specific cookie extraction, the variable will be available as `String`.
+/// For all cookies extraction, the variable will be available as `String`.
+///
+/// # Panics
+///
+/// This macro will panic if the requested cookie does not exist in the HTTP request headers.
 #[proc_macro_attribute]
 pub fn request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_cookie_macro(attr, item, Position::Prologue)
@@ -11668,8 +12787,8 @@ pub fn request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// async fn standalone_request_cookies_handler(ctx: &Context) {}
 /// ```
 ///
-/// The macro accepts a variable name that will contain the Cookie header value.
-/// The variable will be available as a String in the function scope.
+/// The macro accepts a variable name that will contain all cookies.
+/// The variable will be available as a Cookies type in the function scope.
 #[proc_macro_attribute]
 pub fn request_cookies(attr: TokenStream, item: TokenStream) -> TokenStream {
     request_cookies_macro(attr, item, Position::Prologue)
@@ -11844,7 +12963,7 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 ///     #[epilogue_macros(
 ///         response_status_code(200),
-///         response_version(HttpVersion::HTTP1_1),
+///         response_version(HttpVersion::Http1_1),
 ///         response_header(SERVER => HYPERLANE)
 ///     )]
 ///     async fn handle(self, ctx: &Context) {}
@@ -11943,15 +13062,15 @@ pub fn panic_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/post")]
-/// struct Post;
+/// #[route("/prologue_macros")]
+/// struct PrologueMacros;
 ///
-/// impl ServerHook for Post {
+/// impl ServerHook for PrologueMacros {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
 ///
-///     #[prologue_macros(post, response_body("post"), send)]
+///     #[prologue_macros(post, response_body("prologue_macros"), send)]
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
@@ -12042,14 +13161,15 @@ pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// # Examples
 ///
 /// Using no parameters (default buffer size):
+///
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/ws1")]
-/// struct Websocket1;
+/// #[route("/ws")]
+/// struct Websocket;
 ///
-/// impl ServerHook for Websocket1 {
+/// impl ServerHook for Websocket {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -12064,21 +13184,22 @@ pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// }
 /// ```
 ///
-/// Using only buffer size:
+/// Using only request config:
+///
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/ws5")]
-/// struct Websocket5;
+/// #[route("/ws")]
+/// struct Websocket;
 ///
-/// impl ServerHook for Websocket5 {
+/// impl ServerHook for Websocket {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
 ///
 ///     #[ws]
-///     #[ws_from_stream(1024)]
+///     #[ws_from_stream(RequestConfig::default())]
 ///     async fn handle(self, ctx: &Context) {
 ///         let body: RequestBody = ctx.get_request_body().await;
 ///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -12088,14 +13209,15 @@ pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// ```
 ///
 /// Using variable name to store request data:
+///
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/ws2")]
-/// struct Websocket2;
+/// #[route("/ws")]
+/// struct Websocket;
 ///
-/// impl ServerHook for Websocket2 {
+/// impl ServerHook for Websocket {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -12110,21 +13232,22 @@ pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// }
 /// ```
 ///
-/// Using buffer size and variable name:
+/// Using request config and variable name:
+///
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/ws3")]
-/// struct Websocket3;
+/// #[route("/ws")]
+/// struct Websocket;
 ///
-/// impl ServerHook for Websocket3 {
+/// impl ServerHook for Websocket {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
 ///
 ///     #[ws]
-///     #[ws_from_stream(1024, request)]
+///     #[ws_from_stream(RequestConfig::default(), request)]
 ///     async fn handle(self, ctx: &Context) {
 ///         let body: &RequestBody = request.get_body();
 ///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -12133,21 +13256,22 @@ pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream 
 /// }
 /// ```
 ///
-/// Using variable name and buffer size (reversed order):
+/// Using variable name and request config (reversed order):
+///
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/ws4")]
-/// struct Websocket4;
+/// #[route("/ws")]
+/// struct Websocket;
 ///
-/// impl ServerHook for Websocket4 {
+/// impl ServerHook for Websocket {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
 ///
 ///     #[ws]
-///     #[ws_from_stream(request, 1024)]
+///     #[ws_from_stream(request, RequestConfig::default())]
 ///     async fn handle(self, ctx: &Context) {
 ///         let body: &RequestBody = request.get_body();
 ///         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -12155,7 +13279,7 @@ pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream 
 ///     }
 /// }
 ///
-/// impl Websocket4 {
+/// impl Websocket {
 ///     #[ws_from_stream(request)]
 ///     async fn ws_from_stream_with_ref_self(&self, ctx: &Context) {}
 /// }
@@ -12190,14 +13314,15 @@ pub fn ws_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// Using with epilogue_macros:
+///
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
 ///
-/// #[route("/request_query")]
-/// struct RequestQuery;
+/// #[route("/http_from_stream")]
+/// struct HttpFromStreamTest;
 ///
-/// impl ServerHook for RequestQuery {
+/// impl ServerHook for HttpFromStreamTest {
 ///     async fn new(_ctx: &Context) -> Self {
 ///         Self
 ///     }
@@ -12206,13 +13331,14 @@ pub fn ws_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///         request_query("test" => request_query_option),
 ///         response_body(&format!("request query: {request_query_option:?}")),
 ///         send,
-///         http_from_stream(1024)
+///         http_from_stream(RequestConfig::default())
 ///     )]
 ///     async fn handle(self, ctx: &Context) {}
 /// }
 /// ```
 ///
 /// Using with variable name:
+///
 /// ```rust
 /// use hyperlane::*;
 /// use hyperlane_macros::*;
@@ -12658,7 +13784,7 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
     }
 }
 
-/// Checks if an expression is an integer literal.
+/// Checks if an expression is an integer literal or RequestConfig::default().
 ///
 /// # Arguments
 ///
@@ -12666,15 +13792,33 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
 ///
 /// # Returns
 ///
-/// - `bool` - Returns `true` if the expression is an integer literal, `false` otherwise.
+/// - `bool` - Returns `true` if the expression is an integer literal or RequestConfig::default(), `false` otherwise.
 pub(crate) fn is_integer_literal(expr: &Expr) -> bool {
-    matches!(
+    // Check for integer literals
+    if matches!(
         expr,
         Expr::Lit(ExprLit {
             lit: Lit::Int(_),
             ..
         })
-    )
+    ) {
+        return true;
+    }
+
+    // Check for RequestConfig::default() function calls
+    if let Expr::Call(ExprCall { func, .. }) = expr {
+        if let Expr::Path(ExprPath { path, .. }) = &**func {
+            if path.segments.len() == 2 {
+                let first = &path.segments[0];
+                let second = &path.segments[1];
+                if first.ident == "RequestConfig" && second.ident == "default" {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
 }
 
 ```
@@ -12764,6 +13908,7 @@ use crate::*;
 ///
 /// This handler takes a single `TokenStream` as input and returns a `TokenStream`.
 pub(crate) type MacroHandlerPosition = fn(TokenStream, Position) -> TokenStream;
+
 /// A type alias for a macro handler function that accepts attributes.
 ///
 /// This handler takes two `TokenStream`s as input (one for attributes, one for the item)
@@ -12881,7 +14026,7 @@ use crate::*;
 /// Implementation of Parse trait for FromStreamData.
 ///
 /// This implementation handles parsing of macro attributes that specify stream processing parameters.
-/// It supports various parameter combinations including buffer size, variable name, or both.
+/// It supports various parameter combinations including request config, variable name, or both.
 /// The parser validates input syntax and semantic correctness according to the macro's requirements.
 ///
 /// # Arguments
@@ -12894,7 +14039,7 @@ use crate::*;
 /// # Errors
 /// This function returns an error when:
 /// - No parameters are provided
-/// - Two buffer size parameters are provided
+/// - Two request config parameters are provided
 /// - Two variable name parameters are provided
 /// - Additional unexpected tokens are present after valid parameters
 /// - A comma is present without a second parameter following it
@@ -12903,8 +14048,8 @@ impl Parse for FromStreamData {
     ///
     /// This method implements the core parsing logic for the FromStream macro attribute.
     /// It handles three possible parameter configurations:
-    /// 1. Single parameter: interpreted as buffer size if integer literal, otherwise as variable name
-    /// 2. Two parameters: first as buffer size, second as variable name (order independent)
+    /// 1. Single parameter: interpreted as request config if integer literal, otherwise as variable name
+    /// 2. Two parameters: first as request config, second as variable name (order independent)
     /// 3. No parameters: results in an error
     ///
     /// The method performs comprehensive validation of the input syntax and semantics,
@@ -12915,29 +14060,29 @@ impl Parse for FromStreamData {
     ///
     /// # Returns
     /// Returns `syn::Result<Self>` where:
-    /// - Ok(FromStreamData) contains the successfully parsed data with buffer and variable name
+    /// - Ok(FromStreamData) contains the successfully parsed data with request config and variable name
     /// - Err(syn::Error) contains an appropriate error message for invalid input
     ///
     /// # Errors
     /// The function returns errors in the following cases:
     /// - Empty input: when no parameters are provided
-    /// - Two integer literals: when both parameters are buffer sizes
+    /// - Two integer literals: when both parameters are request configs
     /// - Two non-integer expressions: when both parameters are variable names
     /// - Malformed syntax: when comma is present without a second parameter
     /// - Extra tokens: when additional tokens are present after valid parameters
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut buffer: Option<Expr> = None;
+        let mut request_config: Option<Expr> = None;
         let mut variable_name: Option<Expr> = None;
         if input.is_empty() {
             return Ok(FromStreamData {
-                buffer,
+                request_config,
                 variable_name,
             });
         }
         let first_expr: Expr = input.parse()?;
         if input.is_empty() {
             if is_integer_literal(&first_expr) {
-                buffer = Some(first_expr);
+                request_config = Some(first_expr);
             } else {
                 variable_name = Some(first_expr);
             }
@@ -12956,7 +14101,7 @@ impl Parse for FromStreamData {
                 (true, true) => {
                     return Err(syn::Error::new_spanned(
                         &second_expr,
-                        "cannot have two buffer size parameters",
+                        "cannot have two request config parameters",
                     ));
                 }
                 (false, false) => {
@@ -12966,12 +14111,12 @@ impl Parse for FromStreamData {
                     ));
                 }
                 (true, false) => {
-                    buffer = Some(first_expr);
+                    request_config = Some(first_expr);
                     variable_name = Some(second_expr);
                 }
                 (false, true) => {
                     variable_name = Some(first_expr);
-                    buffer = Some(second_expr);
+                    request_config = Some(second_expr);
                 }
             }
         }
@@ -12982,7 +14127,7 @@ impl Parse for FromStreamData {
             ));
         }
         Ok(FromStreamData {
-            buffer,
+            request_config,
             variable_name,
         })
     }
@@ -13007,10 +14152,10 @@ use crate::*;
 
 /// Represents data for stream processing.
 ///
-/// This struct holds the buffer and variable name for stream processing.
+/// This struct holds the request_config and variable name for stream processing.
 pub(crate) struct FromStreamData {
-    /// The buffer to read from the stream.
-    pub(crate) buffer: Option<Expr>,
+    /// The request config to read from the stream.
+    pub(crate) request_config: Option<Expr>,
     /// The variable name to store the read data.
     pub(crate) variable_name: Option<Expr>,
 }
@@ -13024,13 +14169,13 @@ use crate::*;
 
 /// Registers a panic hook.
 ///
-/// This macro takes a function as input and registers it as a panic hook.
-/// The registered function will be called when a panic occurs within the application.
+/// This macro takes a struct as input and registers it as a panic hook.
+/// The registered struct will be used to create handlers when a panic occurs within the application.
 ///
 /// # Arguments
 ///
 /// - `TokenStream` - The attribute `TokenStream`, which can optionally specify an `order`.
-/// - `TokenStream` - The input `TokenStream` representing the function to be registered as a hook.
+/// - `TokenStream` - The input `TokenStream` representing the struct to be registered as a hook.
 ///
 /// # Note
 ///
@@ -13046,10 +14191,10 @@ pub(crate) fn panic_hook_macro(attr: TokenStream, item: TokenStream) -> TokenStr
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: TokenStream2 = quote! {
         #input_struct
-        inventory::submit! {
+        ::hyperlane::inventory::submit! {
             ::hyperlane::HookMacro {
                 hook_type: ::hyperlane::HookType::PanicHook(#order),
-                handler: ::hyperlane::HookHandler::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
+                handler: ::hyperlane::HookHandlerSpec::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
             }
         }
     };
@@ -13189,7 +14334,7 @@ inventory::submit! {
     }
 }
 
-/// Reject requests not matching the specified host.
+/// Rejects requests matching the specified host.
 /// Supports both single and multiple host value checks.
 ///
 /// # Arguments
@@ -13200,7 +14345,7 @@ inventory::submit! {
 ///
 /// # Returns
 ///
-/// - `TokenStream` - The expanded token stream with inverse host filter.
+/// - `TokenStream` - The expanded token stream with host rejection filter.
 pub(crate) fn reject_host_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -13830,7 +14975,7 @@ pub(crate) fn referer_macro(
     inject(position, item, |context| {
         let statements = multi_referer.referer_values.iter().map(|referer_value| {
             quote! {
-                let referer: ::hyperlane::OptionRequestHeadersValueItem = #context.try_get_request_header_back(REFERER).await;
+                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.try_get_request_header_back(REFERER).await;
                 if let Some(referer_header) = referer {
                     if referer_header != #referer_value {
                         return;
@@ -13853,7 +14998,7 @@ inventory::submit! {
     }
 }
 
-/// Reject requests not matching the specified Referer header.
+/// Rejects requests matching the specified Referer header.
 /// Supports both single and multiple referer value checks.
 ///
 /// # Arguments
@@ -13864,7 +15009,7 @@ inventory::submit! {
 ///
 /// # Returns
 ///
-/// - `TokenStream` - The expanded token stream with inverse Referer filter.
+/// - `TokenStream` - The expanded token stream with Referer rejection filter.
 pub(crate) fn reject_referer_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -13874,7 +15019,7 @@ pub(crate) fn reject_referer_macro(
     inject(position, item, |context| {
         let statements = multi_referer.referer_values.iter().map(|referer_value| {
             quote! {
-                let referer: ::hyperlane::OptionRequestHeadersValueItem = #context.try_get_request_header_back(REFERER).await;
+                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.try_get_request_header_back(REFERER).await;
                 if let Some(referer_header) = referer {
                     if referer_header == #referer_value {
                         return;
@@ -13969,7 +15114,7 @@ use crate::*;
 
 /// Rejects requests based on a boolean condition.
 ///
-/// The function continues execution only if the provided code block returns `false`.
+/// The function returns early if the provided code block returns `true`.
 ///
 /// # Arguments
 ///
@@ -14069,6 +15214,44 @@ inventory::submit! {
 /// # Returns
 ///
 /// - `TokenStream` - The expanded token stream with JSON parsing.
+pub(crate) fn request_body_json_result_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_body_json: MultiRequestBodyJsonData =
+        parse_macro_input!(attr as MultiRequestBodyJsonData);
+    inject(position, item, |context| {
+        let statements = multi_body_json.params.iter().map(|(variable, type_name)| {
+            quote! {
+                let #variable: Result<#type_name, ::hyperlane::serde_json::Error> = #context.try_get_request_body_json::<#type_name>().await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+
+inventory::submit! {
+    InjectableMacro {
+        name: "request_body_json_result",
+        handler: Handler::WithAttrPosition(request_body_json_result_macro),
+    }
+}
+
+/// Parses request body as JSON and assigns to specified variable.
+/// Supports both single and multiple variable-type pair extraction.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The input token stream to process.
+/// - `Position` - The position to inject the code.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream with JSON parsing.
 pub(crate) fn request_body_json_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -14079,7 +15262,7 @@ pub(crate) fn request_body_json_macro(
     inject(position, item, |context| {
         let statements = multi_body_json.params.iter().map(|(variable, type_name)| {
             quote! {
-                let #variable: ::hyperlane::ResultJsonError<#type_name> = #context.get_request_body_json::<#type_name>().await;
+                let #variable: #type_name = #context.get_request_body_json::<#type_name>().await;
             }
         });
         quote! {
@@ -14107,7 +15290,7 @@ inventory::submit! {
 /// # Returns
 ///
 /// - `TokenStream` - The expanded token stream with attribute extraction.
-pub(crate) fn attribute_macro(
+pub(crate) fn attribute_option_macro(
     attr: TokenStream,
     item: TokenStream,
     position: Position,
@@ -14120,6 +15303,46 @@ pub(crate) fn attribute_macro(
             .map(|(key_name, variable, type_name)| {
                 quote! {
                     let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name).await;
+                }
+            });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+
+inventory::submit! {
+    InjectableMacro {
+        name: "attribute_option",
+        handler: Handler::WithAttrPosition(attribute_option_macro),
+    }
+}
+
+/// Gets request attribute by key and assigns to specified variable.
+/// Supports both single and multiple attribute extraction.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The input token stream to process.
+/// - `Position` - The position to inject the code.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream with attribute extraction.
+pub(crate) fn attribute_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
+    inject(position, item, |context| {
+        let statements = multi_attr
+            .params
+            .iter()
+            .map(|(key_name, variable, type_name)| {
+                quote! {
+                    let #variable: #type_name = #context.get_attribute(&#key_name).await;
                 }
             });
         quote! {
@@ -14184,6 +15407,43 @@ inventory::submit! {
 /// # Returns
 ///
 /// - `TokenStream` - The expanded token stream with route param extraction.
+pub(crate) fn route_param_option_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
+    inject(position, item, |context| {
+        let statements = multi_param.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: Option<std::string::String> = #context.try_get_route_param(#key_name).await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+
+inventory::submit! {
+    InjectableMacro {
+        name: "route_param_option",
+        handler: Handler::WithAttrPosition(route_param_option_macro),
+    }
+}
+
+/// Gets route parameter by key and assigns to specified variable.
+/// Supports both single and multiple route parameter extraction.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The input token stream to process.
+/// - `Position` - The position to inject the code.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream with route param extraction.
 pub(crate) fn route_param_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -14193,7 +15453,7 @@ pub(crate) fn route_param_macro(
     inject(position, item, |context| {
         let statements = multi_param.params.iter().map(|(key_name, variable)| {
             quote! {
-                let #variable: ::hyperlane::OptionString = #context.try_get_route_param(#key_name).await;
+                let #variable: std::string::String = #context.get_route_param(#key_name).await;
             }
         });
         quote! {
@@ -14258,6 +15518,43 @@ inventory::submit! {
 /// # Returns
 ///
 /// - `TokenStream` - The expanded token stream with query param extraction.
+pub(crate) fn request_query_option_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
+    inject(position, item, |context| {
+        let statements = multi_query.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: Option<::hyperlane::RequestQuerysValue> = #context.try_get_request_query(#key_name).await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+
+inventory::submit! {
+    InjectableMacro {
+        name: "request_query_option",
+        handler: Handler::WithAttrPosition(request_query_option_macro),
+    }
+}
+
+/// Gets request query parameter by key and assigns to specified variable.
+/// Supports both single and multiple parameter extraction.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The input token stream to process.
+/// - `Position` - The position to inject the code.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream with query param extraction.
 pub(crate) fn request_query_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -14267,7 +15564,7 @@ pub(crate) fn request_query_macro(
     inject(position, item, |context| {
         let statements = multi_query.params.iter().map(|(key_name, variable)| {
             quote! {
-                let #variable: ::hyperlane::OptionRequestQuerysValue = #context.try_get_request_query(#key_name).await;
+                let #variable: ::hyperlane::RequestQuerysValue = #context.get_request_query(#key_name).await;
             }
         });
         quote! {
@@ -14332,6 +15629,43 @@ inventory::submit! {
 /// # Returns
 ///
 /// - `TokenStream` - The expanded token stream with header extraction.
+pub(crate) fn request_header_option_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
+    inject(position, item, |context| {
+        let statements = multi_header.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: Option<::hyperlane::RequestHeadersValueItem> = #context.try_get_request_header_back(#key_name).await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+
+inventory::submit! {
+    InjectableMacro {
+        name: "request_header_option",
+        handler: Handler::WithAttrPosition(request_header_option_macro),
+    }
+}
+
+/// Gets request header by key and assigns to specified variable.
+/// Supports both single and multiple header extraction.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The input token stream to process.
+/// - `Position` - The position to inject the code.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream with header extraction.
 pub(crate) fn request_header_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -14341,7 +15675,7 @@ pub(crate) fn request_header_macro(
     inject(position, item, |context| {
         let statements = multi_header.params.iter().map(|(key_name, variable)| {
             quote! {
-                let #variable: ::hyperlane::OptionRequestHeadersValueItem = #context.try_get_request_header_back(#key_name).await;
+                let #variable: ::hyperlane::RequestHeadersValueItem = #context.get_request_header_back(#key_name).await;
             }
         });
         quote! {
@@ -14406,6 +15740,43 @@ inventory::submit! {
 /// # Returns
 ///
 /// - `TokenStream` - The expanded token stream with cookie extraction.
+pub(crate) fn request_cookie_option_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
+    inject(position, item, |context| {
+        let statements = multi_cookie.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: Option<::hyperlane::CookieValue> = #context.try_get_request_cookie(#key_name).await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+
+inventory::submit! {
+    InjectableMacro {
+        name: "request_cookie_option",
+        handler: Handler::WithAttrPosition(request_cookie_option_macro),
+    }
+}
+
+/// Gets request cookie by key and assigns to specified variable.
+/// Supports both single and multiple cookie extraction.
+///
+/// # Arguments
+///
+/// - `TokenStream` - The attribute token stream.
+/// - `TokenStream` - The input token stream to process.
+/// - `Position` - The position to inject the code.
+///
+/// # Returns
+///
+/// - `TokenStream` - The expanded token stream with cookie extraction.
 pub(crate) fn request_cookie_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -14415,7 +15786,7 @@ pub(crate) fn request_cookie_macro(
     inject(position, item, |context| {
         let statements = multi_cookie.params.iter().map(|(key_name, variable)| {
             quote! {
-                let #variable: ::hyperlane::OptionCookiesValue = #context.try_get_request_cookie(#key_name).await;
+                let #variable: ::hyperlane::CookieValue = #context.get_request_cookie(#key_name).await;
             }
         });
         quote! {
@@ -15165,13 +16536,13 @@ use crate::*;
 
 /// Registers a request middleware.
 ///
-/// This macro takes a function as input and registers it as a request middleware.
-/// The registered function will be called before the main request handler.
+/// This macro takes a struct as input and registers it as a request middleware.
+/// The registered struct will be used to create handlers that are called before the main request handler.
 ///
 /// # Arguments
 ///
 /// - `TokenStream` - The attribute `TokenStream`, which can optionally specify an `order`.
-/// - `TokenStream` - The input token stream representing the function to be registered as a middleware.
+/// - `TokenStream` - The input token stream representing the struct to be registered as a middleware.
 ///
 /// # Note
 ///
@@ -15187,10 +16558,10 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: TokenStream2 = quote! {
         #input_struct
-        inventory::submit! {
+        ::hyperlane::inventory::submit! {
             ::hyperlane::HookMacro {
                 hook_type: ::hyperlane::HookType::RequestMiddleware(#order),
-                handler: ::hyperlane::HookHandler::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
+                handler: ::hyperlane::HookHandlerSpec::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
             }
         }
     };
@@ -15220,9 +16591,9 @@ pub(crate) use r#fn::*;
 ```rust
 /// Defines operations that can be performed on response headers.
 pub(crate) enum HeaderOperation {
-    /// Sets an existing header value, keeping the original if not present.
+    /// Sets an existing header value, replacing it if it already exists.
     Set,
-    /// Add a new header value, overwriting any existing value.
+    /// Adds a new header value, keeping any existing values with the same key.
     Add,
 }
 
@@ -15516,13 +16887,13 @@ use crate::*;
 
 /// Registers a response middleware.
 ///
-/// This macro takes a function as input and registers it as a response middleware.
-/// The registered function will be called after the main request handler but before the response is sent.
+/// This macro takes a struct as input and registers it as a response middleware.
+/// The registered struct will be used to create handlers that are called after the main request handler but before the response is sent.
 ///
 /// # Arguments
 ///
 /// - `TokenStream` - The attribute `TokenStream`, which can optionally specify an `order`.
-/// - `TokenStream` - The input token stream representing the function to be registered as a middleware.
+/// - `TokenStream` - The input token stream representing the struct to be registered as a middleware.
 ///
 /// # Note
 ///
@@ -15538,10 +16909,10 @@ pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) ->
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: TokenStream2 = quote! {
         #input_struct
-        inventory::submit! {
+        ::hyperlane::inventory::submit! {
             ::hyperlane::HookMacro {
                 hook_type: ::hyperlane::HookType::ResponseMiddleware(#order),
-                handler: ::hyperlane::HookHandler::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
+                handler: ::hyperlane::HookHandlerSpec::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
             }
         }
     };
@@ -15574,23 +16945,23 @@ use crate::*;
 /// Internal implementation for the `route` attribute macro.
 ///
 /// This function processes the route attribute and generates code to register
-/// the decorated function as a route handler in the inventory system.
+/// the decorated struct as a route handler in the inventory system.
 ///
 /// # Arguments
 ///
-/// - `TokenStream` - The attribute token stream containing route parameters (path and optional server)
-/// - `TokenStream` - The function token stream being decorated
+/// - `TokenStream` - The attribute token stream containing route parameters (path)
+/// - `TokenStream` - The struct token stream being decorated
 ///
 /// # Returns
 ///
-/// A `TokenStream` containing the original function and inventory registration code
+/// A `TokenStream` containing the original struct and inventory registration code
 ///
 /// # Generated Code
 ///
 /// The macro generates:
-/// - The original function unchanged
+/// - The original struct unchanged
 /// - An `inventory::submit!` block that registers a `HookMacro` instance
-/// - A handler closure that wraps the function in `Box::pin` for async execution
+/// - A handler factory that creates boxed handlers for the struct
 pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let route_attr: RouteAttr = parse_macro_input!(attr as RouteAttr);
     let path: &Expr = &route_attr.path;
@@ -15598,10 +16969,10 @@ pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: TokenStream2 = quote! {
         #input_struct
-        ::hyperlane::server_submit! {
+        ::hyperlane::inventory::submit! {
             ::hyperlane::HookMacro {
                 hook_type: ::hyperlane::HookType::Route(#path),
-                handler: ::hyperlane::HookHandler::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
+                handler: ::hyperlane::HookHandlerSpec::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
             }
         }
     };
@@ -15824,7 +17195,7 @@ use syn::Ident;
 ///
 /// - `&Ident` - The context identifier to use for stream access
 /// - `&str` - The stream method to call (e.g., "http_from_stream" or "ws_from_stream")
-/// - `&FromStreamData` - The FromStreamData containing buffer size and variable name
+/// - `&FromStreamData` - The FromStreamData containing request config and variable name
 /// - `&[Stmt]` - The statements to execute when data is successfully read
 ///
 /// # Returns
@@ -15837,31 +17208,31 @@ pub(crate) fn generate_stream(
     stmts: &[Stmt],
 ) -> TokenStream2 {
     let method_ident: Ident = Ident::new(stream_method, proc_macro2::Span::call_site());
-    match (data.buffer.clone(), data.variable_name.clone()) {
-        (Some(buffer), Some(variable_name)) => {
+    match (data.request_config.clone(), data.variable_name.clone()) {
+        (Some(request_config), Some(variable_name)) => {
             quote! {
-                while let Ok(#variable_name) = #context.#method_ident(#buffer).await {
+                while let Ok(#variable_name) = #context.#method_ident(#request_config).await {
                     #(#stmts)*
                 }
             }
         }
-        (Some(buffer), None) => {
+        (Some(request_config), None) => {
             quote! {
-                while #context.#method_ident(#buffer).await.is_ok() {
+                while #context.#method_ident(#request_config).await.is_ok() {
                     #(#stmts)*
                 }
             }
         }
         (None, Some(variable_name)) => {
             quote! {
-                while let Ok(#variable_name) = #context.#method_ident(::hyperlane::DEFAULT_BUFFER_SIZE).await {
+                while let Ok(#variable_name) = #context.#method_ident(::hyperlane::RequestConfig::default()).await {
                     #(#stmts)*
                 }
             }
         }
         (None, None) => {
             quote! {
-                while #context.#method_ident(::hyperlane::DEFAULT_BUFFER_SIZE).await.is_ok() {
+                while #context.#method_ident(::hyperlane::RequestConfig::default()).await.is_ok() {
                     #(#stmts)*
                 }
             }
@@ -15877,7 +17248,7 @@ pub(crate) fn generate_stream(
 ///
 /// # Arguments
 ///
-/// - `TokenStream` - The attribute containing the buffer and variable name.
+/// - `TokenStream` - The attribute containing the request config and variable name.
 /// - `TokenStream` - The input token stream to process.
 ///
 /// # Returns
@@ -15922,7 +17293,7 @@ inventory::submit! {
 ///
 /// # Arguments
 ///
-/// - `attr` - The attribute containing the buffer and variable name.
+/// - `attr` - The attribute containing the request config and variable name.
 /// - `item` - The input token stream to process.
 ///
 /// # Returns
@@ -15999,6 +17370,10 @@ struct RequestMiddleware {
     socket_addr: String,
 }
 struct UpgradeHook;
+struct ServerPanicHook {
+    response_body: String,
+    content_type: String,
+}
 struct GroupChat;
 struct PrivateChat {
     config: WebSocketConfig<String>,
@@ -16032,7 +17407,7 @@ struct PrivateChatRequestHook {
 static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
 
 fn get_broadcast_map() -> &'static WebSocket {
-    BROADCAST_MAP.get_or_init(|| WebSocket::new())
+    BROADCAST_MAP.get_or_init(WebSocket::new)
 }
 
 impl ServerHook for RequestMiddleware {
@@ -16042,7 +17417,7 @@ impl ServerHook for RequestMiddleware {
     }
 
     async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::HTTP1_1)
+        ctx.set_response_version(HttpVersion::Http1_1)
             .await
             .set_response_status_code(200)
             .await
@@ -16070,7 +17445,9 @@ impl ServerHook for UpgradeHook {
         }
         if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_status_code(101)
+            ctx.set_response_version(HttpVersion::Http1_1)
+                .await
+                .set_response_status_code(101)
                 .await
                 .set_response_header(UPGRADE, WEBSOCKET)
                 .await
@@ -16104,7 +17481,7 @@ impl ServerHook for ConnectedHook {
             .unwrap_or_default();
         let private_broadcast_type: BroadcastType<String> =
             BroadcastType::PointToPoint(my_name, your_name);
-        let data: String = format!("receiver_count => {:?}", receiver_count).into();
+        let data: String = format!("receiver_count => {receiver_count:?}");
         Self {
             receiver_count,
             data,
@@ -16145,7 +17522,7 @@ impl ServerHook for GroupChatRequestHook {
         let mut body: RequestBody = ctx.get_request_body().await;
         if body.is_empty() {
             receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-            body = format!("receiver_count => {:?}", receiver_count).into();
+            body = format!("receiver_count => {receiver_count:?}").into();
         }
         Self {
             body,
@@ -16166,7 +17543,7 @@ impl ServerHook for GroupClosedHook {
         let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
         let receiver_count: ReceiverCount =
             get_broadcast_map().receiver_count_after_closed(key.clone());
-        let body: String = format!("receiver_count => {:?}", receiver_count);
+        let body: String = format!("receiver_count => {receiver_count:?}");
         Self {
             body,
             receiver_count,
@@ -16189,7 +17566,7 @@ impl ServerHook for PrivateChatRequestHook {
         let mut body: RequestBody = ctx.get_request_body().await;
         if body.is_empty() {
             receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-            body = format!("receiver_count => {:?}", receiver_count).into();
+            body = format!("receiver_count => {receiver_count:?}").into();
         }
         Self {
             body,
@@ -16211,7 +17588,7 @@ impl ServerHook for PrivateClosedHook {
         let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
         let receiver_count: ReceiverCount =
             get_broadcast_map().receiver_count_after_closed(key);
-        let body: String = format!("receiver_count => {:?}", receiver_count);
+        let body: String = format!("receiver_count => {receiver_count:?}");
         Self {
             body,
             receiver_count,
@@ -16248,7 +17625,7 @@ impl ServerHook for PrivateChat {
         let config: WebSocketConfig<String> = WebSocketConfig::new()
             .set_context(ctx.clone())
             .set_broadcast_type(key)
-            .set_buffer_size(4096)
+            .set_request_config(RequestConfig::default())
             .set_capacity(1024)
             .set_connected_hook::<ConnectedHook>()
             .set_request_hook::<PrivateChatRequestHook>()
@@ -16273,7 +17650,7 @@ impl ServerHook for GroupChat {
         let config: WebSocketConfig<String> = WebSocketConfig::new()
             .set_context(ctx.clone())
             .set_broadcast_type(key)
-            .set_buffer_size(4096)
+            .set_request_config(RequestConfig::default())
             .set_capacity(1024)
             .set_connected_hook::<ConnectedHook>()
             .set_request_hook::<GroupChatRequestHook>()
@@ -16283,13 +17660,43 @@ impl ServerHook for GroupChat {
     }
 }
 
-#[tokio::main]
+impl ServerHook for ServerPanicHook {
+    async fn new(ctx: &Context) -> Self {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String =
+            ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+
+    async fn handle(self, ctx: &Context) {
+        let _ = ctx
+            .set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+
 async fn main() {
     let server: Server = Server::new().await;
     let config: ServerConfig = ServerConfig::new().await;
     config.host("0.0.0.0").await;
     config.port(60000).await;
-    config.buffer(4096).await;
+    config.request_config(RequestConfig::default()).await;
     config.disable_linger().await;
     config.disable_nodelay().await;
     server.config(config).await;
@@ -16350,6 +17757,10 @@ async fn test_server() {
         socket_addr: String,
     }
     struct UpgradeHook;
+    struct ServerPanicHook {
+        response_body: String,
+        content_type: String,
+    }
     struct GroupChat;
     struct PrivateChat {
         config: WebSocketConfig<String>,
@@ -16383,7 +17794,7 @@ async fn test_server() {
     static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
 
     fn get_broadcast_map() -> &'static WebSocket {
-        BROADCAST_MAP.get_or_init(|| WebSocket::new())
+        BROADCAST_MAP.get_or_init(WebSocket::new)
     }
 
     impl ServerHook for RequestMiddleware {
@@ -16393,7 +17804,7 @@ async fn test_server() {
         }
 
         async fn handle(self, ctx: &Context) {
-            ctx.set_response_version(HttpVersion::HTTP1_1)
+            ctx.set_response_version(HttpVersion::Http1_1)
                 .await
                 .set_response_status_code(200)
                 .await
@@ -16421,7 +17832,9 @@ async fn test_server() {
             }
             if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
                 let accept_key: String = WebSocketFrame::generate_accept_key(key);
-                ctx.set_response_status_code(101)
+                ctx.set_response_version(HttpVersion::Http1_1)
+                    .await
+                    .set_response_status_code(101)
                     .await
                     .set_response_header(UPGRADE, WEBSOCKET)
                     .await
@@ -16455,7 +17868,7 @@ async fn test_server() {
                 .unwrap_or_default();
             let private_broadcast_type: BroadcastType<String> =
                 BroadcastType::PointToPoint(my_name, your_name);
-            let data: String = format!("receiver_count => {:?}", receiver_count).into();
+            let data: String = format!("receiver_count => {receiver_count:?}");
             Self {
                 receiver_count,
                 data,
@@ -16496,7 +17909,7 @@ async fn test_server() {
             let mut body: RequestBody = ctx.get_request_body().await;
             if body.is_empty() {
                 receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-                body = format!("receiver_count => {:?}", receiver_count).into();
+                body = format!("receiver_count => {receiver_count:?}").into();
             }
             Self {
                 body,
@@ -16517,7 +17930,7 @@ async fn test_server() {
             let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
             let receiver_count: ReceiverCount =
                 get_broadcast_map().receiver_count_after_closed(key.clone());
-            let body: String = format!("receiver_count => {:?}", receiver_count);
+            let body: String = format!("receiver_count => {receiver_count:?}");
             Self {
                 body,
                 receiver_count,
@@ -16540,7 +17953,7 @@ async fn test_server() {
             let mut body: RequestBody = ctx.get_request_body().await;
             if body.is_empty() {
                 receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-                body = format!("receiver_count => {:?}", receiver_count).into();
+                body = format!("receiver_count => {receiver_count:?}").into();
             }
             Self {
                 body,
@@ -16562,7 +17975,7 @@ async fn test_server() {
             let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
             let receiver_count: ReceiverCount =
                 get_broadcast_map().receiver_count_after_closed(key);
-            let body: String = format!("receiver_count => {:?}", receiver_count);
+            let body: String = format!("receiver_count => {receiver_count:?}");
             Self {
                 body,
                 receiver_count,
@@ -16599,7 +18012,7 @@ async fn test_server() {
             let config: WebSocketConfig<String> = WebSocketConfig::new()
                 .set_context(ctx.clone())
                 .set_broadcast_type(key)
-                .set_buffer_size(4096)
+                .set_request_config(RequestConfig::default())
                 .set_capacity(1024)
                 .set_connected_hook::<ConnectedHook>()
                 .set_request_hook::<PrivateChatRequestHook>()
@@ -16624,7 +18037,7 @@ async fn test_server() {
             let config: WebSocketConfig<String> = WebSocketConfig::new()
                 .set_context(ctx.clone())
                 .set_broadcast_type(key)
-                .set_buffer_size(4096)
+                .set_request_config(RequestConfig::default())
                 .set_capacity(1024)
                 .set_connected_hook::<ConnectedHook>()
                 .set_request_hook::<GroupChatRequestHook>()
@@ -16634,12 +18047,43 @@ async fn test_server() {
         }
     }
 
+    impl ServerHook for ServerPanicHook {
+        async fn new(ctx: &Context) -> Self {
+            let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+            let response_body: String = error.to_string();
+            let content_type: String =
+                ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+            Self {
+                response_body,
+                content_type,
+            }
+        }
+
+        async fn handle(self, ctx: &Context) {
+            let _ = ctx
+                .set_response_version(HttpVersion::Http1_1)
+                .await
+                .set_response_status_code(500)
+                .await
+                .clear_response_headers()
+                .await
+                .set_response_header(SERVER, HYPERLANE)
+                .await
+                .set_response_header(CONTENT_TYPE, &self.content_type)
+                .await
+                .set_response_body(&self.response_body)
+                .await
+                .send()
+                .await;
+        }
+    }
+
     async fn main() {
         let server: Server = Server::new().await;
         let config: ServerConfig = ServerConfig::new().await;
         config.host("0.0.0.0").await;
         config.port(60000).await;
-        config.buffer(4096).await;
+        config.request_config(RequestConfig::default()).await;
         config.disable_linger().await;
         config.disable_nodelay().await;
         server.config(config).await;
@@ -16675,6 +18119,7 @@ mod cfg;
 ///
 /// This constant is used to construct unique keys for point-to-point WebSocket broadcasts.
 pub(crate) const POINT_TO_POINT_KEY: &str = "ptp-";
+
 /// Represents the prefix for point-to-group broadcast keys.
 ///
 /// This constant is used to construct unique keys for point-to-group WebSocket broadcasts.
@@ -16720,182 +18165,249 @@ use crate::*;
 
 /// Allows `String` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for String {}
+
 /// Allows string slices to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &str {}
+
 /// Allows `char` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for char {}
+
 /// Allows `bool` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for bool {}
+
 /// Allows `i8` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for i8 {}
+
 /// Allows `i16` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for i16 {}
+
 /// Allows `i32` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for i32 {}
+
 /// Allows `i64` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for i64 {}
+
 /// Allows `i128` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for i128 {}
+
 /// Allows `isize` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for isize {}
+
 /// Allows `u8` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for u8 {}
+
 /// Allows `u16` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for u16 {}
+
 /// Allows `u32` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for u32 {}
+
 /// Allows `u64` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for u64 {}
+
 /// Allows `u128` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for u128 {}
+
 /// Allows `usize` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for usize {}
+
 /// Allows `f32` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for f32 {}
+
 /// Allows `f64` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for f64 {}
+
 /// Allows `IpAddr` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for IpAddr {}
+
 /// Allows `Ipv4Addr` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for Ipv4Addr {}
+
 /// Allows `Ipv6Addr` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for Ipv6Addr {}
+
 /// Allows `SocketAddr` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for SocketAddr {}
+
 /// Allows `NonZeroU8` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroU8 {}
+
 /// Allows `NonZeroU16` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroU16 {}
+
 /// Allows `NonZeroU32` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroU32 {}
+
 /// Allows `NonZeroU64` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroU64 {}
+
 /// Allows `NonZeroU128` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroU128 {}
+
 /// Allows `NonZeroUsize` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroUsize {}
+
 /// Allows `NonZeroI8` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroI8 {}
+
 /// Allows `NonZeroI16` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroI16 {}
+
 /// Allows `NonZeroI32` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroI32 {}
+
 /// Allows `NonZeroI64` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroI64 {}
+
 /// Allows `NonZeroI128` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroI128 {}
+
 /// Allows `NonZeroIsize` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for NonZeroIsize {}
+
 /// Allows `Infallible` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for Infallible {}
 
 /// Allows references to `String` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &String {}
+
 /// Allows double references to string slices to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &&str {}
+
 /// Allows references to `char` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &char {}
+
 /// Allows references to `bool` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &bool {}
+
 /// Allows references to `i8` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &i8 {}
+
 /// Allows references to `i16` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &i16 {}
+
 /// Allows references to `i32` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &i32 {}
+
 /// Allows references to `i64` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &i64 {}
+
 /// Allows references to `i128` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &i128 {}
+
 /// Allows references to `isize` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &isize {}
+
 /// Allows references to `u8` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &u8 {}
+
 /// Allows references to `u16` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &u16 {}
+
 /// Allows references to `u32` to be used as broadcast identifiers.
 impl BroadcastTypeTrait for &u32 {}
+
 /// Allows references to `u64` to be used as
 /// Implements `BroadcastTypeTrait` for `&u128`.
 ///
 /// This allows references to `u128` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &u128 {}
+
 /// Implements `BroadcastTypeTrait` for `&usize`.
 ///
 /// This allows references to `usize` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &usize {}
+
 /// Implements `BroadcastTypeTrait` for `&f32`.
 ///
 /// This allows references to `f32` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &f32 {}
+
 /// Implements `BroadcastTypeTrait` for `&f64`.
 ///
 /// This allows references to `f64` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &f64 {}
+
 /// Implements `BroadcastTypeTrait` for `&IpAddr`.
 ///
 /// This allows references to `IpAddr` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &IpAddr {}
+
 /// Implements `BroadcastTypeTrait` for `&Ipv4Addr`.
 ///
 /// This allows references to `Ipv4Addr` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &Ipv4Addr {}
+
 /// Implements `BroadcastTypeTrait` for `&Ipv6Addr`.
 ///
 /// This allows references to `Ipv6Addr` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &Ipv6Addr {}
+
 /// Implements `BroadcastTypeTrait` for `&SocketAddr`.
 ///
 /// This allows references to `SocketAddr` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &SocketAddr {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroU8`.
 ///
 /// This allows references to `NonZeroU8` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroU8 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroU16`.
 ///
 /// This allows references to `NonZeroU16` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroU16 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroU32`.
 ///
 /// This allows references to `NonZeroU32` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroU32 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroU64`.
 ///
 /// This allows references to `NonZeroU64` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroU64 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroU128`.
 ///
 /// This allows references to `NonZeroU128` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroU128 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroUsize`.
 ///
 /// This allows references to `NonZeroUsize` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroUsize {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroI8`.
 ///
 /// This allows references to `NonZeroI8` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroI8 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroI16`.
 ///
 /// This allows references to `NonZeroI16` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroI16 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroI32`.
 ///
 /// This allows references to `NonZeroI32` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroI32 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroI64`.
 ///
 /// This allows references to `NonZeroI64` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroI64 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroI128`.
 ///
 /// This allows references to `NonZeroI128` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroI128 {}
+
 /// Implements `BroadcastTypeTrait` for `&NonZeroIsize`.
 ///
 /// This allows references to `NonZeroIsize` to be used as a broadcast identifier.
 impl BroadcastTypeTrait for &NonZeroIsize {}
+
 /// Implements `BroadcastTypeTrait` for `&Infallible`.
 ///
 /// This allows references to `Infallible` to be used as a broadcast identifier.
@@ -16966,7 +18478,7 @@ impl<B: BroadcastTypeTrait> Default for WebSocketConfig<B> {
         let default_hook: ServerHookHandler = Arc::new(|_ctx| Box::pin(async {}));
         Self {
             context: Context::default(),
-            buffer_size: DEFAULT_BUFFER_SIZE,
+            request_config: RequestConfig::default(),
             capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
             broadcast_type: BroadcastType::default(),
             connected_hook: default_hook.clone(),
@@ -16990,18 +18502,18 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
 }
 
 impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
-    /// Sets the buffer size for the WebSocket connection.
+    /// Sets the request configuration for the WebSocket connection.
     ///
     /// # Arguments
     ///
-    /// - `usize` - The desired buffer size in bytes.
+    /// - `RequestConfig` - The request configuration to use for this WebSocket.
     ///
     /// # Returns
     ///
     /// - `WebSocketConfig<B>` - The modified WebSocket configuration instance.
     #[inline(always)]
-    pub fn set_buffer_size(mut self, buffer_size: usize) -> Self {
-        self.buffer_size = buffer_size;
+    pub fn set_request_config(mut self, request_config: RequestConfig) -> Self {
+        self.request_config = request_config;
         self
     }
 
@@ -17060,14 +18572,14 @@ impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
         &self.context
     }
 
-    /// Retrieves the buffer size configured for the WebSocket connection.
+    /// Retrieves the request configuration for this WebSocket.
     ///
     /// # Returns
     ///
-    /// - `usize` - The buffer size in bytes.
+    /// - `RequestConfig` - The request configuration object.
     #[inline(always)]
-    pub fn get_buffer_size(&self) -> usize {
-        self.buffer_size
+    pub fn get_request_config(&self) -> RequestConfig {
+        self.request_config
     }
 
     /// Retrieves the capacity configured for the broadcast sender.
@@ -17472,7 +18984,7 @@ impl WebSocket {
         if ctx.to_string() == Context::default().to_string() {
             panic!("Context must be set");
         }
-        let buffer_size: usize = config.get_buffer_size();
+        let request_config: RequestConfig = config.get_request_config();
         let capacity: Capacity = config.get_capacity();
         let broadcast_type: BroadcastType<B> = config.get_broadcast_type().clone();
         let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
@@ -17488,7 +19000,7 @@ impl WebSocket {
         };
         loop {
             tokio::select! {
-                request_res = ctx.ws_from_stream(buffer_size) => {
+                request_res = ctx.ws_from_stream(request_config) => {
                     if request_res.is_ok() {
                         config.get_request_hook()(&ctx).await;
                     } else {
@@ -17567,10 +19079,11 @@ pub struct WebSocketConfig<B: BroadcastTypeTrait> {
     ///
     /// This context is associated with this WebSocket connection.
     pub(super) context: Context,
-    /// The buffer size.
+    /// The request config.
     ///
-    /// This is the size of the buffer used for reading from the WebSocket stream.
-    pub(super) buffer_size: usize,
+    /// This configuration is used for managing WebSocket request processing,
+    /// including connection upgrade handling and request lifecycle management.
+    pub(super) request_config: RequestConfig,
     /// The capacity.
     ///
     /// This is the capacity of the broadcast sender channel.
@@ -17810,11 +19323,12 @@ impl ServerHook for PanicHook {
     }
 
     #[epilogue_macros(
-        clear_response_headers,
+        response_version(HttpVersion::Http1_1),
         response_status_code(500),
+        clear_response_headers,
         response_body(&response_body),
         response_header(SERVER => HYPERLANE),
-        response_version(HttpVersion::HTTP1_1),
+        response_version(HttpVersion::Http1_1),
         response_header(CONTENT_TYPE, &content_type),
         send
     )]
@@ -17890,7 +19404,7 @@ impl ServerHook for CrossMiddleware {
         Self
     }
 
-    #[response_version(HttpVersion::HTTP1_1)]
+    #[response_version(HttpVersion::Http1_1)]
     #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
     #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
     #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
@@ -18005,8 +19519,9 @@ impl ServerHook for UpgradeMiddleware {
 
     #[ws]
     #[epilogue_macros(
-        response_body(&vec![]),
+        response_version(HttpVersion::Http1_1),
         response_status_code(101),
+        response_body(&vec![]),
         response_header(UPGRADE => WEBSOCKET),
         response_header(CONNECTION => UPGRADE),
         response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
@@ -18444,9 +19959,9 @@ pub use r#const::*;
 use super::*;
 
 #[cfg(debug_assertions)]
-pub const SERVER_PORT: usize = DEFAULT_WEB_PORT;
+pub const SERVER_PORT: u16 = DEFAULT_WEB_PORT;
 #[cfg(not(debug_assertions))]
-pub const SERVER_PORT: usize = 65002;
+pub const SERVER_PORT: u16 = 65002;
 pub const SERVER_HOST: &str = DEFAULT_HOST;
 pub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;
 pub const SERVER_LOG_SIZE: usize = 100_024_000;
@@ -18454,7 +19969,7 @@ pub const SERVER_LOG_DIR: &str = "./tmp/logs";
 pub const SERVER_INNER_PRINT: bool = true;
 pub const SERVER_INNER_LOG: bool = true;
 pub const SERVER_NODELAY: bool = false;
-pub const SERVER_LINGER: OptionDuration = None;
+pub const SERVER_LINGER: Option<Duration> = None;
 pub const SERVER_TTI: u32 = 128;
 pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
 
@@ -18468,6 +19983,8 @@ mod r#const;
 pub use r#const::*;
 
 use super::*;
+
+use std::time::Duration;
 
 ```
 
@@ -18543,7 +20060,7 @@ async fn init_config(server: &Server) {
     config.ttl(SERVER_TTI).await;
     config.linger(SERVER_LINGER).await;
     config.nodelay(SERVER_NODELAY).await;
-    config.buffer(SERVER_BUFFER).await;
+    config.request_config(RequestConfig::default()).await;
     server.config(config).await;
 }
 
@@ -18579,7 +20096,7 @@ fn runtime() -> Runtime {
 async fn create_server() {
     init_config(&server).await;
     println_success!("Server initialization successful");
-    let server_result: ServerResult<ServerControlHook> = server.run().await;
+    let server_result: Result<ServerControlHook, ServerError> = server.run().await;
     match server_result {
         Ok(server_hook) => {
             let host_port: String = format!("{SERVER_HOST}:{SERVER_PORT}");
@@ -18914,7 +20431,7 @@ pub(crate) mod time;
 
 pub use time::r#fn::*;
 
-pub(crate) use time::r#enum::from_env_var;
+pub(crate) use time::r#enum::*;
 
 pub(crate) use std::{
     env, fmt,
@@ -18930,7 +20447,7 @@ pub(crate) use std::{
 ```rust
 #[test]
 fn test_lang() {
-    use crate::time::r#enum::from_env_var;
+    use crate::*;
     println!("test_lang: {}", from_env_var());
 }
 
@@ -18970,16 +20487,15 @@ fn test_methods() {
 # Path: hyperlane-time\src\time\enum.rs
 
 ```rust
-use crate::*;
-
 /// Represents supported languages.
 ///
 /// Each variant corresponds to a specific language and locale combination.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Lang {
     /// English (United States).
     EnUsUtf8,
     /// Chinese (China).
+    #[default]
     ZhCnUtf8,
     /// French (France).
     FrFrUtf8,
@@ -19012,126 +20528,27 @@ pub enum Lang {
     /// Finnish (Finland).
     FiFiUtf8,
 }
-/// Implementation of Display trait for Lang.
-///
-/// Provides a human-readable string representation for each language variant.
-impl fmt::Display for Lang {
-    /// Formats the language for display.
-    ///
-    /// # Arguments
-    ///
-    /// - `&mut fmt::Formatter` - The formatter to write to.
-    ///
-    /// # Returns
-    ///
-    /// - `fmt::Result` - The result of the formatting operation.
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let lang_str: &str = match self {
-            Lang::EnUsUtf8 => "English (US)",
-            Lang::ZhCnUtf8 => "中文 (中国)",
-            Lang::FrFrUtf8 => "Français (France)",
-            Lang::DeDeUtf8 => "Deutsch (Deutschland)",
-            Lang::EsEsUtf8 => "Español (España)",
-            Lang::ItItUtf8 => "Italiano (Italia)",
-            Lang::JaJpUtf8 => "日本語 (日本)",
-            Lang::KoKrUtf8 => "한국어 (한국)",
-            Lang::PtPtUtf8 => "Português (Portugal)",
-            Lang::RuRuUtf8 => "Русский (Россия)",
-            Lang::ArSaUtf8 => "العربية (السعودية)",
-            Lang::HiInUtf8 => "हिन्दी (भारत)",
-            Lang::ThThUtf8 => "ภาษาไทย (ประเทศไทย)",
-            Lang::ViVnUtf8 => "Tiếng Việt (Việt Nam)",
-            Lang::NlNlUtf8 => "Nederlands (Nederland)",
-            Lang::SvSeUtf8 => "Svenska (Sverige)",
-            Lang::FiFiUtf8 => "Suomi (Suomi)",
-        };
-        write!(f, "{lang_str}")
-    }
-}
-impl Lang {
-    /// Returns the UTC offset in seconds for the corresponding language.
-    ///
-    /// Each language is associated with a specific UTC offset,
-    /// indicating the difference from Coordinated Universal Time (UTC).
-    ///
-    /// # Returns
-    ///
-    /// - `u64` - The UTC offset in seconds.
-    pub fn value(&self) -> u64 {
-        match self {
-            Lang::EnUsUtf8 => 0,     // UTC
-            Lang::ZhCnUtf8 => 28800, // UTC+8
-            Lang::FrFrUtf8 => 3600,  // UTC+1
-            Lang::DeDeUtf8 => 3600,  // UTC+1
-            Lang::EsEsUtf8 => 3600,  // UTC+1
-            Lang::ItItUtf8 => 3600,  // UTC+1
-            Lang::JaJpUtf8 => 32400, // UTC+9
-            Lang::KoKrUtf8 => 32400, // UTC+9
-            Lang::PtPtUtf8 => 3600,  // UTC+1
-            Lang::RuRuUtf8 => 10800, // UTC+3
-            Lang::ArSaUtf8 => 10800, // UTC+3
-            Lang::HiInUtf8 => 19800, // UTC+5:30
-            Lang::ThThUtf8 => 25200, // UTC+7
-            Lang::ViVnUtf8 => 25200, // UTC+7
-            Lang::NlNlUtf8 => 3600,  // UTC+1
-            Lang::SvSeUtf8 => 3600,  // UTC+1
-            Lang::FiFiUtf8 => 3600,  // UTC+1
-        }
-    }
-}
 
-/// Implementation of Default trait for Lang.
-///
-/// Provides a default value for the Lang enum.
-impl Default for Lang {
-    /// Returns the default language.
-    ///
-    /// # Returns
-    ///
-    /// - `Lang` - The default language (Chinese/China).
-    fn default() -> Self {
-        Lang::ZhCnUtf8
-    }
-}
-/// Implementation of FromStr trait for Lang.
-///
-/// Allows parsing a string into a Lang variant.
-impl FromStr for Lang {
-    /// The error type for parsing operations.
-    type Err = ();
+```
 
-    /// Parses a string into a Lang variant.
-    ///
-    /// # Arguments
-    ///
-    /// - `&str` - The string to parse.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Self, Self::Err>` - The parsed Lang variant or an error.
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "en_US.UTF-8" => Ok(Lang::EnUsUtf8),
-            "zh_CN.UTF-8" => Ok(Lang::ZhCnUtf8),
-            "fr_FR.UTF-8" => Ok(Lang::FrFrUtf8),
-            "de_DE.UTF-8" => Ok(Lang::DeDeUtf8),
-            "es_ES.UTF-8" => Ok(Lang::EsEsUtf8),
-            "it_IT.UTF-8" => Ok(Lang::ItItUtf8),
-            "ja_JP.UTF-8" => Ok(Lang::JaJpUtf8),
-            "ko_KR.UTF-8" => Ok(Lang::KoKrUtf8),
-            "pt_PT.UTF-8" => Ok(Lang::PtPtUtf8),
-            "ru_RU.UTF-8" => Ok(Lang::RuRuUtf8),
-            "ar_SA.UTF-8" => Ok(Lang::ArSaUtf8),
-            "hi_IN.UTF-8" => Ok(Lang::HiInUtf8),
-            "th_TH.UTF-8" => Ok(Lang::ThThUtf8),
-            "vi_VN.UTF-8" => Ok(Lang::ViVnUtf8),
-            "nl_NL.UTF-8" => Ok(Lang::NlNlUtf8),
-            "sv_SE.UTF-8" => Ok(Lang::SvSeUtf8),
-            "fi_FI.UTF-8" => Ok(Lang::FiFiUtf8),
-            _ => Err(()),
-        }
-    }
-}
+# Path: hyperlane-time\src\time\fn.rs
+
+```rust
+use crate::*;
+
+/// Leap Year
+pub const LEAP_YEAR: [u64; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/// Common Year
+pub const COMMON_YEAR: [u64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/// Days
+pub const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/// Months
+pub const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
 /// Gets the time zone offset from the system environment variable.
 ///
@@ -19149,24 +20566,6 @@ pub fn from_env_var() -> Lang {
         .unwrap_or_default();
     lang
 }
-
-```
-
-# Path: hyperlane-time\src\time\fn.rs
-
-```rust
-use crate::*;
-
-/// Leap Year
-pub const LEAP_YEAR: [u64; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-/// Common Year
-pub const COMMON_YEAR: [u64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-/// Days
-pub const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-/// Months
-pub const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
 
 /// Determines if a year is a leap year.
 ///
@@ -19472,12 +20871,128 @@ pub fn timestamp_micros() -> u64 {
 
 ```
 
+# Path: hyperlane-time\src\time\impl.rs
+
+```rust
+use crate::*;
+
+/// Implementation of Display trait for Lang.
+///
+/// Provides a human-readable string representation for each language variant.
+impl fmt::Display for Lang {
+    /// Formats the language for display.
+    ///
+    /// # Arguments
+    ///
+    /// - `&mut fmt::Formatter` - The formatter to write to.
+    ///
+    /// # Returns
+    ///
+    /// - `fmt::Result` - The result of the formatting operation.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let lang_str: &str = match self {
+            Lang::EnUsUtf8 => "English (US)",
+            Lang::ZhCnUtf8 => "中文 (中国)",
+            Lang::FrFrUtf8 => "Français (France)",
+            Lang::DeDeUtf8 => "Deutsch (Deutschland)",
+            Lang::EsEsUtf8 => "Español (España)",
+            Lang::ItItUtf8 => "Italiano (Italia)",
+            Lang::JaJpUtf8 => "日本語 (日本)",
+            Lang::KoKrUtf8 => "한국어 (한국)",
+            Lang::PtPtUtf8 => "Português (Portugal)",
+            Lang::RuRuUtf8 => "Русский (Россия)",
+            Lang::ArSaUtf8 => "العربية (السعودية)",
+            Lang::HiInUtf8 => "हिन्दी (भारत)",
+            Lang::ThThUtf8 => "ภาษาไทย (ประเทศไทย)",
+            Lang::ViVnUtf8 => "Tiếng Việt (Việt Nam)",
+            Lang::NlNlUtf8 => "Nederlands (Nederland)",
+            Lang::SvSeUtf8 => "Svenska (Sverige)",
+            Lang::FiFiUtf8 => "Suomi (Suomi)",
+        };
+        write!(f, "{lang_str}")
+    }
+}
+impl Lang {
+    /// Returns the UTC offset in seconds for the corresponding language.
+    ///
+    /// Each language is associated with a specific UTC offset,
+    /// indicating the difference from Coordinated Universal Time (UTC).
+    ///
+    /// # Returns
+    ///
+    /// - `u64` - The UTC offset in seconds.
+    pub fn value(&self) -> u64 {
+        match self {
+            Lang::EnUsUtf8 => 0,     // UTC
+            Lang::ZhCnUtf8 => 28800, // UTC+8
+            Lang::FrFrUtf8 => 3600,  // UTC+1
+            Lang::DeDeUtf8 => 3600,  // UTC+1
+            Lang::EsEsUtf8 => 3600,  // UTC+1
+            Lang::ItItUtf8 => 3600,  // UTC+1
+            Lang::JaJpUtf8 => 32400, // UTC+9
+            Lang::KoKrUtf8 => 32400, // UTC+9
+            Lang::PtPtUtf8 => 3600,  // UTC+1
+            Lang::RuRuUtf8 => 10800, // UTC+3
+            Lang::ArSaUtf8 => 10800, // UTC+3
+            Lang::HiInUtf8 => 19800, // UTC+5:30
+            Lang::ThThUtf8 => 25200, // UTC+7
+            Lang::ViVnUtf8 => 25200, // UTC+7
+            Lang::NlNlUtf8 => 3600,  // UTC+1
+            Lang::SvSeUtf8 => 3600,  // UTC+1
+            Lang::FiFiUtf8 => 3600,  // UTC+1
+        }
+    }
+}
+
+/// Implementation of FromStr trait for Lang.
+///
+/// Allows parsing a string into a Lang variant.
+impl FromStr for Lang {
+    /// The error type for parsing operations.
+    type Err = ();
+
+    /// Parses a string into a Lang variant.
+    ///
+    /// # Arguments
+    ///
+    /// - `&str` - The string to parse.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self, Self::Err>` - The parsed Lang variant or an error.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "en_US.UTF-8" => Ok(Lang::EnUsUtf8),
+            "zh_CN.UTF-8" => Ok(Lang::ZhCnUtf8),
+            "fr_FR.UTF-8" => Ok(Lang::FrFrUtf8),
+            "de_DE.UTF-8" => Ok(Lang::DeDeUtf8),
+            "es_ES.UTF-8" => Ok(Lang::EsEsUtf8),
+            "it_IT.UTF-8" => Ok(Lang::ItItUtf8),
+            "ja_JP.UTF-8" => Ok(Lang::JaJpUtf8),
+            "ko_KR.UTF-8" => Ok(Lang::KoKrUtf8),
+            "pt_PT.UTF-8" => Ok(Lang::PtPtUtf8),
+            "ru_RU.UTF-8" => Ok(Lang::RuRuUtf8),
+            "ar_SA.UTF-8" => Ok(Lang::ArSaUtf8),
+            "hi_IN.UTF-8" => Ok(Lang::HiInUtf8),
+            "th_TH.UTF-8" => Ok(Lang::ThThUtf8),
+            "vi_VN.UTF-8" => Ok(Lang::ViVnUtf8),
+            "nl_NL.UTF-8" => Ok(Lang::NlNlUtf8),
+            "sv_SE.UTF-8" => Ok(Lang::SvSeUtf8),
+            "fi_FI.UTF-8" => Ok(Lang::FiFiUtf8),
+            _ => Err(()),
+        }
+    }
+}
+
+```
+
 # Path: hyperlane-time\src\time\mod.rs
 
 ```rust
 pub(crate) mod cfg;
 pub(crate) mod r#enum;
 pub(crate) mod r#fn;
+pub(crate) mod r#impl;
 
 ```
 
@@ -19541,7 +21056,6 @@ pub use chrono;
 pub use dotenvy;
 pub use futures;
 pub use hex;
-pub use inventory;
 pub use log;
 pub use num_cpus;
 pub use once_cell;
@@ -19549,7 +21063,6 @@ pub use redis;
 pub use regex;
 pub use sea_orm;
 pub use serde;
-pub use serde_json;
 pub use serde_urlencoded;
 pub use serde_with;
 pub use serde_xml_rs;
