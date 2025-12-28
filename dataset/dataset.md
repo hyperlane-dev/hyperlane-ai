@@ -1,6 +1,5 @@
 # Path: hyperlane\README.md
 
-
 ## hyperlane
 
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -266,7 +265,6 @@ async fn main() {
 ```
 
 ## Contact
-
 
 # Path: hyperlane\src\lib.rs
 
@@ -6190,7 +6188,6 @@ async fn test_server() {
 
 # Path: hyperlane-broadcast\README.md
 
-
 ## hyperlane-broadcast
 
 [Official Documentation](https://docs.ltpp.vip/hyperlane-broadcast/)
@@ -6233,7 +6230,6 @@ assert_eq!(rec3.recv().await, Ok(10));
 ```
 
 ## Contact
-
 
 # Path: hyperlane-broadcast\src\cfg.rs
 
@@ -6681,7 +6677,6 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 
 # Path: hyperlane-log\README.md
 
-
 ## hyperlane-log
 
 [Official Documentation](https://docs.ltpp.vip/hyperlane-log/)
@@ -6773,7 +6768,6 @@ let log: Log = Log::new("./logs", DISABLE_LOG_FILE_SIZE);
 ```
 
 ## Contact
-
 
 # Path: hyperlane-log\src\cfg.rs
 
@@ -7401,7 +7395,6 @@ pub type ArcLog = Arc<Log>;
 ```
 
 # Path: hyperlane-macros\README.md
-
 
 ## hyperlane-macros
 
@@ -8875,7 +8868,6 @@ async fn main() {
 ```
 
 ## Contact
-
 
 # Path: hyperlane-macros\debug\src\main.rs
 
@@ -17343,7 +17335,6 @@ pub(crate) use r#fn::*;
 
 # Path: hyperlane-plugin-websocket\README.md
 
-
 ## hyperlane-plugin-websocket
 
 [Official Documentation](https://docs.ltpp.vip/hyperlane-plugin-websocket/)
@@ -17710,7 +17701,6 @@ async fn main() {
 ```
 
 ## Contact
-
 
 # Path: hyperlane-plugin-websocket\src\lib.rs
 
@@ -19126,7 +19116,6 @@ pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 
 # Path: hyperlane-quick-start\README.md
 
-
 ## hyperlane-quick-start
 
 [English](README.md) | [简体中文](README.ZH-CN.md)
@@ -19201,9 +19190,7 @@ cargo run restart -d
 
 ## Contact
 
-
 # Path: hyperlane-quick-start\README.ZH-CN.md
-
 
 ## hyperlane-quick-start
 
@@ -19276,7 +19263,6 @@ cargo run restart -d
 | BTC      | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
 | ETH      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 | BSC      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-
 
 # Path: hyperlane-quick-start\app\lib.rs
 
@@ -20374,7 +20360,6 @@ fn main() {
 
 # Path: hyperlane-time\README.md
 
-
 ## hyperlane-time
 
 [Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
@@ -20418,7 +20403,6 @@ println!("Current Time with Micros: {}", time_micros());
 ```
 
 ## Contact
-
 
 # Path: hyperlane-time\src\lib.rs
 
@@ -20998,7 +20982,6 @@ pub(crate) mod r#impl;
 
 # Path: hyperlane-utils\README.md
 
-
 ## hyperlane-utils
 
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -21022,7 +21005,6 @@ use hyperlane_utils::*;
 ```
 
 ## Contact
-
 
 # Path: hyperlane-utils\src\lib.rs
 
@@ -21082,24 +21064,19 @@ pub use uuid;
 
 # Path: ltpp-docs\src\appreciate.md
 
-
 <Appreciate />
 
 <CratesDownloads />
 
 <GitHubMetrics />
 
-
 # Path: ltpp-docs\src\catalog.md
-
 
 > `Eastspire` 文档目录
 
 <Catalog :level=2 />
 
-
 # Path: ltpp-docs\src\hyperlane\README.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane)
 
@@ -21273,9 +21250,7 @@ async fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\config\config.md
-
 
 ### 设置 `host`
 
@@ -21412,9 +21387,7 @@ let config: ServerConfig = ServerConfig::from_str(config_str).unwrap();
 server.config(config).await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\config\middleware.md
-
 
 > `hyperlane` 框架支持请求中间件和响应中间件，
 > 支持多次注册，会按照注册顺序进行执行，如果任何阶段设置了 `aborted`，则后续注册的逻辑将不会执行。
@@ -21477,9 +21450,7 @@ server.response_middleware(|ctx: Context| async move {
 }).await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\config\panic-hook.md
-
 
 > `hyperlane` 框架内部会对 `panic` 进行捕获，用户可通过钩子进行设置（不设置，框架默认不处理），
 > 需要注意的是，触发 `panic` 后在执行 `panic_hook` 之前，框架会重置 `aborted` 状态，
@@ -21492,9 +21463,7 @@ server.panic_hook(|cxt: Context| {
 }).await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\config\route.md
-
 
 > `hyperlane` 框架使用 `route` 接口进行路由注册，第一个参数是路由名称，第二个参数是路由处理函数，
 > 框架支持动态路由，更多路由详细使用请参考[官方文档](../usage-introduction/route.md)，
@@ -21509,9 +21478,7 @@ server.route("路由名称", |ctx: Context| async move {
 }).await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\config\runtime.md
-
 
 > `hyperlane` 框架基于 `tokio`，可以参考 `tokio` [官方文档](https://docs.rs/tokio/latest/tokio/) 进行配置。
 
@@ -21539,9 +21506,7 @@ fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\config\server.md
-
 
 > `hyperlane` 框架创建服务方式如下，需要调用 `run` 方法，服务才会正常运行。
 > `ServerHook` 提供了等待框架运行完成和框架停止运行的 `hook`
@@ -21567,17 +21532,13 @@ println!("Server result: {:?}", result);
 let _ = std::io::Write::flush(&mut std::io::stderr());
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\help\async.md
-
 
 ### 异步
 
 > 由于 `hyperlane` 框架本身涉及到锁的数据均采取 `tokio`中的读写锁实现，所以涉及到锁的方法调用均需要 `await`。
 
-
 # Path: ltpp-docs\src\hyperlane\help\build.md
-
 
 ### 构建
 
@@ -21599,9 +21560,7 @@ docker run --rm -v "$(pwd):/tmp/cargo_build" ccr.ccs.tencentyun.com/linux_enviro
 docker run --rm -v "${pwd}:/tmp/cargo_build" ccr.ccs.tencentyun.com/linux_environment/cargo:1.0.0 /bin/bash -c "source ~/.bashrc && cd /tmp/cargo_build && RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu"
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\help\explain.md
-
 
 ### 框架说明
 
@@ -21611,9 +21570,7 @@ docker run --rm -v "${pwd}:/tmp/cargo_build" ccr.ccs.tencentyun.com/linux_enviro
 
 > 推荐阅读 [点击阅读](../../hyperlane-utils/README.md) 。
 
-
 # Path: ltpp-docs\src\hyperlane\help\flamegraph.md
-
 
 > `hyperlane` 框架使用 `flamegraph`，使用前提是需要有 `perf` 环境，生成火焰图步骤如下：
 
@@ -21629,9 +21586,7 @@ cargo install flamegraph
 CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --release
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\help\install.md
-
 
 ### 安装
 
@@ -21643,9 +21598,7 @@ CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --release
 cargo add hyperlane;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\middleware\auth.md
-
 
 ### 身份校验中间件
 
@@ -21703,9 +21656,7 @@ async fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\middleware\cross.md
-
 
 ### 跨域中间件
 
@@ -21749,9 +21700,7 @@ async fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\middleware\static-file.md
-
 
 ### 静态资源中间件
 
@@ -21808,9 +21757,7 @@ async fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\middleware\timeout.md
-
 
 ### 超时中间件
 
@@ -21876,9 +21823,7 @@ async fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\quick-start\directory.md
-
 
 > 基于 `hyperlane` 设计的目录结构，配置和业务分离，扩展以插件形式存在，便于开发和维护。
 
@@ -22051,9 +21996,7 @@ async fn main() {
   - `static/html`、`img`：被 `view` 层或浏览器直接访问。
   - `templates/html`：被 `controller` 或 `view` 用于渲染页面。
 
-
 # Path: ltpp-docs\src\hyperlane\quick-start\README.md
-
 
 ## 快速开始
 
@@ -22112,9 +22055,7 @@ cargo run restart -d
 cargo run hot
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\speed\close-keep-alive.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/web-server-pressure-measurement/tree/master/close-keep-alive)
 
@@ -22451,9 +22392,7 @@ Percentage of the requests served within a certain time (ms)
  100%   1108 (longest request)
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\speed\env.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/web-server-pressure-measurement)
 
@@ -22512,15 +22451,11 @@ root hard nofile 1024000
 RUSTFLAGS="-C target-cpu=native -C link-arg=-fuse-ld=lld" cargo run --release
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\speed\flamegraph.md
-
 
 ## plaintext
 
-
 # Path: ltpp-docs\src\hyperlane\speed\open-keep-alive.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/web-server-pressure-measurement/tree/master/open-keep-alive)
 
@@ -22865,9 +22800,7 @@ Percentage of the requests served within a certain time (ms)
  100%   1102 (longest request)
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\speed\request-time.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/test-request)
 
@@ -22879,9 +22812,7 @@ Percentage of the requests served within a certain time (ms)
 | hyperlane | 100us                 | 150us          |
 | 阿帕奇    | 300us                 | 2500us         |
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\addr.md
-
 
 > `hyperlane` 框架封装了获取客户端地址的方法
 
@@ -22923,9 +22854,7 @@ ctx.try_get_socket_host().await;
 ctx.try_get_socket_port().await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\async.md
-
 
 > `hyperlane` 框架在 `v3.0.0` 之前不对异步做任何处理，如果需要异步操作，可以引入第三方库
 > `hyperlane` 框架在 `v3.0.0` 之后内置异步机制
@@ -22991,9 +22920,7 @@ let func = future_fn!(test_string, |_| {
 server.route("/test/async", func).await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\attribute.md
-
 
 > `hyperlane` 框架支持临时上下文属性以 `key-value` 形式存储，生命周期贯穿一个完整的请求和响应。
 > 存储的 `value` 支持实现了`Any + Send + Sync + Clone` 的 `trait` 的类型。
@@ -23041,9 +22968,7 @@ let println_hyperlane = ctx
 println_hyperlane("test");
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\connection.md
-
 
 > `hyperlane` 框架提供了完整的连接状态管理功能，包括连接的中止、关闭状态控制，以及 `Keep-Alive` 连接支持。
 
@@ -23110,9 +23035,7 @@ while !ctx.get_closed().await && !ctx.get_aborted().await {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\cookie.md
-
 
 > `hyperlane` 框架提供了完整的 `Cookie` 处理功能，支持请求和响应中的 `Cookie` 操作。
 
@@ -23236,9 +23159,7 @@ let clear_cookie: String = CookieBuilder::new("session", "")
 ctx.set_response_header(SET_COOKIE, clear_cookie).await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\multi-server.md
-
 
 > `hyperlane` 框架支持多服务模式，仅需创建多个 `server` 实例并进行监听即可
 
@@ -23270,9 +23191,7 @@ let app2 = spawn(async move {
 let _ = tokio::join!(app1, app2);
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\panic.md
-
 
 > `hyperlane` 框架对于用户线程 `panic` 会进行捕获并写入错误日志，`hook` 支持发送响应
 > 需注意对于一个请求如果在任一中间件环节触发 `panic` 当前请求的后续注册的路由处理函数将不会执行。
@@ -23303,9 +23222,7 @@ async fn default_panic_hook(ctx: Context) {
 server.panic_hook(default_panic_hook);
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\request.md
-
 
 > `hyperlane` 框架对 `ctx` 额外封装了子字段的方法，可以直接调用大部分子字段的 `get` 和 `set` 方法名称。
 > 例如：调用 `request` 上的 `get_method` 方法，
@@ -23473,9 +23390,7 @@ ctx.get_request().await.get_string();
 let request_string: String = ctx.get_request_string().await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\response.md
-
 
 > `hyperlane` 框架没有发送响应前通过 `ctx` 中 `get_response` 获取的只是响应的初始化实例，里面其实没有数据，
 > 只有当用户发送响应时才会构建出完整 `http` 响应，此后再次 `get_response` 才能获取到响应内容。
@@ -23697,9 +23612,7 @@ ctx.get_response().await.get_string();
 let response_string: String = ctx.get_response_string().await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\route.md
-
 
 ## 静态路由
 
@@ -23745,9 +23658,7 @@ ctx.get_route_params().await;
 ctx.get_route_param("text").await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\send.md
-
 
 > `hyperlane` 框架提供了多种响应发送方法，支持完整 HTTP 响应发送、仅响应体发送，以及连接管理。
 > - `send_with_data`: 发送完整响应并设置响应体。
@@ -23892,9 +23803,7 @@ pub async fn handle(ctx: Context) {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\sse.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-quick-start/tree/sse)
 
@@ -23986,9 +23895,7 @@ eventSource.onerror = function (event) {
 };
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\stream.md
-
 
 > `hyperlane` 框架接收请求和发送响应均依赖 `stream`，类型是 [`ArcRwLockStream`](../type/stream.md) 需要注意框架提供的 `stream` 仅可读，使用方式如下：
 
@@ -24022,9 +23929,7 @@ let socket_addr: String = ctx
 ctx.closed().await;
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\usage-introduction\websocket.md
-
 
 > `hyperlane` 框架支持 `websocket` 协议，服务端自动处理协议升级，支持请求中间件，路由处理，响应中间件。
 
@@ -24071,9 +23976,7 @@ ws.onclose = () => {
 };
 ```
 
-
 # Path: ltpp-docs\src\hyperlane\utils\inner-utils.md
-
 
 ## http-constant
 
@@ -24090,9 +23993,7 @@ ws.onclose = () => {
 > `hyperlane` 框架使用了 `http-type` 库（框架已内置，无需额外安装和导入），
 > 使用参考 [官方文档](../../http-type/README.md)。
 
-
 # Path: ltpp-docs\src\hyperlane\utils\recommend-utils.md
-
 
 ## hyperlane-utils
 
@@ -24305,9 +24206,7 @@ async fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane-ai\README.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-ai)
 
@@ -24407,9 +24306,7 @@ OUTPUT_DIR=my_output
 
 成功执行后，最终的 GGUF 模型将位于: `$OUTPUT_DIR/$OUTPUT_DIR.gguf`
 
-
 # Path: ltpp-docs\src\hyperlane-broadcast\README.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-broadcast)
 
@@ -24452,9 +24349,7 @@ assert_eq!(rec3.recv().await, Ok(10));
 
 ## 开源协议
 
-
 # Path: ltpp-docs\src\hyperlane-log\README.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-log)
 
@@ -24544,9 +24439,7 @@ log.async_debug(String::from("async debug data!"), |debug| {
 let log: Log = Log::new("./logs", DISABLE_LOG_FILE_SIZE);
 ```
 
-
 # Path: ltpp-docs\src\hyperlane-macros\README.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-macros)
 
@@ -25141,9 +25034,7 @@ async fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane-plugin-websocket\README.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-plugin-websocket)
 
@@ -25308,9 +25199,7 @@ async fn main() {
 }
 ```
 
-
 # Path: ltpp-docs\src\hyperlane-time\README.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-time)
 
@@ -25352,9 +25241,7 @@ println!("Current Time with Millis: {}", time_millis());
 println!("Current Time with Micros: {}", time_micros());
 ```
 
-
 # Path: ltpp-docs\src\hyperlane-utils\README.md
-
 
 [GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-utils)
 
@@ -25375,5 +25262,4 @@ cargo add hyperlane-utils
 ```rust
 use hyperlane_utils::*;
 ```
-
 

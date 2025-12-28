@@ -442,9 +442,7 @@ class ThreadSafeFileProcessor:
                     content_lines.append("\n\n")
 
                 entry_content = "".join(content_lines)
-                entry_content = re.sub(
-                    r"(\n\\s*){2,}", "\n\n", entry_content, flags=re.MULTILINE
-                )
+                entry_content = re.sub(r"\n\s*\n\s*\n", "\n\n", entry_content)
                 current_file_handle.write(entry_content)
                 current_file_size += len(entry_content.encode("utf-8"))
 
