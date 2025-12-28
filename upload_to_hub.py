@@ -3,31 +3,21 @@ import os
 import argparse
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
-
-# --- Configuration ---
 HUGGING_FACE_REPO_ID = os.getenv("HUGGING_FACE_REPO_ID")
 MODEL_DIR = os.getenv("OUTPUT_DIR")
 REPO_ID = "hyperlane-dev/hyperlane-ai-training"
 DATASET_DIR = "dataset"
 
 
-# --- Main Script ---
 def upload_model_to_hub():
-    """
-    Uploads the contents of the MODEL_DIR to the specified Hugging Face Hub repository.
-    """
     api = HfApi()
     token = HfFolder.get_token()
-
     if token is None:
         print(
             "Hugging Face token not found. Please log in using 'huggingface-cli login' or 'hf auth login'."
         )
         return
-
-    # Get user info to check who is logged in
     try:
         user_info = api.whoami(token=token)
         username = user_info.get("name")
@@ -36,7 +26,6 @@ def upload_model_to_hub():
         print(f"Error getting user info: {e}")
         print("Please ensure your token is valid.")
         return
-
     repo_owner = HUGGING_FACE_REPO_ID.split("/")[0]
     if username != repo_owner:
         print(
@@ -45,12 +34,9 @@ def upload_model_to_hub():
         print(
             "Please make sure you have the necessary permissions to upload to this repository."
         )
-
     print(
         f"Preparing to upload the contents of '{MODEL_DIR}' to '{HUGGING_FACE_REPO_ID}'..."
     )
-
-    # Create the repository on the Hub (if it doesn't exist). It will be public.
     try:
         api.create_repo(
             repo_id=HUGGING_FACE_REPO_ID, repo_type="model", exist_ok=True, token=token
@@ -59,8 +45,6 @@ def upload_model_to_hub():
     except Exception as e:
         print(f"Error creating repository: {e}")
         return
-
-    # Upload the folder
     try:
         api.upload_folder(
             folder_path=MODEL_DIR,
@@ -77,19 +61,13 @@ def upload_model_to_hub():
 
 
 def upload_dataset_to_hub():
-    """
-    Uploads the contents of the DATASET_DIR to the specified Hugging Face Hub dataset repository.
-    """
     api = HfApi()
     token = HfFolder.get_token()
-
     if token is None:
         print(
             "Hugging Face token not found. Please log in using 'huggingface-cli login' or 'hf auth login'."
         )
         return
-
-    # Get user info to check who is logged in
     try:
         user_info = api.whoami(token=token)
         username = user_info.get("name")
@@ -98,7 +76,6 @@ def upload_dataset_to_hub():
         print(f"Error getting user info: {e}")
         print("Please ensure your token is valid.")
         return
-
     repo_owner = REPO_ID.split("/")[0]
     if username != repo_owner:
         print(
@@ -107,10 +84,7 @@ def upload_dataset_to_hub():
         print(
             "Please make sure you have the necessary permissions to upload to this repository."
         )
-
     print(f"Preparing to upload the contents of '{DATASET_DIR}' to '{REPO_ID}'...")
-
-    # Create the dataset repository on the Hub (if it doesn't exist). It will be public.
     try:
         api.create_repo(
             repo_id=REPO_ID, repo_type="dataset", exist_ok=True, token=token
@@ -119,8 +93,6 @@ def upload_dataset_to_hub():
     except Exception as e:
         print(f"Error creating dataset repository: {e}")
         return
-
-    # Upload the folder
     try:
         api.upload_folder(
             folder_path=DATASET_DIR,
@@ -144,15 +116,12 @@ if __name__ == "__main__":
         choices=["model", "dataset"],
         help="Specify 'model' to upload only model, 'dataset' to upload only dataset. If not specified, both will be uploaded.",
     )
-
     args = parser.parse_args()
-
     if args.target == "model":
         upload_model_to_hub()
     elif args.target == "dataset":
         upload_dataset_to_hub()
     else:
-        # Upload both if no argument or unrecognized argument
         upload_model_to_hub()
         print("\n" + "=" * 50 + "\n")
         upload_dataset_to_hub()

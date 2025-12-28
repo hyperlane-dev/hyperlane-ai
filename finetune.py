@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-"""
-CPU优化的微调脚本 - 支持Windows和Linux
-"""
 import torch
 import argparse
 from datasets import load_dataset, Dataset
@@ -11,17 +7,11 @@ from peft import LoraConfig, get_peft_model, PeftModel
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
-
-# Configuration
 MODEL_NAME = os.getenv("MODEL_NAME")
 DATASET_PATH = os.getenv("DATASET_PATH")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR")
-
 DEFAULT_TIPS = "An intelligent assistant for Hyperlane Web framework written in Rust (Project URL: https://github.com/hyperlane-dev/hyperlane)"
-
-# LoRA configuration
 lora_config = LoraConfig(
     r=32,
     target_modules=[
@@ -42,7 +32,6 @@ lora_config = LoraConfig(
 
 
 def augment_dataset(dataset, repeat_factor=3):
-    """数据增强"""
     augmented_data = []
     for example in dataset:
         augmented_data.append(example)
@@ -78,34 +67,25 @@ def parse_args():
 
 def main():
     args = parse_args()
-
     print("=" * 60)
     print("Loading model and tokenizer...")
     print("=" * 60)
-
-    # Load model
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         trust_remote_code=True,
         torch_dtype=torch.float32,
         low_cpu_mem_usage=True,
     )
-
-    # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-
-    # CPU optimizations
     if not torch.cuda.is_available():
         torch.set_num_threads(os.cpu_count() or 4)
         print(f"✓ CPU mode: {torch.get_num_threads()} threads")
-
-    # Apply LoRA
     if os.path.exists(OUTPUT_DIR) and os.path.isdir(OUTPUT_DIR):
         try:
             files = os.listdir(OUTPUT_DIR)
-            if any(f.startswith("adapter_config") for f in files):
+            if any((f.startswith("adapter_config") for f in files)):
                 print(f"✓ Resuming from: {OUTPUT_DIR}")
                 model = PeftModel.from_pretrained(model, OUTPUT_DIR)
             else:
@@ -117,41 +97,26 @@ def main():
     else:
         print("✓ Applying LoRA configuration...")
         model = get_peft_model(model, lora_config)
-
-    # Prompt template
-    alpaca_prompt = """<|im_start|>system
-You must strictly answer according to the following training data content, do not use your pre-training knowledge. If there is relevant information in the training data, please prioritize using the content from the training data.
-{}<|im_end|>
-<|im_start|>user
-{}<|im_end|>
-<|im_start|>assistant
-{}<|im_end|>"""
-
+    alpaca_prompt = "<|im_start|>system\nYou must strictly answer according to the following training data content, do not use your pre-training knowledge. If there is relevant information in the training data, please prioritize using the content from the training data.\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n{}<|im_end|>"
     EOS_TOKEN = tokenizer.eos_token
 
     def formatting_func(example):
         system_content = (example.get("system") or "").strip()
         if not system_content:
             system_content = f"You are {DEFAULT_TIPS}. Please answer questions strictly according to training data, prioritizing information from the training data."
-
         instruction = (example.get("instruction") or "").strip()
         input_content = (example.get("input") or "").strip()
-
         user_content = (
             f"{instruction}\n\n{input_content}" if input_content else instruction
         )
         output_content = (example.get("output") or "").strip()
-
         return (
             alpaca_prompt.format(system_content, user_content, output_content)
             + EOS_TOKEN
         )
 
-    # Load dataset
     print("✓ Loading dataset...")
     dataset = load_dataset("json", data_files=DATASET_PATH, split="train")
-
-    # Add identity data
     identity_data = [
         {
             "instruction": "Who are you",
@@ -169,25 +134,19 @@ You must strictly answer according to the following training data content, do no
             "system": "Function definition must be consistent with training data.",
         },
     ]
-
     for data in identity_data:
         dataset = dataset.add_item(data)
-
-    # Data augmentation
     dataset_list = list(dataset)
     augmented_list = augment_dataset(dataset_list, repeat_factor=5)
     dataset = Dataset.from_list(augmented_list)
-
     print(f"✓ Dataset size: {len(dataset)} samples")
-
-    # Training arguments
     training_args = TrainingArguments(
         per_device_train_batch_size=1,
         gradient_accumulation_steps=16,
         warmup_steps=100,
         warmup_ratio=0.1,
         max_steps=args.max_steps,
-        learning_rate=3e-4 * args.override_strength,
+        learning_rate=0.0003 * args.override_strength,
         fp16=False,
         bf16=False,
         logging_steps=5,
@@ -208,8 +167,6 @@ You must strictly answer according to the following training data content, do no
         load_best_model_at_end=False,
         report_to="none",
     )
-
-    # Initialize trainer
     print("✓ Initializing trainer...")
     trainer = SFTTrainer(
         model=model,
@@ -217,18 +174,14 @@ You must strictly answer according to the following training data content, do no
         train_dataset=dataset,
         formatting_func=formatting_func,
     )
-
     print("=" * 60)
     print("Starting training...")
     print("=" * 60)
     trainer.train()
-
-    # Save model
     print("=" * 60)
     print("Saving model...")
     trainer.save_model(OUTPUT_DIR)
     tokenizer.save_pretrained(OUTPUT_DIR)
-
     print("=" * 60)
     print(f"✓ Training completed! Model saved to: {OUTPUT_DIR}")
     print("=" * 60)
