@@ -95,6 +95,45 @@ class ThreadSafeFileProcessor:
             "total_processing_time": 0,
             "thread_stats": {},
         }
+        # Language-specific comment patterns
+        self.comment_patterns = {
+            "python": [r"#.*$"],
+            "javascript": [r"//.*$", r"/\*"],
+            "typescript": [r"//.*$", r"/\*"],
+            "java": [r"//.*$", r"/\*"],
+            "cpp": [r"//.*$", r"/\*"],
+            "c": [r"//.*$", r"/\*"],
+            "rust": [r"//.*$"],
+            "go": [r"//.*$", r"/\*"],
+            "php": [r"//.*$", r"#.*$", r"/\*.*?\*/"],
+            "ruby": [r"#.*$"],
+            "bash": [r"#.*$"],
+            "shell": [r"#.*$"],
+            "sql": [r"--.*$", r"/\*.*?\*/"],
+            "css": [r"/\*.*?\*/"],
+            "scss": [r"/\*.*?\*/", r"//.*$"],
+            "less": [r"/\*.*?\*/", r"//.*$"],
+            "html": [r"<!--.*?-->"],
+            "xml": [r"<!--.*?-->"],
+            "yaml": [r"#.*$"],
+            "yml": [r"#.*$"],
+            "dockerfile": [r"#.*$"],
+            "makefile": [r"#.*$"],
+            "cmake": [r"#.*$"],
+            "powershell": [r"#.*$"],
+            "ps1": [r"#.*$"],
+            "r": [r"#.*$"],
+            "perl": [r"#.*$"],
+            "lua": [r"--.*$", r"--\[\[.*?\]\]"],
+            "haskell": [r"--.*$", r"\{.*?\}"],
+            "erlang": [r"%.*$"],
+            "elixir": [r"#.*$"],
+            "swift": [r"//.*$", r"/\*.*?\*/"],
+            "kotlin": [r"//.*$", r"/\*.*?\*/"],
+            "scala": [r"//.*$", r"/\*.*?\*/"],
+            "dart": [r"//.*$", r"/\*.*?\*/"],
+            "objective-c": [r"//.*$", r"/\*.*?\*/"],
+        }
 
     def filter_content(self, content):
         lines = content.split("\n")
@@ -106,6 +145,24 @@ class ThreadSafeFileProcessor:
         for line in lines:
             if line.strip().startswith("<img") or line.strip().startswith("!["):
                 continue
+            
+            # Remove specific HTML tags (self-closing and with attributes)
+            tags_to_remove = [
+                "Catalog",
+                "Appreciate", 
+                "CratesDownloads",
+                "GitHubMetrics",
+                "Bottom",
+                "Share"
+            ]
+            
+            for tag in tags_to_remove:
+                # Remove self-closing tags like <Catalog /> or <Catalog attribute="value" />
+                line = re.sub(rf'<{tag}\s*[^>]*/>', '', line, flags=re.IGNORECASE)
+                # Remove opening and closing tags like <Catalog>content</Catalog>
+                line = re.sub(rf'<{tag}\s*[^>]*>.*?</{tag}>', '', line, flags=re.IGNORECASE | re.DOTALL)
+                # Remove opening tags like <Catalog attribute="value">
+                line = re.sub(rf'<{tag}\s*[^>]*>', '', line, flags=re.IGNORECASE)
             if (
                 "shields.io" in line
                 or "img.shields.io" in line
@@ -196,6 +253,158 @@ class ThreadSafeFileProcessor:
             result_lines.append(line)
             prev_empty = is_empty
         return "\n".join(result_lines)
+
+    def remove_code_comments(self, content, language):
+        """
+        Remove comments from code content based on the specified language.
+        This method is careful to preserve content inside string literals.
+
+        Arguments:
+        - `content`: The code content to process
+        - `language`: The programming language of the content
+
+        Returns:
+        - Content with comments removed
+        """
+        if not content or not language:
+            return content
+
+        patterns = self.comment_patterns.get(language.lower(), [])
+        if not patterns:
+            return content
+
+        # Process line by line to handle string literals properly
+        lines = content.split('\n')
+        result_lines = []
+
+        in_multiline_comment = False
+        in_multiline_string = False
+        string_delimiter = None
+
+        for line in lines:
+            if not line.strip():
+                result_lines.append(line)
+                continue
+
+            processed_line = line
+            i = 0
+            new_line = ""
+            in_string = False
+            string_char = None
+            escaped = False
+
+            # Process character by character to handle strings and comments properly
+            while i < len(processed_line):
+                char = processed_line[i]
+                next_char = processed_line[i + 1] if i + 1 < len(processed_line) else ''
+
+                # Handle escape sequences
+                if escaped:
+                    new_line += char
+                    escaped = False
+                    i += 1
+                    continue
+
+                if char == '\\':
+                    escaped = True
+                    new_line += char
+                    i += 1
+                    continue
+
+                # Handle string literals
+                if not in_string and char in ['"', "'"]:
+                    in_string = True
+                    string_char = char
+                    new_line += char
+                elif in_string and char == string_char:
+                    in_string = False
+                    string_char = None
+                    new_line += char
+                elif in_string:
+                    new_line += char
+                else:
+                    # Check for comments only when not in string
+                    comment_found = False
+
+                    for pattern in patterns:
+                        if pattern.startswith("//") and char == '/' and next_char == '/':
+                            # Single-line comment, skip rest of line
+                            comment_found = True
+                            break
+                        elif pattern.startswith("#") and char == '#':
+                            # Hash comment, skip rest of line
+                            comment_found = True
+                            break
+                        elif pattern.startswith("--") and char == '-' and next_char == '-':
+                            # SQL-style comment, skip rest of line
+                            comment_found = True
+                            break
+
+                    if comment_found:
+                        break  # Skip the rest of the line
+                    else:
+                        new_line += char
+
+                i += 1
+
+            result_lines.append(new_line)
+
+        # Handle multi-line comments (/* */ style)
+        content_with_single_line_comments_removed = '\n'.join(result_lines)
+        result = content_with_single_line_comments_removed
+
+        # Remove multi-line comments carefully
+        for pattern in patterns:
+            if pattern == r"/\*":
+                try:
+                    # Process multi-line comments line by line to handle strings properly
+                    lines = result.split('\n')
+                    result_lines = []
+                    in_multiline_comment = False
+                    
+                    for line in lines:
+                        if not in_multiline_comment:
+                            # Look for /* in this line
+                            if '/*' in line:
+                                # Check if /* is inside a string
+                                in_string = False
+                                string_char = None
+                                i = 0
+                                while i < len(line):
+                                    char = line[i]
+                                    if not in_string and char in ['"', "'"]:
+                                        in_string = True
+                                        string_char = char
+                                    elif in_string and char == string_char:
+                                        in_string = False
+                                        string_char = None
+                                    elif not in_string and i < len(line) - 1 and char == '/' and line[i + 1] == '*':
+                                        # Found /* not in string, start of multi-line comment
+                                        in_multiline_comment = True
+                                        # Add content before /*
+                                        line = line[:i]
+                                        break
+                                    i += 1
+                                
+                        if in_multiline_comment:
+                            # Look for */ in this line
+                            if '*/' in line:
+                                in_multiline_comment = False
+                                # Remove content up to and including */
+                                line = line.split('*/', 1)[1]
+                            else:
+                                # Skip this entire line as it's inside a multi-line comment
+                                line = ''
+                        
+                        if line.strip() or not in_multiline_comment:
+                            result_lines.append(line)
+                    
+                    result = '\n'.join(result_lines)
+                except Exception:
+                    # If anything goes wrong, skip this pattern
+                    continue
+
+        return result
 
     def read_text_file(self, file_path):
         encodings = ["utf-8", "gbk", "gb2312", "latin1"]
@@ -357,14 +566,18 @@ class ThreadSafeFileProcessor:
                         content_lines.append(filtered_content)
                         content_lines.append("\n\n")
                     else:
+                        # Remove comments from code content before adding to markdown
+                        code_without_comments = self.remove_code_comments(
+                            filtered_content, lang
+                        )
                         content_lines.append(f"```{lang}\n")
-                        content_lines.append(filtered_content)
+                        content_lines.append(code_without_comments)
                         content_lines.append("\n```\n\n")
                 else:
                     content_lines.append(filtered_content)
                     content_lines.append("\n\n")
                 entry_content = "".join(content_lines)
-                entry_content = re.sub("\\n\\s*\\n\\s*\\n", "\n\n", entry_content)
+                entry_content = re.sub(r"\n\s*\n", "\n", entry_content)
                 current_file_handle.write(entry_content)
                 current_file_size += len(entry_content.encode("utf-8"))
             print(f"\n✅ Markdown report generated: {self.output_file}")
