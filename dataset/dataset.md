@@ -17,24 +17,51 @@ git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ## Use
 ```rust
 use hyperlane::*;
-struct UpgradeMiddleware;
-struct SendBodyMiddleware {
-    socket_addr: String,
-}
-struct ResponseMiddleware;
-struct ServerPanicHook {
+struct ServerPanic {
     response_body: String,
     content_type: String,
 }
-struct RootRoute {
-    response_body: String,
-    cookie1: String,
-    cookie2: String,
+impl ServerHook for ServerPanic {
+    async fn new(ctx: &Context) -> Self {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
 }
-struct SseRoute;
-struct WebsocketRoute;
-struct DynamicRoute {
-    params: RouteParams,
+struct RequestError;
+impl ServerHook for RequestError {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .send()
+            .await;
+    }
+}
+struct SendBodyMiddleware {
+    socket_addr: String,
 }
 impl ServerHook for SendBodyMiddleware {
     async fn new(ctx: &Context) -> Self {
@@ -58,6 +85,7 @@ impl ServerHook for SendBodyMiddleware {
             .await;
     }
 }
+struct UpgradeMiddleware;
 impl ServerHook for UpgradeMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
@@ -81,11 +109,11 @@ impl ServerHook for UpgradeMiddleware {
                 .set_response_body(&vec![])
                 .await
                 .send()
-                .await
-                .unwrap();
+                .await;
         }
     }
 }
+struct ResponseMiddleware;
 impl ServerHook for ResponseMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
@@ -94,8 +122,13 @@ impl ServerHook for ResponseMiddleware {
         if ctx.get_request().await.is_ws() {
             return;
         }
-        let _ = ctx.send().await;
+        ctx.send().await;
     }
+}
+struct RootRoute {
+    response_body: String,
+    cookie1: String,
+    cookie2: String,
 }
 impl ServerHook for RootRoute {
     async fn new(ctx: &Context) -> Self {
@@ -118,14 +151,15 @@ impl ServerHook for RootRoute {
             .await;
     }
 }
+struct WebsocketRoute;
 impl WebsocketRoute {
     async fn send_body_hook(&self, ctx: &Context) {
-        let body: ResponseBody = ctx.get_response_body().await;
         if ctx.get_request().await.is_ws() {
+            let body: ResponseBody = ctx.get_response_body().await;
             let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-            ctx.send_body_list_with_data(&frame_list).await.unwrap();
+            ctx.send_body_list_with_data(&frame_list).await;
         } else {
-            ctx.send_body().await.unwrap();
+            ctx.send_body().await;
         }
     }
 }
@@ -145,31 +179,33 @@ impl ServerHook for WebsocketRoute {
                 Err(error) => {
                     ctx.set_response_body(&error.to_string()).await;
                     self.send_body_hook(ctx).await;
-                    break;
+                    return;
                 }
             }
         }
     }
 }
+struct SseRoute;
 impl ServerHook for SseRoute {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
     async fn handle(self, ctx: &Context) {
-        let _ = ctx
-            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
             .send()
             .await;
         for i in 0..10 {
-            let _ = ctx
-                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
                 .await
                 .send_body()
                 .await;
         }
-        let _ = ctx.closed().await;
+        ctx.closed().await;
     }
+}
+struct DynamicRoute {
+    params: RouteParams,
 }
 impl ServerHook for DynamicRoute {
     async fn new(ctx: &Context) -> Self {
@@ -182,47 +218,14 @@ impl ServerHook for DynamicRoute {
         panic!("Test panic {:?}", self.params);
     }
 }
-impl ServerHook for ServerPanicHook {
-    async fn new(ctx: &Context) -> Self {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String =
-            ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        let _ = ctx
-            .set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .send()
-            .await;
-    }
-}
+#[tokio::main]
 async fn main() {
-    let config: ServerConfig = ServerConfig::new().await;
-    config.host("0.0.0.0").await;
-    config.port(60000).await;
-    config.request_config(RequestConfig::default()).await;
-    config.disable_linger().await;
-    config.disable_nodelay().await;
-    let server: Server = Server::from(config).await;
+    let server: Server = Server::new().await;
+    server.panic::<ServerPanic>().await;
+    server.request_error::<RequestError>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
-    server.panic_hook::<ServerPanicHook>().await;
     server.route::<RootRoute>("/").await;
     server.route::<WebsocketRoute>("/websocket").await;
     server.route::<SseRoute>("/sse").await;
@@ -243,6 +246,7 @@ mod hook;
 mod panic;
 mod route;
 mod server;
+#[cfg(test)]
 mod tests;
 pub use attribute::*;
 pub use config::*;
@@ -481,6 +485,25 @@ impl From<ContextInner> for Context {
         Self(arc_rwlock(ctx))
     }
 }
+impl From<&ArcRwLockStream> for Context {
+    #[inline(always)]
+    fn from(stream: &ArcRwLockStream) -> Self {
+        let request: Request = Request::default();
+        let mut internal_ctx: ContextInner = ContextInner::default();
+        internal_ctx
+            .set_stream(Some(stream.clone()))
+            .set_request(request.clone())
+            .get_mut_response()
+            .set_version(request.get_version().clone());
+        internal_ctx.into()
+    }
+}
+impl From<ArcRwLockStream> for Context {
+    #[inline(always)]
+    fn from(stream: ArcRwLockStream) -> Self {
+        (&stream).into()
+    }
+}
 impl Context {
     #[inline(always)]
     pub(crate) fn new(stream: &ArcRwLockStream, request: &Request) -> Context {
@@ -497,6 +520,46 @@ impl Context {
     }
     async fn write(&self) -> ContextWriteGuard<'_> {
         self.get_0().write().await
+    }
+    pub async fn http_from_stream(
+        &self,
+        request_config: RequestConfig,
+    ) -> Result<Request, RequestError> {
+        if self.get_aborted().await {
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
+        }
+        if let Some(stream) = self.try_get_stream().await.as_ref() {
+            let request_res: Result<Request, RequestError> =
+                Request::http_from_stream(stream, &request_config).await;
+            if let Ok(request) = request_res.as_ref() {
+                self.set_request(request).await;
+            }
+            return request_res;
+        };
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+    }
+    pub async fn ws_from_stream(
+        &self,
+        request_config: RequestConfig,
+    ) -> Result<Request, RequestError> {
+        if self.get_aborted().await {
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
+        }
+        if let Some(stream) = self.try_get_stream().await.as_ref() {
+            let mut last_request: Request = self.get_request().await;
+            let request_res: Result<Request, RequestError> =
+                last_request.ws_from_stream(stream, &request_config).await;
+            match request_res.as_ref() {
+                Ok(request) => {
+                    self.set_request(request).await;
+                }
+                Err(_) => {
+                    self.set_request(&last_request).await;
+                }
+            }
+            return request_res;
+        };
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
     pub async fn get_aborted(&self) -> bool {
         *self.read().await.get_aborted()
@@ -1138,21 +1201,30 @@ impl Context {
         self.get_internal_attribute(InternalAttribute::Hook(key.to_string()))
             .await
     }
-    pub async fn send(&self) -> Result<(), ResponseError> {
+    pub async fn try_send(&self) -> Result<(), ResponseError> {
         if self.is_terminated().await {
             return Err(ResponseError::Terminated);
         }
         let response_data: ResponseData = self.write().await.get_mut_response().build();
         if let Some(stream) = self.try_get_stream().await {
-            return stream.send(response_data).await;
+            return stream.try_send(response_data).await;
         }
         Err(ResponseError::NotFoundStream)
     }
-    pub async fn send_body(&self) -> Result<(), ResponseError> {
-        let response_body: ResponseBody = self.get_response_body().await;
-        self.send_body_with_data(response_body).await
+    pub async fn send(&self) {
+        self.try_send().await.unwrap();
     }
-    pub async fn send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
+    pub async fn try_send_body(&self) -> Result<(), ResponseError> {
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
+        }
+        let response_body: ResponseBody = self.get_response_body().await;
+        self.try_send_body_with_data(response_body).await
+    }
+    pub async fn send_body(&self) {
+        self.try_send_body().await.unwrap();
+    }
+    pub async fn try_send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
     where
         D: AsRef<[u8]>,
     {
@@ -1160,11 +1232,17 @@ impl Context {
             return Err(ResponseError::Terminated);
         }
         if let Some(stream) = self.try_get_stream().await {
-            return stream.send_body(data).await;
+            return stream.try_send_body(data).await;
         }
         Err(ResponseError::NotFoundStream)
     }
-    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
+    pub async fn send_body_with_data<D>(&self, data: D)
+    where
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_with_data(data).await.unwrap();
+    }
+    pub async fn try_send_body_list<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
     where
         I: IntoIterator<Item = D>,
         D: AsRef<[u8]>,
@@ -1173,56 +1251,51 @@ impl Context {
             return Err(ResponseError::Terminated);
         }
         if let Some(stream) = self.try_get_stream().await {
-            return stream.send_body_list(data_iter).await;
+            return stream.try_send_body_list(data_iter).await;
         }
         Err(ResponseError::NotFoundStream)
     }
-    pub async fn flush(&self) -> Result<(), ResponseError> {
+    pub async fn send_body_list<I, D>(&self, data_iter: I)
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_list(data_iter).await.unwrap();
+    }
+    pub async fn try_send_body_list_with_data<I, D>(
+        &self,
+        data_iter: I,
+    ) -> Result<(), ResponseError>
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
+        }
         if let Some(stream) = self.try_get_stream().await {
-            stream.flush().await;
-            return Ok(());
+            return stream.try_send_body_list(data_iter).await;
         }
         Err(ResponseError::NotFoundStream)
     }
-    pub async fn http_from_stream(
-        &self,
-        request_config: RequestConfig,
-    ) -> Result<Request, RequestError> {
-        if self.get_aborted().await {
-            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
-        }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let request_res: Result<Request, RequestError> =
-                Request::http_from_stream(stream, &request_config).await;
-            if let Ok(request) = request_res.as_ref() {
-                self.set_request(request).await;
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I)
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_list_with_data(data_iter).await.unwrap()
     }
-    pub async fn ws_from_stream(
-        &self,
-        request_config: RequestConfig,
-    ) -> Result<Request, RequestError> {
-        if self.get_aborted().await {
-            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
+    pub async fn try_flush(&self) -> Result<(), ResponseError> {
+        if self.is_terminated().await {
+            return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let mut last_request: Request = self.get_request().await;
-            let request_res: Result<Request, RequestError> =
-                last_request.ws_from_stream(stream, &request_config).await;
-            match request_res.as_ref() {
-                Ok(request) => {
-                    self.set_request(request).await;
-                }
-                Err(_) => {
-                    self.set_request(&last_request).await;
-                }
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+        if let Some(stream) = self.try_get_stream().await {
+            return stream.try_flush().await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+    pub async fn flush(&self) {
+        self.try_flush().await.unwrap();
     }
 }
 ```
@@ -1303,17 +1376,13 @@ pub use r#enum::*;
 # Path: hyperlane\src\hook\enum.rs
 ```rust
 use crate::*;
-#[derive(Clone)]
-pub enum HookHandlerSpec {
-    Handler(ServerHookHandler),
-    Factory(ServerHookHandlerFactory),
-}
-#[derive(Clone, Debug, PartialEq, Eq, Copy, Hash, DisplayDebug)]
+#[derive(Clone, Debug, Copy, DisplayDebug)]
 pub enum HookType {
-    PanicHook(Option<isize>),
-    RequestMiddleware(Option<isize>),
-    Route(&'static str),
-    ResponseMiddleware(Option<isize>),
+    Panic(Option<isize>, ServerHookHandlerFactory),
+    RequestError(Option<isize>, ServerHookHandlerFactory),
+    RequestMiddleware(Option<isize>, ServerHookHandlerFactory),
+    Route(&'static str, ServerHookHandlerFactory),
+    ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
 }
 ```
 # Path: hyperlane\src\hook\fn.rs
@@ -1332,19 +1401,15 @@ where
     })
 }
 #[inline(always)]
-pub fn assert_hook_unique_order(list: Vec<HookMacro>) {
+pub fn assert_hook_unique_order(list: Vec<HookType>) {
     let mut seen: HashSet<(HookType, isize)> = HashSet::new();
-    list.iter()
-        .filter_map(|hook| {
-            hook.hook_type
-                .try_get()
-                .map(|order| (hook.hook_type, order))
-        })
-        .for_each(|(key, order)| {
-            if !seen.insert((key, order)) {
-                panic!("Duplicate hook detected: {} with order {}", key, order);
-            }
-        });
+    list.iter().for_each(|hook| {
+        if let Some(order) = hook.try_get_order()
+            && !seen.insert((*hook, order))
+        {
+            panic!("Duplicate hook detected: {} with order {}", hook, order);
+        }
+    });
 }
 ```
 # Path: hyperlane\src\hook\impl.rs
@@ -1378,28 +1443,83 @@ impl ServerControlHook {
         self.get_shutdown_hook()().await;
     }
 }
-impl PartialEq for HookHandlerSpec {
+impl PartialEq for HookType {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (HookHandlerSpec::Handler(handler_a), HookHandlerSpec::Handler(handler_b)) => {
-                Arc::ptr_eq(handler_a, handler_b)
+            (HookType::Panic(order1, factory1), HookType::Panic(order2, factory2)) => {
+                order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
             }
-            (HookHandlerSpec::Factory(factory_a), HookHandlerSpec::Factory(factory_b)) => {
-                std::ptr::eq(factory_a as *const _, factory_b as *const _)
+            (
+                HookType::RequestError(order1, factory1),
+                HookType::RequestError(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            (
+                HookType::RequestMiddleware(order1, factory1),
+                HookType::RequestMiddleware(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            (HookType::Route(path1, factory1), HookType::Route(path2, factory2)) => {
+                path1 == path2 && std::ptr::fn_addr_eq(*factory1, *factory2)
             }
+            (
+                HookType::ResponseMiddleware(order1, factory1),
+                HookType::ResponseMiddleware(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
             _ => false,
         }
     }
 }
-impl Eq for HookHandlerSpec {}
+impl Eq for HookType {}
+impl Hash for HookType {
+    #[inline(always)]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            HookType::Panic(order, factory) => {
+                0u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::RequestError(order, factory) => {
+                1u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::RequestMiddleware(order, factory) => {
+                2u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::Route(path, factory) => {
+                3u8.hash(state);
+                path.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::ResponseMiddleware(order, factory) => {
+                4u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+        }
+    }
+}
 impl HookType {
     #[inline(always)]
-    pub fn try_get(&self) -> Option<isize> {
+    pub fn try_get_order(&self) -> Option<isize> {
         match *self {
-            HookType::RequestMiddleware(order)
-            | HookType::ResponseMiddleware(order)
-            | HookType::PanicHook(order) => order,
+            HookType::RequestMiddleware(order, _)
+            | HookType::ResponseMiddleware(order, _)
+            | HookType::Panic(order, _)
+            | HookType::RequestError(order, _) => order,
+            _ => None,
+        }
+    }
+    #[inline(always)]
+    pub fn try_get_hook(&self) -> Option<ServerHookHandlerFactory> {
+        match *self {
+            HookType::RequestMiddleware(_, hook)
+            | HookType::ResponseMiddleware(_, hook)
+            | HookType::Panic(_, hook)
+            | HookType::RequestError(_, hook) => Some(hook),
             _ => None,
         }
     }
@@ -1432,38 +1552,6 @@ pub struct ServerControlHook {
     #[get(pub)]
     #[set(pub(crate))]
     pub(super) shutdown_hook: SharedAsyncTaskFactory<()>,
-}
-#[derive(Getter, Setter, Clone, CustomDebug, PartialEq, Eq)]
-pub struct HookMacro {
-    #[debug(skip)]
-    pub handler: HookHandlerSpec,
-    pub hook_type: HookType,
-}
-impl HookMacro {
-    pub fn panic_hook<P: ServerHook>(order: Option<isize>) -> Self {
-        Self {
-            handler: HookHandlerSpec::Factory(server_hook_factory::<P>),
-            hook_type: HookType::PanicHook(order),
-        }
-    }
-    pub fn request_middleware<M: ServerHook>(order: Option<isize>) -> Self {
-        Self {
-            handler: HookHandlerSpec::Factory(server_hook_factory::<M>),
-            hook_type: HookType::RequestMiddleware(order),
-        }
-    }
-    pub fn response_middleware<M: ServerHook>(order: Option<isize>) -> Self {
-        Self {
-            handler: HookHandlerSpec::Factory(server_hook_factory::<M>),
-            hook_type: HookType::ResponseMiddleware(order),
-        }
-    }
-    pub fn route<R: ServerHook>(path: &'static str) -> Self {
-        Self {
-            handler: HookHandlerSpec::Factory(server_hook_factory::<R>),
-            hook_type: HookType::Route(path),
-        }
-    }
 }
 ```
 # Path: hyperlane\src\hook\trait.rs
@@ -1568,7 +1656,7 @@ pub enum RouteSegment {
 # Path: hyperlane\src\route\impl.rs
 ```rust
 use crate::*;
-collect!(HookMacro);
+collect!(HookType);
 impl Default for RouteMatcher {
     #[inline(always)]
     fn default() -> Self {
@@ -1800,7 +1888,7 @@ impl RoutePattern {
                     }
                     params.insert(param_name.clone(), segment_value);
                     if idx == route_segments_len - 1 {
-                        break;
+                        return Some(params);
                     }
                 }
             }
@@ -1845,18 +1933,14 @@ impl RouteMatcher {
         }
         path.matches(DEFAULT_HTTP_PATH).count() + 1
     }
-    pub(crate) fn add(
-        &mut self,
-        pattern: &str,
-        handler: ServerHookHandler,
-    ) -> Result<(), RouteError> {
+    pub(crate) fn add(&mut self, pattern: &str, hook: ServerHookHandler) -> Result<(), RouteError> {
         let route_pattern: RoutePattern = RoutePattern::new(pattern)?;
         if route_pattern.is_static() {
             if self.get_static_route().contains_key(pattern) {
                 return Err(RouteError::DuplicatePattern(pattern.to_owned()));
             }
             self.get_mut_static_route()
-                .insert(pattern.to_string(), handler);
+                .insert(pattern.to_string(), hook);
             return Ok(());
         }
         let target_map: &mut ServerHookPatternRoute = if route_pattern.is_dynamic() {
@@ -1869,7 +1953,7 @@ impl RouteMatcher {
             target_map.entry(segment_count).or_default();
         match routes_for_count.binary_search_by(|(p, _)| p.cmp(&route_pattern)) {
             Ok(_) => return Err(RouteError::DuplicatePattern(pattern.to_owned())),
-            Err(pos) => routes_for_count.insert(pos, (route_pattern, handler)),
+            Err(pos) => routes_for_count.insert(pos, (route_pattern, hook)),
         }
         Ok(())
     }
@@ -1878,24 +1962,24 @@ impl RouteMatcher {
         ctx: &Context,
         path: &str,
     ) -> Option<ServerHookHandler> {
-        if let Some(handler) = self.get_static_route().get(path) {
+        if let Some(hook) = self.get_static_route().get(path) {
             ctx.set_route_params(RouteParams::default()).await;
-            return Some(handler.clone());
+            return Some(hook.clone());
         }
         let path_segment_count: usize = Self::count_path_segments(path);
         if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
-            for (pattern, handler) in routes {
+            for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params).await;
-                    return Some(handler.clone());
+                    return Some(hook.clone());
                 }
             }
         }
         if let Some(routes) = self.get_regex_route().get(&path_segment_count) {
-            for (pattern, handler) in routes {
+            for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params).await;
-                    return Some(handler.clone());
+                    return Some(hook.clone());
                 }
             }
         }
@@ -1903,13 +1987,13 @@ impl RouteMatcher {
             if segment_count == path_segment_count {
                 continue;
             }
-            for (pattern, handler) in routes {
+            for (pattern, hook) in routes {
                 if pattern.has_tail_regex()
                     && path_segment_count >= segment_count
                     && let Some(params) = pattern.try_match_path(path)
                 {
                     ctx.set_route_params(params).await;
-                    return Some(handler.clone());
+                    return Some(hook.clone());
                 }
             }
         }
@@ -1969,7 +2053,8 @@ impl Default for ServerInner {
     fn default() -> Self {
         Self {
             config: ServerConfigInner::default(),
-            panic_hook: vec![],
+            panic: vec![],
+            request_error: vec![],
             route_matcher: RouteMatcher::new(),
             request_middleware: vec![],
             response_middleware: vec![],
@@ -1980,13 +2065,19 @@ impl PartialEq for ServerInner {
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
             && self.route_matcher == other.route_matcher
-            && self.panic_hook.len() == other.panic_hook.len()
+            && self.panic.len() == other.panic.len()
+            && self.request_error.len() == other.request_error.len()
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
             && self
-                .panic_hook
+                .panic
                 .iter()
-                .zip(other.panic_hook.iter())
+                .zip(other.panic.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .request_error
+                .iter()
+                .zip(other.request_error.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .request_middleware
@@ -2043,51 +2134,29 @@ impl Server {
     pub async fn get_route_matcher(&self) -> RouteMatcher {
         self.read().await.get_route_matcher().clone()
     }
-    pub async fn handle_hook(&self, hook: HookMacro) {
-        match (hook.hook_type, hook.handler) {
-            (HookType::PanicHook(_), HookHandlerSpec::Handler(handler)) => {
-                self.write().await.get_mut_panic_hook().push(handler);
+    pub async fn handle_hook(&self, hook: HookType) {
+        match hook {
+            HookType::Panic(_, hook) => {
+                self.write().await.get_mut_panic().push(hook());
             }
-            (HookType::PanicHook(_), HookHandlerSpec::Factory(factory)) => {
-                self.write().await.get_mut_panic_hook().push(factory());
+            HookType::RequestError(_, hook) => {
+                self.write().await.get_mut_request_error().push(hook());
             }
-            (HookType::RequestMiddleware(_), HookHandlerSpec::Handler(handler)) => {
-                self.write()
-                    .await
-                    .get_mut_request_middleware()
-                    .push(handler);
+            HookType::RequestMiddleware(_, hook) => {
+                self.write().await.get_mut_request_middleware().push(hook());
             }
-            (HookType::RequestMiddleware(_), HookHandlerSpec::Factory(factory)) => {
-                self.write()
-                    .await
-                    .get_mut_request_middleware()
-                    .push(factory());
-            }
-            (HookType::Route(path), HookHandlerSpec::Handler(handler)) => {
+            HookType::Route(path, hook) => {
                 self.write()
                     .await
                     .get_mut_route_matcher()
-                    .add(path, handler)
+                    .add(path, hook())
                     .unwrap();
             }
-            (HookType::Route(path), HookHandlerSpec::Factory(factory)) => {
-                self.write()
-                    .await
-                    .get_mut_route_matcher()
-                    .add(path, factory())
-                    .unwrap();
-            }
-            (HookType::ResponseMiddleware(_), HookHandlerSpec::Handler(handler)) => {
+            HookType::ResponseMiddleware(_, hook) => {
                 self.write()
                     .await
                     .get_mut_response_middleware()
-                    .push(handler);
-            }
-            (HookType::ResponseMiddleware(_), HookHandlerSpec::Factory(factory)) => {
-                self.write()
-                    .await
-                    .get_mut_response_middleware()
-                    .push(factory());
+                    .push(hook());
             }
         };
     }
@@ -2100,13 +2169,23 @@ impl Server {
         self.write().await.set_config(config.get_inner().await);
         self
     }
-    pub async fn panic_hook<S>(&self) -> &Self
+    pub async fn panic<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
             .await
-            .get_mut_panic_hook()
+            .get_mut_panic()
+            .push(server_hook_factory::<S>());
+        self
+    }
+    pub async fn request_error<S>(&self) -> &Self
+    where
+        S: ServerHook,
+    {
+        self.write()
+            .await
+            .get_mut_request_error()
             .push(server_hook_factory::<S>());
         self
     }
@@ -2174,11 +2253,11 @@ impl Server {
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
         let panic_clone: Panic = panic.clone();
         ctx.cancel_aborted().await.set_panic(panic_clone).await;
-        for hook in self.read().await.get_panic_hook().iter() {
+        for hook in self.read().await.get_panic().iter() {
             if let Err(join_error) = spawn(hook(ctx)).await
                 && join_error.is_panic()
             {
-                eprintln!("Panic occurred in panic hook: {:?}", join_error);
+                eprintln!("Panic occurred in panic handler: {:?}", join_error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
             if ctx.get_aborted().await {
@@ -2192,15 +2271,8 @@ impl Server {
             .await;
         self.handle_panic_with_context(ctx, &panic).await;
     }
-    async fn handle_middleware(&self, ctx: &Context, handler: &ServerHookHandler) {
-        if let Err(join_error) = spawn(handler(ctx)).await
-            && join_error.is_panic()
-        {
-            self.handle_task_panic(ctx, join_error).await;
-        }
-    }
-    async fn handle_route_matcher_handler(&self, ctx: &Context, handler: &ServerHookHandler) {
-        if let Err(join_error) = spawn(handler(ctx)).await
+    async fn spawn_handler(&self, ctx: &Context, hook: &ServerHookHandler) {
+        if let Err(join_error) = spawn(hook(ctx)).await
             && join_error.is_panic()
         {
             self.handle_task_panic(ctx, join_error).await;
@@ -2241,15 +2313,29 @@ impl Server {
             server.handle_connection(stream, request_config).await;
         });
     }
+    pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
+        ctx.cancel_aborted()
+            .await
+            .set_response_status_code(error.get_http_status_code())
+            .await
+            .set_response_body(&error.to_string())
+            .await;
+        for hook in self.read().await.get_request_error().iter() {
+            self.spawn_handler(ctx, hook).await;
+            if ctx.get_aborted().await {
+                return;
+            }
+        }
+    }
     async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfig) {
         match Request::http_from_stream(&stream, &request_config).await {
             Ok(request) => {
-                let handler: HandlerState = HandlerState::new(stream, request_config);
-                self.handle_http_requests(&handler, &request).await;
+                let hook: HandlerState = HandlerState::new(stream, request_config);
+                self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
-                let ctx: Context = Context::new(&stream, &Request::default());
-                self.handle_http_requests_error(&ctx, &error).await;
+                self.handle_http_requests_error(&stream.into(), &error)
+                    .await;
             }
         }
     }
@@ -2287,24 +2373,16 @@ impl Server {
                     }
                 }
                 Err(error) => {
-                    Self::flush_stdout_and_stderr();
-                    let ctx: Context = Context::new(state.get_stream(), &Request::default());
-                    self.handle_http_requests_error(&ctx, &error).await;
-                    break;
+                    self.handle_http_requests_error(&state.get_stream().into(), &error)
+                        .await;
+                    return;
                 }
             }
         }
     }
-    pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
-        let mut panic: Panic = Panic::default();
-        panic.set_message(Some(error.to_string()));
-        ctx.set_response_status_code(error.get_http_status_code())
-            .await;
-        self.handle_panic_with_context(ctx, &panic).await;
-    }
     pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
-        for handler in self.read().await.get_request_middleware().iter() {
-            self.handle_middleware(ctx, handler).await;
+        for hook in self.read().await.get_request_middleware().iter() {
+            self.spawn_handler(ctx, hook).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -2312,14 +2390,14 @@ impl Server {
         false
     }
     pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
-        if let Some(handler) = self
+        if let Some(hook) = self
             .read()
             .await
             .get_route_matcher()
             .try_resolve_route(ctx, path)
             .await
         {
-            self.handle_route_matcher_handler(ctx, &handler).await;
+            self.spawn_handler(ctx, &hook).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -2327,8 +2405,8 @@ impl Server {
         false
     }
     pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
-        for handler in self.read().await.get_response_middleware().iter() {
-            self.handle_middleware(ctx, handler).await;
+        for hook in self.read().await.get_response_middleware().iter() {
+            self.spawn_handler(ctx, hook).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -2397,7 +2475,12 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic_hook: ServerHookList,
+    pub(super) request_error: ServerHookList,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) panic: ServerHookList,
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -2981,228 +3064,227 @@ async fn server_inner_partial_eq() {
     let inner2: ServerInner = ServerInner::default();
     assert_eq!(inner1, inner2);
 }
-#[tokio::test]
-async fn test_server() {
-    struct UpgradeMiddleware;
-    struct SendBodyMiddleware {
-        socket_addr: String,
-    }
-    struct ResponseMiddleware;
-    struct ServerPanicHook {
-        response_body: String,
-        content_type: String,
-    }
-    struct RootRoute {
-        response_body: String,
-        cookie1: String,
-        cookie2: String,
-    }
-    struct SseRoute;
-    struct WebsocketRoute;
-    struct DynamicRoute {
-        params: RouteParams,
-    }
-    impl ServerHook for SendBodyMiddleware {
-        async fn new(ctx: &Context) -> Self {
-            let socket_addr: String = ctx.get_socket_addr_string().await;
-            Self { socket_addr }
+struct ServerPanic {
+    response_body: String,
+    content_type: String,
+}
+impl ServerHook for ServerPanic {
+    async fn new(ctx: &Context) -> Self {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
         }
-        async fn handle(self, ctx: &Context) {
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+struct RequestError;
+impl ServerHook for RequestError {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .send()
+            .await;
+    }
+}
+struct SendBodyMiddleware {
+    socket_addr: String,
+}
+impl ServerHook for SendBodyMiddleware {
+    async fn new(ctx: &Context) -> Self {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        Self { socket_addr }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(200)
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONNECTION, KEEP_ALIVE)
+            .await
+            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .await
+            .set_response_header("SocketAddr", &self.socket_addr)
+            .await;
+    }
+}
+struct UpgradeMiddleware;
+impl ServerHook for UpgradeMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
             ctx.set_response_version(HttpVersion::Http1_1)
                 .await
-                .set_response_status_code(200)
+                .set_response_status_code(101)
                 .await
-                .set_response_header(SERVER, HYPERLANE)
+                .set_response_header(UPGRADE, WEBSOCKET)
                 .await
-                .set_response_header(CONNECTION, KEEP_ALIVE)
+                .set_response_header(CONNECTION, UPGRADE)
                 .await
-                .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
                 .await
-                .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+                .set_response_body(&vec![])
                 .await
-                .set_response_header("SocketAddr", &self.socket_addr)
+                .send()
                 .await;
         }
     }
-    impl ServerHook for UpgradeMiddleware {
-        async fn new(_ctx: &Context) -> Self {
-            Self
+}
+struct ResponseMiddleware;
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if ctx.get_request().await.is_ws() {
+            return;
         }
-        async fn handle(self, ctx: &Context) {
-            if !ctx.get_request().await.is_ws() {
-                return;
-            }
-            if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-                let accept_key: String = WebSocketFrame::generate_accept_key(key);
-                ctx.set_response_version(HttpVersion::Http1_1)
-                    .await
-                    .set_response_status_code(101)
-                    .await
-                    .set_response_header(UPGRADE, WEBSOCKET)
-                    .await
-                    .set_response_header(CONNECTION, UPGRADE)
-                    .await
-                    .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                    .await
-                    .set_response_body(&vec![])
-                    .await
-                    .send()
-                    .await
-                    .unwrap();
-            }
+        ctx.send().await;
+    }
+}
+struct RootRoute {
+    response_body: String,
+    cookie1: String,
+    cookie2: String,
+}
+impl ServerHook for RootRoute {
+    async fn new(ctx: &Context) -> Self {
+        let path: RequestPath = ctx.get_request_path().await;
+        let response_body: String = format!("Hello hyperlane => {}", path);
+        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
+        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
+        Self {
+            response_body,
+            cookie1,
+            cookie2,
         }
     }
-    impl ServerHook for ResponseMiddleware {
-        async fn new(_ctx: &Context) -> Self {
-            Self
-        }
-        async fn handle(self, ctx: &Context) {
-            if ctx.get_request().await.is_ws() {
-                return;
-            }
-            let _ = ctx.send().await;
-        }
+    async fn handle(self, ctx: &Context) {
+        ctx.add_response_header(SET_COOKIE, &self.cookie1)
+            .await
+            .add_response_header(SET_COOKIE, &self.cookie2)
+            .await
+            .set_response_body(&self.response_body)
+            .await;
     }
-    impl ServerHook for RootRoute {
-        async fn new(ctx: &Context) -> Self {
-            let path: RequestPath = ctx.get_request_path().await;
-            let response_body: String = format!("Hello hyperlane => {}", path);
-            let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
-            let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-            Self {
-                response_body,
-                cookie1,
-                cookie2,
-            }
-        }
-        async fn handle(self, ctx: &Context) {
-            ctx.add_response_header(SET_COOKIE, &self.cookie1)
-                .await
-                .add_response_header(SET_COOKIE, &self.cookie2)
-                .await
-                .set_response_body(&self.response_body)
-                .await;
-        }
-    }
-    impl WebsocketRoute {
-        async fn send_body_hook(&self, ctx: &Context) {
+}
+struct WebsocketRoute;
+impl WebsocketRoute {
+    async fn send_body_hook(&self, ctx: &Context) {
+        if ctx.get_request().await.is_ws() {
             let body: ResponseBody = ctx.get_response_body().await;
-            if ctx.get_request().await.is_ws() {
-                let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-                ctx.send_body_list_with_data(&frame_list).await.unwrap();
-            } else {
-                ctx.send_body().await.unwrap();
-            }
+            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+            ctx.send_body_list_with_data(&frame_list).await;
+        } else {
+            ctx.send_body().await;
         }
     }
-    impl ServerHook for WebsocketRoute {
-        async fn new(_ctx: &Context) -> Self {
-            Self
-        }
-        async fn handle(self, ctx: &Context) {
-            loop {
-                match ctx.ws_from_stream(RequestConfig::default()).await {
-                    Ok(_) => {
-                        let request_body: Vec<u8> = ctx.get_request_body().await;
-                        ctx.set_response_body(&request_body).await;
-                        self.send_body_hook(ctx).await;
-                        continue;
-                    }
-                    Err(error) => {
-                        ctx.set_response_body(&error.to_string()).await;
-                        self.send_body_hook(ctx).await;
-                        break;
-                    }
+}
+impl ServerHook for WebsocketRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        loop {
+            match ctx.ws_from_stream(RequestConfig::default()).await {
+                Ok(_) => {
+                    let request_body: Vec<u8> = ctx.get_request_body().await;
+                    ctx.set_response_body(&request_body).await;
+                    self.send_body_hook(ctx).await;
+                    continue;
+                }
+                Err(error) => {
+                    ctx.set_response_body(&error.to_string()).await;
+                    self.send_body_hook(ctx).await;
+                    return;
                 }
             }
         }
     }
-    impl ServerHook for SseRoute {
-        async fn new(_ctx: &Context) -> Self {
-            Self
-        }
-        async fn handle(self, ctx: &Context) {
-            let _ = ctx
-                .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-                .await
-                .send()
-                .await;
-            for i in 0..10 {
-                let _ = ctx
-                    .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
-                    .await
-                    .send_body()
-                    .await;
-            }
-            let _ = ctx.closed().await;
-        }
+}
+struct SseRoute;
+impl ServerHook for SseRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
     }
-    impl ServerHook for DynamicRoute {
-        async fn new(ctx: &Context) -> Self {
-            Self {
-                params: ctx.get_route_params().await,
-            }
-        }
-        async fn handle(mut self, _ctx: &Context) {
-            self.params.insert("key".to_owned(), "value".to_owned());
-            panic!("Test panic {:?}", self.params);
-        }
-    }
-    impl ServerHook for ServerPanicHook {
-        async fn new(ctx: &Context) -> Self {
-            let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-            let response_body: String = error.to_string();
-            let content_type: String =
-                ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-            Self {
-                response_body,
-                content_type,
-            }
-        }
-        async fn handle(self, ctx: &Context) {
-            let _ = ctx
-                .set_response_version(HttpVersion::Http1_1)
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .send()
+            .await;
+        for i in 0..10 {
+            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
                 .await
-                .set_response_status_code(500)
-                .await
-                .clear_response_headers()
-                .await
-                .set_response_header(SERVER, HYPERLANE)
-                .await
-                .set_response_header(CONTENT_TYPE, &self.content_type)
-                .await
-                .set_response_body(&self.response_body)
-                .await
-                .send()
+                .send_body()
                 .await;
         }
+        ctx.closed().await;
     }
-    async fn main() {
-        let config: ServerConfig = ServerConfig::new().await;
-        config.host("0.0.0.0").await;
-        config.port(60000).await;
-        config.request_config(RequestConfig::default()).await;
-        config.disable_linger().await;
-        config.disable_nodelay().await;
-        let server: Server = Server::from(config).await;
-        server.request_middleware::<SendBodyMiddleware>().await;
-        server.request_middleware::<UpgradeMiddleware>().await;
-        server.response_middleware::<ResponseMiddleware>().await;
-        server.panic_hook::<ServerPanicHook>().await;
-        server.route::<RootRoute>("/").await;
-        server.route::<WebsocketRoute>("/websocket").await;
-        server.route::<SseRoute>("/sse").await;
-        server.route::<DynamicRoute>("/dynamic/{routing}").await;
-        server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
-        let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
-        let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-            server_control_hook_2.shutdown().await;
-        });
-        server_control_hook_1.wait().await;
+}
+struct DynamicRoute {
+    params: RouteParams,
+}
+impl ServerHook for DynamicRoute {
+    async fn new(ctx: &Context) -> Self {
+        Self {
+            params: ctx.get_route_params().await,
+        }
     }
-    main().await;
+    async fn handle(mut self, _ctx: &Context) {
+        self.params.insert("key".to_owned(), "value".to_owned());
+        panic!("Test panic {:?}", self.params);
+    }
+}
+#[tokio::test]
+async fn main() {
+    let server: Server = Server::new().await;
+    server.panic::<ServerPanic>().await;
+    server.request_error::<RequestError>().await;
+    server.request_middleware::<SendBodyMiddleware>().await;
+    server.request_middleware::<UpgradeMiddleware>().await;
+    server.response_middleware::<ResponseMiddleware>().await;
+    server.route::<RootRoute>("/").await;
+    server.route::<WebsocketRoute>("/websocket").await;
+    server.route::<SseRoute>("/sse").await;
+    server.route::<DynamicRoute>("/dynamic/{routing}").await;
+    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
+    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
+    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        server_control_hook_2.shutdown().await;
+    });
+    server_control_hook_1.wait().await;
 }
 ```
 # Path: hyperlane-broadcast\README.md
@@ -3894,11 +3976,15 @@ cargo add hyperlane-macros
 - `#[response_version(version)]` - Set response HTTP version (supports literals and global constants)
 - `#[clear_response_headers]` - Clear all response headers
 ### Send Operation Macros
-- `#[send]` - Send complete response (headers and body) after function execution
-- `#[send_body]` - Send only response body after function execution
-- `#[send_body_with_data("data")]` - Send only response body with specified data after function execution
+- `#[try_send]` - Try to send complete response (headers and body) after function execution (returns Result)
+- `#[send]` - Send complete response (headers and body) after function execution (**panics on failure**)
+- `#[try_send_body]` - Try to send only response body after function execution (returns Result)
+- `#[send_body]` - Send only response body after function execution (**panics on failure**)
+- `#[try_send_body_with_data("data")]` - Try to send only response body with specified data after function execution (returns Result)
+- `#[send_body_with_data("data")]` - Send only response body with specified data after function execution (**panics on failure**)
 ### Flush Macros
-- `#[flush]` - Flush response stream after function execution to ensure immediate data transmission
+- `#[try_flush]` - Try to flush response stream after function execution to ensure immediate data transmission (returns Result)
+- `#[flush]` - Flush response stream after function execution to ensure immediate data transmission (**panics on failure**)
 ### Aborted Macros
 - `#[aborted]` - Handle aborted requests, providing cleanup logic for prematurely terminated connections
 ### Closed Operation Macros
@@ -3970,7 +4056,8 @@ cargo add hyperlane-macros
 ### Hook Macros
 - `#[prologue_hooks(function_name)]` - Execute specified function before the main handler function
 - `#[epilogue_hooks(function_name)]` - Execute specified function after the main handler function
-- `#[panic_hook]` - Execute function when a panic occurs within the server
+- `#[panic]` - Execute function when a panic occurs within the server
+- `#[request_error]` - Execute function when a request error occurs within the server
 - `#[prologue_macros(macro1, macro2, ...)]` - Injects a list of macros before the decorated function.
 - `#[epilogue_macros(macro1, macro2, ...)]` - Injects a list of macros after the decorated function.
 ### Middleware Macros
@@ -3978,8 +4065,10 @@ cargo add hyperlane-macros
 - `#[request_middleware(order)]` - Register a function as a request middleware with specified order
 - `#[response_middleware]` - Register a function as a response middleware
 - `#[response_middleware(order)]` - Register a function as a response middleware with specified order
-- `#[panic_hook]` - Register a function as a panic hook
-- `#[panic_hook(order)]` - Register a function as a panic hook with specified order
+- `#[panic]` - Register a function as a panic hook
+- `#[panic(order)]` - Register a function as a panic hook with specified order
+- `#[request_error]` - Register a function as a request error hook
+- `#[request_error(order)]` - Register a function as a request error hook with specified order
 ### Stream Processing Macros
 - `#[http_from_stream]` - Wraps function body with HTTP stream processing, using default request config. The function body only executes if data is successfully read from the HTTP stream.
 - `#[http_from_stream(request_config)]` - Wraps function body with HTTP stream processing using specified request config.
@@ -3998,1005 +4087,11 @@ cargo add hyperlane-macros
 ### Helper Tips
 - **Request related macros** (data extraction) use **`get`** operations - they retrieve/query data from the request
 - **Response related macros** (data setting) use **`set`** operations - they assign/configure response data
-- **Hook macros** For hook-related macros that support an `order` parameter, if `order` is not specified, the hook will have higher priority than hooks with a specified `order` (applies only to macros like `#[request_middleware]`, `#[response_middleware]`, `#[panic_hook]`)
+- **Hook macros** For hook-related macros that support an `order` parameter, if `order` is not specified, the hook will have higher priority than hooks with a specified `order` (applies only to macros like `#[request_middleware]`, `#[response_middleware]`, `#[panic]`)
 - **Multi-parameter support** Most data extraction macros support multiple parameters in a single call (e.g., `#[request_body(var1, var2)]`, `#[request_query("k1" => v1, "k2" => v2)]`). This reduces macro repetition and improves code readability.
 ### Best Practice Warning
 - Request related macros are mostly query functions, while response related macros are mostly assignment functions.
 - When using `prologue_hooks` or `epilogue_hooks` macros, it is not recommended to combine them with other macros (such as `#[get]`, `#[post]`, `#[http]`, etc.) on the same function. These macros should be placed in the hook functions themselves. If you are not clear about how macros are expanded, combining them may lead to problematic code behavior.
-## Example Usage
-```rust
-use hyperlane::*;
-use hyperlane_macros::*;
-use serde::{Deserialize, Serialize};
-const STEP: &str = "step";
-const TEST_ATTRIBUTE_KEY: &str = "test_attribute_key";
-const CUSTOM_STATUS_CODE: i32 = 200;
-const CUSTOM_REASON: &str = "Accepted";
-const CUSTOM_HEADER_NAME: &str = "X-Custom-Header";
-const CUSTOM_HEADER_VALUE: &str = "custom-value";
-const RESPONSE_DATA: &str = "{\"status\": \"success\"}";
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct TestData {
-    name: String,
-    age: u32,
-}
-#[panic_hook]
-#[panic_hook(1)]
-#[panic_hook("2")]
-struct PanicHook;
-impl ServerHook for PanicHook {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        response_version(HttpVersion::Http1_1),
-        response_status_code(500),
-        response_body("panic_hook"),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[request_middleware]
-struct RequestMiddleware;
-impl ServerHook for RequestMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        response_version(HttpVersion::Http1_1),
-        response_status_code(200),
-        response_header(SERVER => HYPERLANE),
-        response_header(CONNECTION => KEEP_ALIVE),
-        response_header(CONTENT_TYPE => TEXT_PLAIN),
-        response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY),
-        response_header(STEP => "request_middleware"),
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[request_middleware(1)]
-struct UpgradeHook;
-impl ServerHook for UpgradeHook {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        ws,
-        response_body(&vec![]),
-        response_status_code(101),
-        response_header(UPGRADE => WEBSOCKET),
-        response_header(CONNECTION => UPGRADE),
-        response_header(SEC_WEBSOCKET_ACCEPT => &WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
-        response_header(STEP => "upgrade_hook"),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[request_middleware(2)]
-struct ConnectedHook;
-impl ServerHook for ConnectedHook {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_status_code(200)]
-    #[response_header(SERVER => HYPERLANE)]
-    #[response_version(HttpVersion::Http1_1)]
-    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
-    #[response_header(STEP => "connected_hook")]
-    async fn handle(self, ctx: &Context) {}
-}
-#[response_middleware]
-struct ResponseMiddleware1;
-impl ServerHook for ResponseMiddleware1 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_header(STEP => "response_middleware_1")]
-    async fn handle(self, ctx: &Context) {}
-}
-#[response_middleware(2)]
-struct ResponseMiddleware2;
-impl ServerHook for ResponseMiddleware2 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        reject(ctx.get_request().await.is_ws()),
-        response_header(STEP => "response_middleware_2")
-    )]
-    #[epilogue_macros(send, flush)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[response_middleware("3")]
-struct ResponseMiddleware3;
-impl ServerHook for ResponseMiddleware3 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        ws,
-        response_header(STEP => "response_middleware_3")
-    )]
-    #[epilogue_macros(send_body, flush)]
-    async fn handle(self, ctx: &Context) {}
-}
-struct PrologueHooks;
-impl ServerHook for PrologueHooks {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[get]
-    #[http]
-    async fn handle(self, _ctx: &Context) {}
-}
-struct EpilogueHooks;
-impl ServerHook for EpilogueHooks {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_status_code(200)]
-    async fn handle(self, ctx: &Context) {}
-}
-async fn prologue_hooks_fn(ctx: Context) {
-    let hook = PrologueHooks::new(&ctx).await;
-    hook.handle(&ctx).await;
-}
-async fn epilogue_hooks_fn(ctx: Context) {
-    let hook = EpilogueHooks::new(&ctx).await;
-    hook.handle(&ctx).await;
-}
-#[route("/response")]
-struct Response;
-impl ServerHook for Response {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&RESPONSE_DATA)]
-    #[response_reason_phrase(CUSTOM_REASON)]
-    #[response_status_code(CUSTOM_STATUS_CODE)]
-    #[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/connect")]
-struct Connect;
-impl ServerHook for Connect {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(connect, response_body("connect"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/delete")]
-struct Delete;
-impl ServerHook for Delete {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(delete, response_body("delete"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/head")]
-struct Head;
-impl ServerHook for Head {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(head, response_body("head"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/options")]
-struct Options;
-impl ServerHook for Options {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(options, response_body("options"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/patch")]
-struct Patch;
-impl ServerHook for Patch {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(patch, response_body("patch"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/put")]
-struct Put;
-impl ServerHook for Put {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(put, response_body("put"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/trace")]
-struct Trace;
-impl ServerHook for Trace {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(trace, response_body("trace"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/h2c")]
-struct H2c;
-impl ServerHook for H2c {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(h2c, response_body("h2c"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http")]
-struct HttpOnly;
-impl ServerHook for HttpOnly {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http, response_body("http"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http0_9")]
-struct Http09;
-impl ServerHook for Http09 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http0_9, response_body("http0_9"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http1_0")]
-struct Http10;
-impl ServerHook for Http10 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http1_0, response_body("http1_0"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http1_1")]
-struct Http11;
-impl ServerHook for Http11 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http1_1, response_body("http1_1"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http2")]
-struct Http2;
-impl ServerHook for Http2 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http2, response_body("http2"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http3")]
-struct Http3;
-impl ServerHook for Http3 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http3, response_body("http3"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/tls")]
-struct Tls;
-impl ServerHook for Tls {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(tls, response_body("tls"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http1_1_or_higher")]
-struct Http11OrHigher;
-impl ServerHook for Http11OrHigher {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/unknown_method")]
-struct UnknownMethod;
-impl ServerHook for UnknownMethod {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        clear_response_headers,
-        filter(ctx.get_request().await.is_unknown_method()),
-        response_body("unknown_method")
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/get")]
-struct Get;
-impl ServerHook for Get {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(ws, get, response_body("get"), send_body)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/post")]
-struct Post;
-impl ServerHook for Post {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(post, response_body("post"), send)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/ws1")]
-struct Websocket1;
-impl ServerHook for Websocket1 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[ws]
-    #[ws_from_stream]
-    async fn handle(self, ctx: &Context) {
-        let body: RequestBody = ctx.get_request_body().await;
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
-    }
-}
-#[route("/ws2")]
-struct Websocket2;
-impl ServerHook for Websocket2 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[ws]
-    #[ws_from_stream(request)]
-    async fn handle(self, ctx: &Context) {
-        let body: &RequestBody = request.get_body();
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
-    }
-}
-#[route("/ws3")]
-struct Websocket3;
-impl ServerHook for Websocket3 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[ws]
-    #[ws_from_stream(RequestConfig::default(), request)]
-    async fn handle(self, ctx: &Context) {
-        let body: &RequestBody = request.get_body();
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
-    }
-}
-#[route("/ws4")]
-struct Websocket4;
-impl ServerHook for Websocket4 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[ws]
-    #[ws_from_stream(request, RequestConfig::default())]
-    async fn handle(self, ctx: &Context) {
-        let body: &RequestBody = request.get_body();
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
-    }
-}
-#[route("/ws5")]
-struct Websocket5;
-impl ServerHook for Websocket5 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[ws]
-    #[ws_from_stream(RequestConfig::default())]
-    async fn handle(self, ctx: &Context) {
-        let body: RequestBody = ctx.get_request_body().await;
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
-    }
-}
-#[route("/hook")]
-struct Hook;
-impl ServerHook for Hook {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_hooks(prologue_hooks_fn)]
-    #[epilogue_hooks(epilogue_hooks_fn)]
-    #[response_body("Testing hook macro")]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/get_post")]
-struct GetPost;
-impl ServerHook for GetPost {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[closed]
-    #[prologue_macros(
-        http,
-        methods(get, post),
-        response_body("get_post"),
-        response_status_code(200),
-        response_reason_phrase("OK")
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/attributes")]
-struct Attributes;
-impl ServerHook for Attributes {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("request attributes: {request_attributes:?}"))]
-    #[attributes(request_attributes)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/route_params/:test")]
-struct RouteParams;
-impl ServerHook for RouteParams {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("request route params: {request_route_params:?}"))]
-    #[route_params(request_route_params)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/route_param_option/:test")]
-struct RouteParamOption;
-impl ServerHook for RouteParamOption {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("route param: {request_route_param_option1:?} {request_route_param_option2:?} {request_route_param_option3:?}"))]
-    #[route_param_option("test1" => request_route_param_option1)]
-    #[route_param_option("test2" => request_route_param_option2, "test3" => request_route_param_option3)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/route_param/:test")]
-struct RouteParam;
-impl ServerHook for RouteParam {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("route param: {request_route_param1} {request_route_param2} {request_route_param3}"))]
-    #[route_param("test1" => request_route_param1)]
-    #[route_param("test2" => request_route_param2, "test3" => request_route_param3)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/host")]
-struct Host;
-impl ServerHook for Host {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[host("localhost")]
-    #[epilogue_macros(
-        response_body("host string literal: localhost"),
-        send,
-        http_from_stream
-    )]
-    #[prologue_macros(response_body("host string literal: localhost"), send)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_query_option")]
-struct RequestQueryOption;
-impl ServerHook for RequestQueryOption {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        request_query_option("test" => request_query_option),
-        response_body(&format!("request query: {request_query_option:?}")),
-        send,
-        http_from_stream(RequestConfig::default())
-    )]
-    #[prologue_macros(
-        request_query_option("test" => request_query_option),
-        response_body(&format!("request query: {request_query_option:?}")),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_query")]
-struct RequestQuery;
-impl ServerHook for RequestQuery {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        request_query("test" => request_query),
-        response_body(&format!("request query: {request_query}")),
-        send,
-        http_from_stream(RequestConfig::default())
-    )]
-    #[prologue_macros(
-        request_query("test" => request_query),
-        response_body(&format!("request query: {request_query}")),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_header_option")]
-struct RequestHeaderOption;
-impl ServerHook for RequestHeaderOption {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        request_header_option(HOST => request_header_option),
-        response_body(&format!("request header: {request_header_option:?}")),
-        send,
-        http_from_stream(_request)
-    )]
-    #[prologue_macros(
-        request_header_option(HOST => request_header_option),
-        response_body(&format!("request header: {request_header_option:?}")),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_header")]
-struct RequestHeader;
-impl ServerHook for RequestHeader {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        request_header(HOST => request_header),
-        response_body(&format!("request header: {request_header}")),
-        send,
-        http_from_stream(_request)
-    )]
-    #[prologue_macros(
-        request_header(HOST => request_header),
-        response_body(&format!("request header: {request_header}")),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_querys")]
-struct RequestQuerys;
-impl ServerHook for RequestQuerys {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        request_querys(request_querys),
-        response_body(&format!("request querys: {request_querys:?}")),
-        send,
-        http_from_stream(RequestConfig::default(), _request)
-    )]
-    #[prologue_macros(
-        request_querys(request_querys),
-        response_body(&format!("request querys: {request_querys:?}")),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_headers")]
-struct RequestHeaders;
-impl ServerHook for RequestHeaders {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(
-        request_headers(request_headers),
-        response_body(&format!("request headers: {request_headers:?}")),
-        send,
-        http_from_stream(_request, RequestConfig::default())
-    )]
-    #[prologue_macros(
-        request_headers(request_headers),
-        response_body(&format!("request headers: {request_headers:?}")),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_body")]
-struct RequestBodyRoute;
-impl ServerHook for RequestBodyRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("raw body: {raw_body:?}"))]
-    #[request_body(raw_body)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/reject_host")]
-struct RejectHost;
-impl ServerHook for RejectHost {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        reject_host("filter.localhost"),
-        response_body("host filter string literal")
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/attribute_option")]
-struct AttributeOption;
-impl ServerHook for AttributeOption {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
-    #[attribute_option(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/attribute")]
-struct Attribute;
-impl ServerHook for Attribute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("request attribute: {request_attribute:?}"))]
-    #[attribute(TEST_ATTRIBUTE_KEY => request_attribute: TestData)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_body_json_result")]
-struct RequestBodyJsonResult;
-impl ServerHook for RequestBodyJsonResult {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("request data: {request_data_result:?}"))]
-    #[request_body_json_result(request_data_result: TestData)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_body_json")]
-struct RequestBodyJson;
-impl ServerHook for RequestBodyJson {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("request data: {request_data_result:?}"))]
-    #[request_body_json(request_data_result: TestData)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/referer")]
-struct Referer;
-impl ServerHook for Referer {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        referer("http://localhost"),
-        response_body("referer string literal: http://localhost")
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/reject_referer")]
-struct RejectReferer;
-impl ServerHook for RejectReferer {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        reject_referer("http://localhost"),
-        response_body("referer filter string literal")
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/cookies")]
-struct Cookies;
-impl ServerHook for Cookies {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("All cookies: {cookie_value:?}"))]
-    #[request_cookies(cookie_value)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_cookie_option")]
-struct CookieOption;
-impl ServerHook for CookieOption {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
-    #[request_cookie_option("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_cookie")]
-struct Cookie;
-impl ServerHook for Cookie {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("Session cookie: {session_cookie1}, {session_cookie2}"))]
-    #[request_cookie("test1" => session_cookie1, "test2" => session_cookie2)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_version")]
-struct RequestVersionTest;
-impl ServerHook for RequestVersionTest {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("HTTP Version: {http_version}"))]
-    #[request_version(http_version)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/request_path")]
-struct RequestPathTest;
-impl ServerHook for RequestPathTest {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(&format!("Request Path: {request_path}"))]
-    #[request_path(request_path)]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/response_header")]
-struct ResponseHeaderTest;
-impl ServerHook for ResponseHeaderTest {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body("Testing header set and replace operations")]
-    #[response_header("X-Add-Header", "add-value")]
-    #[response_header("X-Set-Header" => "set-value")]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/literals")]
-struct Literals;
-impl ServerHook for Literals {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_status_code(201)]
-    #[response_header(CONTENT_TYPE => APPLICATION_JSON)]
-    #[response_body("{\"message\": \"Resource created\"}")]
-    #[response_reason_phrase(HttpStatus::Created.to_string())]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/inject/response_body")]
-struct InjectResponseBody;
-impl ServerHook for InjectResponseBody {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        self.response_body_with_ref_self(ctx).await;
-    }
-}
-impl InjectResponseBody {
-    #[response_body("response body with ref self")]
-    async fn response_body_with_ref_self(&self, ctx: &Context) {}
-}
-#[route("/inject/post_method")]
-struct InjectPostMethod;
-impl ServerHook for InjectPostMethod {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        self.post_method_with_ref_self(ctx).await;
-    }
-}
-impl InjectPostMethod {
-    #[prologue_macros(post, response_body("post method with ref self"))]
-    async fn post_method_with_ref_self(&self, ctx: &Context) {}
-}
-#[route("/inject/send_flush")]
-struct InjectSendFlush;
-impl ServerHook for InjectSendFlush {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        self.send_and_flush_with_ref_self(ctx).await;
-    }
-}
-impl InjectSendFlush {
-    #[epilogue_macros(send, flush)]
-    async fn send_and_flush_with_ref_self(&self, ctx: &Context) {}
-}
-#[route("/inject/request_body")]
-struct InjectRequestBody;
-impl ServerHook for InjectRequestBody {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        self.extract_request_body_with_ref_self(ctx).await;
-    }
-}
-impl InjectRequestBody {
-    #[request_body(_raw_body)]
-    async fn extract_request_body_with_ref_self(&self, _ctx: &Context) {}
-}
-#[route("/inject/multiple_methods")]
-struct InjectMultipleMethods;
-impl ServerHook for InjectMultipleMethods {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        self.multiple_methods_with_ref_self(ctx).await;
-    }
-}
-impl InjectMultipleMethods {
-    #[methods(get, post)]
-    async fn multiple_methods_with_ref_self(&self, ctx: &Context) {}
-}
-#[route("/inject/http_stream")]
-struct InjectHttpStream;
-impl ServerHook for InjectHttpStream {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        self.http_stream_handler_with_ref_self(ctx).await;
-    }
-}
-impl InjectHttpStream {
-    #[http_from_stream(RequestConfig::default(), _request)]
-    async fn http_stream_handler_with_ref_self(&self, _ctx: &Context) {}
-}
-#[route("/inject/ws_stream")]
-struct InjectWsStream;
-impl ServerHook for InjectWsStream {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        self.websocket_stream_handler_with_ref_self(ctx).await;
-    }
-}
-impl InjectWsStream {
-    #[ws_from_stream(_request)]
-    async fn websocket_stream_handler_with_ref_self(&self, _ctx: &Context) {}
-}
-#[route("/inject/complex_post")]
-struct InjectComplexPost;
-impl ServerHook for InjectComplexPost {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        self.complex_post_handler_with_ref_self(ctx).await;
-    }
-}
-impl InjectComplexPost {
-    #[prologue_macros(
-        post,
-        http,
-        request_body(raw_body),
-        response_status_code(201),
-        response_header(CONTENT_TYPE => APPLICATION_JSON),
-        response_body(&format!("Received: {raw_body:?}"))
-    )]
-    #[epilogue_macros(send, flush)]
-    async fn complex_post_handler_with_ref_self(&self, ctx: &Context) {}
-}
-impl InjectComplexPost {
-    #[post]
-    async fn test_with_bool_param(_a: bool, ctx: &Context) {}
-    #[get]
-    async fn test_with_multiple_params(_a: bool, ctx: &Context, _b: i32) {}
-}
-#[response_body("standalone response body")]
-async fn standalone_response_body_handler(ctx: &Context) {}
-#[prologue_macros(get, response_body("standalone get handler"))]
-async fn standalone_get_handler(ctx: &Context) {}
-#[epilogue_macros(send, flush)]
-async fn standalone_send_and_flush_handler(ctx: &Context) {}
-#[request_body(_raw_body)]
-async fn standalone_request_body_extractor(ctx: &Context) {}
-#[methods(get, post)]
-async fn standalone_multiple_methods_handler(ctx: &Context) {}
-#[http_from_stream]
-async fn standalone_http_stream_handler(ctx: &Context) {}
-#[ws_from_stream]
-async fn standalone_websocket_stream_handler(ctx: &Context) {}
-#[prologue_macros(
-    get,
-    http,
-    response_status_code(200),
-    response_header(CONTENT_TYPE => TEXT_PLAIN),
-    response_body("standalone complex handler")
-)]
-#[epilogue_macros(send, flush)]
-async fn standalone_complex_get_handler(ctx: &Context) {}
-#[get]
-async fn standalone_get_handler_with_param(_a: bool, ctx: &Context) {}
-#[request_body(body1, body2, body3)]
-async fn test_multi_request_body(ctx: &Context) {
-    println!("body1: {:?}, body2: {:?}, body3: {:?}", body1, body2, body3);
-}
-#[route("/test_multi_request_body_json")]
-#[derive(Debug, serde::Deserialize)]
-struct User {
-    name: String,
-}
-impl ServerHook for User {
-    async fn new(_ctx: &Context) -> Self {
-        Self {
-            name: String::from("test"),
-        }
-    }
-    #[prologue_macros(
-        request_body_json(user1: User, user2: User),
-        response_body(format!(
-            "user1: {:?}, user2: {:?}",
-            user1.name,
-            user2.name
-        )),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-#[attribute("key1" => attr1: String, "key2" => attr2: i32)]
-async fn test_multi_attribute(ctx: &Context) {
-    println!("attr1: {:?}, attr2: {:?}", attr1, attr2);
-}
-#[attributes(attrs1, attrs2)]
-async fn test_multi_attributes(ctx: &Context) {
-    println!("attrs1: {:?}, attrs2: {:?}", attrs1, attrs2);
-}
-#[route_params(params1, params2)]
-async fn test_multi_route_params(ctx: &Context) {
-    println!("params1: {:?}, params2: {:?}", params1, params2);
-}
-#[request_querys(querys1, querys2)]
-async fn test_multi_request_querys(ctx: &Context) {
-    println!("querys1: {:?}, querys2: {:?}", querys1, querys2);
-}
-#[request_headers(headers1, headers2)]
-async fn test_multi_request_headers(ctx: &Context) {
-    println!("headers1: {:?}, headers2: {:?}", headers1, headers2);
-}
-#[request_cookies(cookies1, cookies2)]
-async fn test_multi_request_cookies(ctx: &Context) {
-    println!("cookies1: {:?}, cookies2: {:?}", cookies1, cookies2);
-}
-#[request_version(version1, version2)]
-async fn test_multi_request_version(ctx: &Context) {
-    println!("version1: {:?}, version2: {:?}", version1, version2);
-}
-#[request_path(path1, path2)]
-async fn test_multi_request_path(ctx: &Context) {
-    println!("path1: {:?}, path2: {:?}", path1, path2);
-}
-#[host("localhost", "127.0.0.1")]
-async fn test_multi_host(ctx: &Context) {
-    println!("Host check passed");
-}
-#[reject_host("badhost.com", "spam.com")]
-async fn test_multi_reject_host(ctx: &Context) {
-    println!("Reject host check passed");
-}
-#[referer("http://localhost", "http://127.0.0.1")]
-async fn test_multi_referer(ctx: &Context) {
-    println!("Referer check passed");
-}
-#[reject_referer("http://badsite.com", "http://spam.com")]
-async fn test_multi_reject_referer(ctx: &Context) {
-    println!("Reject referer check passed");
-}
-#[hyperlane(server1: Server, server2: Server)]
-async fn test_multi_hyperlane() {
-    println!("server1 and server2 initialized");
-}
-#[hyperlane(server: Server)]
-#[hyperlane(config: ServerConfig)]
-#[tokio::main]
-async fn main() {
-    config.disable_nodelay().await;
-    server.config(config).await;
-    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
-    server_control_hook.wait().await;
-}
-```
 ## Contact
 # Path: hyperlane-macros\debug\src\main.rs
 ```rust
@@ -5015,18 +4110,34 @@ struct TestData {
     name: String,
     age: u32,
 }
-#[panic_hook]
-#[panic_hook(1)]
-#[panic_hook("2")]
-struct PanicHook;
-impl ServerHook for PanicHook {
+#[panic]
+#[panic(1)]
+#[panic("2")]
+struct ServerPanic;
+impl ServerHook for ServerPanic {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
     #[epilogue_macros(
         response_version(HttpVersion::Http1_1),
         response_status_code(500),
-        response_body("panic_hook"),
+        response_body("panic"),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[request_error]
+#[request_error(1)]
+#[request_error("2")]
+struct RequestError;
+impl ServerHook for RequestError {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(500),
+        response_body("request_error"),
         send
     )]
     async fn handle(self, ctx: &Context) {}
@@ -5060,7 +4171,7 @@ impl ServerHook for UpgradeHook {
         response_status_code(101),
         response_header(UPGRADE => WEBSOCKET),
         response_header(CONNECTION => UPGRADE),
-        response_header(SEC_WEBSOCKET_ACCEPT => &WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
+        response_header(SEC_WEBSOCKET_ACCEPT => &WebSocketFrame::generate_accept_key(ctx.get_request_header_back(SEC_WEBSOCKET_KEY).await)),
         response_header(STEP => "upgrade_hook"),
         send
     )]
@@ -5098,7 +4209,7 @@ impl ServerHook for ResponseMiddleware2 {
         reject(ctx.get_request().await.is_ws()),
         response_header(STEP => "response_middleware_2")
     )]
-    #[epilogue_macros(send, flush)]
+    #[epilogue_macros(try_send, flush)]
     async fn handle(self, ctx: &Context) {}
 }
 #[response_middleware("3")]
@@ -5111,7 +4222,7 @@ impl ServerHook for ResponseMiddleware3 {
         ws,
         response_header(STEP => "response_middleware_3")
     )]
-    #[epilogue_macros(send_body, flush)]
+    #[epilogue_macros(try_send, flush)]
     async fn handle(self, ctx: &Context) {}
 }
 struct PrologueHooks;
@@ -5314,7 +4425,7 @@ impl ServerHook for Get {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(ws, get, response_body("get"), send_body)]
+    #[prologue_macros(ws, get, response_body("get"))]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/post")]
@@ -5323,7 +4434,7 @@ impl ServerHook for Post {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(post, response_body("post"), send)]
+    #[prologue_macros(post, response_body("post"), try_send)]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/ws1")]
@@ -5337,7 +4448,7 @@ impl ServerHook for Websocket1 {
     async fn handle(self, ctx: &Context) {
         let body: RequestBody = ctx.get_request_body().await;
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
+        ctx.send_body_list_with_data(&body_list).await;
     }
 }
 #[route("/ws2")]
@@ -5351,7 +4462,7 @@ impl ServerHook for Websocket2 {
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
+        ctx.send_body_list_with_data(&body_list).await;
     }
 }
 #[route("/ws3")]
@@ -5365,7 +4476,7 @@ impl ServerHook for Websocket3 {
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
+        ctx.send_body_list_with_data(&body_list).await;
     }
 }
 #[route("/ws4")]
@@ -5379,7 +4490,7 @@ impl ServerHook for Websocket4 {
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
+        ctx.send_body_list_with_data(&body_list).await;
     }
 }
 #[route("/ws5")]
@@ -5393,7 +4504,7 @@ impl ServerHook for Websocket5 {
     async fn handle(self, ctx: &Context) {
         let body: RequestBody = ctx.get_request_body().await;
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-        ctx.send_body_list_with_data(&body_list).await.unwrap();
+        ctx.send_body_list_with_data(&body_list).await;
     }
 }
 #[route("/hook")]
@@ -5792,7 +4903,7 @@ impl ServerHook for InjectSendFlush {
     }
 }
 impl InjectSendFlush {
-    #[epilogue_macros(send, flush)]
+    #[epilogue_macros(try_send, flush)]
     async fn send_and_flush_with_ref_self(&self, ctx: &Context) {}
 }
 #[route("/inject/request_body")]
@@ -5870,7 +4981,7 @@ impl InjectComplexPost {
         response_header(CONTENT_TYPE => APPLICATION_JSON),
         response_body(&format!("Received: {raw_body:?}"))
     )]
-    #[epilogue_macros(send, flush)]
+    #[epilogue_macros(try_send, flush)]
     async fn complex_post_handler_with_ref_self(&self, ctx: &Context) {}
 }
 impl InjectComplexPost {
@@ -5879,11 +4990,159 @@ impl InjectComplexPost {
     #[get]
     async fn test_with_multiple_params(_a: bool, ctx: &Context, _b: i32) {}
 }
+#[route("/test/send")]
+struct TestSend;
+impl ServerHook for TestSend {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_body("Test send operation")
+    )]
+    #[epilogue_macros(send)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/send_body")]
+struct TestSendBody;
+impl ServerHook for TestSendBody {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_body("Test send body operation")
+    )]
+    #[epilogue_macros(send_body)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/send_body_with_data")]
+struct TestSendBodyWithData;
+impl ServerHook for TestSendBodyWithData {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN)
+    )]
+    #[epilogue_macros(send_body_with_data("Custom data from send_body_with_data"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/try_send")]
+struct TestTrySend;
+impl ServerHook for TestTrySend {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_body("Test try send operation")
+    )]
+    #[epilogue_macros(try_send)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/try_send_body")]
+struct TestTrySendBody;
+impl ServerHook for TestTrySendBody {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_body("Test try send body operation")
+    )]
+    #[epilogue_macros(try_send_body)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/try_send_body_with_data")]
+struct TestTrySendBodyWithData;
+impl ServerHook for TestTrySendBodyWithData {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN)
+    )]
+    #[epilogue_macros(try_send_body_with_data("Custom data from try_send_body_with_data"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/try_flush")]
+struct TestTryFlush;
+impl ServerHook for TestTryFlush {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_body("Test try flush operation")
+    )]
+    #[epilogue_macros(try_flush)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/aborted")]
+struct TestAborted;
+impl ServerHook for TestAborted {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_body("Test aborted operation")
+    )]
+    #[epilogue_macros(aborted)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/closed")]
+struct TestClosed;
+impl ServerHook for TestClosed {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_body("Test closed operation")
+    )]
+    #[epilogue_macros(closed)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/test/flush")]
+struct TestFlush;
+impl ServerHook for TestFlush {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(200),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_body("Test flush operation")
+    )]
+    #[epilogue_macros(flush)]
+    async fn handle(self, ctx: &Context) {}
+}
 #[response_body("standalone response body")]
 async fn standalone_response_body_handler(ctx: &Context) {}
 #[prologue_macros(get, response_body("standalone get handler"))]
 async fn standalone_get_handler(ctx: &Context) {}
-#[epilogue_macros(send, flush)]
+#[epilogue_macros(try_send, flush)]
 async fn standalone_send_and_flush_handler(ctx: &Context) {}
 #[request_body(_raw_body)]
 async fn standalone_request_body_extractor(ctx: &Context) {}
@@ -5893,6 +5152,16 @@ async fn standalone_multiple_methods_handler(ctx: &Context) {}
 async fn standalone_http_stream_handler(ctx: &Context) {}
 #[ws_from_stream]
 async fn standalone_websocket_stream_handler(ctx: &Context) {}
+#[aborted]
+async fn standalone_aborted_handler(ctx: &Context) {}
+#[closed]
+async fn standalone_closed_handler(ctx: &Context) {}
+#[flush]
+async fn standalone_flush_handler(ctx: &Context) {}
+#[try_flush]
+async fn standalone_try_flush_handler(ctx: &Context) {}
+#[ws]
+async fn standalone_ws_handler(ctx: &Context) {}
 #[prologue_macros(
     get,
     http,
@@ -5900,7 +5169,7 @@ async fn standalone_websocket_stream_handler(ctx: &Context) {}
     response_header(CONTENT_TYPE => TEXT_PLAIN),
     response_body("standalone complex handler")
 )]
-#[epilogue_macros(send, flush)]
+#[epilogue_macros(try_send, flush)]
 async fn standalone_complex_get_handler(ctx: &Context) {}
 #[get]
 async fn standalone_get_handler_with_param(_a: bool, ctx: &Context) {}
@@ -5926,7 +5195,7 @@ impl ServerHook for User {
             user1.name,
             user2.name
         )),
-        send
+        try_send
     )]
     async fn handle(self, ctx: &Context) {}
 }
@@ -5966,7 +5235,7 @@ async fn test_multi_request_path(ctx: &Context) {
 async fn test_multi_host(ctx: &Context) {
     println!("Host check passed");
 }
-#[reject_host("badhost.com", "spam.com")]
+#[reject_host("localhost", "127.0.0.1")]
 async fn test_multi_reject_host(ctx: &Context) {
     println!("Reject host check passed");
 }
@@ -5974,7 +5243,7 @@ async fn test_multi_reject_host(ctx: &Context) {
 async fn test_multi_referer(ctx: &Context) {
     println!("Referer check passed");
 }
-#[reject_referer("http://badsite.com", "http://spam.com")]
+#[reject_referer("http://localhost", "http://127.0.0.1")]
 async fn test_multi_reject_referer(ctx: &Context) {
     println!("Reject referer check passed");
 }
@@ -5982,6 +5251,145 @@ async fn test_multi_reject_referer(ctx: &Context) {
 async fn test_multi_hyperlane() {
     println!("server1 and server2 initialized");
 }
+#[response_status_code(200)]
+async fn standalone_response_status_code_handler(_ctx: &Context) {}
+#[response_reason_phrase("Custom Reason")]
+async fn standalone_response_reason_phrase_handler(_ctx: &Context) {}
+#[response_header(CONTENT_TYPE => APPLICATION_JSON)]
+async fn standalone_response_header_handler(_ctx: &Context) {}
+#[response_header("X-Custom-Header", "custom-value")]
+async fn standalone_response_header_with_comma_handler(_ctx: &Context) {}
+#[response_version(HttpVersion::Http1_1)]
+async fn standalone_response_version_handler(_ctx: &Context) {}
+#[connect]
+async fn standalone_connect_handler(_ctx: &Context) {}
+#[delete]
+async fn standalone_delete_handler(_ctx: &Context) {}
+#[head]
+async fn standalone_head_handler(_ctx: &Context) {}
+#[options]
+async fn standalone_options_handler(_ctx: &Context) {}
+#[patch]
+async fn standalone_patch_handler(_ctx: &Context) {}
+#[put]
+async fn standalone_put_handler(_ctx: &Context) {}
+#[h2c]
+async fn standalone_h2c_handler(_ctx: &Context) {}
+#[http0_9]
+async fn standalone_http0_9_handler(_ctx: &Context) {}
+#[http1_0]
+async fn standalone_http1_0_handler(_ctx: &Context) {}
+#[http1_1]
+async fn standalone_http1_1_handler(_ctx: &Context) {}
+#[http1_1_or_higher]
+async fn standalone_http1_1_or_higher_handler(_ctx: &Context) {}
+#[http3]
+async fn standalone_http3_handler(_ctx: &Context) {}
+#[tls]
+async fn standalone_tls_handler(_ctx: &Context) {}
+#[methods(get, post, put)]
+async fn standalone_methods_multiple_handler(_ctx: &Context) {}
+#[filter(_ctx.get_request().await.is_get())]
+async fn standalone_filter_handler(_ctx: &Context) {}
+#[reject(_ctx.get_request().await.is_post())]
+async fn standalone_reject_handler(_ctx: &Context) {}
+#[reject_host("example.com")]
+async fn standalone_reject_host_handler(_ctx: &Context) {}
+#[referer("https://example.com")]
+async fn standalone_referer_handler(_ctx: &Context) {}
+#[reject_referer("https://malicious.com")]
+async fn standalone_reject_referer_handler(_ctx: &Context) {}
+#[request_query("param" => _value)]
+async fn standalone_request_query_handler(_ctx: &Context) {}
+#[request_query_option("optional_param" => _optional_value)]
+async fn standalone_request_query_option_handler(_ctx: &Context) {}
+#[request_header(HOST => _host_value)]
+async fn standalone_request_header_handler(_ctx: &Context) {}
+#[request_header_option(USER_AGENT => _user_agent)]
+async fn standalone_request_header_option_handler(_ctx: &Context) {}
+#[request_querys(_querys)]
+async fn standalone_request_querys_handler(_ctx: &Context) {}
+#[request_headers(_headers)]
+async fn standalone_request_headers_handler(_ctx: &Context) {}
+#[request_cookies(_cookies)]
+async fn standalone_request_cookies_handler(_ctx: &Context) {}
+#[request_cookie("session" => _session_cookie)]
+async fn standalone_request_cookie_handler(_ctx: &Context) {}
+#[request_cookie_option("optional_cookie" => _optional_cookie)]
+async fn standalone_request_cookie_option_handler(_ctx: &Context) {}
+#[request_version(_version)]
+async fn standalone_request_version_handler(_ctx: &Context) {}
+#[request_path(_path)]
+async fn standalone_request_path_handler(_ctx: &Context) {}
+#[attribute("key" => _attr_value: String)]
+async fn standalone_attribute_handler(_ctx: &Context) {}
+#[attribute_option("optional_key" => _optional_attr: String)]
+async fn standalone_attribute_option_handler(_ctx: &Context) {}
+#[attributes(_attrs)]
+async fn standalone_attributes_handler(_ctx: &Context) {}
+#[route_params(_params)]
+async fn standalone_route_params_handler(_ctx: &Context) {}
+#[route_param("param" => _param_value)]
+async fn standalone_route_param_handler(_ctx: &Context) {}
+#[route_param_option("optional_param" => _optional_param_value)]
+async fn standalone_route_param_option_handler(_ctx: &Context) {}
+#[request_body_json(_user: TestData)]
+async fn standalone_request_body_json_handler(_ctx: &Context) {}
+#[request_body_json_result(_user_result: TestData)]
+async fn standalone_request_body_json_result_handler(_ctx: &Context) {}
+#[http_from_stream(RequestConfig::default())]
+async fn standalone_http_from_stream_with_config_handler(_ctx: &Context) {}
+#[ws_from_stream(RequestConfig::default())]
+async fn standalone_ws_from_stream_with_config_handler(_ctx: &Context) {}
+#[http_from_stream(_request)]
+async fn standalone_http_from_stream_with_request_handler(_ctx: &Context) {}
+#[ws_from_stream(_request)]
+async fn standalone_ws_from_stream_with_request_handler(_ctx: &Context) {}
+#[http_from_stream(RequestConfig::default(), _request)]
+async fn standalone_http_from_stream_full_handler(_ctx: &Context) {}
+#[ws_from_stream(RequestConfig::default(), _request)]
+async fn standalone_ws_from_stream_full_handler(_ctx: &Context) {}
+#[send]
+async fn standalone_send_handler_2(_ctx: &Context) {}
+#[send_body]
+async fn standalone_send_body_handler_2(_ctx: &Context) {}
+#[send_body_with_data("Custom send body data")]
+async fn standalone_send_body_with_data_handler_2(_ctx: &Context) {}
+#[try_send]
+async fn standalone_try_send_handler_2(_ctx: &Context) {}
+#[try_send_body]
+async fn standalone_try_send_body_handler_2(_ctx: &Context) {}
+#[try_send_body_with_data("Custom try send body data")]
+async fn standalone_try_send_body_with_data_handler_2(_ctx: &Context) {}
+#[flush]
+async fn standalone_flush_handler_2(_ctx: &Context) {}
+#[try_flush]
+async fn standalone_try_flush_handler_2(_ctx: &Context) {}
+#[aborted]
+async fn standalone_aborted_handler_2(_ctx: &Context) {}
+#[closed]
+async fn standalone_closed_handler_2(_ctx: &Context) {}
+#[clear_response_headers]
+async fn standalone_clear_response_headers_handler(_ctx: &Context) {}
+#[prologue_macros(
+    get,
+    response_status_code(200),
+    response_header(CONTENT_TYPE => TEXT_PLAIN),
+    response_body("prologue macros test")
+)]
+async fn standalone_prologue_macros_complex_handler(_ctx: &Context) {}
+#[epilogue_macros(
+    response_status_code(201),
+    response_header(CONTENT_TYPE => APPLICATION_JSON),
+    response_body("epilogue macros test"),
+    try_send,
+    flush
+)]
+async fn standalone_epilogue_macros_complex_handler(_ctx: &Context) {}
+#[prologue_hooks(prologue_hooks_fn)]
+async fn standalone_prologue_hooks_handler(_ctx: &Context) {}
+#[epilogue_hooks(epilogue_hooks_fn)]
+async fn standalone_epilogue_hooks_handler(_ctx: &Context) {}
 #[hyperlane(server: Server)]
 #[hyperlane(config: ServerConfig)]
 #[tokio::main]
@@ -6054,12 +5462,20 @@ pub(crate) use syn::{
 };
 inventory::collect!(InjectableMacro);
 #[proc_macro_attribute]
+pub fn ws_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
+    ws_from_stream_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn http_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
+    http_from_stream_macro(attr, item)
+}
+#[proc_macro_attribute]
 pub fn get(_attr: TokenStream, item: TokenStream) -> TokenStream {
     get_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
 pub fn post(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    epilogue_handler(item, Position::Prologue)
+    post_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
 pub fn put(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -6124,18 +5540,6 @@ pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStr
 #[proc_macro_attribute]
 pub fn response_version(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_version_macro(attr, item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn send(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    send_macro(item, Position::Epilogue)
-}
-#[proc_macro_attribute]
-pub fn send_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    send_body_macro(item, Position::Epilogue)
-}
-#[proc_macro_attribute]
-pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    flush_macro(item, Position::Prologue)
 }
 #[proc_macro_attribute]
 pub fn aborted(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -6306,8 +5710,12 @@ pub fn response_middleware(attr: TokenStream, item: TokenStream) -> TokenStream 
     response_middleware_macro(attr, item)
 }
 #[proc_macro_attribute]
-pub fn panic_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
-    panic_hook_macro(attr, item)
+pub fn panic(attr: TokenStream, item: TokenStream) -> TokenStream {
+    panic_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn request_error(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_error_macro(attr, item)
 }
 #[proc_macro_attribute]
 pub fn prologue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -6318,16 +5726,36 @@ pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
     epilogue_macros_macro(attr, item)
 }
 #[proc_macro_attribute]
+pub fn try_send(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_send_macro(item, Position::Epilogue)
+}
+#[proc_macro_attribute]
+pub fn send(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    send_macro(item, Position::Epilogue)
+}
+#[proc_macro_attribute]
+pub fn try_send_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_send_body_macro(item, Position::Epilogue)
+}
+#[proc_macro_attribute]
+pub fn send_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    send_body_macro(item, Position::Epilogue)
+}
+#[proc_macro_attribute]
+pub fn try_send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_send_body_with_data_macro(attr, item, Position::Epilogue)
+}
+#[proc_macro_attribute]
 pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream {
     send_body_with_data_macro(attr, item, Position::Epilogue)
 }
 #[proc_macro_attribute]
-pub fn ws_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
-    ws_from_stream_macro(attr, item)
+pub fn try_flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_flush_macro(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn http_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
-    http_from_stream_macro(attr, item)
+pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    flush_macro(item, Position::Prologue)
 }
 ```
 # Path: hyperlane-macros\src\aborted\fn.rs
@@ -6669,18 +6097,31 @@ pub(crate) use r#fn::*;
 # Path: hyperlane-macros\src\flush\fn.rs
 ```rust
 use crate::*;
-pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
+pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
         quote! {
-            let _ = #context.flush().await;
+            let _ = #context.try_flush().await;
         }
     })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_flush",
+        handler: Handler::NoAttrPosition(try_flush_macro),
+    }
 }
 inventory::submit! {
     InjectableMacro {
         name: "flush",
         handler: Handler::NoAttrPosition(flush_macro),
     }
+}
+pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            #context.flush().await;
+        }
+    })
 }
 ```
 # Path: hyperlane-macros\src\flush\mod.rs
@@ -6772,7 +6213,7 @@ pub(crate) struct FromStreamData {
 # Path: hyperlane-macros\src\hook\fn.rs
 ```rust
 use crate::*;
-pub(crate) fn panic_hook_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
@@ -6780,18 +6221,34 @@ pub(crate) fn panic_hook_macro(attr: TokenStream, item: TokenStream) -> TokenStr
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookMacro {
-                hook_type: ::hyperlane::HookType::PanicHook(#order),
-                handler: ::hyperlane::HookHandlerSpec::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
-            }
+            ::hyperlane::HookType::Panic(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
         }
     };
     gen_code.into()
 }
 inventory::submit! {
     InjectableMacro {
-        name: "panic_hook",
-        handler: Handler::WithAttr(panic_hook_macro),
+        name: "panic",
+        handler: Handler::WithAttr(panic_macro),
+    }
+}
+pub(crate) fn request_error_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
+    let order: TokenStream2 = expr_to_isize(&attr_args.order);
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: TokenStream2 = quote! {
+        #input_struct
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::RequestError(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "request_error",
+        handler: Handler::WithAttr(request_error_macro),
     }
 }
 pub(crate) fn prologue_hooks_macro(
@@ -6957,7 +6414,7 @@ macro_rules! impl_http_method_macro {
     };
 }
 impl_http_method_macro!(get_handler, "get");
-impl_http_method_macro!(epilogue_handler, "post");
+impl_http_method_macro!(post_handler, "post");
 impl_http_method_macro!(put_handler, "put");
 impl_http_method_macro!(delete_handler, "delete");
 impl_http_method_macro!(patch_handler, "patch");
@@ -7039,9 +6496,9 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
         });
         if type_name == SERVER_TYPE_KEY {
             init_statements.push(quote! {
-                let mut hooks: Vec<::hyperlane::HookMacro> = inventory::iter().cloned().collect();
+                let mut hooks: Vec<::hyperlane::HookType> = inventory::iter().cloned().collect();
                 assert_hook_unique_order(hooks.clone());
-                hooks.sort_by_key(|hook| hook.hook_type.try_get());
+                hooks.sort_by_key(|hook| hook.try_get_order());
                 for hook in hooks {
                     #var_name.handle_hook(hook.clone()).await;
                 }
@@ -8168,10 +7625,7 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookMacro {
-                hook_type: ::hyperlane::HookType::RequestMiddleware(#order),
-                handler: ::hyperlane::HookHandlerSpec::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
-            }
+            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -8383,10 +7837,7 @@ pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) ->
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookMacro {
-                hook_type: ::hyperlane::HookType::ResponseMiddleware(#order),
-                handler: ::hyperlane::HookHandlerSpec::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
-            }
+            ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -8414,10 +7865,7 @@ pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookMacro {
-                hook_type: ::hyperlane::HookType::Route(#path),
-                handler: ::hyperlane::HookHandlerSpec::Factory(|| ::hyperlane::server_hook_factory::<#struct_name>()),
-            }
+            ::hyperlane::HookType::Route(#path, || ::hyperlane::server_hook_factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -8457,10 +7905,23 @@ pub(crate) struct RouteAttr {
 # Path: hyperlane-macros\src\send\fn.rs
 ```rust
 use crate::*;
+pub(crate) fn try_send_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            let _ = #context.try_send().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_send",
+        handler: Handler::NoAttrPosition(try_send_macro),
+    }
+}
 pub(crate) fn send_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
         quote! {
-            let _ = #context.send().await;
+            #context.send().await;
         }
     })
 }
@@ -8470,10 +7931,23 @@ inventory::submit! {
         handler: Handler::NoAttrPosition(send_macro),
     }
 }
+pub(crate) fn try_send_body_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            let _ = #context.try_send_body().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_send_body",
+        handler: Handler::NoAttrPosition(try_send_body_macro),
+    }
+}
 pub(crate) fn send_body_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
         quote! {
-            let _ = #context.send_body().await;
+            #context.send_body().await;
         }
     })
 }
@@ -8481,6 +7955,25 @@ inventory::submit! {
     InjectableMacro {
         name: "send_body",
         handler: Handler::NoAttrPosition(send_body_macro),
+    }
+}
+pub(crate) fn try_send_body_with_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let send_data: SendData = parse_macro_input!(attr as SendData);
+    let data: Expr = send_data.data;
+    inject(position, item, |context| {
+        quote! {
+            let _ = #context.try_send_body_with_data(#data).await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_send_body_with_data",
+        handler: Handler::WithAttrPosition(try_send_body_with_data_macro),
     }
 }
 pub(crate) fn send_body_with_data_macro(
@@ -8492,7 +7985,7 @@ pub(crate) fn send_body_with_data_macro(
     let data: Expr = send_data.data;
     inject(position, item, |context| {
         quote! {
-            let _ = #context.send_body_with_data(#data).await;
+            #context.send_body_with_data(#data).await;
         }
     })
 }
@@ -8653,46 +8146,55 @@ cargo add hyperlane-plugin-websocket
 ```rust
 use hyperlane::*;
 use hyperlane_plugin_websocket::*;
-struct RequestMiddleware {
-    socket_addr: String,
-}
-struct UpgradeHook;
-struct ServerPanicHook {
-    response_body: String,
-    content_type: String,
-}
-struct GroupChat;
-struct PrivateChat {
-    config: WebSocketConfig<String>,
-}
-struct ConnectedHook {
-    receiver_count: ReceiverCount,
-    data: String,
-    group_broadcast_type: BroadcastType<String>,
-    private_broadcast_type: BroadcastType<String>,
-}
-struct PrivateClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
-struct SendedHook {
-    msg: String,
-}
-struct GroupChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
-struct GroupClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
-struct PrivateChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
 static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
 fn get_broadcast_map() -> &'static WebSocket {
     BROADCAST_MAP.get_or_init(WebSocket::new)
+}
+struct ServerPanic {
+    response_body: String,
+    content_type: String,
+}
+impl ServerHook for ServerPanic {
+    async fn new(ctx: &Context) -> Self {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+struct RequestError;
+impl ServerHook for RequestError {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .send()
+            .await;
+    }
+}
+struct RequestMiddleware {
+    socket_addr: String,
 }
 impl ServerHook for RequestMiddleware {
     async fn new(ctx: &Context) -> Self {
@@ -8716,6 +8218,7 @@ impl ServerHook for RequestMiddleware {
             .await;
     }
 }
+struct UpgradeHook;
 impl ServerHook for UpgradeHook {
     async fn new(_ctx: &Context) -> Self {
         Self
@@ -8739,10 +8242,15 @@ impl ServerHook for UpgradeHook {
                 .set_response_body(&vec![])
                 .await
                 .send()
-                .await
-                .unwrap();
+                .await;
         }
     }
+}
+struct ConnectedHook {
+    receiver_count: ReceiverCount,
+    data: String,
+    group_broadcast_type: BroadcastType<String>,
+    private_broadcast_type: BroadcastType<String>,
 }
 impl ServerHook for ConnectedHook {
     async fn new(ctx: &Context) -> Self {
@@ -8750,8 +8258,7 @@ impl ServerHook for ConnectedHook {
             .try_get_route_param("group_name")
             .await
             .unwrap_or_default();
-        let group_broadcast_type: BroadcastType<String> =
-            BroadcastType::PointToGroup(group_name);
+        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
         let receiver_count: ReceiverCount =
             get_broadcast_map().receiver_count(group_broadcast_type.clone());
         let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
@@ -8789,8 +8296,25 @@ impl ServerHook for ConnectedHook {
             "[connected_hook]receiver_count => {:?}",
             self.receiver_count
         );
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+        Server::flush_stdout();
     }
+}
+struct SendedHook {
+    msg: String,
+}
+impl ServerHook for SendedHook {
+    async fn new(ctx: &Context) -> Self {
+        let msg: String = ctx.get_response_body_string().await;
+        Self { msg }
+    }
+    async fn handle(self, _ctx: &Context) {
+        println!("[sended_hook]msg => {}", self.msg);
+        Server::flush_stdout();
+    }
+}
+struct GroupChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
 }
 impl ServerHook for GroupChatRequestHook {
     async fn new(ctx: &Context) -> Self {
@@ -8810,8 +8334,12 @@ impl ServerHook for GroupChatRequestHook {
     async fn handle(self, ctx: &Context) {
         ctx.set_response_body(&self.body).await;
         println!("[group_chat]receiver_count => {:?}", self.receiver_count);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+        Server::flush_stdout();
     }
+}
+struct GroupClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
 }
 impl ServerHook for GroupClosedHook {
     async fn new(ctx: &Context) -> Self {
@@ -8828,8 +8356,32 @@ impl ServerHook for GroupClosedHook {
     async fn handle(self, ctx: &Context) {
         ctx.set_response_body(&self.body).await;
         println!("[group_closed]receiver_count => {:?}", self.receiver_count);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+        Server::flush_stdout();
     }
+}
+struct GroupChat;
+impl ServerHook for GroupChat {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_request_config(RequestConfig::default())
+            .set_capacity(1024)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<GroupChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<GroupClosedHook>();
+        get_broadcast_map().run(config).await;
+    }
+}
+struct PrivateChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
 }
 impl ServerHook for PrivateChatRequestHook {
     async fn new(ctx: &Context) -> Self {
@@ -8850,16 +8402,19 @@ impl ServerHook for PrivateChatRequestHook {
     async fn handle(self, ctx: &Context) {
         ctx.set_response_body(&self.body).await;
         println!("[private_chat]receiver_count => {:?}", self.receiver_count);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+        Server::flush_stdout();
     }
+}
+struct PrivateClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
 }
 impl ServerHook for PrivateClosedHook {
     async fn new(ctx: &Context) -> Self {
         let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
         let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count_after_closed(key);
+        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
         let body: String = format!("receiver_count => {receiver_count:?}");
         Self {
             body,
@@ -8872,18 +8427,11 @@ impl ServerHook for PrivateClosedHook {
             "[private_closed]receiver_count => {:?}",
             self.receiver_count
         );
-        let _ = std::io::Write::flush(&mut std::io::stdout());
+        Server::flush_stdout();
     }
 }
-impl ServerHook for SendedHook {
-    async fn new(ctx: &Context) -> Self {
-        let msg: String = ctx.get_response_body_string().await;
-        Self { msg }
-    }
-    async fn handle(self, _ctx: &Context) {
-        println!("[sended_hook]msg => {}", self.msg);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
-    }
+struct PrivateChat {
+    config: WebSocketConfig<String>,
 }
 impl ServerHook for PrivateChat {
     async fn new(ctx: &Context) -> Self {
@@ -8905,63 +8453,11 @@ impl ServerHook for PrivateChat {
         get_broadcast_map().run(self.config).await;
     }
 }
-impl ServerHook for GroupChat {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
-            .set_context(ctx.clone())
-            .set_broadcast_type(key)
-            .set_request_config(RequestConfig::default())
-            .set_capacity(1024)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<GroupChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<GroupClosedHook>();
-        get_broadcast_map().run(config).await;
-    }
-}
-impl ServerHook for ServerPanicHook {
-    async fn new(ctx: &Context) -> Self {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String =
-            ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        let _ = ctx
-            .set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .send()
-            .await;
-    }
-}
+#[tokio::main]
 async fn main() {
     let server: Server = Server::new().await;
-    let config: ServerConfig = ServerConfig::new().await;
-    config.host("0.0.0.0").await;
-    config.port(60000).await;
-    config.request_config(RequestConfig::default()).await;
-    config.disable_linger().await;
-    config.disable_nodelay().await;
-    server.config(config).await;
+    server.panic::<ServerPanic>().await;
+    server.request_error::<RequestError>().await;
     server.request_middleware::<RequestMiddleware>().await;
     server.request_middleware::<UpgradeHook>().await;
     server.route::<GroupChat>("/{group_name}").await;
@@ -8973,6 +8469,7 @@ async fn main() {
 ## Contact
 # Path: hyperlane-plugin-websocket\src\lib.rs
 ```rust
+#[cfg(test)]
 pub(crate) mod tests;
 pub(crate) mod websocket;
 pub use websocket::{r#enum::*, r#struct::*};
@@ -8994,330 +8491,329 @@ pub(crate) use std::sync::OnceLock;
 # Path: hyperlane-plugin-websocket\src\tests\cfg.rs
 ```rust
 use crate::*;
-#[tokio::test]
-async fn test_server() {
-    struct RequestMiddleware {
-        socket_addr: String,
-    }
-    struct UpgradeHook;
-    struct ServerPanicHook {
-        response_body: String,
-        content_type: String,
-    }
-    struct GroupChat;
-    struct PrivateChat {
-        config: WebSocketConfig<String>,
-    }
-    struct ConnectedHook {
-        receiver_count: ReceiverCount,
-        data: String,
-        group_broadcast_type: BroadcastType<String>,
-        private_broadcast_type: BroadcastType<String>,
-    }
-    struct PrivateClosedHook {
-        body: String,
-        receiver_count: ReceiverCount,
-    }
-    struct SendedHook {
-        msg: String,
-    }
-    struct GroupChatRequestHook {
-        body: RequestBody,
-        receiver_count: ReceiverCount,
-    }
-    struct GroupClosedHook {
-        body: String,
-        receiver_count: ReceiverCount,
-    }
-    struct PrivateChatRequestHook {
-        body: RequestBody,
-        receiver_count: ReceiverCount,
-    }
-    static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
-    fn get_broadcast_map() -> &'static WebSocket {
-        BROADCAST_MAP.get_or_init(WebSocket::new)
-    }
-    impl ServerHook for RequestMiddleware {
-        async fn new(ctx: &Context) -> Self {
-            let socket_addr: String = ctx.get_socket_addr_string().await;
-            Self { socket_addr }
+static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
+fn get_broadcast_map() -> &'static WebSocket {
+    BROADCAST_MAP.get_or_init(WebSocket::new)
+}
+struct ServerPanic {
+    response_body: String,
+    content_type: String,
+}
+impl ServerHook for ServerPanic {
+    async fn new(ctx: &Context) -> Self {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
         }
-        async fn handle(self, ctx: &Context) {
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+struct RequestError;
+impl ServerHook for RequestError {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .send()
+            .await;
+    }
+}
+struct RequestMiddleware {
+    socket_addr: String,
+}
+impl ServerHook for RequestMiddleware {
+    async fn new(ctx: &Context) -> Self {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        Self { socket_addr }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(200)
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONNECTION, KEEP_ALIVE)
+            .await
+            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .await
+            .set_response_header("SocketAddr", &self.socket_addr)
+            .await;
+    }
+}
+struct UpgradeHook;
+impl ServerHook for UpgradeHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
             ctx.set_response_version(HttpVersion::Http1_1)
                 .await
-                .set_response_status_code(200)
+                .set_response_status_code(101)
                 .await
-                .set_response_header(SERVER, HYPERLANE)
+                .set_response_header(UPGRADE, WEBSOCKET)
                 .await
-                .set_response_header(CONNECTION, KEEP_ALIVE)
+                .set_response_header(CONNECTION, UPGRADE)
                 .await
-                .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
                 .await
-                .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-                .await
-                .set_response_header("SocketAddr", &self.socket_addr)
-                .await;
-        }
-    }
-    impl ServerHook for UpgradeHook {
-        async fn new(_ctx: &Context) -> Self {
-            Self
-        }
-        async fn handle(self, ctx: &Context) {
-            if !ctx.get_request().await.is_ws() {
-                return;
-            }
-            if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-                let accept_key: String = WebSocketFrame::generate_accept_key(key);
-                ctx.set_response_version(HttpVersion::Http1_1)
-                    .await
-                    .set_response_status_code(101)
-                    .await
-                    .set_response_header(UPGRADE, WEBSOCKET)
-                    .await
-                    .set_response_header(CONNECTION, UPGRADE)
-                    .await
-                    .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                    .await
-                    .set_response_body(&vec![])
-                    .await
-                    .send()
-                    .await
-                    .unwrap();
-            }
-        }
-    }
-    impl ServerHook for ConnectedHook {
-        async fn new(ctx: &Context) -> Self {
-            let group_name: String = ctx
-                .try_get_route_param("group_name")
-                .await
-                .unwrap_or_default();
-            let group_broadcast_type: BroadcastType<String> =
-                BroadcastType::PointToGroup(group_name);
-            let receiver_count: ReceiverCount =
-                get_broadcast_map().receiver_count(group_broadcast_type.clone());
-            let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
-            let your_name: String = ctx
-                .try_get_route_param("your_name")
-                .await
-                .unwrap_or_default();
-            let private_broadcast_type: BroadcastType<String> =
-                BroadcastType::PointToPoint(my_name, your_name);
-            let data: String = format!("receiver_count => {receiver_count:?}");
-            Self {
-                receiver_count,
-                data,
-                group_broadcast_type,
-                private_broadcast_type,
-            }
-        }
-        async fn handle(self, _ctx: &Context) {
-            get_broadcast_map()
-                .send(self.group_broadcast_type, self.data.clone())
-                .unwrap_or_else(|err| {
-                    println!("[connected_hook]send group error => {:?}", err.to_string());
-                    None
-                });
-            get_broadcast_map()
-                .send(self.private_broadcast_type, self.data)
-                .unwrap_or_else(|err| {
-                    println!(
-                        "[connected_hook]send private error => {:?}",
-                        err.to_string()
-                    );
-                    None
-                });
-            println!(
-                "[connected_hook]receiver_count => {:?}",
-                self.receiver_count
-            );
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-        }
-    }
-    impl ServerHook for GroupChatRequestHook {
-        async fn new(ctx: &Context) -> Self {
-            let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-            let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-            let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-            let mut body: RequestBody = ctx.get_request_body().await;
-            if body.is_empty() {
-                receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-                body = format!("receiver_count => {receiver_count:?}").into();
-            }
-            Self {
-                body,
-                receiver_count,
-            }
-        }
-        async fn handle(self, ctx: &Context) {
-            ctx.set_response_body(&self.body).await;
-            println!("[group_chat]receiver_count => {:?}", self.receiver_count);
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-        }
-    }
-    impl ServerHook for GroupClosedHook {
-        async fn new(ctx: &Context) -> Self {
-            let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-            let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-            let receiver_count: ReceiverCount =
-                get_broadcast_map().receiver_count_after_closed(key.clone());
-            let body: String = format!("receiver_count => {receiver_count:?}");
-            Self {
-                body,
-                receiver_count,
-            }
-        }
-        async fn handle(self, ctx: &Context) {
-            ctx.set_response_body(&self.body).await;
-            println!("[group_closed]receiver_count => {:?}", self.receiver_count);
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-        }
-    }
-    impl ServerHook for PrivateChatRequestHook {
-        async fn new(ctx: &Context) -> Self {
-            let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-            let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-            let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-            let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-            let mut body: RequestBody = ctx.get_request_body().await;
-            if body.is_empty() {
-                receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-                body = format!("receiver_count => {receiver_count:?}").into();
-            }
-            Self {
-                body,
-                receiver_count,
-            }
-        }
-        async fn handle(self, ctx: &Context) {
-            ctx.set_response_body(&self.body).await;
-            println!("[private_chat]receiver_count => {:?}", self.receiver_count);
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-        }
-    }
-    impl ServerHook for PrivateClosedHook {
-        async fn new(ctx: &Context) -> Self {
-            let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-            let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-            let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-            let receiver_count: ReceiverCount =
-                get_broadcast_map().receiver_count_after_closed(key);
-            let body: String = format!("receiver_count => {receiver_count:?}");
-            Self {
-                body,
-                receiver_count,
-            }
-        }
-        async fn handle(self, ctx: &Context) {
-            ctx.set_response_body(&self.body).await;
-            println!(
-                "[private_closed]receiver_count => {:?}",
-                self.receiver_count
-            );
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-        }
-    }
-    impl ServerHook for SendedHook {
-        async fn new(ctx: &Context) -> Self {
-            let msg: String = ctx.get_response_body_string().await;
-            Self { msg }
-        }
-        async fn handle(self, _ctx: &Context) {
-            println!("[sended_hook]msg => {}", self.msg);
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-        }
-    }
-    impl ServerHook for PrivateChat {
-        async fn new(ctx: &Context) -> Self {
-            let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-            let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-            let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-            let config: WebSocketConfig<String> = WebSocketConfig::new()
-                .set_context(ctx.clone())
-                .set_broadcast_type(key)
-                .set_request_config(RequestConfig::default())
-                .set_capacity(1024)
-                .set_connected_hook::<ConnectedHook>()
-                .set_request_hook::<PrivateChatRequestHook>()
-                .set_sended_hook::<SendedHook>()
-                .set_closed_hook::<PrivateClosedHook>();
-            Self { config }
-        }
-        async fn handle(self, _ctx: &Context) {
-            get_broadcast_map().run(self.config).await;
-        }
-    }
-    impl ServerHook for GroupChat {
-        async fn new(_ctx: &Context) -> Self {
-            Self
-        }
-        async fn handle(self, ctx: &Context) {
-            let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-            let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-            let config: WebSocketConfig<String> = WebSocketConfig::new()
-                .set_context(ctx.clone())
-                .set_broadcast_type(key)
-                .set_request_config(RequestConfig::default())
-                .set_capacity(1024)
-                .set_connected_hook::<ConnectedHook>()
-                .set_request_hook::<GroupChatRequestHook>()
-                .set_sended_hook::<SendedHook>()
-                .set_closed_hook::<GroupClosedHook>();
-            get_broadcast_map().run(config).await;
-        }
-    }
-    impl ServerHook for ServerPanicHook {
-        async fn new(ctx: &Context) -> Self {
-            let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-            let response_body: String = error.to_string();
-            let content_type: String =
-                ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-            Self {
-                response_body,
-                content_type,
-            }
-        }
-        async fn handle(self, ctx: &Context) {
-            let _ = ctx
-                .set_response_version(HttpVersion::Http1_1)
-                .await
-                .set_response_status_code(500)
-                .await
-                .clear_response_headers()
-                .await
-                .set_response_header(SERVER, HYPERLANE)
-                .await
-                .set_response_header(CONTENT_TYPE, &self.content_type)
-                .await
-                .set_response_body(&self.response_body)
+                .set_response_body(&vec![])
                 .await
                 .send()
                 .await;
         }
     }
-    async fn main() {
-        let server: Server = Server::new().await;
-        let config: ServerConfig = ServerConfig::new().await;
-        config.host("0.0.0.0").await;
-        config.port(60000).await;
-        config.request_config(RequestConfig::default()).await;
-        config.disable_linger().await;
-        config.disable_nodelay().await;
-        server.config(config).await;
-        server.request_middleware::<RequestMiddleware>().await;
-        server.request_middleware::<UpgradeHook>().await;
-        server.route::<GroupChat>("/{group_name}").await;
-        server.route::<PrivateChat>("/{my_name}/{your_name}").await;
-        let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
-        let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-            server_control_hook_2.shutdown().await;
-        });
-        server_control_hook_1.wait().await;
+}
+struct ConnectedHook {
+    receiver_count: ReceiverCount,
+    data: String,
+    group_broadcast_type: BroadcastType<String>,
+    private_broadcast_type: BroadcastType<String>,
+}
+impl ServerHook for ConnectedHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx
+            .try_get_route_param("group_name")
+            .await
+            .unwrap_or_default();
+        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count(group_broadcast_type.clone());
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
+        let your_name: String = ctx
+            .try_get_route_param("your_name")
+            .await
+            .unwrap_or_default();
+        let private_broadcast_type: BroadcastType<String> =
+            BroadcastType::PointToPoint(my_name, your_name);
+        let data: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            receiver_count,
+            data,
+            group_broadcast_type,
+            private_broadcast_type,
+        }
     }
-    main().await;
+    async fn handle(self, _ctx: &Context) {
+        get_broadcast_map()
+            .send(self.group_broadcast_type, self.data.clone())
+            .unwrap_or_else(|err| {
+                println!("[connected_hook]send group error => {:?}", err.to_string());
+                None
+            });
+        get_broadcast_map()
+            .send(self.private_broadcast_type, self.data)
+            .unwrap_or_else(|err| {
+                println!(
+                    "[connected_hook]send private error => {:?}",
+                    err.to_string()
+                );
+                None
+            });
+        println!(
+            "[connected_hook]receiver_count => {:?}",
+            self.receiver_count
+        );
+        Server::flush_stdout();
+    }
+}
+struct SendedHook {
+    msg: String,
+}
+impl ServerHook for SendedHook {
+    async fn new(ctx: &Context) -> Self {
+        let msg: String = ctx.get_response_body_string().await;
+        Self { msg }
+    }
+    async fn handle(self, _ctx: &Context) {
+        println!("[sended_hook]msg => {}", self.msg);
+        Server::flush_stdout();
+    }
+}
+struct GroupChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for GroupChatRequestHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request_body().await;
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[group_chat]receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct GroupClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for GroupClosedHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count_after_closed(key.clone());
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[group_closed]receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct GroupChat;
+impl ServerHook for GroupChat {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_request_config(RequestConfig::default())
+            .set_capacity(1024)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<GroupChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<GroupClosedHook>();
+        get_broadcast_map().run(config).await;
+    }
+}
+struct PrivateChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for PrivateChatRequestHook {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request_body().await;
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[private_chat]receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct PrivateClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for PrivateClosedHook {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!(
+            "[private_closed]receiver_count => {:?}",
+            self.receiver_count
+        );
+        Server::flush_stdout();
+    }
+}
+struct PrivateChat {
+    config: WebSocketConfig<String>,
+}
+impl ServerHook for PrivateChat {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_request_config(RequestConfig::default())
+            .set_capacity(1024)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<PrivateChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<PrivateClosedHook>();
+        Self { config }
+    }
+    async fn handle(self, _ctx: &Context) {
+        get_broadcast_map().run(self.config).await;
+    }
+}
+#[tokio::test]
+async fn main() {
+    let server: Server = Server::new().await;
+    server.panic::<ServerPanic>().await;
+    server.request_error::<RequestError>().await;
+    server.request_middleware::<RequestMiddleware>().await;
+    server.request_middleware::<UpgradeHook>().await;
+    server.route::<GroupChat>("/{group_name}").await;
+    server.route::<PrivateChat>("/{my_name}/{your_name}").await;
+    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
+    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        server_control_hook_2.shutdown().await;
+    });
+    server_control_hook_1.wait().await;
 }
 ```
 # Path: hyperlane-plugin-websocket\src\tests\mod.rs
@@ -9663,7 +9159,7 @@ impl WebSocket {
                 msg_res = receiver.recv() => {
                     if let Ok(msg) = &msg_res {
                         let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(msg);
-                        if ctx.send_body_list_with_data(&frame_list).await.is_ok() {
+                        if ctx.try_send_body_list_with_data(&frame_list).await.is_ok() {
                             continue;
                         }
                     }
