@@ -14,227 +14,6 @@ cargo add hyperlane
 ```sh
 git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```
-## Use
-```rust
-use hyperlane::*;
-struct ServerPanic {
-    response_body: String,
-    content_type: String,
-}
-impl ServerHook for ServerPanic {
-    async fn new(ctx: &Context) -> Self {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .send()
-            .await;
-    }
-}
-struct RequestError;
-impl ServerHook for RequestError {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .send()
-            .await;
-    }
-}
-struct SendBodyMiddleware {
-    socket_addr: String,
-}
-impl ServerHook for SendBodyMiddleware {
-    async fn new(ctx: &Context) -> Self {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
-        Self { socket_addr }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(200)
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONNECTION, KEEP_ALIVE)
-            .await
-            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-            .await
-            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .await
-            .set_response_header("SocketAddr", &self.socket_addr)
-            .await;
-    }
-}
-struct UpgradeMiddleware;
-impl ServerHook for UpgradeMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        if !ctx.get_request().await.is_ws() {
-            return;
-        }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_version(HttpVersion::Http1_1)
-                .await
-                .set_response_status_code(101)
-                .await
-                .set_response_header(UPGRADE, WEBSOCKET)
-                .await
-                .set_response_header(CONNECTION, UPGRADE)
-                .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .await
-                .set_response_body(&vec![])
-                .await
-                .send()
-                .await;
-        }
-    }
-}
-struct ResponseMiddleware;
-impl ServerHook for ResponseMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        if ctx.get_request().await.is_ws() {
-            return;
-        }
-        ctx.send().await;
-    }
-}
-struct RootRoute {
-    response_body: String,
-    cookie1: String,
-    cookie2: String,
-}
-impl ServerHook for RootRoute {
-    async fn new(ctx: &Context) -> Self {
-        let path: RequestPath = ctx.get_request_path().await;
-        let response_body: String = format!("Hello hyperlane => {}", path);
-        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
-        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-        Self {
-            response_body,
-            cookie1,
-            cookie2,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.add_response_header(SET_COOKIE, &self.cookie1)
-            .await
-            .add_response_header(SET_COOKIE, &self.cookie2)
-            .await
-            .set_response_body(&self.response_body)
-            .await;
-    }
-}
-struct WebsocketRoute;
-impl WebsocketRoute {
-    async fn send_body_hook(&self, ctx: &Context) {
-        if ctx.get_request().await.is_ws() {
-            let body: ResponseBody = ctx.get_response_body().await;
-            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-            ctx.send_body_list_with_data(&frame_list).await;
-        } else {
-            ctx.send_body().await;
-        }
-    }
-}
-impl ServerHook for WebsocketRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        loop {
-            match ctx.ws_from_stream(RequestConfig::default()).await {
-                Ok(_) => {
-                    let request_body: Vec<u8> = ctx.get_request_body().await;
-                    ctx.set_response_body(&request_body).await;
-                    self.send_body_hook(ctx).await;
-                    continue;
-                }
-                Err(error) => {
-                    ctx.set_response_body(&error.to_string()).await;
-                    self.send_body_hook(ctx).await;
-                    return;
-                }
-            }
-        }
-    }
-}
-struct SseRoute;
-impl ServerHook for SseRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .await
-            .send()
-            .await;
-        for i in 0..10 {
-            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
-                .await
-                .send_body()
-                .await;
-        }
-        ctx.closed().await;
-    }
-}
-struct DynamicRoute {
-    params: RouteParams,
-}
-impl ServerHook for DynamicRoute {
-    async fn new(ctx: &Context) -> Self {
-        Self {
-            params: ctx.get_route_params().await,
-        }
-    }
-    async fn handle(mut self, _ctx: &Context) {
-        self.params.insert("key".to_owned(), "value".to_owned());
-        panic!("Test panic {:?}", self.params);
-    }
-}
-#[tokio::main]
-async fn main() {
-    let server: Server = Server::new().await;
-    server.panic::<ServerPanic>().await;
-    server.request_error::<RequestError>().await;
-    server.request_middleware::<SendBodyMiddleware>().await;
-    server.request_middleware::<UpgradeMiddleware>().await;
-    server.response_middleware::<ResponseMiddleware>().await;
-    server.route::<RootRoute>("/").await;
-    server.route::<WebsocketRoute>("/websocket").await;
-    server.route::<SseRoute>("/sse").await;
-    server.route::<DynamicRoute>("/dynamic/{routing}").await;
-    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
-    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
-    server_control_hook.wait().await;
-}
-```
 ## Contact
 # Path: hyperlane\src\lib.rs
 ```rust
@@ -297,7 +76,8 @@ pub(crate) enum Attribute {
 }
 #[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
 pub(crate) enum InternalAttribute {
-    Panic,
+    TaskPanicData,
+    RequestErrorData,
     Hook(String),
 }
 ```
@@ -1165,15 +945,28 @@ impl Context {
             .insert(Attribute::Internal(key).to_string(), Arc::new(value));
         self
     }
-    pub async fn try_get_panic(&self) -> Option<Panic> {
-        self.try_get_internal_attribute(InternalAttribute::Panic)
+    pub(crate) async fn set_task_panic(&self, panic_data: PanicData) -> &Self {
+        self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
             .await
     }
-    pub async fn get_panic(&self) -> Panic {
-        self.get_internal_attribute(InternalAttribute::Panic).await
+    pub async fn try_get_task_panic_data(&self) -> Option<PanicData> {
+        self.try_get_internal_attribute(InternalAttribute::TaskPanicData)
+            .await
     }
-    pub(crate) async fn set_panic(&self, panic: Panic) -> &Self {
-        self.set_internal_attribute(InternalAttribute::Panic, panic)
+    pub async fn get_task_panic_data(&self) -> PanicData {
+        self.get_internal_attribute(InternalAttribute::TaskPanicData)
+            .await
+    }
+    pub(crate) async fn set_request_error_data(&self, request_error: RequestError) -> &Self {
+        self.set_internal_attribute(InternalAttribute::RequestErrorData, request_error)
+            .await
+    }
+    pub async fn try_get_request_error_data(&self) -> Option<RequestError> {
+        self.try_get_internal_attribute(InternalAttribute::RequestErrorData)
+            .await
+    }
+    pub async fn get_request_error_data(&self) -> RequestError {
+        self.get_internal_attribute(InternalAttribute::RequestErrorData)
             .await
     }
     pub async fn set_hook<K, F, Fut>(&self, key: K, hook: F) -> &Self
@@ -1378,7 +1171,7 @@ pub use r#enum::*;
 use crate::*;
 #[derive(Clone, Debug, Copy, DisplayDebug)]
 pub enum HookType {
-    Panic(Option<isize>, ServerHookHandlerFactory),
+    TaskPanic(Option<isize>, ServerHookHandlerFactory),
     RequestError(Option<isize>, ServerHookHandlerFactory),
     RequestMiddleware(Option<isize>, ServerHookHandlerFactory),
     Route(&'static str, ServerHookHandlerFactory),
@@ -1447,7 +1240,7 @@ impl PartialEq for HookType {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (HookType::Panic(order1, factory1), HookType::Panic(order2, factory2)) => {
+            (HookType::TaskPanic(order1, factory1), HookType::TaskPanic(order2, factory2)) => {
                 order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
             }
             (
@@ -1474,7 +1267,7 @@ impl Hash for HookType {
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            HookType::Panic(order, factory) => {
+            HookType::TaskPanic(order, factory) => {
                 0u8.hash(state);
                 order.hash(state);
                 (factory as *const fn() -> ServerHookHandler).hash(state);
@@ -1508,7 +1301,7 @@ impl HookType {
         match *self {
             HookType::RequestMiddleware(order, _)
             | HookType::ResponseMiddleware(order, _)
-            | HookType::Panic(order, _)
+            | HookType::TaskPanic(order, _)
             | HookType::RequestError(order, _) => order,
             _ => None,
         }
@@ -1518,11 +1311,17 @@ impl HookType {
         match *self {
             HookType::RequestMiddleware(_, hook)
             | HookType::ResponseMiddleware(_, hook)
-            | HookType::Panic(_, hook)
+            | HookType::TaskPanic(_, hook)
             | HookType::RequestError(_, hook) => Some(hook),
             _ => None,
         }
     }
+}
+impl ServerHook for DefaultServerHook {
+    async fn new(_: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &Context) {}
 }
 ```
 # Path: hyperlane\src\hook\mod.rs
@@ -1542,6 +1341,8 @@ pub use r#type::*;
 # Path: hyperlane\src\hook\struct.rs
 ```rust
 use crate::*;
+#[derive(Clone, Copy, Debug, DisplayDebug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DefaultServerHook;
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
 pub struct ServerControlHook {
     #[debug(skip)]
@@ -1582,7 +1383,7 @@ pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, Se
 # Path: hyperlane\src\panic\impl.rs
 ```rust
 use crate::*;
-impl Panic {
+impl PanicData {
     #[inline(always)]
     pub(crate) fn new(
         message: Option<String>,
@@ -1616,7 +1417,7 @@ impl Panic {
         {
             message = Some(default_message);
         }
-        let panic: Panic = Panic::new(message, None, None);
+        let panic: PanicData = PanicData::new(message, None, None);
         panic
     }
 }
@@ -1631,7 +1432,7 @@ pub use r#struct::*;
 ```rust
 use crate::*;
 #[derive(CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter)]
-pub struct Panic {
+pub struct PanicData {
     #[get(pub)]
     #[set(pub(crate))]
     pub(super) message: Option<String>,
@@ -2053,7 +1854,7 @@ impl Default for ServerInner {
     fn default() -> Self {
         Self {
             config: ServerConfigInner::default(),
-            panic: vec![],
+            task_panic: vec![],
             request_error: vec![],
             route_matcher: RouteMatcher::new(),
             request_middleware: vec![],
@@ -2065,14 +1866,14 @@ impl PartialEq for ServerInner {
     fn eq(&self, other: &Self) -> bool {
         self.config == other.config
             && self.route_matcher == other.route_matcher
-            && self.panic.len() == other.panic.len()
+            && self.task_panic.len() == other.task_panic.len()
             && self.request_error.len() == other.request_error.len()
             && self.request_middleware.len() == other.request_middleware.len()
             && self.response_middleware.len() == other.response_middleware.len()
             && self
-                .panic
+                .task_panic
                 .iter()
-                .zip(other.panic.iter())
+                .zip(other.task_panic.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
             && self
                 .request_error
@@ -2136,8 +1937,8 @@ impl Server {
     }
     pub async fn handle_hook(&self, hook: HookType) {
         match hook {
-            HookType::Panic(_, hook) => {
-                self.write().await.get_mut_panic().push(hook());
+            HookType::TaskPanic(_, hook) => {
+                self.write().await.get_mut_task_panic().push(hook());
             }
             HookType::RequestError(_, hook) => {
                 self.write().await.get_mut_request_error().push(hook());
@@ -2169,13 +1970,13 @@ impl Server {
         self.write().await.set_config(config.get_inner().await);
         self
     }
-    pub async fn panic<S>(&self) -> &Self
+    pub async fn task_panic<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
             .await
-            .get_mut_panic()
+            .get_mut_task_panic()
             .push(server_hook_factory::<S>());
         self
     }
@@ -2250,32 +2051,32 @@ impl Server {
         Self::flush_stdout();
         Self::flush_stderr();
     }
-    async fn handle_panic_with_context(&self, ctx: &Context, panic: &Panic) {
-        let panic_clone: Panic = panic.clone();
-        ctx.cancel_aborted().await.set_panic(panic_clone).await;
-        for hook in self.read().await.get_panic().iter() {
-            if let Err(join_error) = spawn(hook(ctx)).await
-                && join_error.is_panic()
-            {
-                eprintln!("Panic occurred in panic handler: {:?}", join_error);
-                let _ = Self::try_flush_stdout_and_stderr();
-            }
+    async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
+        let panic_clone: PanicData = panic.clone();
+        ctx.cancel_aborted().await.set_task_panic(panic_clone).await;
+        for hook in self.read().await.get_task_panic().iter() {
+            Box::pin(self.task_handler(ctx, hook, false)).await;
             if ctx.get_aborted().await {
                 return;
             }
         }
     }
     async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
-        let panic: Panic = Panic::from_join_error(join_error);
+        let panic: PanicData = PanicData::from_join_error(join_error);
         ctx.set_response_status_code(HttpStatus::InternalServerError.code())
             .await;
         self.handle_panic_with_context(ctx, &panic).await;
     }
-    async fn spawn_handler(&self, ctx: &Context, hook: &ServerHookHandler) {
+    async fn task_handler(&self, ctx: &Context, hook: &ServerHookHandler, progress: bool) {
         if let Err(join_error) = spawn(hook(ctx)).await
             && join_error.is_panic()
         {
-            self.handle_task_panic(ctx, join_error).await;
+            if progress {
+                Box::pin(self.handle_task_panic(ctx, join_error)).await;
+            } else {
+                eprintln!("Panic occurred in panic handler: {:?}", join_error);
+                let _ = Self::try_flush_stdout_and_stderr();
+            }
         }
     }
     async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
@@ -2313,15 +2114,13 @@ impl Server {
             server.handle_connection(stream, request_config).await;
         });
     }
-    pub async fn handle_http_requests_error(&self, ctx: &Context, error: &RequestError) {
+    pub async fn handle_request_error(&self, ctx: &Context, error: &RequestError) {
         ctx.cancel_aborted()
             .await
-            .set_response_status_code(error.get_http_status_code())
-            .await
-            .set_response_body(&error.to_string())
+            .set_request_error_data(error.clone())
             .await;
         for hook in self.read().await.get_request_error().iter() {
-            self.spawn_handler(ctx, hook).await;
+            self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return;
             }
@@ -2334,8 +2133,7 @@ impl Server {
                 self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
-                self.handle_http_requests_error(&stream.into(), &error)
-                    .await;
+                self.handle_request_error(&stream.into(), &error).await;
             }
         }
     }
@@ -2352,7 +2150,7 @@ impl Server {
         if self.handle_response_middleware(ctx).await {
             return ctx.is_keep_alive(keep_alive).await;
         }
-        if let Some(panic) = ctx.try_get_panic().await {
+        if let Some(panic) = ctx.try_get_task_panic_data().await {
             ctx.set_response_status_code(HttpStatus::InternalServerError.code())
                 .await;
             self.handle_panic_with_context(ctx, &panic).await;
@@ -2373,7 +2171,7 @@ impl Server {
                     }
                 }
                 Err(error) => {
-                    self.handle_http_requests_error(&state.get_stream().into(), &error)
+                    self.handle_request_error(&state.get_stream().into(), &error)
                         .await;
                     return;
                 }
@@ -2382,7 +2180,7 @@ impl Server {
     }
     pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
         for hook in self.read().await.get_request_middleware().iter() {
-            self.spawn_handler(ctx, hook).await;
+            self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -2397,7 +2195,7 @@ impl Server {
             .try_resolve_route(ctx, path)
             .await
         {
-            self.spawn_handler(ctx, &hook).await;
+            self.task_handler(ctx, &hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -2406,7 +2204,7 @@ impl Server {
     }
     pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
         for hook in self.read().await.get_response_middleware().iter() {
-            self.spawn_handler(ctx, hook).await;
+            self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return true;
             }
@@ -2480,7 +2278,7 @@ pub(crate) struct ServerInner {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) panic: ServerHookList,
+    pub(super) task_panic: ServerHookList,
     #[debug(skip)]
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -2509,13 +2307,13 @@ use crate::*;
 #[tokio::test]
 async fn get_panic_from_context() {
     let ctx: Context = Context::default();
-    let set_panic: Panic = Panic::new(
+    let set_panic: PanicData = PanicData::new(
         Some("test".to_string()),
         Some("test".to_string()),
         Some("test".to_string()),
     );
-    ctx.set_panic(set_panic.clone()).await;
-    let get_panic: Panic = ctx.try_get_panic().await.unwrap();
+    ctx.set_task_panic(set_panic.clone()).await;
+    let get_panic: PanicData = ctx.try_get_task_panic_data().await.unwrap();
     assert_eq!(set_panic, get_panic);
 }
 #[tokio::test]
@@ -2539,7 +2337,7 @@ async fn get_panic_from_join_error() {
         panic!("{}", message.to_string());
     });
     let join_error: JoinError = join_handle.await.unwrap_err();
-    let panic_struct: Panic = Panic::from_join_error(join_error);
+    let panic_struct: PanicData = PanicData::from_join_error(join_error);
     assert!(!panic_struct.get_message().is_none());
     assert!(
         panic_struct
@@ -2705,7 +2503,7 @@ mod server;
 use crate::*;
 #[test]
 fn panic_new() {
-    let panic: Panic = Panic::new(
+    let panic: PanicData = PanicData::new(
         Some("message".to_string()),
         Some("location".to_string()),
         Some("payload".to_string()),
@@ -2722,7 +2520,7 @@ async fn from_join_error() {
     let result: Result<(), JoinError> = handle.await;
     assert!(result.is_err());
     if let Err(join_error) = result {
-        let is_panic: bool = Panic::from_join_error(join_error)
+        let is_panic: bool = PanicData::from_join_error(join_error)
             .get_message()
             .clone()
             .unwrap_or_default()
@@ -3064,13 +2862,13 @@ async fn server_inner_partial_eq() {
     let inner2: ServerInner = ServerInner::default();
     assert_eq!(inner1, inner2);
 }
-struct ServerPanic {
+struct TaskPanicHook {
     response_body: String,
     content_type: String,
 }
-impl ServerHook for ServerPanic {
+impl ServerHook for TaskPanicHook {
     async fn new(ctx: &Context) -> Self {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
         let response_body: String = error.to_string();
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
         Self {
@@ -3095,13 +2893,25 @@ impl ServerHook for ServerPanic {
             .await;
     }
 }
-struct RequestError;
-impl ServerHook for RequestError {
-    async fn new(_ctx: &Context) -> Self {
-        Self
+struct RequestErrorHook {
+    response_status_code: ResponseStatusCode,
+    response_body: String,
+}
+impl ServerHook for RequestErrorHook {
+    async fn new(ctx: &Context) -> Self {
+        let request_error: RequestError =
+            ctx.try_get_request_error_data().await.unwrap_or_default();
+        Self {
+            response_status_code: request_error.get_http_status_code(),
+            response_body: request_error.to_string(),
+        }
     }
     async fn handle(self, ctx: &Context) {
         ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(self.response_status_code)
+            .await
+            .set_response_body(self.response_body)
             .await
             .send()
             .await;
@@ -3198,6 +3008,25 @@ impl ServerHook for RootRoute {
             .await;
     }
 }
+struct SseRoute;
+impl ServerHook for SseRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .send()
+            .await;
+        for i in 0..10 {
+            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .await
+                .send_body()
+                .await;
+        }
+        ctx.closed().await;
+    }
+}
 struct WebsocketRoute;
 impl WebsocketRoute {
     async fn send_body_hook(&self, ctx: &Context) {
@@ -3232,25 +3061,6 @@ impl ServerHook for WebsocketRoute {
         }
     }
 }
-struct SseRoute;
-impl ServerHook for SseRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .await
-            .send()
-            .await;
-        for i in 0..10 {
-            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
-                .await
-                .send_body()
-                .await;
-        }
-        ctx.closed().await;
-    }
-}
 struct DynamicRoute {
     params: RouteParams,
 }
@@ -3268,14 +3078,14 @@ impl ServerHook for DynamicRoute {
 #[tokio::test]
 async fn main() {
     let server: Server = Server::new().await;
-    server.panic::<ServerPanic>().await;
-    server.request_error::<RequestError>().await;
+    server.task_panic::<TaskPanicHook>().await;
+    server.request_error::<RequestErrorHook>().await;
     server.request_middleware::<SendBodyMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
     server.route::<RootRoute>("/").await;
-    server.route::<WebsocketRoute>("/websocket").await;
     server.route::<SseRoute>("/sse").await;
+    server.route::<WebsocketRoute>("/websocket").await;
     server.route::<DynamicRoute>("/dynamic/{routing}").await;
     server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
@@ -3296,27 +3106,6 @@ async fn main() {
 To use this crate, you can run cmd:
 ```shell
 cargo add hyperlane-broadcast
-```
-## Use
-```rust
-use hyperlane_broadcast::*;
-let broadcast: Broadcast<usize> = Broadcast::new(10);
-let mut rec1: BroadcastReceiver<usize> = broadcast.subscribe();
-let mut rec2: BroadcastReceiver<usize> = broadcast.subscribe();
-broadcast.send(20).unwrap();
-assert_eq!(rec1.recv().await, Ok(20));
-assert_eq!(rec2.recv().await, Ok(20));
-let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
-broadcast_map.insert("a", 10);
-let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
-let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
-let mut rec3: BroadcastMapReceiver<usize> =
-    broadcast_map.subscribe_or_insert("b", DEFAULT_BROADCAST_SENDER_CAPACITY);
-broadcast_map.send("a", 20).unwrap();
-broadcast_map.send("b", 10).unwrap();
-assert_eq!(rec1.recv().await, Ok(20));
-assert_eq!(rec2.recv().await, Ok(20));
-assert_eq!(rec3.recv().await, Ok(10));
 ```
 ## Contact
 # Path: hyperlane-broadcast\src\cfg.rs
@@ -3537,68 +3326,6 @@ cargo add hyperlane-log
 ```
 ## Log Storage Location Description
 > Three directories will be created under the user-specified directory: one for error logs, one for info logs, and one for debug logs. Each of these directories will contain a subdirectory named by the date, and the log files within these subdirectories will be named in the format `timestamp.index.log`.
-## Use sync
-```rust
-use hyperlane_log::*;
-let log: Log = Log::new("./logs", 1_024_000);
-log.error("error data!", |error| {
-    let write_data: String = format!("User error func => {:?}\n", error);
-    write_data
-});
-log.error(String::from("error data!"), |error| {
-    let write_data: String = format!("User error func => {:?}\n", error);
-    write_data
-});
-log.info("info data!", |info| {
-    let write_data: String = format!("User info func => {:?}\n", info);
-    write_data
-});
-log.info(String::from("info data!"), |info| {
-    let write_data: String = format!("User info func => {:?}\n", info);
-    write_data
-});
-log.debug("debug data!", |debug| {
-    let write_data: String = format!("User debug func => {:#?}\n", debug);
-    write_data
-});
-log.debug(String::from("debug data!"), |debug| {
-    let write_data: String = format!("User debug func => {:#?}\n", debug);
-    write_data
-});
-```
-## Use async
-```rust
-use hyperlane_log::*;
-let log: Log = Log::new("./logs", 1_024_000);
-log.async_error("async error data!", |error| {
-    let write_data: String = format!("User error func => {:?}\n", error);
-    write_data
-}).await;
-log.async_error(String::from("async error data!"), |error| {
-    let write_data: String = format!("User error func => {:?}\n", error);
-    write_data
-}).await;
-log.async_info("async info data!", |info| {
-    let write_data: String = format!("User info func => {:?}\n", info);
-    write_data
-}).await;
-log.async_info(String::from("async info data!"), |info| {
-    let write_data: String = format!("User info func => {:?}\n", info);
-    write_data
-}).await;
-log.async_debug("async debug data!", |debug| {
-    let write_data: String = format!("User debug func => {:#?}\n", debug);
-    write_data
-}).await;
-log.async_debug(String::from("async debug data!"), |debug| {
-    let write_data: String = format!("User debug func => {:#?}\n", debug);
-    write_data
-}).await;
-```
-## Disable log
-```rust
-let log: Log = Log::new("./logs", DISABLE_LOG_FILE_SIZE);
-```
 ## Contact
 # Path: hyperlane-log\src\cfg.rs
 ```rust
@@ -4005,6 +3732,16 @@ cargo add hyperlane-macros
 ### Attributes Macros
 - `#[attributes(variable_name)]` - Get all attributes as a HashMap for comprehensive attribute access
 - `#[attributes(var1, var2, ...)]` - Supports multiple attribute collections
+### Panic Data Macros
+- `#[task_panic_data_option(variable_name)]` - Extract panic data into a variable wrapped in Option type
+- `#[task_panic_data_option(var1, var2, ...)]` - Supports multiple panic data variables
+- `#[task_panic_data(variable_name)]` - Extract panic data into a variable with panic on missing value
+- `#[task_panic_data(var1, var2, ...)]` - Supports multiple panic data variables
+### Request Error Data Macros
+- `#[request_error_data_option(variable_name)]` - Extract request error data into a variable wrapped in Option type
+- `#[request_error_data_option(var1, var2, ...)]` - Supports multiple request error data variables
+- `#[request_error_data(variable_name)]` - Extract request error data into a variable with panic on missing value
+- `#[request_error_data(var1, var2, ...)]` - Supports multiple request error data variables
 ### Route Param Macros
 - `#[route_param_option(key => variable_name)]` - Extract a specific route parameter by key into a variable
 - `#[route_param_option("key1" => var1, "key2" => var2, ...)]` - Supports multiple route parameter extraction
@@ -4056,7 +3793,7 @@ cargo add hyperlane-macros
 ### Hook Macros
 - `#[prologue_hooks(function_name)]` - Execute specified function before the main handler function
 - `#[epilogue_hooks(function_name)]` - Execute specified function after the main handler function
-- `#[panic]` - Execute function when a panic occurs within the server
+- `#[task_panic]` - Execute function when a panic occurs within the server
 - `#[request_error]` - Execute function when a request error occurs within the server
 - `#[prologue_macros(macro1, macro2, ...)]` - Injects a list of macros before the decorated function.
 - `#[epilogue_macros(macro1, macro2, ...)]` - Injects a list of macros after the decorated function.
@@ -4065,8 +3802,8 @@ cargo add hyperlane-macros
 - `#[request_middleware(order)]` - Register a function as a request middleware with specified order
 - `#[response_middleware]` - Register a function as a response middleware
 - `#[response_middleware(order)]` - Register a function as a response middleware with specified order
-- `#[panic]` - Register a function as a panic hook
-- `#[panic(order)]` - Register a function as a panic hook with specified order
+- `#[task_panic]` - Register a function as a panic hook
+- `#[task_panic(order)]` - Register a function as a panic hook with specified order
 - `#[request_error]` - Register a function as a request error hook
 - `#[request_error(order)]` - Register a function as a request error hook with specified order
 ### Stream Processing Macros
@@ -4087,7 +3824,7 @@ cargo add hyperlane-macros
 ### Helper Tips
 - **Request related macros** (data extraction) use **`get`** operations - they retrieve/query data from the request
 - **Response related macros** (data setting) use **`set`** operations - they assign/configure response data
-- **Hook macros** For hook-related macros that support an `order` parameter, if `order` is not specified, the hook will have higher priority than hooks with a specified `order` (applies only to macros like `#[request_middleware]`, `#[response_middleware]`, `#[panic]`)
+- **Hook macros** For hook-related macros that support an `order` parameter, if `order` is not specified, the hook will have higher priority than hooks with a specified `order` (applies only to macros like `#[request_middleware]`, `#[response_middleware]`, `#[task_panic]`)
 - **Multi-parameter support** Most data extraction macros support multiple parameters in a single call (e.g., `#[request_body(var1, var2)]`, `#[request_query("k1" => v1, "k2" => v2)]`). This reduces macro repetition and improves code readability.
 ### Best Practice Warning
 - Request related macros are mostly query functions, while response related macros are mostly assignment functions.
@@ -4110,18 +3847,22 @@ struct TestData {
     name: String,
     age: u32,
 }
-#[panic]
-#[panic(1)]
-#[panic("2")]
-struct ServerPanic;
-impl ServerHook for ServerPanic {
+#[task_panic]
+#[task_panic(1)]
+#[task_panic("2")]
+struct TakPanicHook;
+impl ServerHook for TakPanicHook {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
+    #[prologue_macros(
+        task_panic_data_option(task_panic_data_option),
+        task_panic_data(task_panic_data)
+    )]
     #[epilogue_macros(
         response_version(HttpVersion::Http1_1),
         response_status_code(500),
-        response_body("panic"),
+        response_body(format!("{task_panic_data} {task_panic_data_option:?}")),
         send
     )]
     async fn handle(self, ctx: &Context) {}
@@ -4129,15 +3870,19 @@ impl ServerHook for ServerPanic {
 #[request_error]
 #[request_error(1)]
 #[request_error("2")]
-struct RequestError;
-impl ServerHook for RequestError {
+struct RequestErrorHook;
+impl ServerHook for RequestErrorHook {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
+    #[prologue_macros(
+        request_error_data_option(request_error_data_option),
+        request_error_data(request_error_data)
+    )]
     #[epilogue_macros(
         response_version(HttpVersion::Http1_1),
         response_status_code(500),
-        response_body("request_error"),
+        response_body(format!("{request_error_data} {request_error_data_option:?}")),
         send
     )]
     async fn handle(self, ctx: &Context) {}
@@ -5638,6 +5383,22 @@ pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
     attributes_macro(attr, item, Position::Prologue)
 }
 #[proc_macro_attribute]
+pub fn task_panic_data_option(attr: TokenStream, item: TokenStream) -> TokenStream {
+    task_panic_data_option_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStream {
+    task_panic_data_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_error_data_option(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_error_data_option_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_error_data(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_error_data_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
 pub fn route_param_option(attr: TokenStream, item: TokenStream) -> TokenStream {
     route_param_option_macro(attr, item, Position::Prologue)
 }
@@ -5710,8 +5471,8 @@ pub fn response_middleware(attr: TokenStream, item: TokenStream) -> TokenStream 
     response_middleware_macro(attr, item)
 }
 #[proc_macro_attribute]
-pub fn panic(attr: TokenStream, item: TokenStream) -> TokenStream {
-    panic_macro(attr, item)
+pub fn task_panic(attr: TokenStream, item: TokenStream) -> TokenStream {
+    task_panic_macro(attr, item)
 }
 #[proc_macro_attribute]
 pub fn request_error(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -6213,7 +5974,7 @@ pub(crate) struct FromStreamData {
 # Path: hyperlane-macros\src\hook\fn.rs
 ```rust
 use crate::*;
-pub(crate) fn panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
@@ -6221,15 +5982,15 @@ pub(crate) fn panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::Panic(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+            ::hyperlane::HookType::TaskPanic(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
         }
     };
     gen_code.into()
 }
 inventory::submit! {
     InjectableMacro {
-        name: "panic",
-        handler: Handler::WithAttr(panic_macro),
+        name: "task_panic",
+        handler: Handler::WithAttr(task_panic_macro),
     }
 }
 pub(crate) fn request_error_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -6970,6 +6731,98 @@ inventory::submit! {
         handler: Handler::WithAttrPosition(attributes_macro),
     }
 }
+pub(crate) fn task_panic_data_option_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
+    inject(position, item, |context| {
+        let statements = multi_task_panic_data.variables.iter().map(|variable| {
+            quote! {
+                let #variable: Option<::hyperlane::PanicData> = #context.try_get_task_panic_data().await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "task_panic_data_option",
+        handler: Handler::WithAttrPosition(task_panic_data_option_macro),
+    }
+}
+pub(crate) fn task_panic_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
+    inject(position, item, |context| {
+        let statements = multi_task_panic_data.variables.iter().map(|variable| {
+            quote! {
+                let #variable: ::hyperlane::PanicData = #context.get_task_panic_data().await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "task_panic_data",
+        handler: Handler::WithAttrPosition(task_panic_data_macro),
+    }
+}
+pub(crate) fn request_error_data_option_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
+    inject(position, item, |context| {
+        let statements = multi_error_data.variables.iter().map(|variable| {
+            quote! {
+                let #variable: Option<::hyperlane::RequestError> = #context.try_get_request_error_data().await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "request_error_data_option",
+        handler: Handler::WithAttrPosition(request_error_data_option_macro),
+    }
+}
+pub(crate) fn request_error_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
+    inject(position, item, |context| {
+        let statements = multi_error_data.variables.iter().map(|variable| {
+            quote! {
+                let #variable: ::hyperlane::RequestError = #context.get_request_error_data().await;
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "request_error_data",
+        handler: Handler::WithAttrPosition(request_error_data_macro),
+    }
+}
 pub(crate) fn route_param_option_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7556,6 +7409,40 @@ impl Parse for MultiRequestPathData {
         Ok(MultiRequestPathData { variables })
     }
 }
+impl Parse for MultiPanicData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiPanicData { variables })
+    }
+}
+impl Parse for MultiRequestErrorData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRequestErrorData { variables })
+    }
+}
 ```
 # Path: hyperlane-macros\src\request\mod.rs
 ```rust
@@ -7611,6 +7498,12 @@ pub(crate) struct MultiRequestVersionData {
     pub(crate) variables: Vec<Ident>,
 }
 pub(crate) struct MultiRequestPathData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiPanicData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestErrorData {
     pub(crate) variables: Vec<Ident>,
 }
 ```
@@ -8142,330 +8035,6 @@ To use this crate, you can run cmd:
 ```shell
 cargo add hyperlane-plugin-websocket
 ```
-## Use
-```rust
-use hyperlane::*;
-use hyperlane_plugin_websocket::*;
-static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
-fn get_broadcast_map() -> &'static WebSocket {
-    BROADCAST_MAP.get_or_init(WebSocket::new)
-}
-struct ServerPanic {
-    response_body: String,
-    content_type: String,
-}
-impl ServerHook for ServerPanic {
-    async fn new(ctx: &Context) -> Self {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .send()
-            .await;
-    }
-}
-struct RequestError;
-impl ServerHook for RequestError {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .send()
-            .await;
-    }
-}
-struct RequestMiddleware {
-    socket_addr: String,
-}
-impl ServerHook for RequestMiddleware {
-    async fn new(ctx: &Context) -> Self {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
-        Self { socket_addr }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(200)
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONNECTION, KEEP_ALIVE)
-            .await
-            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-            .await
-            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .await
-            .set_response_header("SocketAddr", &self.socket_addr)
-            .await;
-    }
-}
-struct UpgradeHook;
-impl ServerHook for UpgradeHook {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        if !ctx.get_request().await.is_ws() {
-            return;
-        }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_version(HttpVersion::Http1_1)
-                .await
-                .set_response_status_code(101)
-                .await
-                .set_response_header(UPGRADE, WEBSOCKET)
-                .await
-                .set_response_header(CONNECTION, UPGRADE)
-                .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .await
-                .set_response_body(&vec![])
-                .await
-                .send()
-                .await;
-        }
-    }
-}
-struct ConnectedHook {
-    receiver_count: ReceiverCount,
-    data: String,
-    group_broadcast_type: BroadcastType<String>,
-    private_broadcast_type: BroadcastType<String>,
-}
-impl ServerHook for ConnectedHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx
-            .try_get_route_param("group_name")
-            .await
-            .unwrap_or_default();
-        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count(group_broadcast_type.clone());
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
-        let your_name: String = ctx
-            .try_get_route_param("your_name")
-            .await
-            .unwrap_or_default();
-        let private_broadcast_type: BroadcastType<String> =
-            BroadcastType::PointToPoint(my_name, your_name);
-        let data: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            receiver_count,
-            data,
-            group_broadcast_type,
-            private_broadcast_type,
-        }
-    }
-    async fn handle(self, _ctx: &Context) {
-        get_broadcast_map()
-            .send(self.group_broadcast_type, self.data.clone())
-            .unwrap_or_else(|err| {
-                println!("[connected_hook]send group error => {:?}", err.to_string());
-                None
-            });
-        get_broadcast_map()
-            .send(self.private_broadcast_type, self.data)
-            .unwrap_or_else(|err| {
-                println!(
-                    "[connected_hook]send private error => {:?}",
-                    err.to_string()
-                );
-                None
-            });
-        println!(
-            "[connected_hook]receiver_count => {:?}",
-            self.receiver_count
-        );
-        Server::flush_stdout();
-    }
-}
-struct SendedHook {
-    msg: String,
-}
-impl ServerHook for SendedHook {
-    async fn new(ctx: &Context) -> Self {
-        let msg: String = ctx.get_response_body_string().await;
-        Self { msg }
-    }
-    async fn handle(self, _ctx: &Context) {
-        println!("[sended_hook]msg => {}", self.msg);
-        Server::flush_stdout();
-    }
-}
-struct GroupChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for GroupChatRequestHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request_body().await;
-        if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-            body = format!("receiver_count => {receiver_count:?}").into();
-        }
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
-        println!("[group_chat]receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct GroupClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for GroupClosedHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count_after_closed(key.clone());
-        let body: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
-        println!("[group_closed]receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct GroupChat;
-impl ServerHook for GroupChat {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
-            .set_context(ctx.clone())
-            .set_broadcast_type(key)
-            .set_request_config(RequestConfig::default())
-            .set_capacity(1024)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<GroupChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<GroupClosedHook>();
-        get_broadcast_map().run(config).await;
-    }
-}
-struct PrivateChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for PrivateChatRequestHook {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request_body().await;
-        if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-            body = format!("receiver_count => {receiver_count:?}").into();
-        }
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
-        println!("[private_chat]receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct PrivateClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for PrivateClosedHook {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
-        let body: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
-        println!(
-            "[private_closed]receiver_count => {:?}",
-            self.receiver_count
-        );
-        Server::flush_stdout();
-    }
-}
-struct PrivateChat {
-    config: WebSocketConfig<String>,
-}
-impl ServerHook for PrivateChat {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
-            .set_context(ctx.clone())
-            .set_broadcast_type(key)
-            .set_request_config(RequestConfig::default())
-            .set_capacity(1024)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<PrivateChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<PrivateClosedHook>();
-        Self { config }
-    }
-    async fn handle(self, _ctx: &Context) {
-        get_broadcast_map().run(self.config).await;
-    }
-}
-#[tokio::main]
-async fn main() {
-    let server: Server = Server::new().await;
-    server.panic::<ServerPanic>().await;
-    server.request_error::<RequestError>().await;
-    server.request_middleware::<RequestMiddleware>().await;
-    server.request_middleware::<UpgradeHook>().await;
-    server.route::<GroupChat>("/{group_name}").await;
-    server.route::<PrivateChat>("/{my_name}/{your_name}").await;
-    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
-    server_control_hook.wait().await;
-}
-```
 ## Contact
 # Path: hyperlane-plugin-websocket\src\lib.rs
 ```rust
@@ -8495,13 +8064,13 @@ static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
 fn get_broadcast_map() -> &'static WebSocket {
     BROADCAST_MAP.get_or_init(WebSocket::new)
 }
-struct ServerPanic {
+struct TaskPanicHook {
     response_body: String,
     content_type: String,
 }
-impl ServerHook for ServerPanic {
+impl ServerHook for TaskPanicHook {
     async fn new(ctx: &Context) -> Self {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
         let response_body: String = error.to_string();
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
         Self {
@@ -8526,13 +8095,25 @@ impl ServerHook for ServerPanic {
             .await;
     }
 }
-struct RequestError;
-impl ServerHook for RequestError {
-    async fn new(_ctx: &Context) -> Self {
-        Self
+struct RequestErrorHook {
+    response_status_code: ResponseStatusCode,
+    response_body: String,
+}
+impl ServerHook for RequestErrorHook {
+    async fn new(ctx: &Context) -> Self {
+        let request_error: RequestError =
+            ctx.try_get_request_error_data().await.unwrap_or_default();
+        Self {
+            response_status_code: request_error.get_http_status_code(),
+            response_body: request_error.to_string(),
+        }
     }
     async fn handle(self, ctx: &Context) {
         ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(self.response_status_code)
+            .await
+            .set_response_body(self.response_body)
             .await
             .send()
             .await;
@@ -8801,8 +8382,8 @@ impl ServerHook for PrivateChat {
 #[tokio::test]
 async fn main() {
     let server: Server = Server::new().await;
-    server.panic::<ServerPanic>().await;
-    server.request_error::<RequestError>().await;
+    server.task_panic::<TaskPanicHook>().await;
+    server.request_error::<RequestErrorHook>().await;
     server.request_middleware::<RequestMiddleware>().await;
     server.request_middleware::<UpgradeHook>().await;
     server.route::<GroupChat>("/{group_name}").await;
@@ -9320,9 +8901,15 @@ use super::*;
 # Path: hyperlane-quick-start\app\exception\framework\impl.rs
 ```rust
 use super::*;
-impl ServerHook for PanicHook {
-    async fn new(_ctx: &Context) -> Self {
-        Self
+impl ServerHook for TaskPanicHook {
+    #[prologue_macros(task_panic_data(task_panic_data))]
+    async fn new(ctx: &Context) -> Self {
+        let content_type: String =
+            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
+        Self {
+            content_type,
+            response_body: task_panic_data.to_string(),
+        }
     }
     #[epilogue_macros(
         response_version(HttpVersion::Http1_1),
@@ -9331,18 +8918,46 @@ impl ServerHook for PanicHook {
         response_body(&response_body),
         response_header(SERVER => HYPERLANE),
         response_version(HttpVersion::Http1_1),
-        response_header(CONTENT_TYPE, &content_type),
+        response_header(CONTENT_TYPE, &self.content_type),
         send
     )]
     async fn handle(self, ctx: &Context) {
-        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
-        let error_message: String = error.to_string();
-        log_error(&error_message).await;
+        log_error(&self.response_body).await;
         let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, error_message);
+            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
         let response_body: Vec<u8> = api_response.to_json_bytes();
+    }
+}
+impl ServerHook for RequestErrorHook {
+    #[prologue_macros(request_error_data(request_error_data))]
+    async fn new(_ctx: &Context) -> Self {
         let content_type: String =
             ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
+        Self {
+            response_status_code: request_error_data.get_http_status_code(),
+            content_type,
+            response_body: request_error_data.to_string(),
+        }
+    }
+    #[epilogue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(self.response_status_code),
+        clear_response_headers,
+        response_body(&response_body),
+        response_header(SERVER => HYPERLANE),
+        response_version(HttpVersion::Http1_1),
+        response_header(CONTENT_TYPE, &self.content_type),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {
+        if self.response_status_code == HttpStatus::BadRequest.code() {
+            ctx.aborted().await;
+            return;
+        }
+        log_error(&self.response_body).await;
+        let api_response: ApiResponse<()> =
+            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
+        let response_body: Vec<u8> = api_response.to_json_bytes();
     }
 }
 ```
@@ -9357,8 +8972,17 @@ use model::data_transfer::common::*;
 # Path: hyperlane-quick-start\app\exception\framework\struct.rs
 ```rust
 use super::*;
-#[panic_hook]
-pub struct PanicHook;
+#[task_panic]
+pub struct TaskPanicHook {
+    pub(super) content_type: String,
+    pub(super) response_body: String,
+}
+#[request_error]
+pub struct RequestErrorHook {
+    pub(super) response_status_code: ResponseStatusCode,
+    pub(super) content_type: String,
+    pub(super) response_body: String,
+}
 ```
 # Path: hyperlane-quick-start\app\middleware\mod.rs
 ```rust
@@ -10110,29 +9734,6 @@ To use this crate, you can run cmd:
 ```shell
 cargo add hyperlane-time
 ```
-## Use
-```rust
-use hyperlane_time::*;
-println!("Current Time: {}", time());
-println!("Current Date: {}", date());
-println!("GMT Date: {}", gmt());
-println!("Timestamp (s): {}", timestamp());
-println!("Timestamp (ms): {}", timestamp_millis());
-println!("Timestamp (μs): {}", timestamp_micros());
-println!("Current Year: {}", year());
-println!("Current Month: {}", month());
-println!("Current Day: {}", day());
-println!("Current Hour: {}", hour());
-println!("Current Minute: {}", minute());
-println!("Current Second: {}", second());
-println!("Current Millis: {}", millis());
-println!("Current Micros: {}", micros());
-println!("Is Leap Year (1949): {}", is_leap_year(1949));
-println!("Calculate Current Time: {:?}", calculate_time());
-println!("Compute Date (10000 days): {:?}", compute_date(10000));
-println!("Current Time with Millis: {}", time_millis());
-println!("Current Time with Micros: {}", time_micros());
-```
 ## Contact
 # Path: hyperlane-time\src\lib.rs
 ```rust
@@ -10486,10 +10087,6 @@ pub(crate) mod r#impl;
 To use this crate, you can run cmd:
 ```shell
 cargo add hyperlane-utils
-```
-## Use
-```rust
-use hyperlane_utils::*;
 ```
 ## Contact
 # Path: hyperlane-utils\src\lib.rs
