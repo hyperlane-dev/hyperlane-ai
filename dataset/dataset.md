@@ -48,7 +48,6 @@ pub(crate) use std::{
     net::SocketAddr,
     pin::Pin,
     sync::Arc,
-    time::Duration,
 };
 pub(crate) use inventory::collect;
 pub(crate) use lombok_macros::*;
@@ -64,7 +63,7 @@ pub(crate) use tokio::{
     task::{JoinError, JoinHandle},
 };
 #[cfg(test)]
-pub(crate) use std::time::Instant;
+pub(crate) use std::time::{Duration, Instant};
 ```
 # Path: hyperlane\src\attribute\enum.rs
 ```rust
@@ -127,7 +126,6 @@ impl Default for ServerConfigInner {
             port: DEFAULT_WEB_PORT,
             request_config: RequestConfig::default(),
             nodelay: DEFAULT_NODELAY,
-            linger: DEFAULT_LINGER,
             ttl: DEFAULT_TTI,
         }
     }
@@ -188,18 +186,6 @@ impl ServerConfig {
     pub async fn disable_nodelay(&self) -> &Self {
         self.nodelay(false).await
     }
-    pub async fn linger(&self, linger_opt: Option<Duration>) -> &Self {
-        self.write().await.set_linger(linger_opt);
-        self
-    }
-    pub async fn enable_linger(&self, linger: Duration) -> &Self {
-        self.linger(Some(linger)).await;
-        self
-    }
-    pub async fn disable_linger(&self) -> &Self {
-        self.linger(None).await;
-        self
-    }
     pub async fn ttl(&self, ttl: u32) -> &Self {
         self.write().await.set_ttl(Some(ttl));
         self
@@ -238,10 +224,6 @@ pub(crate) struct ServerConfigInner {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) nodelay: Option<bool>,
-    #[get(pub(crate))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) linger: Option<Duration>,
     #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
@@ -2099,7 +2081,6 @@ impl Server {
     async fn configure_stream(&self, stream: &TcpStream) {
         let server_inner: ServerStateReadGuard = self.read().await;
         let config: &ServerConfigInner = server_inner.get_config();
-        stream.set_linger(*config.get_linger()).unwrap();
         if let Some(nodelay) = config.get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
@@ -2392,19 +2373,23 @@ async fn config_from_str() {
                 "http_read_timeout_ms": 6000,
                 "ws_read_timeout_ms": 1800000
             },
-            "nodelay": true,
-            "linger": { "secs": 64, "nanos": 0 },
+            "nodelay": true,            
             "ttl": 64
         }
     "#;
     let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
     let new_config: ServerConfig = ServerConfig::new().await;
-    new_config.host("0.0.0.0").await;
-    new_config.port(80).await;
-    new_config.request_config(RequestConfig::default()).await;
-    new_config.enable_nodelay().await;
-    new_config.linger(Some(Duration::from_secs(64))).await;
-    new_config.ttl(64).await;
+    new_config
+        .host("0.0.0.0")
+        .await
+        .port(80)
+        .await
+        .request_config(RequestConfig::default())
+        .await
+        .enable_nodelay()
+        .await
+        .ttl(64)
+        .await;
     assert_eq!(config, new_config);
 }
 ```
@@ -8954,7 +8939,9 @@ impl ServerHook for RequestErrorHook {
             ctx.aborted().await;
             return;
         }
-        log_error(&self.response_body).await;
+        if self.response_status_code != HttpStatus::RequestTimeout.code() {
+            log_error(&self.response_body).await;
+        }
         let api_response: ApiResponse<()> =
             ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
         let response_body: Vec<u8> = api_response.to_json_bytes();
@@ -9402,7 +9389,6 @@ pub const SERVER_LOG_DIR: &str = "./tmp/logs";
 pub const SERVER_INNER_PRINT: bool = true;
 pub const SERVER_INNER_LOG: bool = true;
 pub const SERVER_NODELAY: bool = false;
-pub const SERVER_LINGER: Option<Duration> = None;
 pub const SERVER_TTI: u32 = 128;
 pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
 ```
@@ -9411,7 +9397,6 @@ pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
 mod r#const;
 pub use r#const::*;
 use super::*;
-use std::time::Duration;
 ```
 # Path: hyperlane-quick-start\init\lib.rs
 ```rust
@@ -9460,7 +9445,6 @@ async fn init_config(server: &Server) {
     config.host(SERVER_HOST).await;
     config.port(SERVER_PORT).await;
     config.ttl(SERVER_TTI).await;
-    config.linger(SERVER_LINGER).await;
     config.nodelay(SERVER_NODELAY).await;
     config.request_config(RequestConfig::default()).await;
     server.config(config).await;
