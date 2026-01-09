@@ -26240,109 +26240,109 @@
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[prologue_macros(task_panic_data(task_panic_data))]\n    async fn new(ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            content_type,\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    async fn new(ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            content_type,\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[prologue_macros(task_panic_data(task_panic_data))]\n    async fn new(ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            content_type,\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    async fn new(ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            content_type,\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[prologue_macros(task_panic_data(task_panic_data))]\n    async fn new(ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            content_type,\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    async fn new(ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            content_type,\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[prologue_macros(task_panic_data(task_panic_data))]\n    async fn new(ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            content_type,\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    async fn new(ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            content_type,\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、异步编程",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：7\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        log_error(&self.response_body).await;\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[prologue_macros(request_error_data(request_error_data))]\n    async fn new(_ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type,\n            response_body: request_error_data.to_string(),\n        }\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    async fn new(_ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type,\n            response_body: request_error_data.to_string(),\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[prologue_macros(request_error_data(request_error_data))]\n    async fn new(_ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type,\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    async fn new(_ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type,\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[prologue_macros(request_error_data(request_error_data))]\n    async fn new(_ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type,\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    async fn new(_ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type,\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[prologue_macros(request_error_data(request_error_data))]\n    async fn new(_ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type,\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    async fn new(_ctx: &Context) -> Self {\n        let content_type: String =\n            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type,\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：12\n- 包含高级特性：泛型编程、异步编程",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：13\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), send)]\n    async fn handle(self, ctx: &Context) {\n        if self.response_status_code == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            return;\n        }\n        if self.response_status_code != HttpStatus::RequestTimeout.code() {\n            log_error(&self.response_body).await;\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -26672,19 +26672,19 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(http, reject(ctx.get_request_upgrade_type().await.is_ws()), send)]\n    async fn handle(self, ctx: &Context) {}\n}\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(http, reject(ctx.get_request_upgrade_type().await.is_ws()), send)]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(http, reject(ctx.get_request_upgrade_type().await.is_ws()), send)]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {

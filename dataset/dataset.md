@@ -8887,7 +8887,7 @@ use super::*;
 ```rust
 use super::*;
 impl ServerHook for TaskPanicHook {
-    #[prologue_macros(task_panic_data(task_panic_data))]
+    #[task_panic_data(task_panic_data)]
     async fn new(ctx: &Context) -> Self {
         let content_type: String =
             ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
@@ -8896,16 +8896,15 @@ impl ServerHook for TaskPanicHook {
             response_body: task_panic_data.to_string(),
         }
     }
-    #[epilogue_macros(
+    #[prologue_macros(
         response_version(HttpVersion::Http1_1),
         response_status_code(500),
         clear_response_headers,
-        response_body(&response_body),
         response_header(SERVER => HYPERLANE),
         response_version(HttpVersion::Http1_1),
         response_header(CONTENT_TYPE, &self.content_type),
-        send
     )]
+    #[epilogue_macros(response_body(&response_body), send)]
     async fn handle(self, ctx: &Context) {
         log_error(&self.response_body).await;
         let api_response: ApiResponse<()> =
@@ -8914,7 +8913,7 @@ impl ServerHook for TaskPanicHook {
     }
 }
 impl ServerHook for RequestErrorHook {
-    #[prologue_macros(request_error_data(request_error_data))]
+    #[request_error_data(request_error_data)]
     async fn new(_ctx: &Context) -> Self {
         let content_type: String =
             ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
@@ -8924,16 +8923,15 @@ impl ServerHook for RequestErrorHook {
             response_body: request_error_data.to_string(),
         }
     }
-    #[epilogue_macros(
+    #[prologue_macros(
         response_version(HttpVersion::Http1_1),
         response_status_code(self.response_status_code),
         clear_response_headers,
-        response_body(&response_body),
         response_header(SERVER => HYPERLANE),
         response_version(HttpVersion::Http1_1),
         response_header(CONTENT_TYPE, &self.content_type),
-        send
     )]
+    #[epilogue_macros(response_body(&response_body), send)]
     async fn handle(self, ctx: &Context) {
         if self.response_status_code == HttpStatus::BadRequest.code() {
             ctx.aborted().await;
@@ -9021,12 +9019,12 @@ impl ServerHook for ResponseHeaderMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
+    #[response_header(DATE => gmt())]
+    #[response_header(SERVER => HYPERLANE)]
+    #[response_header(CONNECTION => KEEP_ALIVE)]
     #[epilogue_macros(
-        response_header(DATE => gmt()),
-        response_header(SERVER => HYPERLANE),
-        response_header(CONNECTION => KEEP_ALIVE),
         response_header(CONTENT_TYPE => content_type),
-        response_header("SocketAddr" => socket_addr_string),
+        response_header("SocketAddr" => socket_addr_string)
     )]
     async fn handle(self, ctx: &Context) {
         let socket_addr_string: String = ctx.get_socket_addr_string().await;
@@ -9073,8 +9071,8 @@ impl ServerHook for UpgradeMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[ws]
-    #[epilogue_macros(
+    #[prologue_macros(
+        ws,
         response_version(HttpVersion::Http1_1),
         response_status_code(101),
         response_body(&vec![]),
@@ -9142,7 +9140,11 @@ impl ServerHook for SendMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[epilogue_macros(http, reject(ctx.get_request_upgrade_type().await.is_ws()), send)]
+    #[prologue_macros(
+        http,
+        reject(ctx.get_request_upgrade_type().await.is_ws()),
+        send
+    )]
     async fn handle(self, ctx: &Context) {}
 }
 ```
