@@ -3318,7 +3318,7 @@ cargo add hyperlane-log
 #[tokio::test]
 async fn test() {
     use crate::*;
-    let log: Log = Log::new("./logs", 1_024_000);
+    let log: ServerLog = ServerLog::new("./logs", 1_024_000);
     let error_str: String = String::from("custom error message");
     log.error(error_str, |error| {
         let write_data: String = format!("User error func => {error:?}\n");
@@ -3357,7 +3357,7 @@ async fn test() {
 #[tokio::test]
 async fn test_more_log_first() {
     use crate::*;
-    let log: Log = Log::new("./logs", DISABLE_LOG_FILE_SIZE);
+    let log: ServerLog = ServerLog::new("./logs", DISABLE_LOG_FILE_SIZE);
     log.error("error data => ", |error| {
         let write_data: String = format!("User error func => {error:?}\n");
         write_data
@@ -3391,7 +3391,7 @@ async fn test_more_log_first() {
 async fn test_more_log_second() {
     use crate::*;
     for _ in 0..10 {
-        let log: Log = Log::new("./logs", 512_000);
+        let log: ServerLog = ServerLog::new("./logs", 512_000);
         log.error("error data!\n", common_log);
         log.async_error("async error data!\n", common_log).await;
     }
@@ -3404,17 +3404,11 @@ pub(crate) mod log;
 pub use log::*;
 pub(crate) use file_operation::*;
 pub(crate) use hyperlane_time::*;
-pub(crate) use std::{
-    fs::read_dir,
-    sync::{Arc, RwLock},
-};
+pub(crate) use std::fs::read_dir;
 ```
 # Path: hyperlane-log\src\log\const.rs
 ```rust
 pub const DEFAULT_LOG_DIR: &str = "./logs";
-pub const ERROR_DIR: &str = "error";
-pub const INFO_DIR: &str = "info";
-pub const DEBUG_DIR: &str = "debug";
 pub const LOG_EXTENSION: &str = "log";
 pub const DEFAULT_LOG_FILE_START_IDX: usize = 1;
 pub const DEFAULT_LOG_FILE_SIZE: usize = 1_024_000_000;
@@ -3422,6 +3416,11 @@ pub const DISABLE_LOG_FILE_SIZE: usize = 0;
 pub(crate) const ROOT_PATH: &str = "/";
 pub(crate) const POINT: &str = ".";
 pub(crate) const BR: &str = "\n";
+pub const TRACE_DIR: &str = "trace";
+pub const DEBUG_DIR: &str = "debug";
+pub const INFO_DIR: &str = "info";
+pub const WARN_DIR: &str = "warn";
+pub const ERROR_DIR: &str = "error";
 ```
 # Path: hyperlane-log\src\log\fn.rs
 ```rust
@@ -3495,13 +3494,13 @@ pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
 # Path: hyperlane-log\src\log\impl.rs
 ```rust
 use crate::*;
-impl<F, T> LogFuncTrait<T> for F
+impl<F, T> ServerLogFuncTrait<T> for F
 where
     F: Fn(T) -> String + Send + Sync,
     T: AsRef<str>,
 {
 }
-impl Default for Log {
+impl Default for ServerLog {
     #[inline(always)]
     fn default() -> Self {
         Self {
@@ -3510,7 +3509,7 @@ impl Default for Log {
         }
     }
 }
-impl Log {
+impl ServerLog {
     #[inline(always)]
     pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {
         Self {
@@ -3539,7 +3538,7 @@ impl Log {
     fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self
     where
         T: AsRef<str>,
-        L: LogFuncTrait<T>,
+        L: ServerLogFuncTrait<T>,
     {
         if self.is_disable() {
             return self;
@@ -3552,7 +3551,7 @@ impl Log {
     async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self
     where
         T: AsRef<str>,
-        L: LogFuncTrait<T>,
+        L: ServerLogFuncTrait<T>,
     {
         if self.is_disable() {
             return self;
@@ -3562,47 +3561,75 @@ impl Log {
         let _ = async_append_to_file(&path, out.as_bytes()).await;
         self
     }
-    pub fn error<T, L>(&self, data: T, func: L) -> &Self
+    pub fn trace<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: LogFuncTrait<T>,
+        L: ServerLogFuncTrait<T>,
     {
-        self.write_sync(data, func, ERROR_DIR)
+        self.write_sync(data, func, TRACE_DIR)
     }
-    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self
+    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: LogFuncTrait<T>,
+        L: ServerLogFuncTrait<T>,
     {
-        self.write_async(data, func, ERROR_DIR).await
-    }
-    pub fn info<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: LogFuncTrait<T>,
-    {
-        self.write_sync(data, func, INFO_DIR)
-    }
-    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: LogFuncTrait<T>,
-    {
-        self.write_async(data, func, INFO_DIR).await
+        self.write_async(data, func, TRACE_DIR).await
     }
     pub fn debug<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: LogFuncTrait<T>,
+        L: ServerLogFuncTrait<T>,
     {
         self.write_sync(data, func, DEBUG_DIR)
     }
     pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: LogFuncTrait<T>,
+        L: ServerLogFuncTrait<T>,
     {
         self.write_async(data, func, DEBUG_DIR).await
+    }
+    pub fn info<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: ServerLogFuncTrait<T>,
+    {
+        self.write_sync(data, func, INFO_DIR)
+    }
+    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: ServerLogFuncTrait<T>,
+    {
+        self.write_async(data, func, INFO_DIR).await
+    }
+    pub fn warn<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: ServerLogFuncTrait<T>,
+    {
+        self.write_sync(data, func, WARN_DIR)
+    }
+    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: ServerLogFuncTrait<T>,
+    {
+        self.write_async(data, func, WARN_DIR).await
+    }
+    pub fn error<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: ServerLogFuncTrait<T>,
+    {
+        self.write_sync(data, func, ERROR_DIR)
+    }
+    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: ServerLogFuncTrait<T>,
+    {
+        self.write_async(data, func, ERROR_DIR).await
     }
 }
 ```
@@ -3613,34 +3640,22 @@ pub(crate) mod r#fn;
 pub(crate) mod r#impl;
 pub(crate) mod r#struct;
 pub(crate) mod r#trait;
-pub(crate) mod r#type;
 pub use r#const::*;
 pub use r#fn::*;
 pub use r#struct::*;
 pub use r#trait::*;
-pub use r#type::*;
 ```
 # Path: hyperlane-log\src\log\struct.rs
 ```rust
 #[derive(Clone)]
-pub struct Log {
+pub struct ServerLog {
     pub(super) path: String,
     pub(super) limit_file_size: usize,
 }
 ```
 # Path: hyperlane-log\src\log\trait.rs
 ```rust
-pub trait LogFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
-```
-# Path: hyperlane-log\src\log\type.rs
-```rust
-use crate::*;
-pub type ListLog<T> = Vec<(String, ArcLogFunc<T>)>;
-pub type LogListArcLock<T> = Arc<RwLock<ListLog<T>>>;
-pub type LogArcLock = Arc<RwLock<Log>>;
-pub type LogFunc<T> = dyn LogFuncTrait<T>;
-pub type ArcLogFunc<T> = Arc<LogFunc<T>>;
-pub type ArcLog = Arc<Log>;
+pub trait ServerLogFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
 ```
 # Path: hyperlane-macros\README.md
 ## hyperlane-macros
@@ -8873,8 +8888,10 @@ pub mod service;
 pub mod utils;
 pub mod view;
 use hyperlane::*;
-use hyperlane_utils::*;
-use hyperlane_plugin::log::*;
+use hyperlane_utils::{
+    log::{error, info},
+    *,
+};
 ```
 # Path: hyperlane-quick-start\app\exception\mod.rs
 ```rust
@@ -8906,7 +8923,7 @@ impl ServerHook for TaskPanicHook {
     )]
     #[epilogue_macros(response_body(&response_body), send)]
     async fn handle(self, ctx: &Context) {
-        log_error(&self.response_body).await;
+        error!("{}", self.response_body);
         let api_response: ApiResponse<()> =
             ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
         let response_body: Vec<u8> = api_response.to_json_bytes();
@@ -8938,7 +8955,7 @@ impl ServerHook for RequestErrorHook {
             return;
         }
         if self.response_status_code != HttpStatus::RequestTimeout.code() {
-            log_error(&self.response_body).await;
+            error!("{}", self.response_body);
         }
         let api_response: ApiResponse<()> =
             ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
@@ -9115,8 +9132,8 @@ impl ServerHook for LogMiddleware {
     async fn handle(self, ctx: &Context) {
         let request: String = ctx.get_request().await.get_string();
         let response: String = ctx.get_response().await.get_string();
-        log_info(request).await;
-        log_info(response).await
+        info!("{request}");
+        info!("{response}");
     }
 }
 ```
@@ -9405,7 +9422,29 @@ use super::*;
 pub mod application;
 pub mod framework;
 use hyperlane::*;
-use hyperlane_utils::*;
+use hyperlane_utils::{
+    log::{error, info},
+    *,
+};
+```
+# Path: hyperlane-quick-start\init\application\mod.rs
+```rust
+mod log;
+pub use log::*;
+```
+# Path: hyperlane-quick-start\init\application\log\fn.rs
+```rust
+use super::*;
+pub fn init_log(level: LevelFilter) {
+    Logger::init(level);
+}
+```
+# Path: hyperlane-quick-start\init\application\log\mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use hyperlane_plugin::log::*;
+use hyperlane_utils::log::LevelFilter;
 ```
 # Path: hyperlane-quick-start\init\framework\mod.rs
 ```rust
@@ -9441,6 +9480,7 @@ pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start\init\framework\wait\fn.rs
 ```rust
+use crate::application::init_log;
 use super::*;
 #[hyperlane(config: ServerConfig)]
 async fn init_config(server: &Server) {
@@ -9454,16 +9494,16 @@ async fn init_config(server: &Server) {
 async fn print_route_matcher(server: &Server) {
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     for key in route_matcher.get_static_route().keys() {
-        println_success!("Static route: {key}");
+        info!("Static route: {key}");
     }
     for value in route_matcher.get_dynamic_route().values() {
         for (route_pattern, _) in value {
-            println_success!("Dynamic route: {route_pattern}");
+            info!("Dynamic route: {route_pattern}");
         }
     }
     for value in route_matcher.get_regex_route().values() {
         for (route_pattern, _) in value {
-            println_success!("Regex route: {route_pattern}");
+            info!("Regex route: {route_pattern}");
         }
     }
 }
@@ -9479,19 +9519,20 @@ fn runtime() -> Runtime {
 }
 #[hyperlane(server: Server)]
 async fn create_server() {
+    init_log(LevelFilter::Info);
     init_config(&server).await;
-    println_success!("Server initialization successful");
+    info!("Server initialization successful");
     let server_result: Result<ServerControlHook, ServerError> = server.run().await;
     match server_result {
         Ok(server_hook) => {
             let host_port: String = format!("{SERVER_HOST}:{SERVER_PORT}");
             print_route_matcher(&server).await;
-            println_success!("Server listen in: {host_port}");
+            info!("Server listen in: {host_port}");
             let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();
             set_shutdown(shutdown);
             server_hook.wait().await;
         }
-        Err(server_error) => println_error!("Server run error: {server_error}"),
+        Err(server_error) => error!("Server run error: {server_error}"),
     }
 }
 pub fn run() {
@@ -9507,58 +9548,161 @@ use super::{shutdown::*, *};
 use hyperlane_app::*;
 use hyperlane_config::framework::*;
 use hyperlane_plugin::process::*;
+use hyperlane_utils::log::LevelFilter;
 use tokio::runtime::{Builder, Runtime};
 ```
 # Path: hyperlane-quick-start\plugin\lib.rs
 ```rust
 pub mod log;
 pub mod process;
-use hyperlane_utils::*;
+use hyperlane::*;
+use hyperlane_utils::{
+    log::{error, info},
+    *,
+};
 ```
-# Path: hyperlane-quick-start\plugin\log\fn.rs
+# Path: hyperlane-quick-start\plugin\log\impl.rs
 ```rust
 use super::*;
-pub async fn log_info<T>(data: T)
-where
-    T: AsRef<str>,
-{
-    println_warning!("{}", data.as_ref());
-    LOG.async_info(data, log_handler).await;
+impl Logger {
+    pub fn log_trace<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        LOG.trace(data, log_handler);
+    }
+    pub fn log_debug<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        LOG.debug(data, log_handler);
+    }
+    pub fn log_info<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        LOG.info(data, log_handler);
+    }
+    pub fn log_warn<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        LOG.warn(data, log_handler);
+    }
+    pub fn log_error<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        LOG.error(data, log_handler);
+    }
 }
-pub async fn log_debug<T>(data: T)
-where
-    T: AsRef<str>,
-{
-    println_warning!("{}", data.as_ref());
-    LOG.async_debug(data, log_handler).await;
+impl Log for Logger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        #[cfg(debug_assertions)]
+        {
+            metadata.level() <= Level::Debug
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            metadata.level() <= Level::Error
+        }
+    }
+    fn log(&self, record: &Record) {
+        let time_text: String = format!("{SPACE}{}{SPACE}", time());
+        let level_text: String = format!("{SPACE}{}{SPACE}", record.level());
+        let args_text: String = format!("{SPACE}{}{SPACE}", record.args());
+        let write_file_data: String = format!("{} - {}", record.level(), record.args());
+        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let time_output: Output<'_> = time_output_builder
+            .text(&time_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(ColorType::Use(Color::Green))
+            .build();
+        let level_output: Output<'_> = level_output_builder
+            .text(&level_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(match record.level() {
+                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),
+                Level::Info | Level::Warn => ColorType::Use(Color::Blue),
+                Level::Error => ColorType::Use(Color::Red),
+            })
+            .build();
+        let args_output: Output<'_> = args_output_builder
+            .text(&args_text)
+            .bold(true)
+            .endl(true)
+            .color(match record.level() {
+                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),
+                Level::Info | Level::Warn => ColorType::Use(Color::Blue),
+                Level::Error => ColorType::Use(Color::Red),
+            })
+            .build();
+        OutputListBuilder::new()
+            .add(time_output)
+            .add(level_output)
+            .add(args_output)
+            .run();
+        if self.enabled(record.metadata()) {
+            match record.metadata().level() {
+                Level::Trace => Self::log_trace(&write_file_data),
+                Level::Debug => Self::log_debug(&write_file_data),
+                Level::Info => Self::log_info(&write_file_data),
+                Level::Warn => Self::log_warn(&write_file_data),
+                Level::Error => Self::log_error(&write_file_data),
+            }
+        }
+    }
+    fn flush(&self) {
+        Server::flush_stdout_and_stderr();
+    }
 }
-pub async fn log_error<T>(data: T)
-where
-    T: AsRef<str>,
-{
-    println_error!("{}", data.as_ref());
-    LOG.async_error(data, log_handler).await;
+impl Logger {
+    pub fn init(level: LevelFilter) {
+        set_logger(&LOGGER).unwrap();
+        set_max_level(level);
+    }
 }
 ```
 # Path: hyperlane-quick-start\plugin\log\mod.rs
 ```rust
-mod r#fn;
+mod r#impl;
 mod r#static;
-pub use r#fn::*;
-pub use r#static::*;
+mod r#struct;
+pub use r#struct::*;
 use super::*;
 use hyperlane_config::framework::*;
-use hyperlane_utils::once_cell::sync::Lazy;
+use r#static::*;
+use hyperlane_utils::{
+    log::{Level, LevelFilter, Log, Metadata, Record, set_logger, set_max_level},
+    once_cell::sync::Lazy,
+};
 ```
 # Path: hyperlane-quick-start\plugin\log\static.rs
 ```rust
 use super::*;
-pub static LOG: Lazy<Log> = Lazy::new(|| {
-    let mut log: Log = Log::default();
+pub(super) static LOGGER: Logger = Logger;
+pub(super) static LOG: Lazy<ServerLog> = Lazy::new(|| {
+    let mut log: ServerLog = ServerLog::default();
     log.path(SERVER_LOG_DIR);
     log.limit_file_size(SERVER_LOG_SIZE);
     log
 });
+```
+# Path: hyperlane-quick-start\plugin\log\struct.rs
+```rust
+#[derive(Debug, Clone, Copy)]
+pub struct Logger;
+```
+# Path: hyperlane-quick-start\plugin\process\const.rs
+```rust
+pub const CMD_STOP: &str = "stop";
+pub const CMD_RESTART: &str = "restart";
+pub const CMD_HOT_RESTART: &str = "hot-restart";
+pub const DAEMON_FLAG: &str = "-d";
 ```
 # Path: hyperlane-quick-start\plugin\process\fn.rs
 ```rust
@@ -9573,24 +9717,24 @@ where
     manager
         .set_pid_file(SERVER_PID_FILE_PATH)
         .set_server_hook(server_hook);
-    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == "-d";
+    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
     let start_server = || async {
         if is_daemon {
             match manager.start_daemon().await {
-                Ok(_) => println_success!("Server started in background successfully"),
+                Ok(_) => info!("Server started in background successfully"),
                 Err(error) => {
-                    println_error!("Error starting server in background: {error}")
+                    error!("Error starting server in background: {error}")
                 }
             };
         } else {
-            println_success!("Server started successfully");
+            info!("Server started successfully");
             manager.start().await;
         }
     };
     let stop_server = || async {
         match manager.stop().await {
-            Ok(_) => println_success!("Server stopped successfully"),
-            Err(error) => println_error!("Error stopping server: {error}"),
+            Ok(_) => info!("Server stopped successfully"),
+            Err(error) => error!("Error stopping server: {error}"),
         };
     };
     let hot_restart_server = || async {
@@ -9598,8 +9742,8 @@ where
             .watch_detached(&["--clear", "--skip-local-deps", "-q", "-x", "run"])
             .await
         {
-            Ok(_) => println_success!("Server started successfully"),
-            Err(error) => println_error!("Error starting server in background: {error}"),
+            Ok(_) => info!("Server started successfully"),
+            Err(error) => error!("Error starting server in background: {error}"),
         }
     };
     let restart_server = || async {
@@ -9612,19 +9756,20 @@ where
     }
     let command: String = args[1].to_lowercase();
     match command.as_str() {
-        "start" => start_server().await,
-        "stop" => stop_server().await,
-        "restart" => restart_server().await,
-        "hot-restart" => hot_restart_server().await,
+        CMD_STOP => stop_server().await,
+        CMD_RESTART => restart_server().await,
+        CMD_HOT_RESTART => hot_restart_server().await,
         _ => {
-            println_error!("Invalid command: {command}");
+            error!("Invalid command: {command}");
         }
     }
 }
 ```
 # Path: hyperlane-quick-start\plugin\process\mod.rs
 ```rust
+mod r#const;
 mod r#fn;
+pub use r#const::*;
 pub use r#fn::*;
 use super::*;
 use hyperlane_config::framework::*;
