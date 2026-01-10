@@ -31,7 +31,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential
+          hf login --token "$HF_TOKEN" --add-to-git-credential
 
       - name: Make script executable
         run: chmod +x ./update_dataset.sh
