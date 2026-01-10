@@ -1,8 +1,9 @@
 name: Dataset
 
 on:
-  push:
-    branches: [master]
+  schedule:
+    - cron: '0 0 * * *' # 每天一次（UTC 00:00 / 北京时间 08:00）
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -34,7 +35,7 @@ jobs:
           hf auth login --token "$HF_TOKEN" --add-to-git-credential
 
       - name: Make script executable
-        run: chmod +x ./update_dataset.sh
+        run: chmod +x ./*
 
       - name: Run update_dataset.sh
         run: ./update_dataset.sh

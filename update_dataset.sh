@@ -1,4 +1,5 @@
 #!/bin/bash
+./install.sh;
 ./git.sh;
 python generate_markdown.py;
 python generate_dataset.py;

@@ -1,0 +1,2 @@
+#!/bin/bash
+pip install "torch>=2.3.0" transformers datasets trl peft accelerate hf_xet gguf mistral_common dotenv huggingface_hub sentencepiece
