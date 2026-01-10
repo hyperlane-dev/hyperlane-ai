@@ -14,7 +14,8 @@ env:
 jobs:
   update_dataset:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,16 +49,14 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.name "root"
-          git config user.email "root@ltpp.vip"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Add extra remotes
         env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
         run: |
-          git remote add github https://${PAT_TOKEN}@github.com/hyperlane-dev/hyperlane-ai.git
           git remote add gitee https://oauth2:${GITEE_TOKEN}@gitee.com/eastspire/hyperlane-ai.git
           git remote add gitcode https://${GITCODE_TOKEN}@gitcode.com/eastspire/hyperlane-ai.git
 
@@ -67,7 +66,7 @@ jobs:
           if git status --porcelain | grep .; then
             git add .
             git commit -m "chore: update dataset"
-            git push github HEAD:master
+            git push HEAD:master
             git push gitee HEAD:master
             git push gitcode HEAD:master
             echo "✅ Changes pushed to GitHub / Gitee / GitCode"
