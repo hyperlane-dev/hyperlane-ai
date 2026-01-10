@@ -145,24 +145,29 @@ class ThreadSafeFileProcessor:
         for line in lines:
             if line.strip().startswith("<img") or line.strip().startswith("!["):
                 continue
-            
+
             # Remove specific HTML tags (self-closing and with attributes)
             tags_to_remove = [
                 "Catalog",
-                "Appreciate", 
+                "Appreciate",
                 "CratesDownloads",
                 "GitHubMetrics",
                 "Bottom",
-                "Share"
+                "Share",
             ]
-            
+
             for tag in tags_to_remove:
                 # Remove self-closing tags like <Catalog /> or <Catalog attribute="value" />
-                line = re.sub(rf'<{tag}\s*[^>]*/>', '', line, flags=re.IGNORECASE)
+                line = re.sub(rf"<{tag}\s*[^>]*/>", "", line, flags=re.IGNORECASE)
                 # Remove opening and closing tags like <Catalog>content</Catalog>
-                line = re.sub(rf'<{tag}\s*[^>]*>.*?</{tag}>', '', line, flags=re.IGNORECASE | re.DOTALL)
+                line = re.sub(
+                    rf"<{tag}\s*[^>]*>.*?</{tag}>",
+                    "",
+                    line,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
                 # Remove opening tags like <Catalog attribute="value">
-                line = re.sub(rf'<{tag}\s*[^>]*>', '', line, flags=re.IGNORECASE)
+                line = re.sub(rf"<{tag}\s*[^>]*>", "", line, flags=re.IGNORECASE)
             if (
                 "shields.io" in line
                 or "img.shields.io" in line
@@ -274,7 +279,7 @@ class ThreadSafeFileProcessor:
             return content
 
         # Process line by line to handle string literals properly
-        lines = content.split('\n')
+        lines = content.split("\n")
         result_lines = []
 
         in_multiline_comment = False
@@ -296,7 +301,7 @@ class ThreadSafeFileProcessor:
             # Process character by character to handle strings and comments properly
             while i < len(processed_line):
                 char = processed_line[i]
-                next_char = processed_line[i + 1] if i + 1 < len(processed_line) else ''
+                next_char = processed_line[i + 1] if i + 1 < len(processed_line) else ""
 
                 # Handle escape sequences
                 if escaped:
@@ -305,7 +310,7 @@ class ThreadSafeFileProcessor:
                     i += 1
                     continue
 
-                if char == '\\':
+                if char == "\\":
                     escaped = True
                     new_line += char
                     i += 1
@@ -327,15 +332,23 @@ class ThreadSafeFileProcessor:
                     comment_found = False
 
                     for pattern in patterns:
-                        if pattern.startswith("//") and char == '/' and next_char == '/':
+                        if (
+                            pattern.startswith("//")
+                            and char == "/"
+                            and next_char == "/"
+                        ):
                             # Single-line comment, skip rest of line
                             comment_found = True
                             break
-                        elif pattern.startswith("#") and char == '#':
+                        elif pattern.startswith("#") and char == "#":
                             # Hash comment, skip rest of line
                             comment_found = True
                             break
-                        elif pattern.startswith("--") and char == '-' and next_char == '-':
+                        elif (
+                            pattern.startswith("--")
+                            and char == "-"
+                            and next_char == "-"
+                        ):
                             # SQL-style comment, skip rest of line
                             comment_found = True
                             break
@@ -350,7 +363,7 @@ class ThreadSafeFileProcessor:
             result_lines.append(new_line)
 
         # Handle multi-line comments (/* */ style)
-        content_with_single_line_comments_removed = '\n'.join(result_lines)
+        content_with_single_line_comments_removed = "\n".join(result_lines)
         result = content_with_single_line_comments_removed
 
         # Remove multi-line comments carefully
@@ -358,14 +371,14 @@ class ThreadSafeFileProcessor:
             if pattern == r"/\*":
                 try:
                     # Process multi-line comments line by line to handle strings properly
-                    lines = result.split('\n')
+                    lines = result.split("\n")
                     result_lines = []
                     in_multiline_comment = False
-                    
+
                     for line in lines:
                         if not in_multiline_comment:
                             # Look for /* in this line
-                            if '/*' in line:
+                            if "/*" in line:
                                 # Check if /* is inside a string
                                 in_string = False
                                 string_char = None
@@ -378,28 +391,33 @@ class ThreadSafeFileProcessor:
                                     elif in_string and char == string_char:
                                         in_string = False
                                         string_char = None
-                                    elif not in_string and i < len(line) - 1 and char == '/' and line[i + 1] == '*':
+                                    elif (
+                                        not in_string
+                                        and i < len(line) - 1
+                                        and char == "/"
+                                        and line[i + 1] == "*"
+                                    ):
                                         # Found /* not in string, start of multi-line comment
                                         in_multiline_comment = True
                                         # Add content before /*
                                         line = line[:i]
                                         break
                                     i += 1
-                                
+
                         if in_multiline_comment:
                             # Look for */ in this line
-                            if '*/' in line:
+                            if "*/" in line:
                                 in_multiline_comment = False
                                 # Remove content up to and including */
-                                line = line.split('*/', 1)[1]
+                                line = line.split("*/", 1)[1]
                             else:
                                 # Skip this entire line as it's inside a multi-line comment
-                                line = ''
-                        
+                                line = ""
+
                         if line.strip() or not in_multiline_comment:
                             result_lines.append(line)
-                    
-                    result = '\n'.join(result_lines)
+
+                    result = "\n".join(result_lines)
                 except Exception:
                     # If anything goes wrong, skip this pattern
                     continue
@@ -549,6 +567,9 @@ class ThreadSafeFileProcessor:
         current_file_handle = open(self.output_file, "w", encoding="utf-8")
         current_file_size = 0
         print(f"Creating output file: {self.output_file}")
+        current_time = datetime.now()
+        time_header = f"<!--{current_time.strftime('%Y-%m-%d %H:%M:%S')}-->\n"
+        current_file_handle.write(time_header)
         try:
             for item in sorted(self.dataset, key=lambda x: x.get("id", 0)):
                 if "error" in item:

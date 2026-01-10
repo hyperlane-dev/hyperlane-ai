@@ -1,2516 +1,5 @@
-# Path: hyperlane-utils/README.md
-## hyperlane-utils
-[Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
-[Api Docs](https://docs.rs/hyperlane-utils/latest/hyperlane_utils/)
-> A library providing utils for hyperlane.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-utils
-```
-## Contact
-# Path: hyperlane-utils/src/lib.rs
-```rust
-pub use bin_encode_decode::*;
-pub use chunkify::*;
-pub use clonelicious::*;
-pub use color_output::*;
-pub use compare_version::*;
-pub use file_operation::*;
-pub use future_fn::*;
-pub use hot_restart::*;
-pub use http_request::*;
-pub use hyperlane_broadcast::*;
-pub use hyperlane_log::*;
-pub use hyperlane_macros::*;
-pub use hyperlane_plugin_websocket::*;
-pub use lombok_macros::*;
-pub use recoverable_spawn::*;
-pub use recoverable_thread_pool::*;
-pub use server_manager::*;
-pub use std_macro_extensions::*;
-pub use ahash;
-pub use bytemuck_derive;
-pub use chrono;
-pub use dotenvy;
-pub use futures;
-pub use hex;
-pub use log;
-pub use num_cpus;
-pub use once_cell;
-pub use redis;
-pub use regex;
-pub use sea_orm;
-pub use serde;
-pub use serde_urlencoded;
-pub use serde_with;
-pub use serde_xml_rs;
-pub use serde_yaml;
-pub use simd_json;
-pub use snafu;
-pub use sqlx;
-pub use twox_hash;
-pub use url;
-pub use urlencoding;
-pub use utoipa;
-pub use utoipa_rapidoc;
-pub use utoipa_swagger_ui;
-pub use uuid;
-```
-# Path: hyperlane-broadcast/README.md
-## hyperlane-broadcast
-[Official Documentation](https://docs.ltpp.vip/hyperlane-broadcast/)
-[Api Docs](https://docs.rs/hyperlane-broadcast/latest/hyperlane_broadcast/)
-> hyperlane-broadcast is a lightweight and ergonomic wrapper over Tokio’s broadcast channel designed for easy-to-use publish-subscribe messaging in async Rust applications. It simplifies the native Tokio broadcast API by providing a straightforward interface for broadcasting messages to multiple subscribers with minimal boilerplate.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-broadcast
-```
-## Contact
-# Path: hyperlane-broadcast/src/lib.rs
-```rust
-pub(crate) mod broadcast;
-pub(crate) mod broadcast_map;
-pub(crate) mod cfg;
-pub use broadcast::{r#const::*, r#struct::*, r#trait::*, r#type::*};
-pub use broadcast_map::{r#struct::*, r#trait::*, r#type::*};
-pub(crate) use std::{fmt::Debug, hash::BuildHasherDefault};
-pub(crate) use dashmap::*;
-pub(crate) use tokio::sync::broadcast::{
-    error::SendError,
-    {Receiver, Sender},
-};
-pub(crate) use twox_hash::XxHash3_64;
-```
-# Path: hyperlane-broadcast/src/cfg.rs
-```rust
-#[tokio::test]
-pub async fn test_broadcast() {
-    use crate::*;
-    let broadcast: Broadcast<usize> = Broadcast::new(10);
-    let mut rec1: BroadcastReceiver<usize> = broadcast.subscribe();
-    let mut rec2: BroadcastReceiver<usize> = broadcast.subscribe();
-    broadcast.send(20).unwrap();
-    assert_eq!(rec1.recv().await, Ok(20));
-    assert_eq!(rec2.recv().await, Ok(20));
-}
-#[tokio::test]
-pub async fn test_broadcast_map() {
-    use crate::*;
-    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
-    broadcast_map.insert("a", 10);
-    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
-    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
-    let mut rec3: BroadcastMapReceiver<usize> =
-        broadcast_map.subscribe_or_insert("b", DEFAULT_BROADCAST_SENDER_CAPACITY);
-    broadcast_map.send("a", 20).unwrap();
-    broadcast_map.send("b", 10).unwrap();
-    assert_eq!(rec1.recv().await, Ok(20));
-    assert_eq!(rec2.recv().await, Ok(20));
-    assert_eq!(rec3.recv().await, Ok(10));
-}
-```
-# Path: hyperlane-broadcast/src/broadcast/trait.rs
-```rust
-use crate::*;
-pub trait BroadcastTrait: Clone + Debug {}
-```
-# Path: hyperlane-broadcast/src/broadcast/const.rs
-```rust
-pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
-```
-# Path: hyperlane-broadcast/src/broadcast/mod.rs
-```rust
-pub mod r#const;
-pub mod r#impl;
-pub mod r#struct;
-pub mod r#trait;
-pub mod r#type;
-```
-# Path: hyperlane-broadcast/src/broadcast/struct.rs
-```rust
-use crate::*;
-#[derive(Debug, Clone)]
-pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
-```
-# Path: hyperlane-broadcast/src/broadcast/impl.rs
-```rust
-use crate::*;
-impl<T: Clone + Debug> BroadcastTrait for T {}
-impl<T: BroadcastTrait> Default for Broadcast<T> {
-    #[inline(always)]
-    fn default() -> Self {
-        let sender: BroadcastSender<T> = BroadcastSender::new(DEFAULT_BROADCAST_SENDER_CAPACITY);
-        Self(sender)
-    }
-}
-impl<T: BroadcastTrait> Broadcast<T> {
-    #[inline(always)]
-    pub fn new(capacity: Capacity) -> Self {
-        let sender: BroadcastSender<T> = BroadcastSender::new(capacity);
-        Self(sender)
-    }
-    #[inline(always)]
-    pub fn receiver_count(&self) -> ReceiverCount {
-        self.0.receiver_count()
-    }
-    #[inline(always)]
-    pub fn subscribe(&self) -> BroadcastReceiver<T> {
-        self.0.subscribe()
-    }
-    #[inline(always)]
-    pub fn send(&self, data: T) -> BroadcastSendResult<T> {
-        self.0.send(data)
-    }
-}
-```
-# Path: hyperlane-broadcast/src/broadcast/type.rs
-```rust
-use crate::*;
-pub type ReceiverCount = usize;
-pub type BroadcastSendError<T> = SendError<T>;
-pub type BroadcastSendResult<T> = Result<ReceiverCount, BroadcastSendError<T>>;
-pub type BroadcastReceiver<T> = Receiver<T>;
-pub type BroadcastSender<T> = Sender<T>;
-pub type Capacity = usize;
-```
-# Path: hyperlane-broadcast/src/broadcast_map/trait.rs
-```rust
-use crate::*;
-pub trait BroadcastMapTrait: Clone + Debug {}
-```
-# Path: hyperlane-broadcast/src/broadcast_map/mod.rs
-```rust
-pub mod r#impl;
-pub mod r#struct;
-pub mod r#trait;
-pub mod r#type;
-```
-# Path: hyperlane-broadcast/src/broadcast_map/struct.rs
-```rust
-use crate::*;
-#[derive(Debug, Clone)]
-pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>);
-```
-# Path: hyperlane-broadcast/src/broadcast_map/impl.rs
-```rust
-use crate::*;
-impl<T: Clone + Debug> BroadcastMapTrait for T {}
-impl<T: BroadcastMapTrait> Default for BroadcastMap<T> {
-    #[inline(always)]
-    fn default() -> Self {
-        Self(DashMap::with_hasher(BuildHasherDefault::default()))
-    }
-}
-impl<T: BroadcastMapTrait> BroadcastMap<T> {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-    #[inline(always)]
-    fn get(&self) -> &DashMapStringBroadcast<T> {
-        &self.0
-    }
-    #[inline(always)]
-    pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>
-    where
-        K: AsRef<str>,
-    {
-        let broadcast: Broadcast<T> = Broadcast::new(capacity);
-        self.get().insert(key.as_ref().to_owned(), broadcast)
-    }
-    #[inline(always)]
-    pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount
-    where
-        K: AsRef<str>,
-    {
-        self.get()
-            .get(key.as_ref())
-            .map(|receiver| receiver.receiver_count())
-    }
-    #[inline(always)]
-    pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>
-    where
-        K: AsRef<str>,
-    {
-        self.get()
-            .get(key.as_ref())
-            .map(|receiver| receiver.subscribe())
-    }
-    #[inline(always)]
-    pub fn subscribe_or_insert<K>(&self, key: K, capacity: Capacity) -> BroadcastMapReceiver<T>
-    where
-        K: AsRef<str>,
-    {
-        let key_ref: &str = key.as_ref();
-        match self.get().get(key_ref) {
-            Some(sender) => sender.subscribe(),
-            None => {
-                self.insert(key_ref, capacity);
-                self.subscribe_or_insert(key_ref, capacity)
-            }
-        }
-    }
-    #[inline(always)]
-    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T> {
-        match self.get().get(key.as_ref()) {
-            Some(sender) => sender.send(data).map(Some),
-            None => Ok(None),
-        }
-    }
-}
-```
-# Path: hyperlane-broadcast/src/broadcast_map/type.rs
-```rust
-use crate::*;
-pub type BroadcastMapSendError<T> = SendError<T>;
-pub type BroadcastMapSendResult<T> = Result<Option<ReceiverCount>, BroadcastMapSendError<T>>;
-pub type BroadcastMapReceiver<T> = Receiver<T>;
-pub type OptionBroadcast<T> = Option<Broadcast<T>>;
-pub type OptionBroadcastMapReceiver<T> = Option<BroadcastMapReceiver<T>>;
-pub type BroadcastMapSender<T> = Sender<T>;
-pub type OptionBroadcastMapSender<T> = Option<BroadcastMapSender<T>>;
-pub type OptionReceiverCount = Option<ReceiverCount>;
-pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDefault<XxHash3_64>>;
-```
-# Path: hyperlane-plugin-websocket/README.md
-## hyperlane-plugin-websocket
-[Official Documentation](https://docs.ltpp.vip/hyperlane-plugin-websocket/)
-[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/http_type/)
-> A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with hyperlane-broadcast for efficient message dissemination.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-plugin-websocket
-```
-## Contact
-# Path: hyperlane-plugin-websocket/src/lib.rs
-```rust
-#[cfg(test)]
-pub(crate) mod tests;
-pub(crate) mod websocket;
-pub use websocket::{r#enum::*, r#struct::*};
-pub(crate) use websocket::{r#const::*, r#trait::*};
-pub(crate) use std::{
-    convert::Infallible,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    num::{
-        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
-        NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
-    },
-    sync::Arc,
-};
-pub(crate) use hyperlane::{tokio::sync::broadcast::Receiver, *};
-pub(crate) use hyperlane_broadcast::*;
-#[cfg(test)]
-pub(crate) use std::sync::OnceLock;
-```
-# Path: hyperlane-plugin-websocket/src/tests/mod.rs
-```rust
-mod cfg;
-```
-# Path: hyperlane-plugin-websocket/src/tests/cfg.rs
-```rust
-use crate::*;
-static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
-fn get_broadcast_map() -> &'static WebSocket {
-    BROADCAST_MAP.get_or_init(WebSocket::new)
-}
-struct TaskPanicHook {
-    response_body: String,
-    content_type: String,
-}
-impl ServerHook for TaskPanicHook {
-    async fn new(ctx: &Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .send()
-            .await;
-    }
-}
-struct RequestErrorHook {
-    response_status_code: ResponseStatusCode,
-    response_body: String,
-}
-impl ServerHook for RequestErrorHook {
-    async fn new(ctx: &Context) -> Self {
-        let request_error: RequestError =
-            ctx.try_get_request_error_data().await.unwrap_or_default();
-        Self {
-            response_status_code: request_error.get_http_status_code(),
-            response_body: request_error.to_string(),
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(self.response_status_code)
-            .await
-            .set_response_body(self.response_body)
-            .await
-            .send()
-            .await;
-    }
-}
-struct RequestMiddleware {
-    socket_addr: String,
-}
-impl ServerHook for RequestMiddleware {
-    async fn new(ctx: &Context) -> Self {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
-        Self { socket_addr }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(200)
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONNECTION, KEEP_ALIVE)
-            .await
-            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-            .await
-            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .await
-            .set_response_header("SocketAddr", &self.socket_addr)
-            .await;
-    }
-}
-struct UpgradeHook;
-impl ServerHook for UpgradeHook {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        if !ctx.get_request().await.is_ws() {
-            return;
-        }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_version(HttpVersion::Http1_1)
-                .await
-                .set_response_status_code(101)
-                .await
-                .set_response_header(UPGRADE, WEBSOCKET)
-                .await
-                .set_response_header(CONNECTION, UPGRADE)
-                .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .await
-                .set_response_body(&vec![])
-                .await
-                .send()
-                .await;
-        }
-    }
-}
-struct ConnectedHook {
-    receiver_count: ReceiverCount,
-    data: String,
-    group_broadcast_type: BroadcastType<String>,
-    private_broadcast_type: BroadcastType<String>,
-}
-impl ServerHook for ConnectedHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx
-            .try_get_route_param("group_name")
-            .await
-            .unwrap_or_default();
-        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count(group_broadcast_type.clone());
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
-        let your_name: String = ctx
-            .try_get_route_param("your_name")
-            .await
-            .unwrap_or_default();
-        let private_broadcast_type: BroadcastType<String> =
-            BroadcastType::PointToPoint(my_name, your_name);
-        let data: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            receiver_count,
-            data,
-            group_broadcast_type,
-            private_broadcast_type,
-        }
-    }
-    async fn handle(self, _ctx: &Context) {
-        get_broadcast_map()
-            .send(self.group_broadcast_type, self.data.clone())
-            .unwrap_or_else(|err| {
-                println!("[connected_hook]send group error => {:?}", err.to_string());
-                None
-            });
-        get_broadcast_map()
-            .send(self.private_broadcast_type, self.data)
-            .unwrap_or_else(|err| {
-                println!(
-                    "[connected_hook]send private error => {:?}",
-                    err.to_string()
-                );
-                None
-            });
-        println!(
-            "[connected_hook]receiver_count => {:?}",
-            self.receiver_count
-        );
-        Server::flush_stdout();
-    }
-}
-struct SendedHook {
-    msg: String,
-}
-impl ServerHook for SendedHook {
-    async fn new(ctx: &Context) -> Self {
-        let msg: String = ctx.get_response_body_string().await;
-        Self { msg }
-    }
-    async fn handle(self, _ctx: &Context) {
-        println!("[sended_hook]msg => {}", self.msg);
-        Server::flush_stdout();
-    }
-}
-struct GroupChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for GroupChatRequestHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request_body().await;
-        if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-            body = format!("receiver_count => {receiver_count:?}").into();
-        }
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
-        println!("[group_chat]receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct GroupClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for GroupClosedHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count_after_closed(key.clone());
-        let body: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
-        println!("[group_closed]receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct GroupChat;
-impl ServerHook for GroupChat {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
-            .set_context(ctx.clone())
-            .set_broadcast_type(key)
-            .set_request_config(RequestConfig::default())
-            .set_capacity(1024)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<GroupChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<GroupClosedHook>();
-        get_broadcast_map().run(config).await;
-    }
-}
-struct PrivateChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for PrivateChatRequestHook {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request_body().await;
-        if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-            body = format!("receiver_count => {receiver_count:?}").into();
-        }
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
-        println!("[private_chat]receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct PrivateClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for PrivateClosedHook {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
-        let body: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
-        println!(
-            "[private_closed]receiver_count => {:?}",
-            self.receiver_count
-        );
-        Server::flush_stdout();
-    }
-}
-struct PrivateChat {
-    config: WebSocketConfig<String>,
-}
-impl ServerHook for PrivateChat {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
-            .set_context(ctx.clone())
-            .set_broadcast_type(key)
-            .set_request_config(RequestConfig::default())
-            .set_capacity(1024)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<PrivateChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<PrivateClosedHook>();
-        Self { config }
-    }
-    async fn handle(self, _ctx: &Context) {
-        get_broadcast_map().run(self.config).await;
-    }
-}
-#[tokio::test]
-async fn main() {
-    let server: Server = Server::new().await;
-    server.task_panic::<TaskPanicHook>().await;
-    server.request_error::<RequestErrorHook>().await;
-    server.request_middleware::<RequestMiddleware>().await;
-    server.request_middleware::<UpgradeHook>().await;
-    server.route::<GroupChat>("/{group_name}").await;
-    server.route::<PrivateChat>("/{my_name}/{your_name}").await;
-    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
-    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-        server_control_hook_2.shutdown().await;
-    });
-    server_control_hook_1.wait().await;
-}
-```
-# Path: hyperlane-plugin-websocket/src/websocket/trait.rs
-```rust
-pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
-```
-# Path: hyperlane-plugin-websocket/src/websocket/const.rs
-```rust
-pub(crate) const POINT_TO_POINT_KEY: &str = "ptp-";
-pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
-```
-# Path: hyperlane-plugin-websocket/src/websocket/mod.rs
-```rust
-pub(crate) mod r#const;
-pub(crate) mod r#enum;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) mod r#trait;
-```
-# Path: hyperlane-plugin-websocket/src/websocket/enum.rs
-```rust
-use crate::*;
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum BroadcastType<T: BroadcastTypeTrait> {
-    PointToPoint(T, T),
-    PointToGroup(T),
-    Unknown,
-}
-```
-# Path: hyperlane-plugin-websocket/src/websocket/struct.rs
-```rust
-use crate::*;
-#[derive(Debug, Clone, Default)]
-pub struct WebSocket {
-    pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
-}
-#[derive(Clone)]
-pub struct WebSocketConfig<B: BroadcastTypeTrait> {
-    pub(super) context: Context,
-    pub(super) request_config: RequestConfig,
-    pub(super) capacity: Capacity,
-    pub(super) broadcast_type: BroadcastType<B>,
-    pub(super) connected_hook: ServerHookHandler,
-    pub(super) request_hook: ServerHookHandler,
-    pub(super) sended_hook: ServerHookHandler,
-    pub(super) closed_hook: ServerHookHandler,
-}
-```
-# Path: hyperlane-plugin-websocket/src/websocket/impl.rs
-```rust
-use crate::*;
-impl BroadcastTypeTrait for String {}
-impl BroadcastTypeTrait for &str {}
-impl BroadcastTypeTrait for char {}
-impl BroadcastTypeTrait for bool {}
-impl BroadcastTypeTrait for i8 {}
-impl BroadcastTypeTrait for i16 {}
-impl BroadcastTypeTrait for i32 {}
-impl BroadcastTypeTrait for i64 {}
-impl BroadcastTypeTrait for i128 {}
-impl BroadcastTypeTrait for isize {}
-impl BroadcastTypeTrait for u8 {}
-impl BroadcastTypeTrait for u16 {}
-impl BroadcastTypeTrait for u32 {}
-impl BroadcastTypeTrait for u64 {}
-impl BroadcastTypeTrait for u128 {}
-impl BroadcastTypeTrait for usize {}
-impl BroadcastTypeTrait for f32 {}
-impl BroadcastTypeTrait for f64 {}
-impl BroadcastTypeTrait for IpAddr {}
-impl BroadcastTypeTrait for Ipv4Addr {}
-impl BroadcastTypeTrait for Ipv6Addr {}
-impl BroadcastTypeTrait for SocketAddr {}
-impl BroadcastTypeTrait for NonZeroU8 {}
-impl BroadcastTypeTrait for NonZeroU16 {}
-impl BroadcastTypeTrait for NonZeroU32 {}
-impl BroadcastTypeTrait for NonZeroU64 {}
-impl BroadcastTypeTrait for NonZeroU128 {}
-impl BroadcastTypeTrait for NonZeroUsize {}
-impl BroadcastTypeTrait for NonZeroI8 {}
-impl BroadcastTypeTrait for NonZeroI16 {}
-impl BroadcastTypeTrait for NonZeroI32 {}
-impl BroadcastTypeTrait for NonZeroI64 {}
-impl BroadcastTypeTrait for NonZeroI128 {}
-impl BroadcastTypeTrait for NonZeroIsize {}
-impl BroadcastTypeTrait for Infallible {}
-impl BroadcastTypeTrait for &String {}
-impl BroadcastTypeTrait for &&str {}
-impl BroadcastTypeTrait for &char {}
-impl BroadcastTypeTrait for &bool {}
-impl BroadcastTypeTrait for &i8 {}
-impl BroadcastTypeTrait for &i16 {}
-impl BroadcastTypeTrait for &i32 {}
-impl BroadcastTypeTrait for &i64 {}
-impl BroadcastTypeTrait for &i128 {}
-impl BroadcastTypeTrait for &isize {}
-impl BroadcastTypeTrait for &u8 {}
-impl BroadcastTypeTrait for &u16 {}
-impl BroadcastTypeTrait for &u32 {}
-impl BroadcastTypeTrait for &u128 {}
-impl BroadcastTypeTrait for &usize {}
-impl BroadcastTypeTrait for &f32 {}
-impl BroadcastTypeTrait for &f64 {}
-impl BroadcastTypeTrait for &IpAddr {}
-impl BroadcastTypeTrait for &Ipv4Addr {}
-impl BroadcastTypeTrait for &Ipv6Addr {}
-impl BroadcastTypeTrait for &SocketAddr {}
-impl BroadcastTypeTrait for &NonZeroU8 {}
-impl BroadcastTypeTrait for &NonZeroU16 {}
-impl BroadcastTypeTrait for &NonZeroU32 {}
-impl BroadcastTypeTrait for &NonZeroU64 {}
-impl BroadcastTypeTrait for &NonZeroU128 {}
-impl BroadcastTypeTrait for &NonZeroUsize {}
-impl BroadcastTypeTrait for &NonZeroI8 {}
-impl BroadcastTypeTrait for &NonZeroI16 {}
-impl BroadcastTypeTrait for &NonZeroI32 {}
-impl BroadcastTypeTrait for &NonZeroI64 {}
-impl BroadcastTypeTrait for &NonZeroI128 {}
-impl BroadcastTypeTrait for &NonZeroIsize {}
-impl BroadcastTypeTrait for &Infallible {}
-impl<B: BroadcastTypeTrait> Default for BroadcastType<B> {
-    #[inline(always)]
-    fn default() -> Self {
-        BroadcastType::Unknown
-    }
-}
-impl<B: BroadcastTypeTrait> BroadcastType<B> {
-    #[inline(always)]
-    pub fn get_key(broadcast_type: BroadcastType<B>) -> String {
-        match broadcast_type {
-            BroadcastType::PointToPoint(key1, key2) => {
-                let (first_key, second_key) = if key1 <= key2 {
-                    (key1, key2)
-                } else {
-                    (key2, key1)
-                };
-                format!(
-                    "{}-{}-{}",
-                    POINT_TO_POINT_KEY,
-                    first_key.to_string(),
-                    second_key.to_string()
-                )
-            }
-            BroadcastType::PointToGroup(key) => {
-                format!("{}-{}", POINT_TO_GROUP_KEY, key.to_string())
-            }
-            BroadcastType::Unknown => String::new(),
-        }
-    }
-}
-impl<B: BroadcastTypeTrait> Default for WebSocketConfig<B> {
-    #[inline(always)]
-    fn default() -> Self {
-        let default_hook: ServerHookHandler = Arc::new(|_ctx| Box::pin(async {}));
-        Self {
-            context: Context::default(),
-            request_config: RequestConfig::default(),
-            capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
-            broadcast_type: BroadcastType::default(),
-            connected_hook: default_hook.clone(),
-            request_hook: default_hook.clone(),
-            sended_hook: default_hook.clone(),
-            closed_hook: default_hook,
-        }
-    }
-}
-impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
-    #[inline(always)]
-    pub fn set_request_config(mut self, request_config: RequestConfig) -> Self {
-        self.request_config = request_config;
-        self
-    }
-    #[inline(always)]
-    pub fn set_capacity(mut self, capacity: Capacity) -> Self {
-        self.capacity = capacity;
-        self
-    }
-    #[inline(always)]
-    pub fn set_context(mut self, context: Context) -> Self {
-        self.context = context;
-        self
-    }
-    #[inline(always)]
-    pub fn set_broadcast_type(mut self, broadcast_type: BroadcastType<B>) -> Self {
-        self.broadcast_type = broadcast_type;
-        self
-    }
-    #[inline(always)]
-    pub fn get_context(&self) -> &Context {
-        &self.context
-    }
-    #[inline(always)]
-    pub fn get_request_config(&self) -> RequestConfig {
-        self.request_config
-    }
-    #[inline(always)]
-    pub fn get_capacity(&self) -> Capacity {
-        self.capacity
-    }
-    #[inline(always)]
-    pub fn get_broadcast_type(&self) -> &BroadcastType<B> {
-        &self.broadcast_type
-    }
-    #[inline(always)]
-    pub fn set_connected_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.connected_hook = server_hook_factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_request_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.request_hook = server_hook_factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_sended_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.sended_hook = server_hook_factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_closed_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.closed_hook = server_hook_factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn get_connected_hook(&self) -> &ServerHookHandler {
-        &self.connected_hook
-    }
-    #[inline(always)]
-    pub fn get_request_hook(&self) -> &ServerHookHandler {
-        &self.request_hook
-    }
-    #[inline(always)]
-    pub fn get_sended_hook(&self) -> &ServerHookHandler {
-        &self.sended_hook
-    }
-    #[inline(always)]
-    pub fn get_closed_hook(&self) -> &ServerHookHandler {
-        &self.closed_hook
-    }
-}
-impl WebSocket {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-    #[inline(always)]
-    fn subscribe_unwrap_or_insert<B: BroadcastTypeTrait>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-        capacity: Capacity,
-    ) -> BroadcastMapReceiver<Vec<u8>> {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.subscribe_or_insert(&key, capacity)
-    }
-    #[inline(always)]
-    fn point_to_point<B: BroadcastTypeTrait>(
-        &self,
-        key1: &B,
-        key2: &B,
-        capacity: Capacity,
-    ) -> BroadcastMapReceiver<Vec<u8>> {
-        self.subscribe_unwrap_or_insert(
-            BroadcastType::PointToPoint(key1.clone(), key2.clone()),
-            capacity,
-        )
-    }
-    #[inline(always)]
-    fn point_to_group<B: BroadcastTypeTrait>(
-        &self,
-        key: &B,
-        capacity: Capacity,
-    ) -> BroadcastMapReceiver<Vec<u8>> {
-        self.subscribe_unwrap_or_insert(BroadcastType::PointToGroup(key.clone()), capacity)
-    }
-    #[inline(always)]
-    pub fn receiver_count<B: BroadcastTypeTrait>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-    ) -> ReceiverCount {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.receiver_count(&key).unwrap_or(0)
-    }
-    #[inline(always)]
-    pub fn receiver_count_before_connected<B: BroadcastTypeTrait>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-    ) -> ReceiverCount {
-        let count: ReceiverCount = self.receiver_count(broadcast_type);
-        count.clamp(0, ReceiverCount::MAX - 1) + 1
-    }
-    #[inline(always)]
-    pub fn receiver_count_after_closed<B: BroadcastTypeTrait>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-    ) -> ReceiverCount {
-        let count: ReceiverCount = self.receiver_count(broadcast_type);
-        count.clamp(1, ReceiverCount::MAX) - 1
-    }
-    #[inline(always)]
-    pub fn send<T, B>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-        data: T,
-    ) -> BroadcastMapSendResult<Vec<u8>>
-    where
-        T: Into<Vec<u8>>,
-        B: BroadcastTypeTrait,
-    {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.send(&key, data.into())
-    }
-    pub async fn run<B: BroadcastTypeTrait>(&self, config: WebSocketConfig<B>) {
-        let ctx: Context = config.get_context().clone();
-        if ctx.to_string() == Context::default().to_string() {
-            panic!("Context must be set");
-        }
-        let request_config: RequestConfig = config.get_request_config();
-        let capacity: Capacity = config.get_capacity();
-        let broadcast_type: BroadcastType<B> = config.get_broadcast_type().clone();
-        let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
-            BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
-            BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
-            BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
-        };
-        let key: String = BroadcastType::get_key(broadcast_type);
-        config.get_connected_hook()(&ctx).await;
-        let result_handle = || async {
-            ctx.aborted().await;
-            ctx.closed().await;
-        };
-        loop {
-            tokio::select! {
-                request_res = ctx.ws_from_stream(request_config) => {
-                    if request_res.is_ok() {
-                        config.get_request_hook()(&ctx).await;
-                    } else {
-                        config.get_closed_hook()(&ctx).await;
-                    }
-                    if ctx.get_aborted().await {
-                        continue;
-                    }
-                    if ctx.get_closed().await {
-                        break;
-                    }
-                    let body: ResponseBody = ctx.get_response_body().await;
-                    let is_err: bool = self.broadcast_map.send(&key, body).is_err();
-                    config.get_sended_hook()(&ctx).await;
-                    if is_err || ctx.get_closed().await{
-                        break;
-                    }
-                },
-                msg_res = receiver.recv() => {
-                    if let Ok(msg) = &msg_res {
-                        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(msg);
-                        if ctx.try_send_body_list_with_data(&frame_list).await.is_ok() {
-                            continue;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-        result_handle().await;
-    }
-}
-```
-# Path: hyperlane-quick-start/README.md
-## hyperlane-quick-start
-[English](README.md) | [简体中文](README.ZH-CN.md)
-> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
-## Official Documentation
-- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
-## Api Docs
-- [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
-## Run
-### start
-```sh
-cargo run
-```
-### hot-restart
-```sh
-cargo run hot-restart
-```
-### started in background
-```sh
-cargo run -- -d
-```
-### stop
-```sh
-cargo run stop
-```
-### restart
-```sh
-cargo run restart
-```
-### restarted in background
-```sh
-cargo run restart -d
-```
-## Performance
-- [Performance](https://docs.ltpp.vip/hyperlane/speed)
-## Appreciate
-> If you feel that `hyperlane` is helpful to you, feel free to donate
-### WeChat Pay
-### Alipay
-### Virtual Currency Pay
-| Virtual Currency | Virtual Currency Address                   |
-| ---------------- | ------------------------------------------ |
-| BTC              | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
-| ETH              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-| BSC              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-## Contact
-# Path: hyperlane-quick-start/README.ZH-CN.md
-## hyperlane-quick-start
-[English](README.md) | [简体中文](README.ZH-CN.md)
-> 这是一个轻量级、高性能且跨平台的 Rust HTTP 服务器库，基于 Tokio 构建。它通过提供中间件、WebSocket、服务器推送事件(SSE)和原始 TCP 通信的内置支持，简化了现代 Web 服务的开发。凭借在 Windows、Linux 和 macOS 上统一且符合人体工程学的 API，它使开发者能够以最小的开销和最大的灵活性构建强大、可扩展且事件驱动的网络应用程序。
-## 官方文档
-- [官方文档](https://docs.ltpp.vip/hyperlane/)
-## API 文档
-- [API 文档](https://docs.rs/hyperlane/latest/hyperlane/)
-## 运行
-### 运行
-```sh
-cargo run
-```
-### 热重启
-```sh
-cargo run hot-restart
-```
-### 在后台运行
-```sh
-cargo run -- -d
-```
-### 停止
-```sh
-cargo run stop
-```
-### 重启
-```sh
-cargo run restart
-```
-### 重启在后台运行
-```sh
-cargo run restart -d
-```
-## 性能测试
-- [性能测试](https://docs.ltpp.vip/hyperlane/speed)
-## 赞赏
-> 如果你觉得 `hyperlane` 对你有所帮助，欢迎捐赠
-### 微信支付
-### 支付宝支付
-### 虚拟货币支付
-| 虚拟货币 | 虚拟货币地址                               |
-| -------- | ------------------------------------------ |
-| BTC      | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
-| ETH      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-| BSC      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-# Path: hyperlane-quick-start/resources/static/not_found/index.html
-```html
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>404 Not Found</title>
-    <style>
-      .center-text {
-        text-align: center;
-      }
-      a {
-        color: #1e90ff;
-        text-decoration: none;
-        transition: color 0.3s, border-bottom-color 0.3s;
-      }
-      a:hover,
-      a:focus {
-        color: pink;
-        border-bottom-color: pink;
-        outline: none;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <h1 class="center-text">404 Not Found</h1>
-    <hr />
-    <p class="center-text">
-      Server:
-      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
-        >Hyperlane</a
-    </p>
-  </body>
-</html>
-```
-# Path: hyperlane-quick-start/resources/templates/index/index.html
-```html
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hyperlane</title>
-    <style>
-      .center-text {
-        text-align: center;
-      }
-      a {
-        color: #1e90ff;
-        text-decoration: none;
-        transition: color 0.3s, border-bottom-color 0.3s;
-      }
-      a:hover,
-      a:focus {
-        color: pink;
-        border-bottom-color: pink;
-        outline: none;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <h1 class="center-text">Hello hyperlane: {{ time }}</h1>
-    <hr />
-    <p class="center-text">
-      Server:
-      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
-        >Hyperlane</a
-    </p>
-  </body>
-</html>
-```
-# Path: hyperlane-quick-start/init/lib.rs
-```rust
-pub mod application;
-pub mod framework;
-use hyperlane::*;
-use hyperlane_utils::{
-    log::{error, info},
-    *,
-};
-```
-# Path: hyperlane-quick-start/init/framework/mod.rs
-```rust
-pub mod shutdown;
-pub mod wait;
-use super::*;
-```
-# Path: hyperlane-quick-start/init/framework/wait/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use super::{shutdown::*, *};
-#[allow(unused_imports)]
-use hyperlane_app::*;
-use hyperlane_config::framework::*;
-use hyperlane_plugin::process::*;
-use hyperlane_utils::log::LevelFilter;
-use tokio::runtime::{Builder, Runtime};
-```
-# Path: hyperlane-quick-start/init/framework/wait/fn.rs
-```rust
-use crate::application::init_log;
-use super::*;
-#[hyperlane(config: ServerConfig)]
-async fn init_config(server: &Server) {
-    config.host(SERVER_HOST).await;
-    config.port(SERVER_PORT).await;
-    config.ttl(SERVER_TTI).await;
-    config.nodelay(SERVER_NODELAY).await;
-    config.request_config(RequestConfig::default()).await;
-    server.config(config).await;
-}
-async fn print_route_matcher(server: &Server) {
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    for key in route_matcher.get_static_route().keys() {
-        info!("Static route: {key}");
-    }
-    for value in route_matcher.get_dynamic_route().values() {
-        for (route_pattern, _) in value {
-            info!("Dynamic route: {route_pattern}");
-        }
-    }
-    for value in route_matcher.get_regex_route().values() {
-        for (route_pattern, _) in value {
-            info!("Regex route: {route_pattern}");
-        }
-    }
-}
-fn runtime() -> Runtime {
-    Builder::new_multi_thread()
-        .worker_threads(num_cpus::get_physical() << 1)
-        .thread_stack_size(1_048_576)
-        .max_blocking_threads(2_048)
-        .max_io_events_per_tick(1_024)
-        .enable_all()
-        .build()
-        .unwrap()
-}
-#[hyperlane(server: Server)]
-async fn create_server() {
-    init_log(LevelFilter::Info);
-    init_config(&server).await;
-    info!("Server initialization successful");
-    let server_result: Result<ServerControlHook, ServerError> = server.run().await;
-    match server_result {
-        Ok(server_hook) => {
-            let host_port: String = format!("{SERVER_HOST}:{SERVER_PORT}");
-            print_route_matcher(&server).await;
-            info!("Server listen in: {host_port}");
-            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();
-            set_shutdown(shutdown);
-            server_hook.wait().await;
-        }
-        Err(server_error) => error!("Server run error: {server_error}"),
-    }
-}
-pub fn run() {
-    runtime().block_on(create(create_server));
-}
-```
-# Path: hyperlane-quick-start/init/framework/shutdown/mod.rs
-```rust
-mod r#fn;
-mod r#static;
-pub use r#fn::*;
-use super::*;
-use r#static::*;
-use std::sync::{Arc, OnceLock};
-```
-# Path: hyperlane-quick-start/init/framework/shutdown/fn.rs
-```rust
-use super::*;
-pub fn set_shutdown(shutdown: SharedAsyncTaskFactory<()>) {
-    let _ = SHUTDOWN.set(shutdown);
-}
-pub fn shutdown() -> SharedAsyncTaskFactory<()> {
-    SHUTDOWN
-        .get_or_init(|| Arc::new(|| Box::pin(async {})))
-        .clone()
-}
-```
-# Path: hyperlane-quick-start/init/framework/shutdown/static.rs
-```rust
-use super::*;
-pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
-```
-# Path: hyperlane-quick-start/init/application/mod.rs
-```rust
-mod log;
-pub use log::*;
-```
-# Path: hyperlane-quick-start/init/application/log/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use hyperlane_plugin::log::*;
-use hyperlane_utils::log::LevelFilter;
-```
-# Path: hyperlane-quick-start/init/application/log/fn.rs
-```rust
-use super::*;
-pub fn init_log(level: LevelFilter) {
-    Logger::init(level);
-}
-```
-# Path: hyperlane-quick-start/app/lib.rs
-```rust
-pub mod aspect;
-pub mod controller;
-pub mod domain;
-pub mod exception;
-pub mod filter;
-pub mod mapper;
-pub mod middleware;
-pub mod model;
-pub mod service;
-pub mod utils;
-pub mod view;
-use hyperlane::*;
-use hyperlane_utils::{
-    log::{error, info},
-    *,
-};
-```
-# Path: hyperlane-quick-start/app/model/mod.rs
-```rust
-pub mod application;
-pub mod data_transfer;
-pub mod param;
-use super::*;
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
-use utoipa::ToSchema;
-```
-# Path: hyperlane-quick-start/app/model/data_transfer/mod.rs
-```rust
-pub mod common;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/model/data_transfer/common/mod.rs
-```rust
-mod r#enum;
-mod r#impl;
-mod r#struct;
-pub use r#enum::*;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/model/data_transfer/common/enum.rs
-```rust
-use super::*;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[repr(i32)]
-pub enum ResponseCode {
-    Success = 200,
-    BadRequest = 400,
-    Unauthorized = 401,
-    Forbidden = 403,
-    NotFound = 404,
-    InternalError = 500,
-    DatabaseError = 501,
-    BusinessError = 502,
-}
-```
-# Path: hyperlane-quick-start/app/model/data_transfer/common/struct.rs
-```rust
-use super::*;
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, Data)]
-pub struct ApiResponse<T>
-where
-    T: Serialize + Default,
-{
-    code: i32,
-    message: String,
-    data: Option<T>,
-    timestamp: Option<String>,
-}
-```
-# Path: hyperlane-quick-start/app/model/data_transfer/common/impl.rs
-```rust
-use super::*;
-impl ResponseCode {
-    pub fn default_message(&self) -> &'static str {
-        match self {
-            Self::Success => "Operation successful",
-            Self::BadRequest => "Invalid request parameters",
-            Self::Unauthorized => "Unauthorized access",
-            Self::Forbidden => "Access forbidden",
-            Self::NotFound => "Resource not found",
-            Self::InternalError => "Internal server error",
-            Self::DatabaseError => "Database operation failed",
-            Self::BusinessError => "Business logic error",
-        }
-    }
-}
-impl<T> ApiResponse<T>
-where
-    T: Serialize + Default,
-{
-    pub fn success(data: T) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message("Success".to_string())
-            .set_data(Some(data))
-            .set_timestamp(Some(date()));
-        instance
-    }
-    pub fn success_with_message(data: T, message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message(message.into())
-            .set_data(Some(data))
-            .set_timestamp(Some(date()));
-        instance
-    }
-    pub fn error(message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::InternalError as i32)
-            .set_message(message.into())
-            .set_data(None)
-            .set_timestamp(Some(date()));
-        instance
-    }
-    pub fn error_with_code(code: ResponseCode, message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(code as i32)
-            .set_message(message.into())
-            .set_data(None)
-            .set_timestamp(Some(date()));
-        instance
-    }
-    pub fn to_json_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).unwrap_or_default()
-    }
-}
-impl ApiResponse<()> {
-    pub fn success_without_data(message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<()> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message(message.into())
-            .set_data(None)
-            .set_timestamp(Some(date()));
-        instance
-    }
-}
-```
-# Path: hyperlane-quick-start/app/model/param/mod.rs
-```rust
-pub mod websocket;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/model/param/websocket/mod.rs
-```rust
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use serde::{Deserialize, Serialize};
-```
-# Path: hyperlane-quick-start/app/model/param/websocket/struct.rs
-```rust
-use super::*;
-#[derive(Debug, Clone, Default, Data, Deserialize, Serialize)]
-pub struct WebSocketMessage {
-    pub name: String,
-    pub message: String,
-}
-```
-# Path: hyperlane-quick-start/app/middleware/mod.rs
-```rust
-pub mod request;
-pub mod response;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/response/mod.rs
-```rust
-pub mod log;
-pub mod send;
-pub use log::*;
-pub use send::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/response/send/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/response/send/struct.rs
-```rust
-use super::*;
-#[response_middleware(1)]
-pub struct SendMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/response/send/impl.rs
-```rust
-use super::*;
-impl ServerHook for SendMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        http,
-        reject(ctx.get_request_upgrade_type().await.is_ws()),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/struct.rs
-```rust
-use super::*;
-#[response_middleware(2)]
-pub struct LogMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/impl.rs
-```rust
-use super::*;
-impl ServerHook for LogMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        let request: String = ctx.get_request().await.get_string();
-        let response: String = ctx.get_response().await.get_string();
-        info!("{request}");
-        info!("{response}");
-    }
-}
-```
-# Path: hyperlane-quick-start/app/middleware/request/mod.rs
-```rust
-pub mod cross;
-pub mod response;
-pub mod upgrade;
-pub use cross::*;
-pub use response::*;
-pub use upgrade::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/response/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use hyperlane_config::application::templates::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/response/struct.rs
-```rust
-use super::*;
-#[request_middleware(2)]
-pub struct ResponseHeaderMiddleware;
-#[request_middleware(3)]
-pub struct ResponseStatusCodeMiddleware;
-#[request_middleware(4)]
-pub struct ResponseBodyMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/request/response/impl.rs
-```rust
-use super::*;
-impl ServerHook for ResponseHeaderMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_header(DATE => gmt())]
-    #[response_header(SERVER => HYPERLANE)]
-    #[response_header(CONNECTION => KEEP_ALIVE)]
-    #[epilogue_macros(
-        response_header(CONTENT_TYPE => content_type),
-        response_header("SocketAddr" => socket_addr_string)
-    )]
-    async fn handle(self, ctx: &Context) {
-        let socket_addr_string: String = ctx.get_socket_addr_string().await;
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
-    }
-}
-impl ServerHook for ResponseStatusCodeMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_status_code(200)]
-    async fn handle(self, ctx: &Context) {}
-}
-impl ServerHook for ResponseBodyMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_body(INDEX_HTML.replace("{{ time }}", &time()))]
-    async fn handle(self, ctx: &Context) {}
-}
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/struct.rs
-```rust
-use super::*;
-#[request_middleware(1)]
-pub struct CrossMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/impl.rs
-```rust
-use super::*;
-impl ServerHook for CrossMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[response_version(HttpVersion::Http1_1)]
-    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
-    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
-    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
-    async fn handle(self, ctx: &Context) {}
-}
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/struct.rs
-```rust
-use super::*;
-#[request_middleware(5)]
-pub struct UpgradeMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/impl.rs
-```rust
-use super::*;
-impl ServerHook for UpgradeMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        ws,
-        response_version(HttpVersion::Http1_1),
-        response_status_code(101),
-        response_body(&vec![]),
-        response_header(UPGRADE => WEBSOCKET),
-        response_header(CONNECTION => UPGRADE),
-        response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
-        send
-    )]
-    async fn handle(self, ctx: &Context) {}
-}
-```
-# Path: hyperlane-quick-start/app/exception/mod.rs
-```rust
-pub mod application;
-pub mod framework;
-pub use framework::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/exception/framework/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use model::data_transfer::common::*;
-```
-# Path: hyperlane-quick-start/app/exception/framework/struct.rs
-```rust
-use super::*;
-#[task_panic]
-pub struct TaskPanicHook {
-    pub(super) content_type: String,
-    pub(super) response_body: String,
-}
-#[request_error]
-pub struct RequestErrorHook {
-    pub(super) response_status_code: ResponseStatusCode,
-    pub(super) content_type: String,
-    pub(super) response_body: String,
-}
-```
-# Path: hyperlane-quick-start/app/exception/framework/impl.rs
-```rust
-use super::*;
-impl ServerHook for TaskPanicHook {
-    #[task_panic_data(task_panic_data)]
-    async fn new(ctx: &Context) -> Self {
-        let content_type: String =
-            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
-        Self {
-            content_type,
-            response_body: task_panic_data.to_string(),
-        }
-    }
-    #[prologue_macros(
-        response_version(HttpVersion::Http1_1),
-        response_status_code(500),
-        clear_response_headers,
-        response_header(SERVER => HYPERLANE),
-        response_version(HttpVersion::Http1_1),
-        response_header(CONTENT_TYPE, &self.content_type),
-    )]
-    #[epilogue_macros(response_body(&response_body), send)]
-    async fn handle(self, ctx: &Context) {
-        error!("{}", self.response_body);
-        let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
-        let response_body: Vec<u8> = api_response.to_json_bytes();
-    }
-}
-impl ServerHook for RequestErrorHook {
-    #[request_error_data(request_error_data)]
-    async fn new(_ctx: &Context) -> Self {
-        let content_type: String =
-            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
-        Self {
-            response_status_code: request_error_data.get_http_status_code(),
-            content_type,
-            response_body: request_error_data.to_string(),
-        }
-    }
-    #[prologue_macros(
-        response_version(HttpVersion::Http1_1),
-        response_status_code(self.response_status_code),
-        clear_response_headers,
-        response_header(SERVER => HYPERLANE),
-        response_version(HttpVersion::Http1_1),
-        response_header(CONTENT_TYPE, &self.content_type),
-    )]
-    #[epilogue_macros(response_body(&response_body), send)]
-    async fn handle(self, ctx: &Context) {
-        if self.response_status_code == HttpStatus::BadRequest.code() {
-            ctx.aborted().await;
-            return;
-        }
-        if self.response_status_code != HttpStatus::RequestTimeout.code() {
-            error!("{}", self.response_body);
-        }
-        let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
-        let response_body: Vec<u8> = api_response.to_json_bytes();
-    }
-}
-```
-# Path: hyperlane-quick-start/app/view/favicon/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use super::*;
-use hyperlane_config::business::logo_img::*;
-```
-# Path: hyperlane-quick-start/app/view/favicon/fn.rs
-```rust
-use super::*;
-#[route("/favicon.ico")]
-#[prologue_macros(
-  get,
-  response_status_code(301),
-  response_header(LOCATION => LOGO_IMG_URL)
-)]
-pub async fn ico(ctx: Context) {}
-```
-# Path: hyperlane-quick-start/config/lib.rs
-```rust
-pub mod application;
-pub mod framework;
-use hyperlane::*;
-```
-# Path: hyperlane-quick-start/config/framework/const.rs
-```rust
-use super::*;
-#[cfg(debug_assertions)]
-pub const SERVER_PORT: u16 = DEFAULT_WEB_PORT;
-#[cfg(not(debug_assertions))]
-pub const SERVER_PORT: u16 = 65002;
-pub const SERVER_HOST: &str = DEFAULT_HOST;
-pub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;
-pub const SERVER_LOG_SIZE: usize = 100_024_000;
-pub const SERVER_LOG_DIR: &str = "./tmp/logs";
-pub const SERVER_INNER_PRINT: bool = true;
-pub const SERVER_INNER_LOG: bool = true;
-pub const SERVER_NODELAY: bool = false;
-pub const SERVER_TTI: u32 = 128;
-pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
-```
-# Path: hyperlane-quick-start/config/framework/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/config/application/mod.rs
-```rust
-pub mod hello;
-pub mod logo_img;
-pub mod not_found;
-pub mod templates;
-```
-# Path: hyperlane-quick-start/config/application/hello/const.rs
-```rust
-pub const NAME_KEY: &str = "name";
-```
-# Path: hyperlane-quick-start/config/application/hello/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/config/application/logo_img/const.rs
-```rust
-pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
-```
-# Path: hyperlane-quick-start/config/application/logo_img/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/config/application/not_found/const.rs
-```rust
-pub const NOT_FOUND_HTML: &str = include_str!("../../../resources/static/not_found/index.html");
-```
-# Path: hyperlane-quick-start/config/application/not_found/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/config/application/templates/const.rs
-```rust
-pub const INDEX_HTML: &str = include_str!("../../../resources/templates/index/index.html");
-```
-# Path: hyperlane-quick-start/config/application/templates/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/plugin/lib.rs
-```rust
-pub mod log;
-pub mod process;
-use hyperlane::*;
-use hyperlane_utils::{
-    log::{error, info},
-    *,
-};
-```
-# Path: hyperlane-quick-start/plugin/process/const.rs
-```rust
-pub const CMD_STOP: &str = "stop";
-pub const CMD_RESTART: &str = "restart";
-pub const CMD_HOT_RESTART: &str = "hot-restart";
-pub const DAEMON_FLAG: &str = "-d";
-```
-# Path: hyperlane-quick-start/plugin/process/mod.rs
-```rust
-mod r#const;
-mod r#fn;
-pub use r#const::*;
-pub use r#fn::*;
-use super::*;
-use hyperlane_config::framework::*;
-use std::{env::args, future::Future};
-```
-# Path: hyperlane-quick-start/plugin/process/fn.rs
-```rust
-use super::*;
-pub async fn create<F, Fut>(server_hook: F)
-where
-    F: Fn() -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = ()> + Send + 'static,
-{
-    let args: Vec<String> = args().collect();
-    let mut manager: ServerManager = ServerManager::new();
-    manager
-        .set_pid_file(SERVER_PID_FILE_PATH)
-        .set_server_hook(server_hook);
-    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
-    let start_server = || async {
-        if is_daemon {
-            match manager.start_daemon().await {
-                Ok(_) => info!("Server started in background successfully"),
-                Err(error) => {
-                    error!("Error starting server in background: {error}")
-                }
-            };
-        } else {
-            info!("Server started successfully");
-            manager.start().await;
-        }
-    };
-    let stop_server = || async {
-        match manager.stop().await {
-            Ok(_) => info!("Server stopped successfully"),
-            Err(error) => error!("Error stopping server: {error}"),
-        };
-    };
-    let hot_restart_server = || async {
-        match manager
-            .watch_detached(&["--clear", "--skip-local-deps", "-q", "-x", "run"])
-            .await
-        {
-            Ok(_) => info!("Server started successfully"),
-            Err(error) => error!("Error starting server in background: {error}"),
-        }
-    };
-    let restart_server = || async {
-        stop_server().await;
-        start_server().await;
-    };
-    if args.len() < 2 {
-        start_server().await;
-        return;
-    }
-    let command: String = args[1].to_lowercase();
-    match command.as_str() {
-        CMD_STOP => stop_server().await,
-        CMD_RESTART => restart_server().await,
-        CMD_HOT_RESTART => hot_restart_server().await,
-        _ => {
-            error!("Invalid command: {command}");
-        }
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/log/mod.rs
-```rust
-mod r#impl;
-mod r#static;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use hyperlane_config::framework::*;
-use r#static::*;
-use hyperlane_utils::{
-    log::{Level, LevelFilter, Log, Metadata, Record, set_logger, set_max_level},
-    once_cell::sync::Lazy,
-};
-```
-# Path: hyperlane-quick-start/plugin/log/struct.rs
-```rust
-#[derive(Debug, Clone, Copy)]
-pub struct Logger;
-```
-# Path: hyperlane-quick-start/plugin/log/impl.rs
-```rust
-use super::*;
-impl Logger {
-    pub fn log_trace<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        FILE_LOGGER.trace(data, log_handler);
-    }
-    pub fn log_debug<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        FILE_LOGGER.debug(data, log_handler);
-    }
-    pub fn log_info<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        FILE_LOGGER.info(data, log_handler);
-    }
-    pub fn log_warn<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        FILE_LOGGER.warn(data, log_handler);
-    }
-    pub fn log_error<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        FILE_LOGGER.error(data, log_handler);
-    }
-}
-impl Log for Logger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        #[cfg(debug_assertions)]
-        {
-            metadata.level() <= Level::Trace
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            metadata.level() <= Level::Error
-        }
-    }
-    fn log(&self, record: &Record) {
-        let time_text: String = format!("{SPACE}{}{SPACE}", time());
-        let level_text: String = format!("{SPACE}{}{SPACE}", record.level());
-        let args_text: String = format!("{SPACE}{}{SPACE}", record.args());
-        let write_file_data: String = format!("{} {}", record.level(), record.args());
-        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let time_output: Output<'_> = time_output_builder
-            .text(&time_text)
-            .bold(true)
-            .color(ColorType::Use(Color::White))
-            .bg_color(ColorType::Use(Color::Green))
-            .build();
-        let level_output: Output<'_> = level_output_builder
-            .text(&level_text)
-            .bold(true)
-            .color(ColorType::Use(Color::White))
-            .bg_color(match record.level() {
-                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),
-                Level::Info | Level::Warn => ColorType::Use(Color::Blue),
-                Level::Error => ColorType::Use(Color::Red),
-            })
-            .build();
-        let args_output: Output<'_> = args_output_builder
-            .text(&args_text)
-            .bold(true)
-            .endl(true)
-            .color(match record.level() {
-                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),
-                Level::Info | Level::Warn => ColorType::Use(Color::Blue),
-                Level::Error => ColorType::Use(Color::Red),
-            })
-            .build();
-        OutputListBuilder::new()
-            .add(time_output)
-            .add(level_output)
-            .add(args_output)
-            .run();
-        if self.enabled(record.metadata()) {
-            match record.metadata().level() {
-                Level::Trace => Self::log_trace(&write_file_data),
-                Level::Debug => Self::log_debug(&write_file_data),
-                Level::Info => Self::log_info(&write_file_data),
-                Level::Warn => Self::log_warn(&write_file_data),
-                Level::Error => Self::log_error(&write_file_data),
-            }
-        }
-    }
-    fn flush(&self) {
-        Server::flush_stdout_and_stderr();
-    }
-}
-impl Logger {
-    pub fn init(level: LevelFilter) {
-        set_logger(&LOGGER).unwrap();
-        set_max_level(level);
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/log/static.rs
-```rust
-use super::*;
-pub(super) static LOGGER: Logger = Logger;
-pub(super) static FILE_LOGGER: Lazy<FileLogger> = Lazy::new(|| {
-    let mut file_logger: FileLogger = FileLogger::default();
-    file_logger.path(SERVER_LOG_DIR);
-    file_logger.limit_file_size(SERVER_LOG_SIZE);
-    file_logger
-});
-```
-# Path: hyperlane-quick-start/src/main.rs
-```rust
-fn main() {
-    hyperlane_init::framework::wait::run();
-}
-```
-# Path: hyperlane-log/README.md
-## hyperlane-log
-[Official Documentation](https://docs.ltpp.vip/hyperlane-log/)
-[Api Docs](https://docs.rs/hyperlane-log/latest/hyperlane_log/)
-> A Rust logging library that supports both asynchronous and synchronous logging. It provides multiple log levels, such as error, info, and debug. Users can define custom log handling methods and configure log file paths. The library supports log rotation, automatically creating a new log file when the current file reaches the specified size limit. It allows flexible logging configurations, making it suitable for both high-performance asynchronous applications and traditional synchronous logging scenarios. The asynchronous mode utilizes Tokio's async channels for efficient log buffering, while the synchronous mode writes logs directly to the file system.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-log
-```
-## Log Storage Location Description
-> Three directories will be created under the user-specified directory: one for error logs, one for info logs, and one for debug logs. Each of these directories will contain a subdirectory named by the date, and the log files within these subdirectories will be named in the format `timestamp.index.log`.
-## Contact
-# Path: hyperlane-log/src/lib.rs
-```rust
-pub(crate) mod cfg;
-pub(crate) mod log;
-pub use log::*;
-pub(crate) use file_operation::*;
-pub(crate) use hyperlane_time::*;
-pub(crate) use std::fs::read_dir;
-```
-# Path: hyperlane-log/src/cfg.rs
-```rust
-#[cfg(test)]
-#[tokio::test]
-async fn test() {
-    use crate::*;
-    let log: FileLogger = FileLogger::new("./logs", 1_024_000);
-    let trace_str: String = String::from("custom trace message");
-    log.trace(trace_str, |trace| {
-        let write_data: String = format!("User trace func => {trace:#?}\n");
-        write_data
-    });
-    let debug_str: String = String::from("custom debug message");
-    log.debug(debug_str, |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
-        write_data
-    });
-    let info_str: String = String::from("custom info message");
-    log.info(info_str, |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
-        write_data
-    });
-    let warn_str: String = String::from("custom warn message");
-    log.warn(warn_str, |warn| {
-        let write_data: String = format!("User warn func => {warn:#?}\n");
-        write_data
-    });
-    let error_str: String = String::from("custom error message");
-    log.error(error_str, |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    });
-    let async_trace_str: String = String::from("custom async trace message");
-    log.async_trace(async_trace_str, |trace| {
-        let write_data: String = format!("User trace func => {trace:#?}\n");
-        write_data
-    })
-    .await;
-    let async_debug_str: String = String::from("custom async debug message");
-    log.async_debug(async_debug_str, |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
-        write_data
-    })
-    .await;
-    let async_info_str: String = String::from("custom async info message");
-    log.async_info(async_info_str, |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
-        write_data
-    })
-    .await;
-    let async_warn_str: String = String::from("custom async warn message");
-    log.async_warn(async_warn_str, |warn| {
-        let write_data: String = format!("User warn func => {warn:#?}\n");
-        write_data
-    })
-    .await;
-    let async_error_str: String = String::from("custom async error message");
-    log.async_error(async_error_str, |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    })
-    .await;
-}
-#[cfg(test)]
-#[tokio::test]
-async fn test_more_log_first() {
-    use crate::*;
-    let log: FileLogger = FileLogger::new("./logs", DISABLE_LOG_FILE_SIZE);
-    log.trace("trace data => ", |trace| {
-        let write_data: String = format!("User trace func => {trace:#?}\n");
-        write_data
-    });
-    log.debug("debug data => ", |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
-        write_data
-    });
-    log.info("info data => ", |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
-        write_data
-    });
-    log.warn("warn data => ", |warn| {
-        let write_data: String = format!("User warn func => {warn:#?}\n");
-        write_data
-    });
-    log.error("error data => ", |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    });
-    log.async_trace("async trace data => ", |trace| {
-        let write_data: String = format!("User trace func => {trace:#?}\n");
-        write_data
-    })
-    .await;
-    log.async_debug("async debug data => ", |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
-        write_data
-    })
-    .await;
-    log.async_info("async info data => ", |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
-        write_data
-    })
-    .await;
-    log.async_warn("async warn data => ", |warn| {
-        let write_data: String = format!("User warn func => {warn:#?}\n");
-        write_data
-    })
-    .await;
-    log.async_error("async error data => ", |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    })
-    .await;
-}
-#[cfg(test)]
-#[tokio::test]
-async fn test_more_log_second() {
-    use crate::*;
-    for _ in 0..10 {
-        let log: FileLogger = FileLogger::new("./logs", 512_000);
-        log.trace("trace data!\n", common_log);
-        log.async_trace("async trace data!\n", common_log).await;
-        log.debug("debug data!\n", common_log);
-        log.async_debug("async debug data!\n", common_log).await;
-        log.info("info data!\n", common_log);
-        log.async_info("async info data!\n", common_log).await;
-        log.warn("warn data!\n", common_log);
-        log.async_warn("async warn data!\n", common_log).await;
-        log.error("error data!\n", common_log);
-        log.async_error("async error data!\n", common_log).await;
-    }
-}
-```
-# Path: hyperlane-log/src/log/trait.rs
-```rust
-pub trait FileLoggerFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
-```
-# Path: hyperlane-log/src/log/const.rs
-```rust
-pub const DEFAULT_LOG_DIR: &str = "./logs";
-pub const LOG_EXTENSION: &str = "log";
-pub const DEFAULT_LOG_FILE_START_IDX: usize = 1;
-pub const DEFAULT_LOG_FILE_SIZE: usize = 1_024_000_000;
-pub const DISABLE_LOG_FILE_SIZE: usize = 0;
-pub(crate) const ROOT_PATH: &str = "/";
-pub(crate) const POINT: &str = ".";
-pub(crate) const BR: &str = "\n";
-pub const TRACE_DIR: &str = "trace";
-pub const DEBUG_DIR: &str = "debug";
-pub const INFO_DIR: &str = "info";
-pub const WARN_DIR: &str = "warn";
-pub const ERROR_DIR: &str = "error";
-```
-# Path: hyperlane-log/src/log/mod.rs
-```rust
-pub(crate) mod r#const;
-pub(crate) mod r#fn;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) mod r#trait;
-pub use r#const::*;
-pub use r#fn::*;
-pub use r#struct::*;
-pub use r#trait::*;
-```
-# Path: hyperlane-log/src/log/struct.rs
-```rust
-#[derive(Clone)]
-pub struct FileLogger {
-    pub(super) path: String,
-    pub(super) limit_file_size: usize,
-}
-```
-# Path: hyperlane-log/src/log/fn.rs
-```rust
-use crate::*;
-pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
-    let mut res_idx: usize = DEFAULT_LOG_FILE_START_IDX;
-    if let Ok(entries) = read_dir(dir_path) {
-        for entry in entries.filter_map(Result::ok) {
-            let file_name: String = entry.file_name().to_string_lossy().to_string();
-            let parts: Vec<&str> = file_name.split(POINT).collect();
-            if parts.len() > 1
-                && let Ok(second_element) = parts[1].parse::<usize>()
-            {
-                res_idx = second_element.max(res_idx);
-            }
-        }
-    }
-    res_idx.max(DEFAULT_LOG_FILE_START_IDX)
-}
-#[inline(always)]
-pub(crate) fn get_file_name(idx: usize) -> String {
-    format!(
-        "{}{}{}{}{}{}",
-        ROOT_PATH,
-        date(),
-        POINT,
-        idx,
-        POINT,
-        LOG_EXTENSION
-    )
-}
-#[inline(always)]
-pub(crate) fn get_file_dir_name() -> String {
-    format!("{}{}", ROOT_PATH, date())
-}
-pub(crate) fn get_log_path(system_dir: &str, base_path: &str, limit_file_size: &usize) -> String {
-    let mut combined_path: String = base_path.trim_end_matches(ROOT_PATH).to_string();
-    if !system_dir.starts_with(ROOT_PATH) {
-        combined_path.push_str(ROOT_PATH);
-    }
-    combined_path.push_str(
-        system_dir
-            .trim_start_matches(ROOT_PATH)
-            .trim_end_matches(ROOT_PATH),
-    );
-    combined_path.push_str(&get_file_dir_name());
-    let idx: usize = get_second_element_from_filename(&combined_path);
-    let mut combined_path_clone: String = combined_path.clone();
-    combined_path.push_str(&get_file_name(idx));
-    let file_size: usize = get_file_size(&combined_path).unwrap_or_default() as usize;
-    if &file_size <= limit_file_size {
-        return combined_path;
-    }
-    combined_path_clone.push_str(&get_file_name(idx + 1));
-    combined_path_clone
-}
-#[inline(always)]
-pub fn common_log<T: AsRef<str>>(data: T) -> String {
-    let mut log_string: String = String::new();
-    for line in data.as_ref().lines() {
-        let line_string: String = format!("{} {}{}", time(), line, BR);
-        log_string.push_str(&line_string);
-    }
-    log_string
-}
-#[inline(always)]
-pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
-    common_log(log_data)
-}
-```
-# Path: hyperlane-log/src/log/impl.rs
-```rust
-use crate::*;
-impl<F, T> FileLoggerFuncTrait<T> for F
-where
-    F: Fn(T) -> String + Send + Sync,
-    T: AsRef<str>,
-{
-}
-impl Default for FileLogger {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            path: DEFAULT_LOG_DIR.to_owned(),
-            limit_file_size: DEFAULT_LOG_FILE_SIZE,
-        }
-    }
-}
-impl FileLogger {
-    #[inline(always)]
-    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {
-        Self {
-            path: path.as_ref().to_owned(),
-            limit_file_size,
-        }
-    }
-    #[inline(always)]
-    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {
-        self.path = path.as_ref().to_owned();
-        self
-    }
-    #[inline(always)]
-    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {
-        self.limit_file_size = limit_file_size;
-        self
-    }
-    #[inline(always)]
-    pub fn is_enable(&self) -> bool {
-        self.limit_file_size != DISABLE_LOG_FILE_SIZE
-    }
-    #[inline(always)]
-    pub fn is_disable(&self) -> bool {
-        !self.is_enable()
-    }
-    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        if self.is_disable() {
-            return self;
-        }
-        let out: String = func(data);
-        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
-        let _ = append_to_file(&path, out.as_bytes());
-        self
-    }
-    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        if self.is_disable() {
-            return self;
-        }
-        let out: String = func(data);
-        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
-        let _ = async_append_to_file(&path, out.as_bytes()).await;
-        self
-    }
-    pub fn trace<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, TRACE_DIR)
-    }
-    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, TRACE_DIR).await
-    }
-    pub fn debug<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, DEBUG_DIR)
-    }
-    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, DEBUG_DIR).await
-    }
-    pub fn info<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, INFO_DIR)
-    }
-    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, INFO_DIR).await
-    }
-    pub fn warn<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, WARN_DIR)
-    }
-    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, WARN_DIR).await
-    }
-    pub fn error<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, ERROR_DIR)
-    }
-    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, ERROR_DIR).await
-    }
-}
-```
-# Path: hyperlane/README.md
+<!--2026-01-10 17:31:59-->
+# Path: hyperlane\README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
@@ -2527,7 +16,7 @@ cargo add hyperlane
 git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```
 ## Contact
-# Path: hyperlane/src/lib.rs
+# Path: hyperlane\src\lib.rs
 ```rust
 mod attribute;
 mod config;
@@ -2577,318 +66,78 @@ pub(crate) use tokio::{
 #[cfg(test)]
 pub(crate) use std::time::{Duration, Instant};
 ```
-# Path: hyperlane/src/hook/trait.rs
+# Path: hyperlane\src\attribute\enum.rs
 ```rust
 use crate::*;
-pub trait FnContextSendSync<R>: Fn(Context) -> R + Send + Sync {}
-pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<SendableAsyncTask<T>> {}
-pub trait FnContextSendSyncStatic<Fut, T>: FnContextSendSync<Fut> + 'static
-where
-    Fut: Future<Output = T> + Send,
-{
+#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
+pub(crate) enum Attribute {
+    External(String),
+    Internal(InternalAttribute),
+}
+#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
+pub(crate) enum InternalAttribute {
+    TaskPanicData,
+    RequestErrorData,
+    Hook(String),
 }
 ```
-# Path: hyperlane/src/hook/mod.rs
+# Path: hyperlane\src\attribute\impl.rs
+```rust
+use crate::*;
+impl From<&str> for Attribute {
+    #[inline(always)]
+    fn from(key: &str) -> Self {
+        Attribute::External(key.to_string())
+    }
+}
+impl From<String> for Attribute {
+    #[inline(always)]
+    fn from(key: String) -> Self {
+        Attribute::External(key)
+    }
+}
+impl From<InternalAttribute> for Attribute {
+    #[inline(always)]
+    fn from(key: InternalAttribute) -> Self {
+        Attribute::Internal(key)
+    }
+}
+```
+# Path: hyperlane\src\attribute\mod.rs
 ```rust
 pub(crate) mod r#enum;
-pub(crate) mod r#fn;
 pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) mod r#trait;
 pub(crate) mod r#type;
-pub use r#enum::*;
-pub use r#fn::*;
-pub use r#struct::*;
-pub use r#trait::*;
 pub use r#type::*;
+pub(crate) use r#enum::*;
 ```
-# Path: hyperlane/src/hook/enum.rs
+# Path: hyperlane\src\attribute\type.rs
 ```rust
 use crate::*;
-#[derive(Clone, Debug, Copy, DisplayDebug)]
-pub enum HookType {
-    TaskPanic(Option<isize>, ServerHookHandlerFactory),
-    RequestError(Option<isize>, ServerHookHandlerFactory),
-    RequestMiddleware(Option<isize>, ServerHookHandlerFactory),
-    Route(&'static str, ServerHookHandlerFactory),
-    ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
-}
+pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
 ```
-# Path: hyperlane/src/hook/struct.rs
+# Path: hyperlane\src\config\impl.rs
 ```rust
 use crate::*;
-#[derive(Clone, Copy, Debug, DisplayDebug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct DefaultServerHook;
-#[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
-pub struct ServerControlHook {
-    #[debug(skip)]
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) wait_hook: SharedAsyncTaskFactory<()>,
-    #[debug(skip)]
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) shutdown_hook: SharedAsyncTaskFactory<()>,
-}
-```
-# Path: hyperlane/src/hook/fn.rs
-```rust
-use crate::*;
-#[inline(always)]
-pub fn server_hook_factory<R>() -> ServerHookHandler
-where
-    R: ServerHook,
-{
-    Arc::new(move |ctx: &Context| -> SendableAsyncTask<()> {
-        let ctx: Context = ctx.clone();
-        Box::pin(async move {
-            R::new(&ctx).await.handle(&ctx).await;
-        })
-    })
-}
-#[inline(always)]
-pub fn assert_hook_unique_order(list: Vec<HookType>) {
-    let mut seen: HashSet<(HookType, isize)> = HashSet::new();
-    list.iter().for_each(|hook| {
-        if let Some(order) = hook.try_get_order()
-            && !seen.insert((*hook, order))
-        {
-            panic!("Duplicate hook detected: {} with order {}", hook, order);
-        }
-    });
-}
-```
-# Path: hyperlane/src/hook/impl.rs
-```rust
-use crate::*;
-impl<F, R> FnContextSendSync<R> for F where F: Fn(Context) -> R + Send + Sync {}
-impl<F, T> FnContextPinBoxSendSync<T> for F where F: FnContextSendSync<SendableAsyncTask<T>> {}
-impl<F, Fut, T> FnContextSendSyncStatic<Fut, T> for F
-where
-    F: FnContextSendSync<Fut> + 'static,
-    Fut: Future<Output = T> + Send,
-{
-}
-impl<T, R> FutureSendStatic<R> for T where T: Future<Output = R> + Send + 'static {}
-impl<T, O> FutureSend<O> for T where T: Future<Output = O> + Send {}
-impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> SendableAsyncTask<O> + Send + Sync {}
-impl Default for ServerControlHook {
+impl Default for ServerConfigInner {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            wait_hook: Arc::new(|| Box::pin(async {})),
-            shutdown_hook: Arc::new(|| Box::pin(async {})),
+            host: DEFAULT_HOST.to_owned(),
+            port: DEFAULT_WEB_PORT,
+            request_config: RequestConfig::default(),
+            nodelay: DEFAULT_NODELAY,
+            ttl: DEFAULT_TTI,
         }
     }
 }
-impl ServerControlHook {
-    pub async fn wait(&self) {
-        self.get_wait_hook()().await;
-    }
-    pub async fn shutdown(&self) {
-        self.get_shutdown_hook()().await;
-    }
-}
-impl PartialEq for HookType {
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (HookType::TaskPanic(order1, factory1), HookType::TaskPanic(order2, factory2)) => {
-                order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
-            }
-            (
-                HookType::RequestError(order1, factory1),
-                HookType::RequestError(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
-            (
-                HookType::RequestMiddleware(order1, factory1),
-                HookType::RequestMiddleware(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
-            (HookType::Route(path1, factory1), HookType::Route(path2, factory2)) => {
-                path1 == path2 && std::ptr::fn_addr_eq(*factory1, *factory2)
-            }
-            (
-                HookType::ResponseMiddleware(order1, factory1),
-                HookType::ResponseMiddleware(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
-            _ => false,
-        }
-    }
-}
-impl Eq for HookType {}
-impl Hash for HookType {
-    #[inline(always)]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            HookType::TaskPanic(order, factory) => {
-                0u8.hash(state);
-                order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
-            }
-            HookType::RequestError(order, factory) => {
-                1u8.hash(state);
-                order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
-            }
-            HookType::RequestMiddleware(order, factory) => {
-                2u8.hash(state);
-                order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
-            }
-            HookType::Route(path, factory) => {
-                3u8.hash(state);
-                path.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
-            }
-            HookType::ResponseMiddleware(order, factory) => {
-                4u8.hash(state);
-                order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
-            }
-        }
-    }
-}
-impl HookType {
-    #[inline(always)]
-    pub fn try_get_order(&self) -> Option<isize> {
-        match *self {
-            HookType::RequestMiddleware(order, _)
-            | HookType::ResponseMiddleware(order, _)
-            | HookType::TaskPanic(order, _)
-            | HookType::RequestError(order, _) => order,
-            _ => None,
-        }
-    }
-    #[inline(always)]
-    pub fn try_get_hook(&self) -> Option<ServerHookHandlerFactory> {
-        match *self {
-            HookType::RequestMiddleware(_, hook)
-            | HookType::ResponseMiddleware(_, hook)
-            | HookType::TaskPanic(_, hook)
-            | HookType::RequestError(_, hook) => Some(hook),
-            _ => None,
-        }
-    }
-}
-impl ServerHook for DefaultServerHook {
-    async fn new(_: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, _: &Context) {}
-}
-```
-# Path: hyperlane/src/hook/type.rs
-```rust
-use crate::*;
-pub type HookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
-pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
-pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
-pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
-pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
-pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
-pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Send + Sync>;
-pub type ServerHookList = Vec<ServerHookHandler>;
-pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
-pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
-```
-# Path: hyperlane/src/server/mod.rs
-```rust
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) mod r#type;
-pub use r#struct::*;
-pub(crate) use r#type::*;
-```
-# Path: hyperlane/src/server/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, CustomDebug, DisplayDebug, Getter)]
-pub(crate) struct HandlerState {
-    pub(super) stream: ArcRwLockStream,
-    pub(super) request_config: RequestConfig,
-}
-#[derive(Data, Clone, CustomDebug, DisplayDebug)]
-pub(crate) struct ServerInner {
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) config: ServerConfigInner,
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) route_matcher: RouteMatcher,
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) request_error: ServerHookList,
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) task_panic: ServerHookList,
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) request_middleware: ServerHookList,
-    #[debug(skip)]
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) response_middleware: ServerHookList,
-}
-#[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
-pub struct Server(#[get(pub(super))] pub(super) SharedServerState);
-```
-# Path: hyperlane/src/server/impl.rs
-```rust
-use crate::*;
-impl Default for ServerInner {
+impl Default for ServerConfig {
     #[inline(always)]
     fn default() -> Self {
-        Self {
-            config: ServerConfigInner::default(),
-            task_panic: vec![],
-            request_error: vec![],
-            route_matcher: RouteMatcher::new(),
-            request_middleware: vec![],
-            response_middleware: vec![],
-        }
+        Self(arc_rwlock(ServerConfigInner::default()))
     }
 }
-impl PartialEq for ServerInner {
-    fn eq(&self, other: &Self) -> bool {
-        self.config == other.config
-            && self.route_matcher == other.route_matcher
-            && self.task_panic.len() == other.task_panic.len()
-            && self.request_error.len() == other.request_error.len()
-            && self.request_middleware.len() == other.request_middleware.len()
-            && self.response_middleware.len() == other.response_middleware.len()
-            && self
-                .task_panic
-                .iter()
-                .zip(other.task_panic.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
-            && self
-                .request_error
-                .iter()
-                .zip(other.request_error.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
-            && self
-                .request_middleware
-                .iter()
-                .zip(other.request_middleware.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
-            && self
-                .response_middleware
-                .iter()
-                .zip(other.response_middleware.iter())
-                .all(|(a, b)| Arc::ptr_eq(a, b))
-    }
-}
-impl Eq for ServerInner {}
-impl PartialEq for Server {
+impl PartialEq for ServerConfig {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(self.get_0(), other.get_0()) {
@@ -2901,460 +150,96 @@ impl PartialEq for Server {
         }
     }
 }
-impl Eq for Server {}
-impl HandlerState {
+impl Eq for ServerConfig {}
+impl ServerConfig {
     #[inline(always)]
-    pub(super) fn new(stream: ArcRwLockStream, request_config: RequestConfig) -> Self {
-        Self {
-            stream,
-            request_config,
-        }
-    }
-}
-impl Server {
     pub async fn new() -> Self {
-        let server: ServerInner = ServerInner::default();
-        Self(arc_rwlock(server))
+        Self::default()
     }
-    pub async fn from(config: ServerConfig) -> Self {
-        let server: Self = Self::new().await;
-        server.config(config).await;
-        server
-    }
-    pub(super) async fn read(&self) -> ServerStateReadGuard<'_> {
+    async fn read(&self) -> ConfigReadGuard<'_> {
         self.get_0().read().await
     }
-    async fn write(&self) -> ServerStateWriteGuard<'_> {
+    async fn write(&self) -> ConfigWriteGuard<'_> {
         self.get_0().write().await
     }
-    pub async fn get_route_matcher(&self) -> RouteMatcher {
-        self.read().await.get_route_matcher().clone()
+    pub(crate) async fn get_inner(&self) -> ServerConfigInner {
+        self.read().await.clone()
     }
-    pub async fn handle_hook(&self, hook: HookType) {
-        match hook {
-            HookType::TaskPanic(_, hook) => {
-                self.write().await.get_mut_task_panic().push(hook());
-            }
-            HookType::RequestError(_, hook) => {
-                self.write().await.get_mut_request_error().push(hook());
-            }
-            HookType::RequestMiddleware(_, hook) => {
-                self.write().await.get_mut_request_middleware().push(hook());
-            }
-            HookType::Route(path, hook) => {
-                self.write()
-                    .await
-                    .get_mut_route_matcher()
-                    .add(path, hook())
-                    .unwrap();
-            }
-            HookType::ResponseMiddleware(_, hook) => {
-                self.write()
-                    .await
-                    .get_mut_response_middleware()
-                    .push(hook());
-            }
-        };
-    }
-    pub async fn config_str<C: ToString>(&self, config_str: C) -> &Self {
-        let config: ServerConfig = ServerConfig::from_json_str(&config_str.to_string()).unwrap();
-        self.write().await.set_config(config.get_inner().await);
+    pub async fn host<H: ToString>(&self, host: H) -> &Self {
+        self.write().await.set_host(host.to_string());
         self
     }
-    pub async fn config(&self, config: ServerConfig) -> &Self {
-        self.write().await.set_config(config.get_inner().await);
+    pub async fn port(&self, port: u16) -> &Self {
+        self.write().await.set_port(port);
         self
     }
-    pub async fn task_panic<S>(&self) -> &Self
-    where
-        S: ServerHook,
-    {
-        self.write()
-            .await
-            .get_mut_task_panic()
-            .push(server_hook_factory::<S>());
+    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
+        self.write().await.set_request_config(request_config);
         self
     }
-    pub async fn request_error<S>(&self) -> &Self
-    where
-        S: ServerHook,
-    {
-        self.write()
-            .await
-            .get_mut_request_error()
-            .push(server_hook_factory::<S>());
+    pub async fn nodelay(&self, nodelay: bool) -> &Self {
+        self.write().await.set_nodelay(Some(nodelay));
         self
     }
-    pub async fn route<S>(&self, path: impl ToString) -> &Self
-    where
-        S: ServerHook,
-    {
-        self.write()
-            .await
-            .get_mut_route_matcher()
-            .add(&path.to_string(), server_hook_factory::<S>())
-            .unwrap();
+    pub async fn enable_nodelay(&self) -> &Self {
+        self.nodelay(true).await
+    }
+    pub async fn disable_nodelay(&self) -> &Self {
+        self.nodelay(false).await
+    }
+    pub async fn ttl(&self, ttl: u32) -> &Self {
+        self.write().await.set_ttl(Some(ttl));
         self
     }
-    pub async fn request_middleware<S>(&self) -> &Self
-    where
-        S: ServerHook,
-    {
-        self.write()
-            .await
-            .get_mut_request_middleware()
-            .push(server_hook_factory::<S>());
-        self
-    }
-    pub async fn response_middleware<S>(&self) -> &Self
-    where
-        S: ServerHook,
-    {
-        self.write()
-            .await
-            .get_mut_response_middleware()
-            .push(server_hook_factory::<S>());
-        self
-    }
-    #[inline(always)]
-    pub fn format_host_port<H: ToString>(host: H, port: u16) -> String {
-        format!("{}{COLON}{port}", host.to_string())
-    }
-    #[inline(always)]
-    pub fn try_flush_stdout() -> io::Result<()> {
-        stdout().flush()
-    }
-    #[inline(always)]
-    pub fn flush_stdout() {
-        stdout().flush().unwrap();
-    }
-    #[inline(always)]
-    pub fn try_flush_stderr() -> io::Result<()> {
-        stderr().flush()
-    }
-    #[inline(always)]
-    pub fn flush_stderr() {
-        stderr().flush().unwrap();
-    }
-    #[inline(always)]
-    pub fn try_flush_stdout_and_stderr() -> io::Result<()> {
-        Self::try_flush_stdout()?;
-        Self::try_flush_stderr()
-    }
-    #[inline(always)]
-    pub fn flush_stdout_and_stderr() {
-        Self::flush_stdout();
-        Self::flush_stderr();
-    }
-    async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
-        let panic_clone: PanicData = panic.clone();
-        ctx.cancel_aborted().await.set_task_panic(panic_clone).await;
-        for hook in self.read().await.get_task_panic().iter() {
-            Box::pin(self.task_handler(ctx, hook, false)).await;
-            if ctx.get_aborted().await {
-                return;
-            }
-        }
-    }
-    async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
-        let panic: PanicData = PanicData::from_join_error(join_error);
-        ctx.set_response_status_code(HttpStatus::InternalServerError.code())
-            .await;
-        self.handle_panic_with_context(ctx, &panic).await;
-    }
-    async fn task_handler(&self, ctx: &Context, hook: &ServerHookHandler, progress: bool) {
-        if let Err(join_error) = spawn(hook(ctx)).await
-            && join_error.is_panic()
-        {
-            if progress {
-                Box::pin(self.handle_task_panic(ctx, join_error)).await;
-            } else {
-                eprintln!("Panic occurred in panic handler: {:?}", join_error);
-                let _ = Self::try_flush_stdout_and_stderr();
-            }
-        }
-    }
-    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        let config: ServerConfigInner = self.read().await.get_config().clone();
-        let host: String = config.get_host().clone();
-        let port: u16 = *config.get_port();
-        let addr: String = Self::format_host_port(host, port);
-        TcpListener::bind(&addr)
-            .await
-            .map_err(|error| ServerError::TcpBind(error.to_string()))
-    }
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
-        while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-            self.configure_stream(&stream).await;
-            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            self.spawn_connection_handler(stream).await;
-        }
-        Ok(())
-    }
-    async fn configure_stream(&self, stream: &TcpStream) {
-        let server_inner: ServerStateReadGuard = self.read().await;
-        let config: &ServerConfigInner = server_inner.get_config();
-        if let Some(nodelay) = config.get_nodelay() {
-            let _ = stream.set_nodelay(*nodelay);
-        }
-        if let Some(ttl) = config.get_ttl() {
-            let _ = stream.set_ttl(*ttl);
-        }
-    }
-    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
-        let server: Server = self.clone();
-        let request_config: RequestConfig = *self.read().await.get_config().get_request_config();
-        spawn(async move {
-            server.handle_connection(stream, request_config).await;
-        });
-    }
-    pub async fn handle_request_error(&self, ctx: &Context, error: &RequestError) {
-        ctx.cancel_aborted()
-            .await
-            .set_request_error_data(error.clone())
-            .await;
-        for hook in self.read().await.get_request_error().iter() {
-            self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
-                return;
-            }
-        }
-    }
-    async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfig) {
-        match Request::http_from_stream(&stream, &request_config).await {
-            Ok(request) => {
-                let hook: HandlerState = HandlerState::new(stream, request_config);
-                self.handle_http_requests(&hook, &request).await;
-            }
-            Err(error) => {
-                self.handle_request_error(&stream.into(), &error).await;
-            }
-        }
-    }
-    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
-        let route: &str = request.get_path();
-        let ctx: &Context = &Context::new(state.get_stream(), request);
-        let keep_alive: bool = request.is_enable_keep_alive();
-        if self.handle_request_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive).await;
-        }
-        if self.handle_route_matcher(ctx, route).await {
-            return ctx.is_keep_alive(keep_alive).await;
-        }
-        if self.handle_response_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive).await;
-        }
-        if let Some(panic) = ctx.try_get_task_panic_data().await {
-            ctx.set_response_status_code(HttpStatus::InternalServerError.code())
-                .await;
-            self.handle_panic_with_context(ctx, &panic).await;
-        }
-        ctx.is_keep_alive(keep_alive).await
-    }
-    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
-        if !self.request_hook(state, request).await {
-            return;
-        }
-        let stream: &ArcRwLockStream = state.get_stream();
-        let request_config: &RequestConfig = state.get_request_config();
-        loop {
-            match Request::http_from_stream(stream, request_config).await {
-                Ok(new_request) => {
-                    if !self.request_hook(state, &new_request).await {
-                        return;
-                    }
-                }
-                Err(error) => {
-                    self.handle_request_error(&state.get_stream().into(), &error)
-                        .await;
-                    return;
-                }
-            }
-        }
-    }
-    pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
-        for hook in self.read().await.get_request_middleware().iter() {
-            self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
-                return true;
-            }
-        }
-        false
-    }
-    pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
-        if let Some(hook) = self
-            .read()
-            .await
-            .get_route_matcher()
-            .try_resolve_route(ctx, path)
-            .await
-        {
-            self.task_handler(ctx, &hook, true).await;
-            if ctx.get_aborted().await {
-                return true;
-            }
-        }
-        false
-    }
-    pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
-        for hook in self.read().await.get_response_middleware().iter() {
-            self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
-                return true;
-            }
-        }
-        false
-    }
-    pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
-        let tcp_listener: TcpListener = self.create_tcp_listener().await?;
-        let server: Server = self.clone();
-        let (wait_sender, wait_receiver) = channel(());
-        let (shutdown_sender, mut shutdown_receiver) = channel(());
-        let accept_connections: JoinHandle<()> = spawn(async move {
-            let _ = server.accept_connections(&tcp_listener).await;
-            let _ = wait_sender.send(());
-        });
-        let wait_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
-            let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
-            Box::pin(async move {
-                let _ = wait_receiver_clone.changed().await;
-            })
-        });
-        let shutdown_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
-            let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
-            Box::pin(async move {
-                let _ = shutdown_sender_clone.send(());
-            })
-        });
-        spawn(async move {
-            let _ = shutdown_receiver.changed().await;
-            accept_connections.abort();
-        });
-        let mut server_control_hook: ServerControlHook = ServerControlHook::default();
-        server_control_hook.set_shutdown_hook(shutdown_hook);
-        server_control_hook.set_wait_hook(wait_hook);
-        Ok(server_control_hook)
+    pub fn from_json_str(config_str: &str) -> Result<ServerConfig, serde_json::Error> {
+        serde_json::from_str(config_str).map(|config: ServerConfigInner| Self(arc_rwlock(config)))
     }
 }
 ```
-# Path: hyperlane/src/server/type.rs
-```rust
-use crate::*;
-pub(crate) type SharedServerState = ArcRwLock<ServerInner>;
-pub(crate) type SharedServerConfig = ArcRwLock<ServerConfigInner>;
-pub(crate) type ServerStateReadGuard<'a> = RwLockReadGuard<'a, ServerInner>;
-pub(crate) type ServerStateWriteGuard<'a> = RwLockWriteGuard<'a, ServerInner>;
-```
-# Path: hyperlane/src/panic/mod.rs
-```rust
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub use r#struct::*;
-```
-# Path: hyperlane/src/panic/struct.rs
-```rust
-use crate::*;
-#[derive(CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter)]
-pub struct PanicData {
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) message: Option<String>,
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) location: Option<String>,
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) payload: Option<String>,
-}
-```
-# Path: hyperlane/src/panic/impl.rs
-```rust
-use crate::*;
-impl PanicData {
-    #[inline(always)]
-    pub(crate) fn new(
-        message: Option<String>,
-        location: Option<String>,
-        payload: Option<String>,
-    ) -> Self {
-        Self {
-            message,
-            location,
-            payload,
-        }
-    }
-    #[inline(always)]
-    fn try_extract_panic_message(panic_payload: &dyn Any) -> Option<String> {
-        if let Some(s) = panic_payload.downcast_ref::<&str>() {
-            Some(s.to_string())
-        } else {
-            panic_payload.downcast_ref::<String>().cloned()
-        }
-    }
-    pub(crate) fn from_join_error(join_error: JoinError) -> Self {
-        let default_message: String = join_error.to_string();
-        let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
-        {
-            Self::try_extract_panic_message(&panic_join_error)
-        } else {
-            None
-        };
-        if (message.is_none() || message.clone().unwrap_or_default().is_empty())
-            && !default_message.is_empty()
-        {
-            message = Some(default_message);
-        }
-        let panic: PanicData = PanicData::new(message, None, None);
-        panic
-    }
-}
-```
-# Path: hyperlane/src/context/mod.rs
+# Path: hyperlane\src\config\mod.rs
 ```rust
 pub(crate) mod r#impl;
 pub(crate) mod r#struct;
 pub(crate) mod r#type;
 pub use r#struct::*;
-pub(crate) use r#type::*;
+pub(super) use r#type::*;
 ```
-# Path: hyperlane/src/context/struct.rs
+# Path: hyperlane\src\config\struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
-pub(crate) struct ContextInner {
-    #[get(pub(super))]
+#[derive(Clone, Data, CustomDebug, DisplayDebug, PartialEq, Eq, Deserialize, Serialize)]
+pub(crate) struct ServerConfigInner {
+    #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    aborted: bool,
-    #[get(pub(super))]
+    pub(super) host: String,
+    #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    closed: bool,
-    #[get(pub(super))]
+    pub(super) port: u16,
+    #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    stream: Option<ArcRwLockStream>,
-    #[get(pub(super))]
+    pub(super) request_config: RequestConfig,
+    #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    request: Request,
-    #[get(pub(super))]
+    pub(super) nodelay: Option<bool>,
+    #[get(pub(crate))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    response: Response,
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    route_params: RouteParams,
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    attributes: ThreadSafeAttributeStore,
+    pub(super) ttl: Option<u32>,
 }
-#[derive(Clone, Default, Getter, CustomDebug, DisplayDebug)]
-pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextInner>);
+#[derive(Clone, Getter, CustomDebug, DisplayDebug)]
+pub struct ServerConfig(#[get(pub(super))] pub(super) SharedServerConfig);
 ```
-# Path: hyperlane/src/context/impl.rs
+# Path: hyperlane\src\config\type.rs
+```rust
+use crate::*;
+pub(crate) type ConfigReadGuard<'a> = RwLockReadGuard<'a, ServerConfigInner>;
+pub(crate) type ConfigWriteGuard<'a> = RwLockWriteGuard<'a, ServerConfigInner>;
+```
+# Path: hyperlane\src\context\impl.rs
 ```rust
 use crate::*;
 impl From<ContextInner> for Context {
@@ -4190,991 +1075,58 @@ impl Context {
     }
 }
 ```
-# Path: hyperlane/src/context/type.rs
-```rust
-use crate::*;
-pub(crate) type ContextWriteGuard<'a> = RwLockWriteGuard<'a, ContextInner>;
-pub(crate) type ContextReadGuard<'a> = RwLockReadGuard<'a, ContextInner>;
-```
-# Path: hyperlane/src/attribute/mod.rs
-```rust
-pub(crate) mod r#enum;
-pub(crate) mod r#impl;
-pub(crate) mod r#type;
-pub use r#type::*;
-pub(crate) use r#enum::*;
-```
-# Path: hyperlane/src/attribute/enum.rs
-```rust
-use crate::*;
-#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
-pub(crate) enum Attribute {
-    External(String),
-    Internal(InternalAttribute),
-}
-#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
-pub(crate) enum InternalAttribute {
-    TaskPanicData,
-    RequestErrorData,
-    Hook(String),
-}
-```
-# Path: hyperlane/src/attribute/impl.rs
-```rust
-use crate::*;
-impl From<&str> for Attribute {
-    #[inline(always)]
-    fn from(key: &str) -> Self {
-        Attribute::External(key.to_string())
-    }
-}
-impl From<String> for Attribute {
-    #[inline(always)]
-    fn from(key: String) -> Self {
-        Attribute::External(key)
-    }
-}
-impl From<InternalAttribute> for Attribute {
-    #[inline(always)]
-    fn from(key: InternalAttribute) -> Self {
-        Attribute::Internal(key)
-    }
-}
-```
-# Path: hyperlane/src/attribute/type.rs
-```rust
-use crate::*;
-pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
-```
-# Path: hyperlane/src/tests/server.rs
-```rust
-use crate::*;
-#[tokio::test]
-async fn server_partial_eq() {
-    let server1: Server = Server::new().await;
-    let server2: Server = Server::new().await;
-    assert_eq!(server1, server2);
-    let server1_clone: Server = server1.clone();
-    assert_eq!(server1, server1_clone);
-}
-#[tokio::test]
-async fn server_inner_partial_eq() {
-    let inner1: ServerInner = ServerInner::default();
-    let inner2: ServerInner = ServerInner::default();
-    assert_eq!(inner1, inner2);
-}
-struct TaskPanicHook {
-    response_body: String,
-    content_type: String,
-}
-impl ServerHook for TaskPanicHook {
-    async fn new(ctx: &Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .send()
-            .await;
-    }
-}
-struct RequestErrorHook {
-    response_status_code: ResponseStatusCode,
-    response_body: String,
-}
-impl ServerHook for RequestErrorHook {
-    async fn new(ctx: &Context) -> Self {
-        let request_error: RequestError =
-            ctx.try_get_request_error_data().await.unwrap_or_default();
-        Self {
-            response_status_code: request_error.get_http_status_code(),
-            response_body: request_error.to_string(),
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(self.response_status_code)
-            .await
-            .set_response_body(self.response_body)
-            .await
-            .send()
-            .await;
-    }
-}
-struct SendBodyMiddleware {
-    socket_addr: String,
-}
-impl ServerHook for SendBodyMiddleware {
-    async fn new(ctx: &Context) -> Self {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
-        Self { socket_addr }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(200)
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONNECTION, KEEP_ALIVE)
-            .await
-            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-            .await
-            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .await
-            .set_response_header("SocketAddr", &self.socket_addr)
-            .await;
-    }
-}
-struct UpgradeMiddleware;
-impl ServerHook for UpgradeMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        if !ctx.get_request().await.is_ws() {
-            return;
-        }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_version(HttpVersion::Http1_1)
-                .await
-                .set_response_status_code(101)
-                .await
-                .set_response_header(UPGRADE, WEBSOCKET)
-                .await
-                .set_response_header(CONNECTION, UPGRADE)
-                .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .await
-                .set_response_body(&vec![])
-                .await
-                .send()
-                .await;
-        }
-    }
-}
-struct ResponseMiddleware;
-impl ServerHook for ResponseMiddleware {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        if ctx.get_request().await.is_ws() {
-            return;
-        }
-        ctx.send().await;
-    }
-}
-struct RootRoute {
-    response_body: String,
-    cookie1: String,
-    cookie2: String,
-}
-impl ServerHook for RootRoute {
-    async fn new(ctx: &Context) -> Self {
-        let path: RequestPath = ctx.get_request_path().await;
-        let response_body: String = format!("Hello hyperlane => {}", path);
-        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
-        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-        Self {
-            response_body,
-            cookie1,
-            cookie2,
-        }
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.add_response_header(SET_COOKIE, &self.cookie1)
-            .await
-            .add_response_header(SET_COOKIE, &self.cookie2)
-            .await
-            .set_response_body(&self.response_body)
-            .await;
-    }
-}
-struct SseRoute;
-impl ServerHook for SseRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .await
-            .send()
-            .await;
-        for i in 0..10 {
-            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
-                .await
-                .send_body()
-                .await;
-        }
-        ctx.closed().await;
-    }
-}
-struct WebsocketRoute;
-impl WebsocketRoute {
-    async fn send_body_hook(&self, ctx: &Context) {
-        if ctx.get_request().await.is_ws() {
-            let body: ResponseBody = ctx.get_response_body().await;
-            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-            ctx.send_body_list_with_data(&frame_list).await;
-        } else {
-            ctx.send_body().await;
-        }
-    }
-}
-impl ServerHook for WebsocketRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &Context) {
-        loop {
-            match ctx.ws_from_stream(RequestConfig::default()).await {
-                Ok(_) => {
-                    let request_body: Vec<u8> = ctx.get_request_body().await;
-                    ctx.set_response_body(&request_body).await;
-                    self.send_body_hook(ctx).await;
-                    continue;
-                }
-                Err(error) => {
-                    ctx.set_response_body(&error.to_string()).await;
-                    self.send_body_hook(ctx).await;
-                    return;
-                }
-            }
-        }
-    }
-}
-struct DynamicRoute {
-    params: RouteParams,
-}
-impl ServerHook for DynamicRoute {
-    async fn new(ctx: &Context) -> Self {
-        Self {
-            params: ctx.get_route_params().await,
-        }
-    }
-    async fn handle(mut self, _ctx: &Context) {
-        self.params.insert("key".to_owned(), "value".to_owned());
-        panic!("Test panic {:?}", self.params);
-    }
-}
-#[tokio::test]
-async fn main() {
-    let server: Server = Server::new().await;
-    server.task_panic::<TaskPanicHook>().await;
-    server.request_error::<RequestErrorHook>().await;
-    server.request_middleware::<SendBodyMiddleware>().await;
-    server.request_middleware::<UpgradeMiddleware>().await;
-    server.response_middleware::<ResponseMiddleware>().await;
-    server.route::<RootRoute>("/").await;
-    server.route::<SseRoute>("/sse").await;
-    server.route::<WebsocketRoute>("/websocket").await;
-    server.route::<DynamicRoute>("/dynamic/{routing}").await;
-    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
-    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
-    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-        server_control_hook_2.shutdown().await;
-    });
-    server_control_hook_1.wait().await;
-}
-```
-# Path: hyperlane/src/tests/route.rs
-```rust
-use crate::*;
-#[cfg(test)]
-async fn assert_panic_message_contains<F, Fut>(future_factory: F, expected_msg: &str)
-where
-    F: Fn() -> Fut + Send + 'static,
-    Fut: Future<Output = ()> + Send + 'static,
-{
-    let result: Result<(), JoinError> = spawn(future_factory()).await;
-    assert!(
-        result.is_err(),
-        "Expected panic, but task completed successfully"
-    );
-    let join_err: JoinError = result.unwrap_err();
-    if !join_err.is_panic() {
-        panic!("Task failed but was not a panic");
-    }
-    let panic_payload: Box<dyn Any + Send> = join_err.into_panic();
-    let panic_msg: &str = if let Some(s) = panic_payload.downcast_ref::<&str>() {
-        s
-    } else if let Some(s) = panic_payload.downcast_ref::<String>() {
-        s.as_str()
-    } else {
-        "Unknown panic type"
-    };
-    assert!(
-        panic_msg.contains(expected_msg),
-        "Expected panic message to contain: '{}', but got: '{}'",
-        expected_msg,
-        panic_msg
-    );
-}
-#[cfg(test)]
-struct TestRoute {
-    data: String,
-}
-#[cfg(test)]
-impl ServerHook for TestRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self {
-            data: String::new(),
-        }
-    }
-    async fn handle(mut self, _ctx: &Context) {
-        self.data = String::from("test");
-    }
-}
-#[tokio::test]
-async fn empty_route() {
-    assert_panic_message_contains(
-        || async {
-            let _server: &Server = Server::new().await.route::<TestRoute>(EMPTY_STR).await;
-        },
-        &RouteError::EmptyPattern.to_string(),
-    )
-    .await;
-}
-#[tokio::test]
-async fn duplicate_route() {
-    assert_panic_message_contains(
-        || async {
-            let _server: &Server = Server::new()
-                .await
-                .route::<TestRoute>(ROOT_PATH)
-                .await
-                .route::<TestRoute>(ROOT_PATH)
-                .await;
-        },
-        &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
-    )
-    .await;
-}
-#[tokio::test]
-async fn get_route() {
-    let server: Server = Server::new().await;
-    server
-        .route::<TestRoute>(ROOT_PATH)
-        .await
-        .route::<TestRoute>("/dynamic/{routing}")
-        .await
-        .route::<TestRoute>("/regex/{file:^.*$}")
-        .await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    for key in route_matcher.get_static_route().keys() {
-        println!("Static route: {key}");
-    }
-    for value in route_matcher.get_dynamic_route().values() {
-        for (route_pattern, _) in value {
-            println!("Dynamic route: {route_pattern}");
-        }
-    }
-    for value in route_matcher.get_regex_route().values() {
-        for (route_pattern, _) in value {
-            println!("Regex route: {route_pattern}");
-        }
-    }
-}
-#[tokio::test]
-async fn segment_count_optimization() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/users/{id}").await;
-    server.route::<TestRoute>("/users/{id}/posts").await;
-    server
-        .route::<TestRoute>("/users/{id}/posts/{post_id}")
-        .await;
-    server.route::<TestRoute>("/api/v1/users/{id}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(
-        route_matcher.get_dynamic_route().contains_key(&2),
-        "Should have 2-segment routes"
-    );
-    assert!(
-        route_matcher.get_dynamic_route().contains_key(&3),
-        "Should have 3-segment routes"
-    );
-    assert!(
-        route_matcher.get_dynamic_route().contains_key(&4),
-        "Should have 4-segment routes"
-    );
-    assert_eq!(route_matcher.get_dynamic_route().get(&2).unwrap().len(), 1);
-    assert_eq!(route_matcher.get_dynamic_route().get(&3).unwrap().len(), 1);
-    assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
-}
-#[tokio::test]
-async fn regex_route_segment_count() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/files/{path:.*}").await;
-    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
-    server
-        .route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}")
-        .await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(
-        route_matcher.get_regex_route().contains_key(&2),
-        "Should have 2-segment regex routes"
-    );
-    assert!(
-        route_matcher.get_regex_route().contains_key(&3),
-        "Should have 3-segment regex routes"
-    );
-    assert!(
-        route_matcher.get_regex_route().contains_key(&4),
-        "Should have 4-segment regex routes"
-    );
-}
-#[tokio::test]
-async fn mixed_route_types() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/").await;
-    server.route::<TestRoute>("/about").await;
-    server.route::<TestRoute>("/users/{id}").await;
-    server.route::<TestRoute>("/posts/{slug}").await;
-    server.route::<TestRoute>("/files/{path:.*}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert_eq!(route_matcher.get_static_route().len(), 2);
-    assert!(route_matcher.get_dynamic_route().contains_key(&2));
-    assert!(route_matcher.get_regex_route().contains_key(&2));
-}
-#[tokio::test]
-async fn large_dynamic_routes() {
-    const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
-    let start_insert: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/{{id}}");
-        server.route::<TestRoute>(&path).await;
-    }
-    let insert_duration: Duration = start_insert.elapsed();
-    println!(
-        "Inserted {} dynamic routes in: {:?}",
-        ROUTE_COUNT, insert_duration
-    );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(!route_matcher.get_dynamic_route().is_empty());
-    let ctx: Context = Context::default();
-    let start_match: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
-    }
-    let match_duration: Duration = start_match.elapsed();
-    println!(
-        "Matched {} dynamic routes in: {:?}",
-        ROUTE_COUNT, match_duration
-    );
-    println!(
-        "Average per dynamic route match: {:?}",
-        match_duration / ROUTE_COUNT
-    );
-}
-#[tokio::test]
-async fn large_regex_routes() {
-    const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
-    let start_insert: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
-        server.route::<TestRoute>(&path).await;
-    }
-    let insert_duration: Duration = start_insert.elapsed();
-    println!(
-        "Inserted {} regex routes in: {:?}",
-        ROUTE_COUNT, insert_duration
-    );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(!route_matcher.get_regex_route().is_empty());
-    let ctx: Context = Context::default();
-    let start_match: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
-    }
-    let match_duration: Duration = start_match.elapsed();
-    println!(
-        "Matched {} regex routes in: {:?}",
-        ROUTE_COUNT, match_duration
-    );
-    println!(
-        "Average per regex route match: {:?}",
-        match_duration / ROUTE_COUNT
-    );
-}
-#[tokio::test]
-async fn large_tail_regex_routes() {
-    const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
-    let start_insert: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/{{path:.*}}");
-        server.route::<TestRoute>(&path).await;
-    }
-    let insert_duration: Duration = start_insert.elapsed();
-    println!(
-        "Inserted {} tail regex routes in: {:?}",
-        ROUTE_COUNT, insert_duration
-    );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    assert!(!route_matcher.get_regex_route().is_empty());
-    let ctx: Context = Context::default();
-    let start_match: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/some/nested/path");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
-    }
-    let match_duration: Duration = start_match.elapsed();
-    println!(
-        "Matched {} tail regex routes in: {:?}",
-        ROUTE_COUNT, match_duration
-    );
-    println!(
-        "Average per tail regex route match: {:?}",
-        match_duration / ROUTE_COUNT
-    );
-}
-```
-# Path: hyperlane/src/tests/error.rs
-```rust
-use crate::*;
-#[tokio::test]
-async fn server_error() {
-    let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
-    let new_tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
-    assert_eq!(tcp_bind_error, new_tcp_bind_error);
-    let unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
-    let new_unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
-    assert_eq!(unknown_error, new_unknown_error);
-    let request: Request = Request::default();
-    let invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request.clone());
-    let new_invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request);
-    assert_eq!(invalid_http_request_error, new_invalid_http_request_error);
-    let other_error: ServerError = ServerError::Other("other error".to_string());
-    let new_other_error: ServerError = ServerError::Other("other error".to_string());
-    assert_eq!(other_error, new_other_error);
-}
-#[tokio::test]
-async fn route_error() {
-    let empty_pattern_error: RouteError = RouteError::EmptyPattern;
-    assert_eq!(empty_pattern_error, RouteError::EmptyPattern);
-    let duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
-    let new_duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
-    assert_eq!(duplicate_pattern_error, new_duplicate_pattern_error);
-    let invalid_regex_pattern_error: RouteError = RouteError::InvalidRegexPattern("[".to_string());
-    let new_invalid_regex_pattern_error: RouteError =
-        RouteError::InvalidRegexPattern("[".to_string());
-    assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
-}
-```
-# Path: hyperlane/src/tests/mod.rs
-```rust
-mod attribute;
-mod config;
-mod context;
-mod error;
-mod panic;
-mod route;
-mod send;
-mod server;
-```
-# Path: hyperlane/src/tests/attribute.rs
-```rust
-use crate::*;
-#[tokio::test]
-async fn get_panic_from_context() {
-    let ctx: Context = Context::default();
-    let set_panic: PanicData = PanicData::new(
-        Some("test".to_string()),
-        Some("test".to_string()),
-        Some("test".to_string()),
-    );
-    ctx.set_task_panic(set_panic.clone()).await;
-    let get_panic: PanicData = ctx.try_get_task_panic_data().await.unwrap();
-    assert_eq!(set_panic, get_panic);
-}
-#[tokio::test]
-async fn context_attributes() {
-    let ctx: Context = Context::default();
-    ctx.set_attribute("key1", "value1".to_string()).await;
-    let value: Option<String> = ctx.try_get_attribute("key1").await;
-    assert_eq!(value, Some("value1".to_string()));
-    ctx.remove_attribute("key1").await;
-    let value: Option<String> = ctx.try_get_attribute("key1").await;
-    assert_eq!(value, None);
-    ctx.set_attribute("key2", 123).await;
-    ctx.clear_attribute().await;
-    let value: Option<i32> = ctx.try_get_attribute("key2").await;
-    assert_eq!(value, None);
-}
-#[tokio::test]
-async fn get_panic_from_join_error() {
-    let message: &'static str = "Test panic message";
-    let join_handle: JoinHandle<()> = spawn(async {
-        panic!("{}", message.to_string());
-    });
-    let join_error: JoinError = join_handle.await.unwrap_err();
-    let panic_struct: PanicData = PanicData::from_join_error(join_error);
-    assert!(!panic_struct.get_message().is_none());
-    assert!(
-        panic_struct
-            .get_message()
-            .clone()
-            .unwrap_or_default()
-            .contains(message)
-    );
-}
-#[tokio::test]
-async fn run_set_func() {
-    let ctx: Context = Context::default();
-    const KEY: &str = "string";
-    const PARAM: &str = "test";
-    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
-    ctx.set_attribute(KEY, func).await;
-    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =
-        ctx.try_get_attribute(KEY).await.unwrap();
-    assert_eq!(get_key(PARAM), func(PARAM));
-}
-#[tokio::test]
-async fn send_body_hook() {
-    let ctx: Context = Context::default();
-    async fn send_body_hook_fn(ctx: Context) {
-        let _ = ctx.send_body().await;
-    }
-    ctx.set_hook("send_body", send_body_hook_fn).await;
-    assert!(ctx.try_get_hook("send_body").await.is_some());
-}
-```
-# Path: hyperlane/src/tests/context.rs
-```rust
-use crate::*;
-#[tokio::test]
-async fn context_aborted_and_closed() {
-    let ctx: Context = Context::default();
-    assert!(!ctx.get_aborted().await);
-    ctx.aborted().await;
-    assert!(ctx.get_aborted().await);
-    ctx.cancel_aborted().await;
-    assert!(!ctx.get_aborted().await);
-    assert!(!ctx.get_closed().await);
-    ctx.closed().await;
-    assert!(ctx.get_closed().await);
-    ctx.cancel_closed().await;
-    assert!(!ctx.get_closed().await);
-    assert!(!ctx.is_terminated().await);
-    ctx.aborted().await;
-    assert!(ctx.is_terminated().await);
-    ctx.cancel_aborted().await;
-    ctx.closed().await;
-    assert!(ctx.is_terminated().await);
-}
-#[tokio::test]
-async fn context_route_params() {
-    let ctx: Context = Context::default();
-    let mut params: RouteParams = RouteParams::default();
-    params.insert("id".to_string(), "123".to_string());
-    ctx.set_route_params(params).await;
-    let id: Option<String> = ctx.try_get_route_param("id").await;
-    assert_eq!(id, Some("123".to_string()));
-    let name: Option<String> = ctx.try_get_route_param("name").await;
-    assert_eq!(name, None);
-}
-#[tokio::test]
-async fn context_request_and_response() {
-    let ctx: Context = Context::default();
-    let request: Request = Request::default();
-    ctx.set_request(&request).await;
-    let fetched_request: Request = ctx.get_request().await;
-    assert_eq!(request.get_string(), fetched_request.get_string());
-    let response: Response = Response::default();
-    ctx.set_response(&response).await;
-    let fetched_response: Response = ctx.get_response().await;
-    assert_eq!(response.get_string(), fetched_response.get_string());
-}
-```
-# Path: hyperlane/src/tests/config.rs
-```rust
-use crate::*;
-#[tokio::test]
-async fn config_from_str() {
-    let config_str: &'static str = r#"
-        {
-            "host": "0.0.0.0",
-            "port": 80,           
-            "request_config": {
-                "buffer_size": 8192,
-                "max_request_line_length": 8192,
-                "max_path_length": 8192,
-                "max_query_length": 8192,
-                "max_header_line_length": 8192,
-                "max_header_count": 100,
-                "max_header_key_length": 8192,
-                "max_header_value_length": 8192,
-                "max_body_size": 2097152,
-                "max_ws_frame_size": 65536,
-                "max_ws_frames": 6000,
-                "http_read_timeout_ms": 6000,
-                "ws_read_timeout_ms": 1800000
-            },
-            "nodelay": true,            
-            "ttl": 64
-        }
-    "#;
-    let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
-    let new_config: ServerConfig = ServerConfig::new().await;
-    new_config
-        .host("0.0.0.0")
-        .await
-        .port(80)
-        .await
-        .request_config(RequestConfig::default())
-        .await
-        .enable_nodelay()
-        .await
-        .ttl(64)
-        .await;
-    assert_eq!(config, new_config);
-}
-```
-# Path: hyperlane/src/tests/send.rs
-```rust
-use crate::*;
-#[allow(dead_code)]
-struct TestSendRoute;
-impl ServerHook for TestSendRoute {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    async fn handle(self, _ctx: &Context) {}
-}
-#[tokio::test]
-async fn server_send_sync() {
-    fn assert_send<T: Send>() {}
-    fn assert_sync<T: Sync>() {}
-    fn assert_send_sync<T: Send + Sync>() {}
-    assert_send::<Server>();
-    assert_sync::<Server>();
-    assert_send_sync::<Server>();
-}
-#[tokio::test]
-async fn server_clone_across_threads() {
-    let server: Server = Server::new()
-        .await
-        .route::<TestSendRoute>("/test")
-        .await
-        .clone();
-    let server_clone: Server = server.clone();
-    let handle: JoinHandle<&'static str> = spawn(async move {
-        let _server_in_thread: Server = server_clone;
-        "success"
-    });
-    let result: &'static str = handle.await.unwrap();
-    assert_eq!(result, "success");
-}
-#[tokio::test]
-async fn server_share_across_threads() {
-    let server: Arc<Server> = Arc::new(
-        Server::new()
-            .await
-            .route::<TestSendRoute>("/test")
-            .await
-            .clone(),
-    );
-    let server1: Arc<Server> = server.clone();
-    let server2: Arc<Server> = server.clone();
-    let handle1: JoinHandle<&'static str> = spawn(async move {
-        let _server_in_thread1: Arc<Server> = server1;
-        "thread1"
-    });
-    let handle2: JoinHandle<&'static str> = spawn(async move {
-        let _server_in_thread2: Arc<Server> = server2;
-        "thread2"
-    });
-    let result1: &'static str = handle1.await.unwrap();
-    let result2: &'static str = handle2.await.unwrap();
-    assert_eq!(result1, "thread1");
-    assert_eq!(result2, "thread2");
-}
-```
-# Path: hyperlane/src/tests/panic.rs
-```rust
-use crate::*;
-#[test]
-fn panic_new() {
-    let panic: PanicData = PanicData::new(
-        Some("message".to_string()),
-        Some("location".to_string()),
-        Some("payload".to_string()),
-    );
-    assert_eq!(panic.get_message(), &Some("message".to_string()));
-    assert_eq!(panic.get_location(), &Some("location".to_string()));
-    assert_eq!(panic.get_payload(), &Some("payload".to_string()));
-}
-#[tokio::test]
-async fn from_join_error() {
-    let handle: JoinHandle<()> = tokio::spawn(async {
-        panic!("test panic");
-    });
-    let result: Result<(), JoinError> = handle.await;
-    assert!(result.is_err());
-    if let Err(join_error) = result {
-        let is_panic: bool = PanicData::from_join_error(join_error)
-            .get_message()
-            .clone()
-            .unwrap_or_default()
-            .contains("test panic");
-        assert!(is_panic);
-    }
-}
-```
-# Path: hyperlane/src/config/mod.rs
+# Path: hyperlane\src\context\mod.rs
 ```rust
 pub(crate) mod r#impl;
 pub(crate) mod r#struct;
 pub(crate) mod r#type;
 pub use r#struct::*;
-pub(super) use r#type::*;
+pub(crate) use r#type::*;
 ```
-# Path: hyperlane/src/config/struct.rs
+# Path: hyperlane\src\context\struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, Data, CustomDebug, DisplayDebug, PartialEq, Eq, Deserialize, Serialize)]
-pub(crate) struct ServerConfigInner {
-    #[get(pub(crate))]
+#[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
+pub(crate) struct ContextInner {
+    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) host: String,
-    #[get(pub(crate))]
+    aborted: bool,
+    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) port: u16,
-    #[get(pub(crate))]
+    closed: bool,
+    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) request_config: RequestConfig,
-    #[get(pub(crate))]
+    stream: Option<ArcRwLockStream>,
+    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) nodelay: Option<bool>,
-    #[get(pub(crate))]
+    request: Request,
+    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) ttl: Option<u32>,
+    response: Response,
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    route_params: RouteParams,
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    attributes: ThreadSafeAttributeStore,
 }
-#[derive(Clone, Getter, CustomDebug, DisplayDebug)]
-pub struct ServerConfig(#[get(pub(super))] pub(super) SharedServerConfig);
+#[derive(Clone, Default, Getter, CustomDebug, DisplayDebug)]
+pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextInner>);
 ```
-# Path: hyperlane/src/config/impl.rs
+# Path: hyperlane\src\context\type.rs
 ```rust
 use crate::*;
-impl Default for ServerConfigInner {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            host: DEFAULT_HOST.to_owned(),
-            port: DEFAULT_WEB_PORT,
-            request_config: RequestConfig::default(),
-            nodelay: DEFAULT_NODELAY,
-            ttl: DEFAULT_TTI,
-        }
-    }
-}
-impl Default for ServerConfig {
-    #[inline(always)]
-    fn default() -> Self {
-        Self(arc_rwlock(ServerConfigInner::default()))
-    }
-}
-impl PartialEq for ServerConfig {
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(self.get_0(), other.get_0()) {
-            return true;
-        }
-        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
-            *s == *o
-        } else {
-            false
-        }
-    }
-}
-impl Eq for ServerConfig {}
-impl ServerConfig {
-    #[inline(always)]
-    pub async fn new() -> Self {
-        Self::default()
-    }
-    async fn read(&self) -> ConfigReadGuard<'_> {
-        self.get_0().read().await
-    }
-    async fn write(&self) -> ConfigWriteGuard<'_> {
-        self.get_0().write().await
-    }
-    pub(crate) async fn get_inner(&self) -> ServerConfigInner {
-        self.read().await.clone()
-    }
-    pub async fn host<H: ToString>(&self, host: H) -> &Self {
-        self.write().await.set_host(host.to_string());
-        self
-    }
-    pub async fn port(&self, port: u16) -> &Self {
-        self.write().await.set_port(port);
-        self
-    }
-    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
-        self.write().await.set_request_config(request_config);
-        self
-    }
-    pub async fn nodelay(&self, nodelay: bool) -> &Self {
-        self.write().await.set_nodelay(Some(nodelay));
-        self
-    }
-    pub async fn enable_nodelay(&self) -> &Self {
-        self.nodelay(true).await
-    }
-    pub async fn disable_nodelay(&self) -> &Self {
-        self.nodelay(false).await
-    }
-    pub async fn ttl(&self, ttl: u32) -> &Self {
-        self.write().await.set_ttl(Some(ttl));
-        self
-    }
-    pub fn from_json_str(config_str: &str) -> Result<ServerConfig, serde_json::Error> {
-        serde_json::from_str(config_str).map(|config: ServerConfigInner| Self(arc_rwlock(config)))
-    }
-}
+pub(crate) type ContextWriteGuard<'a> = RwLockWriteGuard<'a, ContextInner>;
+pub(crate) type ContextReadGuard<'a> = RwLockReadGuard<'a, ContextInner>;
 ```
-# Path: hyperlane/src/config/type.rs
-```rust
-use crate::*;
-pub(crate) type ConfigReadGuard<'a> = RwLockReadGuard<'a, ServerConfigInner>;
-pub(crate) type ConfigWriteGuard<'a> = RwLockWriteGuard<'a, ServerConfigInner>;
-```
-# Path: hyperlane/src/error/mod.rs
-```rust
-pub(crate) mod r#enum;
-pub use r#enum::*;
-```
-# Path: hyperlane/src/error/enum.rs
+# Path: hyperlane\src\error\enum.rs
 ```rust
 use crate::*;
 #[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone)]
@@ -5192,17 +1144,290 @@ pub enum RouteError {
     InvalidRegexPattern(String),
 }
 ```
-# Path: hyperlane/src/route/mod.rs
+# Path: hyperlane\src\error\mod.rs
 ```rust
 pub(crate) mod r#enum;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) mod r#type;
-pub use r#struct::*;
-pub use r#type::*;
 pub use r#enum::*;
 ```
-# Path: hyperlane/src/route/enum.rs
+# Path: hyperlane\src\hook\enum.rs
+```rust
+use crate::*;
+#[derive(Clone, Debug, Copy, DisplayDebug)]
+pub enum HookType {
+    TaskPanic(Option<isize>, ServerHookHandlerFactory),
+    RequestError(Option<isize>, ServerHookHandlerFactory),
+    RequestMiddleware(Option<isize>, ServerHookHandlerFactory),
+    Route(&'static str, ServerHookHandlerFactory),
+    ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
+}
+```
+# Path: hyperlane\src\hook\fn.rs
+```rust
+use crate::*;
+#[inline(always)]
+pub fn server_hook_factory<R>() -> ServerHookHandler
+where
+    R: ServerHook,
+{
+    Arc::new(move |ctx: &Context| -> SendableAsyncTask<()> {
+        let ctx: Context = ctx.clone();
+        Box::pin(async move {
+            R::new(&ctx).await.handle(&ctx).await;
+        })
+    })
+}
+#[inline(always)]
+pub fn assert_hook_unique_order(list: Vec<HookType>) {
+    let mut seen: HashSet<(HookType, isize)> = HashSet::new();
+    list.iter().for_each(|hook| {
+        if let Some(order) = hook.try_get_order()
+            && !seen.insert((*hook, order))
+        {
+            panic!("Duplicate hook detected: {} with order {}", hook, order);
+        }
+    });
+}
+```
+# Path: hyperlane\src\hook\impl.rs
+```rust
+use crate::*;
+impl<F, R> FnContextSendSync<R> for F where F: Fn(Context) -> R + Send + Sync {}
+impl<F, T> FnContextPinBoxSendSync<T> for F where F: FnContextSendSync<SendableAsyncTask<T>> {}
+impl<F, Fut, T> FnContextSendSyncStatic<Fut, T> for F
+where
+    F: FnContextSendSync<Fut> + 'static,
+    Fut: Future<Output = T> + Send,
+{
+}
+impl<T, R> FutureSendStatic<R> for T where T: Future<Output = R> + Send + 'static {}
+impl<T, O> FutureSend<O> for T where T: Future<Output = O> + Send {}
+impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> SendableAsyncTask<O> + Send + Sync {}
+impl Default for ServerControlHook {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            wait_hook: Arc::new(|| Box::pin(async {})),
+            shutdown_hook: Arc::new(|| Box::pin(async {})),
+        }
+    }
+}
+impl ServerControlHook {
+    pub async fn wait(&self) {
+        self.get_wait_hook()().await;
+    }
+    pub async fn shutdown(&self) {
+        self.get_shutdown_hook()().await;
+    }
+}
+impl PartialEq for HookType {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (HookType::TaskPanic(order1, factory1), HookType::TaskPanic(order2, factory2)) => {
+                order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
+            }
+            (
+                HookType::RequestError(order1, factory1),
+                HookType::RequestError(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            (
+                HookType::RequestMiddleware(order1, factory1),
+                HookType::RequestMiddleware(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            (HookType::Route(path1, factory1), HookType::Route(path2, factory2)) => {
+                path1 == path2 && std::ptr::fn_addr_eq(*factory1, *factory2)
+            }
+            (
+                HookType::ResponseMiddleware(order1, factory1),
+                HookType::ResponseMiddleware(order2, factory2),
+            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            _ => false,
+        }
+    }
+}
+impl Eq for HookType {}
+impl Hash for HookType {
+    #[inline(always)]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            HookType::TaskPanic(order, factory) => {
+                0u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::RequestError(order, factory) => {
+                1u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::RequestMiddleware(order, factory) => {
+                2u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::Route(path, factory) => {
+                3u8.hash(state);
+                path.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+            HookType::ResponseMiddleware(order, factory) => {
+                4u8.hash(state);
+                order.hash(state);
+                (factory as *const fn() -> ServerHookHandler).hash(state);
+            }
+        }
+    }
+}
+impl HookType {
+    #[inline(always)]
+    pub fn try_get_order(&self) -> Option<isize> {
+        match *self {
+            HookType::RequestMiddleware(order, _)
+            | HookType::ResponseMiddleware(order, _)
+            | HookType::TaskPanic(order, _)
+            | HookType::RequestError(order, _) => order,
+            _ => None,
+        }
+    }
+    #[inline(always)]
+    pub fn try_get_hook(&self) -> Option<ServerHookHandlerFactory> {
+        match *self {
+            HookType::RequestMiddleware(_, hook)
+            | HookType::ResponseMiddleware(_, hook)
+            | HookType::TaskPanic(_, hook)
+            | HookType::RequestError(_, hook) => Some(hook),
+            _ => None,
+        }
+    }
+}
+impl ServerHook for DefaultServerHook {
+    async fn new(_: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &Context) {}
+}
+```
+# Path: hyperlane\src\hook\mod.rs
+```rust
+pub(crate) mod r#enum;
+pub(crate) mod r#fn;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+pub(crate) mod r#trait;
+pub(crate) mod r#type;
+pub use r#enum::*;
+pub use r#fn::*;
+pub use r#struct::*;
+pub use r#trait::*;
+pub use r#type::*;
+```
+# Path: hyperlane\src\hook\struct.rs
+```rust
+use crate::*;
+#[derive(Clone, Copy, Debug, DisplayDebug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DefaultServerHook;
+#[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
+pub struct ServerControlHook {
+    #[debug(skip)]
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) wait_hook: SharedAsyncTaskFactory<()>,
+    #[debug(skip)]
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) shutdown_hook: SharedAsyncTaskFactory<()>,
+}
+```
+# Path: hyperlane\src\hook\trait.rs
+```rust
+use crate::*;
+pub trait FnContextSendSync<R>: Fn(Context) -> R + Send + Sync {}
+pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<SendableAsyncTask<T>> {}
+pub trait FnContextSendSyncStatic<Fut, T>: FnContextSendSync<Fut> + 'static
+where
+    Fut: Future<Output = T> + Send,
+{
+}
+```
+# Path: hyperlane\src\hook\type.rs
+```rust
+use crate::*;
+pub type HookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
+pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
+pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
+pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
+pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Send + Sync>;
+pub type ServerHookList = Vec<ServerHookHandler>;
+pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
+pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
+```
+# Path: hyperlane\src\panic\impl.rs
+```rust
+use crate::*;
+impl PanicData {
+    #[inline(always)]
+    pub(crate) fn new(
+        message: Option<String>,
+        location: Option<String>,
+        payload: Option<String>,
+    ) -> Self {
+        Self {
+            message,
+            location,
+            payload,
+        }
+    }
+    #[inline(always)]
+    fn try_extract_panic_message(panic_payload: &dyn Any) -> Option<String> {
+        if let Some(s) = panic_payload.downcast_ref::<&str>() {
+            Some(s.to_string())
+        } else {
+            panic_payload.downcast_ref::<String>().cloned()
+        }
+    }
+    pub(crate) fn from_join_error(join_error: JoinError) -> Self {
+        let default_message: String = join_error.to_string();
+        let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
+        {
+            Self::try_extract_panic_message(&panic_join_error)
+        } else {
+            None
+        };
+        if (message.is_none() || message.clone().unwrap_or_default().is_empty())
+            && !default_message.is_empty()
+        {
+            message = Some(default_message);
+        }
+        let panic: PanicData = PanicData::new(message, None, None);
+        panic
+    }
+}
+```
+# Path: hyperlane\src\panic\mod.rs
+```rust
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+pub use r#struct::*;
+```
+# Path: hyperlane\src\panic\struct.rs
+```rust
+use crate::*;
+#[derive(CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter)]
+pub struct PanicData {
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) message: Option<String>,
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) location: Option<String>,
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) payload: Option<String>,
+}
+```
+# Path: hyperlane\src\route\enum.rs
 ```rust
 use crate::*;
 #[derive(Clone, CustomDebug, DisplayDebug)]
@@ -5212,34 +1437,7 @@ pub enum RouteSegment {
     Regex(String, Regex),
 }
 ```
-# Path: hyperlane/src/route/struct.rs
-```rust
-use crate::*;
-#[derive(Debug, Clone, Getter, DisplayDebug)]
-pub struct RoutePattern(
-    #[get]
-    pub(super) RouteSegmentList,
-);
-#[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug, Setter)]
-pub struct RouteMatcher {
-    #[get]
-    #[set(skip)]
-    #[get_mut(pub(super))]
-    #[debug(skip)]
-    pub(super) static_route: ServerHookMap,
-    #[get]
-    #[set(skip)]
-    #[get_mut(pub(super))]
-    #[debug(skip)]
-    pub(super) dynamic_route: ServerHookPatternRoute,
-    #[get]
-    #[set(skip)]
-    #[get_mut(pub(super))]
-    #[debug(skip)]
-    pub(super) regex_route: ServerHookPatternRoute,
-}
-```
-# Path: hyperlane/src/route/impl.rs
+# Path: hyperlane\src\route\impl.rs
 ```rust
 use crate::*;
 collect!(HookType);
@@ -5587,368 +1785,1928 @@ impl RouteMatcher {
     }
 }
 ```
-# Path: hyperlane/src/route/type.rs
+# Path: hyperlane\src\route\mod.rs
+```rust
+pub(crate) mod r#enum;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+pub(crate) mod r#type;
+pub use r#struct::*;
+pub use r#type::*;
+pub use r#enum::*;
+```
+# Path: hyperlane\src\route\struct.rs
+```rust
+use crate::*;
+#[derive(Debug, Clone, Getter, DisplayDebug)]
+pub struct RoutePattern(
+    #[get]
+    pub(super) RouteSegmentList,
+);
+#[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug, Setter)]
+pub struct RouteMatcher {
+    #[get]
+    #[set(skip)]
+    #[get_mut(pub(super))]
+    #[debug(skip)]
+    pub(super) static_route: ServerHookMap,
+    #[get]
+    #[set(skip)]
+    #[get_mut(pub(super))]
+    #[debug(skip)]
+    pub(super) dynamic_route: ServerHookPatternRoute,
+    #[get]
+    #[set(skip)]
+    #[get_mut(pub(super))]
+    #[debug(skip)]
+    pub(super) regex_route: ServerHookPatternRoute,
+}
+```
+# Path: hyperlane\src\route\type.rs
 ```rust
 use crate::*;
 pub type RouteParams = HashMapXxHash3_64<String, String>;
 pub type RouteSegmentList = Vec<RouteSegment>;
 pub(crate) type PathComponentList<'a> = Vec<&'a str>;
 ```
-# Path: hyperlane-time/README.md
-## hyperlane-time
-[Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
-[Api Docs](https://docs.rs/hyperlane-time/latest/hyperlane_time/)
-> A library for fetching the current time based on the system's locale settings.
+# Path: hyperlane\src\server\impl.rs
+```rust
+use crate::*;
+impl Default for ServerInner {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            config: ServerConfigInner::default(),
+            task_panic: vec![],
+            request_error: vec![],
+            route_matcher: RouteMatcher::new(),
+            request_middleware: vec![],
+            response_middleware: vec![],
+        }
+    }
+}
+impl PartialEq for ServerInner {
+    fn eq(&self, other: &Self) -> bool {
+        self.config == other.config
+            && self.route_matcher == other.route_matcher
+            && self.task_panic.len() == other.task_panic.len()
+            && self.request_error.len() == other.request_error.len()
+            && self.request_middleware.len() == other.request_middleware.len()
+            && self.response_middleware.len() == other.response_middleware.len()
+            && self
+                .task_panic
+                .iter()
+                .zip(other.task_panic.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .request_error
+                .iter()
+                .zip(other.request_error.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .request_middleware
+                .iter()
+                .zip(other.request_middleware.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+            && self
+                .response_middleware
+                .iter()
+                .zip(other.response_middleware.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
+    }
+}
+impl Eq for ServerInner {}
+impl PartialEq for Server {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        if Arc::ptr_eq(self.get_0(), other.get_0()) {
+            return true;
+        }
+        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
+            *s == *o
+        } else {
+            false
+        }
+    }
+}
+impl Eq for Server {}
+impl HandlerState {
+    #[inline(always)]
+    pub(super) fn new(stream: ArcRwLockStream, request_config: RequestConfig) -> Self {
+        Self {
+            stream,
+            request_config,
+        }
+    }
+}
+impl Server {
+    pub async fn new() -> Self {
+        let server: ServerInner = ServerInner::default();
+        Self(arc_rwlock(server))
+    }
+    pub async fn from(config: ServerConfig) -> Self {
+        let server: Self = Self::new().await;
+        server.config(config).await;
+        server
+    }
+    pub(super) async fn read(&self) -> ServerStateReadGuard<'_> {
+        self.get_0().read().await
+    }
+    async fn write(&self) -> ServerStateWriteGuard<'_> {
+        self.get_0().write().await
+    }
+    pub async fn get_route_matcher(&self) -> RouteMatcher {
+        self.read().await.get_route_matcher().clone()
+    }
+    pub async fn handle_hook(&self, hook: HookType) {
+        match hook {
+            HookType::TaskPanic(_, hook) => {
+                self.write().await.get_mut_task_panic().push(hook());
+            }
+            HookType::RequestError(_, hook) => {
+                self.write().await.get_mut_request_error().push(hook());
+            }
+            HookType::RequestMiddleware(_, hook) => {
+                self.write().await.get_mut_request_middleware().push(hook());
+            }
+            HookType::Route(path, hook) => {
+                self.write()
+                    .await
+                    .get_mut_route_matcher()
+                    .add(path, hook())
+                    .unwrap();
+            }
+            HookType::ResponseMiddleware(_, hook) => {
+                self.write()
+                    .await
+                    .get_mut_response_middleware()
+                    .push(hook());
+            }
+        };
+    }
+    pub async fn config_str<C: ToString>(&self, config_str: C) -> &Self {
+        let config: ServerConfig = ServerConfig::from_json_str(&config_str.to_string()).unwrap();
+        self.write().await.set_config(config.get_inner().await);
+        self
+    }
+    pub async fn config(&self, config: ServerConfig) -> &Self {
+        self.write().await.set_config(config.get_inner().await);
+        self
+    }
+    pub async fn task_panic<S>(&self) -> &Self
+    where
+        S: ServerHook,
+    {
+        self.write()
+            .await
+            .get_mut_task_panic()
+            .push(server_hook_factory::<S>());
+        self
+    }
+    pub async fn request_error<S>(&self) -> &Self
+    where
+        S: ServerHook,
+    {
+        self.write()
+            .await
+            .get_mut_request_error()
+            .push(server_hook_factory::<S>());
+        self
+    }
+    pub async fn route<S>(&self, path: impl ToString) -> &Self
+    where
+        S: ServerHook,
+    {
+        self.write()
+            .await
+            .get_mut_route_matcher()
+            .add(&path.to_string(), server_hook_factory::<S>())
+            .unwrap();
+        self
+    }
+    pub async fn request_middleware<S>(&self) -> &Self
+    where
+        S: ServerHook,
+    {
+        self.write()
+            .await
+            .get_mut_request_middleware()
+            .push(server_hook_factory::<S>());
+        self
+    }
+    pub async fn response_middleware<S>(&self) -> &Self
+    where
+        S: ServerHook,
+    {
+        self.write()
+            .await
+            .get_mut_response_middleware()
+            .push(server_hook_factory::<S>());
+        self
+    }
+    #[inline(always)]
+    pub fn format_host_port<H: ToString>(host: H, port: u16) -> String {
+        format!("{}{COLON}{port}", host.to_string())
+    }
+    #[inline(always)]
+    pub fn try_flush_stdout() -> io::Result<()> {
+        stdout().flush()
+    }
+    #[inline(always)]
+    pub fn flush_stdout() {
+        stdout().flush().unwrap();
+    }
+    #[inline(always)]
+    pub fn try_flush_stderr() -> io::Result<()> {
+        stderr().flush()
+    }
+    #[inline(always)]
+    pub fn flush_stderr() {
+        stderr().flush().unwrap();
+    }
+    #[inline(always)]
+    pub fn try_flush_stdout_and_stderr() -> io::Result<()> {
+        Self::try_flush_stdout()?;
+        Self::try_flush_stderr()
+    }
+    #[inline(always)]
+    pub fn flush_stdout_and_stderr() {
+        Self::flush_stdout();
+        Self::flush_stderr();
+    }
+    async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
+        let panic_clone: PanicData = panic.clone();
+        ctx.cancel_aborted().await.set_task_panic(panic_clone).await;
+        for hook in self.read().await.get_task_panic().iter() {
+            Box::pin(self.task_handler(ctx, hook, false)).await;
+            if ctx.get_aborted().await {
+                return;
+            }
+        }
+    }
+    async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
+        let panic: PanicData = PanicData::from_join_error(join_error);
+        ctx.set_response_status_code(HttpStatus::InternalServerError.code())
+            .await;
+        self.handle_panic_with_context(ctx, &panic).await;
+    }
+    async fn task_handler(&self, ctx: &Context, hook: &ServerHookHandler, progress: bool) {
+        if let Err(join_error) = spawn(hook(ctx)).await
+            && join_error.is_panic()
+        {
+            if progress {
+                Box::pin(self.handle_task_panic(ctx, join_error)).await;
+            } else {
+                eprintln!("Panic occurred in panic handler: {:?}", join_error);
+                let _ = Self::try_flush_stdout_and_stderr();
+            }
+        }
+    }
+    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
+        let config: ServerConfigInner = self.read().await.get_config().clone();
+        let host: String = config.get_host().clone();
+        let port: u16 = *config.get_port();
+        let addr: String = Self::format_host_port(host, port);
+        TcpListener::bind(&addr)
+            .await
+            .map_err(|error| ServerError::TcpBind(error.to_string()))
+    }
+    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
+        while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
+            self.configure_stream(&stream).await;
+            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
+            self.spawn_connection_handler(stream).await;
+        }
+        Ok(())
+    }
+    async fn configure_stream(&self, stream: &TcpStream) {
+        let server_inner: ServerStateReadGuard = self.read().await;
+        let config: &ServerConfigInner = server_inner.get_config();
+        if let Some(nodelay) = config.get_nodelay() {
+            let _ = stream.set_nodelay(*nodelay);
+        }
+        if let Some(ttl) = config.get_ttl() {
+            let _ = stream.set_ttl(*ttl);
+        }
+    }
+    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
+        let server: Server = self.clone();
+        let request_config: RequestConfig = *self.read().await.get_config().get_request_config();
+        spawn(async move {
+            server.handle_connection(stream, request_config).await;
+        });
+    }
+    pub async fn handle_request_error(&self, ctx: &Context, error: &RequestError) {
+        ctx.cancel_aborted()
+            .await
+            .set_request_error_data(error.clone())
+            .await;
+        for hook in self.read().await.get_request_error().iter() {
+            self.task_handler(ctx, hook, true).await;
+            if ctx.get_aborted().await {
+                return;
+            }
+        }
+    }
+    async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfig) {
+        match Request::http_from_stream(&stream, &request_config).await {
+            Ok(request) => {
+                let hook: HandlerState = HandlerState::new(stream, request_config);
+                self.handle_http_requests(&hook, &request).await;
+            }
+            Err(error) => {
+                self.handle_request_error(&stream.into(), &error).await;
+            }
+        }
+    }
+    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
+        let route: &str = request.get_path();
+        let ctx: &Context = &Context::new(state.get_stream(), request);
+        let keep_alive: bool = request.is_enable_keep_alive();
+        if self.handle_request_middleware(ctx).await {
+            return ctx.is_keep_alive(keep_alive).await;
+        }
+        if self.handle_route_matcher(ctx, route).await {
+            return ctx.is_keep_alive(keep_alive).await;
+        }
+        if self.handle_response_middleware(ctx).await {
+            return ctx.is_keep_alive(keep_alive).await;
+        }
+        if let Some(panic) = ctx.try_get_task_panic_data().await {
+            ctx.set_response_status_code(HttpStatus::InternalServerError.code())
+                .await;
+            self.handle_panic_with_context(ctx, &panic).await;
+        }
+        ctx.is_keep_alive(keep_alive).await
+    }
+    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
+        if !self.request_hook(state, request).await {
+            return;
+        }
+        let stream: &ArcRwLockStream = state.get_stream();
+        let request_config: &RequestConfig = state.get_request_config();
+        loop {
+            match Request::http_from_stream(stream, request_config).await {
+                Ok(new_request) => {
+                    if !self.request_hook(state, &new_request).await {
+                        return;
+                    }
+                }
+                Err(error) => {
+                    self.handle_request_error(&state.get_stream().into(), &error)
+                        .await;
+                    return;
+                }
+            }
+        }
+    }
+    pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
+        for hook in self.read().await.get_request_middleware().iter() {
+            self.task_handler(ctx, hook, true).await;
+            if ctx.get_aborted().await {
+                return true;
+            }
+        }
+        false
+    }
+    pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
+        if let Some(hook) = self
+            .read()
+            .await
+            .get_route_matcher()
+            .try_resolve_route(ctx, path)
+            .await
+        {
+            self.task_handler(ctx, &hook, true).await;
+            if ctx.get_aborted().await {
+                return true;
+            }
+        }
+        false
+    }
+    pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
+        for hook in self.read().await.get_response_middleware().iter() {
+            self.task_handler(ctx, hook, true).await;
+            if ctx.get_aborted().await {
+                return true;
+            }
+        }
+        false
+    }
+    pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
+        let tcp_listener: TcpListener = self.create_tcp_listener().await?;
+        let server: Server = self.clone();
+        let (wait_sender, wait_receiver) = channel(());
+        let (shutdown_sender, mut shutdown_receiver) = channel(());
+        let accept_connections: JoinHandle<()> = spawn(async move {
+            let _ = server.accept_connections(&tcp_listener).await;
+            let _ = wait_sender.send(());
+        });
+        let wait_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
+            let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
+            Box::pin(async move {
+                let _ = wait_receiver_clone.changed().await;
+            })
+        });
+        let shutdown_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
+            let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
+            Box::pin(async move {
+                let _ = shutdown_sender_clone.send(());
+            })
+        });
+        spawn(async move {
+            let _ = shutdown_receiver.changed().await;
+            accept_connections.abort();
+        });
+        let mut server_control_hook: ServerControlHook = ServerControlHook::default();
+        server_control_hook.set_shutdown_hook(shutdown_hook);
+        server_control_hook.set_wait_hook(wait_hook);
+        Ok(server_control_hook)
+    }
+}
+```
+# Path: hyperlane\src\server\mod.rs
+```rust
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+pub(crate) mod r#type;
+pub use r#struct::*;
+pub(crate) use r#type::*;
+```
+# Path: hyperlane\src\server\struct.rs
+```rust
+use crate::*;
+#[derive(Clone, CustomDebug, DisplayDebug, Getter)]
+pub(crate) struct HandlerState {
+    pub(super) stream: ArcRwLockStream,
+    pub(super) request_config: RequestConfig,
+}
+#[derive(Data, Clone, CustomDebug, DisplayDebug)]
+pub(crate) struct ServerInner {
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) config: ServerConfigInner,
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) route_matcher: RouteMatcher,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) request_error: ServerHookList,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) task_panic: ServerHookList,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) request_middleware: ServerHookList,
+    #[debug(skip)]
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) response_middleware: ServerHookList,
+}
+#[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
+pub struct Server(#[get(pub(super))] pub(super) SharedServerState);
+```
+# Path: hyperlane\src\server\type.rs
+```rust
+use crate::*;
+pub(crate) type SharedServerState = ArcRwLock<ServerInner>;
+pub(crate) type SharedServerConfig = ArcRwLock<ServerConfigInner>;
+pub(crate) type ServerStateReadGuard<'a> = RwLockReadGuard<'a, ServerInner>;
+pub(crate) type ServerStateWriteGuard<'a> = RwLockWriteGuard<'a, ServerInner>;
+```
+# Path: hyperlane\src\tests\attribute.rs
+```rust
+use crate::*;
+#[tokio::test]
+async fn get_panic_from_context() {
+    let ctx: Context = Context::default();
+    let set_panic: PanicData = PanicData::new(
+        Some("test".to_string()),
+        Some("test".to_string()),
+        Some("test".to_string()),
+    );
+    ctx.set_task_panic(set_panic.clone()).await;
+    let get_panic: PanicData = ctx.try_get_task_panic_data().await.unwrap();
+    assert_eq!(set_panic, get_panic);
+}
+#[tokio::test]
+async fn context_attributes() {
+    let ctx: Context = Context::default();
+    ctx.set_attribute("key1", "value1".to_string()).await;
+    let value: Option<String> = ctx.try_get_attribute("key1").await;
+    assert_eq!(value, Some("value1".to_string()));
+    ctx.remove_attribute("key1").await;
+    let value: Option<String> = ctx.try_get_attribute("key1").await;
+    assert_eq!(value, None);
+    ctx.set_attribute("key2", 123).await;
+    ctx.clear_attribute().await;
+    let value: Option<i32> = ctx.try_get_attribute("key2").await;
+    assert_eq!(value, None);
+}
+#[tokio::test]
+async fn get_panic_from_join_error() {
+    let message: &'static str = "Test panic message";
+    let join_handle: JoinHandle<()> = spawn(async {
+        panic!("{}", message.to_string());
+    });
+    let join_error: JoinError = join_handle.await.unwrap_err();
+    let panic_struct: PanicData = PanicData::from_join_error(join_error);
+    assert!(!panic_struct.get_message().is_none());
+    assert!(
+        panic_struct
+            .get_message()
+            .clone()
+            .unwrap_or_default()
+            .contains(message)
+    );
+}
+#[tokio::test]
+async fn run_set_func() {
+    let ctx: Context = Context::default();
+    const KEY: &str = "string";
+    const PARAM: &str = "test";
+    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
+    ctx.set_attribute(KEY, func).await;
+    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =
+        ctx.try_get_attribute(KEY).await.unwrap();
+    assert_eq!(get_key(PARAM), func(PARAM));
+}
+#[tokio::test]
+async fn send_body_hook() {
+    let ctx: Context = Context::default();
+    async fn send_body_hook_fn(ctx: Context) {
+        let _ = ctx.send_body().await;
+    }
+    ctx.set_hook("send_body", send_body_hook_fn).await;
+    assert!(ctx.try_get_hook("send_body").await.is_some());
+}
+```
+# Path: hyperlane\src\tests\config.rs
+```rust
+use crate::*;
+#[tokio::test]
+async fn config_from_str() {
+    let config_str: &'static str = r#"
+        {
+            "host": "0.0.0.0",
+            "port": 80,           
+            "request_config": {
+                "buffer_size": 8192,
+                "max_request_line_length": 8192,
+                "max_path_length": 8192,
+                "max_query_length": 8192,
+                "max_header_line_length": 8192,
+                "max_header_count": 100,
+                "max_header_key_length": 8192,
+                "max_header_value_length": 8192,
+                "max_body_size": 2097152,
+                "max_ws_frame_size": 65536,
+                "max_ws_frames": 6000,
+                "http_read_timeout_ms": 6000,
+                "ws_read_timeout_ms": 1800000
+            },
+            "nodelay": true,            
+            "ttl": 64
+        }
+    "#;
+    let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
+    let new_config: ServerConfig = ServerConfig::new().await;
+    new_config
+        .host("0.0.0.0")
+        .await
+        .port(80)
+        .await
+        .request_config(RequestConfig::default())
+        .await
+        .enable_nodelay()
+        .await
+        .ttl(64)
+        .await;
+    assert_eq!(config, new_config);
+}
+```
+# Path: hyperlane\src\tests\context.rs
+```rust
+use crate::*;
+#[tokio::test]
+async fn context_aborted_and_closed() {
+    let ctx: Context = Context::default();
+    assert!(!ctx.get_aborted().await);
+    ctx.aborted().await;
+    assert!(ctx.get_aborted().await);
+    ctx.cancel_aborted().await;
+    assert!(!ctx.get_aborted().await);
+    assert!(!ctx.get_closed().await);
+    ctx.closed().await;
+    assert!(ctx.get_closed().await);
+    ctx.cancel_closed().await;
+    assert!(!ctx.get_closed().await);
+    assert!(!ctx.is_terminated().await);
+    ctx.aborted().await;
+    assert!(ctx.is_terminated().await);
+    ctx.cancel_aborted().await;
+    ctx.closed().await;
+    assert!(ctx.is_terminated().await);
+}
+#[tokio::test]
+async fn context_route_params() {
+    let ctx: Context = Context::default();
+    let mut params: RouteParams = RouteParams::default();
+    params.insert("id".to_string(), "123".to_string());
+    ctx.set_route_params(params).await;
+    let id: Option<String> = ctx.try_get_route_param("id").await;
+    assert_eq!(id, Some("123".to_string()));
+    let name: Option<String> = ctx.try_get_route_param("name").await;
+    assert_eq!(name, None);
+}
+#[tokio::test]
+async fn context_request_and_response() {
+    let ctx: Context = Context::default();
+    let request: Request = Request::default();
+    ctx.set_request(&request).await;
+    let fetched_request: Request = ctx.get_request().await;
+    assert_eq!(request.get_string(), fetched_request.get_string());
+    let response: Response = Response::default();
+    ctx.set_response(&response).await;
+    let fetched_response: Response = ctx.get_response().await;
+    assert_eq!(response.get_string(), fetched_response.get_string());
+}
+```
+# Path: hyperlane\src\tests\error.rs
+```rust
+use crate::*;
+#[tokio::test]
+async fn server_error() {
+    let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
+    let new_tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
+    assert_eq!(tcp_bind_error, new_tcp_bind_error);
+    let unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
+    let new_unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
+    assert_eq!(unknown_error, new_unknown_error);
+    let request: Request = Request::default();
+    let invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request.clone());
+    let new_invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request);
+    assert_eq!(invalid_http_request_error, new_invalid_http_request_error);
+    let other_error: ServerError = ServerError::Other("other error".to_string());
+    let new_other_error: ServerError = ServerError::Other("other error".to_string());
+    assert_eq!(other_error, new_other_error);
+}
+#[tokio::test]
+async fn route_error() {
+    let empty_pattern_error: RouteError = RouteError::EmptyPattern;
+    assert_eq!(empty_pattern_error, RouteError::EmptyPattern);
+    let duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
+    let new_duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
+    assert_eq!(duplicate_pattern_error, new_duplicate_pattern_error);
+    let invalid_regex_pattern_error: RouteError = RouteError::InvalidRegexPattern("[".to_string());
+    let new_invalid_regex_pattern_error: RouteError =
+        RouteError::InvalidRegexPattern("[".to_string());
+    assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
+}
+```
+# Path: hyperlane\src\tests\mod.rs
+```rust
+mod attribute;
+mod config;
+mod context;
+mod error;
+mod panic;
+mod route;
+mod send;
+mod server;
+```
+# Path: hyperlane\src\tests\panic.rs
+```rust
+use crate::*;
+#[test]
+fn panic_new() {
+    let panic: PanicData = PanicData::new(
+        Some("message".to_string()),
+        Some("location".to_string()),
+        Some("payload".to_string()),
+    );
+    assert_eq!(panic.get_message(), &Some("message".to_string()));
+    assert_eq!(panic.get_location(), &Some("location".to_string()));
+    assert_eq!(panic.get_payload(), &Some("payload".to_string()));
+}
+#[tokio::test]
+async fn from_join_error() {
+    let handle: JoinHandle<()> = tokio::spawn(async {
+        panic!("test panic");
+    });
+    let result: Result<(), JoinError> = handle.await;
+    assert!(result.is_err());
+    if let Err(join_error) = result {
+        let is_panic: bool = PanicData::from_join_error(join_error)
+            .get_message()
+            .clone()
+            .unwrap_or_default()
+            .contains("test panic");
+        assert!(is_panic);
+    }
+}
+```
+# Path: hyperlane\src\tests\route.rs
+```rust
+use crate::*;
+#[cfg(test)]
+async fn assert_panic_message_contains<F, Fut>(future_factory: F, expected_msg: &str)
+where
+    F: Fn() -> Fut + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    let result: Result<(), JoinError> = spawn(future_factory()).await;
+    assert!(
+        result.is_err(),
+        "Expected panic, but task completed successfully"
+    );
+    let join_err: JoinError = result.unwrap_err();
+    if !join_err.is_panic() {
+        panic!("Task failed but was not a panic");
+    }
+    let panic_payload: Box<dyn Any + Send> = join_err.into_panic();
+    let panic_msg: &str = if let Some(s) = panic_payload.downcast_ref::<&str>() {
+        s
+    } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+        s.as_str()
+    } else {
+        "Unknown panic type"
+    };
+    assert!(
+        panic_msg.contains(expected_msg),
+        "Expected panic message to contain: '{}', but got: '{}'",
+        expected_msg,
+        panic_msg
+    );
+}
+#[cfg(test)]
+struct TestRoute {
+    data: String,
+}
+#[cfg(test)]
+impl ServerHook for TestRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self {
+            data: String::new(),
+        }
+    }
+    async fn handle(mut self, _ctx: &Context) {
+        self.data = String::from("test");
+    }
+}
+#[tokio::test]
+async fn empty_route() {
+    assert_panic_message_contains(
+        || async {
+            let _server: &Server = Server::new().await.route::<TestRoute>(EMPTY_STR).await;
+        },
+        &RouteError::EmptyPattern.to_string(),
+    )
+    .await;
+}
+#[tokio::test]
+async fn duplicate_route() {
+    assert_panic_message_contains(
+        || async {
+            let _server: &Server = Server::new()
+                .await
+                .route::<TestRoute>(ROOT_PATH)
+                .await
+                .route::<TestRoute>(ROOT_PATH)
+                .await;
+        },
+        &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
+    )
+    .await;
+}
+#[tokio::test]
+async fn get_route() {
+    let server: Server = Server::new().await;
+    server
+        .route::<TestRoute>(ROOT_PATH)
+        .await
+        .route::<TestRoute>("/dynamic/{routing}")
+        .await
+        .route::<TestRoute>("/regex/{file:^.*$}")
+        .await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    for key in route_matcher.get_static_route().keys() {
+        println!("Static route: {key}");
+    }
+    for value in route_matcher.get_dynamic_route().values() {
+        for (route_pattern, _) in value {
+            println!("Dynamic route: {route_pattern}");
+        }
+    }
+    for value in route_matcher.get_regex_route().values() {
+        for (route_pattern, _) in value {
+            println!("Regex route: {route_pattern}");
+        }
+    }
+}
+#[tokio::test]
+async fn segment_count_optimization() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/users/{id}").await;
+    server.route::<TestRoute>("/users/{id}/posts").await;
+    server
+        .route::<TestRoute>("/users/{id}/posts/{post_id}")
+        .await;
+    server.route::<TestRoute>("/api/v1/users/{id}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&2),
+        "Should have 2-segment routes"
+    );
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&3),
+        "Should have 3-segment routes"
+    );
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&4),
+        "Should have 4-segment routes"
+    );
+    assert_eq!(route_matcher.get_dynamic_route().get(&2).unwrap().len(), 1);
+    assert_eq!(route_matcher.get_dynamic_route().get(&3).unwrap().len(), 1);
+    assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
+}
+#[tokio::test]
+async fn regex_route_segment_count() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/files/{path:.*}").await;
+    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
+    server
+        .route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}")
+        .await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(
+        route_matcher.get_regex_route().contains_key(&2),
+        "Should have 2-segment regex routes"
+    );
+    assert!(
+        route_matcher.get_regex_route().contains_key(&3),
+        "Should have 3-segment regex routes"
+    );
+    assert!(
+        route_matcher.get_regex_route().contains_key(&4),
+        "Should have 4-segment regex routes"
+    );
+}
+#[tokio::test]
+async fn mixed_route_types() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/").await;
+    server.route::<TestRoute>("/about").await;
+    server.route::<TestRoute>("/users/{id}").await;
+    server.route::<TestRoute>("/posts/{slug}").await;
+    server.route::<TestRoute>("/files/{path:.*}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert_eq!(route_matcher.get_static_route().len(), 2);
+    assert!(route_matcher.get_dynamic_route().contains_key(&2));
+    assert!(route_matcher.get_regex_route().contains_key(&2));
+}
+#[tokio::test]
+async fn large_dynamic_routes() {
+    const ROUTE_COUNT: u32 = 1000;
+    let server: Server = Server::new().await;
+    let start_insert: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/{{id}}");
+        server.route::<TestRoute>(&path).await;
+    }
+    let insert_duration: Duration = start_insert.elapsed();
+    println!(
+        "Inserted {} dynamic routes in: {:?}",
+        ROUTE_COUNT, insert_duration
+    );
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(!route_matcher.get_dynamic_route().is_empty());
+    let ctx: Context = Context::default();
+    let start_match: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/123");
+        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+    }
+    let match_duration: Duration = start_match.elapsed();
+    println!(
+        "Matched {} dynamic routes in: {:?}",
+        ROUTE_COUNT, match_duration
+    );
+    println!(
+        "Average per dynamic route match: {:?}",
+        match_duration / ROUTE_COUNT
+    );
+}
+#[tokio::test]
+async fn large_regex_routes() {
+    const ROUTE_COUNT: u32 = 1000;
+    let server: Server = Server::new().await;
+    let start_insert: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
+        server.route::<TestRoute>(&path).await;
+    }
+    let insert_duration: Duration = start_insert.elapsed();
+    println!(
+        "Inserted {} regex routes in: {:?}",
+        ROUTE_COUNT, insert_duration
+    );
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(!route_matcher.get_regex_route().is_empty());
+    let ctx: Context = Context::default();
+    let start_match: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/123");
+        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+    }
+    let match_duration: Duration = start_match.elapsed();
+    println!(
+        "Matched {} regex routes in: {:?}",
+        ROUTE_COUNT, match_duration
+    );
+    println!(
+        "Average per regex route match: {:?}",
+        match_duration / ROUTE_COUNT
+    );
+}
+#[tokio::test]
+async fn large_tail_regex_routes() {
+    const ROUTE_COUNT: u32 = 1000;
+    let server: Server = Server::new().await;
+    let start_insert: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/{{path:.*}}");
+        server.route::<TestRoute>(&path).await;
+    }
+    let insert_duration: Duration = start_insert.elapsed();
+    println!(
+        "Inserted {} tail regex routes in: {:?}",
+        ROUTE_COUNT, insert_duration
+    );
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    assert!(!route_matcher.get_regex_route().is_empty());
+    let ctx: Context = Context::default();
+    let start_match: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/some/nested/path");
+        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+    }
+    let match_duration: Duration = start_match.elapsed();
+    println!(
+        "Matched {} tail regex routes in: {:?}",
+        ROUTE_COUNT, match_duration
+    );
+    println!(
+        "Average per tail regex route match: {:?}",
+        match_duration / ROUTE_COUNT
+    );
+}
+```
+# Path: hyperlane\src\tests\send.rs
+```rust
+use crate::*;
+#[allow(dead_code)]
+struct TestSendRoute;
+impl ServerHook for TestSendRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, _ctx: &Context) {}
+}
+#[tokio::test]
+async fn server_send_sync() {
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send::<Server>();
+    assert_sync::<Server>();
+    assert_send_sync::<Server>();
+}
+#[tokio::test]
+async fn server_clone_across_threads() {
+    let server: Server = Server::new()
+        .await
+        .route::<TestSendRoute>("/test")
+        .await
+        .clone();
+    let server_clone: Server = server.clone();
+    let handle: JoinHandle<&'static str> = spawn(async move {
+        let _server_in_thread: Server = server_clone;
+        "success"
+    });
+    let result: &'static str = handle.await.unwrap();
+    assert_eq!(result, "success");
+}
+#[tokio::test]
+async fn server_share_across_threads() {
+    let server: Arc<Server> = Arc::new(
+        Server::new()
+            .await
+            .route::<TestSendRoute>("/test")
+            .await
+            .clone(),
+    );
+    let server1: Arc<Server> = server.clone();
+    let server2: Arc<Server> = server.clone();
+    let handle1: JoinHandle<&'static str> = spawn(async move {
+        let _server_in_thread1: Arc<Server> = server1;
+        "thread1"
+    });
+    let handle2: JoinHandle<&'static str> = spawn(async move {
+        let _server_in_thread2: Arc<Server> = server2;
+        "thread2"
+    });
+    let result1: &'static str = handle1.await.unwrap();
+    let result2: &'static str = handle2.await.unwrap();
+    assert_eq!(result1, "thread1");
+    assert_eq!(result2, "thread2");
+}
+```
+# Path: hyperlane\src\tests\server.rs
+```rust
+use crate::*;
+#[tokio::test]
+async fn server_partial_eq() {
+    let server1: Server = Server::new().await;
+    let server2: Server = Server::new().await;
+    assert_eq!(server1, server2);
+    let server1_clone: Server = server1.clone();
+    assert_eq!(server1, server1_clone);
+}
+#[tokio::test]
+async fn server_inner_partial_eq() {
+    let inner1: ServerInner = ServerInner::default();
+    let inner2: ServerInner = ServerInner::default();
+    assert_eq!(inner1, inner2);
+}
+struct TaskPanicHook {
+    response_body: String,
+    content_type: String,
+}
+impl ServerHook for TaskPanicHook {
+    async fn new(ctx: &Context) -> Self {
+        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+struct RequestErrorHook {
+    response_status_code: ResponseStatusCode,
+    response_body: String,
+}
+impl ServerHook for RequestErrorHook {
+    async fn new(ctx: &Context) -> Self {
+        let request_error: RequestError =
+            ctx.try_get_request_error_data().await.unwrap_or_default();
+        Self {
+            response_status_code: request_error.get_http_status_code(),
+            response_body: request_error.to_string(),
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(self.response_status_code)
+            .await
+            .set_response_body(self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+struct SendBodyMiddleware {
+    socket_addr: String,
+}
+impl ServerHook for SendBodyMiddleware {
+    async fn new(ctx: &Context) -> Self {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        Self { socket_addr }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(200)
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONNECTION, KEEP_ALIVE)
+            .await
+            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .await
+            .set_response_header("SocketAddr", &self.socket_addr)
+            .await;
+    }
+}
+struct UpgradeMiddleware;
+impl ServerHook for UpgradeMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            ctx.set_response_version(HttpVersion::Http1_1)
+                .await
+                .set_response_status_code(101)
+                .await
+                .set_response_header(UPGRADE, WEBSOCKET)
+                .await
+                .set_response_header(CONNECTION, UPGRADE)
+                .await
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .await
+                .set_response_body(&vec![])
+                .await
+                .send()
+                .await;
+        }
+    }
+}
+struct ResponseMiddleware;
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if ctx.get_request().await.is_ws() {
+            return;
+        }
+        ctx.send().await;
+    }
+}
+struct RootRoute {
+    response_body: String,
+    cookie1: String,
+    cookie2: String,
+}
+impl ServerHook for RootRoute {
+    async fn new(ctx: &Context) -> Self {
+        let path: RequestPath = ctx.get_request_path().await;
+        let response_body: String = format!("Hello hyperlane => {}", path);
+        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
+        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
+        Self {
+            response_body,
+            cookie1,
+            cookie2,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.add_response_header(SET_COOKIE, &self.cookie1)
+            .await
+            .add_response_header(SET_COOKIE, &self.cookie2)
+            .await
+            .set_response_body(&self.response_body)
+            .await;
+    }
+}
+struct SseRoute;
+impl ServerHook for SseRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .send()
+            .await;
+        for i in 0..10 {
+            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .await
+                .send_body()
+                .await;
+        }
+        ctx.closed().await;
+    }
+}
+struct WebsocketRoute;
+impl WebsocketRoute {
+    async fn send_body_hook(&self, ctx: &Context) {
+        if ctx.get_request().await.is_ws() {
+            let body: ResponseBody = ctx.get_response_body().await;
+            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+            ctx.send_body_list_with_data(&frame_list).await;
+        } else {
+            ctx.send_body().await;
+        }
+    }
+}
+impl ServerHook for WebsocketRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        loop {
+            match ctx.ws_from_stream(RequestConfig::default()).await {
+                Ok(_) => {
+                    let request_body: Vec<u8> = ctx.get_request_body().await;
+                    ctx.set_response_body(&request_body).await;
+                    self.send_body_hook(ctx).await;
+                    continue;
+                }
+                Err(error) => {
+                    ctx.set_response_body(&error.to_string()).await;
+                    self.send_body_hook(ctx).await;
+                    return;
+                }
+            }
+        }
+    }
+}
+struct DynamicRoute {
+    params: RouteParams,
+}
+impl ServerHook for DynamicRoute {
+    async fn new(ctx: &Context) -> Self {
+        Self {
+            params: ctx.get_route_params().await,
+        }
+    }
+    async fn handle(mut self, _ctx: &Context) {
+        self.params.insert("key".to_owned(), "value".to_owned());
+        panic!("Test panic {:?}", self.params);
+    }
+}
+#[tokio::test]
+async fn main() {
+    let server: Server = Server::new().await;
+    server.task_panic::<TaskPanicHook>().await;
+    server.request_error::<RequestErrorHook>().await;
+    server.request_middleware::<SendBodyMiddleware>().await;
+    server.request_middleware::<UpgradeMiddleware>().await;
+    server.response_middleware::<ResponseMiddleware>().await;
+    server.route::<RootRoute>("/").await;
+    server.route::<SseRoute>("/sse").await;
+    server.route::<WebsocketRoute>("/websocket").await;
+    server.route::<DynamicRoute>("/dynamic/{routing}").await;
+    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
+    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
+    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        server_control_hook_2.shutdown().await;
+    });
+    server_control_hook_1.wait().await;
+}
+```
+# Path: hyperlane-broadcast\README.md
+## hyperlane-broadcast
+[Official Documentation](https://docs.ltpp.vip/hyperlane-broadcast/)
+[Api Docs](https://docs.rs/hyperlane-broadcast/latest/hyperlane_broadcast/)
+> hyperlane-broadcast is a lightweight and ergonomic wrapper over Tokio’s broadcast channel designed for easy-to-use publish-subscribe messaging in async Rust applications. It simplifies the native Tokio broadcast API by providing a straightforward interface for broadcasting messages to multiple subscribers with minimal boilerplate.
 ## Installation
 To use this crate, you can run cmd:
 ```shell
-cargo add hyperlane-time
+cargo add hyperlane-broadcast
 ```
 ## Contact
-# Path: hyperlane-time/src/lib.rs
+# Path: hyperlane-broadcast\src\cfg.rs
 ```rust
-pub(crate) mod time;
-pub use time::r#fn::*;
-pub(crate) use time::r#enum::*;
-pub(crate) use std::{
-    env, fmt,
-    fmt::Write,
-    str::FromStr,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+#[tokio::test]
+pub async fn test_broadcast() {
+    use crate::*;
+    let broadcast: Broadcast<usize> = Broadcast::new(10);
+    let mut rec1: BroadcastReceiver<usize> = broadcast.subscribe();
+    let mut rec2: BroadcastReceiver<usize> = broadcast.subscribe();
+    broadcast.send(20).unwrap();
+    assert_eq!(rec1.recv().await, Ok(20));
+    assert_eq!(rec2.recv().await, Ok(20));
+}
+#[tokio::test]
+pub async fn test_broadcast_map() {
+    use crate::*;
+    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
+    broadcast_map.insert("a", 10);
+    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
+    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
+    let mut rec3: BroadcastMapReceiver<usize> =
+        broadcast_map.subscribe_or_insert("b", DEFAULT_BROADCAST_SENDER_CAPACITY);
+    broadcast_map.send("a", 20).unwrap();
+    broadcast_map.send("b", 10).unwrap();
+    assert_eq!(rec1.recv().await, Ok(20));
+    assert_eq!(rec2.recv().await, Ok(20));
+    assert_eq!(rec3.recv().await, Ok(10));
+}
 ```
-# Path: hyperlane-time/src/time/mod.rs
+# Path: hyperlane-broadcast\src\lib.rs
+```rust
+pub(crate) mod broadcast;
+pub(crate) mod broadcast_map;
+pub(crate) mod cfg;
+pub use broadcast::{r#const::*, r#struct::*, r#trait::*, r#type::*};
+pub use broadcast_map::{r#struct::*, r#trait::*, r#type::*};
+pub(crate) use std::{fmt::Debug, hash::BuildHasherDefault};
+pub(crate) use dashmap::*;
+pub(crate) use tokio::sync::broadcast::{
+    error::SendError,
+    {Receiver, Sender},
+};
+pub(crate) use twox_hash::XxHash3_64;
+```
+# Path: hyperlane-broadcast\src\broadcast\const.rs
+```rust
+pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
+```
+# Path: hyperlane-broadcast\src\broadcast\impl.rs
+```rust
+use crate::*;
+impl<T: Clone + Debug> BroadcastTrait for T {}
+impl<T: BroadcastTrait> Default for Broadcast<T> {
+    #[inline(always)]
+    fn default() -> Self {
+        let sender: BroadcastSender<T> = BroadcastSender::new(DEFAULT_BROADCAST_SENDER_CAPACITY);
+        Self(sender)
+    }
+}
+impl<T: BroadcastTrait> Broadcast<T> {
+    #[inline(always)]
+    pub fn new(capacity: Capacity) -> Self {
+        let sender: BroadcastSender<T> = BroadcastSender::new(capacity);
+        Self(sender)
+    }
+    #[inline(always)]
+    pub fn receiver_count(&self) -> ReceiverCount {
+        self.0.receiver_count()
+    }
+    #[inline(always)]
+    pub fn subscribe(&self) -> BroadcastReceiver<T> {
+        self.0.subscribe()
+    }
+    #[inline(always)]
+    pub fn send(&self, data: T) -> BroadcastSendResult<T> {
+        self.0.send(data)
+    }
+}
+```
+# Path: hyperlane-broadcast\src\broadcast\mod.rs
+```rust
+pub mod r#const;
+pub mod r#impl;
+pub mod r#struct;
+pub mod r#trait;
+pub mod r#type;
+```
+# Path: hyperlane-broadcast\src\broadcast\struct.rs
+```rust
+use crate::*;
+#[derive(Debug, Clone)]
+pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
+```
+# Path: hyperlane-broadcast\src\broadcast\trait.rs
+```rust
+use crate::*;
+pub trait BroadcastTrait: Clone + Debug {}
+```
+# Path: hyperlane-broadcast\src\broadcast\type.rs
+```rust
+use crate::*;
+pub type ReceiverCount = usize;
+pub type BroadcastSendError<T> = SendError<T>;
+pub type BroadcastSendResult<T> = Result<ReceiverCount, BroadcastSendError<T>>;
+pub type BroadcastReceiver<T> = Receiver<T>;
+pub type BroadcastSender<T> = Sender<T>;
+pub type Capacity = usize;
+```
+# Path: hyperlane-broadcast\src\broadcast_map\impl.rs
+```rust
+use crate::*;
+impl<T: Clone + Debug> BroadcastMapTrait for T {}
+impl<T: BroadcastMapTrait> Default for BroadcastMap<T> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self(DashMap::with_hasher(BuildHasherDefault::default()))
+    }
+}
+impl<T: BroadcastMapTrait> BroadcastMap<T> {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    #[inline(always)]
+    fn get(&self) -> &DashMapStringBroadcast<T> {
+        &self.0
+    }
+    #[inline(always)]
+    pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>
+    where
+        K: AsRef<str>,
+    {
+        let broadcast: Broadcast<T> = Broadcast::new(capacity);
+        self.get().insert(key.as_ref().to_owned(), broadcast)
+    }
+    #[inline(always)]
+    pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount
+    where
+        K: AsRef<str>,
+    {
+        self.get()
+            .get(key.as_ref())
+            .map(|receiver| receiver.receiver_count())
+    }
+    #[inline(always)]
+    pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>
+    where
+        K: AsRef<str>,
+    {
+        self.get()
+            .get(key.as_ref())
+            .map(|receiver| receiver.subscribe())
+    }
+    #[inline(always)]
+    pub fn subscribe_or_insert<K>(&self, key: K, capacity: Capacity) -> BroadcastMapReceiver<T>
+    where
+        K: AsRef<str>,
+    {
+        let key_ref: &str = key.as_ref();
+        match self.get().get(key_ref) {
+            Some(sender) => sender.subscribe(),
+            None => {
+                self.insert(key_ref, capacity);
+                self.subscribe_or_insert(key_ref, capacity)
+            }
+        }
+    }
+    #[inline(always)]
+    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T> {
+        match self.get().get(key.as_ref()) {
+            Some(sender) => sender.send(data).map(Some),
+            None => Ok(None),
+        }
+    }
+}
+```
+# Path: hyperlane-broadcast\src\broadcast_map\mod.rs
+```rust
+pub mod r#impl;
+pub mod r#struct;
+pub mod r#trait;
+pub mod r#type;
+```
+# Path: hyperlane-broadcast\src\broadcast_map\struct.rs
+```rust
+use crate::*;
+#[derive(Debug, Clone)]
+pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>);
+```
+# Path: hyperlane-broadcast\src\broadcast_map\trait.rs
+```rust
+use crate::*;
+pub trait BroadcastMapTrait: Clone + Debug {}
+```
+# Path: hyperlane-broadcast\src\broadcast_map\type.rs
+```rust
+use crate::*;
+pub type BroadcastMapSendError<T> = SendError<T>;
+pub type BroadcastMapSendResult<T> = Result<Option<ReceiverCount>, BroadcastMapSendError<T>>;
+pub type BroadcastMapReceiver<T> = Receiver<T>;
+pub type OptionBroadcast<T> = Option<Broadcast<T>>;
+pub type OptionBroadcastMapReceiver<T> = Option<BroadcastMapReceiver<T>>;
+pub type BroadcastMapSender<T> = Sender<T>;
+pub type OptionBroadcastMapSender<T> = Option<BroadcastMapSender<T>>;
+pub type OptionReceiverCount = Option<ReceiverCount>;
+pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDefault<XxHash3_64>>;
+```
+# Path: hyperlane-log\README.md
+## hyperlane-log
+[Official Documentation](https://docs.ltpp.vip/hyperlane-log/)
+[Api Docs](https://docs.rs/hyperlane-log/latest/hyperlane_log/)
+> A Rust logging library that supports both asynchronous and synchronous logging. It provides multiple log levels, such as error, info, and debug. Users can define custom log handling methods and configure log file paths. The library supports log rotation, automatically creating a new log file when the current file reaches the specified size limit. It allows flexible logging configurations, making it suitable for both high-performance asynchronous applications and traditional synchronous logging scenarios. The asynchronous mode utilizes Tokio's async channels for efficient log buffering, while the synchronous mode writes logs directly to the file system.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-log
+```
+## Log Storage Location Description
+> Three directories will be created under the user-specified directory: one for error logs, one for info logs, and one for debug logs. Each of these directories will contain a subdirectory named by the date, and the log files within these subdirectories will be named in the format `timestamp.index.log`.
+## Contact
+# Path: hyperlane-log\src\cfg.rs
+```rust
+#[cfg(test)]
+#[tokio::test]
+async fn test() {
+    use crate::*;
+    let log: FileLogger = FileLogger::new("./logs", 1_024_000);
+    let trace_str: String = String::from("custom trace message");
+    log.trace(trace_str, |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
+    });
+    let debug_str: String = String::from("custom debug message");
+    log.debug(debug_str, |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
+        write_data
+    });
+    let info_str: String = String::from("custom info message");
+    log.info(info_str, |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    });
+    let warn_str: String = String::from("custom warn message");
+    log.warn(warn_str, |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    });
+    let error_str: String = String::from("custom error message");
+    log.error(error_str, |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    });
+    let async_trace_str: String = String::from("custom async trace message");
+    log.async_trace(async_trace_str, |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
+    })
+    .await;
+    let async_debug_str: String = String::from("custom async debug message");
+    log.async_debug(async_debug_str, |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
+        write_data
+    })
+    .await;
+    let async_info_str: String = String::from("custom async info message");
+    log.async_info(async_info_str, |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    })
+    .await;
+    let async_warn_str: String = String::from("custom async warn message");
+    log.async_warn(async_warn_str, |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    })
+    .await;
+    let async_error_str: String = String::from("custom async error message");
+    log.async_error(async_error_str, |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    })
+    .await;
+}
+#[cfg(test)]
+#[tokio::test]
+async fn test_more_log_first() {
+    use crate::*;
+    let log: FileLogger = FileLogger::new("./logs", DISABLE_LOG_FILE_SIZE);
+    log.trace("trace data => ", |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
+    });
+    log.debug("debug data => ", |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
+        write_data
+    });
+    log.info("info data => ", |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    });
+    log.warn("warn data => ", |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    });
+    log.error("error data => ", |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    });
+    log.async_trace("async trace data => ", |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
+    })
+    .await;
+    log.async_debug("async debug data => ", |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
+        write_data
+    })
+    .await;
+    log.async_info("async info data => ", |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    })
+    .await;
+    log.async_warn("async warn data => ", |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    })
+    .await;
+    log.async_error("async error data => ", |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    })
+    .await;
+}
+#[cfg(test)]
+#[tokio::test]
+async fn test_more_log_second() {
+    use crate::*;
+    for _ in 0..10 {
+        let log: FileLogger = FileLogger::new("./logs", 512_000);
+        log.trace("trace data!\n", common_log);
+        log.async_trace("async trace data!\n", common_log).await;
+        log.debug("debug data!\n", common_log);
+        log.async_debug("async debug data!\n", common_log).await;
+        log.info("info data!\n", common_log);
+        log.async_info("async info data!\n", common_log).await;
+        log.warn("warn data!\n", common_log);
+        log.async_warn("async warn data!\n", common_log).await;
+        log.error("error data!\n", common_log);
+        log.async_error("async error data!\n", common_log).await;
+    }
+}
+```
+# Path: hyperlane-log\src\lib.rs
 ```rust
 pub(crate) mod cfg;
-pub(crate) mod r#enum;
-pub(crate) mod r#fn;
-pub(crate) mod r#impl;
+pub(crate) mod log;
+pub use log::*;
+pub(crate) use file_operation::*;
+pub(crate) use hyperlane_time::*;
+pub(crate) use std::fs::read_dir;
 ```
-# Path: hyperlane-time/src/time/enum.rs
+# Path: hyperlane-log\src\log\const.rs
 ```rust
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Lang {
-    EnUsUtf8,
-    #[default]
-    ZhCnUtf8,
-    FrFrUtf8,
-    DeDeUtf8,
-    EsEsUtf8,
-    ItItUtf8,
-    JaJpUtf8,
-    KoKrUtf8,
-    PtPtUtf8,
-    RuRuUtf8,
-    ArSaUtf8,
-    HiInUtf8,
-    ThThUtf8,
-    ViVnUtf8,
-    NlNlUtf8,
-    SvSeUtf8,
-    FiFiUtf8,
-}
+pub const DEFAULT_LOG_DIR: &str = "./logs";
+pub const LOG_EXTENSION: &str = "log";
+pub const DEFAULT_LOG_FILE_START_IDX: usize = 1;
+pub const DEFAULT_LOG_FILE_SIZE: usize = 1_024_000_000;
+pub const DISABLE_LOG_FILE_SIZE: usize = 0;
+pub(crate) const ROOT_PATH: &str = "/";
+pub(crate) const POINT: &str = ".";
+pub(crate) const BR: &str = "\n";
+pub const TRACE_DIR: &str = "trace";
+pub const DEBUG_DIR: &str = "debug";
+pub const INFO_DIR: &str = "info";
+pub const WARN_DIR: &str = "warn";
+pub const ERROR_DIR: &str = "error";
 ```
-# Path: hyperlane-time/src/time/fn.rs
+# Path: hyperlane-log\src\log\fn.rs
 ```rust
 use crate::*;
-pub const LEAP_YEAR: [u64; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-pub const COMMON_YEAR: [u64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-pub const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-pub const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-pub fn from_env_var() -> Lang {
-    let lang: Lang = env::var("LANG")
-        .unwrap_or_default()
-        .parse::<Lang>()
-        .unwrap_or_default();
-    lang
+pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
+    let mut res_idx: usize = DEFAULT_LOG_FILE_START_IDX;
+    if let Ok(entries) = read_dir(dir_path) {
+        for entry in entries.filter_map(Result::ok) {
+            let file_name: String = entry.file_name().to_string_lossy().to_string();
+            let parts: Vec<&str> = file_name.split(POINT).collect();
+            if parts.len() > 1
+                && let Ok(second_element) = parts[1].parse::<usize>()
+            {
+                res_idx = second_element.max(res_idx);
+            }
+        }
+    }
+    res_idx.max(DEFAULT_LOG_FILE_START_IDX)
 }
 #[inline(always)]
-pub fn is_leap_year(year: u64) -> bool {
-    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
-}
-pub fn time() -> String {
-    let (year, month, day, hour, minute, second, _, _) = calculate_time();
-    let mut date_time: String = String::new();
-    write!(
-        &mut date_time,
-        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}"
-    )
-    .unwrap_or_default();
-    date_time
-}
-pub fn date() -> String {
-    let (year, month, day, _, _, _, _, _) = calculate_time();
-    let mut date_time: String = String::new();
-    write!(&mut date_time, "{year:04}-{month:02}-{day:02}").unwrap_or_default();
-    date_time
-}
-pub fn compute_date(mut days_since_epoch: u64) -> (u64, u64, u64) {
-    let mut year: u64 = 1970;
-    loop {
-        let days_in_year: u64 = if is_leap_year(year) { 366 } else { 365 };
-        if days_since_epoch < days_in_year {
-            break;
-        }
-        days_since_epoch -= days_in_year as u64;
-        year += 1;
-    }
-    let mut month: u64 = 0;
-    for (i, &days) in COMMON_YEAR.iter().enumerate() {
-        let days_in_month = if i == 1 && is_leap_year(year) {
-            days + 1
-        } else {
-            days
-        };
-        if days_since_epoch < days_in_month as u64 {
-            month = i as u64 + 1;
-            return (year, month, days_since_epoch + 1);
-        }
-        days_since_epoch -= days_in_month as u64;
-    }
-    (year, month, 1)
-}
-pub fn gmt() -> String {
-    let now: SystemTime = SystemTime::now();
-    let duration_since_epoch: Duration = now.duration_since(UNIX_EPOCH).unwrap();
-    let timestamp: u64 = duration_since_epoch.as_secs();
-    let seconds_in_day: u64 = 86_400;
-    let days_since_epoch: u64 = timestamp / seconds_in_day;
-    let seconds_of_day: u64 = timestamp % seconds_in_day;
-    let hours: u64 = seconds_of_day / 3600;
-    let minutes: u64 = (seconds_of_day % 3600) / 60;
-    let seconds: u64 = seconds_of_day % 60;
-    let (year, month, day) = compute_date(days_since_epoch);
-    let weekday: usize = ((days_since_epoch + 4) % 7) as usize;
+pub(crate) fn get_file_name(idx: usize) -> String {
     format!(
-        "{}, {:02} {} {} {:02}:{:02}:{:02} GMT",
-        DAYS[weekday],
-        day,
-        MONTHS[month as usize - 1],
-        year,
-        hours,
-        minutes,
-        seconds
+        "{}{}{}{}{}{}",
+        ROOT_PATH,
+        date(),
+        POINT,
+        idx,
+        POINT,
+        LOG_EXTENSION
     )
 }
-pub fn year() -> u64 {
-    calculate_time().0
+#[inline(always)]
+pub(crate) fn get_file_dir_name() -> String {
+    format!("{}{}", ROOT_PATH, date())
 }
-pub fn month() -> u64 {
-    calculate_time().1
-}
-pub fn day() -> u64 {
-    calculate_time().2
-}
-pub fn hour() -> u64 {
-    calculate_time().3
-}
-pub fn minute() -> u64 {
-    calculate_time().4
-}
-pub fn second() -> u64 {
-    calculate_time().5
-}
-pub fn millis() -> u64 {
-    calculate_time().6
-}
-pub fn micros() -> u64 {
-    calculate_time().7
-}
-pub fn calculate_time() -> (u64, u64, u64, u64, u64, u64, u64, u64) {
-    let start: SystemTime = SystemTime::now();
-    let duration: Duration = start.duration_since(UNIX_EPOCH).unwrap();
-    let total_seconds: u64 = duration.as_secs();
-    let nanoseconds: u64 = duration.subsec_nanos() as u64;
-    let milliseconds: u64 = nanoseconds / 1_000_000;
-    let microseconds: u64 = nanoseconds / 1_000;
-    let mut total_days: u64 = total_seconds / 86400;
-    let mut year: u64 = 1970;
-    while total_days >= if is_leap_year(year) { 366 } else { 365 } {
-        total_days -= if is_leap_year(year) { 366 } else { 365 };
-        year += 1;
+pub(crate) fn get_log_path(system_dir: &str, base_path: &str, limit_file_size: &usize) -> String {
+    let mut combined_path: String = base_path.trim_end_matches(ROOT_PATH).to_string();
+    if !system_dir.starts_with(ROOT_PATH) {
+        combined_path.push_str(ROOT_PATH);
     }
-    let mut month: u64 = 1;
-    let month_days: [u64; 12] = if is_leap_year(year) {
-        LEAP_YEAR
-    } else {
-        COMMON_YEAR
-    };
-    while total_days >= month_days[month as usize - 1] {
-        total_days -= month_days[month as usize - 1];
-        month += 1;
+    combined_path.push_str(
+        system_dir
+            .trim_start_matches(ROOT_PATH)
+            .trim_end_matches(ROOT_PATH),
+    );
+    combined_path.push_str(&get_file_dir_name());
+    let idx: usize = get_second_element_from_filename(&combined_path);
+    let mut combined_path_clone: String = combined_path.clone();
+    combined_path.push_str(&get_file_name(idx));
+    let file_size: usize = get_file_size(&combined_path).unwrap_or_default() as usize;
+    if &file_size <= limit_file_size {
+        return combined_path;
     }
-    let day: u64 = total_days + 1;
-    let remaining_seconds: u64 = total_seconds % 86400;
-    let timezone_offset: u64 = from_env_var().value();
-    let hour: u64 = ((remaining_seconds + timezone_offset) / 3600) % 24;
-    let minute: u64 = (remaining_seconds % 3600) / 60;
-    let second: u64 = remaining_seconds % 60;
-    (
-        year,
-        month,
-        day,
-        hour,
-        minute,
-        second,
-        milliseconds,
-        microseconds,
-    )
+    combined_path_clone.push_str(&get_file_name(idx + 1));
+    combined_path_clone
 }
-pub fn time_millis() -> String {
-    let (year, month, day, hour, minute, second, millisecond, _) = calculate_time();
-    let mut date_time: String = String::new();
-    write!(
-        &mut date_time,
-        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{millisecond:03}"
-    )
-    .unwrap_or_default();
-    date_time
+#[inline(always)]
+pub fn common_log<T: AsRef<str>>(data: T) -> String {
+    let mut log_string: String = String::new();
+    for line in data.as_ref().lines() {
+        let line_string: String = format!("{}: {}{}", time(), line, BR);
+        log_string.push_str(&line_string);
+    }
+    log_string
 }
-pub fn time_micros() -> String {
-    let (year, month, day, hour, minute, second, _, microseconds) = calculate_time();
-    let mut date_time: String = String::new();
-    write!(
-        &mut date_time,
-        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{microseconds:06}"
-    )
-    .unwrap_or_default();
-    date_time
-}
-pub fn timestamp() -> u64 {
-    let timezone_offset: u64 = from_env_var().value();
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        .saturating_add(timezone_offset)
-}
-pub fn timestamp_millis() -> u64 {
-    let timezone_offset: u64 = from_env_var().value();
-    let duration: Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    (duration.as_secs().saturating_add(timezone_offset)) * 1000 + duration.subsec_millis() as u64
-}
-pub fn timestamp_micros() -> u64 {
-    let timezone_offset: u64 = from_env_var().value();
-    let duration: Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    (duration.as_secs().saturating_add(timezone_offset)) * 1_000_000
-        + duration.subsec_micros() as u64
+#[inline(always)]
+pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
+    common_log(log_data)
 }
 ```
-# Path: hyperlane-time/src/time/impl.rs
+# Path: hyperlane-log\src\log\impl.rs
 ```rust
 use crate::*;
-impl fmt::Display for Lang {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let lang_str: &str = match self {
-            Lang::EnUsUtf8 => "English (US)",
-            Lang::ZhCnUtf8 => "中文 (中国)",
-            Lang::FrFrUtf8 => "Français (France)",
-            Lang::DeDeUtf8 => "Deutsch (Deutschland)",
-            Lang::EsEsUtf8 => "Español (España)",
-            Lang::ItItUtf8 => "Italiano (Italia)",
-            Lang::JaJpUtf8 => "日本語 (日本)",
-            Lang::KoKrUtf8 => "한국어 (한국)",
-            Lang::PtPtUtf8 => "Português (Portugal)",
-            Lang::RuRuUtf8 => "Русский (Россия)",
-            Lang::ArSaUtf8 => "العربية (السعودية)",
-            Lang::HiInUtf8 => "हिन्दी (भारत)",
-            Lang::ThThUtf8 => "ภาษาไทย (ประเทศไทย)",
-            Lang::ViVnUtf8 => "Tiếng Việt (Việt Nam)",
-            Lang::NlNlUtf8 => "Nederlands (Nederland)",
-            Lang::SvSeUtf8 => "Svenska (Sverige)",
-            Lang::FiFiUtf8 => "Suomi (Suomi)",
-        };
-        write!(f, "{lang_str}")
-    }
+impl<F, T> FileLoggerFuncTrait<T> for F
+where
+    F: Fn(T) -> String + Send + Sync,
+    T: AsRef<str>,
+{
 }
-impl Lang {
-    pub fn value(&self) -> u64 {
-        match self {
-            Lang::EnUsUtf8 => 0,     
-            Lang::ZhCnUtf8 => 28800, 
-            Lang::FrFrUtf8 => 3600,  
-            Lang::DeDeUtf8 => 3600,  
-            Lang::EsEsUtf8 => 3600,  
-            Lang::ItItUtf8 => 3600,  
-            Lang::JaJpUtf8 => 32400, 
-            Lang::KoKrUtf8 => 32400, 
-            Lang::PtPtUtf8 => 3600,  
-            Lang::RuRuUtf8 => 10800, 
-            Lang::ArSaUtf8 => 10800, 
-            Lang::HiInUtf8 => 19800, 
-            Lang::ThThUtf8 => 25200, 
-            Lang::ViVnUtf8 => 25200, 
-            Lang::NlNlUtf8 => 3600,  
-            Lang::SvSeUtf8 => 3600,  
-            Lang::FiFiUtf8 => 3600,  
+impl Default for FileLogger {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            path: DEFAULT_LOG_DIR.to_owned(),
+            limit_file_size: DEFAULT_LOG_FILE_SIZE,
         }
     }
 }
-impl FromStr for Lang {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "en_US.UTF-8" => Ok(Lang::EnUsUtf8),
-            "zh_CN.UTF-8" => Ok(Lang::ZhCnUtf8),
-            "fr_FR.UTF-8" => Ok(Lang::FrFrUtf8),
-            "de_DE.UTF-8" => Ok(Lang::DeDeUtf8),
-            "es_ES.UTF-8" => Ok(Lang::EsEsUtf8),
-            "it_IT.UTF-8" => Ok(Lang::ItItUtf8),
-            "ja_JP.UTF-8" => Ok(Lang::JaJpUtf8),
-            "ko_KR.UTF-8" => Ok(Lang::KoKrUtf8),
-            "pt_PT.UTF-8" => Ok(Lang::PtPtUtf8),
-            "ru_RU.UTF-8" => Ok(Lang::RuRuUtf8),
-            "ar_SA.UTF-8" => Ok(Lang::ArSaUtf8),
-            "hi_IN.UTF-8" => Ok(Lang::HiInUtf8),
-            "th_TH.UTF-8" => Ok(Lang::ThThUtf8),
-            "vi_VN.UTF-8" => Ok(Lang::ViVnUtf8),
-            "nl_NL.UTF-8" => Ok(Lang::NlNlUtf8),
-            "sv_SE.UTF-8" => Ok(Lang::SvSeUtf8),
-            "fi_FI.UTF-8" => Ok(Lang::FiFiUtf8),
-            _ => Err(()),
+impl FileLogger {
+    #[inline(always)]
+    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {
+        Self {
+            path: path.as_ref().to_owned(),
+            limit_file_size,
         }
+    }
+    #[inline(always)]
+    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {
+        self.path = path.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {
+        self.limit_file_size = limit_file_size;
+        self
+    }
+    #[inline(always)]
+    pub fn is_enable(&self) -> bool {
+        self.limit_file_size != DISABLE_LOG_FILE_SIZE
+    }
+    #[inline(always)]
+    pub fn is_disable(&self) -> bool {
+        !self.is_enable()
+    }
+    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        if self.is_disable() {
+            return self;
+        }
+        let out: String = func(data);
+        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
+        let _ = append_to_file(&path, out.as_bytes());
+        self
+    }
+    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        if self.is_disable() {
+            return self;
+        }
+        let out: String = func(data);
+        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
+        let _ = async_append_to_file(&path, out.as_bytes()).await;
+        self
+    }
+    pub fn trace<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, TRACE_DIR)
+    }
+    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, TRACE_DIR).await
+    }
+    pub fn debug<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, DEBUG_DIR)
+    }
+    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, DEBUG_DIR).await
+    }
+    pub fn info<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, INFO_DIR)
+    }
+    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, INFO_DIR).await
+    }
+    pub fn warn<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, WARN_DIR)
+    }
+    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, WARN_DIR).await
+    }
+    pub fn error<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, ERROR_DIR)
+    }
+    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, ERROR_DIR).await
     }
 }
 ```
-# Path: hyperlane-time/src/time/cfg.rs
+# Path: hyperlane-log\src\log\mod.rs
 ```rust
-#[test]
-fn test_lang() {
-    use crate::*;
-    println!("test_lang: {}", from_env_var());
-}
-#[test]
-fn test_now_time() {
-    use crate::*;
-    println!("test_now_time: {}", time());
-}
-#[test]
-fn test_methods() {
-    use crate::*;
-    println!("Current Time: {}", time());
-    println!("Current Date: {}", date());
-    println!("GMT Date: {}", gmt());
-    println!("Timestamp (s): {}", timestamp());
-    println!("Timestamp (ms): {}", timestamp_millis());
-    println!("Timestamp (μs): {}", timestamp_micros());
-    println!("Current Year: {}", year());
-    println!("Current Month: {}", month());
-    println!("Current Day: {}", day());
-    println!("Current Hour: {}", hour());
-    println!("Current Minute: {}", minute());
-    println!("Current Second: {}", second());
-    println!("Current Millis: {}", millis());
-    println!("Current Micros: {}", micros());
-    println!("Is Leap Year (1949): {}", is_leap_year(1949));
-    println!("Calculate Current Time: {:?}", calculate_time());
-    println!("Compute Date (10000 days): {:?}", compute_date(10000));
-    println!("Current Time with Millis: {}", time_millis());
-    println!("Current Time with Micros: {}", time_micros());
+pub(crate) mod r#const;
+pub(crate) mod r#fn;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+pub(crate) mod r#trait;
+pub use r#const::*;
+pub use r#fn::*;
+pub use r#struct::*;
+pub use r#trait::*;
+```
+# Path: hyperlane-log\src\log\struct.rs
+```rust
+#[derive(Clone)]
+pub struct FileLogger {
+    pub(super) path: String,
+    pub(super) limit_file_size: usize,
 }
 ```
-# Path: hyperlane-macros/README.md
+# Path: hyperlane-log\src\log\trait.rs
+```rust
+pub trait FileLoggerFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
+```
+# Path: hyperlane-macros\README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
 [Api Docs](https://docs.rs/hyperlane-macros/latest/hyperlane_macros/)
@@ -6121,7 +3879,7 @@ cargo add hyperlane-macros
 - Request related macros are mostly query functions, while response related macros are mostly assignment functions.
 - When using `prologue_hooks` or `epilogue_hooks` macros, it is not recommended to combine them with other macros (such as `#[get]`, `#[post]`, `#[http]`, etc.) on the same function. These macros should be placed in the hook functions themselves. If you are not clear about how macros are expanded, combining them may lead to problematic code behavior.
 ## Contact
-# Path: hyperlane-macros/debug/src/main.rs
+# Path: hyperlane-macros\debug\src\main.rs
 ```rust
 use hyperlane::*;
 use hyperlane_macros::*;
@@ -7441,7 +5199,7 @@ async fn main() {
     server_control_hook_1.wait().await;
 }
 ```
-# Path: hyperlane-macros/src/lib.rs
+# Path: hyperlane-macros\src\lib.rs
 ```rust
 mod aborted;
 mod closed;
@@ -7810,12 +5568,29 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
     flush_macro(item, Position::Prologue)
 }
 ```
-# Path: hyperlane-macros/src/closed/mod.rs
+# Path: hyperlane-macros\src\aborted\fn.rs
+```rust
+use crate::*;
+pub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            let _ = #context.aborted().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "aborted",
+        handler: Handler::NoAttrPosition(aborted_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\aborted\mod.rs
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/closed/fn.rs
+# Path: hyperlane-macros\src\closed\fn.rs
 ```rust
 use crate::*;
 pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
@@ -7832,12 +5607,420 @@ inventory::submit! {
     }
 }
 ```
-# Path: hyperlane-macros/src/hook/mod.rs
+# Path: hyperlane-macros\src\closed\mod.rs
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/hook/fn.rs
+# Path: hyperlane-macros\src\common\const.rs
+```rust
+pub(crate) const SERVER_TYPE_KEY: &str = "Server";
+```
+# Path: hyperlane-macros\src\common\enum.rs
+```rust
+use crate::*;
+pub(crate) enum Handler {
+    WithAttr(MacroHandlerWithAttr),
+    NoAttrPosition(MacroHandlerPosition),
+    WithAttrPosition(MacroHandlerWithAttrPosition),
+}
+pub(crate) enum Position {
+    Prologue,
+    Epilogue,
+}
+```
+# Path: hyperlane-macros\src\common\fn.rs
+```rust
+use crate::*;
+fn inject_at_start(
+    input: TokenStream,
+    before_fn: impl FnOnce(&Ident) -> TokenStream2,
+) -> TokenStream {
+    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let before_code: TokenStream2 = before_fn(context);
+            let stmts: &Vec<Stmt> = &block.stmts;
+            let gen_code: TokenStream2 = quote! {
+                #(#attrs)*
+                #vis #sig {
+                    #before_code
+                    #(#stmts)*
+                }
+            };
+            gen_code.into()
+        }
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+fn inject_at_end(input: TokenStream, after_fn: impl FnOnce(&Ident) -> TokenStream2) -> TokenStream {
+    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let after_code: TokenStream2 = after_fn(context);
+            let stmts: &Vec<Stmt> = &block.stmts;
+            let gen_code: TokenStream2 = quote! {
+                #(#attrs)*
+                #vis #sig {
+                    #(#stmts)*
+                    #after_code
+                }
+            };
+            gen_code.into()
+        }
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+pub(crate) fn inject(
+    position: Position,
+    input: TokenStream,
+    hook: impl FnOnce(&Ident) -> TokenStream2,
+) -> TokenStream {
+    match position {
+        Position::Prologue => inject_at_start(input, hook),
+        Position::Epilogue => inject_at_end(input, hook),
+    }
+}
+#[allow(dead_code)]
+pub(crate) fn parse_context_from_fn(sig: &Signature) -> syn::Result<&Ident> {
+    match sig.inputs.first() {
+        Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
+            Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
+            Pat::Wild(wild) => Err(syn::Error::new_spanned(
+                wild,
+                "The argument cannot be anonymous `_`, please use a named identifier",
+            )),
+            _ => Err(syn::Error::new_spanned(
+                &pat_type.pat,
+                "expected identifier as first argument",
+            )),
+        },
+        _ => Err(syn::Error::new_spanned(
+            &sig.inputs,
+            "expected at least one argument",
+        )),
+    }
+}
+#[allow(dead_code)]
+pub(crate) fn parse_self_from_method(sig: &Signature) -> syn::Result<&Ident> {
+    match sig.inputs.first() {
+        Some(FnArg::Receiver(_)) => match sig.inputs.iter().nth(1) {
+            Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
+                Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
+                Pat::Wild(wild) => Err(syn::Error::new_spanned(
+                    wild,
+                    "The context argument cannot be anonymous `_`, please use a named identifier",
+                )),
+                _ => Err(syn::Error::new_spanned(
+                    &pat_type.pat,
+                    "expected identifier as second argument (context)",
+                )),
+            },
+            _ => Err(syn::Error::new_spanned(
+                &sig.inputs,
+                "expected context as second argument",
+            )),
+        },
+        _ => Err(syn::Error::new_spanned(
+            &sig.inputs,
+            "expected self as first argument for method",
+        )),
+    }
+}
+fn is_context_type(ty: &Type) -> bool {
+    if let Type::Reference(type_ref) = ty
+        && let Type::Path(type_path) = &*type_ref.elem
+    {
+        let path: &Path = &type_path.path;
+        if path.segments.len() >= 2 {
+            let segments: Vec<_> = path.segments.iter().collect();
+            if segments.len() >= 2 {
+                let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
+                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
+                    return true;
+                }
+            }
+        }
+        if path.segments.len() == 1 && path.segments[0].ident == "Context" {
+            return true;
+        }
+    }
+    false
+}
+pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<&Ident> {
+    for arg in sig.inputs.iter() {
+        if let FnArg::Typed(pat_type) = arg
+            && is_context_type(&pat_type.ty)
+        {
+            match &*pat_type.pat {
+                Pat::Ident(pat_ident) => return Ok(&pat_ident.ident),
+                Pat::Wild(wild) => {
+                    return Err(syn::Error::new_spanned(
+                        wild,
+                        "The context argument cannot be anonymous `_`, please use a named identifier",
+                    ));
+                }
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        &pat_type.pat,
+                        "expected identifier for context parameter",
+                    ));
+                }
+            }
+        }
+    }
+    Err(syn::Error::new_spanned(
+        &sig.inputs,
+        "expected at least one parameter of type &::hyperlane::Context",
+    ))
+}
+pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
+    match opt_expr {
+        Some(expr) => match expr {
+            Expr::Lit(ExprLit {
+                lit: Lit::Int(lit_int),
+                ..
+            }) => {
+                let value: isize = lit_int.base10_parse::<isize>().unwrap();
+                quote! { Some(#value) }
+            }
+            Expr::Lit(ExprLit {
+                lit: Lit::Str(lit_str),
+                ..
+            }) => {
+                let value: isize = lit_str.value().parse().expect("Cannot parse to isize");
+                quote! { Some(#value) }
+            }
+            _ => quote! { None },
+        },
+        None => quote! { None },
+    }
+}
+pub(crate) fn is_integer_literal(expr: &Expr) -> bool {
+    if matches!(
+        expr,
+        Expr::Lit(ExprLit {
+            lit: Lit::Int(_),
+            ..
+        })
+    ) {
+        return true;
+    }
+    if let Expr::Call(ExprCall { func, .. }) = expr {
+        if let Expr::Path(ExprPath { path, .. }) = &**func {
+            if path.segments.len() == 2 {
+                let first = &path.segments[0];
+                let second = &path.segments[1];
+                if first.ident == "RequestConfig" && second.ident == "default" {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+```
+# Path: hyperlane-macros\src\common\impl.rs
+```rust
+use crate::*;
+impl Parse for OrderAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.is_empty() {
+            return Ok(OrderAttr { order: None });
+        }
+        let expr: Expr = input.parse()?;
+        Ok(OrderAttr { order: Some(expr) })
+    }
+}
+```
+# Path: hyperlane-macros\src\common\mod.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+mod r#type;
+pub(crate) use r#const::*;
+pub(crate) use r#enum::*;
+pub(crate) use r#fn::*;
+pub(crate) use r#struct::*;
+pub(crate) use r#type::*;
+```
+# Path: hyperlane-macros\src\common\struct.rs
+```rust
+use crate::*;
+#[derive(Clone)]
+pub(crate) struct OrderAttr {
+    pub(crate) order: Option<Expr>,
+}
+pub(crate) struct InjectableMacro {
+    pub(crate) name: &'static str,
+    pub(crate) handler: Handler,
+}
+```
+# Path: hyperlane-macros\src\common\type.rs
+```rust
+use crate::*;
+pub(crate) type MacroHandlerPosition = fn(TokenStream, Position) -> TokenStream;
+pub(crate) type MacroHandlerWithAttr = fn(TokenStream, TokenStream) -> TokenStream;
+pub(crate) type MacroHandlerWithAttrPosition =
+    fn(TokenStream, TokenStream, Position) -> TokenStream;
+```
+# Path: hyperlane-macros\src\filter\fn.rs
+```rust
+use crate::*;
+pub(crate) fn filter_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let condition: Expr = parse_macro_input!(attr as Expr);
+    inject(position, item, |_| {
+        quote! {
+            if !(#condition) {
+                return;
+            }
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "filter",
+        handler: Handler::WithAttrPosition(filter_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\filter\mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros\src\flush\fn.rs
+```rust
+use crate::*;
+pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            let _ = #context.try_flush().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_flush",
+        handler: Handler::NoAttrPosition(try_flush_macro),
+    }
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "flush",
+        handler: Handler::NoAttrPosition(flush_macro),
+    }
+}
+pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            #context.flush().await;
+        }
+    })
+}
+```
+# Path: hyperlane-macros\src\flush\mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros\src\from_stream\impl.rs
+```rust
+use crate::*;
+impl Parse for FromStreamData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut request_config: Option<Expr> = None;
+        let mut variable_name: Option<Expr> = None;
+        if input.is_empty() {
+            return Ok(FromStreamData {
+                request_config,
+                variable_name,
+            });
+        }
+        let first_expr: Expr = input.parse()?;
+        if input.is_empty() {
+            if is_integer_literal(&first_expr) {
+                request_config = Some(first_expr);
+            } else {
+                variable_name = Some(first_expr);
+            }
+        } else {
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "expected second parameter after comma",
+                ));
+            }
+            let second_expr: Expr = input.parse()?;
+            let first_is_int: bool = is_integer_literal(&first_expr);
+            let second_is_int: bool = is_integer_literal(&second_expr);
+            match (first_is_int, second_is_int) {
+                (true, true) => {
+                    return Err(syn::Error::new_spanned(
+                        &second_expr,
+                        "cannot have two request config parameters",
+                    ));
+                }
+                (false, false) => {
+                    return Err(syn::Error::new_spanned(
+                        &second_expr,
+                        "cannot have two variable name parameters",
+                    ));
+                }
+                (true, false) => {
+                    request_config = Some(first_expr);
+                    variable_name = Some(second_expr);
+                }
+                (false, true) => {
+                    variable_name = Some(first_expr);
+                    request_config = Some(second_expr);
+                }
+            }
+        }
+        if !input.is_empty() {
+            return Err(syn::Error::new_spanned(
+                input.parse::<TokenStream2>()?,
+                "unexpected additional tokens in attribute",
+            ));
+        }
+        Ok(FromStreamData {
+            request_config,
+            variable_name,
+        })
+    }
+}
+```
+# Path: hyperlane-macros\src\from_stream\mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+```
+# Path: hyperlane-macros\src\from_stream\struct.rs
+```rust
+use crate::*;
+pub(crate) struct FromStreamData {
+    pub(crate) request_config: Option<Expr>,
+    pub(crate) variable_name: Option<Expr>,
+}
+```
+# Path: hyperlane-macros\src\hook\fn.rs
 ```rust
 use crate::*;
 pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -7927,196 +6110,266 @@ inventory::submit! {
     }
 }
 ```
-# Path: hyperlane-macros/src/response/mod.rs
+# Path: hyperlane-macros\src\hook\mod.rs
 ```rust
-mod r#enum;
 mod r#fn;
-mod r#impl;
-mod r#struct;
-pub(crate) use r#enum::*;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros\src\host\fn.rs
+```rust
+use crate::*;
+pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
+    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
+    inject(position, item, |context| {
+        let statements = multi_host.host_values.iter().map(|host_value| {
+            quote! {
+                let request_host: ::hyperlane::RequestHost = #context.get_request_host().await;
+                if request_host.as_str() != #host_value {
+                    return;
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "host",
+        handler: Handler::WithAttrPosition(host_macro),
+    }
+}
+pub(crate) fn reject_host_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
+    inject(position, item, |context| {
+        let statements = multi_host.host_values.iter().map(|host_value| {
+            quote! {
+                let request_host: ::hyperlane::RequestHost = #context.get_request_host().await;
+                if request_host.as_str() == #host_value {
+                    return;
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "reject_host",
+        handler: Handler::WithAttrPosition(reject_host_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\host\impl.rs
+```rust
+use crate::*;
+impl Parse for MultiHostData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut host_values: Vec<Expr> = Vec::new();
+        loop {
+            let host_value: Expr = input.parse()?;
+            host_values.push(host_value);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiHostData { host_values })
+    }
+}
+```
+# Path: hyperlane-macros\src\host\mod.rs
+```rust
+pub(crate) mod r#fn;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
 pub(crate) use r#fn::*;
 pub(crate) use r#struct::*;
 ```
-# Path: hyperlane-macros/src/response/enum.rs
-```rust
-pub(crate) enum HeaderOperation {
-    Set,
-    Add,
-}
-```
-# Path: hyperlane-macros/src/response/struct.rs
+# Path: hyperlane-macros\src\host\struct.rs
 ```rust
 use crate::*;
-pub(crate) struct SendData {
-    pub(crate) data: Expr,
+pub(crate) struct MultiHostData {
+    pub(crate) host_values: Vec<Expr>,
 }
 ```
-# Path: hyperlane-macros/src/response/fn.rs
+# Path: hyperlane-macros\src\http\fn.rs
 ```rust
 use crate::*;
-pub(crate) fn response_status_code_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let value: Expr = match parse(attr) {
-        Ok(v) => v,
-        Err(err) => return err.to_compile_error().into(),
-    };
-    inject(position, item, |context| {
-        quote! {
-            #context.set_response_status_code(::hyperlane::ResponseStatusCode::from(#value as usize)).await;
+macro_rules! impl_http_method_macro {
+    ($name:ident, $method:expr) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_method_check($method, proc_macro2::Span::call_site()),
+            )
         }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_status_code",
-        handler: Handler::WithAttrPosition(response_status_code_macro),
-    }
-}
-pub(crate) fn response_reason_phrase_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let value: Expr = match parse(attr) {
-        Ok(v) => v,
-        Err(err) => return err.to_compile_error().into(),
-    };
-    inject(position, item, |context| {
-        quote! {
-            #context.set_response_reason_phrase(&#value).await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_reason_phrase",
-        handler: Handler::WithAttrPosition(response_reason_phrase_macro),
-    }
-}
-pub(crate) fn response_header_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);
-    let key: Expr = header_data.key;
-    let value: Expr = header_data.value;
-    let operation: HeaderOperation = header_data.operation;
-    inject(position, item, |context| match operation {
-        HeaderOperation::Add => {
-            quote! {
-                #context.add_response_header(&#key, &#value).await;
+        inventory::submit! {
+            InjectableMacro {
+                name: $method,
+                handler: Handler::NoAttrPosition($name),
             }
         }
-        HeaderOperation::Set => {
-            quote! {
-                #context.set_response_header(&#key, &#value).await;
+    };
+}
+impl_http_method_macro!(get_handler, "get");
+impl_http_method_macro!(post_handler, "post");
+impl_http_method_macro!(put_handler, "put");
+impl_http_method_macro!(delete_handler, "delete");
+impl_http_method_macro!(patch_handler, "patch");
+impl_http_method_macro!(head_handler, "head");
+impl_http_method_macro!(options_handler, "options");
+impl_http_method_macro!(connect_handler, "connect");
+impl_http_method_macro!(trace_handler, "trace");
+pub(crate) fn create_method_check(
+    method_name: &str,
+    span: proc_macro2::Span,
+) -> impl FnOnce(&Ident) -> TokenStream2 {
+    let check_method: Ident = Ident::new(&format!("is_{method_name}"), span);
+    move |context| {
+        quote! {
+            if !#context.get_request().await.#check_method() {
+                return;
             }
         }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_header",
-        handler: Handler::WithAttrPosition(response_header_macro),
     }
 }
-pub(crate) fn response_body_macro(
+pub(crate) fn methods_macro(
     attr: TokenStream,
     item: TokenStream,
     position: Position,
 ) -> TokenStream {
-    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
-    let body: Expr = body_data.body;
-    inject(position, item, |context| {
-        quote! {
-            #context.set_response_body(&#body).await;
+    let item_clone_1: TokenStream = item.clone();
+    let methods: RequestMethods = parse_macro_input!(attr as RequestMethods);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let sig: &Signature = &input_fn.sig;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let method_checks = methods.methods.iter().map(|method| {
+                let check_fn: Ident = Ident::new(&format!("is_{method}"), method.span());
+                quote! {
+                    #context.get_request().await.#check_fn()
+                }
+            });
+            inject(position, item_clone_1, |_| {
+                quote! {
+                    if !(#(#method_checks)||*) {
+                        return;
+                    }
+                }
+            })
         }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_body",
-        handler: Handler::WithAttrPosition(response_body_macro),
+        Err(err) => err.to_compile_error().into(),
     }
 }
-pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            #context.clear_response_headers().await;
-        }
-    })
-}
 inventory::submit! {
     InjectableMacro {
-        name: "clear_response_headers",
-        handler: Handler::NoAttrPosition(clear_response_headers_macro),
-    }
-}
-pub(crate) fn response_version_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let value: Expr = match parse(attr) {
-        Ok(v) => v,
-        Err(err) => return err.to_compile_error().into(),
-    };
-    inject(position, item, |context| {
-        quote! {
-            #context.set_response_version(#value).await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_version",
-        handler: Handler::WithAttrPosition(response_version_macro),
+        name: "methods",
+        handler: Handler::WithAttrPosition(methods_macro),
     }
 }
 ```
-# Path: hyperlane-macros/src/response/impl.rs
+# Path: hyperlane-macros\src\http\mod.rs
 ```rust
-use crate::*;
-impl Parse for ResponseHeaderData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let key: Expr = input.parse()?;
-        let operation: HeaderOperation = if input.peek(Token![=>]) {
-            input.parse::<Token![=>]>()?;
-            HeaderOperation::Set
-        } else if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-            HeaderOperation::Add
-        } else {
-            return Err(syn::Error::new(
-                input.span(),
-                "Expected either ',' for add operation or '=>' for set operation",
-            ));
-        };
-        let value: Expr = input.parse()?;
-        Ok(ResponseHeaderData {
-            key,
-            value,
-            operation,
-        })
-    }
-}
-impl Parse for ResponseBodyData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let body: Expr = input.parse()?;
-        Ok(ResponseBodyData { body })
-    }
-}
-```
-# Path: hyperlane-macros/src/inject/mod.rs
-```rust
-pub(crate) mod r#fn;
+mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/inject/fn.rs
+# Path: hyperlane-macros\src\hyperlane\fn.rs
+```rust
+use crate::*;
+pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let multi_hyperlane: MultiHyperlaneAttr = parse_macro_input!(attr as MultiHyperlaneAttr);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let ident: &Ident = &sig.ident;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    let stmts: &Vec<Stmt> = &block.stmts;
+    let inputs: &Punctuated<FnArg, token::Comma> = &sig.inputs;
+    let output: &ReturnType = &sig.output;
+    let mut init_statements: Vec<TokenStream2> = Vec::new();
+    for (var_name, type_name) in &multi_hyperlane.params {
+        init_statements.push(quote! {
+            let #var_name: #type_name = #type_name::new().await;
+        });
+        if type_name == SERVER_TYPE_KEY {
+            init_statements.push(quote! {
+                let mut hooks: Vec<::hyperlane::HookType> = inventory::iter().cloned().collect();
+                assert_hook_unique_order(hooks.clone());
+                hooks.sort_by_key(|hook| hook.try_get_order());
+                for hook in hooks {
+                    #var_name.handle_hook(hook.clone()).await;
+                }
+            });
+        }
+    }
+    let gen_code: TokenStream2 = quote! {
+        #(#attrs)*
+        #vis async fn #ident(#inputs) #output {
+            #(#init_statements)*
+            #(#stmts)*
+        }
+    };
+    gen_code.into()
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "hyperlane",
+        handler: Handler::WithAttr(hyperlane_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\hyperlane\impl.rs
+```rust
+use crate::*;
+impl Parse for MultiHyperlaneAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut params: Vec<(Ident, Ident)> = Vec::new();
+        loop {
+            let var_name: Ident = input.parse()?;
+            input.parse::<Token![:]>()?;
+            let type_name: Ident = input.parse()?;
+            params.push((var_name, type_name));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiHyperlaneAttr { params })
+    }
+}
+```
+# Path: hyperlane-macros\src\hyperlane\mod.rs
+```rust
+pub(crate) mod r#fn;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+pub(crate) use r#fn::*;
+pub(crate) use r#struct::*;
+```
+# Path: hyperlane-macros\src\hyperlane\struct.rs
+```rust
+use crate::*;
+pub(crate) struct MultiHyperlaneAttr {
+    pub(crate) params: Vec<(Ident, Ident)>,
+}
+```
+# Path: hyperlane-macros\src\inject\fn.rs
 ```rust
 use crate::*;
 fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) -> TokenStream {
@@ -8174,257 +6427,12 @@ pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
     current_stream
 }
 ```
-# Path: hyperlane-macros/src/request_middleware/mod.rs
+# Path: hyperlane-macros\src\inject\mod.rs
 ```rust
 pub(crate) mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/request_middleware/fn.rs
-```rust
-use crate::*;
-pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
-    let order: TokenStream2 = expr_to_isize(&attr_args.order);
-    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
-    let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
-        #input_struct
-        ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
-        }
-    };
-    gen_code.into()
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_middleware",
-        handler: Handler::WithAttr(request_middleware_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/hyperlane/mod.rs
-```rust
-pub(crate) mod r#fn;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
-```
-# Path: hyperlane-macros/src/hyperlane/struct.rs
-```rust
-use crate::*;
-pub(crate) struct MultiHyperlaneAttr {
-    pub(crate) params: Vec<(Ident, Ident)>,
-}
-```
-# Path: hyperlane-macros/src/hyperlane/fn.rs
-```rust
-use crate::*;
-pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let multi_hyperlane: MultiHyperlaneAttr = parse_macro_input!(attr as MultiHyperlaneAttr);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
-    let block: &Block = &input_fn.block;
-    let ident: &Ident = &sig.ident;
-    let attrs: &Vec<Attribute> = &input_fn.attrs;
-    let stmts: &Vec<Stmt> = &block.stmts;
-    let inputs: &Punctuated<FnArg, token::Comma> = &sig.inputs;
-    let output: &ReturnType = &sig.output;
-    let mut init_statements: Vec<TokenStream2> = Vec::new();
-    for (var_name, type_name) in &multi_hyperlane.params {
-        init_statements.push(quote! {
-            let #var_name: #type_name = #type_name::new().await;
-        });
-        if type_name == SERVER_TYPE_KEY {
-            init_statements.push(quote! {
-                let mut hooks: Vec<::hyperlane::HookType> = inventory::iter().cloned().collect();
-                assert_hook_unique_order(hooks.clone());
-                hooks.sort_by_key(|hook| hook.try_get_order());
-                for hook in hooks {
-                    #var_name.handle_hook(hook.clone()).await;
-                }
-            });
-        }
-    }
-    let gen_code: TokenStream2 = quote! {
-        #(#attrs)*
-        #vis async fn #ident(#inputs) #output {
-            #(#init_statements)*
-            #(#stmts)*
-        }
-    };
-    gen_code.into()
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "hyperlane",
-        handler: Handler::WithAttr(hyperlane_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/hyperlane/impl.rs
-```rust
-use crate::*;
-impl Parse for MultiHyperlaneAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let mut params: Vec<(Ident, Ident)> = Vec::new();
-        loop {
-            let var_name: Ident = input.parse()?;
-            input.parse::<Token![:]>()?;
-            let type_name: Ident = input.parse()?;
-            params.push((var_name, type_name));
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-            if input.is_empty() {
-                break;
-            }
-        }
-        Ok(MultiHyperlaneAttr { params })
-    }
-}
-```
-# Path: hyperlane-macros/src/referer/mod.rs
-```rust
-mod r#fn;
-mod r#impl;
-mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
-```
-# Path: hyperlane-macros/src/referer/struct.rs
-```rust
-use crate::*;
-pub(crate) struct MultiRefererData {
-    pub(crate) referer_values: Vec<Expr>,
-}
-```
-# Path: hyperlane-macros/src/referer/fn.rs
-```rust
-use crate::*;
-pub(crate) fn referer_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
-    inject(position, item, |context| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value| {
-            quote! {
-                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.try_get_request_header_back(REFERER).await;
-                if let Some(referer_header) = referer {
-                    if referer_header != #referer_value {
-                        return;
-                    }
-                } else {
-                    return;
-                }
-            }
-        });
-        quote! {
-            #(#statements)*
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "referer",
-        handler: Handler::WithAttrPosition(referer_macro),
-    }
-}
-pub(crate) fn reject_referer_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
-    inject(position, item, |context| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value| {
-            quote! {
-                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.try_get_request_header_back(REFERER).await;
-                if let Some(referer_header) = referer {
-                    if referer_header == #referer_value {
-                        return;
-                    }
-                }
-            }
-        });
-        quote! {
-            #(#statements)*
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "reject_referer",
-        handler: Handler::WithAttrPosition(reject_referer_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/referer/impl.rs
-```rust
-use crate::*;
-impl Parse for MultiRefererData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut referer_values: Vec<Expr> = Vec::new();
-        loop {
-            let referer_value: Expr = input.parse()?;
-            referer_values.push(referer_value);
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-            if input.is_empty() {
-                break;
-            }
-        }
-        Ok(MultiRefererData { referer_values })
-    }
-}
-```
-# Path: hyperlane-macros/src/flush/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/flush/fn.rs
-```rust
-use crate::*;
-pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            let _ = #context.try_flush().await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "try_flush",
-        handler: Handler::NoAttrPosition(try_flush_macro),
-    }
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "flush",
-        handler: Handler::NoAttrPosition(flush_macro),
-    }
-}
-pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            #context.flush().await;
-        }
-    })
-}
-```
-# Path: hyperlane-macros/src/protocol/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/protocol/fn.rs
+# Path: hyperlane-macros\src\protocol\fn.rs
 ```rust
 use crate::*;
 pub(crate) fn ws_macro(item: TokenStream, position: Position) -> TokenStream {
@@ -8491,7 +6499,95 @@ impl_protocol_check_macro!(http2_macro, is_http2, "http2");
 impl_protocol_check_macro!(http3_macro, is_http3, "http3");
 impl_protocol_check_macro!(tls_macro, is_tls, "tls");
 ```
-# Path: hyperlane-macros/src/request/mod.rs
+# Path: hyperlane-macros\src\protocol\mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros\src\referer\fn.rs
+```rust
+use crate::*;
+pub(crate) fn referer_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
+    inject(position, item, |context| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+            quote! {
+                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.try_get_request_header_back(REFERER).await;
+                if let Some(referer_header) = referer {
+                    if referer_header != #referer_value {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "referer",
+        handler: Handler::WithAttrPosition(referer_macro),
+    }
+}
+pub(crate) fn reject_referer_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
+    inject(position, item, |context| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+            quote! {
+                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.try_get_request_header_back(REFERER).await;
+                if let Some(referer_header) = referer {
+                    if referer_header == #referer_value {
+                        return;
+                    }
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "reject_referer",
+        handler: Handler::WithAttrPosition(reject_referer_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\referer\impl.rs
+```rust
+use crate::*;
+impl Parse for MultiRefererData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut referer_values: Vec<Expr> = Vec::new();
+        loop {
+            let referer_value: Expr = input.parse()?;
+            referer_values.push(referer_value);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRefererData { referer_values })
+    }
+}
+```
+# Path: hyperlane-macros\src\referer\mod.rs
 ```rust
 mod r#fn;
 mod r#impl;
@@ -8499,62 +6595,43 @@ mod r#struct;
 pub(crate) use r#fn::*;
 pub(crate) use r#struct::*;
 ```
-# Path: hyperlane-macros/src/request/struct.rs
+# Path: hyperlane-macros\src\referer\struct.rs
 ```rust
 use crate::*;
-pub(crate) struct RequestMethods {
-    pub(crate) methods: Punctuated<Ident, Token![,]>,
-}
-pub(crate) struct MultiRequestBodyData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRequestBodyJsonData {
-    pub(crate) params: Vec<(Ident, Type)>,
-}
-pub(crate) struct MultiAttributeData {
-    pub(crate) params: Vec<(Expr, Ident, Type)>,
-}
-pub(crate) struct MultiAttributesData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRouteParamData {
-    pub(crate) params: Vec<(Expr, Ident)>,
-}
-pub(crate) struct MultiRouteParamsData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiQueryData {
-    pub(crate) params: Vec<(Expr, Ident)>,
-}
-pub(crate) struct MultiQuerysData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiHeaderData {
-    pub(crate) params: Vec<(Expr, Ident)>,
-}
-pub(crate) struct MultiHeadersData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiCookieData {
-    pub(crate) params: Vec<(Expr, Ident)>,
-}
-pub(crate) struct MultiCookiesData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRequestVersionData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRequestPathData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiPanicData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRequestErrorData {
-    pub(crate) variables: Vec<Ident>,
+pub(crate) struct MultiRefererData {
+    pub(crate) referer_values: Vec<Expr>,
 }
 ```
-# Path: hyperlane-macros/src/request/fn.rs
+# Path: hyperlane-macros\src\reject\fn.rs
+```rust
+use crate::*;
+pub(crate) fn reject_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let condition: Expr = parse_macro_input!(attr as Expr);
+    inject(position, item, |_| {
+        quote! {
+            if #condition {
+                return;
+            }
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "reject",
+        handler: Handler::WithAttrPosition(reject_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\reject\mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros\src\request\fn.rs
 ```rust
 use crate::*;
 pub(crate) fn request_body_macro(
@@ -9119,7 +7196,7 @@ inventory::submit! {
     }
 }
 ```
-# Path: hyperlane-macros/src/request/impl.rs
+# Path: hyperlane-macros\src\request\impl.rs
 ```rust
 use crate::*;
 impl Parse for RequestMethods {
@@ -9416,34 +7493,482 @@ impl Parse for MultiRequestErrorData {
     }
 }
 ```
-# Path: hyperlane-macros/src/aborted/mod.rs
+# Path: hyperlane-macros\src\request\mod.rs
 ```rust
 mod r#fn;
+mod r#impl;
+mod r#struct;
 pub(crate) use r#fn::*;
+pub(crate) use r#struct::*;
 ```
-# Path: hyperlane-macros/src/aborted/fn.rs
+# Path: hyperlane-macros\src\request\struct.rs
 ```rust
 use crate::*;
-pub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {
+pub(crate) struct RequestMethods {
+    pub(crate) methods: Punctuated<Ident, Token![,]>,
+}
+pub(crate) struct MultiRequestBodyData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestBodyJsonData {
+    pub(crate) params: Vec<(Ident, Type)>,
+}
+pub(crate) struct MultiAttributeData {
+    pub(crate) params: Vec<(Expr, Ident, Type)>,
+}
+pub(crate) struct MultiAttributesData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRouteParamData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiRouteParamsData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiQueryData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiQuerysData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiHeaderData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiHeadersData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiCookieData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiCookiesData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestVersionData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestPathData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiPanicData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestErrorData {
+    pub(crate) variables: Vec<Ident>,
+}
+```
+# Path: hyperlane-macros\src\request_middleware\fn.rs
+```rust
+use crate::*;
+pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
+    let order: TokenStream2 = expr_to_isize(&attr_args.order);
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: TokenStream2 = quote! {
+        #input_struct
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "request_middleware",
+        handler: Handler::WithAttr(request_middleware_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\request_middleware\mod.rs
+```rust
+pub(crate) mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros\src\response\enum.rs
+```rust
+pub(crate) enum HeaderOperation {
+    Set,
+    Add,
+}
+```
+# Path: hyperlane-macros\src\response\fn.rs
+```rust
+use crate::*;
+pub(crate) fn response_status_code_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
     inject(position, item, |context| {
         quote! {
-            let _ = #context.aborted().await;
+            #context.set_response_status_code(::hyperlane::ResponseStatusCode::from(#value as usize)).await;
         }
     })
 }
 inventory::submit! {
     InjectableMacro {
-        name: "aborted",
-        handler: Handler::NoAttrPosition(aborted_macro),
+        name: "response_status_code",
+        handler: Handler::WithAttrPosition(response_status_code_macro),
+    }
+}
+pub(crate) fn response_reason_phrase_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    inject(position, item, |context| {
+        quote! {
+            #context.set_response_reason_phrase(&#value).await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_reason_phrase",
+        handler: Handler::WithAttrPosition(response_reason_phrase_macro),
+    }
+}
+pub(crate) fn response_header_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);
+    let key: Expr = header_data.key;
+    let value: Expr = header_data.value;
+    let operation: HeaderOperation = header_data.operation;
+    inject(position, item, |context| match operation {
+        HeaderOperation::Add => {
+            quote! {
+                #context.add_response_header(&#key, &#value).await;
+            }
+        }
+        HeaderOperation::Set => {
+            quote! {
+                #context.set_response_header(&#key, &#value).await;
+            }
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_header",
+        handler: Handler::WithAttrPosition(response_header_macro),
+    }
+}
+pub(crate) fn response_body_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
+    let body: Expr = body_data.body;
+    inject(position, item, |context| {
+        quote! {
+            #context.set_response_body(&#body).await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_body",
+        handler: Handler::WithAttrPosition(response_body_macro),
+    }
+}
+pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            #context.clear_response_headers().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "clear_response_headers",
+        handler: Handler::NoAttrPosition(clear_response_headers_macro),
+    }
+}
+pub(crate) fn response_version_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    inject(position, item, |context| {
+        quote! {
+            #context.set_response_version(#value).await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_version",
+        handler: Handler::WithAttrPosition(response_version_macro),
     }
 }
 ```
-# Path: hyperlane-macros/src/stream/mod.rs
+# Path: hyperlane-macros\src\response\impl.rs
 ```rust
+use crate::*;
+impl Parse for ResponseHeaderData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let key: Expr = input.parse()?;
+        let operation: HeaderOperation = if input.peek(Token![=>]) {
+            input.parse::<Token![=>]>()?;
+            HeaderOperation::Set
+        } else if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            HeaderOperation::Add
+        } else {
+            return Err(syn::Error::new(
+                input.span(),
+                "Expected either ',' for add operation or '=>' for set operation",
+            ));
+        };
+        let value: Expr = input.parse()?;
+        Ok(ResponseHeaderData {
+            key,
+            value,
+            operation,
+        })
+    }
+}
+impl Parse for ResponseBodyData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let body: Expr = input.parse()?;
+        Ok(ResponseBodyData { body })
+    }
+}
+```
+# Path: hyperlane-macros\src\response\mod.rs
+```rust
+mod r#enum;
 mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use r#enum::*;
+pub(crate) use r#fn::*;
+pub(crate) use r#struct::*;
+```
+# Path: hyperlane-macros\src\response\struct.rs
+```rust
+use crate::*;
+pub(crate) struct SendData {
+    pub(crate) data: Expr,
+}
+```
+# Path: hyperlane-macros\src\response_middleware\fn.rs
+```rust
+use crate::*;
+pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
+    let order: TokenStream2 = expr_to_isize(&attr_args.order);
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: TokenStream2 = quote! {
+        #input_struct
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_middleware",
+        handler: Handler::WithAttr(response_middleware_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\response_middleware\mod.rs
+```rust
+pub(crate) mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/stream/fn.rs
+# Path: hyperlane-macros\src\route\fn.rs
+```rust
+use crate::*;
+pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let route_attr: RouteAttr = parse_macro_input!(attr as RouteAttr);
+    let path: &Expr = &route_attr.path;
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: TokenStream2 = quote! {
+        #input_struct
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::Route(#path, || ::hyperlane::server_hook_factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "route",
+        handler: Handler::WithAttr(route_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\route\impl.rs
+```rust
+use crate::*;
+impl Parse for RouteAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let first_expr: Expr = input.parse()?;
+        Ok(RouteAttr { path: first_expr })
+    }
+}
+```
+# Path: hyperlane-macros\src\route\mod.rs
+```rust
+pub(crate) mod r#fn;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+pub(crate) use r#fn::*;
+pub(crate) use r#struct::*;
+```
+# Path: hyperlane-macros\src\route\struct.rs
+```rust
+use crate::*;
+pub(crate) struct RouteAttr {
+    pub(crate) path: Expr,
+}
+```
+# Path: hyperlane-macros\src\send\fn.rs
+```rust
+use crate::*;
+pub(crate) fn try_send_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            let _ = #context.try_send().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_send",
+        handler: Handler::NoAttrPosition(try_send_macro),
+    }
+}
+pub(crate) fn send_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            #context.send().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "send",
+        handler: Handler::NoAttrPosition(send_macro),
+    }
+}
+pub(crate) fn try_send_body_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            let _ = #context.try_send_body().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_send_body",
+        handler: Handler::NoAttrPosition(try_send_body_macro),
+    }
+}
+pub(crate) fn send_body_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            #context.send_body().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "send_body",
+        handler: Handler::NoAttrPosition(send_body_macro),
+    }
+}
+pub(crate) fn try_send_body_with_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let send_data: SendData = parse_macro_input!(attr as SendData);
+    let data: Expr = send_data.data;
+    inject(position, item, |context| {
+        quote! {
+            let _ = #context.try_send_body_with_data(#data).await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_send_body_with_data",
+        handler: Handler::WithAttrPosition(try_send_body_with_data_macro),
+    }
+}
+pub(crate) fn send_body_with_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let send_data: SendData = parse_macro_input!(attr as SendData);
+    let data: Expr = send_data.data;
+    inject(position, item, |context| {
+        quote! {
+            #context.send_body_with_data(#data).await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "send_body_with_data",
+        handler: Handler::WithAttrPosition(send_body_with_data_macro),
+    }
+}
+```
+# Path: hyperlane-macros\src\send\impl.rs
+```rust
+use crate::*;
+impl Parse for SendData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let data: Expr = input.parse()?;
+        Ok(SendData { data })
+    }
+}
+```
+# Path: hyperlane-macros\src\send\mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use r#fn::*;
+pub(crate) use r#struct::*;
+```
+# Path: hyperlane-macros\src\send\struct.rs
+```rust
+use crate::*;
+pub(crate) struct ResponseHeaderData {
+    pub(crate) key: Expr,
+    pub(crate) value: Expr,
+    pub(crate) operation: HeaderOperation,
+}
+pub(crate) struct ResponseBodyData {
+    pub(crate) body: Expr,
+}
+```
+# Path: hyperlane-macros\src\stream\fn.rs
 ```rust
 use crate::*;
 use syn::Ident;
@@ -9544,775 +8069,6649 @@ inventory::submit! {
     }
 }
 ```
-# Path: hyperlane-macros/src/from_stream/mod.rs
+# Path: hyperlane-macros\src\stream\mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-plugin-websocket\README.md
+## hyperlane-plugin-websocket
+[Official Documentation](https://docs.ltpp.vip/hyperlane-plugin-websocket/)
+[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/http_type/)
+> A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with hyperlane-broadcast for efficient message dissemination.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-plugin-websocket
+```
+## Contact
+# Path: hyperlane-plugin-websocket\src\lib.rs
+```rust
+#[cfg(test)]
+pub(crate) mod tests;
+pub(crate) mod websocket;
+pub use websocket::{r#enum::*, r#struct::*};
+pub(crate) use websocket::{r#const::*, r#trait::*};
+pub(crate) use std::{
+    convert::Infallible,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    num::{
+        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
+        NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
+    },
+    sync::Arc,
+};
+pub(crate) use hyperlane::{tokio::sync::broadcast::Receiver, *};
+pub(crate) use hyperlane_broadcast::*;
+#[cfg(test)]
+pub(crate) use std::sync::OnceLock;
+```
+# Path: hyperlane-plugin-websocket\src\tests\cfg.rs
+```rust
+use crate::*;
+static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
+fn get_broadcast_map() -> &'static WebSocket {
+    BROADCAST_MAP.get_or_init(WebSocket::new)
+}
+struct TaskPanicHook {
+    response_body: String,
+    content_type: String,
+}
+impl ServerHook for TaskPanicHook {
+    async fn new(ctx: &Context) -> Self {
+        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+struct RequestErrorHook {
+    response_status_code: ResponseStatusCode,
+    response_body: String,
+}
+impl ServerHook for RequestErrorHook {
+    async fn new(ctx: &Context) -> Self {
+        let request_error: RequestError =
+            ctx.try_get_request_error_data().await.unwrap_or_default();
+        Self {
+            response_status_code: request_error.get_http_status_code(),
+            response_body: request_error.to_string(),
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(self.response_status_code)
+            .await
+            .set_response_body(self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+struct RequestMiddleware {
+    socket_addr: String,
+}
+impl ServerHook for RequestMiddleware {
+    async fn new(ctx: &Context) -> Self {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        Self { socket_addr }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(200)
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONNECTION, KEEP_ALIVE)
+            .await
+            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .await
+            .set_response_header("SocketAddr", &self.socket_addr)
+            .await;
+    }
+}
+struct UpgradeHook;
+impl ServerHook for UpgradeHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            ctx.set_response_version(HttpVersion::Http1_1)
+                .await
+                .set_response_status_code(101)
+                .await
+                .set_response_header(UPGRADE, WEBSOCKET)
+                .await
+                .set_response_header(CONNECTION, UPGRADE)
+                .await
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .await
+                .set_response_body(&vec![])
+                .await
+                .send()
+                .await;
+        }
+    }
+}
+struct ConnectedHook {
+    receiver_count: ReceiverCount,
+    data: String,
+    group_broadcast_type: BroadcastType<String>,
+    private_broadcast_type: BroadcastType<String>,
+}
+impl ServerHook for ConnectedHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx
+            .try_get_route_param("group_name")
+            .await
+            .unwrap_or_default();
+        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count(group_broadcast_type.clone());
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
+        let your_name: String = ctx
+            .try_get_route_param("your_name")
+            .await
+            .unwrap_or_default();
+        let private_broadcast_type: BroadcastType<String> =
+            BroadcastType::PointToPoint(my_name, your_name);
+        let data: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            receiver_count,
+            data,
+            group_broadcast_type,
+            private_broadcast_type,
+        }
+    }
+    async fn handle(self, _ctx: &Context) {
+        get_broadcast_map()
+            .send(self.group_broadcast_type, self.data.clone())
+            .unwrap_or_else(|err| {
+                println!("[connected_hook]send group error => {:?}", err.to_string());
+                None
+            });
+        get_broadcast_map()
+            .send(self.private_broadcast_type, self.data)
+            .unwrap_or_else(|err| {
+                println!(
+                    "[connected_hook]send private error => {:?}",
+                    err.to_string()
+                );
+                None
+            });
+        println!(
+            "[connected_hook]receiver_count => {:?}",
+            self.receiver_count
+        );
+        Server::flush_stdout();
+    }
+}
+struct SendedHook {
+    msg: String,
+}
+impl ServerHook for SendedHook {
+    async fn new(ctx: &Context) -> Self {
+        let msg: String = ctx.get_response_body_string().await;
+        Self { msg }
+    }
+    async fn handle(self, _ctx: &Context) {
+        println!("[sended_hook]msg => {}", self.msg);
+        Server::flush_stdout();
+    }
+}
+struct GroupChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for GroupChatRequestHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request_body().await;
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[group_chat]receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct GroupClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for GroupClosedHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count_after_closed(key.clone());
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[group_closed]receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct GroupChat;
+impl ServerHook for GroupChat {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_request_config(RequestConfig::default())
+            .set_capacity(1024)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<GroupChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<GroupClosedHook>();
+        get_broadcast_map().run(config).await;
+    }
+}
+struct PrivateChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for PrivateChatRequestHook {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request_body().await;
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[private_chat]receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct PrivateClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for PrivateClosedHook {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!(
+            "[private_closed]receiver_count => {:?}",
+            self.receiver_count
+        );
+        Server::flush_stdout();
+    }
+}
+struct PrivateChat {
+    config: WebSocketConfig<String>,
+}
+impl ServerHook for PrivateChat {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_request_config(RequestConfig::default())
+            .set_capacity(1024)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<PrivateChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<PrivateClosedHook>();
+        Self { config }
+    }
+    async fn handle(self, _ctx: &Context) {
+        get_broadcast_map().run(self.config).await;
+    }
+}
+#[tokio::test]
+async fn main() {
+    let server: Server = Server::new().await;
+    server.task_panic::<TaskPanicHook>().await;
+    server.request_error::<RequestErrorHook>().await;
+    server.request_middleware::<RequestMiddleware>().await;
+    server.request_middleware::<UpgradeHook>().await;
+    server.route::<GroupChat>("/{group_name}").await;
+    server.route::<PrivateChat>("/{my_name}/{your_name}").await;
+    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
+    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        server_control_hook_2.shutdown().await;
+    });
+    server_control_hook_1.wait().await;
+}
+```
+# Path: hyperlane-plugin-websocket\src\tests\mod.rs
+```rust
+mod cfg;
+```
+# Path: hyperlane-plugin-websocket\src\websocket\const.rs
+```rust
+pub(crate) const POINT_TO_POINT_KEY: &str = "ptp-";
+pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
+```
+# Path: hyperlane-plugin-websocket\src\websocket\enum.rs
+```rust
+use crate::*;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum BroadcastType<T: BroadcastTypeTrait> {
+    PointToPoint(T, T),
+    PointToGroup(T),
+    Unknown,
+}
+```
+# Path: hyperlane-plugin-websocket\src\websocket\impl.rs
+```rust
+use crate::*;
+impl BroadcastTypeTrait for String {}
+impl BroadcastTypeTrait for &str {}
+impl BroadcastTypeTrait for char {}
+impl BroadcastTypeTrait for bool {}
+impl BroadcastTypeTrait for i8 {}
+impl BroadcastTypeTrait for i16 {}
+impl BroadcastTypeTrait for i32 {}
+impl BroadcastTypeTrait for i64 {}
+impl BroadcastTypeTrait for i128 {}
+impl BroadcastTypeTrait for isize {}
+impl BroadcastTypeTrait for u8 {}
+impl BroadcastTypeTrait for u16 {}
+impl BroadcastTypeTrait for u32 {}
+impl BroadcastTypeTrait for u64 {}
+impl BroadcastTypeTrait for u128 {}
+impl BroadcastTypeTrait for usize {}
+impl BroadcastTypeTrait for f32 {}
+impl BroadcastTypeTrait for f64 {}
+impl BroadcastTypeTrait for IpAddr {}
+impl BroadcastTypeTrait for Ipv4Addr {}
+impl BroadcastTypeTrait for Ipv6Addr {}
+impl BroadcastTypeTrait for SocketAddr {}
+impl BroadcastTypeTrait for NonZeroU8 {}
+impl BroadcastTypeTrait for NonZeroU16 {}
+impl BroadcastTypeTrait for NonZeroU32 {}
+impl BroadcastTypeTrait for NonZeroU64 {}
+impl BroadcastTypeTrait for NonZeroU128 {}
+impl BroadcastTypeTrait for NonZeroUsize {}
+impl BroadcastTypeTrait for NonZeroI8 {}
+impl BroadcastTypeTrait for NonZeroI16 {}
+impl BroadcastTypeTrait for NonZeroI32 {}
+impl BroadcastTypeTrait for NonZeroI64 {}
+impl BroadcastTypeTrait for NonZeroI128 {}
+impl BroadcastTypeTrait for NonZeroIsize {}
+impl BroadcastTypeTrait for Infallible {}
+impl BroadcastTypeTrait for &String {}
+impl BroadcastTypeTrait for &&str {}
+impl BroadcastTypeTrait for &char {}
+impl BroadcastTypeTrait for &bool {}
+impl BroadcastTypeTrait for &i8 {}
+impl BroadcastTypeTrait for &i16 {}
+impl BroadcastTypeTrait for &i32 {}
+impl BroadcastTypeTrait for &i64 {}
+impl BroadcastTypeTrait for &i128 {}
+impl BroadcastTypeTrait for &isize {}
+impl BroadcastTypeTrait for &u8 {}
+impl BroadcastTypeTrait for &u16 {}
+impl BroadcastTypeTrait for &u32 {}
+impl BroadcastTypeTrait for &u128 {}
+impl BroadcastTypeTrait for &usize {}
+impl BroadcastTypeTrait for &f32 {}
+impl BroadcastTypeTrait for &f64 {}
+impl BroadcastTypeTrait for &IpAddr {}
+impl BroadcastTypeTrait for &Ipv4Addr {}
+impl BroadcastTypeTrait for &Ipv6Addr {}
+impl BroadcastTypeTrait for &SocketAddr {}
+impl BroadcastTypeTrait for &NonZeroU8 {}
+impl BroadcastTypeTrait for &NonZeroU16 {}
+impl BroadcastTypeTrait for &NonZeroU32 {}
+impl BroadcastTypeTrait for &NonZeroU64 {}
+impl BroadcastTypeTrait for &NonZeroU128 {}
+impl BroadcastTypeTrait for &NonZeroUsize {}
+impl BroadcastTypeTrait for &NonZeroI8 {}
+impl BroadcastTypeTrait for &NonZeroI16 {}
+impl BroadcastTypeTrait for &NonZeroI32 {}
+impl BroadcastTypeTrait for &NonZeroI64 {}
+impl BroadcastTypeTrait for &NonZeroI128 {}
+impl BroadcastTypeTrait for &NonZeroIsize {}
+impl BroadcastTypeTrait for &Infallible {}
+impl<B: BroadcastTypeTrait> Default for BroadcastType<B> {
+    #[inline(always)]
+    fn default() -> Self {
+        BroadcastType::Unknown
+    }
+}
+impl<B: BroadcastTypeTrait> BroadcastType<B> {
+    #[inline(always)]
+    pub fn get_key(broadcast_type: BroadcastType<B>) -> String {
+        match broadcast_type {
+            BroadcastType::PointToPoint(key1, key2) => {
+                let (first_key, second_key) = if key1 <= key2 {
+                    (key1, key2)
+                } else {
+                    (key2, key1)
+                };
+                format!(
+                    "{}-{}-{}",
+                    POINT_TO_POINT_KEY,
+                    first_key.to_string(),
+                    second_key.to_string()
+                )
+            }
+            BroadcastType::PointToGroup(key) => {
+                format!("{}-{}", POINT_TO_GROUP_KEY, key.to_string())
+            }
+            BroadcastType::Unknown => String::new(),
+        }
+    }
+}
+impl<B: BroadcastTypeTrait> Default for WebSocketConfig<B> {
+    #[inline(always)]
+    fn default() -> Self {
+        let default_hook: ServerHookHandler = Arc::new(|_ctx| Box::pin(async {}));
+        Self {
+            context: Context::default(),
+            request_config: RequestConfig::default(),
+            capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
+            broadcast_type: BroadcastType::default(),
+            connected_hook: default_hook.clone(),
+            request_hook: default_hook.clone(),
+            sended_hook: default_hook.clone(),
+            closed_hook: default_hook,
+        }
+    }
+}
+impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+impl<B: BroadcastTypeTrait> WebSocketConfig<B> {
+    #[inline(always)]
+    pub fn set_request_config(mut self, request_config: RequestConfig) -> Self {
+        self.request_config = request_config;
+        self
+    }
+    #[inline(always)]
+    pub fn set_capacity(mut self, capacity: Capacity) -> Self {
+        self.capacity = capacity;
+        self
+    }
+    #[inline(always)]
+    pub fn set_context(mut self, context: Context) -> Self {
+        self.context = context;
+        self
+    }
+    #[inline(always)]
+    pub fn set_broadcast_type(mut self, broadcast_type: BroadcastType<B>) -> Self {
+        self.broadcast_type = broadcast_type;
+        self
+    }
+    #[inline(always)]
+    pub fn get_context(&self) -> &Context {
+        &self.context
+    }
+    #[inline(always)]
+    pub fn get_request_config(&self) -> RequestConfig {
+        self.request_config
+    }
+    #[inline(always)]
+    pub fn get_capacity(&self) -> Capacity {
+        self.capacity
+    }
+    #[inline(always)]
+    pub fn get_broadcast_type(&self) -> &BroadcastType<B> {
+        &self.broadcast_type
+    }
+    #[inline(always)]
+    pub fn set_connected_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.connected_hook = server_hook_factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_request_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.request_hook = server_hook_factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_sended_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.sended_hook = server_hook_factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_closed_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.closed_hook = server_hook_factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn get_connected_hook(&self) -> &ServerHookHandler {
+        &self.connected_hook
+    }
+    #[inline(always)]
+    pub fn get_request_hook(&self) -> &ServerHookHandler {
+        &self.request_hook
+    }
+    #[inline(always)]
+    pub fn get_sended_hook(&self) -> &ServerHookHandler {
+        &self.sended_hook
+    }
+    #[inline(always)]
+    pub fn get_closed_hook(&self) -> &ServerHookHandler {
+        &self.closed_hook
+    }
+}
+impl WebSocket {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    #[inline(always)]
+    fn subscribe_unwrap_or_insert<B: BroadcastTypeTrait>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+        capacity: Capacity,
+    ) -> BroadcastMapReceiver<Vec<u8>> {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.subscribe_or_insert(&key, capacity)
+    }
+    #[inline(always)]
+    fn point_to_point<B: BroadcastTypeTrait>(
+        &self,
+        key1: &B,
+        key2: &B,
+        capacity: Capacity,
+    ) -> BroadcastMapReceiver<Vec<u8>> {
+        self.subscribe_unwrap_or_insert(
+            BroadcastType::PointToPoint(key1.clone(), key2.clone()),
+            capacity,
+        )
+    }
+    #[inline(always)]
+    fn point_to_group<B: BroadcastTypeTrait>(
+        &self,
+        key: &B,
+        capacity: Capacity,
+    ) -> BroadcastMapReceiver<Vec<u8>> {
+        self.subscribe_unwrap_or_insert(BroadcastType::PointToGroup(key.clone()), capacity)
+    }
+    #[inline(always)]
+    pub fn receiver_count<B: BroadcastTypeTrait>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+    ) -> ReceiverCount {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.receiver_count(&key).unwrap_or(0)
+    }
+    #[inline(always)]
+    pub fn receiver_count_before_connected<B: BroadcastTypeTrait>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+    ) -> ReceiverCount {
+        let count: ReceiverCount = self.receiver_count(broadcast_type);
+        count.clamp(0, ReceiverCount::MAX - 1) + 1
+    }
+    #[inline(always)]
+    pub fn receiver_count_after_closed<B: BroadcastTypeTrait>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+    ) -> ReceiverCount {
+        let count: ReceiverCount = self.receiver_count(broadcast_type);
+        count.clamp(1, ReceiverCount::MAX) - 1
+    }
+    #[inline(always)]
+    pub fn send<T, B>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+        data: T,
+    ) -> BroadcastMapSendResult<Vec<u8>>
+    where
+        T: Into<Vec<u8>>,
+        B: BroadcastTypeTrait,
+    {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.send(&key, data.into())
+    }
+    pub async fn run<B: BroadcastTypeTrait>(&self, config: WebSocketConfig<B>) {
+        let ctx: Context = config.get_context().clone();
+        if ctx.to_string() == Context::default().to_string() {
+            panic!("Context must be set");
+        }
+        let request_config: RequestConfig = config.get_request_config();
+        let capacity: Capacity = config.get_capacity();
+        let broadcast_type: BroadcastType<B> = config.get_broadcast_type().clone();
+        let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
+            BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
+            BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
+            BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
+        };
+        let key: String = BroadcastType::get_key(broadcast_type);
+        config.get_connected_hook()(&ctx).await;
+        let result_handle = || async {
+            ctx.aborted().await;
+            ctx.closed().await;
+        };
+        loop {
+            tokio::select! {
+                request_res = ctx.ws_from_stream(request_config) => {
+                    if request_res.is_ok() {
+                        config.get_request_hook()(&ctx).await;
+                    } else {
+                        config.get_closed_hook()(&ctx).await;
+                    }
+                    if ctx.get_aborted().await {
+                        continue;
+                    }
+                    if ctx.get_closed().await {
+                        break;
+                    }
+                    let body: ResponseBody = ctx.get_response_body().await;
+                    let is_err: bool = self.broadcast_map.send(&key, body).is_err();
+                    config.get_sended_hook()(&ctx).await;
+                    if is_err || ctx.get_closed().await{
+                        break;
+                    }
+                },
+                msg_res = receiver.recv() => {
+                    if let Ok(msg) = &msg_res {
+                        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(msg);
+                        if ctx.try_send_body_list_with_data(&frame_list).await.is_ok() {
+                            continue;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        result_handle().await;
+    }
+}
+```
+# Path: hyperlane-plugin-websocket\src\websocket\mod.rs
+```rust
+pub(crate) mod r#const;
+pub(crate) mod r#enum;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+pub(crate) mod r#trait;
+```
+# Path: hyperlane-plugin-websocket\src\websocket\struct.rs
+```rust
+use crate::*;
+#[derive(Debug, Clone, Default)]
+pub struct WebSocket {
+    pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
+}
+#[derive(Clone)]
+pub struct WebSocketConfig<B: BroadcastTypeTrait> {
+    pub(super) context: Context,
+    pub(super) request_config: RequestConfig,
+    pub(super) capacity: Capacity,
+    pub(super) broadcast_type: BroadcastType<B>,
+    pub(super) connected_hook: ServerHookHandler,
+    pub(super) request_hook: ServerHookHandler,
+    pub(super) sended_hook: ServerHookHandler,
+    pub(super) closed_hook: ServerHookHandler,
+}
+```
+# Path: hyperlane-plugin-websocket\src\websocket\trait.rs
+```rust
+pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
+```
+# Path: hyperlane-quick-start\README.md
+## hyperlane-quick-start
+[English](README.md) | [简体中文](README.ZH-CN.md)
+> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+## Official Documentation
+- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+## Api Docs
+- [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
+## Run
+### start
+```sh
+cargo run
+```
+### hot-restart
+```sh
+cargo run hot-restart
+```
+### started in background
+```sh
+cargo run -- -d
+```
+### stop
+```sh
+cargo run stop
+```
+### restart
+```sh
+cargo run restart
+```
+### restarted in background
+```sh
+cargo run restart -d
+```
+## Performance
+- [Performance](https://docs.ltpp.vip/hyperlane/speed)
+## Appreciate
+> If you feel that `hyperlane` is helpful to you, feel free to donate
+### WeChat Pay
+### Alipay
+### Virtual Currency Pay
+| Virtual Currency | Virtual Currency Address                   |
+| ---------------- | ------------------------------------------ |
+| BTC              | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
+| ETH              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
+| BSC              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
+## Contact
+# Path: hyperlane-quick-start\README.ZH-CN.md
+## hyperlane-quick-start
+[English](README.md) | [简体中文](README.ZH-CN.md)
+> 这是一个轻量级、高性能且跨平台的 Rust HTTP 服务器库，基于 Tokio 构建。它通过提供中间件、WebSocket、服务器推送事件(SSE)和原始 TCP 通信的内置支持，简化了现代 Web 服务的开发。凭借在 Windows、Linux 和 macOS 上统一且符合人体工程学的 API，它使开发者能够以最小的开销和最大的灵活性构建强大、可扩展且事件驱动的网络应用程序。
+## 官方文档
+- [官方文档](https://docs.ltpp.vip/hyperlane/)
+## API 文档
+- [API 文档](https://docs.rs/hyperlane/latest/hyperlane/)
+## 运行
+### 运行
+```sh
+cargo run
+```
+### 热重启
+```sh
+cargo run hot-restart
+```
+### 在后台运行
+```sh
+cargo run -- -d
+```
+### 停止
+```sh
+cargo run stop
+```
+### 重启
+```sh
+cargo run restart
+```
+### 重启在后台运行
+```sh
+cargo run restart -d
+```
+## 性能测试
+- [性能测试](https://docs.ltpp.vip/hyperlane/speed)
+## 赞赏
+> 如果你觉得 `hyperlane` 对你有所帮助，欢迎捐赠
+### 微信支付
+### 支付宝支付
+### 虚拟货币支付
+| 虚拟货币 | 虚拟货币地址                               |
+| -------- | ------------------------------------------ |
+| BTC      | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
+| ETH      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
+| BSC      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
+# Path: hyperlane-quick-start\app\lib.rs
+```rust
+pub mod aspect;
+pub mod controller;
+pub mod domain;
+pub mod exception;
+pub mod filter;
+pub mod mapper;
+pub mod middleware;
+pub mod model;
+pub mod service;
+pub mod utils;
+pub mod view;
+use hyperlane::*;
+use hyperlane_utils::{
+    log::{error, info},
+    *,
+};
+```
+# Path: hyperlane-quick-start\app\exception\mod.rs
+```rust
+pub mod application;
+pub mod framework;
+pub use framework::*;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\exception\framework\impl.rs
+```rust
+use super::*;
+impl ServerHook for TaskPanicHook {
+    #[task_panic_data(task_panic_data)]
+    async fn new(ctx: &Context) -> Self {
+        let content_type: String =
+            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
+        Self {
+            content_type,
+            response_body: task_panic_data.to_string(),
+        }
+    }
+    #[prologue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(500),
+        clear_response_headers,
+        response_header(SERVER => HYPERLANE),
+        response_version(HttpVersion::Http1_1),
+        response_header(CONTENT_TYPE, &self.content_type),
+    )]
+    #[epilogue_macros(response_body(&response_body), send)]
+    async fn handle(self, ctx: &Context) {
+        error!("{}", self.response_body);
+        let api_response: ApiResponse<()> =
+            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
+        let response_body: Vec<u8> = api_response.to_json_bytes();
+    }
+}
+impl ServerHook for RequestErrorHook {
+    #[request_error_data(request_error_data)]
+    async fn new(_ctx: &Context) -> Self {
+        let content_type: String =
+            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
+        Self {
+            response_status_code: request_error_data.get_http_status_code(),
+            content_type,
+            response_body: request_error_data.to_string(),
+        }
+    }
+    #[prologue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(self.response_status_code),
+        clear_response_headers,
+        response_header(SERVER => HYPERLANE),
+        response_version(HttpVersion::Http1_1),
+        response_header(CONTENT_TYPE, &self.content_type),
+    )]
+    #[epilogue_macros(response_body(&response_body), send)]
+    async fn handle(self, ctx: &Context) {
+        if self.response_status_code == HttpStatus::BadRequest.code() {
+            ctx.aborted().await;
+            return;
+        }
+        if self.response_status_code != HttpStatus::RequestTimeout.code() {
+            error!("{}", self.response_body);
+        }
+        let api_response: ApiResponse<()> =
+            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
+        let response_body: Vec<u8> = api_response.to_json_bytes();
+    }
+}
+```
+# Path: hyperlane-quick-start\app\exception\framework\mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
-pub(crate) use r#struct::*;
+pub use r#struct::*;
+use super::*;
+use model::data_transfer::common::*;
 ```
-# Path: hyperlane-macros/src/from_stream/struct.rs
+# Path: hyperlane-quick-start\app\exception\framework\struct.rs
 ```rust
-use crate::*;
-pub(crate) struct FromStreamData {
-    pub(crate) request_config: Option<Expr>,
-    pub(crate) variable_name: Option<Expr>,
+use super::*;
+#[task_panic]
+pub struct TaskPanicHook {
+    pub(super) content_type: String,
+    pub(super) response_body: String,
+}
+#[request_error]
+pub struct RequestErrorHook {
+    pub(super) response_status_code: ResponseStatusCode,
+    pub(super) content_type: String,
+    pub(super) response_body: String,
 }
 ```
-# Path: hyperlane-macros/src/from_stream/impl.rs
+# Path: hyperlane-quick-start\app\middleware\mod.rs
 ```rust
-use crate::*;
-impl Parse for FromStreamData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut request_config: Option<Expr> = None;
-        let mut variable_name: Option<Expr> = None;
-        if input.is_empty() {
-            return Ok(FromStreamData {
-                request_config,
-                variable_name,
-            });
-        }
-        let first_expr: Expr = input.parse()?;
-        if input.is_empty() {
-            if is_integer_literal(&first_expr) {
-                request_config = Some(first_expr);
-            } else {
-                variable_name = Some(first_expr);
-            }
-        } else {
-            input.parse::<Token![,]>()?;
-            if input.is_empty() {
-                return Err(syn::Error::new(
-                    input.span(),
-                    "expected second parameter after comma",
-                ));
-            }
-            let second_expr: Expr = input.parse()?;
-            let first_is_int: bool = is_integer_literal(&first_expr);
-            let second_is_int: bool = is_integer_literal(&second_expr);
-            match (first_is_int, second_is_int) {
-                (true, true) => {
-                    return Err(syn::Error::new_spanned(
-                        &second_expr,
-                        "cannot have two request config parameters",
-                    ));
-                }
-                (false, false) => {
-                    return Err(syn::Error::new_spanned(
-                        &second_expr,
-                        "cannot have two variable name parameters",
-                    ));
-                }
-                (true, false) => {
-                    request_config = Some(first_expr);
-                    variable_name = Some(second_expr);
-                }
-                (false, true) => {
-                    variable_name = Some(first_expr);
-                    request_config = Some(second_expr);
-                }
-            }
-        }
-        if !input.is_empty() {
-            return Err(syn::Error::new_spanned(
-                input.parse::<TokenStream2>()?,
-                "unexpected additional tokens in attribute",
-            ));
-        }
-        Ok(FromStreamData {
-            request_config,
-            variable_name,
-        })
+pub mod request;
+pub mod response;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\middleware\request\mod.rs
+```rust
+pub mod cross;
+pub mod response;
+pub mod upgrade;
+pub use cross::*;
+pub use response::*;
+pub use upgrade::*;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\middleware\request\cross\impl.rs
+```rust
+use super::*;
+impl ServerHook for CrossMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_version(HttpVersion::Http1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
+    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
+    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
+    async fn handle(self, ctx: &Context) {}
+}
+```
+# Path: hyperlane-quick-start\app\middleware\request\cross\mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\middleware\request\cross\struct.rs
+```rust
+use super::*;
+#[request_middleware(1)]
+pub struct CrossMiddleware;
+```
+# Path: hyperlane-quick-start\app\middleware\request\response\impl.rs
+```rust
+use super::*;
+impl ServerHook for ResponseHeaderMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_header(DATE => gmt())]
+    #[response_header(SERVER => HYPERLANE)]
+    #[response_header(CONNECTION => KEEP_ALIVE)]
+    #[epilogue_macros(
+        response_header(CONTENT_TYPE => content_type),
+        response_header("SocketAddr" => socket_addr_string)
+    )]
+    async fn handle(self, ctx: &Context) {
+        let socket_addr_string: String = ctx.get_socket_addr_string().await;
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
+    }
+}
+impl ServerHook for ResponseStatusCodeMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_status_code(200)]
+    async fn handle(self, ctx: &Context) {}
+}
+impl ServerHook for ResponseBodyMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(INDEX_HTML.replace("{{ time }}", &time()))]
+    async fn handle(self, ctx: &Context) {}
+}
+```
+# Path: hyperlane-quick-start\app\middleware\request\response\mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use hyperlane_config::application::templates::*;
+```
+# Path: hyperlane-quick-start\app\middleware\request\response\struct.rs
+```rust
+use super::*;
+#[request_middleware(2)]
+pub struct ResponseHeaderMiddleware;
+#[request_middleware(3)]
+pub struct ResponseStatusCodeMiddleware;
+#[request_middleware(4)]
+pub struct ResponseBodyMiddleware;
+```
+# Path: hyperlane-quick-start\app\middleware\request\upgrade\impl.rs
+```rust
+use super::*;
+impl ServerHook for UpgradeMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        ws,
+        response_version(HttpVersion::Http1_1),
+        response_status_code(101),
+        response_body(&vec![]),
+        response_header(UPGRADE => WEBSOCKET),
+        response_header(CONNECTION => UPGRADE),
+        response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+```
+# Path: hyperlane-quick-start\app\middleware\request\upgrade\mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\middleware\request\upgrade\struct.rs
+```rust
+use super::*;
+#[request_middleware(5)]
+pub struct UpgradeMiddleware;
+```
+# Path: hyperlane-quick-start\app\middleware\response\mod.rs
+```rust
+pub mod log;
+pub mod send;
+pub use log::*;
+pub use send::*;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\middleware\response\log\impl.rs
+```rust
+use super::*;
+impl ServerHook for LogMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let request: String = ctx.get_request().await.get_string();
+        let response: String = ctx.get_response().await.get_string();
+        info!("{request}");
+        info!("{response}");
     }
 }
 ```
-# Path: hyperlane-macros/src/host/mod.rs
+# Path: hyperlane-quick-start\app\middleware\response\log\mod.rs
 ```rust
-pub(crate) mod r#fn;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
 ```
-# Path: hyperlane-macros/src/host/struct.rs
+# Path: hyperlane-quick-start\app\middleware\response\log\struct.rs
 ```rust
-use crate::*;
-pub(crate) struct MultiHostData {
-    pub(crate) host_values: Vec<Expr>,
+use super::*;
+#[response_middleware(2)]
+pub struct LogMiddleware;
+```
+# Path: hyperlane-quick-start\app\middleware\response\send\impl.rs
+```rust
+use super::*;
+impl ServerHook for SendMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        http,
+        reject(ctx.get_request_upgrade_type().await.is_ws()),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
 }
 ```
-# Path: hyperlane-macros/src/host/fn.rs
+# Path: hyperlane-quick-start\app\middleware\response\send\mod.rs
 ```rust
-use crate::*;
-pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
-    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
-    inject(position, item, |context| {
-        let statements = multi_host.host_values.iter().map(|host_value| {
-            quote! {
-                let request_host: ::hyperlane::RequestHost = #context.get_request_host().await;
-                if request_host.as_str() != #host_value {
-                    return;
-                }
-            }
-        });
-        quote! {
-            #(#statements)*
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\middleware\response\send\struct.rs
+```rust
+use super::*;
+#[response_middleware(1)]
+pub struct SendMiddleware;
+```
+# Path: hyperlane-quick-start\app\model\mod.rs
+```rust
+pub mod application;
+pub mod data_transfer;
+pub mod param;
+use super::*;
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
+use utoipa::ToSchema;
+```
+# Path: hyperlane-quick-start\app\model\data_transfer\mod.rs
+```rust
+pub mod common;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\model\data_transfer\common\enum.rs
+```rust
+use super::*;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[repr(i32)]
+pub enum ResponseCode {
+    Success = 200,
+    BadRequest = 400,
+    Unauthorized = 401,
+    Forbidden = 403,
+    NotFound = 404,
+    InternalError = 500,
+    DatabaseError = 501,
+    BusinessError = 502,
+}
+```
+# Path: hyperlane-quick-start\app\model\data_transfer\common\impl.rs
+```rust
+use super::*;
+impl ResponseCode {
+    pub fn default_message(&self) -> &'static str {
+        match self {
+            Self::Success => "Operation successful",
+            Self::BadRequest => "Invalid request parameters",
+            Self::Unauthorized => "Unauthorized access",
+            Self::Forbidden => "Access forbidden",
+            Self::NotFound => "Resource not found",
+            Self::InternalError => "Internal server error",
+            Self::DatabaseError => "Database operation failed",
+            Self::BusinessError => "Business logic error",
         }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "host",
-        handler: Handler::WithAttrPosition(host_macro),
     }
 }
-pub(crate) fn reject_host_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
-    inject(position, item, |context| {
-        let statements = multi_host.host_values.iter().map(|host_value| {
-            quote! {
-                let request_host: ::hyperlane::RequestHost = #context.get_request_host().await;
-                if request_host.as_str() == #host_value {
-                    return;
-                }
-            }
-        });
-        quote! {
-            #(#statements)*
-        }
-    })
+impl<T> ApiResponse<T>
+where
+    T: Serialize + Default,
+{
+    pub fn success(data: T) -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::Success as i32)
+            .set_message("Success".to_string())
+            .set_data(Some(data))
+            .set_timestamp(Some(date()));
+        instance
+    }
+    pub fn success_with_message(data: T, message: impl Into<String>) -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::Success as i32)
+            .set_message(message.into())
+            .set_data(Some(data))
+            .set_timestamp(Some(date()));
+        instance
+    }
+    pub fn error(message: impl Into<String>) -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::InternalError as i32)
+            .set_message(message.into())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+    pub fn error_with_code(code: ResponseCode, message: impl Into<String>) -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(code as i32)
+            .set_message(message.into())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap_or_default()
+    }
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "reject_host",
-        handler: Handler::WithAttrPosition(reject_host_macro),
+impl ApiResponse<()> {
+    pub fn success_without_data(message: impl Into<String>) -> Self {
+        let mut instance: ApiResponse<()> = Self::default();
+        instance
+            .set_code(ResponseCode::Success as i32)
+            .set_message(message.into())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
     }
 }
 ```
-# Path: hyperlane-macros/src/host/impl.rs
+# Path: hyperlane-quick-start\app\model\data_transfer\common\mod.rs
 ```rust
-use crate::*;
-impl Parse for MultiHostData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut host_values: Vec<Expr> = Vec::new();
-        loop {
-            let host_value: Expr = input.parse()?;
-            host_values.push(host_value);
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-            if input.is_empty() {
-                break;
-            }
-        }
-        Ok(MultiHostData { host_values })
-    }
+mod r#enum;
+mod r#impl;
+mod r#struct;
+pub use r#enum::*;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane-quick-start\app\model\data_transfer\common\struct.rs
+```rust
+use super::*;
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, Data)]
+pub struct ApiResponse<T>
+where
+    T: Serialize + Default,
+{
+    code: i32,
+    message: String,
+    data: Option<T>,
+    timestamp: Option<String>,
 }
 ```
-# Path: hyperlane-macros/src/common/const.rs
+# Path: hyperlane-quick-start\app\model\param\mod.rs
 ```rust
-pub(crate) const SERVER_TYPE_KEY: &str = "Server";
+pub mod websocket;
+use super::*;
 ```
-# Path: hyperlane-macros/src/common/mod.rs
+# Path: hyperlane-quick-start\app\model\param\websocket\mod.rs
+```rust
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use serde::{Deserialize, Serialize};
+```
+# Path: hyperlane-quick-start\app\model\param\websocket\struct.rs
+```rust
+use super::*;
+#[derive(Debug, Clone, Default, Data, Deserialize, Serialize)]
+pub struct WebSocketMessage {
+    pub name: String,
+    pub message: String,
+}
+```
+# Path: hyperlane-quick-start\app\view\favicon\fn.rs
+```rust
+use super::*;
+#[route("/favicon.ico")]
+#[prologue_macros(
+  get,
+  response_status_code(301),
+  response_header(LOCATION => LOGO_IMG_URL)
+)]
+pub async fn ico(ctx: Context) {}
+```
+# Path: hyperlane-quick-start\app\view\favicon\mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+use hyperlane_config::business::logo_img::*;
+```
+# Path: hyperlane-quick-start\config\lib.rs
+```rust
+pub mod application;
+pub mod framework;
+use hyperlane::*;
+```
+# Path: hyperlane-quick-start\config\application\mod.rs
+```rust
+pub mod hello;
+pub mod logo_img;
+pub mod not_found;
+pub mod templates;
+```
+# Path: hyperlane-quick-start\config\application\hello\const.rs
+```rust
+pub const NAME_KEY: &str = "name";
+```
+# Path: hyperlane-quick-start\config\application\hello\mod.rs
 ```rust
 mod r#const;
-mod r#enum;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start\config\application\logo_img\const.rs
+```rust
+pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
+```
+# Path: hyperlane-quick-start\config\application\logo_img\mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start\config\application\not_found\const.rs
+```rust
+pub const NOT_FOUND_HTML: &str = include_str!("../../../resources/static/not_found/index.html");
+```
+# Path: hyperlane-quick-start\config\application\not_found\mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start\config\application\templates\const.rs
+```rust
+pub const INDEX_HTML: &str = include_str!("../../../resources/templates/index/index.html");
+```
+# Path: hyperlane-quick-start\config\application\templates\mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start\config\framework\const.rs
+```rust
+use super::*;
+#[cfg(debug_assertions)]
+pub const SERVER_PORT: u16 = DEFAULT_WEB_PORT;
+#[cfg(not(debug_assertions))]
+pub const SERVER_PORT: u16 = 65002;
+pub const SERVER_HOST: &str = DEFAULT_HOST;
+pub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;
+pub const SERVER_LOG_SIZE: usize = 100_024_000;
+pub const SERVER_LOG_DIR: &str = "./tmp/logs";
+pub const SERVER_INNER_PRINT: bool = true;
+pub const SERVER_INNER_LOG: bool = true;
+pub const SERVER_NODELAY: bool = false;
+pub const SERVER_TTI: u32 = 128;
+pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
+```
+# Path: hyperlane-quick-start\config\framework\mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+use super::*;
+```
+# Path: hyperlane-quick-start\init\lib.rs
+```rust
+pub mod application;
+pub mod framework;
+use hyperlane::*;
+use hyperlane_utils::{
+    log::{error, info},
+    *,
+};
+```
+# Path: hyperlane-quick-start\init\application\mod.rs
+```rust
+mod log;
+pub use log::*;
+```
+# Path: hyperlane-quick-start\init\application\log\fn.rs
+```rust
+use super::*;
+pub fn init_log(level: LevelFilter) {
+    Logger::init(level);
+}
+```
+# Path: hyperlane-quick-start\init\application\log\mod.rs
+```rust
 mod r#fn;
-mod r#impl;
-mod r#struct;
-mod r#type;
-pub(crate) use r#const::*;
-pub(crate) use r#enum::*;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
-pub(crate) use r#type::*;
+pub use r#fn::*;
+use hyperlane_plugin::log::*;
+use hyperlane_utils::log::LevelFilter;
 ```
-# Path: hyperlane-macros/src/common/enum.rs
+# Path: hyperlane-quick-start\init\framework\mod.rs
 ```rust
-use crate::*;
-pub(crate) enum Handler {
-    WithAttr(MacroHandlerWithAttr),
-    NoAttrPosition(MacroHandlerPosition),
-    WithAttrPosition(MacroHandlerWithAttrPosition),
-}
-pub(crate) enum Position {
-    Prologue,
-    Epilogue,
-}
+pub mod shutdown;
+pub mod wait;
+use super::*;
 ```
-# Path: hyperlane-macros/src/common/struct.rs
+# Path: hyperlane-quick-start\init\framework\shutdown\fn.rs
 ```rust
-use crate::*;
-#[derive(Clone)]
-pub(crate) struct OrderAttr {
-    pub(crate) order: Option<Expr>,
+use super::*;
+pub fn set_shutdown(shutdown: SharedAsyncTaskFactory<()>) {
+    let _ = SHUTDOWN.set(shutdown);
 }
-pub(crate) struct InjectableMacro {
-    pub(crate) name: &'static str,
-    pub(crate) handler: Handler,
+pub fn shutdown() -> SharedAsyncTaskFactory<()> {
+    SHUTDOWN
+        .get_or_init(|| Arc::new(|| Box::pin(async {})))
+        .clone()
 }
 ```
-# Path: hyperlane-macros/src/common/fn.rs
+# Path: hyperlane-quick-start\init\framework\shutdown\mod.rs
 ```rust
-use crate::*;
-fn inject_at_start(
-    input: TokenStream,
-    before_fn: impl FnOnce(&Ident) -> TokenStream2,
-) -> TokenStream {
-    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
-    let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
-    let block: &Block = &input_fn.block;
-    let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let before_code: TokenStream2 = before_fn(context);
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let gen_code: TokenStream2 = quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #before_code
-                    #(#stmts)*
-                }
-            };
-            gen_code.into()
+mod r#fn;
+mod r#static;
+pub use r#fn::*;
+use super::*;
+use r#static::*;
+use std::sync::{Arc, OnceLock};
+```
+# Path: hyperlane-quick-start\init\framework\shutdown\static.rs
+```rust
+use super::*;
+pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
+```
+# Path: hyperlane-quick-start\init\framework\wait\fn.rs
+```rust
+use crate::application::init_log;
+use super::*;
+#[hyperlane(config: ServerConfig)]
+async fn init_config(server: &Server) {
+    config.host(SERVER_HOST).await;
+    config.port(SERVER_PORT).await;
+    config.ttl(SERVER_TTI).await;
+    config.nodelay(SERVER_NODELAY).await;
+    config.request_config(RequestConfig::default()).await;
+    server.config(config).await;
+}
+async fn print_route_matcher(server: &Server) {
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    for key in route_matcher.get_static_route().keys() {
+        info!("Static route: {key}");
+    }
+    for value in route_matcher.get_dynamic_route().values() {
+        for (route_pattern, _) in value {
+            info!("Dynamic route: {route_pattern}");
         }
-        Err(err) => err.to_compile_error().into(),
     }
-}
-fn inject_at_end(input: TokenStream, after_fn: impl FnOnce(&Ident) -> TokenStream2) -> TokenStream {
-    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
-    let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
-    let block: &Block = &input_fn.block;
-    let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let after_code: TokenStream2 = after_fn(context);
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let gen_code: TokenStream2 = quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #(#stmts)*
-                    #after_code
-                }
-            };
-            gen_code.into()
+    for value in route_matcher.get_regex_route().values() {
+        for (route_pattern, _) in value {
+            info!("Regex route: {route_pattern}");
         }
-        Err(err) => err.to_compile_error().into(),
     }
 }
-pub(crate) fn inject(
-    position: Position,
-    input: TokenStream,
-    hook: impl FnOnce(&Ident) -> TokenStream2,
-) -> TokenStream {
-    match position {
-        Position::Prologue => inject_at_start(input, hook),
-        Position::Epilogue => inject_at_end(input, hook),
+fn runtime() -> Runtime {
+    Builder::new_multi_thread()
+        .worker_threads(num_cpus::get_physical() << 1)
+        .thread_stack_size(1_048_576)
+        .max_blocking_threads(2_048)
+        .max_io_events_per_tick(1_024)
+        .enable_all()
+        .build()
+        .unwrap()
+}
+#[hyperlane(server: Server)]
+async fn create_server() {
+    init_log(LevelFilter::Info);
+    init_config(&server).await;
+    info!("Server initialization successful");
+    let server_result: Result<ServerControlHook, ServerError> = server.run().await;
+    match server_result {
+        Ok(server_hook) => {
+            let host_port: String = format!("{SERVER_HOST}:{SERVER_PORT}");
+            print_route_matcher(&server).await;
+            info!("Server listen in: {host_port}");
+            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();
+            set_shutdown(shutdown);
+            server_hook.wait().await;
+        }
+        Err(server_error) => error!("Server run error: {server_error}"),
     }
 }
-#[allow(dead_code)]
-pub(crate) fn parse_context_from_fn(sig: &Signature) -> syn::Result<&Ident> {
-    match sig.inputs.first() {
-        Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
-            Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
-            Pat::Wild(wild) => Err(syn::Error::new_spanned(
-                wild,
-                "The argument cannot be anonymous `_`, please use a named identifier",
-            )),
-            _ => Err(syn::Error::new_spanned(
-                &pat_type.pat,
-                "expected identifier as first argument",
-            )),
-        },
-        _ => Err(syn::Error::new_spanned(
-            &sig.inputs,
-            "expected at least one argument",
-        )),
-    }
+pub fn run() {
+    runtime().block_on(create(create_server));
 }
-#[allow(dead_code)]
-pub(crate) fn parse_self_from_method(sig: &Signature) -> syn::Result<&Ident> {
-    match sig.inputs.first() {
-        Some(FnArg::Receiver(_)) => match sig.inputs.iter().nth(1) {
-            Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
-                Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
-                Pat::Wild(wild) => Err(syn::Error::new_spanned(
-                    wild,
-                    "The context argument cannot be anonymous `_`, please use a named identifier",
-                )),
-                _ => Err(syn::Error::new_spanned(
-                    &pat_type.pat,
-                    "expected identifier as second argument (context)",
-                )),
-            },
-            _ => Err(syn::Error::new_spanned(
-                &sig.inputs,
-                "expected context as second argument",
-            )),
-        },
-        _ => Err(syn::Error::new_spanned(
-            &sig.inputs,
-            "expected self as first argument for method",
-        )),
-    }
-}
-fn is_context_type(ty: &Type) -> bool {
-    if let Type::Reference(type_ref) = ty
-        && let Type::Path(type_path) = &*type_ref.elem
+```
+# Path: hyperlane-quick-start\init\framework\wait\mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::{shutdown::*, *};
+#[allow(unused_imports)]
+use hyperlane_app::*;
+use hyperlane_config::framework::*;
+use hyperlane_plugin::process::*;
+use hyperlane_utils::log::LevelFilter;
+use tokio::runtime::{Builder, Runtime};
+```
+# Path: hyperlane-quick-start\plugin\lib.rs
+```rust
+pub mod log;
+pub mod process;
+use hyperlane::*;
+use hyperlane_utils::{
+    log::{error, info},
+    *,
+};
+```
+# Path: hyperlane-quick-start\plugin\log\impl.rs
+```rust
+use super::*;
+impl Logger {
+    pub fn log_trace<T>(data: T)
+    where
+        T: AsRef<str>,
     {
-        let path: &Path = &type_path.path;
-        if path.segments.len() >= 2 {
-            let segments: Vec<_> = path.segments.iter().collect();
-            if segments.len() >= 2 {
-                let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
-                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
-                    return true;
-                }
-            }
-        }
-        if path.segments.len() == 1 && path.segments[0].ident == "Context" {
-            return true;
-        }
+        FILE_LOGGER.trace(data, log_handler);
     }
-    false
+    pub fn log_debug<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        FILE_LOGGER.debug(data, log_handler);
+    }
+    pub fn log_info<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        FILE_LOGGER.info(data, log_handler);
+    }
+    pub fn log_warn<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        FILE_LOGGER.warn(data, log_handler);
+    }
+    pub fn log_error<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        FILE_LOGGER.error(data, log_handler);
+    }
 }
-pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<&Ident> {
-    for arg in sig.inputs.iter() {
-        if let FnArg::Typed(pat_type) = arg
-            && is_context_type(&pat_type.ty)
+impl Log for Logger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        #[cfg(debug_assertions)]
         {
-            match &*pat_type.pat {
-                Pat::Ident(pat_ident) => return Ok(&pat_ident.ident),
-                Pat::Wild(wild) => {
-                    return Err(syn::Error::new_spanned(
-                        wild,
-                        "The context argument cannot be anonymous `_`, please use a named identifier",
-                    ));
-                }
-                _ => {
-                    return Err(syn::Error::new_spanned(
-                        &pat_type.pat,
-                        "expected identifier for context parameter",
-                    ));
-                }
+            metadata.level() <= Level::Debug
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            metadata.level() <= Level::Error
+        }
+    }
+    fn log(&self, record: &Record) {
+        let time_text: String = format!("{SPACE}{}{SPACE}", time());
+        let level_text: String = format!("{SPACE}{}{SPACE}", record.level());
+        let args_text: String = format!("{SPACE}{}{SPACE}", record.args());
+        let write_file_data: String = format!("{} - {}", record.level(), record.args());
+        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let time_output: Output<'_> = time_output_builder
+            .text(&time_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(ColorType::Use(Color::Green))
+            .build();
+        let level_output: Output<'_> = level_output_builder
+            .text(&level_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(match record.level() {
+                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),
+                Level::Info | Level::Warn => ColorType::Use(Color::Blue),
+                Level::Error => ColorType::Use(Color::Red),
+            })
+            .build();
+        let args_output: Output<'_> = args_output_builder
+            .text(&args_text)
+            .bold(true)
+            .endl(true)
+            .color(match record.level() {
+                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),
+                Level::Info | Level::Warn => ColorType::Use(Color::Blue),
+                Level::Error => ColorType::Use(Color::Red),
+            })
+            .build();
+        OutputListBuilder::new()
+            .add(time_output)
+            .add(level_output)
+            .add(args_output)
+            .run();
+        if self.enabled(record.metadata()) {
+            match record.metadata().level() {
+                Level::Trace => Self::log_trace(&write_file_data),
+                Level::Debug => Self::log_debug(&write_file_data),
+                Level::Info => Self::log_info(&write_file_data),
+                Level::Warn => Self::log_warn(&write_file_data),
+                Level::Error => Self::log_error(&write_file_data),
             }
         }
     }
-    Err(syn::Error::new_spanned(
-        &sig.inputs,
-        "expected at least one parameter of type &::hyperlane::Context",
-    ))
-}
-pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
-    match opt_expr {
-        Some(expr) => match expr {
-            Expr::Lit(ExprLit {
-                lit: Lit::Int(lit_int),
-                ..
-            }) => {
-                let value: isize = lit_int.base10_parse::<isize>().unwrap();
-                quote! { Some(#value) }
-            }
-            Expr::Lit(ExprLit {
-                lit: Lit::Str(lit_str),
-                ..
-            }) => {
-                let value: isize = lit_str.value().parse().expect("Cannot parse to isize");
-                quote! { Some(#value) }
-            }
-            _ => quote! { None },
-        },
-        None => quote! { None },
+    fn flush(&self) {
+        Server::flush_stdout_and_stderr();
     }
 }
-pub(crate) fn is_integer_literal(expr: &Expr) -> bool {
-    if matches!(
-        expr,
-        Expr::Lit(ExprLit {
-            lit: Lit::Int(_),
-            ..
-        })
-    ) {
-        return true;
-    }
-    if let Expr::Call(ExprCall { func, .. }) = expr {
-        if let Expr::Path(ExprPath { path, .. }) = &**func {
-            if path.segments.len() == 2 {
-                let first = &path.segments[0];
-                let second = &path.segments[1];
-                if first.ident == "RequestConfig" && second.ident == "default" {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-```
-# Path: hyperlane-macros/src/common/impl.rs
-```rust
-use crate::*;
-impl Parse for OrderAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        if input.is_empty() {
-            return Ok(OrderAttr { order: None });
-        }
-        let expr: Expr = input.parse()?;
-        Ok(OrderAttr { order: Some(expr) })
+impl Logger {
+    pub fn init(level: LevelFilter) {
+        set_logger(&LOGGER).unwrap();
+        set_max_level(level);
     }
 }
 ```
-# Path: hyperlane-macros/src/common/type.rs
+# Path: hyperlane-quick-start\plugin\log\mod.rs
 ```rust
-use crate::*;
-pub(crate) type MacroHandlerPosition = fn(TokenStream, Position) -> TokenStream;
-pub(crate) type MacroHandlerWithAttr = fn(TokenStream, TokenStream) -> TokenStream;
-pub(crate) type MacroHandlerWithAttrPosition =
-    fn(TokenStream, TokenStream, Position) -> TokenStream;
-```
-# Path: hyperlane-macros/src/send/mod.rs
-```rust
-mod r#fn;
 mod r#impl;
+mod r#static;
 mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+pub use r#struct::*;
+use super::*;
+use hyperlane_config::framework::*;
+use r#static::*;
+use hyperlane_utils::{
+    log::{Level, LevelFilter, Log, Metadata, Record, set_logger, set_max_level},
+    once_cell::sync::Lazy,
+};
 ```
-# Path: hyperlane-macros/src/send/struct.rs
+# Path: hyperlane-quick-start\plugin\log\static.rs
 ```rust
-use crate::*;
-pub(crate) struct ResponseHeaderData {
-    pub(crate) key: Expr,
-    pub(crate) value: Expr,
-    pub(crate) operation: HeaderOperation,
-}
-pub(crate) struct ResponseBodyData {
-    pub(crate) body: Expr,
-}
+use super::*;
+pub(super) static LOGGER: Logger = Logger;
+pub(super) static FILE_LOGGER: Lazy<FileLogger> = Lazy::new(|| {
+    let mut file_logger: FileLogger = FileLogger::default();
+    file_logger.path(SERVER_LOG_DIR);
+    file_logger.limit_file_size(SERVER_LOG_SIZE);
+    file_logger
+});
 ```
-# Path: hyperlane-macros/src/send/fn.rs
+# Path: hyperlane-quick-start\plugin\log\struct.rs
 ```rust
-use crate::*;
-pub(crate) fn try_send_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            let _ = #context.try_send().await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "try_send",
-        handler: Handler::NoAttrPosition(try_send_macro),
-    }
-}
-pub(crate) fn send_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            #context.send().await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "send",
-        handler: Handler::NoAttrPosition(send_macro),
-    }
-}
-pub(crate) fn try_send_body_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            let _ = #context.try_send_body().await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "try_send_body",
-        handler: Handler::NoAttrPosition(try_send_body_macro),
-    }
-}
-pub(crate) fn send_body_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            #context.send_body().await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "send_body",
-        handler: Handler::NoAttrPosition(send_body_macro),
-    }
-}
-pub(crate) fn try_send_body_with_data_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let send_data: SendData = parse_macro_input!(attr as SendData);
-    let data: Expr = send_data.data;
-    inject(position, item, |context| {
-        quote! {
-            let _ = #context.try_send_body_with_data(#data).await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "try_send_body_with_data",
-        handler: Handler::WithAttrPosition(try_send_body_with_data_macro),
-    }
-}
-pub(crate) fn send_body_with_data_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let send_data: SendData = parse_macro_input!(attr as SendData);
-    let data: Expr = send_data.data;
-    inject(position, item, |context| {
-        quote! {
-            #context.send_body_with_data(#data).await;
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "send_body_with_data",
-        handler: Handler::WithAttrPosition(send_body_with_data_macro),
-    }
-}
+#[derive(Debug, Clone, Copy)]
+pub struct Logger;
 ```
-# Path: hyperlane-macros/src/send/impl.rs
+# Path: hyperlane-quick-start\plugin\process\const.rs
 ```rust
-use crate::*;
-impl Parse for SendData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let data: Expr = input.parse()?;
-        Ok(SendData { data })
-    }
-}
+pub const CMD_STOP: &str = "stop";
+pub const CMD_RESTART: &str = "restart";
+pub const CMD_HOT_RESTART: &str = "hot-restart";
+pub const DAEMON_FLAG: &str = "-d";
 ```
-# Path: hyperlane-macros/src/filter/mod.rs
+# Path: hyperlane-quick-start\plugin\process\fn.rs
 ```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/filter/fn.rs
-```rust
-use crate::*;
-pub(crate) fn filter_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let condition: Expr = parse_macro_input!(attr as Expr);
-    inject(position, item, |_| {
-        quote! {
-            if !(#condition) {
-                return;
-            }
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "filter",
-        handler: Handler::WithAttrPosition(filter_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/reject/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/reject/fn.rs
-```rust
-use crate::*;
-pub(crate) fn reject_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let condition: Expr = parse_macro_input!(attr as Expr);
-    inject(position, item, |_| {
-        quote! {
-            if #condition {
-                return;
-            }
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "reject",
-        handler: Handler::WithAttrPosition(reject_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/response_middleware/mod.rs
-```rust
-pub(crate) mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/response_middleware/fn.rs
-```rust
-use crate::*;
-pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
-    let order: TokenStream2 = expr_to_isize(&attr_args.order);
-    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
-    let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
-        #input_struct
-        ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+use super::*;
+pub async fn create<F, Fut>(server_hook: F)
+where
+    F: Fn() -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    let args: Vec<String> = args().collect();
+    let mut manager: ServerManager = ServerManager::new();
+    manager
+        .set_pid_file(SERVER_PID_FILE_PATH)
+        .set_server_hook(server_hook);
+    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
+    let start_server = || async {
+        if is_daemon {
+            match manager.start_daemon().await {
+                Ok(_) => info!("Server started in background successfully"),
+                Err(error) => {
+                    error!("Error starting server in background: {error}")
+                }
+            };
+        } else {
+            info!("Server started successfully");
+            manager.start().await;
         }
     };
-    gen_code.into()
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_middleware",
-        handler: Handler::WithAttr(response_middleware_macro),
+    let stop_server = || async {
+        match manager.stop().await {
+            Ok(_) => info!("Server stopped successfully"),
+            Err(error) => error!("Error stopping server: {error}"),
+        };
+    };
+    let hot_restart_server = || async {
+        match manager
+            .watch_detached(&["--clear", "--skip-local-deps", "-q", "-x", "run"])
+            .await
+        {
+            Ok(_) => info!("Server started successfully"),
+            Err(error) => error!("Error starting server in background: {error}"),
+        }
+    };
+    let restart_server = || async {
+        stop_server().await;
+        start_server().await;
+    };
+    if args.len() < 2 {
+        start_server().await;
+        return;
+    }
+    let command: String = args[1].to_lowercase();
+    match command.as_str() {
+        CMD_STOP => stop_server().await,
+        CMD_RESTART => restart_server().await,
+        CMD_HOT_RESTART => hot_restart_server().await,
+        _ => {
+            error!("Invalid command: {command}");
+        }
     }
 }
 ```
-# Path: hyperlane-macros/src/route/mod.rs
+# Path: hyperlane-quick-start\plugin\process\mod.rs
 ```rust
+mod r#const;
+mod r#fn;
+pub use r#const::*;
+pub use r#fn::*;
+use super::*;
+use hyperlane_config::framework::*;
+use std::{env::args, future::Future};
+```
+# Path: hyperlane-quick-start\resources\static\not_found\index.html
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 Not Found</title>
+    <style>
+      .center-text {
+        text-align: center;
+      }
+      a {
+        color: #1e90ff;
+        text-decoration: none;
+        transition: color 0.3s, border-bottom-color 0.3s;
+      }
+      a:hover,
+      a:focus {
+        color: pink;
+        border-bottom-color: pink;
+        outline: none;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="center-text">404 Not Found</h1>
+    <hr />
+    <p class="center-text">
+      Server:
+      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
+        >Hyperlane</a
+    </p>
+  </body>
+</html>
+```
+# Path: hyperlane-quick-start\resources\templates\index\index.html
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hyperlane</title>
+    <style>
+      .center-text {
+        text-align: center;
+      }
+      a {
+        color: #1e90ff;
+        text-decoration: none;
+        transition: color 0.3s, border-bottom-color 0.3s;
+      }
+      a:hover,
+      a:focus {
+        color: pink;
+        border-bottom-color: pink;
+        outline: none;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="center-text">Hello hyperlane: {{ time }}</h1>
+    <hr />
+    <p class="center-text">
+      Server:
+      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
+        >Hyperlane</a
+    </p>
+  </body>
+</html>
+```
+# Path: hyperlane-quick-start\src\main.rs
+```rust
+fn main() {
+    hyperlane_init::framework::wait::run();
+}
+```
+# Path: hyperlane-time\README.md
+## hyperlane-time
+[Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
+[Api Docs](https://docs.rs/hyperlane-time/latest/hyperlane_time/)
+> A library for fetching the current time based on the system's locale settings.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-time
+```
+## Contact
+# Path: hyperlane-time\src\lib.rs
+```rust
+pub(crate) mod time;
+pub use time::r#fn::*;
+pub(crate) use time::r#enum::*;
+pub(crate) use std::{
+    env, fmt,
+    fmt::Write,
+    str::FromStr,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+```
+# Path: hyperlane-time\src\time\cfg.rs
+```rust
+#[test]
+fn test_lang() {
+    use crate::*;
+    println!("test_lang: {}", from_env_var());
+}
+#[test]
+fn test_now_time() {
+    use crate::*;
+    println!("test_now_time: {}", time());
+}
+#[test]
+fn test_methods() {
+    use crate::*;
+    println!("Current Time: {}", time());
+    println!("Current Date: {}", date());
+    println!("GMT Date: {}", gmt());
+    println!("Timestamp (s): {}", timestamp());
+    println!("Timestamp (ms): {}", timestamp_millis());
+    println!("Timestamp (μs): {}", timestamp_micros());
+    println!("Current Year: {}", year());
+    println!("Current Month: {}", month());
+    println!("Current Day: {}", day());
+    println!("Current Hour: {}", hour());
+    println!("Current Minute: {}", minute());
+    println!("Current Second: {}", second());
+    println!("Current Millis: {}", millis());
+    println!("Current Micros: {}", micros());
+    println!("Is Leap Year (1949): {}", is_leap_year(1949));
+    println!("Calculate Current Time: {:?}", calculate_time());
+    println!("Compute Date (10000 days): {:?}", compute_date(10000));
+    println!("Current Time with Millis: {}", time_millis());
+    println!("Current Time with Micros: {}", time_micros());
+}
+```
+# Path: hyperlane-time\src\time\enum.rs
+```rust
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Lang {
+    EnUsUtf8,
+    #[default]
+    ZhCnUtf8,
+    FrFrUtf8,
+    DeDeUtf8,
+    EsEsUtf8,
+    ItItUtf8,
+    JaJpUtf8,
+    KoKrUtf8,
+    PtPtUtf8,
+    RuRuUtf8,
+    ArSaUtf8,
+    HiInUtf8,
+    ThThUtf8,
+    ViVnUtf8,
+    NlNlUtf8,
+    SvSeUtf8,
+    FiFiUtf8,
+}
+```
+# Path: hyperlane-time\src\time\fn.rs
+```rust
+use crate::*;
+pub const LEAP_YEAR: [u64; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+pub const COMMON_YEAR: [u64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+pub const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+pub const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+pub fn from_env_var() -> Lang {
+    let lang: Lang = env::var("LANG")
+        .unwrap_or_default()
+        .parse::<Lang>()
+        .unwrap_or_default();
+    lang
+}
+#[inline(always)]
+pub fn is_leap_year(year: u64) -> bool {
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
+}
+pub fn time() -> String {
+    let (year, month, day, hour, minute, second, _, _) = calculate_time();
+    let mut date_time: String = String::new();
+    write!(
+        &mut date_time,
+        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}"
+    )
+    .unwrap_or_default();
+    date_time
+}
+pub fn date() -> String {
+    let (year, month, day, _, _, _, _, _) = calculate_time();
+    let mut date_time: String = String::new();
+    write!(&mut date_time, "{year:04}-{month:02}-{day:02}").unwrap_or_default();
+    date_time
+}
+pub fn compute_date(mut days_since_epoch: u64) -> (u64, u64, u64) {
+    let mut year: u64 = 1970;
+    loop {
+        let days_in_year: u64 = if is_leap_year(year) { 366 } else { 365 };
+        if days_since_epoch < days_in_year {
+            break;
+        }
+        days_since_epoch -= days_in_year as u64;
+        year += 1;
+    }
+    let mut month: u64 = 0;
+    for (i, &days) in COMMON_YEAR.iter().enumerate() {
+        let days_in_month = if i == 1 && is_leap_year(year) {
+            days + 1
+        } else {
+            days
+        };
+        if days_since_epoch < days_in_month as u64 {
+            month = i as u64 + 1;
+            return (year, month, days_since_epoch + 1);
+        }
+        days_since_epoch -= days_in_month as u64;
+    }
+    (year, month, 1)
+}
+pub fn gmt() -> String {
+    let now: SystemTime = SystemTime::now();
+    let duration_since_epoch: Duration = now.duration_since(UNIX_EPOCH).unwrap();
+    let timestamp: u64 = duration_since_epoch.as_secs();
+    let seconds_in_day: u64 = 86_400;
+    let days_since_epoch: u64 = timestamp / seconds_in_day;
+    let seconds_of_day: u64 = timestamp % seconds_in_day;
+    let hours: u64 = seconds_of_day / 3600;
+    let minutes: u64 = (seconds_of_day % 3600) / 60;
+    let seconds: u64 = seconds_of_day % 60;
+    let (year, month, day) = compute_date(days_since_epoch);
+    let weekday: usize = ((days_since_epoch + 4) % 7) as usize;
+    format!(
+        "{}, {:02} {} {} {:02}:{:02}:{:02} GMT",
+        DAYS[weekday],
+        day,
+        MONTHS[month as usize - 1],
+        year,
+        hours,
+        minutes,
+        seconds
+    )
+}
+pub fn year() -> u64 {
+    calculate_time().0
+}
+pub fn month() -> u64 {
+    calculate_time().1
+}
+pub fn day() -> u64 {
+    calculate_time().2
+}
+pub fn hour() -> u64 {
+    calculate_time().3
+}
+pub fn minute() -> u64 {
+    calculate_time().4
+}
+pub fn second() -> u64 {
+    calculate_time().5
+}
+pub fn millis() -> u64 {
+    calculate_time().6
+}
+pub fn micros() -> u64 {
+    calculate_time().7
+}
+pub fn calculate_time() -> (u64, u64, u64, u64, u64, u64, u64, u64) {
+    let start: SystemTime = SystemTime::now();
+    let duration: Duration = start.duration_since(UNIX_EPOCH).unwrap();
+    let total_seconds: u64 = duration.as_secs();
+    let nanoseconds: u64 = duration.subsec_nanos() as u64;
+    let milliseconds: u64 = nanoseconds / 1_000_000;
+    let microseconds: u64 = nanoseconds / 1_000;
+    let mut total_days: u64 = total_seconds / 86400;
+    let mut year: u64 = 1970;
+    while total_days >= if is_leap_year(year) { 366 } else { 365 } {
+        total_days -= if is_leap_year(year) { 366 } else { 365 };
+        year += 1;
+    }
+    let mut month: u64 = 1;
+    let month_days: [u64; 12] = if is_leap_year(year) {
+        LEAP_YEAR
+    } else {
+        COMMON_YEAR
+    };
+    while total_days >= month_days[month as usize - 1] {
+        total_days -= month_days[month as usize - 1];
+        month += 1;
+    }
+    let day: u64 = total_days + 1;
+    let remaining_seconds: u64 = total_seconds % 86400;
+    let timezone_offset: u64 = from_env_var().value();
+    let hour: u64 = ((remaining_seconds + timezone_offset) / 3600) % 24;
+    let minute: u64 = (remaining_seconds % 3600) / 60;
+    let second: u64 = remaining_seconds % 60;
+    (
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        milliseconds,
+        microseconds,
+    )
+}
+pub fn time_millis() -> String {
+    let (year, month, day, hour, minute, second, millisecond, _) = calculate_time();
+    let mut date_time: String = String::new();
+    write!(
+        &mut date_time,
+        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{millisecond:03}"
+    )
+    .unwrap_or_default();
+    date_time
+}
+pub fn time_micros() -> String {
+    let (year, month, day, hour, minute, second, _, microseconds) = calculate_time();
+    let mut date_time: String = String::new();
+    write!(
+        &mut date_time,
+        "{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02}.{microseconds:06}"
+    )
+    .unwrap_or_default();
+    date_time
+}
+pub fn timestamp() -> u64 {
+    let timezone_offset: u64 = from_env_var().value();
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        .saturating_add(timezone_offset)
+}
+pub fn timestamp_millis() -> u64 {
+    let timezone_offset: u64 = from_env_var().value();
+    let duration: Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    (duration.as_secs().saturating_add(timezone_offset)) * 1000 + duration.subsec_millis() as u64
+}
+pub fn timestamp_micros() -> u64 {
+    let timezone_offset: u64 = from_env_var().value();
+    let duration: Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    (duration.as_secs().saturating_add(timezone_offset)) * 1_000_000
+        + duration.subsec_micros() as u64
+}
+```
+# Path: hyperlane-time\src\time\impl.rs
+```rust
+use crate::*;
+impl fmt::Display for Lang {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let lang_str: &str = match self {
+            Lang::EnUsUtf8 => "English (US)",
+            Lang::ZhCnUtf8 => "中文 (中国)",
+            Lang::FrFrUtf8 => "Français (France)",
+            Lang::DeDeUtf8 => "Deutsch (Deutschland)",
+            Lang::EsEsUtf8 => "Español (España)",
+            Lang::ItItUtf8 => "Italiano (Italia)",
+            Lang::JaJpUtf8 => "日本語 (日本)",
+            Lang::KoKrUtf8 => "한국어 (한국)",
+            Lang::PtPtUtf8 => "Português (Portugal)",
+            Lang::RuRuUtf8 => "Русский (Россия)",
+            Lang::ArSaUtf8 => "العربية (السعودية)",
+            Lang::HiInUtf8 => "हिन्दी (भारत)",
+            Lang::ThThUtf8 => "ภาษาไทย (ประเทศไทย)",
+            Lang::ViVnUtf8 => "Tiếng Việt (Việt Nam)",
+            Lang::NlNlUtf8 => "Nederlands (Nederland)",
+            Lang::SvSeUtf8 => "Svenska (Sverige)",
+            Lang::FiFiUtf8 => "Suomi (Suomi)",
+        };
+        write!(f, "{lang_str}")
+    }
+}
+impl Lang {
+    pub fn value(&self) -> u64 {
+        match self {
+            Lang::EnUsUtf8 => 0,     
+            Lang::ZhCnUtf8 => 28800, 
+            Lang::FrFrUtf8 => 3600,  
+            Lang::DeDeUtf8 => 3600,  
+            Lang::EsEsUtf8 => 3600,  
+            Lang::ItItUtf8 => 3600,  
+            Lang::JaJpUtf8 => 32400, 
+            Lang::KoKrUtf8 => 32400, 
+            Lang::PtPtUtf8 => 3600,  
+            Lang::RuRuUtf8 => 10800, 
+            Lang::ArSaUtf8 => 10800, 
+            Lang::HiInUtf8 => 19800, 
+            Lang::ThThUtf8 => 25200, 
+            Lang::ViVnUtf8 => 25200, 
+            Lang::NlNlUtf8 => 3600,  
+            Lang::SvSeUtf8 => 3600,  
+            Lang::FiFiUtf8 => 3600,  
+        }
+    }
+}
+impl FromStr for Lang {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "en_US.UTF-8" => Ok(Lang::EnUsUtf8),
+            "zh_CN.UTF-8" => Ok(Lang::ZhCnUtf8),
+            "fr_FR.UTF-8" => Ok(Lang::FrFrUtf8),
+            "de_DE.UTF-8" => Ok(Lang::DeDeUtf8),
+            "es_ES.UTF-8" => Ok(Lang::EsEsUtf8),
+            "it_IT.UTF-8" => Ok(Lang::ItItUtf8),
+            "ja_JP.UTF-8" => Ok(Lang::JaJpUtf8),
+            "ko_KR.UTF-8" => Ok(Lang::KoKrUtf8),
+            "pt_PT.UTF-8" => Ok(Lang::PtPtUtf8),
+            "ru_RU.UTF-8" => Ok(Lang::RuRuUtf8),
+            "ar_SA.UTF-8" => Ok(Lang::ArSaUtf8),
+            "hi_IN.UTF-8" => Ok(Lang::HiInUtf8),
+            "th_TH.UTF-8" => Ok(Lang::ThThUtf8),
+            "vi_VN.UTF-8" => Ok(Lang::ViVnUtf8),
+            "nl_NL.UTF-8" => Ok(Lang::NlNlUtf8),
+            "sv_SE.UTF-8" => Ok(Lang::SvSeUtf8),
+            "fi_FI.UTF-8" => Ok(Lang::FiFiUtf8),
+            _ => Err(()),
+        }
+    }
+}
+```
+# Path: hyperlane-time\src\time\mod.rs
+```rust
+pub(crate) mod cfg;
+pub(crate) mod r#enum;
 pub(crate) mod r#fn;
 pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
 ```
-# Path: hyperlane-macros/src/route/struct.rs
-```rust
-use crate::*;
-pub(crate) struct RouteAttr {
-    pub(crate) path: Expr,
-}
+# Path: hyperlane-utils\README.md
+## hyperlane-utils
+[Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
+[Api Docs](https://docs.rs/hyperlane-utils/latest/hyperlane_utils/)
+> A library providing utils for hyperlane.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-utils
 ```
-# Path: hyperlane-macros/src/route/fn.rs
+## Contact
+# Path: hyperlane-utils\src\lib.rs
 ```rust
-use crate::*;
-pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let route_attr: RouteAttr = parse_macro_input!(attr as RouteAttr);
-    let path: &Expr = &route_attr.path;
-    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
-    let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
-        #input_struct
-        ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::Route(#path, || ::hyperlane::server_hook_factory::<#struct_name>())
-        }
-    };
-    gen_code.into()
+pub use bin_encode_decode::*;
+pub use chunkify::*;
+pub use clonelicious::*;
+pub use color_output::*;
+pub use compare_version::*;
+pub use file_operation::*;
+pub use future_fn::*;
+pub use hot_restart::*;
+pub use http_request::*;
+pub use hyperlane_broadcast::*;
+pub use hyperlane_log::*;
+pub use hyperlane_macros::*;
+pub use hyperlane_plugin_websocket::*;
+pub use lombok_macros::*;
+pub use recoverable_spawn::*;
+pub use recoverable_thread_pool::*;
+pub use server_manager::*;
+pub use std_macro_extensions::*;
+pub use ahash;
+pub use bytemuck_derive;
+pub use chrono;
+pub use dotenvy;
+pub use futures;
+pub use hex;
+pub use log;
+pub use num_cpus;
+pub use once_cell;
+pub use redis;
+pub use regex;
+pub use sea_orm;
+pub use serde;
+pub use serde_urlencoded;
+pub use serde_with;
+pub use serde_xml_rs;
+pub use serde_yaml;
+pub use simd_json;
+pub use snafu;
+pub use sqlx;
+pub use twox_hash;
+pub use url;
+pub use urlencoding;
+pub use utoipa;
+pub use utoipa_rapidoc;
+pub use utoipa_swagger_ui;
+pub use uuid;
+```
+# Path: ltpp-docs\src\hyperlane\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane)
+[API 文档](https://docs.rs/hyperlane/latest/hyperlane/)
+> 一个轻量级、高性能、跨平台的 Rust HTTP 服务器库，构建于 Tokio 之上，旨在简化现代 Web 服务开发。它内建对中间件、WebSocket、服务器发送事件（SSE）以及原始 TCP 通信的支持，同时在 Windows、Linux 和 macOS 平台上提供统一且符合人体工学的 API，使开发者能够以最小的开销和最大的灵活性构建健壮、可扩展、事件驱动的网络应用程序。
+## 安装
+要使用此 crate，可以运行以下命令：
+```shell
+cargo add hyperlane
+```
+## 快速开始
+- [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
+- [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start/)
+```sh
+git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
+```
+## 使用示例
+```rust
+use hyperlane::*;
+struct UpgradeMiddleware;
+struct SendBodyMiddleware {
+    socket_addr: String,
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "route",
-        handler: Handler::WithAttr(route_macro),
+struct ResponseMiddleware;
+struct ServerPanicHook {
+    response_body: String,
+    content_type: String,
+}
+struct RootRoute {
+    response_body: String,
+    cookie1: String,
+    cookie2: String,
+}
+struct SseRoute;
+struct WebsocketRoute;
+struct DynamicRoute {
+    params: RouteParams,
+}
+impl ServerHook for SendBodyMiddleware {
+    async fn new(ctx: &Context) -> Self {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        Self { socket_addr }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(200)
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONNECTION, KEEP_ALIVE)
+            .await
+            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .await
+            .set_response_header("SocketAddr", &self.socket_addr)
+            .await;
     }
 }
-```
-# Path: hyperlane-macros/src/route/impl.rs
-```rust
-use crate::*;
-impl Parse for RouteAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let first_expr: Expr = input.parse()?;
-        Ok(RouteAttr { path: first_expr })
+impl ServerHook for UpgradeMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            ctx.set_response_version(HttpVersion::Http1_1)
+                .await
+                .set_response_status_code(101)
+                .await
+                .set_response_header(UPGRADE, WEBSOCKET)
+                .await
+                .set_response_header(CONNECTION, UPGRADE)
+                .await
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .await
+                .set_response_body(&vec![])
+                .await
+                .send()
+                .await
+                .unwrap();
+        }
     }
 }
-```
-# Path: hyperlane-macros/src/http/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/http/fn.rs
-```rust
-use crate::*;
-macro_rules! impl_http_method_macro {
-    ($name:ident, $method:expr) => {
-        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
-            inject(
-                position,
-                item,
-                create_method_check($method, proc_macro2::Span::call_site()),
-            )
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if ctx.get_request().await.is_ws() {
+            return;
         }
-        inventory::submit! {
-            InjectableMacro {
-                name: $method,
-                handler: Handler::NoAttrPosition($name),
+        let _ = ctx.send().await;
+    }
+}
+impl ServerHook for RootRoute {
+    async fn new(ctx: &Context) -> Self {
+        let path: RequestPath = ctx.get_request_path().await;
+        let response_body: String = format!("Hello hyperlane => {}", path);
+        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
+        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
+        Self {
+            response_body,
+            cookie1,
+            cookie2,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.add_response_header(SET_COOKIE, &self.cookie1)
+            .await
+            .add_response_header(SET_COOKIE, &self.cookie2)
+            .await
+            .set_response_body(&self.response_body)
+            .await;
+    }
+}
+impl WebsocketRoute {
+    async fn send_body_hook(&self, ctx: &Context) {
+        let body: ResponseBody = ctx.get_response_body().await;
+        if ctx.get_request().await.is_ws() {
+            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+            ctx.send_body_list_with_data(&frame_list).await.unwrap();
+        } else {
+            ctx.send_body().await.unwrap();
+        }
+    }
+}
+impl ServerHook for WebsocketRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        loop {
+            match ctx.ws_from_stream(RequestConfig::default()).await {
+                Ok(_) => {
+                    let request_body: Vec<u8> = ctx.get_request_body().await;
+                    ctx.set_response_body(&request_body).await;
+                    self.send_body_hook(ctx).await;
+                    continue;
+                }
+                Err(error) => {
+                    ctx.set_response_body(&error.to_string()).await;
+                    self.send_body_hook(ctx).await;
+                    break;
+                }
             }
         }
-    };
+    }
 }
-impl_http_method_macro!(get_handler, "get");
-impl_http_method_macro!(post_handler, "post");
-impl_http_method_macro!(put_handler, "put");
-impl_http_method_macro!(delete_handler, "delete");
-impl_http_method_macro!(patch_handler, "patch");
-impl_http_method_macro!(head_handler, "head");
-impl_http_method_macro!(options_handler, "options");
-impl_http_method_macro!(connect_handler, "connect");
-impl_http_method_macro!(trace_handler, "trace");
-pub(crate) fn create_method_check(
-    method_name: &str,
-    span: proc_macro2::Span,
-) -> impl FnOnce(&Ident) -> TokenStream2 {
-    let check_method: Ident = Ident::new(&format!("is_{method_name}"), span);
-    move |context| {
-        quote! {
-            if !#context.get_request().await.#check_method() {
-                return;
-            }
+impl ServerHook for SseRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let _ = ctx
+            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .send()
+            .await;
+        for i in 0..10 {
+            let _ = ctx
+                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .await
+                .send_body()
+                .await;
+        }
+        let _ = ctx.closed().await;
+    }
+}
+impl ServerHook for DynamicRoute {
+    async fn new(ctx: &Context) -> Self {
+        Self {
+            params: ctx.get_route_params().await,
+        }
+    }
+    async fn handle(mut self, _ctx: &Context) {
+        self.params.insert("key".to_owned(), "value".to_owned());
+        panic!("Test panic {:?}", self.params);
+    }
+}
+impl ServerHook for ServerPanicHook {
+    async fn new(ctx: &Context) -> Self {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String =
+            ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        let _ = ctx
+            .set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+async fn main() {
+    let config: ServerConfig = ServerConfig::new().await;
+    config.host("0.0.0.0").await;
+    config.port(60000).await;
+    config.request_config(RequestConfig::default()).await;
+    config.disable_linger().await;
+    config.disable_nodelay().await;
+    let server: Server = Server::from(config).await;
+    server.request_middleware::<SendBodyMiddleware>().await;
+    server.request_middleware::<UpgradeMiddleware>().await;
+    server.response_middleware::<ResponseMiddleware>().await;
+    server.panic_hook::<ServerPanicHook>().await;
+    server.route::<RootRoute>("/").await;
+    server.route::<WebsocketRoute>("/websocket").await;
+    server.route::<SseRoute>("/sse").await;
+    server.route::<DynamicRoute>("/dynamic/{routing}").await;
+    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
+    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
+    server_control_hook.wait().await;
+}
+```
+# Path: ltpp-docs\src\hyperlane\config\config.md
+### 设置 `host`
+> `hyperlane` 框架绑定 `host` 方式如下：
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.host("0.0.0.0").await;
+```
+### 设置 `port`
+> `hyperlane` 框架绑定端口方式如下：
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.port(60000).await;
+```
+### 设置 `request_config`
+> `hyperlane` 框架设置请求配置方式如下：
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.request_config(RequestConfig::default()).await;
+```
+> `hyperlane` 框架内部为 `RequestConfig` 生成了 `get|get_mut|set` 等方法。`RequestConfig` 是用于请求解析的安全配置结构体，定义了各种限制和约束以防止拒绝服务攻击和其他安全漏洞。
+**网络与缓冲区配置**
+| 属性                 | 类型  | 说明                                                         | 默认值 / 安全优先值  |
+| -------------------- | ----- | ------------------------------------------------------------ | -------------------- |
+| buffer_size          | usize | 读取操作的缓冲区大小。较大的值可能提高性能但会消耗更多内存。 | 8KB / 4KB            |
+| http_read_timeout_ms | u64   | 读取 HTTP 请求的超时时间（毫秒）。防止慢速攻击。             | 6000ms / 3000ms      |
+| ws_read_timeout_ms   | u64   | 读取 WebSocket 帧的超时时间（毫秒）。                        | 1800000ms / 900000ms |
+**HTTP 请求行配置**
+| 属性                    | 类型  | 说明                                                                   | 默认值 / 安全优先值 |
+| ----------------------- | ----- | ---------------------------------------------------------------------- | ------------------- |
+| max_request_line_length | usize | HTTP 请求行最大长度（如 "GET /path HTTP/1.1"）。防止过长的请求行攻击。 | 8KB / 4KB           |
+| max_path_length         | usize | URL 路径部分的最大长度（如 "/api/v1/users"）。不包括查询参数。         | 8KB / 4KB           |
+| max_query_length        | usize | 查询字符串的最大长度（"?" 之后的部分）。                               | 8KB / 4KB           |
+**HTTP 头部配置**
+| 属性                    | 类型  | 说明                                                       | 默认值 / 安全优先值 |
+| ----------------------- | ----- | ---------------------------------------------------------- | ------------------- |
+| max_header_line_length  | usize | 单个头部行的最大长度（包括头部名和值）。                   | 8KB / 4KB           |
+| max_header_count        | usize | 允许的头部字段最大数量。防止使用数千个头部的内存耗尽攻击。 | 100 / 50            |
+| max_header_key_length   | usize | 头部键名的最大长度。                                       | 8KB / 4KB           |
+| max_header_value_length | usize | 头部值的最大长度。                                         | 8KB / 4KB           |
+**请求体配置**
+| 属性          | 类型  | 说明                                         | 默认值 / 安全优先值 |
+| ------------- | ----- | -------------------------------------------- | ------------------- |
+| max_body_size | usize | 请求体的最大大小（字节）。根据应用需求调整。 | 2MB / 1MB           |
+**WebSocket**
+| 属性              | 类型  | 说明                                      | 默认值 / 安全优先值 |
+| ----------------- | ----- | ----------------------------------------- | ------------------- |
+| max_ws_frame_size | usize | WebSocket 帧的最大大小（字节）。          | 64KB / 32KB         |
+| max_ws_frames     | usize | 单个请求中处理的 WebSocket 帧的最大数量。 | 6000 / 3000         |
+**默认配置**
+使用 `RequestConfig::new()` 或 `RequestConfig::default()` 获得平衡的默认值。
+**高安全配置**
+使用 `RequestConfig::high_security()` 获得更严格的安全限制，适用于高风险环境。
+### 设置 `linger`
+> `hyperlane` 框架支持配置 `linger`，该选项基于 `Tokio` 的 `TcpStream::set_linger`，用于控制 `SO_LINGER` 选项，以决定连接关闭时未发送数据的处理方式，从而影响连接终止时的行为。
+### 启用 `linger`
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.linger(Some(Duration::from_millis(10))).await;
+```
+### 启用 `linger`
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.enable_linger(Duration::from_millis(10)).await;
+```
+### 关闭 `linger`
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.disable_linger().await;
+```
+### 设置 `nodelay`
+> `hyperlane` 框架支持配置 `nodelay`，该选项基于 `Tokio` 的 `TcpStream::set_nodelay`，用于控制 `TCP_NODELAY` 选项，以减少 `Nagle` 算法的影响，提高低延迟场景下的数据传输效率。
+### 启用 `nodelay`
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.enable_nodelay().await;
+```
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.nodelay(true).await;
+```
+### 禁用 `nodelay`
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.disable_nodelay().await;
+```
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.nodelay(false).await;
+```
+### 设置 `ttl`
+> `hyperlane` 框架支持配置 `ttl`，该选项基于 `Tokio` 的 `TcpStream::set_ttl`，用于控制 `IP_TTL` 选项，以设置传输数据包的生存时间（`Time To Live`），从而影响数据包在网络中的跳数限制。
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+config.ttl(128).await;
+```
+### 设置 `config_str`
+> `hyperlane` 框架支持直接传入配置字符串。
+```rust
+let config_str: &'static str = r#"
+{
+    "host": "0.0.0.0",
+    "port": 80,
+    "request_config": {
+        "buffer_size": 8192,
+        "max_request_line_length": 8192,
+        "max_path_length": 8192,
+        "max_query_length": 8192,
+        "max_header_line_length": 8192,
+        "max_header_count": 100,
+        "max_header_key_length": 8192,
+        "max_header_value_length": 8192,
+        "max_body_size": 2097152,
+        "max_ws_frame_size": 65536,
+        "max_ws_frames": 6000,
+        "http_read_timeout_ms": 6000,
+        "ws_read_timeout_ms": 6000
+    },
+    "nodelay": true,
+    "linger": { "secs": 64, "nanos": 0 },
+    "ttl": 64
+}
+"#;
+server.config_str(config_str).await;
+```
+### 设置 `config`
+```rust
+let config_str: &'static str = r#"
+    {
+        "host": "0.0.0.0",
+        "port": 80,
+        "request_config": {
+            "buffer_size": 8192,
+            "max_request_line_length": 8192,
+            "max_path_length": 8192,
+            "max_query_length": 8192,
+            "max_header_line_length": 8192,
+            "max_header_count": 100,
+            "max_header_key_length": 8192,
+            "max_header_value_length": 8192,
+            "max_body_size": 2097152,
+            "max_ws_frame_size": 65536,
+            "max_ws_frames": 6000,
+            "http_read_timeout_ms": 6000,
+            "ws_read_timeout_ms": 6000
+        },
+        "nodelay": true,
+        "linger": { "secs": 64, "nanos": 0 },
+        "ttl": 64
+    }
+"#;
+let config: ServerConfig = ServerConfig::from_str(config_str).unwrap();
+server.config(config).await;
+```
+# Path: ltpp-docs\src\hyperlane\config\middleware.md
+> `hyperlane` 框架支持请求中间件和响应中间件，
+> 支持多次注册，会按照注册顺序进行执行，如果任何阶段设置了 `aborted`，则后续注册的逻辑将不会执行。
+### 请求中间件
+#### 注册请求中间件
+```rust
+// 省略 server 创建
+struct Middleware;
+server.request_middleware::<Middleware>().await;
+```
+#### 注册多个请求中间件
+```rust
+// 省略 server 创建
+struct Middleware1;
+struct Middleware2;
+struct Middleware3;
+struct Middleware4;
+server.request_middleware::<Middleware1>().await;
+server.request_middleware::<Middleware2>().await;
+server.request_middleware::<Middleware3>().await;
+server.request_middleware::<Middleware4>().await;
+```
+### 设置响应中间件
+#### 注册响应中间件
+```rust
+// 省略 server 创建
+struct Middleware;
+server.response_middleware::<Middleware>().await;
+```
+#### 注册多个响应中间件
+```rust
+// 省略 server 创建
+struct Middleware1;
+struct Middleware2;
+struct Middleware3;
+struct Middleware4;
+server.response_middleware::<Middleware1>().await;
+server.response_middleware::<Middleware2>().await;
+server.response_middleware::<Middleware3>().await;
+server.response_middleware::<Middleware4>().await;
+```
+# Path: ltpp-docs\src\hyperlane\config\panic-hook.md
+> `hyperlane` 框架内部会对 `panic` 进行捕获，用户可通过钩子进行设置（不设置，框架默认不处理），
+> 需要注意的是，触发 `panic` 后在执行 `panic_hook` 之前，框架会重置 `aborted` 状态，
+> 支持多次注册，触发 `panic` 会按照注册顺序进行执行，如果任何阶段设置了 `aborted`，则后续注册的 `panic_hook` 将不会执行。
+```rust
+server.panic_hook::<PanicHook>().await;
+```
+# Path: ltpp-docs\src\hyperlane\config\route.md
+> `hyperlane` 框架使用 `route` 接口进行路由注册，第一个参数是路由名称，第二个参数是路由处理函数，
+> 框架支持动态路由，更多路由详细使用请参考[官方文档](../usage-introduction/route.md)，
+> 路由处理函数参数类型参考 [controller-data 文档](../type/controller-data.md)。
+### 注册路由
+```rust
+// 省略 server 创建
+struct Route;
+server.route::<Route>("/route").await;
+```
+# Path: ltpp-docs\src\hyperlane\config\runtime.md
+> `hyperlane` 框架基于 `tokio`，可以参考 `tokio` [官方文档](https://docs.rs/tokio/latest/tokio/) 进行配置。
+### 快速配置
+```rust
+#[tokio::main]
+async fn main() {}
+```
+### 精细化配置
+```rust
+fn main() {
+    let thread_count: usize = get_thread_count();
+    let runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(thread_count)
+        .thread_stack_size(2097152)
+        .max_blocking_threads(5120)
+        .max_io_events_per_tick(5120)
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime().block_on(async move {}).unwrap();
+}
+```
+# Path: ltpp-docs\src\hyperlane\config\server.md
+> `hyperlane` 框架创建服务方式如下，需要调用 `run` 方法，服务才会正常运行。
+> `ServerHook` 提供了等待框架运行完成和框架停止运行的 `hook`
+> - `wait`: `server.run().await.unwrap_or_default().wait()` 实现等待框架运行完成
+> - `shutdown`: `server.run().await.unwrap_or_default().shutdown()` 实现框架停止运行
+## Server::new
+```rust
+let server: Server = Server::new().await;
+let result: ServerResult<ServerControlHook> = server.run().await;
+println!("Server result: {:?}", result);
+let _ = std::io::Write::flush(&mut std::io::stderr());
+```
+## Server::from
+```rust
+let config: ServerConfig = ServerConfig::new().await;
+let server: Server = Server::from(config).await;
+let result: ServerResult<ServerControlHook> = server.run().await;
+println!("Server result: {:?}", result);
+let _ = std::io::Write::flush(&mut std::io::stderr());
+```
+# Path: ltpp-docs\src\hyperlane\help\async.md
+### 异步
+> 由于 `hyperlane` 框架本身涉及到锁的数据均采取 `tokio`中的异步读写锁实现，所以涉及到锁的方法调用均需要 `await`。
+> 框架内部 `Context`内的结构之所以不设计成无锁结构，一方面是处于性能考虑，另一方面是让开发者尽可能减少`Context`内字段的所有权感知和生命周期管理以及异步竞争的发生。
+# Path: ltpp-docs\src\hyperlane\help\build.md
+### 构建
+```sh
+cargo build --release
+```
+### 使用 `docker` 进行静态链接
+#### Linux / MacOS
+```sh
+docker run --rm -v "$(pwd):/tmp/cargo_build" ccr.ccs.tencentyun.com/linux_environment/cargo:1.0.0 /bin/bash -c "source ~/.bashrc && cd /tmp/cargo_build && RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu"
+```
+#### Windows
+```sh
+docker run --rm -v "${pwd}:/tmp/cargo_build" ccr.ccs.tencentyun.com/linux_environment/cargo:1.0.0 /bin/bash -c "source ~/.bashrc && cd /tmp/cargo_build && RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu"
+```
+# Path: ltpp-docs\src\hyperlane\help\explain.md
+### 框架说明
+> `hyperlane` 仅提供最核心的功能(路由、中间件、异常处理、请求处理等基础核心的功能)。其余功能支持全部复用 `crate.io` 生态，这意味着你可以在 `hyperlane` 里使用 `crate.io` 里的第三方库，在 `hyperlane` 里集成他们是非常容易的事情。
+### 推荐阅读
+> 推荐阅读 [点击阅读](../../hyperlane-utils/README.md) 。
+# Path: ltpp-docs\src\hyperlane\help\flamegraph.md
+> `hyperlane` 框架使用 `flamegraph`，使用前提是需要有 `perf` 环境，生成火焰图步骤如下：
+### 安装
+```sh
+cargo install flamegraph
+```
+### 使用
+```sh
+CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --release
+```
+# Path: ltpp-docs\src\hyperlane\help\install.md
+### 安装
+> 如果不使用 `Cargo.lock` 提交到 `git`，请在 `Cargo.toml` 文件的版本号前加 `=` 来锁定版本。
+#### 命令
+```shell
+cargo add hyperlane;
+```
+# Path: ltpp-docs\src\hyperlane\middleware\auth.md
+### 身份校验中间件
+#### 原生写法
+```rs
+use hyperlane::*;
+struct HttpVersionMiddleware;
+struct AuthMiddleware;
+struct IndexRoute;
+struct ResponseMiddleware;
+impl ServerHook for HttpVersionMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1).await;
+    }
+}
+impl ServerHook for AuthMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let auth_str: String = ctx
+            .try_get_request_header_back(AUTHORIZATION)
+            .await
+            .unwrap_or_default();
+        if auth_str.is_empty() {
+            ctx.set_response_status_code(401)
+                .await
+                .set_response_body("Unauthorized")
+                .await
+                .send()
+                .await
+                .unwrap();
+            ctx.aborted().await;
         }
     }
 }
-pub(crate) fn methods_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let item_clone_1: TokenStream = item.clone();
-    let methods: RequestMethods = parse_macro_input!(attr as RequestMethods);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let sig: &Signature = &input_fn.sig;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let method_checks = methods.methods.iter().map(|method| {
-                let check_fn: Ident = Ident::new(&format!("is_{method}"), method.span());
-                quote! {
-                    #context.get_request().await.#check_fn()
-                }
-            });
-            inject(position, item_clone_1, |_| {
-                quote! {
-                    if !(#(#method_checks)||*) {
-                        return;
-                    }
-                }
+impl ServerHook for IndexRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_status_code(200)
+            .await
+            .set_response_body("Hello, world!")
+            .await;
+    }
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.send().await.unwrap();
+    }
+}
+#[tokio::main]
+async fn main() {
+    Server::new()
+        .await
+        .request_middleware::<HttpVersionMiddleware>()
+        .await
+        .request_middleware::<AuthMiddleware>()
+        .await
+        .response_middleware::<ResponseMiddleware>()
+        .await
+        .route::<IndexRoute>("/")
+        .await
+        .run()
+        .await
+        .unwrap()
+        .wait()
+        .await
+}
+```
+#### 宏写法
+```rs
+use hyperlane::*;
+use hyperlane_utils::*;
+#[request_middleware(1)]
+struct HttpVersionMiddleware;
+#[request_middleware(2)]
+struct AuthMiddleware;
+#[route("/")]
+struct IndexRoute;
+#[response_middleware(1)]
+struct ResponseMiddleware;
+impl ServerHook for HttpVersionMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_version(HttpVersion::Http1_1)]
+    async fn handle(self, ctx: &Context) {}
+}
+impl ServerHook for AuthMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[request_header_option(AUTHORIZATION => auth_str_opt)]
+    async fn handle(self, ctx: &Context) {
+        let auth_str: String = auth_str_opt.unwrap_or_default();
+        if auth_str.is_empty() {
+            ctx.set_response_status_code(401)
+                .await
+                .set_response_body("Unauthorized")
+                .await
+                .send()
+                .await
+                .unwrap();
+            ctx.aborted().await;
+        }
+    }
+}
+impl ServerHook for IndexRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_status_code(200)]
+    #[response_body("Hello, world!")]
+    async fn handle(self, ctx: &Context) {}
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[send]
+    async fn handle(self, ctx: &Context) {}
+}
+#[tokio::main]
+async fn main() {
+    Server::new().await.run().await.unwrap().wait().await
+}
+```
+# Path: ltpp-docs\src\hyperlane\middleware\cross.md
+### 跨域中间件
+#### 原生写法
+```rust
+use hyperlane::*;
+struct CrossMiddleware;
+struct IndexRoute;
+struct ResponseMiddleware;
+impl ServerHook for CrossMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_METHODS, ALL_METHODS)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_HEADERS, WILDCARD_ANY)
+            .await;
+    }
+}
+impl ServerHook for IndexRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_status_code(200)
+            .await
+            .set_response_body("Hello, world!")
+            .await;
+    }
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.send().await.unwrap();
+    }
+}
+#[tokio::main]
+async fn main() {
+    Server::new()
+        .await
+        .request_middleware::<CrossMiddleware>()
+        .await
+        .response_middleware::<ResponseMiddleware>()
+        .await
+        .route::<IndexRoute>("/")
+        .await
+        .run()
+        .await
+        .unwrap()
+        .wait()
+        .await
+}
+```
+#### 宏写法
+```rust
+use hyperlane::*;
+use hyperlane_utils::*;
+#[request_middleware(1)]
+struct CrossMiddleware;
+#[route("/")]
+struct IndexRoute;
+#[response_middleware(1)]
+struct ResponseMiddleware;
+impl ServerHook for CrossMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_version(HttpVersion::Http1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)]
+    #[response_header(ACCESS_CONTROL_ALLOW_METHODS, ALL_METHODS)]
+    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS, WILDCARD_ANY)]
+    async fn handle(self, ctx: &Context) {}
+}
+impl ServerHook for IndexRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_status_code(200)]
+    #[response_body("Hello, world!")]
+    async fn handle(self, ctx: &Context) {}
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[send]
+    async fn handle(self, ctx: &Context) {}
+}
+#[tokio::main]
+async fn main() {
+    Server::new().await.run().await.unwrap().wait().await
+}
+```
+# Path: ltpp-docs\src\hyperlane\middleware\static-file.md
+### 静态资源中间件
+#### 原生写法
+```rs
+use hyperlane::*;
+const STATIC_DIR_PATH_KEY: &str = "static_dir_path";
+const STATIC_FILE_DATA_KEY: &str = "static_file_data";
+struct HttpVersionMiddleware;
+struct StaticMiddleware;
+struct ResponseMiddleware;
+impl ServerHook for HttpVersionMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_attribute(STATIC_DIR_PATH_KEY, "./")
+            .await;
+    }
+}
+impl ServerHook for StaticMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let static_path_opt: Option<&str> = ctx.try_get_attribute(STATIC_DIR_PATH_KEY).await;
+        let static_path: &str =
+            static_path_opt.expect(&format!("attribute {STATIC_DIR_PATH_KEY} not found"));
+        let path: String = ctx.get_request_path().await;
+        let file_path: String = format!("{static_path}{path}");
+        let file_extension: String = FileExtension::get_extension_name(&file_path);
+        let content_type: &'static str = FileExtension::parse(&file_extension).get_content_type();
+        let content_type: String =
+            ContentType::format_content_type_with_charset(content_type, UTF8);
+        ctx.set_response_header(CONTENT_TYPE, content_type).await;
+        let file_data_opt: Option<String> = tokio::fs::read_to_string(&file_path).await.ok();
+        ctx.set_attribute(STATIC_FILE_DATA_KEY, file_data_opt).await;
+    }
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let static_file_data_opt: Option<String> = ctx
+            .try_get_attribute(STATIC_FILE_DATA_KEY)
+            .await
+            .expect("attribute static_file_data not found");
+        let _ = ctx
+            .set_response_body(static_file_data_opt.unwrap_or_default())
+            .await
+            .send()
+            .await;
+    }
+}
+#[tokio::main]
+async fn main() {
+    Server::new()
+        .await
+        .request_middleware::<HttpVersionMiddleware>()
+        .await
+        .request_middleware::<StaticMiddleware>()
+        .await
+        .response_middleware::<ResponseMiddleware>()
+        .await
+        .run()
+        .await
+        .unwrap()
+        .wait()
+        .await
+}
+```
+#### 宏写法
+```rs
+use hyperlane::*;
+use hyperlane_utils::*;
+const STATIC_DIR_PATH_KEY: &str = "static_dir_path";
+const STATIC_FILE_DATA_KEY: &str = "static_file_data";
+#[request_middleware(1)]
+struct HttpVersionMiddleware;
+#[request_middleware(2)]
+struct StaticMiddleware;
+#[response_middleware(1)]
+struct ResponseMiddleware;
+impl ServerHook for HttpVersionMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_version(HttpVersion::Http1_1)]
+    async fn handle(self, ctx: &Context) {
+        ctx.set_attribute(STATIC_DIR_PATH_KEY, "./").await;
+    }
+}
+impl ServerHook for StaticMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(request_path(path), attribute_option(STATIC_DIR_PATH_KEY => static_path_opt: &str))]
+    #[epilogue_macros(response_header(CONTENT_TYPE => content_type))]
+    async fn handle(self, ctx: &Context) {
+        let static_path: &str =
+            static_path_opt.expect(&format!("attribute {STATIC_DIR_PATH_KEY} not found"));
+        let file_path: String = format!("{static_path}{path}");
+        let file_extension: String = FileExtension::get_extension_name(&file_path);
+        let content_type: &'static str = FileExtension::parse(&file_extension).get_content_type();
+        let content_type: String =
+            ContentType::format_content_type_with_charset(content_type, UTF8);
+        let file_data_opt: Option<String> = tokio::fs::read_to_string(&file_path).await.ok();
+        ctx.set_attribute(STATIC_FILE_DATA_KEY, file_data_opt).await;
+    }
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[attribute_option(STATIC_FILE_DATA_KEY => static_file_data_opt: String)]
+    async fn handle(self, ctx: &Context) {
+        let static_file_data: String =
+            static_file_data_opt.expect("attribute static_file_data not found");
+        let _ = ctx.set_response_body(static_file_data).await.send().await;
+    }
+}
+#[tokio::main]
+async fn main() {
+    Server::new().await.run().await.unwrap().wait().await
+}
+```
+# Path: ltpp-docs\src\hyperlane\middleware\timeout.md
+### 超时中间件
+#### 原生写法
+```rust
+use hyperlane::{
+    tokio::{
+        spawn,
+        time::{sleep, timeout},
+    },
+    *,
+};
+use std::time::Duration;
+struct HttpVersionMiddleware;
+struct TimeoutMiddleware;
+struct IndexRoute;
+struct ResponseMiddleware;
+impl ServerHook for HttpVersionMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1).await;
+    }
+}
+impl ServerHook for TimeoutMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let ctx_clone: Context = ctx.clone();
+        spawn(async move {
+            timeout(Duration::from_millis(100), async move {
+                ctx_clone
+                    .set_response_status_code(504)
+                    .await
+                    .set_response_body("timeout")
+                    .await
+                    .send()
+                    .await
+                    .unwrap();
+                ctx_clone.aborted().await;
             })
+            .await
+            .unwrap();
+        });
+    }
+}
+impl ServerHook for IndexRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        sleep(Duration::from_secs(1)).await;
+        ctx.set_response_status_code(200)
+            .await
+            .set_response_body("Hello, world!")
+            .await;
+    }
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.send().await.unwrap();
+    }
+}
+#[tokio::main]
+async fn main() {
+    Server::new()
+        .await
+        .request_middleware::<HttpVersionMiddleware>()
+        .await
+        .request_middleware::<TimeoutMiddleware>()
+        .await
+        .response_middleware::<ResponseMiddleware>()
+        .await
+        .route::<IndexRoute>("/")
+        .await
+        .run()
+        .await
+        .unwrap()
+        .wait()
+        .await
+}
+```
+#### 宏写法
+```rust
+use hyperlane::{
+    tokio::{
+        spawn,
+        time::{sleep, timeout},
+    },
+    *,
+};
+use hyperlane_utils::*;
+use std::time::Duration;
+#[request_middleware(1)]
+struct HttpVersionMiddleware;
+#[request_middleware(2)]
+struct TimeoutMiddleware;
+#[route("/")]
+struct IndexRoute;
+#[response_middleware(1)]
+struct ResponseMiddleware;
+impl ServerHook for HttpVersionMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_version(HttpVersion::Http1_1)]
+    async fn handle(self, ctx: &Context) {}
+}
+impl ServerHook for TimeoutMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let ctx_clone: Context = ctx.clone();
+        spawn(async move {
+            timeout(Duration::from_millis(100), async move {
+                ctx_clone
+                    .set_response_status_code(504)
+                    .await
+                    .set_response_body("timeout")
+                    .await
+                    .send()
+                    .await
+                    .unwrap();
+                ctx_clone.aborted().await;
+            })
+            .await
+            .unwrap();
+        });
+    }
+}
+impl ServerHook for IndexRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_status_code(200)]
+    #[response_body("Hello, world!")]
+    async fn handle(self, ctx: &Context) {
+        sleep(Duration::from_secs(1)).await;
+    }
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[send]
+    async fn handle(self, ctx: &Context) {}
+}
+#[tokio::main]
+async fn main() {
+    Server::new().await.run().await.unwrap().wait().await
+}
+```
+```
+# Path: ltpp-docs\src\hyperlane\quick-start\directory.md
+> 基于 `hyperlane` 设计的目录结构，配置和业务分离，扩展以插件形式存在，便于开发和维护。
+```txt
+├── app                      # app目录
+│   ├── aspect               # 切面编程层
+│   ├── controller           # 接口控制层
+│   ├── domain               # 业务领域层
+│   ├── exception            # 异常处理层
+│      ├── application       # 应用异常
+│      ├── framework         # 框架异常
+│   ├── filter               # 过滤器层
+│   ├── mapper               # 数据访问层
+│   ├── middleware           # 中间件层
+│   ├── model                # 数据模型层
+│      ├── application       # 应用对象
+│      ├── data_transfer     # 数据传输对象
+│      ├── param             # 参数对象
+│   ├── service              # 业务逻辑层
+│   ├── utils                # 工具层
+│   ├── view                 # 视图层
+├── config                   # 配置目录
+│   ├── application          # 应用配置
+│   ├── framework            # 框架配置
+│   ├── server_manager       # 服务管理配置
+├── init                     # 初始化目录
+│   ├── application          # 应用初始化
+│   ├── framework            # 框架始化
+├── plugin                   # 插件目录
+│   ├── log                  # 日志插件
+│   ├── server_manager       # 服务进程管理插件
+├── resources                # 资源目录
+│   ├── static               # 静态资源目录
+│      ├── html              # HTML静态资源
+│      ├── img               # 图片静态资源
+│   ├── templates            # 模板目录
+│      ├── html              # HTML模板
+```
+# Path: ltpp-docs\src\hyperlane\quick-start\README.md
+## 快速开始
+> 这是基于 `hyperlane` 封装的项目（[hyperlane-quick-start](https://github.com/hyperlane-dev/hyperlane-quick-start)），旨在简化使用和规范项目代码结构。
+### 克隆项目
+```sh
+git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
+```
+### 进入项目
+```sh
+cd hyperlane-quick-start
+```
+### 运行
+> 此项目使用 `server-manager` 进行服务管理。
+> 使用参考 [官方文档](../../server-manager/README.md)。
+#### 运行
+```sh
+cargo run
+```
+#### 热重启
+```sh
+cargo run hot-restart
+```
+#### 在后台运行
+```sh
+cargo run -d
+```
+#### 停止
+```sh
+cargo run stop
+```
+#### 重启
+```sh
+cargo run restart
+```
+#### 重启在后台运行
+```sh
+cargo run restart -d
+```
+# Path: ltpp-docs\src\hyperlane\speed\close-keep-alive.md
+[GITHUB 地址](https://github.com/hyperlane-dev/web-server-pressure-measurement/tree/master/close-keep-alive)
+### wrk
+#### 压测命令
+```sh
+wrk -c360 -d60s -H "Connection: close" http://127.0.0.1:60000/
+```
+#### 压测结果
+> 测试 `360` 并发，持续 `60s` 请求。`QPS` 结果如下：
+> - 1 `Hyperlane框架` ：51031.27
+> - 2 `Tokio` ：49555.87
+> - 3 `Rocket框架` ：49345.76
+> - 4 `Gin框架` ：40149.75
+> - 5 `Go标准库` ：38364.06
+> - 6 `Rust标准库` ：30142.55
+> - 7 `Node标准库` ：28286.96
+#### hyperlane 框架
+```sh
+#### Rust 标准库
+```sh
+#### Tokio 框架
+```sh
+#### Rocket 框架
+```sh
+#### Gin 框架
+```sh
+#### Go 标准库
+```sh
+#### Node 标准库
+```sh
+### ab
+#### 压测命令
+```sh
+ab -n 1000000 -c 1000 -r http://127.0.0.1:60000/
+```
+#### 压测结果
+> 测试 `1000` 并发，一共 `100w` 请求。`QPS` 结果如下：
+> - 1 `Tokio` ：51825.13
+> - 2 `Hyperlane框架` ：51554.47
+> - 3 `Rocket框架` ：49621.02
+> - 4 `Go标准库` ：47915.20
+> - 5 `Gin框架` ：47081.05
+> - 6 `Node标准库` ：44763.11
+> - 7 `Rust标准库` ：31511.00
+#### hyperlane 框架
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        5 bytes
+Concurrency Level:      1000
+Time taken for tests:   19.397 seconds
+Complete requests:      1000000
+Failed requests:        0
+Total transferred:      107000000 bytes
+HTML transferred:       5000000 bytes
+Requests per second:    51554.47 [#/sec] (mean)
+Time per request:       19.397 [ms] (mean)
+Time per request:       0.019 [ms] (mean, across all concurrent requests)
+Transfer rate:          5387.04 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    9   9.1      8    1069
+Processing:     0   10   4.7     10     289
+Waiting:        0    9   4.5      9     286
+Total:          1   19  11.1     19    1085
+Percentage of the requests served within a certain time (ms)
+  50%     19
+  66%     22
+  75%     24
+  80%     25
+  90%     29
+  95%     33
+  98%     37
+  99%     41
+ 100%   1085 (longest request)
+```
+#### Rust 标准库
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        5 bytes
+Concurrency Level:      1000
+Time taken for tests:   31.735 seconds
+Complete requests:      1000000
+Failed requests:        0
+Total transferred:      88000000 bytes
+HTML transferred:       5000000 bytes
+Requests per second:    31511.00 [#/sec] (mean)
+Time per request:       31.735 [ms] (mean)
+Time per request:       0.032 [ms] (mean, across all concurrent requests)
+Transfer rate:          2707.98 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0   22 167.7      0    7232
+Processing:     0    9  45.2      4    5771
+Waiting:        0    9  45.2      4    5771
+Total:          0   31 178.6      4    7441
+Percentage of the requests served within a certain time (ms)
+  50%      4
+  66%      5
+  75%      5
+  80%      6
+  90%      7
+  95%      8
+  98%    426
+  99%   1050
+ 100%   7441 (longest request)
+```
+#### Tokio 框架
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        5 bytes
+Concurrency Level:      1000
+Time taken for tests:   19.296 seconds
+Complete requests:      1000000
+Failed requests:        0
+Total transferred:      88000000 bytes
+HTML transferred:       5000000 bytes
+Requests per second:    51825.13 [#/sec] (mean)
+Time per request:       19.296 [ms] (mean)
+Time per request:       0.019 [ms] (mean, across all concurrent requests)
+Transfer rate:          4453.72 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    9  19.4      8    1091
+Processing:     0   10   5.4      9     284
+Waiting:        0    9   5.2      8     284
+Total:          0   19  20.6     18    1107
+Percentage of the requests served within a certain time (ms)
+  50%     18
+  66%     21
+  75%     23
+  80%     25
+  90%     29
+  95%     33
+  98%     38
+  99%     42
+ 100%   1107 (longest request)
+```
+#### Rocket 框架
+```sh
+Server Software:        Rocket
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        13 bytes
+Concurrency Level:      1000
+Time taken for tests:   20.153 seconds
+Complete requests:      1000000
+Failed requests:        0
+Total transferred:      247000000 bytes
+HTML transferred:       13000000 bytes
+Requests per second:    49621.02 [#/sec] (mean)
+Time per request:       20.153 [ms] (mean)
+Time per request:       0.020 [ms] (mean, across all concurrent requests)
+Transfer rate:          11969.13 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    9  11.2      9    1094
+Processing:     0   11   5.4     10     305
+Waiting:        0   10   5.2      9     305
+Total:          0   20  13.3     19    1107
+Percentage of the requests served within a certain time (ms)
+  50%     19
+  66%     22
+  75%     25
+  80%     26
+  90%     30
+  95%     34
+  98%     39
+  99%     43
+ 100%   1107 (longest request)
+```
+#### Gin 框架
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        5 bytes
+Concurrency Level:      1000
+Time taken for tests:   21.240 seconds
+Complete requests:      1000000
+Failed requests:        0
+Total transferred:      140000000 bytes
+HTML transferred:       5000000 bytes
+Requests per second:    47081.05 [#/sec] (mean)
+Time per request:       21.240 [ms] (mean)
+Time per request:       0.021 [ms] (mean, across all concurrent requests)
+Transfer rate:          6436.86 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0   10  13.0      9    1095
+Processing:     0   12   6.0     11     288
+Waiting:        0   11   5.8     10     286
+Total:          1   21  15.1     20    1114
+Percentage of the requests served within a certain time (ms)
+  50%     20
+  66%     23
+  75%     26
+  80%     27
+  90%     32
+  95%     35
+  98%     40
+  99%     44
+ 100%   1114 (longest request)
+```
+#### Go 标准库
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        13 bytes
+Concurrency Level:      1000
+Time taken for tests:   20.870 seconds
+Complete requests:      1000000
+Failed requests:        0
+Total transferred:      149000000 bytes
+HTML transferred:       13000000 bytes
+Requests per second:    47915.20 [#/sec] (mean)
+Time per request:       20.870 [ms] (mean)
+Time per request:       0.021 [ms] (mean, across all concurrent requests)
+Transfer rate:          6972.04 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    9  21.1      8    1103
+Processing:     0   11   6.5     11     323
+Waiting:        0   10   6.3     10     322
+Total:          1   21  22.6     19    1120
+Percentage of the requests served within a certain time (ms)
+  50%     19
+  66%     23
+  75%     25
+  80%     27
+  90%     31
+  95%     35
+  98%     41
+  99%     46
+ 100%   1120 (longest request)
+```
+#### Node 标准库
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        13 bytes
+Concurrency Level:      1000
+Time taken for tests:   22.340 seconds
+Complete requests:      1000000
+Failed requests:        0
+Total transferred:      114000000 bytes
+HTML transferred:       13000000 bytes
+Requests per second:    44763.11 [#/sec] (mean)
+Time per request:       22.340 [ms] (mean)
+Time per request:       0.022 [ms] (mean, across all concurrent requests)
+Transfer rate:          4983.39 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    6  42.1      4    1086
+Processing:     0   16  11.7     15     453
+Waiting:        0   13  11.2     12     452
+Total:          1   22  43.7     20    1108
+Percentage of the requests served within a certain time (ms)
+  50%     20
+  66%     22
+  75%     23
+  80%     24
+  90%     27
+  95%     29
+  98%     33
+  99%     37
+ 100%   1108 (longest request)
+```
+# Path: ltpp-docs\src\hyperlane\speed\flamegraph.md
+## plaintext
+# Path: ltpp-docs\src\hyperlane\speed\open-keep-alive.md
+[GITHUB 地址](https://github.com/hyperlane-dev/web-server-pressure-measurement/tree/master/open-keep-alive)
+### wrk
+#### 压测命令
+```sh
+wrk -c360 -d60s http://127.0.0.1:60000/
+```
+#### 压测结果
+> 测试 `360` 并发，持续 `60s` 请求。`QPS` 结果如下：
+> - 1 `Tokio` ：340130.92
+> - 2 `Hyperlane框架` ：334888.27
+> - 3 `Rocket框架` ：298945.31
+> - 4 `Rust标准库` ：291218.96
+> - 5 `Gin框架` ：242570.16
+> - 6 `Go标准库` ：234178.93
+> - 7 `Node标准库` ：139412.13
+#### hyperlane 框架
+```sh
+#### Rust 标准库
+```sh
+#### Tokio 框架
+```sh
+#### Rocket 框架
+```sh
+#### Gin 框架
+```sh
+#### Go 标准库
+```sh
+#### Node 标准库
+```sh
+### ab
+#### 压测命令
+```sh
+ab -n 1000000 -c 1000 -r -k http://127.0.0.1:60000/
+```
+#### 压测结果
+> 测试 `1000` 并发，一共 `100w` 请求。`QPS` 结果如下：
+> - 1 `Hyperlane框架` ：316211.63
+> - 2 `Tokio` ：308596.26
+> - 3 `Rocket框架` ：267931.52
+> - 4 `Rust标准库` ：260514.56
+> - 5 `Go标准库` ：226550.34
+> - 6 `Gin框架` ：224296.16
+> - 7 `Node标准库` ：85357.18
+#### hyperlane 框架
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        5 bytes
+Concurrency Level:      1000
+Time taken for tests:   3.162 seconds
+Complete requests:      1000000
+Failed requests:        0
+Keep-Alive requests:    1000000
+Total transferred:      104000000 bytes
+HTML transferred:       5000000 bytes
+Requests per second:    316211.63 [#/sec] (mean)
+Time per request:       3.162 [ms] (mean)
+Time per request:       0.003 [ms] (mean, across all concurrent requests)
+Transfer rate:          32115.24 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.3      0      11
+Processing:     0    3   1.3      3      11
+Waiting:        0    3   1.3      3      11
+Total:          0    3   1.3      3      17
+Percentage of the requests served within a certain time (ms)
+  50%      3
+  66%      4
+  75%      4
+  80%      4
+  90%      5
+  95%      5
+  98%      6
+  99%      7
+ 100%     17 (longest request)
+```
+#### Rust 标准库
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        5 bytes
+Concurrency Level:      1000
+Time taken for tests:   3.839 seconds
+Complete requests:      1000000
+Failed requests:        0
+Keep-Alive requests:    1000000
+Total transferred:      93000000 bytes
+HTML transferred:       5000000 bytes
+Requests per second:    260514.56 [#/sec] (mean)
+Time per request:       3.839 [ms] (mean)
+Time per request:       0.004 [ms] (mean, across all concurrent requests)
+Transfer rate:          23660.01 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0  21.2      0    1069
+Processing:     0    3   5.5      3     419
+Waiting:        0    3   5.5      3     419
+Total:          0    4  23.4      3    1286
+Percentage of the requests served within a certain time (ms)
+  50%      3
+  66%      4
+  75%      4
+  80%      4
+  90%      5
+  95%      6
+  98%      8
+  99%      8
+ 100%   1286 (longest request)
+```
+#### Tokio 框架
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        5 bytes
+Concurrency Level:      1000
+Time taken for tests:   3.240 seconds
+Complete requests:      1000000
+Failed requests:        0
+Keep-Alive requests:    1000000
+Total transferred:      93000000 bytes
+HTML transferred:       5000000 bytes
+Requests per second:    308596.26 [#/sec] (mean)
+Time per request:       3.240 [ms] (mean)
+Time per request:       0.003 [ms] (mean, across all concurrent requests)
+Transfer rate:          28026.81 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.3      0      11
+Processing:     0    3   1.3      3      16
+Waiting:        0    3   1.3      3      16
+Total:          0    3   1.4      3      16
+Percentage of the requests served within a certain time (ms)
+  50%      3
+  66%      4
+  75%      4
+  80%      4
+  90%      5
+  95%      6
+  98%      7
+  99%      7
+ 100%     16 (longest request)
+```
+#### Rocket 框架
+```sh
+Server Software:        Rocket
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        13 bytes
+Concurrency Level:      1000
+Time taken for tests:   3.732 seconds
+Complete requests:      1000000
+Failed requests:        0
+Keep-Alive requests:    1000000
+Total transferred:      271000000 bytes
+HTML transferred:       13000000 bytes
+Requests per second:    267931.52 [#/sec] (mean)
+Time per request:       3.732 [ms] (mean)
+Time per request:       0.004 [ms] (mean, across all concurrent requests)
+Transfer rate:          70907.66 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.2      0      14
+Processing:     0    4   1.4      4      17
+Waiting:        0    4   1.4      4      17
+Total:          0    4   1.4      4      21
+Percentage of the requests served within a certain time (ms)
+  50%      4
+  66%      4
+  75%      5
+  80%      5
+  90%      6
+  95%      6
+  98%      7
+  99%      8
+ 100%     21 (longest request)
+```
+#### Gin 框架
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        5 bytes
+Concurrency Level:      1000
+Time taken for tests:   4.458 seconds
+Complete requests:      1000000
+Failed requests:        0
+Keep-Alive requests:    1000000
+Total transferred:      145000000 bytes
+HTML transferred:       5000000 bytes
+Requests per second:    224296.16 [#/sec] (mean)
+Time per request:       4.458 [ms] (mean)
+Time per request:       0.004 [ms] (mean, across all concurrent requests)
+Transfer rate:          31760.69 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.2      0       7
+Processing:     0    4   4.7      4     181
+Waiting:        0    4   4.7      4     181
+Total:          0    4   4.8      4     184
+Percentage of the requests served within a certain time (ms)
+  50%      4
+  66%      5
+  75%      5
+  80%      6
+  90%      8
+  95%     10
+  98%     12
+  99%     13
+ 100%    184 (longest request)
+```
+#### Go 标准库
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        13 bytes
+Concurrency Level:      1000
+Time taken for tests:   4.414 seconds
+Complete requests:      1000000
+Failed requests:        0
+Keep-Alive requests:    1000000
+Total transferred:      154000000 bytes
+HTML transferred:       13000000 bytes
+Requests per second:    226550.34 [#/sec] (mean)
+Time per request:       4.414 [ms] (mean)
+Time per request:       0.004 [ms] (mean, across all concurrent requests)
+Transfer rate:          34071.05 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.2      0       7
+Processing:     0    4   3.9      4     172
+Waiting:        0    4   3.9      4     172
+Total:          0    4   4.0      4     176
+Percentage of the requests served within a certain time (ms)
+  50%      4
+  66%      4
+  75%      5
+  80%      5
+  90%      7
+  95%      8
+  98%      8
+  99%      9
+ 100%    176 (longest request)
+```
+#### Node 标准库
+```sh
+Server Hostname:        127.0.0.1
+Server Port:            60000
+Document Path:          /
+Document Length:        13 bytes
+Concurrency Level:      1000
+Time taken for tests:   11.715 seconds
+Complete requests:      1000000
+Failed requests:        811908
+   (Connect: 0, Receive: 14737, Length: 499810, Exceptions: 297361)
+Keep-Alive requests:    500200
+Total transferred:      59523800 bytes
+HTML transferred:       6502600 bytes
+Requests per second:    85357.18 [#/sec] (mean)
+Time per request:       11.715 [ms] (mean)
+Time per request:       0.012 [ms] (mean, across all concurrent requests)
+Transfer rate:          4961.70 [Kbytes/sec] received
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    3  33.5      0    1082
+Processing:     0    8   9.6      7     247
+Waiting:        0    7  10.5      3     247
+Total:          0   12  35.3      9    1102
+Percentage of the requests served within a certain time (ms)
+  50%      9
+  66%     15
+  75%     17
+  80%     18
+  90%     21
+  95%     23
+  98%     27
+  99%     30
+ 100%   1102 (longest request)
+```
+# Path: ltpp-docs\src\hyperlane\speed\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/web-server-pressure-measurement)
+### 环境信息
+- 系统: `Ubuntu20.04.6 LTS`
+- CPU: `i9-14900KF`
+- 内存: `192GB 6400MT/S（实际运行 4000MT/S）`
+- 硬盘: `SKC3000D2048G * 2`
+- GPU: `AMD Radeon RX 6750 GRE 10GB`
+### 调优
+#### Linux 内核调优
+> 打开文件 `/etc/sysctl.conf`，增加以下设置。
+```sh
+#该参数设置系统的TIME_WAIT的数量，如果超过默认值则会被立即清除
+net.ipv4.tcp_max_tw_buckets = 20000
+#定义了系统中每一个端口最大的监听队列的长度，这是个全局的参数
+net.core.somaxconn = 65535
+#对于还未获得对方确认的连接请求，可保存在队列中的最大数目
+net.ipv4.tcp_max_syn_backlog = 262144
+#在每个网络接口接收数据包的速率比内核处理这些包的速率快时，允许送到队列的数据包的最大数目
+net.core.netdev_max_backlog = 30000
+#此选项会导致处于NAT网络的客户端超时，建议为0。Linux从4.12内核开始移除了 tcp_tw_recycle 配置，如果报错"No such file or directory"请忽略
+net.ipv4.tcp_tw_recycle = 0
+#系统所有进程一共可以打开的文件数量
+fs.file-max = 6815744
+#防火墙跟踪表的大小。注意：如果防火墙没开则会提示error: "net.netfilter.nf_conntrack_max" is an unknown key，忽略即可
+net.netfilter.nf_conntrack_max = 2621440
+net.ipv4.ip_local_port_range = 10240 65000
+```
+#### 控制台执行 `ulimit`
+```sh
+ulimit -n 1024000
+```
+#### 打开文件数
+> 修改 `open files` 的数值重启后永久生效，修改配置文件：`/etc/security/limits.conf`。在这个文件后加上
+```sh
+* soft nofile 1024000
+* hard nofile 1024000
+root soft nofile 1024000
+root hard nofile 1024000
+```
+#### 运行命令
+```sh
+RUSTFLAGS="-C target-cpu=native -C link-arg=-fuse-ld=lld" cargo run --release
+```
+# Path: ltpp-docs\src\hyperlane\speed\request-time.md
+[GITHUB 地址](https://github.com/hyperlane-dev/test-request)
+> 测试累计请求 `1w` 次
+| 场景      | http-request 平均耗时 | hyper 平均耗时 |
+| --------- | --------------------- | -------------- |
+| TCP 失败  | 39us                  | 78us           |
+| hyperlane | 100us                 | 150us          |
+| 阿帕奇    | 300us                 | 2500us         |
+# Path: ltpp-docs\src\hyperlane\usage-introduction\addr.md
+> `hyperlane` 框架封装了获取客户端地址的方法
+### 使用
+#### 获取 `SocketAddr`
+```rust
+ctx.try_get_socket_addr().await;
+```
+#### 获取 `SocketAddr` 如果失败使用默认值
+```rust
+ctx.get_socket_addr().await;
+```
+#### 获取 `SocketAddr` 字符串
+```rust
+ctx.try_get_socket_addr_string().await;
+```
+#### 获取 `SocketAddr` 字符串，如果失败使用默认值
+```rust
+ctx.get_socket_addr_string().await;
+```
+#### 获取 `SocketHost`
+```rust
+ctx.try_get_socket_host().await;
+```
+#### 获取 `SocketPort`
+```rust
+ctx.try_get_socket_port().await;
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\async.md
+> `hyperlane` 框架在 `v3.0.0` 之前不对异步做任何处理，如果需要异步操作，可以引入第三方库
+> `hyperlane` 框架在 `v3.0.0` 之后内置异步机制
+> `hyperlane` 框架在 `v4.0.0` 之前支持同步和异步中间件/路由共存。
+> `hyperlane` 框架在 `v4.0.0` 之后为了性能移除了同步中间件和路由（ `all in async` ），在开启 `keep-alive` 情况下带来了效果 `QPS 10w+`的提升
+### 框架本身异步使用
+```rust
+struct Route;
+server.route::<Route>("/", move |_| async move {
+    println!("hello");
+}).await;
+```
+### 下面是使用 `tokio` 库的异步运行时示例代码
+#### v4.0.0 之后版本的示例代码
+```rust
+use hyperlane::*;
+use runtime::Runtime;
+struct Route;
+async fn some_async_task() -> i32 {
+    println!("Starting the task...");
+    // 模拟异步操作
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    println!("Task completed!");
+    0
+}
+#[tokio::main]
+async fn main() {
+    let server: Server = Server::new().await;
+    server.route::<Route>("/", move |ctx: Context| {
+        some_async_task().await;
+    });
+    server.listen();
+}
+```
+### 异步闭包捕获外部变量
+#### 使用 async move
+```rust
+struct Route;
+let test_string: String = "test".to_owned();
+server.route::<Route>("/test/async", move |_| {
+    let tmp_test_string = test_string.clone();
+    async move {
+        println!("{:?}", tmp_test_string);
+    }
+}).await;
+```
+#### 使用 future_fn!
+```rust
+struct Route;
+let test_string: String = "test".to_owned();
+let func = future_fn!(test_string, |_| {
+    println!("async_move => {:?}", test_string);
+});
+server.route::<Route>("/test/async", func).await;
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\attribute.md
+> `hyperlane` 框架支持临时上下文属性以 `key-value` 形式存储，生命周期贯穿一个完整的请求和响应。
+> 存储的 `value` 支持实现了`Any + Send + Sync + Clone` 的 `trait` 的类型。
+### 设置某个临时上下文属性
+```rust
+ctx.set_attribute("key", &"value").await;
+```
+### 获取某个临时上下文属性
+```rust
+let value: Option<String> = ctx.try_get_attribute::<String>("key").await;
+```
+### 移除某个临时上下文属性
+```rust
+ctx.remove_attribute("key").await;
+```
+### 清空临时上下文属性
+```rust
+ctx.clear_attribute().await;
+```
+### 额外示例
+#### 设置闭包
+> 闭包需要实现 `Send + Sync` 的 `trait`，否则无法跨线程调用。
+> 不推荐 `value` 存储函数，这里只是提供一个示例
+```rust
+let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {
+    println_success!("hyperlane: ", msg);
+};
+ctx.set_attribute("println_hyperlane", func).await;
+let println_hyperlane = ctx
+    .get_attribute::<&(dyn Fn(&str) + Send + Sync)>("println_hyperlane")
+    .await
+    .unwrap();
+println_hyperlane("test");
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\connection.md
+> `hyperlane` 框架提供了完整的连接状态管理功能，包括连接的中止、关闭状态控制，以及 `Keep-Alive` 连接支持。
+## 连接状态管理
+### 获取连接状态
+```rust
+// 是否中止生命周期中的后续流程
+let is_aborted: bool = ctx.get_aborted().await;
+// 连接是否断开
+let is_closed: bool = ctx.get_closed().await;
+// 是否停止（等价于is_aborted || is_closed）
+let is_terminated: bool = ctx.is_terminated().await;
+```
+### 设置连接状态
+```rust
+ctx.set_aborted(true).await;
+ctx.set_closed(true).await;
+```
+### 快捷方法
+```rust
+// 中止连接
+ctx.aborted().await;
+// 关闭连接
+ctx.closed().await;
+// 取消中止
+ctx.cancel_aborted().await;
+// 取消关闭
+ctx.cancel_closed().await;
+```
+## Keep-Alive 连接
+### 检查是否启用 Keep-Alive
+```rust
+let keep_alive: bool = ctx.is_enable_keep_alive().await;
+```
+## 基本使用示例
+### 连接状态检查
+```rust
+if ctx.get_closed().await {
+    return;
+}
+```
+### 长连接处理
+```rust
+while !ctx.get_closed().await && !ctx.get_aborted().await {
+    let _ = ctx.http_from_stream(8192).await;
+    if !ctx.is_enable_keep_alive().await {
+        ctx.closed().await;
+        break;
+    }
+}
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\cookie.md
+> `hyperlane` 框架提供了完整的 `Cookie` 处理功能，支持请求和响应中的 `Cookie` 操作。
+## 请求 Cookie 操作
+### 获取所有请求 Cookie
+```rust
+let cookies: Cookies = ctx.get_request_cookies().await;
+```
+### 获取特定请求 Cookie
+```rust
+// 尝试获取特定请求 Cookie
+let cookie_value: OptionCookiesValue = ctx.try_get_request_cookie("session_id").await;
+// 获取特定请求 Cookie（获取不到则panic）
+let cookie_value: CookiesValue = ctx.get_request_cookie("session_id").await;
+```
+> `Cookie` 名称通常是自定义的，所以使用字符串字面量。但对于标准的请求头操作，建议使用框架常量。
+## 响应 Cookie 操作
+### 获取所有响应 Cookie
+```rust
+let cookies: Cookies = ctx.get_response_cookies().await;
+```
+### 获取特定响应 Cookie
+```rust
+// 尝试获取特定响应 Cookie
+let cookie_value: OptionCookiesValue = ctx.try_get_response_cookie("user_token").await;
+// 获取特定响应 Cookie（获取不到则panic）
+let cookie_value: CookiesValue = ctx.get_response_cookie("user_token").await;
+```
+### 设置响应 Cookie
+#### 使用字符串直接设置
+```rust
+ctx.set_response_header(SET_COOKIE, "session_id=abc123; Path=/; HttpOnly").await;
+```
+#### 使用 CookieBuilder 构建
+```rust
+let cookie_value: String = CookieBuilder::new("session_id", "abc123")
+    .path("/")
+    .http_only()
+    .build();
+ctx.set_response_header(SET_COOKIE, cookie_value).await;
+```
+### 设置多个 Cookie
+```rust
+let session_cookie: String = CookieBuilder::new("session_id", "abc123")
+    .path("/")
+    .http_only()
+    .secure()
+    .max_age(3600)
+    .build();
+let pref_cookie: String = CookieBuilder::new("user_pref", "dark_mode")
+    .path("/")
+    .max_age(86400)
+    .build();
+ctx.set_response_header(SET_COOKIE, session_cookie).await
+   .set_response_header(SET_COOKIE, pref_cookie).await;
+```
+## CookieBuilder 方法
+### 基本构建
+```rust
+let cookie: String = CookieBuilder::new("name", "value").build();
+```
+### 设置属性
+```rust
+let cookie: String = CookieBuilder::new("session", "token123")
+    .expires("Wed, 21 Oct 2025 07:28:00 GMT")
+    .max_age(3600)
+    .domain("example.com")
+    .path("/")
+    .secure()
+    .http_only()
+    .same_site("Strict")
+    .build();
+```
+### 解析现有 Cookie
+```rust
+let cookie_builder: CookieBuilder = CookieBuilder::parse("name=value; Path=/; HttpOnly");
+let rebuilt_cookie: String = cookie_builder.build();
+```
+## 基本使用示例
+### 会话管理
+```rust
+let session_cookie: String = CookieBuilder::new("session", "token123")
+    .http_only()
+    .secure()
+    .max_age(3600)
+    .build();
+ctx.set_response_header(SET_COOKIE, session_cookie).await;
+if let Some(session) = ctx.get_request_cookie("session").await {}
+```
+### 清除 Cookie
+```rust
+let clear_cookie: String = CookieBuilder::new("session", "")
+    .max_age(0)
+    .build();
+ctx.set_response_header(SET_COOKIE, clear_cookie).await;
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\multi-server.md
+> `hyperlane` 框架支持多服务模式，仅需创建多个 `server` 实例并进行监听即可
+### 多服务
+> 启动多个服务，监听多个端口
+```rust
+struct Route;
+let app1 = spawn(async move {
+    let config: ServerConfig = ServerConfig::new().await;
+    config.host("0.0.0.0").await;
+    config.port(80).await;
+    let server: Server = Server::from(config).await;
+    server.route::<Route>("/", |ctx: Context| async move {
+        let _ = ctx.send_status_body(200, "hello world").await;
+    }).await;
+    let server_control_hook: ServerHook = server.run().await.unwrap_or_default();
+    server_control_hook.wait().await;
+});
+let app2 = spawn(async move {
+    let config: ServerConfig = ServerConfig::new().await;
+    config.host("0.0.0.0").await;
+    config.port(81).await;
+    let server: Server = Server::from(config).await;
+    server.route::<Route>("/", |ctx: Context| async move {
+        let _ = ctx.send_status_body(200, "hello world").await;
+    }).await;
+    let server_control_hook: ServerHook = server.run().await.unwrap_or_default();
+    server_control_hook.wait().await;
+});
+let _ = tokio::join!(app1, app2);
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\process.md
+> `hyperlane` 框架时序图如下
+```mermaid
+sequenceDiagram
+    participant User as 请求
+    participant Server as Server
+    participant ReqMiddleware as 请求中间件
+    participant Route as 路由处理器
+    participant ResMiddleware as 响应中间件
+    participant PanicHandler as Panic处理器
+    participant PanicHook as PanicHook
+    Note over Server: 请求处理流程
+    User->>Server: HTTP请求
+    Note over ReqMiddleware: 请求中间件阶段
+    Server->>ReqMiddleware: 执行请求中间件
+    alt 发生panic
+        ReqMiddleware->>PanicHandler: 捕获panic
+        PanicHandler->>PanicHandler: 转换为Panic结构
+        PanicHandler->>PanicHandler: 存储到context
+    end
+    Note over Route: 路由处理阶段
+    Server->>Route: 执行路由处理器
+    alt 发生panic
+        Route->>PanicHandler: 捕获panic
+        PanicHandler->>PanicHandler: 转换为Panic结构
+        PanicHandler->>PanicHandler: 存储到context
+    end
+    Note over ResMiddleware: 响应中间件阶段
+    Server->>ResMiddleware: 执行响应中间件
+    alt 发生panic
+        ResMiddleware->>PanicHandler: 捕获panic
+        PanicHandler->>PanicHandler: 转换为Panic结构
+        PanicHandler->>PanicHandler: 存储到context
+    end
+    Note over PanicHook: Panic处理阶段
+    alt 发生panic
+        Server->>PanicHook: 执行panic hooks
+        PanicHook->>PanicHook: 生成错误响应
+    end
+    Server-->>User: 返回响应
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\request.md
+> `hyperlane` 框架对 `ctx` 额外封装了子字段的方法，可以直接调用大部分子字段的 `get` 和 `set` 方法名称。
+> 例如：调用 `request` 上的 `get_method` 方法，
+> 一般需要从 `ctx` 解出 `request`，再调用`request.get_method()`，
+> 可以简化成直接调用 `ctx.get_request_method().await`。
+> **调用规律**
+> - `request` 仅支持`get`，不支持`set`，框架保证请求信息不会被意外修改。
+> - 原 `request` 的 `get` 方法的 `get` 名称后加 `request` 名称，中间使用\_拼接。
+## 获取请求信息
+#### 获取 `request`
+```rust
+let request: Request = ctx.get_request().await;
+```
+#### 获取 `method`
+```rust
+let method: RequestMethod = ctx.get_request_method().await;
+```
+#### 获取 `host`
+```rust
+let host: RequestHost = ctx.get_request_host().await;
+```
+#### 获取 `path`
+```rust
+let path: RequestPath = ctx.get_request_path().await;
+```
+#### 获取 `version`
+```rust
+let version: RequestVersion = ctx.get_request_version().await;
+```
+#### 获取 `querys`
+```rust
+let querys: RequestQuerys = ctx.get_request_querys().await;
+```
+#### 获取特定查询参数
+```rust
+// 尝试获取查询参数
+let query_value: OptionRequestQuerysValue = ctx.try_get_request_query("key").await;
+// 获取查询参数（获取不到则panic）
+let query_value: RequestQuerysValue = ctx.get_request_query("key").await;
+```
+#### 获取 `header`
+> `hyperlane` 框架请求头的 `key` 是经过全小写处理，建议使用框架定义的常量。
+```rust
+// 尝试获取请求头
+let header: OptionRequestHeadersValue = ctx.try_get_request_header(CONTENT_TYPE).await;
+// 获取请求头（获取不到则panic）
+let header: RequestHeadersValue = ctx.get_request_header(CONTENT_TYPE).await;
+```
+#### 获取 `headers`
+```rust
+let headers: RequestHeaders = ctx.get_request_headers().await;
+```
+#### 获取请求头的第一个值
+```rust
+// 尝试获取请求头的第一个值
+let header_value: OptionRequestHeadersValueItem = ctx.try_get_request_header_front(CONTENT_TYPE).await;
+// 获取请求头的第一个值（获取不到则panic）
+let header_value: RequestHeadersValueItem = ctx.get_request_header_front(CONTENT_TYPE).await;
+```
+#### 获取请求头的最后一个值
+```rust
+// 尝试获取请求头的最后一个值
+let header_value: OptionRequestHeadersValueItem = ctx.try_get_request_header_back(ACCEPT).await;
+// 获取请求头的最后一个值（获取不到则panic）
+let header_value: RequestHeadersValueItem = ctx.get_request_header_back(ACCEPT).await;
+```
+#### 获取请求头值的数量
+```rust
+// 尝试获取请求头值的数量
+let header_count: OptionUsize = ctx.try_get_request_header_len(ACCEPT_ENCODING).await;
+// 获取请求头值的数量（获取不到则panic）
+let header_count: usize = ctx.get_request_header_len(ACCEPT_ENCODING).await;
+```
+#### 获取所有请求头值的总数量
+```rust
+let total_values: usize = ctx.get_request_headers_values_length().await;
+```
+#### 获取请求头的数量
+```rust
+let headers_count: usize = ctx.get_request_headers_length().await;
+```
+#### 检查是否存在特定请求头
+```rust
+let has_header: bool = ctx.has_request_header(CONTENT_TYPE).await;
+```
+#### 检查请求头是否包含特定值
+```rust
+let has_value: bool = ctx.has_request_header_value(CONTENT_TYPE, APPLICATION_JSON).await;
+```
+#### 获取请求体
+```rust
+let body: RequestBody = ctx.get_request_body().await;
+```
+#### 获取 `string` 格式的请求体
+```rust
+let body: String = ctx.get_request_body_string().await;
+```
+#### 获取 `json` 格式的请求体
+```rust
+// 反序列化请求体
+let body: ResultJsonError<T> = ctx.try_get_request_body_json::<T>().await;
+// 反序列化请求体（反序列化失败则panic）
+let body: T = ctx.get_request_body_json::<T>().await;
+```
+#### 获取请求升级类型
+```rust
+let upgrade_type: UpgradeType = ctx.get_request_upgrade_type().await;
+```
+## 执行闭包操作
+#### 使用请求执行异步闭包
+```rust
+let result = ctx.with_request(|request| async move {
+    request.get_method()
+}).await;
+```
+## 转字符串
+#### 通过 `to_string`
+> 将获得完整的原始结构体字符串结构。
+```rust
+ctx.get_request().await.to_string();
+```
+#### 通过 `get_string`
+> 将获得简化的结构体字符串结构。
+```rust
+ctx.get_request().await.get_string();
+```
+#### 通过 `ctx.get_request_string`
+```rust
+let request_string: String = ctx.get_request_string().await;
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\response.md
+> `hyperlane` 框架没有发送响应前通过 `ctx` 中 `get_response` 获取的只是响应的初始化实例，里面其实没有数据，
+> 只有当用户发送响应时才会构建出完整 `http` 响应，此后再次 `get_response` 才能获取到响应内容。
+> `hyperlane` 框架对 `ctx` 额外封装了子字段的方法，可以直接调用大部分子字段的 `get` 和 `set` 方法名称，
+> 例如：调用 `response` 上的 `get_status_code` 方法。
+> **调用规律**
+> - 原 `response` 的 `get` 方法的 `get` 名称后加 `response` 名称，中间使用\_拼接。
+> - 原 `response` 的 `set` 方法的 `set` 名称后加 `response` 名称，中间使用\_拼接。
+### 获取响应
+#### 获取 `response`
+```rust
+let response: Response = ctx.get_response().await;
+```
+#### 获取响应版本
+```rust
+let version: ResponseVersion = ctx.get_response_version().await;
+```
+#### 获取响应状态码
+```rust
+let status_code: ResponseStatusCode = ctx.get_response_status_code().await;
+```
+#### 获取响应原因短语
+```rust
+let reason_phrase: ResponseReasonPhrase = ctx.get_response_reason_phrase().await;
+```
+#### 获取完整响应头
+```rust
+let headers: ResponseHeaders = ctx.get_response_headers().await;
+```
+#### 获取某个响应头
+```rust
+// 尝试获取响应头
+let value: OptionResponseHeadersValue = ctx.try_get_response_header(CONTENT_TYPE).await;
+// 获取响应头（获取不到则panic）
+let value: ResponseHeadersValue = ctx.get_response_header(CONTENT_TYPE).await;
+```
+#### 获取响应头的第一个值
+```rust
+// 尝试获取响应头的第一个值
+let header_value: OptionResponseHeadersValueItem = ctx.try_get_response_header_front(CONTENT_TYPE).await;
+// 获取响应头的第一个值（获取不到则panic）
+let header_value: ResponseHeadersValueItem = ctx.get_response_header_front(CONTENT_TYPE).await;
+```
+#### 获取响应头的最后一个值
+```rust
+// 尝试获取响应头的最后一个值
+let header_value: OptionResponseHeadersValueItem = ctx.try_get_response_header_back(CONTENT_TYPE).await;
+// 获取响应头的最后一个值（获取不到则panic）
+let header_value: ResponseHeadersValueItem = ctx.get_response_header_back(CONTENT_TYPE).await;
+```
+#### 检查是否存在特定响应头
+```rust
+let has_header: bool = ctx.get_response_has_header(CONTENT_TYPE).await;
+```
+#### 检查响应头是否包含特定值
+```rust
+let has_value: bool = ctx.has_response_header_value(CONTENT_TYPE, APPLICATION_JSON).await;
+```
+#### 获取响应头数量
+```rust
+let headers_count: usize = ctx.get_response_headers_length().await;
+```
+#### 获取响应头值的数量
+```rust
+// 尝试获取响应头值的数量
+let header_count: OptionUsize = ctx.try_get_response_header_len(CONTENT_TYPE).await;
+// 获取响应头值的数量（获取不到则panic）
+let header_count: usize = ctx.get_response_header_len(CONTENT_TYPE).await;
+```
+#### 获取所有响应头值的总数量
+```rust
+let total_values: usize = ctx.get_response_headers_values_length().await;
+```
+#### 获取响应体
+```rust
+let body: ResponseBody = ctx.get_response_body().await;
+```
+#### 获取 `string` 格式的响应体
+```rust
+let body: String = ctx.get_response_body_string().await;
+```
+#### 获取 `json` 格式的响应体
+```rust
+// 反序列化响应体
+let body: ResultJsonError<T> = ctx.try_get_response_body_json::<T>().await;
+// 反序列化响应体（反序列化失败则panic）
+let body: T = ctx.get_response_body_json::<T>().await;
+```
+### 设置响应
+#### 设置 `response`
+```rust
+ctx.set_response(Response::default()).await;
+```
+#### 设置响应版本
+> [!warning]
+> 特别注意的是需要设置响应版本，框架默认的版本是空字符串，客户端处理会异常。
+```rust
+ctx.set_response_version(HttpVersion::Http1_1).await;
+```
+#### 设置响应状态码
+```rust
+ctx.set_response_status_code(200).await;
+```
+#### 设置响应原因短语
+```rust
+ctx.set_response_reason_phrase("OK").await;
+```
+#### 设置响应体
+```rust
+ctx.set_response_body("Hello World").await;
+```
+#### 设置（添加）响应头
+> `hyperlane` 框架对响应头的 `key` 是不做大小写处理的，建议使用框架定义的常量。
+```rust
+ctx.add_response_header(SERVER, "hyperlane").await;
+```
+#### 设置（替换）响应头
+```rust
+ctx.set_response_header(CONTENT_TYPE, APPLICATION_JSON).await;
+```
+#### 移除响应头
+```rust
+ctx.remove_response_header(CONTENT_TYPE).await;
+```
+#### 移除响应头的特定值
+```rust
+ctx.remove_response_header_value(CONTENT_TYPE, APPLICATION_JSON).await;
+```
+#### 清空所有响应头
+```rust
+ctx.clear_response_headers().await;
+```
+### 执行闭包操作
+#### 使用响应执行异步闭包
+```rust
+let result = ctx.with_response(|response| async move {
+    response.get_status_code()
+}).await;
+```
+### 转字符串
+#### 通过 `to_string`
+> 将获得完整的原始结构体字符串结构。
+```rust
+ctx.get_response().await.to_string();
+```
+#### 通过 `get_string`
+> 将获得简化的结构体字符串结构。
+```rust
+ctx.get_response().await.get_string();
+```
+#### 通过 `ctx.get_response_string`
+```rust
+let response_string: String = ctx.get_response_string().await;
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\route.md
+## 静态路由
+> `hyperlane` 框架支持静态路由（如果重复注册相同的静态路由，框架会抛出异常，程序退出运行），使用方法如下：
+### 注册
+```rust
+struct Route;
+server.route::<Route>("/test").await;
+```
+## 动态路由
+> `hyperlane` 框架支持动态路由（如果重复注册相同模式的动态路由，框架会抛出异常，程序退出运行），具体使用方法如下：
+### 注册
+> 动态路由使用 `{}` 包裹，有两种写法
+> - `{key}`内直接些字符串，则将匹配的 `value` 存入 `key` 对应的 `value` 中。
+> - `{key:regex}` 则将正则表达式匹配的 `value` 存入 `key` 对应的 `value` 中，如果路径的最后是正则动态路由，则匹配后续所有路径，例如 `/test/{file:^.*$}` 匹配 `/test/a/b/c/d` 会成功，`file` 的 `value` 为 `a/b/c/d`。如果路径的最后不是正则动态路由，则仅使用正则匹配当前段的路由，例如 `/test/{file:^.*$}/b` 匹配 `/test/a/b` 会成功，`file` 的 `value` 为 `a`。
+### 朴素动态路由
+```rust
+struct Route;
+server.route::<Route>("/test/{text}").await;
+```
+### 正则表达式动态路由
+```rust
+struct Route;
+server.route::<Route>("/test/{number:\\d+}").await;
+```
+### 获取全部动态路由参数
+```rust
+ctx.get_route_params().await;
+```
+### 获取某个动态路由参数
+```rust
+ctx.get_route_param("text").await;
+```
+### 获取路由匹配器
+```rust
+let route_matcher: RouteMatcher = server.get_route_matcher().await;
+```
+### 获取所有路由的信息
+```rust
+let route_matcher: RouteMatcher = server.get_route_matcher().await;
+for key in route_matcher.get_static_route().keys() {
+    println!("Static route: {key}");
+}
+for value in route_matcher.get_dynamic_route().values() {
+    for (route_pattern, _) in value {
+        println!("Dynamic route: {route_pattern}");
+    }
+}
+for value in route_matcher.get_regex_route().values() {
+    for (route_pattern, _) in value {
+        println!("Regex route: {route_pattern}");
+    }
+}
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\run.md
+> `hyperlane` 框架运行后需要显示调用 `run` 来完成服务启动。此过程只会启动服务，监听端口，不会等待和处理请求。
+```rust
+let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\send.md
+> `hyperlane` 框架提供了多种响应发送方法，支持完整 HTTP 响应发送、仅响应体发送，以及连接管理。
+> - `send_body_with_data`: 仅发送响应体并保留连接。
+> - `send_body_list_with_data`: 批量发送响应体，适用于 WebSocket 等场景。
+## 发送完整 HTTP 响应
+### send 方法
+> 发送完整的 HTTP 响应，发送后 TCP 连接保留。
+```rust
+let send_result: ResponseResult = ctx.send().await;
+```
+## 发送响应体
+### send_body 方法
+> 仅发送响应体内容，发送后 TCP 连接保留。适用于流式响应和 WebSocket。
+```rust
+let send_result: ResponseResult = ctx.send_body().await;
+```
+## 发送带数据的响应
+### send_body_with_data 方法
+> 仅发送响应体内容，并将提供的数据作为响应体，发送后 TCP 连接保留。
+```rust
+let send_result: ResponseResult = ctx.send_body_with_data("chunk data").await;
+```
+### send_body_list_with_data 方法
+> 批量发送多个响应体数据，适用于 WebSocket 桢列表等场景，发送后 TCP 连接保留。
+```rust
+let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&request_body);
+ctx.send_body_list_with_data(&frame_list).await.unwrap();
+```
+## 刷新缓冲区
+### flush 方法
+> 强制刷新网络缓冲区，确保数据立即发送。
+```rust
+let flush_result: ResponseResult = ctx.flush().await;
+```
+## 基本使用示例
+### 使用框架常量
+```rust
+ctx.set_response_header(CONTENT_TYPE, APPLICATION_JSON).await
+   .set_response_body(r#"{"status": "ok"}"#).await
+   .send().await;
+```
+### 流式发送
+```rust
+let _ = ctx
+    .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+    .await
+    .send()
+    .await;
+for i in 1..10 {
+    let _ = ctx.set_response_body(format!("chunk {}\n", i)).await.send_body().await;
+    ctx.flush().await;
+}
+```
+### WebSocket 发送
+```rust
+struct WebsocketRoute;
+impl ServerHook for WebsocketRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        while ctx.ws_from_stream(4096).await.is_ok() {
+            let request_body: Vec<u8> = ctx.get_request_body().await;
+            ctx.set_response_body(&request_body).await;
+            self.send_body_hook(ctx).await;
         }
-        Err(err) => err.to_compile_error().into(),
     }
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "methods",
-        handler: Handler::WithAttrPosition(methods_macro),
+impl WebsocketRoute {
+    async fn send_body_hook(&self, ctx: &Context) {
+        let body: ResponseBody = ctx.get_response_body().await;
+        if ctx.get_request().await.is_ws() {
+            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+            ctx.send_body_list_with_data(&frame_list).await.unwrap();
+        } else {
+            ctx.send_body().await.unwrap();
+        }
     }
 }
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\shutdown.md
+> `hyperlane` 框架支持优雅的停机方式，可以通过 `server.shutdown()` 方法实现停机。
+```rust
+let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
+server_control_hook.shutdown().await;
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\sse.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-quick-start/tree/sse)
+> `hyperlane` 框架支持 `sse`，服务端主动推送，下面是每隔 `1s` 完成一次推送，并在 `10` 次后关闭连接。
+> `sse` 规范: 服务器使用 `"content-type: text/event-stream"` 表示响应是一个 `sse` 事件流。
+> 接着使用 `"data"` 字段来发送事件数据，每个事件以 `"data:"` 开头，后面跟着事件的内容和一个空行。
+> 客户端收到这样的响应后，就可以解析其中的事件数据并进行相应的处理。
+> 如果开发者非首次响应尝试调用 `send` 会正常发送响应，但是会包含整个 `http` 协议内容，所以对于 `sse`，
+> 非首次响应请统一使用 `send_body` 方法。
+### 服务端代码
+```rust
+struct SseRoute;
+impl ServerHook for SseRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let _ = ctx
+            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .send()
+            .await;
+        for i in 0..10 {
+            let _ = ctx
+                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+                .await
+                .send_body()
+                .await;
+        }
+        let _ = ctx.closed().await;
+    }
+}
+```
+### 客户端代码
+## 客户端代码
+#### 断线重连
+```js
+const eventSource = new EventSource('http://127.0.0.1:60000');
+eventSource.onopen = function (event) {
+  console.log('Connection opened.');
+};
+eventSource.onmessage = function (event) {
+  const eventData = JSON.parse(event.data);
+  console.log('Received event data:', eventData);
+};
+eventSource.onerror = function (event) {
+  if (event.eventPhase === EventSource.CLOSED) {
+    console.log('Connection was closed.');
+  } else {
+    console.error('Error occurred:', event);
+  }
+};
+```
+#### 取消断线重连
+```js
+const eventSource = new EventSource('http://127.0.0.1:60000');
+eventSource.onopen = function (event) {
+  console.log('Connection opened.');
+};
+eventSource.onmessage = function (event) {
+  const eventData = JSON.parse(event.data);
+  console.log('Received event data:', eventData);
+};
+eventSource.onerror = function (event) {
+  if (event.eventPhase === EventSource.CLOSED) {
+    console.log('Connection was closed.');
+    // 关闭连接，防止自动重连
+    eventSource.close();
+  } else {
+    console.error('Error occurred:', event);
+  }
+};
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\stream.md
+> `hyperlane` 框架接收请求和发送响应均依赖 `stream`，类型是 [`ArcRwLockStream`](../type/stream.md) 需要注意框架提供的 `stream` 仅可读，使用方式如下：
+### 获取 `stream`
+```rust
+let stream_lock: ArcRwLockStream = ctx.get_stream().await.clone().unwrap();
+```
+### 获取客户端地址
+> 完整接口参阅[官方文档](./addr.md)，此处只介绍通过 `stream` 解析使用。
+```rust
+let socket_addr: String = ctx
+    .get_stream()
+    .await
+    .unwrap()
+    .read()
+    .await
+    .peer_addr()
+    .and_then(|host| Ok(host.to_string()))
+    .unwrap_or("Unknown".to_owned());
+```
+### 关闭连接
+> 此方法会关闭 `TCP` 连接，不会终止当前的生命周期（当前声明周期结束不会进入下一次生命周期循环，需要重新建立 `TCP` 连接），当前声明周期内的代码正常执行，但是不会再发送响应。
+```rust
+ctx.closed().await;
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\wait.md
+> `hyperlane` 框架运行后需要显示调用 `wait` 来完成等待请求。
+```rust
+let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
+server_control_hook.wait().await;
+```
+# Path: ltpp-docs\src\hyperlane\usage-introduction\websocket.md
+> `hyperlane` 框架支持 `websocket` 协议，服务端自动处理协议升级，支持请求中间件，路由处理，响应中间件。
+### 服务端代码
+> `hyperlane` 框架发送 `websocket` 响应使用`send_body`，与 `sse` 相同。
+> 由于 `websocket`协议基于`http`，所以可以像使用 `http` 一样处理请求，
+> 但是需要注意响应数据需要通过，`WebSocketFrame::create_frame_list` 进行帧处理。
+> 如果开发者尝试调用 `send` 会导致客户端处理错误，
+> （服务端发送响应前需要处理成符合`websocket` 规范的响应，客户端才能正确解析）。所以对于 `websocket` 响应，
+> 请统一使用 `send_body` 或者 `send_body_list_with_data` 方法。
+#### 单点发送
+> 完整代码参考 [`发送响应`](./send.md) 里 **WebSocket 发送** 部分 。
+#### 广播发送
+> 需要阻塞住当前处理函数，将后续所有请求在处理函数中处理。
+> 这里使用 `tokio` 的 `select` 来处理多个请求，使用 [`hyperlane-broadcast`](../../hyperlane-broadcast/README.md) 来实现广播。
+### 客户端代码
+```js
+const ws = new WebSocket('ws://localhost:60000/websocket');
+ws.onopen = () => {
+  console.log('WebSocket opened');
+  setInterval(() => {
+    ws.send(`Now time: ${new Date().toISOString()}`);
+  }, 1000);
+};
+ws.onmessage = (event) => {
+  console.log('Receive: ', event.data);
+};
+ws.onerror = (error) => {
+  console.error('WebSocket error: ', error);
+};
+ws.onclose = () => {
+  console.log('WebSocket closed');
+};
+```
+# Path: ltpp-docs\src\hyperlane\utils\inner-utils.md
+## http-constant
+> `hyperlane` 框架使用了 `http-constant` 库（框架已内置，无需额外安装和导入），
+> 使用参考 [官方文档](../../http-constant/README.md)。
+## http-compress
+> `hyperlane` 框架使用了 `http-compress` 库（框架已内置，无需额外安装和导入），
+> 使用参考 [官方文档](../../http-compress/README.md)。
+## http-type
+> `hyperlane` 框架使用了 `http-type` 库（框架已内置，无需额外安装和导入），
+> 使用参考 [官方文档](../../http-type/README.md)。
+# Path: ltpp-docs\src\hyperlane\utils\recommend-utils.md
+## hyperlane-utils
+> `hyperlane` 框架推荐使用 `hyperlane-utils` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../hyperlane-utils/README.md)。
+## lombok
+> `hyperlane` 框架推荐使用 `lombok` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../lombok-macros/README.md)。
+## clonelicious
+> `hyperlane` 框架推荐使用 `clonelicious` 库，内部提供变量捕获和克隆（需额外安装和导入），
+> 使用参考 [官方文档](../../clonelicious/README.md)。
+## future-fn
+> `hyperlane` 框架推荐使用 `future-fn` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../future-fn/README.md)。
+## std-macro-extensions
+> `hyperlane` 框架推荐使用 `std-macro-extensions` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../std-macro-extensions/README.md)。
+## color-output
+> `hyperlane` 框架推荐使用 `color-output` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../color-output/README.md)。
+## bin-encode-decode
+> `hyperlane` 框架推荐使用 `bin-encode-decode` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../bin-encode-decode/README.md)。
+## file-operation
+> `hyperlane` 框架推荐使用 `file-operation` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../file-operation/README.md)。
+## compare-version
+> `hyperlane` 框架推荐使用 `compare-version` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../compare-version/README.md)。
+## hyperlane-log
+> `hyperlane` 框架使用 `hyperlane-log` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../hyperlane-log/README.md)。
+## hyperlane-time
+> `hyperlane` 框架推荐使用 `hyperlane-time` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../hyperlane-time/README.md)。
+## recoverable-spawn
+> `hyperlane` 框架推荐使用 `recoverable-spawn` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../recoverable-spawn/README.md)。
+## recoverable-thread-pool
+> `hyperlane` 框架推荐使用 `recoverable-thread-pool` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../recoverable-thread-pool/README.md)。
+## http-request
+> `hyperlane` 框架推荐使用 `http-request` 库，支持 `http` 和 `https`（需额外安装和导入），
+> 使用参考 [官方文档](../../http-request/README.md)。
+## hyperlane-broadcast
+> `hyperlane` 框架推荐使用 `hyperlane-broadcast` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../hyperlane-broadcast/README.md)。
+## hyperlane-plugin-websocket
+> `hyperlane` 框架推荐使用 `hyperlane-plugin-websocket` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../hyperlane-plugin-websocket/README.md)。
+## urlencoding
+> `hyperlane` 框架推荐使用 `urlencoding` 库（需额外安装和导入），可以实现 `url` 编解码。
+## server-manager
+> `hyperlane` 框架推荐使用 `server-manager` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../server-manager/README.md)。
+## chunkify
+> `hyperlane` 框架推荐使用 `chunkify` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../chunkify/README.md)。
+## china_identification_card
+> `hyperlane` 框架推荐使用 `china_identification_card` 库（需额外安装和导入），
+> 使用参考 [官方文档](../../china-identification-card/README.md)。
+## utoipa
+> `hyperlane` 框架推荐使用 `utoipa` 库实现 `openapi`
+# Path: ltpp-docs\src\hyperlane-ai\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-ai)
+## 项目概述
+该流水线包括以下步骤：
+1. 使用 Python 虚拟环境进行环境设置
+2. 安装依赖项
+3. 数据集生成
+4. 使用 LoRA 适配器进行模型微调
+5. 将 LoRA 适配器与基础模型合并
+6. 将合并后的模型转换为 GGUF 格式
+7. 分析训练参数
+## 先决条件
+- Python 3.8 或更高版本
+- pip (Python 包安装器)
+- Git
+## 设置和使用
+### 1. 克隆仓库
+```bash
+git clone <repository-url>
+cd hyperlane-ai-training
+```
+### 2. 运行训练流水线
+执行主脚本来运行完整的流水线：
+```bash
+./run.sh
+```
+这将：
+- 创建并激活 Python 虚拟环境
+- 安装所有必需的依赖项
+- 生成数据集
+- 微调模型
+- 将 LoRA 适配器与基础模型合并
+- 将合并后的模型转换为 GGUF 格式
+- 分析训练参数
+### 3. 开发模式
+为了在开发过程中更快地迭代，您可以运行开发模式的流水线，该模式限制训练步数：
+```bash
+./run.sh dev
+```
+## 配置
+项目可以使用根目录中的 `.env` 文件进行配置。以下环境变量可用：
+- `MERGED_MODEL_DIR`: 合并模型的目录 (默认: "merged_model")
+- `OUTPUT_DIR`: 输出文件的目录 (默认: "output")
+示例 `.env` 文件：
+```
+MERGED_MODEL_DIR=my_merged_model
+OUTPUT_DIR=my_output
+```
+## 项目结构
+- `run.sh`: 主执行脚本
+- `generate_markdown.py`: 生成训练数据集的脚本
+- `finetune.py`: 模型微调脚本
+- `merge_model.py`: 将 LoRA 适配器与基础模型合并的脚本
+- `convert_hf_to_gguf.py`: 将模型转换为 GGUF 格式的脚本
+- `analyze_training_args.py`: 分析和记录训练参数的脚本
+- `dataset/`: 包含训练数据集的目录
+## 依赖项
+项目需要以下 Python 包：
+- torch (>=2.3.0)
+- transformers
+- datasets
+- trl
+- peft
+- accelerate
+- hf_xet
+- gguf
+- mistral_common
+- dotenv
+## 输出
+成功执行后，最终的 GGUF 模型将位于: `$OUTPUT_DIR/$OUTPUT_DIR.gguf`
+# Path: ltpp-docs\src\hyperlane-broadcast\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-broadcast)
+[API 文档](https://docs.rs/hyperlane-broadcast/latest/hyperlane_broadcast/)
+> hyperlane-broadcast 是对 Tokio 广播通道的一个轻量级且符合人体工程学的封装，旨在为异步 Rust 应用程序提供易于使用的发布-订阅消息传递。它通过提供一个直接的接口，以最少的样板代码向多个订阅者广播消息，
+## 安装方式
+你可以使用如下命令添加依赖：
+```shell
+cargo add hyperlane-broadcast
+```
+## 使用示例
+```rust
+use hyperlane_broadcast::*;
+let broadcast: Broadcast<usize> = Broadcast::new(10);
+let mut rec1: BroadcastReceiver<usize> = broadcast.subscribe();
+let mut rec2: BroadcastReceiver<usize> = broadcast.subscribe();
+broadcast.send(20).unwrap();
+assert_eq!(rec1.recv().await, Ok(20));
+assert_eq!(rec2.recv().await, Ok(20));
+let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
+broadcast_map.insert("a", 10);
+let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
+let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
+let mut rec3: BroadcastMapReceiver<usize> =
+    broadcast_map.subscribe_or_insert("b", DEFAULT_BROADCAST_SENDER_CAPACITY);
+broadcast_map.send("a", 20).unwrap();
+broadcast_map.send("b", 10).unwrap();
+assert_eq!(rec1.recv().await, Ok(20));
+assert_eq!(rec2.recv().await, Ok(20));
+assert_eq!(rec3.recv().await, Ok(10));
+```
+## 开源协议
+# Path: ltpp-docs\src\hyperlane-log\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-log)
+[API 文档](https://docs.rs/hyperlane-log/latest/hyperlane_log/)
+> 一个支持异步和同步日志记录的 Rust 日志库。它提供多个日志级别，如错误、信息和调试。用户可以定义自定义的日志处理方法并配置日志文件路径。该库支持日志轮换，当当前文件达到指定的大小限制时，会自动创建一个新的日志文件。它允许灵活的日志配置，使其既适用于高性能的异步应用程序，也适用于传统的同步日志记录场景。异步模式利用 Tokio 的异步通道进行高效的日志缓冲，而同步模式则直接将日志写入文件系统。
+## 安装
+要使用此库，您可以运行以下命令：
+```shell
+cargo add hyperlane-log
+```
+## 日志存储位置说明
+> 会在用户指定的目录下生成三个目录，分别对应错误日志目录，信息日志目录，调试日志目录，这三个目录下还有一级目录使用日期命名，此目录下的日志文件命名是时间.下标.log
+## 使用同步
+```rust
+use hyperlane_log::*;
+let log: Log = Log::new("./logs", 1_024_000);
+log.error("error data!", |error| {
+    let write_data: String = format!("User error func => {:?}\n", error);
+    write_data
+});
+log.error(String::from("error data!"), |error| {
+    let write_data: String = format!("User error func => {:?}\n", error);
+    write_data
+});
+log.info("info data!", |info| {
+    let write_data: String = format!("User info func => {:?}\n", info);
+    write_data
+});
+log.info(String::from("info data!"), |info| {
+    let write_data: String = format!("User info func => {:?}\n", info);
+    write_data
+});
+log.debug("debug data!", |debug| {
+    let write_data: String = format!("User debug func => {:#?}\n", debug);
+    write_data
+});
+log.debug(String::from("debug data!"), |debug| {
+    let write_data: String = format!("User debug func => {:#?}\n", debug);
+    write_data
+});
+```
+## 使用异步
+```rust
+use hyperlane_log::*;
+let log: Log = Log::new("./logs", 1_024_000);
+log.async_error("async error data!", |error| {
+    let write_data: String = format!("User error func => {:?}\n", error);
+    write_data
+}).await;
+log.async_error(String::from("async error data!"), |error| {
+    let write_data: String = format!("User error func => {:?}\n", error);
+    write_data
+}).await;
+log.async_info("async info data!", |info| {
+    let write_data: String = format!("User info func => {:?}\n", info);
+    write_data
+}).await;
+log.async_info(String::from("async info data!"), |info| {
+    let write_data: String = format!("User info func => {:?}\n", info);
+    write_data
+}).await;
+log.async_debug("async debug data!", |debug| {
+    let write_data: String = format!("User debug func => {:#?}\n", debug);
+    write_data
+}).await;
+log.async_debug(String::from("async debug data!"), |debug| {
+    let write_data: String = format!("User debug func => {:#?}\n", debug);
+    write_data
+}).await;
+```
+## 禁用日志
+```rust
+let log: Log = Log::new("./logs", DISABLE_LOG_FILE_SIZE);
+```
+# Path: ltpp-docs\src\hyperlane-macros\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-macros)
+[API 文档](https://docs.rs/hyperlane-macros/latest/hyperlane_macros/)
+> 一个用于构建增强功能 HTTP 服务器的过程宏综合集合。该 crate 提供属性宏，简化 HTTP 请求处理、协议验证、响应管理和请求数据提取。
+## 安装
+要使用此 crate，可以运行以下命令：
+```shell
+cargo add hyperlane-macros
+```
+## 可用宏
+### Hyperlane 宏
+- `#[hyperlane(server: Server)]` - 创建一个新的 `Server` 实例，使用指定的变量名、类型，并自动注册 crate 中定义的其他钩子和路由。
+- `#[hyperlane(config: ServerConfig)]` - 创建一个新的 `ServerConfig` 实例，使用指定的变量名和类型。
+- `#[hyperlane(var1: Type1, var2: Type2, ...)]` - 支持在单个调用中初始化多个实例
+### HTTP 方法宏
+- `#[methods(method1, method2, ...)]` - 接受多个 HTTP 方法
+- `#[get]` - GET 方法处理器
+- `#[post]` - POST 方法处理器
+- `#[put]` - PUT 方法处理器
+- `#[delete]` - DELETE 方法处理器
+- `#[patch]` - PATCH 方法处理器
+- `#[head]` - HEAD 方法处理器
+- `#[options]` - OPTIONS 方法处理器
+- `#[connect]` - CONNECT 方法处理器
+- `#[trace]` - TRACE 方法处理器
+### 协议检查宏
+- `#[ws]` - WebSocket 检查，确保函数仅对 WebSocket 升级请求执行
+- `#[http]` - HTTP 检查，确保函数仅对标准 HTTP 请求执行
+- `#[h2c]` - HTTP/2 明文检查，确保函数仅对 HTTP/2 明文请求执行
+- `#[http0_9]` - HTTP/0.9 检查，确保函数仅对 HTTP/0.9 协议请求执行
+- `#[http1_0]` - HTTP/1.0 检查，确保函数仅对 HTTP/1.0 协议请求执行
+- `#[http1_1]` - HTTP/1.1 检查，确保函数仅对 HTTP/1.1 协议请求执行
+- `#[http1_1_or_higher]` - HTTP/1.1 或更高版本检查，确保函数仅对 HTTP/1.1 或更新的协议版本执行
+- `#[http2]` - HTTP/2 检查，确保函数仅对 HTTP/2 协议请求执行
+- `#[http3]` - HTTP/3 检查，确保函数仅对 HTTP/3 协议请求执行
+- `#[tls]` - TLS 检查，确保函数仅对 TLS 安全连接执行
+### 响应设置宏
+- `#[response_status_code(code)]` - 设置响应状态码（支持字面量和全局常量）
+- `#[response_reason_phrase("phrase")]` - 设置响应原因短语（支持字面量和全局常量）
+- `#[response_header("key", "value")]` - 添加响应头（支持字面量和全局常量）
+- `#[response_header("key" => "value")]` - 设置响应头（支持字面量和全局常量）
+- `#[response_body("data")]` - 设置响应体（支持字面量和全局常量）
+- `#[response_version(version)]` - 设置响应 HTTP 版本（支持字面量和全局常量）
+- `#[clear_response_headers]` - 清除所有响应头
+### 发送操作宏
+- `#[send]` - 函数执行后发送完整响应（头和体）
+- `#[send_body]` - 函数执行后仅发送响应体
+- `#[send_body_with_data("data")]` - 函数执行后使用指定数据仅发送响应体
+### 刷新宏
+- `#[flush]` - 函数执行后刷新响应流，确保立即数据传输
+### 中止宏
+- `#[aborted]` - 处理中止的请求，为提前终止的连接提供清理逻辑
+### 关闭操作宏
+- `#[closed]` - 处理关闭的流，为已完成的连接提供清理逻辑
+### 条件宏
+- `#[filter(condition)]` - 仅当 `condition`（返回布尔值的代码块）为 `true` 时继续执行。
+- `#[reject(condition)]` - 仅当 `condition`（返回布尔值的代码块）为 `false` 时继续执行。
+### 请求体宏
+- `#[request_body(variable_name)]` - 将原始请求体提取到指定变量中，使用 RequestBody 类型
+- `#[request_body(var1, var2, ...)]` - 支持多个请求体变量
+- `#[request_body_json(variable_name: type)]` - 将请求体解析为 JSON 到指定变量和类型中
+- `#[request_body_json(var1: Type1, var2: Type2, ...)]` - 支持多个 JSON 体解析
+### 属性宏
+- `#[attribute_option(key => variable_name: type)]` - 通过键提取特定属性到类型化变量中
+- `#[attribute_option("key1" => var1: Type1, "key2" => var2: Type2, ...)]` - 支持多个属性提取
+- `#[attribute(key => variable_name: type)]` - 通过键提取特定属性到类型化变量中
+- `#[attribute("key1" => var1: Type1, "key2" => var2: Type2, ...)]` - 支持多个属性提取
+### 属性集合宏
+- `#[attributes(variable_name)]` - 获取所有属性作为 HashMap，用于全面属性访问
+- `#[attributes(var1, var2, ...)]` - 支持多个属性集合
+### 路由参数宏
+- `#[route_param_option(key => variable_name)]` - 通过键提取特定路由参数到变量中
+- `#[route_param_option("key1" => var1, "key2" => var2, ...)]` - 支持多个路由参数提取
+- `#[route_param(key => variable_name)]` - 通过键提取特定路由参数到变量中
+- `#[route_param("key1" => var1, "key2" => var2, ...)]` - 支持多个路由参数提取
+### 路由参数集合宏
+- `#[route_params(variable_name)]` - 获取所有路由参数作为集合
+- `#[route_params(var1, var2, ...)]` - 支持多个路由参数集合
+### 请求查询宏
+- `#[request_query_option(key => variable_name)]` - 从 URL 查询字符串中通过键提取特定查询参数
+- `#[request_query_option("key1" => var1, "key2" => var2, ...)]` - 支持多个查询参数提取
+- `#[request_query(key => variable_name)]` - 从 URL 查询字符串中通过键提取特定查询参数
+- `#[request_query("key1" => var1, "key2" => var2, ...)]` - 支持多个查询参数提取
+### 请求查询集合宏
+- `#[request_querys(variable_name)]` - 获取所有查询参数作为集合
+- `#[request_querys(var1, var2, ...)]` - 支持多个查询参数集合
+### 请求头宏
+- `#[request_header_option(key => variable_name)]` - 从请求中通过名称提取特定 HTTP 头
+- `#[request_header_option(KEY1 => var1, KEY2 => var2, ...)]` - 支持多个头提取
+- `#[request_header(key => variable_name)]` - 从请求中通过名称提取特定 HTTP 头
+- `#[request_header(KEY1 => var1, KEY2 => var2, ...)]` - 支持多个头提取
+### 请求头集合宏
+- `#[request_headers(variable_name)]` - 获取所有 HTTP 头作为集合
+- `#[request_headers(var1, var2, ...)]` - 支持多个头集合
+### 请求 Cookie 宏
+- `#[request_cookie_option(key => variable_name)]` - 从请求 cookie 头中通过键提取特定 cookie 值
+- `#[request_cookie_option("key1" => var1, "key2" => var2, ...)]` - 支持多个 cookie 提取
+- `#[request_cookie(key => variable_name)]` - 从请求 cookie 头中通过键提取特定 cookie 值
+- `#[request_cookie("key1" => var1, "key2" => var2, ...)]` - 支持多个 cookie 提取
+### 请求 Cookies 宏
+- `#[request_cookies(variable_name)]` - 从 cookie 头获取所有 cookies 作为原始字符串
+- `#[request_cookies(var1, var2, ...)]` - 支持多个 cookie 集合
+### 请求版本宏
+- `#[request_version(variable_name)]` - 将 HTTP 请求版本提取到变量中
+- `#[request_version(var1, var2, ...)]` - 支持多个请求版本变量
+### 请求路径宏
+- `#[request_path(variable_name)]` - 将 HTTP 请求路径提取到变量中
+- `#[request_path(var1, var2, ...)]` - 支持多个请求路径变量
+### 主机宏
+- `#[host("hostname")]` - 限制函数执行仅对具有特定主机头值的请求
+- `#[host("host1", "host2", ...)]` - 支持多个主机检查
+- `#[reject_host("hostname")]` - 拒绝匹配特定主机头值的请求
+- `#[reject_host("host1", "host2", ...)]` - 支持多个主机拒绝
+### 引用页宏
+- `#[referer("url")]` - 限制函数执行仅对具有特定引用页头值的请求
+- `#[referer("url1", "url2", ...)]` - 支持多个引用页检查
+- `#[reject_referer("url")]` - 拒绝匹配特定引用页头值的请求
+- `#[reject_referer("url1", "url2", ...)]` - 支持多个引用页拒绝
+### 钩子宏
+- `#[prologue_hooks(function_name)]` - 在主处理函数之前执行指定函数
+- `#[epilogue_hooks(function_name)]` - 在主处理函数之后执行指定函数
+- `#[panic_hook]` - 当服务器内发生 panic 时执行函数
+- `#[prologue_macros(macro1, macro2, ...)]` - 在被装饰函数之前注入宏列表
+- `#[epilogue_macros(macro1, macro2, ...)]` - 在被装饰函数之后注入宏列表
+### 中间件宏
+- `#[request_middleware]` - 将函数注册为请求中间件
+- `#[request_middleware(order)]` - 将函数注册为具有指定顺序的请求中间件
+- `#[response_middleware]` - 将函数注册为响应中间件
+- `#[response_middleware(order)]` - 将函数注册为具有指定顺序的响应中间件
+- `#[panic_hook]` - 将函数注册为 panic 钩子
+- `#[panic_hook(order)]` - 将函数注册为具有指定顺序的 panic 钩子
+### 流处理宏
+- `#[http_from_stream]` - 使用默认请求配置包装函数体进行 HTTP 流处理。仅当从 HTTP 流成功读取数据时，函数体才会执行。
+- `#[http_from_stream(request_config)]` - 使用指定请求配置包装函数体进行 HTTP 流处理。
+- `#[http_from_stream(variable_name)]` - 包装函数体进行 HTTP 流处理，将数据存储在指定变量名中。
+- `#[http_from_stream(request_config, variable_name)]` - 使用指定请求配置和变量名包装函数体进行 HTTP 流处理。
+- `#[http_from_stream(variable_name, request_config)]` - 使用指定变量名和请求配置（反向顺序）包装函数体进行 HTTP 流处理。
+- `#[ws_from_stream]` - 使用默认请求配置包装函数体进行 WebSocket 流处理。仅当从 WebSocket 流成功读取数据时，函数体才会执行。
+- `#[ws_from_stream(request_config)]` - 使用指定请求配置包装函数体进行 WebSocket 流处理。
+- `#[ws_from_stream(variable_name)]` - 包装函数体进行 WebSocket 流处理，将数据存储在指定变量名中。
+- `#[ws_from_stream(request_config, variable_name)]` - 使用指定请求配置和变量名包装函数体进行 WebSocket 流处理。
+- `#[ws_from_stream(variable_name, request_config)]` - 使用指定变量名和请求配置（反向顺序）包装函数体进行 WebSocket 流处理。
+### 响应头宏
+### 响应体宏
+### 路由宏
+- `#[route("path")]` - 使用默认服务器为给定路径注册路由处理器（前提：需要 #[hyperlane(server: Server)] 宏）
+### 辅助提示
+- **请求相关宏**（数据提取）使用 **`get`** 操作 - 它们从请求中检索/查询数据
+- **响应相关宏**（数据设置）使用 **`set`** 操作 - 它们分配/配置响应数据
+- **钩子宏** 对于支持 `order` 参数的钩子相关宏，如果未指定 `order`，则钩子将比指定了 `order` 的钩子具有更高优先级（仅适用于 `#[request_middleware]`、`#[response_middleware]`、`#[panic_hook]` 等宏）
+- **多参数支持** 大多数数据提取宏支持在单个调用中使用多个参数（例如，`#[request_body(var1, var2)]`、`#[request_query("k1" => v1, "k2" => v2)]`）。这减少了宏重复并提高了代码可读性。
+### 最佳实践警告
+- 请求相关宏大多是查询函数，而响应相关宏大多是赋值函数。
+- 使用 `prologue_hooks` 或 `epilogue_hooks` 宏时，不建议在同一函数中将它们与其他宏（如 `#[get]`、`#[post]`、`#[http]` 等）组合使用。这些宏应放在钩子函数本身中。如果您不清楚宏如何展开，组合使用可能导致有问题的代码行为。
+## 使用示例
+```rust
+use hyperlane::*;
+use hyperlane_macros::*;
+use serde::{Deserialize, Serialize};
+const STEP: &str = "step";
+const TEST_ATTRIBUTE_KEY: &str = "test_attribute_key";
+const CUSTOM_STATUS_CODE: i32 = 200;
+const CUSTOM_REASON: &str = "Accepted";
+const CUSTOM_HEADER_NAME: &str = "X-Custom-Header";
+const CUSTOM_HEADER_VALUE: &str = "custom-value";
+const RESPONSE_DATA: &str = "{\"status\": \"success\"}";
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct TestData {
+    name: String,
+    age: u32,
+}
+#[panic_hook]
+#[panic_hook(1)]
+#[panic_hook("2")]
+struct PanicHook;
+impl ServerHook for PanicHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(500),
+        response_body("panic_hook"),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[request_middleware]
+struct RequestMiddleware;
+impl ServerHook for RequestMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(200),
+        response_header(SERVER => HYPERLANE),
+        response_header(CONNECTION => KEEP_ALIVE),
+        response_header(CONTENT_TYPE => TEXT_PLAIN),
+        response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY),
+        response_header(STEP => "request_middleware"),
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[request_middleware(1)]
+struct UpgradeHook;
+impl ServerHook for UpgradeHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        ws,
+        response_body(&vec![]),
+        response_status_code(101),
+        response_header(UPGRADE => WEBSOCKET),
+        response_header(CONNECTION => UPGRADE),
+        response_header(SEC_WEBSOCKET_ACCEPT => &WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
+        response_header(STEP => "upgrade_hook"),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[request_middleware(2)]
+struct ConnectedHook;
+impl ServerHook for ConnectedHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_status_code(200)]
+    #[response_header(SERVER => HYPERLANE)]
+    #[response_version(HttpVersion::Http1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
+    #[response_header(STEP => "connected_hook")]
+    async fn handle(self, ctx: &Context) {}
+}
+#[response_middleware]
+struct ResponseMiddleware1;
+impl ServerHook for ResponseMiddleware1 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_header(STEP => "response_middleware_1")]
+    async fn handle(self, ctx: &Context) {}
+}
+#[response_middleware(2)]
+struct ResponseMiddleware2;
+impl ServerHook for ResponseMiddleware2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        reject(ctx.get_request().await.is_ws()),
+        response_header(STEP => "response_middleware_2")
+    )]
+    #[epilogue_macros(send, flush)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[response_middleware("3")]
+struct ResponseMiddleware3;
+impl ServerHook for ResponseMiddleware3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        ws,
+        response_header(STEP => "response_middleware_3")
+    )]
+    #[epilogue_macros(send_body, flush)]
+    async fn handle(self, ctx: &Context) {}
+}
+struct PrologueHooks;
+impl ServerHook for PrologueHooks {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[get]
+    #[http]
+    async fn handle(self, _ctx: &Context) {}
+}
+struct EpilogueHooks;
+impl ServerHook for EpilogueHooks {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_status_code(200)]
+    async fn handle(self, ctx: &Context) {}
+}
+async fn prologue_hooks_fn(ctx: Context) {
+    let hook = PrologueHooks::new(&ctx).await;
+    hook.handle(&ctx).await;
+}
+async fn epilogue_hooks_fn(ctx: Context) {
+    let hook = EpilogueHooks::new(&ctx).await;
+    hook.handle(&ctx).await;
+}
+#[route("/response")]
+struct Response;
+impl ServerHook for Response {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&RESPONSE_DATA)]
+    #[response_reason_phrase(CUSTOM_REASON)]
+    #[response_status_code(CUSTOM_STATUS_CODE)]
+    #[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/connect")]
+struct Connect;
+impl ServerHook for Connect {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(connect, response_body("connect"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/delete")]
+struct Delete;
+impl ServerHook for Delete {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(delete, response_body("delete"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/head")]
+struct Head;
+impl ServerHook for Head {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(head, response_body("head"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/options")]
+struct Options;
+impl ServerHook for Options {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(options, response_body("options"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/patch")]
+struct Patch;
+impl ServerHook for Patch {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(patch, response_body("patch"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/put")]
+struct Put;
+impl ServerHook for Put {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(put, response_body("put"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/trace")]
+struct Trace;
+impl ServerHook for Trace {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(trace, response_body("trace"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/h2c")]
+struct H2c;
+impl ServerHook for H2c {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(h2c, response_body("h2c"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http")]
+struct HttpOnly;
+impl ServerHook for HttpOnly {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http, response_body("http"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http0_9")]
+struct Http09;
+impl ServerHook for Http09 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http0_9, response_body("http0_9"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http1_0")]
+struct Http10;
+impl ServerHook for Http10 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http1_0, response_body("http1_0"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http1_1")]
+struct Http11;
+impl ServerHook for Http11 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http1_1, response_body("http1_1"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http2")]
+struct Http2;
+impl ServerHook for Http2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http2, response_body("http2"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http3")]
+struct Http3;
+impl ServerHook for Http3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http3, response_body("http3"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/tls")]
+struct Tls;
+impl ServerHook for Tls {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(tls, response_body("tls"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http1_1_or_higher")]
+struct Http11OrHigher;
+impl ServerHook for Http11OrHigher {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/unknown_method")]
+struct UnknownMethod;
+impl ServerHook for UnknownMethod {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        clear_response_headers,
+        filter(ctx.get_request().await.is_unknown_method()),
+        response_body("unknown_method")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/get")]
+struct Get;
+impl ServerHook for Get {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(ws, get, response_body("get"), send_body)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/post")]
+struct Post;
+impl ServerHook for Post {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(post, response_body("post"), send)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/ws1")]
+struct Websocket1;
+impl ServerHook for Websocket1 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[ws]
+    #[ws_from_stream]
+    async fn handle(self, ctx: &Context) {
+        let body: RequestBody = ctx.get_request_body().await;
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
+}
+#[route("/ws2")]
+struct Websocket2;
+impl ServerHook for Websocket2 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[ws]
+    #[ws_from_stream(request)]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
+}
+#[route("/ws3")]
+struct Websocket3;
+impl ServerHook for Websocket3 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[ws]
+    #[ws_from_stream(RequestConfig::default(), request)]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
+}
+#[route("/ws4")]
+struct Websocket4;
+impl ServerHook for Websocket4 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[ws]
+    #[ws_from_stream(request, RequestConfig::default())]
+    async fn handle(self, ctx: &Context) {
+        let body: &RequestBody = request.get_body();
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
+}
+#[route("/ws5")]
+struct Websocket5;
+impl ServerHook for Websocket5 {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[ws]
+    #[ws_from_stream(RequestConfig::default())]
+    async fn handle(self, ctx: &Context) {
+        let body: RequestBody = ctx.get_request_body().await;
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        ctx.send_body_list_with_data(&body_list).await.unwrap();
+    }
+}
+#[route("/hook")]
+struct Hook;
+impl ServerHook for Hook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_hooks(prologue_hooks_fn)]
+    #[epilogue_hooks(epilogue_hooks_fn)]
+    #[response_body("Testing hook macro")]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/get_post")]
+struct GetPost;
+impl ServerHook for GetPost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[closed]
+    #[prologue_macros(
+        http,
+        methods(get, post),
+        response_body("get_post"),
+        response_status_code(200),
+        response_reason_phrase("OK")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/attributes")]
+struct Attributes;
+impl ServerHook for Attributes {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("request attributes: {request_attributes:?}"))]
+    #[attributes(request_attributes)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/route_params/:test")]
+struct RouteParams;
+impl ServerHook for RouteParams {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("request route params: {request_route_params:?}"))]
+    #[route_params(request_route_params)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/route_param_option/:test")]
+struct RouteParamOption;
+impl ServerHook for RouteParamOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("route param: {request_route_param_option1:?} {request_route_param_option2:?} {request_route_param_option3:?}"))]
+    #[route_param_option("test1" => request_route_param_option1)]
+    #[route_param_option("test2" => request_route_param_option2, "test3" => request_route_param_option3)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/route_param/:test")]
+struct RouteParam;
+impl ServerHook for RouteParam {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("route param: {request_route_param1} {request_route_param2} {request_route_param3}"))]
+    #[route_param("test1" => request_route_param1)]
+    #[route_param("test2" => request_route_param2, "test3" => request_route_param3)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/host")]
+struct Host;
+impl ServerHook for Host {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[host("localhost")]
+    #[epilogue_macros(
+        response_body("host string literal: localhost"),
+        send,
+        http_from_stream
+    )]
+    #[prologue_macros(response_body("host string literal: localhost"), send)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_query_option")]
+struct RequestQueryOption;
+impl ServerHook for RequestQueryOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        request_query_option("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send,
+        http_from_stream(RequestConfig::default())
+    )]
+    #[prologue_macros(
+        request_query_option("test" => request_query_option),
+        response_body(&format!("request query: {request_query_option:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_query")]
+struct RequestQuery;
+impl ServerHook for RequestQuery {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        request_query("test" => request_query),
+        response_body(&format!("request query: {request_query}")),
+        send,
+        http_from_stream(RequestConfig::default())
+    )]
+    #[prologue_macros(
+        request_query("test" => request_query),
+        response_body(&format!("request query: {request_query}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_header_option")]
+struct RequestHeaderOption;
+impl ServerHook for RequestHeaderOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        request_header_option(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
+        send,
+        http_from_stream(_request)
+    )]
+    #[prologue_macros(
+        request_header_option(HOST => request_header_option),
+        response_body(&format!("request header: {request_header_option:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_header")]
+struct RequestHeader;
+impl ServerHook for RequestHeader {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        request_header(HOST => request_header),
+        response_body(&format!("request header: {request_header}")),
+        send,
+        http_from_stream(_request)
+    )]
+    #[prologue_macros(
+        request_header(HOST => request_header),
+        response_body(&format!("request header: {request_header}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_querys")]
+struct RequestQuerys;
+impl ServerHook for RequestQuerys {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        request_querys(request_querys),
+        response_body(&format!("request querys: {request_querys:?}")),
+        send,
+        http_from_stream(RequestConfig::default(), _request)
+    )]
+    #[prologue_macros(
+        request_querys(request_querys),
+        response_body(&format!("request querys: {request_querys:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_headers")]
+struct RequestHeaders;
+impl ServerHook for RequestHeaders {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(
+        request_headers(request_headers),
+        response_body(&format!("request headers: {request_headers:?}")),
+        send,
+        http_from_stream(_request, RequestConfig::default())
+    )]
+    #[prologue_macros(
+        request_headers(request_headers),
+        response_body(&format!("request headers: {request_headers:?}")),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_body")]
+struct RequestBodyRoute;
+impl ServerHook for RequestBodyRoute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("raw body: {raw_body:?}"))]
+    #[request_body(raw_body)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/reject_host")]
+struct RejectHost;
+impl ServerHook for RejectHost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        reject_host("filter.localhost"),
+        response_body("host filter string literal")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/attribute_option")]
+struct AttributeOption;
+impl ServerHook for AttributeOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
+    #[attribute_option(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/attribute")]
+struct Attribute;
+impl ServerHook for Attribute {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("request attribute: {request_attribute:?}"))]
+    #[attribute(TEST_ATTRIBUTE_KEY => request_attribute: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_body_json_result")]
+struct RequestBodyJsonResult;
+impl ServerHook for RequestBodyJsonResult {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("request data: {request_data_result:?}"))]
+    #[request_body_json_result(request_data_result: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_body_json")]
+struct RequestBodyJson;
+impl ServerHook for RequestBodyJson {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("request data: {request_data_result:?}"))]
+    #[request_body_json(request_data_result: TestData)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/referer")]
+struct Referer;
+impl ServerHook for Referer {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        referer("http://localhost"),
+        response_body("referer string literal: http://localhost")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/reject_referer")]
+struct RejectReferer;
+impl ServerHook for RejectReferer {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        reject_referer("http://localhost"),
+        response_body("referer filter string literal")
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/cookies")]
+struct Cookies;
+impl ServerHook for Cookies {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("All cookies: {cookie_value:?}"))]
+    #[request_cookies(cookie_value)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_cookie_option")]
+struct CookieOption;
+impl ServerHook for CookieOption {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
+    #[request_cookie_option("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_cookie")]
+struct Cookie;
+impl ServerHook for Cookie {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("Session cookie: {session_cookie1}, {session_cookie2}"))]
+    #[request_cookie("test1" => session_cookie1, "test2" => session_cookie2)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_version")]
+struct RequestVersionTest;
+impl ServerHook for RequestVersionTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("HTTP Version: {http_version}"))]
+    #[request_version(http_version)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/request_path")]
+struct RequestPathTest;
+impl ServerHook for RequestPathTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body(&format!("Request Path: {request_path}"))]
+    #[request_path(request_path)]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/response_header")]
+struct ResponseHeaderTest;
+impl ServerHook for ResponseHeaderTest {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_body("Testing header set and replace operations")]
+    #[response_header("X-Add-Header", "add-value")]
+    #[response_header("X-Set-Header" => "set-value")]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/literals")]
+struct Literals;
+impl ServerHook for Literals {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_status_code(201)]
+    #[response_header(CONTENT_TYPE => APPLICATION_JSON)]
+    #[response_body("{\"message\": \"Resource created\"}")]
+    #[response_reason_phrase(HttpStatus::Created.to_string())]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/inject/response_body")]
+struct InjectResponseBody;
+impl ServerHook for InjectResponseBody {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        self.response_body_with_ref_self(ctx).await;
+    }
+}
+impl InjectResponseBody {
+    #[response_body("response body with ref self")]
+    async fn response_body_with_ref_self(&self, ctx: &Context) {}
+}
+#[route("/inject/post_method")]
+struct InjectPostMethod;
+impl ServerHook for InjectPostMethod {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        self.post_method_with_ref_self(ctx).await;
+    }
+}
+impl InjectPostMethod {
+    #[prologue_macros(post, response_body("post method with ref self"))]
+    async fn post_method_with_ref_self(&self, ctx: &Context) {}
+}
+#[route("/inject/send_flush")]
+struct InjectSendFlush;
+impl ServerHook for InjectSendFlush {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        self.send_and_flush_with_ref_self(ctx).await;
+    }
+}
+impl InjectSendFlush {
+    #[epilogue_macros(send, flush)]
+    async fn send_and_flush_with_ref_self(&self, ctx: &Context) {}
+}
+#[route("/inject/request_body")]
+struct InjectRequestBody;
+impl ServerHook for InjectRequestBody {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        self.extract_request_body_with_ref_self(ctx).await;
+    }
+}
+impl InjectRequestBody {
+    #[request_body(_raw_body)]
+    async fn extract_request_body_with_ref_self(&self, _ctx: &Context) {}
+}
+#[route("/inject/multiple_methods")]
+struct InjectMultipleMethods;
+impl ServerHook for InjectMultipleMethods {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        self.multiple_methods_with_ref_self(ctx).await;
+    }
+}
+impl InjectMultipleMethods {
+    #[methods(get, post)]
+    async fn multiple_methods_with_ref_self(&self, ctx: &Context) {}
+}
+#[route("/inject/http_stream")]
+struct InjectHttpStream;
+impl ServerHook for InjectHttpStream {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        self.http_stream_handler_with_ref_self(ctx).await;
+    }
+}
+impl InjectHttpStream {
+    #[http_from_stream(RequestConfig::default(), _request)]
+    async fn http_stream_handler_with_ref_self(&self, _ctx: &Context) {}
+}
+#[route("/inject/ws_stream")]
+struct InjectWsStream;
+impl ServerHook for InjectWsStream {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        self.websocket_stream_handler_with_ref_self(ctx).await;
+    }
+}
+impl InjectWsStream {
+    #[ws_from_stream(_request)]
+    async fn websocket_stream_handler_with_ref_self(&self, _ctx: &Context) {}
+}
+#[route("/inject/complex_post")]
+struct InjectComplexPost;
+impl ServerHook for InjectComplexPost {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        self.complex_post_handler_with_ref_self(ctx).await;
+    }
+}
+impl InjectComplexPost {
+    #[prologue_macros(
+        post,
+        http,
+        request_body(raw_body),
+        response_status_code(201),
+        response_header(CONTENT_TYPE => APPLICATION_JSON),
+        response_body(&format!("Received: {raw_body:?}"))
+    )]
+    #[epilogue_macros(send, flush)]
+    async fn complex_post_handler_with_ref_self(&self, ctx: &Context) {}
+}
+impl InjectComplexPost {
+    #[post]
+    async fn test_with_bool_param(_a: bool, ctx: &Context) {}
+    #[get]
+    async fn test_with_multiple_params(_a: bool, ctx: &Context, _b: i32) {}
+}
+#[response_body("standalone response body")]
+async fn standalone_response_body_handler(ctx: &Context) {}
+#[prologue_macros(get, response_body("standalone get handler"))]
+async fn standalone_get_handler(ctx: &Context) {}
+#[epilogue_macros(send, flush)]
+async fn standalone_send_and_flush_handler(ctx: &Context) {}
+#[request_body(_raw_body)]
+async fn standalone_request_body_extractor(ctx: &Context) {}
+#[methods(get, post)]
+async fn standalone_multiple_methods_handler(ctx: &Context) {}
+#[http_from_stream]
+async fn standalone_http_stream_handler(ctx: &Context) {}
+#[ws_from_stream]
+async fn standalone_websocket_stream_handler(ctx: &Context) {}
+#[prologue_macros(
+    get,
+    http,
+    response_status_code(200),
+    response_header(CONTENT_TYPE => TEXT_PLAIN),
+    response_body("standalone complex handler")
+)]
+#[epilogue_macros(send, flush)]
+async fn standalone_complex_get_handler(ctx: &Context) {}
+#[get]
+async fn standalone_get_handler_with_param(_a: bool, ctx: &Context) {}
+#[request_body(body1, body2, body3)]
+async fn test_multi_request_body(ctx: &Context) {
+    println!("body1: {:?}, body2: {:?}, body3: {:?}", body1, body2, body3);
+}
+#[route("/test_multi_request_body_json")]
+#[derive(Debug, serde::Deserialize)]
+struct User {
+    name: String,
+}
+impl ServerHook for User {
+    async fn new(_ctx: &Context) -> Self {
+        Self {
+            name: String::from("test"),
+        }
+    }
+    #[prologue_macros(
+        request_body_json(user1: User, user2: User),
+        response_body(format!(
+            "user1: {:?}, user2: {:?}",
+            user1.name,
+            user2.name
+        )),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {}
+}
+#[attribute("key1" => attr1: String, "key2" => attr2: i32)]
+async fn test_multi_attribute(ctx: &Context) {
+    println!("attr1: {:?}, attr2: {:?}", attr1, attr2);
+}
+#[attributes(attrs1, attrs2)]
+async fn test_multi_attributes(ctx: &Context) {
+    println!("attrs1: {:?}, attrs2: {:?}", attrs1, attrs2);
+}
+#[route_params(params1, params2)]
+async fn test_multi_route_params(ctx: &Context) {
+    println!("params1: {:?}, params2: {:?}", params1, params2);
+}
+#[request_querys(querys1, querys2)]
+async fn test_multi_request_querys(ctx: &Context) {
+    println!("querys1: {:?}, querys2: {:?}", querys1, querys2);
+}
+#[request_headers(headers1, headers2)]
+async fn test_multi_request_headers(ctx: &Context) {
+    println!("headers1: {:?}, headers2: {:?}", headers1, headers2);
+}
+#[request_cookies(cookies1, cookies2)]
+async fn test_multi_request_cookies(ctx: &Context) {
+    println!("cookies1: {:?}, cookies2: {:?}", cookies1, cookies2);
+}
+#[request_version(version1, version2)]
+async fn test_multi_request_version(ctx: &Context) {
+    println!("version1: {:?}, version2: {:?}", version1, version2);
+}
+#[request_path(path1, path2)]
+async fn test_multi_request_path(ctx: &Context) {
+    println!("path1: {:?}, path2: {:?}", path1, path2);
+}
+#[host("localhost", "127.0.0.1")]
+async fn test_multi_host(ctx: &Context) {
+    println!("Host check passed");
+}
+#[reject_host("badhost.com", "spam.com")]
+async fn test_multi_reject_host(ctx: &Context) {
+    println!("Reject host check passed");
+}
+#[referer("http://localhost", "http://127.0.0.1")]
+async fn test_multi_referer(ctx: &Context) {
+    println!("Referer check passed");
+}
+#[reject_referer("http://badsite.com", "http://spam.com")]
+async fn test_multi_reject_referer(ctx: &Context) {
+    println!("Reject referer check passed");
+}
+#[hyperlane(server1: Server, server2: Server)]
+async fn test_multi_hyperlane() {
+    println!("server1 and server2 initialized");
+}
+#[hyperlane(server: Server)]
+#[hyperlane(config: ServerConfig)]
+#[tokio::main]
+async fn main() {
+    config.disable_nodelay().await;
+    server.config(config).await;
+    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
+    server_control_hook.wait().await;
+}
+```
+# Path: ltpp-docs\src\hyperlane-plugin-websocket\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-plugin-websocket)
+[API 文档](https://docs.rs/hyperlane-plugin-websocket/latest/hyperlane_plugin_websocket/)
+> Hyperlane 框架的 WebSocket 插件，提供强大的 WebSocket 通信功能，并与 hyperlane-broadcast 集成以实现高效的消息传播。
+## 安装
+使用以下命令添加此依赖：
+```shell
+cargo add hyperlane-plugin-websocket
+```
+## 使用示例
+```rust
+use hyperlane::*;
+use hyperlane_plugin_websocket::*;
+struct RequestMiddleware {
+    socket_addr: String,
+}
+struct UpgradeHook;
+struct ServerPanicHook {
+    response_body: String,
+    content_type: String,
+}
+struct GroupChat;
+struct PrivateChat {
+    config: WebSocketConfig<String>,
+}
+struct ConnectedHook {
+    receiver_count: ReceiverCount,
+    data: String,
+    group_broadcast_type: BroadcastType<String>,
+    private_broadcast_type: BroadcastType<String>,
+}
+struct PrivateClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
+}
+struct SendedHook {
+    msg: String,
+}
+struct GroupChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
+}
+struct GroupClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
+}
+struct PrivateChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
+}
+static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
+fn get_broadcast_map() -> &'static WebSocket {
+    BROADCAST_MAP.get_or_init(WebSocket::new)
+}
+impl ServerHook for RequestMiddleware {
+    async fn new(ctx: &Context) -> Self {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        Self { socket_addr }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(200)
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONNECTION, KEEP_ALIVE)
+            .await
+            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
+            .await
+            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .await
+            .set_response_header("SocketAddr", &self.socket_addr)
+            .await;
+    }
+}
+impl ServerHook for UpgradeHook {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        if !ctx.get_request().await.is_ws() {
+            return;
+        }
+        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            ctx.set_response_version(HttpVersion::Http1_1)
+                .await
+                .set_response_status_code(101)
+                .await
+                .set_response_header(UPGRADE, WEBSOCKET)
+                .await
+                .set_response_header(CONNECTION, UPGRADE)
+                .await
+                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .await
+                .set_response_body(&vec![])
+                .await
+                .send()
+                .await
+                .unwrap();
+        }
+    }
+}
+impl ServerHook for ConnectedHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx
+            .try_get_route_param("group_name")
+            .await
+            .unwrap_or_default();
+        let group_broadcast_type: BroadcastType<String> =
+            BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count(group_broadcast_type.clone());
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
+        let your_name: String = ctx
+            .try_get_route_param("your_name")
+            .await
+            .unwrap_or_default();
+        let private_broadcast_type: BroadcastType<String> =
+            BroadcastType::PointToPoint(my_name, your_name);
+        let data: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            receiver_count,
+            data,
+            group_broadcast_type,
+            private_broadcast_type,
+        }
+    }
+    async fn handle(self, _ctx: &Context) {
+        get_broadcast_map()
+            .send(self.group_broadcast_type, self.data.clone())
+            .unwrap_or_else(|err| {
+                println!("[connected_hook]send group error => {:?}", err.to_string());
+                None
+            });
+        get_broadcast_map()
+            .send(self.private_broadcast_type, self.data)
+            .unwrap_or_else(|err| {
+                println!(
+                    "[connected_hook]send private error => {:?}",
+                    err.to_string()
+                );
+                None
+            });
+        println!(
+            "[connected_hook]receiver_count => {:?}",
+            self.receiver_count
+        );
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+impl ServerHook for GroupChatRequestHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request_body().await;
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[group_chat]receiver_count => {:?}", self.receiver_count);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+impl ServerHook for GroupClosedHook {
+    async fn new(ctx: &Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count_after_closed(key.clone());
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[group_closed]receiver_count => {:?}", self.receiver_count);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+impl ServerHook for PrivateChatRequestHook {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request_body().await;
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!("[private_chat]receiver_count => {:?}", self.receiver_count);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+impl ServerHook for PrivateClosedHook {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count_after_closed(key);
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        ctx.set_response_body(&self.body).await;
+        println!(
+            "[private_closed]receiver_count => {:?}",
+            self.receiver_count
+        );
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+impl ServerHook for SendedHook {
+    async fn new(ctx: &Context) -> Self {
+        let msg: String = ctx.get_response_body_string().await;
+        Self { msg }
+    }
+    async fn handle(self, _ctx: &Context) {
+        println!("[sended_hook]msg => {}", self.msg);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+impl ServerHook for PrivateChat {
+    async fn new(ctx: &Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_request_config(RequestConfig::default())
+            .set_capacity(1024)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<PrivateChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<PrivateClosedHook>();
+        Self { config }
+    }
+    async fn handle(self, _ctx: &Context) {
+        get_broadcast_map().run(self.config).await;
+    }
+}
+impl ServerHook for GroupChat {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new()
+            .set_context(ctx.clone())
+            .set_broadcast_type(key)
+            .set_request_config(RequestConfig::default())
+            .set_capacity(1024)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<GroupChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<GroupClosedHook>();
+        get_broadcast_map().run(config).await;
+    }
+}
+impl ServerHook for ServerPanicHook {
+    async fn new(ctx: &Context) -> Self {
+        let error: Panic = ctx.try_get_panic().await.unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String =
+            ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, ctx: &Context) {
+        let _ = ctx
+            .set_response_version(HttpVersion::Http1_1)
+            .await
+            .set_response_status_code(500)
+            .await
+            .clear_response_headers()
+            .await
+            .set_response_header(SERVER, HYPERLANE)
+            .await
+            .set_response_header(CONTENT_TYPE, &self.content_type)
+            .await
+            .set_response_body(&self.response_body)
+            .await
+            .send()
+            .await;
+    }
+}
+async fn main() {
+    let server: Server = Server::new().await;
+    let config: ServerConfig = ServerConfig::new().await;
+    config.host("0.0.0.0").await;
+    config.port(60000).await;
+    config.request_config(RequestConfig::default()).await;
+    config.disable_linger().await;
+    config.disable_nodelay().await;
+    server.config(config).await;
+    server.request_middleware::<RequestMiddleware>().await;
+    server.request_middleware::<UpgradeHook>().await;
+    server.route::<GroupChat>("/{group_name}").await;
+    server.route::<PrivateChat>("/{my_name}/{your_name}").await;
+    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
+    server_control_hook.wait().await;
+}
+```
+# Path: ltpp-docs\src\hyperlane-time\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-time)
+[API 文档](https://docs.rs/hyperlane-time/latest/hyperlane_time/)
+> 一个根据系统区域设置获取当前时间的库。
+## 安装
+要使用这个库，你可以运行以下命令：
+```shell
+cargo add hyperlane-time
+```
+## 使用
+```rust
+use hyperlane_time::*;
+println!("Current Time: {}", time());
+println!("Current Date: {}", date());
+println!("GMT Date: {}", gmt());
+println!("Timestamp (s): {}", timestamp());
+println!("Timestamp (ms): {}", timestamp_millis());
+println!("Timestamp (μs): {}", timestamp_micros());
+println!("Current Year: {}", year());
+println!("Current Month: {}", month());
+println!("Current Day: {}", day());
+println!("Current Hour: {}", hour());
+println!("Current Minute: {}", minute());
+println!("Current Second: {}", second());
+println!("Current Millis: {}", millis());
+println!("Current Micros: {}", micros());
+println!("Is Leap Year (1949): {}", is_leap_year(1949));
+println!("Calculate Current Time: {:?}", calculate_time());
+println!("Compute Date (10000 days): {:?}", compute_date(10000));
+println!("Current Time with Millis: {}", time_millis());
+println!("Current Time with Micros: {}", time_micros());
+```
+# Path: ltpp-docs\src\hyperlane-utils\README.md
+[GITHUB 地址](https://github.com/hyperlane-dev/hyperlane-utils)
+[API 文档](https://docs.rs/hyperlane-utils/latest/hyperlane_utils/)
+> 一个为 hyperlane 提供工具的库。
+## 安装
+您可以使用以下命令安装该 crate：
+```shell
+cargo add hyperlane-utils
+```
+## 使用方式
+```rust
+use hyperlane_utils::*;
 ```
