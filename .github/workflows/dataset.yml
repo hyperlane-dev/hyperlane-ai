@@ -53,10 +53,11 @@ jobs:
 
       - name: Add extra remotes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
         run: |
+          git remote set-url origin https://x-access-token:${PAT_TOKEN}@github.com/hyperlane-dev/hyperlane-ai.git
           git remote add gitee https://oauth2:${GITEE_TOKEN}@gitee.com/eastspire/hyperlane-ai.git
           git remote add gitcode https://${GITCODE_TOKEN}@gitcode.com/eastspire/hyperlane-ai.git
 
