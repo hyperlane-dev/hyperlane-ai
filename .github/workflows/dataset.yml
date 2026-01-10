@@ -57,7 +57,7 @@ jobs:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
         run: |
-          git remote add github https://x-access-token:${PAT_TOKEN}@github.com/hyperlane-dev/hyperlane-ai.git
+          git remote add github https://${PAT_TOKEN}@github.com/hyperlane-dev/hyperlane-ai.git
           git remote add gitee https://oauth2:${GITEE_TOKEN}@gitee.com/eastspire/hyperlane-ai.git
           git remote add gitcode https://${GITCODE_TOKEN}@gitcode.com/eastspire/hyperlane-ai.git
 
