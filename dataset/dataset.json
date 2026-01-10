@@ -8132,37 +8132,49 @@
   {
     "instruction": "test函数的源码是怎么实现的？",
     "input": "",
-    "output": "test函数的源码实现如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test() {\n    use crate::*;\n    let log: ServerLog = ServerLog::new(\"./logs\", 1_024_000);\n    let error_str: String = String::from(\"custom error message\");\n    log.error(error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    let info_str: String = String::from(\"custom info message\");\n    log.info(info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    let debug_str: String = String::from(\"custom debug message\");\n    log.debug(debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    let async_error_str: String = String::from(\"custom async error message\");\n    log.async_error(async_error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n    let async_info_str: String = String::from(\"custom async info message\");\n    log.async_info(async_info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    let async_debug_str: String = String::from(\"custom async debug message\");\n    log.async_debug(async_debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n}\n```",
+    "output": "test函数的源码实现如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test() {\n    use crate::*;\n    let log: FileLogger = FileLogger::new(\"./logs\", 1_024_000);\n    let trace_str: String = String::from(\"custom trace message\");\n    log.trace(trace_str, |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    });\n    let debug_str: String = String::from(\"custom debug message\");\n    log.debug(debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    let info_str: String = String::from(\"custom info message\");\n    log.info(info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    let warn_str: String = String::from(\"custom warn message\");\n    log.warn(warn_str, |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    });\n    let error_str: String = String::from(\"custom error message\");\n    log.error(error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    let async_trace_str: String = String::from(\"custom async trace message\");\n    log.async_trace(async_trace_str, |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_debug_str: String = String::from(\"custom async debug message\");\n    log.async_debug(async_debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_info_str: String = String::from(\"custom async info message\");\n    log.async_info(async_info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    let async_warn_str: String = String::from(\"custom async warn message\");\n    log.async_warn(async_warn_str, |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_error_str: String = String::from(\"custom async error message\");\n    log.async_error(async_error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释test这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "test函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test() {\n    use crate::*;\n    let log: FileLogger = FileLogger::new(\"./logs\", 1_024_000);\n    let trace_str: String = String::from(\"custom trace message\");\n    log.trace(trace_str, |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    });\n    let debug_str: String = String::from(\"custom debug message\");\n    log.debug(debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    let info_str: String = String::from(\"custom info message\");\n    log.info(info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    let warn_str: String = String::from(\"custom warn message\");\n    log.warn(warn_str, |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    });\n    let error_str: String = String::from(\"custom error message\");\n    log.error(error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    let async_trace_str: String = String::from(\"custom async trace message\");\n    log.async_trace(async_trace_str, |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_debug_str: String = String::from(\"custom async debug message\");\n    log.async_debug(async_debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_info_str: String = String::from(\"custom async info message\");\n    log.async_info(async_info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    let async_warn_str: String = String::from(\"custom async warn message\");\n    log.async_warn(async_warn_str, |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_error_str: String = String::from(\"custom async error message\");\n    log.async_error(async_error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：61\n- 包含高级特性：异步编程",
     "system": ""
   },
   {
     "instruction": "test函数的异步实现是如何工作的？",
     "input": "",
-    "output": "test函数的异步实现机制如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test() {\n    use crate::*;\n    let log: ServerLog = ServerLog::new(\"./logs\", 1_024_000);\n    let error_str: String = String::from(\"custom error message\");\n    log.error(error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    let info_str: String = String::from(\"custom info message\");\n    log.info(info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    let debug_str: String = String::from(\"custom debug message\");\n    log.debug(debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    let async_error_str: String = String::from(\"custom async error message\");\n    log.async_error(async_error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n    let async_info_str: String = String::from(\"custom async info message\");\n    log.async_info(async_info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    let async_debug_str: String = String::from(\"custom async debug message\");\n    log.async_debug(async_debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "test函数的异步实现机制如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test() {\n    use crate::*;\n    let log: FileLogger = FileLogger::new(\"./logs\", 1_024_000);\n    let trace_str: String = String::from(\"custom trace message\");\n    log.trace(trace_str, |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    });\n    let debug_str: String = String::from(\"custom debug message\");\n    log.debug(debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    let info_str: String = String::from(\"custom info message\");\n    log.info(info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    let warn_str: String = String::from(\"custom warn message\");\n    log.warn(warn_str, |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    });\n    let error_str: String = String::from(\"custom error message\");\n    log.error(error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    let async_trace_str: String = String::from(\"custom async trace message\");\n    log.async_trace(async_trace_str, |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_debug_str: String = String::from(\"custom async debug message\");\n    log.async_debug(async_debug_str, |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_info_str: String = String::from(\"custom async info message\");\n    log.async_info(async_info_str, |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    let async_warn_str: String = String::from(\"custom async warn message\");\n    log.async_warn(async_warn_str, |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    })\n    .await;\n    let async_error_str: String = String::from(\"custom async error message\");\n    log.async_error(async_error_str, |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "test_more_log_first函数的源码是怎么实现的？",
     "input": "",
-    "output": "test_more_log_first函数的源码实现如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_first() {\n    use crate::*;\n    let log: ServerLog = ServerLog::new(\"./logs\", DISABLE_LOG_FILE_SIZE);\n    log.error(\"error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    log.info(\"info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    log.debug(\"debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    log.async_error(\"async error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_info(\"async info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_debug(\"async debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n}\n```",
+    "output": "test_more_log_first函数的源码实现如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_first() {\n    use crate::*;\n    let log: FileLogger = FileLogger::new(\"./logs\", DISABLE_LOG_FILE_SIZE);\n    log.trace(\"trace data => \", |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    });\n    log.debug(\"debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    log.info(\"info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    log.warn(\"warn data => \", |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    });\n    log.error(\"error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    log.async_trace(\"async trace data => \", |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_debug(\"async debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_info(\"async info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_warn(\"async warn data => \", |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_error(\"async error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释test_more_log_first这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "test_more_log_first函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_first() {\n    use crate::*;\n    let log: FileLogger = FileLogger::new(\"./logs\", DISABLE_LOG_FILE_SIZE);\n    log.trace(\"trace data => \", |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    });\n    log.debug(\"debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    log.info(\"info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    log.warn(\"warn data => \", |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    });\n    log.error(\"error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    log.async_trace(\"async trace data => \", |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_debug(\"async debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_info(\"async info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_warn(\"async warn data => \", |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_error(\"async error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：51\n- 包含高级特性：异步编程",
     "system": ""
   },
   {
     "instruction": "test_more_log_first函数的异步实现是如何工作的？",
     "input": "",
-    "output": "test_more_log_first函数的异步实现机制如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_first() {\n    use crate::*;\n    let log: ServerLog = ServerLog::new(\"./logs\", DISABLE_LOG_FILE_SIZE);\n    log.error(\"error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    log.info(\"info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    log.debug(\"debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    log.async_error(\"async error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_info(\"async info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_debug(\"async debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "test_more_log_first函数的异步实现机制如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_first() {\n    use crate::*;\n    let log: FileLogger = FileLogger::new(\"./logs\", DISABLE_LOG_FILE_SIZE);\n    log.trace(\"trace data => \", |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    });\n    log.debug(\"debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    });\n    log.info(\"info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    });\n    log.warn(\"warn data => \", |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    });\n    log.error(\"error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    });\n    log.async_trace(\"async trace data => \", |trace| {\n        let write_data: String = format!(\"User trace func => {trace:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_debug(\"async debug data => \", |debug| {\n        let write_data: String = format!(\"User debug func => {debug:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_info(\"async info data => \", |info| {\n        let write_data: String = format!(\"User info func => {info:?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_warn(\"async warn data => \", |warn| {\n        let write_data: String = format!(\"User warn func => {warn:#?}\\n\");\n        write_data\n    })\n    .await;\n    log.async_error(\"async error data => \", |error| {\n        let write_data: String = format!(\"User error func => {error:?}\\n\");\n        write_data\n    })\n    .await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "test_more_log_second函数的源码是怎么实现的？",
     "input": "",
-    "output": "test_more_log_second函数的源码实现如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_second() {\n    use crate::*;\n    for _ in 0..10 {\n        let log: ServerLog = ServerLog::new(\"./logs\", 512_000);\n        log.error(\"error data!\\n\", common_log);\n        log.async_error(\"async error data!\\n\", common_log).await;\n    }\n}\n```",
+    "output": "test_more_log_second函数的源码实现如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_second() {\n    use crate::*;\n    for _ in 0..10 {\n        let log: FileLogger = FileLogger::new(\"./logs\", 512_000);\n        log.trace(\"trace data!\\n\", common_log);\n        log.async_trace(\"async trace data!\\n\", common_log).await;\n        log.debug(\"debug data!\\n\", common_log);\n        log.async_debug(\"async debug data!\\n\", common_log).await;\n        log.info(\"info data!\\n\", common_log);\n        log.async_info(\"async info data!\\n\", common_log).await;\n        log.warn(\"warn data!\\n\", common_log);\n        log.async_warn(\"async warn data!\\n\", common_log).await;\n        log.error(\"error data!\\n\", common_log);\n        log.async_error(\"async error data!\\n\", common_log).await;\n    }\n}\n```",
     "system": ""
   },
   {
     "instruction": "test_more_log_second函数的异步实现是如何工作的？",
     "input": "",
-    "output": "test_more_log_second函数的异步实现机制如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_second() {\n    use crate::*;\n    for _ in 0..10 {\n        let log: ServerLog = ServerLog::new(\"./logs\", 512_000);\n        log.error(\"error data!\\n\", common_log);\n        log.async_error(\"async error data!\\n\", common_log).await;\n    }\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "test_more_log_second函数的异步实现机制如下：\n\n```rust\n#[cfg(test)]\n#[tokio::test]\nasync fn test_more_log_second() {\n    use crate::*;\n    for _ in 0..10 {\n        let log: FileLogger = FileLogger::new(\"./logs\", 512_000);\n        log.trace(\"trace data!\\n\", common_log);\n        log.async_trace(\"async trace data!\\n\", common_log).await;\n        log.debug(\"debug data!\\n\", common_log);\n        log.async_debug(\"async debug data!\\n\", common_log).await;\n        log.info(\"info data!\\n\", common_log);\n        log.async_info(\"async info data!\\n\", common_log).await;\n        log.warn(\"warn data!\\n\", common_log);\n        log.async_warn(\"async warn data!\\n\", common_log).await;\n        log.error(\"error data!\\n\", common_log);\n        log.async_error(\"async error data!\\n\", common_log).await;\n    }\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
@@ -8282,529 +8294,529 @@
   {
     "instruction": "Default::default方法的源码是怎么实现的？",
     "input": "",
-    "output": "Default::default方法的源码实现如下：\n\n```rust\n/// Creates default ServerLog configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - Default ServerLog instance with default path and file size limit.\n    #[inline(always)]\n    fn default() -> Self {\n        Self {\n            path: DEFAULT_LOG_DIR.to_owned(),\n            limit_file_size: DEFAULT_LOG_FILE_SIZE,\n        }\n    }\n```",
+    "output": "Default::default方法的源码实现如下：\n\n```rust\n/// Creates default FileLogger configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - Default FileLogger instance with default path and file size limit.\n    #[inline(always)]\n    fn default() -> Self {\n        Self {\n            path: DEFAULT_LOG_DIR.to_owned(),\n            limit_file_size: DEFAULT_LOG_FILE_SIZE,\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "Default::default方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "Default::default方法的返回值类型设计如下：\n\n```rust\n/// Creates default ServerLog configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - Default ServerLog instance with default path and file size limit.\n    #[inline(always)]\n    fn default() -> Self {\n        Self {\n            path: DEFAULT_LOG_DIR.to_owned(),\n            limit_file_size: DEFAULT_LOG_FILE_SIZE,\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "Default::default方法的返回值类型设计如下：\n\n```rust\n/// Creates default FileLogger configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - Default FileLogger instance with default path and file size limit.\n    #[inline(always)]\n    fn default() -> Self {\n        Self {\n            path: DEFAULT_LOG_DIR.to_owned(),\n            limit_file_size: DEFAULT_LOG_FILE_SIZE,\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::new方法的源码是怎么实现的？",
+    "instruction": "FileLogger::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::new方法的源码实现如下：\n\n```rust\n/// Creates new ServerLog configuration with specified parameters.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The path for storing log files, which will be converted to string slice.\n    /// - `usize` - The maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - A new ServerLog instance with specified configuration.\n    #[inline(always)]\n    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {\n        Self {\n            path: path.as_ref().to_owned(),\n            limit_file_size,\n        }\n    }\n```",
+    "output": "FileLogger::new方法的源码实现如下：\n\n```rust\n/// Creates new FileLogger configuration with specified parameters.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The path for storing log files, which will be converted to string slice.\n    /// - `usize` - The maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - A new FileLogger instance with specified configuration.\n    #[inline(always)]\n    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {\n        Self {\n            path: path.as_ref().to_owned(),\n            limit_file_size,\n        }\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "ServerLog::new方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::new方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::new方法的泛型设计和使用如下：\n\n```rust\n/// Creates new ServerLog configuration with specified parameters.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The path for storing log files, which will be converted to string slice.\n    /// - `usize` - The maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - A new ServerLog instance with specified configuration.\n    #[inline(always)]\n    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {\n        Self {\n            path: path.as_ref().to_owned(),\n            limit_file_size,\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::new方法的泛型设计和使用如下：\n\n```rust\n/// Creates new FileLogger configuration with specified parameters.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The path for storing log files, which will be converted to string slice.\n    /// - `usize` - The maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - A new FileLogger instance with specified configuration.\n    #[inline(always)]\n    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {\n        Self {\n            path: path.as_ref().to_owned(),\n            limit_file_size,\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::new方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::new方法的参数设计如下：\n\n```rust\n/// Creates new ServerLog configuration with specified parameters.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The path for storing log files, which will be converted to string slice.\n    /// - `usize` - The maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - A new ServerLog instance with specified configuration.\n    #[inline(always)]\n    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {\n        Self {\n            path: path.as_ref().to_owned(),\n            limit_file_size,\n        }\n    }\n```\n\n参数列表：\n- path: P\n- limit_file_size: usize\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::new方法的参数设计如下：\n\n```rust\n/// Creates new FileLogger configuration with specified parameters.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The path for storing log files, which will be converted to string slice.\n    /// - `usize` - The maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - A new FileLogger instance with specified configuration.\n    #[inline(always)]\n    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {\n        Self {\n            path: path.as_ref().to_owned(),\n            limit_file_size,\n        }\n    }\n```\n\n参数列表：\n- path: P\n- limit_file_size: usize\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::new方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::new方法的返回值类型设计如下：\n\n```rust\n/// Creates new ServerLog configuration with specified parameters.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The path for storing log files, which will be converted to string slice.\n    /// - `usize` - The maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - A new ServerLog instance with specified configuration.\n    #[inline(always)]\n    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {\n        Self {\n            path: path.as_ref().to_owned(),\n            limit_file_size,\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::new方法的返回值类型设计如下：\n\n```rust\n/// Creates new FileLogger configuration with specified parameters.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The path for storing log files, which will be converted to string slice.\n    /// - `usize` - The maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `Self` - A new FileLogger instance with specified configuration.\n    #[inline(always)]\n    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {\n        Self {\n            path: path.as_ref().to_owned(),\n            limit_file_size,\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::path方法的源码是怎么实现的？",
+    "instruction": "FileLogger::path方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::path方法的源码实现如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```",
+    "output": "FileLogger::path方法的源码实现如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "ServerLog::path方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::path方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::path方法的泛型设计和使用如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::path方法的泛型设计和使用如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::path方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::path方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::path方法的参数设计如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```\n\n参数列表：\n- path: P\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::path方法的参数设计如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```\n\n参数列表：\n- path: P\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::path方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::path方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::path方法的返回值类型设计如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```\n\n返回类型：&mut Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::path方法的返回值类型设计如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```\n\n返回类型：&mut Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::path方法为什么需要修改状态？",
+    "instruction": "FileLogger::path方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerLog::path方法的状态修改逻辑如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "FileLogger::path方法的状态修改逻辑如下：\n\n```rust\n/// Sets the log file storage path.\n    ///\n    /// # Arguments\n    ///\n    /// - `P: AsRef<str>` - The new path for storing log files, which will be converted to string slice.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {\n        self.path = path.as_ref().to_owned();\n        self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::limit_file_size方法的源码是怎么实现的？",
+    "instruction": "FileLogger::limit_file_size方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::limit_file_size方法的源码实现如下：\n\n```rust\n/// Sets the maximum size limit for log files.\n    ///\n    /// # Arguments\n    ///\n    /// - `usize` - The new maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {\n        self.limit_file_size = limit_file_size;\n        self\n    }\n```",
+    "output": "FileLogger::limit_file_size方法的源码实现如下：\n\n```rust\n/// Sets the maximum size limit for log files.\n    ///\n    /// # Arguments\n    ///\n    /// - `usize` - The new maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {\n        self.limit_file_size = limit_file_size;\n        self\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "ServerLog::limit_file_size方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::limit_file_size方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::limit_file_size方法的参数设计如下：\n\n```rust\n/// Sets the maximum size limit for log files.\n    ///\n    /// # Arguments\n    ///\n    /// - `usize` - The new maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {\n        self.limit_file_size = limit_file_size;\n        self\n    }\n```\n\n参数列表：\n- limit_file_size: usize\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::limit_file_size方法的参数设计如下：\n\n```rust\n/// Sets the maximum size limit for log files.\n    ///\n    /// # Arguments\n    ///\n    /// - `usize` - The new maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {\n        self.limit_file_size = limit_file_size;\n        self\n    }\n```\n\n参数列表：\n- limit_file_size: usize\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::limit_file_size方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::limit_file_size方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::limit_file_size方法的返回值类型设计如下：\n\n```rust\n/// Sets the maximum size limit for log files.\n    ///\n    /// # Arguments\n    ///\n    /// - `usize` - The new maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {\n        self.limit_file_size = limit_file_size;\n        self\n    }\n```\n\n返回类型：&mut Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::limit_file_size方法的返回值类型设计如下：\n\n```rust\n/// Sets the maximum size limit for log files.\n    ///\n    /// # Arguments\n    ///\n    /// - `usize` - The new maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {\n        self.limit_file_size = limit_file_size;\n        self\n    }\n```\n\n返回类型：&mut Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::limit_file_size方法为什么需要修改状态？",
+    "instruction": "FileLogger::limit_file_size方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerLog::limit_file_size方法的状态修改逻辑如下：\n\n```rust\n/// Sets the maximum size limit for log files.\n    ///\n    /// # Arguments\n    ///\n    /// - `usize` - The new maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {\n        self.limit_file_size = limit_file_size;\n        self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "FileLogger::limit_file_size方法的状态修改逻辑如下：\n\n```rust\n/// Sets the maximum size limit for log files.\n    ///\n    /// # Arguments\n    ///\n    /// - `usize` - The new maximum file size limit in bytes.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Mutable reference to self for method chaining.\n    #[inline(always)]\n    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {\n        self.limit_file_size = limit_file_size;\n        self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::is_enable方法的源码是怎么实现的？",
+    "instruction": "FileLogger::is_enable方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::is_enable方法的源码实现如下：\n\n```rust\n/// Checks if logging is enabled.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - True if logging is enabled.\n    #[inline(always)]\n    pub fn is_enable(&self) -> bool {\n        self.limit_file_size != DISABLE_LOG_FILE_SIZE\n    }\n```",
+    "output": "FileLogger::is_enable方法的源码实现如下：\n\n```rust\n/// Checks if logging is enabled.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - True if logging is enabled.\n    #[inline(always)]\n    pub fn is_enable(&self) -> bool {\n        self.limit_file_size != DISABLE_LOG_FILE_SIZE\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "ServerLog::is_enable方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::is_enable方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::is_enable方法的返回值类型设计如下：\n\n```rust\n/// Checks if logging is enabled.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - True if logging is enabled.\n    #[inline(always)]\n    pub fn is_enable(&self) -> bool {\n        self.limit_file_size != DISABLE_LOG_FILE_SIZE\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::is_enable方法的返回值类型设计如下：\n\n```rust\n/// Checks if logging is enabled.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - True if logging is enabled.\n    #[inline(always)]\n    pub fn is_enable(&self) -> bool {\n        self.limit_file_size != DISABLE_LOG_FILE_SIZE\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::is_disable方法的源码是怎么实现的？",
+    "instruction": "FileLogger::is_disable方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::is_disable方法的源码实现如下：\n\n```rust\n/// Checks if logging is disabled.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - True if logging is disabled.\n    #[inline(always)]\n    pub fn is_disable(&self) -> bool {\n        !self.is_enable()\n    }\n```",
+    "output": "FileLogger::is_disable方法的源码实现如下：\n\n```rust\n/// Checks if logging is disabled.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - True if logging is disabled.\n    #[inline(always)]\n    pub fn is_disable(&self) -> bool {\n        !self.is_enable()\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "ServerLog::is_disable方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::is_disable方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::is_disable方法的返回值类型设计如下：\n\n```rust\n/// Checks if logging is disabled.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - True if logging is disabled.\n    #[inline(always)]\n    pub fn is_disable(&self) -> bool {\n        !self.is_enable()\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::is_disable方法的返回值类型设计如下：\n\n```rust\n/// Checks if logging is disabled.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - True if logging is disabled.\n    #[inline(always)]\n    pub fn is_disable(&self) -> bool {\n        !self.is_enable()\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_sync方法的源码是怎么实现的？",
+    "instruction": "FileLogger::write_sync方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::write_sync方法的源码实现如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```",
+    "output": "FileLogger::write_sync方法的源码实现如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::write_sync这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::write_sync这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::write_sync方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：24\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "FileLogger::write_sync方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：24\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_sync方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::write_sync方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::write_sync方法的泛型设计和使用如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::write_sync方法的泛型设计和使用如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_sync方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::write_sync方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::write_sync方法的参数设计如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n- dir: &str\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::write_sync方法的参数设计如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n- dir: &str\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_sync方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::write_sync方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::write_sync方法的返回值类型设计如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::write_sync方法的返回值类型设计如下：\n\n```rust\n/// Writes log data synchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = append_to_file(&path, out.as_bytes());\n        self\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_async方法的源码是怎么实现的？",
+    "instruction": "FileLogger::write_async方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::write_async方法的源码实现如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```",
+    "output": "FileLogger::write_async方法的源码实现如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::write_async这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::write_async这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::write_async方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：7\n- 代码行数：24\n- 包含高级特性：泛型编程、异步编程、where子句约束",
+    "output": "FileLogger::write_async方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：7\n- 代码行数：24\n- 包含高级特性：泛型编程、异步编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_async方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::write_async方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::write_async方法的泛型设计和使用如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::write_async方法的泛型设计和使用如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_async方法的异步实现是如何工作的？",
+    "instruction": "FileLogger::write_async方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerLog::write_async方法的异步实现机制如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "FileLogger::write_async方法的异步实现机制如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_async方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::write_async方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::write_async方法的参数设计如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n- dir: &str\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::write_async方法的参数设计如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n- dir: &str\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::write_async方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::write_async方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::write_async方法的返回值类型设计如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::write_async方法的返回值类型设计如下：\n\n```rust\n/// Writes log data asynchronously to specified directory.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - The log formatting function.\n    /// - `&str` - The subdirectory for log file.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self for method chaining.\n    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        if self.is_disable() {\n            return self;\n        }\n        let out: String = func(data);\n        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);\n        let _ = async_append_to_file(&path, out.as_bytes()).await;\n        self\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::trace方法的源码是怎么实现的？",
+    "instruction": "FileLogger::trace方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::trace方法的源码实现如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```",
+    "output": "FileLogger::trace方法的源码实现如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::trace这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::trace这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::trace方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "FileLogger::trace方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::trace方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::trace方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::trace方法的泛型设计和使用如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::trace方法的泛型设计和使用如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::trace方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::trace方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::trace方法的参数设计如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::trace方法的参数设计如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::trace方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::trace方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::trace方法的返回值类型设计如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::trace方法的返回值类型设计如下：\n\n```rust\n/// Logs trace message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, TRACE_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_trace方法的源码是怎么实现的？",
+    "instruction": "FileLogger::async_trace方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::async_trace方法的源码实现如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```",
+    "output": "FileLogger::async_trace方法的源码实现如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::async_trace这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::async_trace这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::async_trace方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
+    "output": "FileLogger::async_trace方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_trace方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::async_trace方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::async_trace方法的泛型设计和使用如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::async_trace方法的泛型设计和使用如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_trace方法的异步实现是如何工作的？",
+    "instruction": "FileLogger::async_trace方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerLog::async_trace方法的异步实现机制如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "FileLogger::async_trace方法的异步实现机制如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_trace方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::async_trace方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::async_trace方法的参数设计如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::async_trace方法的参数设计如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_trace方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::async_trace方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::async_trace方法的返回值类型设计如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::async_trace方法的返回值类型设计如下：\n\n```rust\n/// Logs trace message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Trace data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, TRACE_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::debug方法的源码是怎么实现的？",
+    "instruction": "FileLogger::debug方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::debug方法的源码实现如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```",
+    "output": "FileLogger::debug方法的源码实现如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::debug这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::debug这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::debug方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "FileLogger::debug方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::debug方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::debug方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::debug方法的泛型设计和使用如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::debug方法的泛型设计和使用如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::debug方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::debug方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::debug方法的参数设计如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::debug方法的参数设计如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::debug方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::debug方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::debug方法的返回值类型设计如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::debug方法的返回值类型设计如下：\n\n```rust\n/// Logs debug message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, DEBUG_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_debug方法的源码是怎么实现的？",
+    "instruction": "FileLogger::async_debug方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::async_debug方法的源码实现如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```",
+    "output": "FileLogger::async_debug方法的源码实现如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::async_debug这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::async_debug这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::async_debug方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
+    "output": "FileLogger::async_debug方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_debug方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::async_debug方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::async_debug方法的泛型设计和使用如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::async_debug方法的泛型设计和使用如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_debug方法的异步实现是如何工作的？",
+    "instruction": "FileLogger::async_debug方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerLog::async_debug方法的异步实现机制如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "FileLogger::async_debug方法的异步实现机制如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_debug方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::async_debug方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::async_debug方法的参数设计如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::async_debug方法的参数设计如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_debug方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::async_debug方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::async_debug方法的返回值类型设计如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::async_debug方法的返回值类型设计如下：\n\n```rust\n/// Logs debug message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Debug data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, DEBUG_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::info方法的源码是怎么实现的？",
+    "instruction": "FileLogger::info方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::info方法的源码实现如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```",
+    "output": "FileLogger::info方法的源码实现如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::info这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::info这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::info方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "FileLogger::info方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::info方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::info方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::info方法的泛型设计和使用如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::info方法的泛型设计和使用如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::info方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::info方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::info方法的参数设计如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::info方法的参数设计如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::info方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::info方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::info方法的返回值类型设计如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::info方法的返回值类型设计如下：\n\n```rust\n/// Logs info message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, INFO_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_info方法的源码是怎么实现的？",
+    "instruction": "FileLogger::async_info方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::async_info方法的源码实现如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```",
+    "output": "FileLogger::async_info方法的源码实现如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::async_info这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::async_info这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::async_info方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
+    "output": "FileLogger::async_info方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_info方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::async_info方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::async_info方法的泛型设计和使用如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::async_info方法的泛型设计和使用如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_info方法的异步实现是如何工作的？",
+    "instruction": "FileLogger::async_info方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerLog::async_info方法的异步实现机制如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "FileLogger::async_info方法的异步实现机制如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_info方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::async_info方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::async_info方法的参数设计如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::async_info方法的参数设计如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_info方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::async_info方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::async_info方法的返回值类型设计如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::async_info方法的返回值类型设计如下：\n\n```rust\n/// Logs info message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Info data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, INFO_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::warn方法的源码是怎么实现的？",
+    "instruction": "FileLogger::warn方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::warn方法的源码实现如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```",
+    "output": "FileLogger::warn方法的源码实现如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::warn这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::warn这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::warn方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "FileLogger::warn方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::warn方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::warn方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::warn方法的泛型设计和使用如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::warn方法的泛型设计和使用如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::warn方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::warn方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::warn方法的参数设计如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::warn方法的参数设计如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::warn方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::warn方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::warn方法的返回值类型设计如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::warn方法的返回值类型设计如下：\n\n```rust\n/// Logs warn message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, WARN_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_warn方法的源码是怎么实现的？",
+    "instruction": "FileLogger::async_warn方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::async_warn方法的源码实现如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```",
+    "output": "FileLogger::async_warn方法的源码实现如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::async_warn这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::async_warn这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::async_warn方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
+    "output": "FileLogger::async_warn方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_warn方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::async_warn方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::async_warn方法的泛型设计和使用如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::async_warn方法的泛型设计和使用如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_warn方法的异步实现是如何工作的？",
+    "instruction": "FileLogger::async_warn方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerLog::async_warn方法的异步实现机制如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "FileLogger::async_warn方法的异步实现机制如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_warn方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::async_warn方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::async_warn方法的参数设计如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::async_warn方法的参数设计如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_warn方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::async_warn方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::async_warn方法的返回值类型设计如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::async_warn方法的返回值类型设计如下：\n\n```rust\n/// Logs warn message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Warn data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, WARN_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::error方法的源码是怎么实现的？",
+    "instruction": "FileLogger::error方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::error方法的源码实现如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```",
+    "output": "FileLogger::error方法的源码实现如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::error这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::error这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::error方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "FileLogger::error方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::error方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::error方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::error方法的泛型设计和使用如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::error方法的泛型设计和使用如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::error方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::error方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::error方法的参数设计如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::error方法的参数设计如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::error方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::error方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::error方法的返回值类型设计如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::error方法的返回值类型设计如下：\n\n```rust\n/// Logs error message synchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub fn error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_sync(data, func, ERROR_DIR)\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_error方法的源码是怎么实现的？",
+    "instruction": "FileLogger::async_error方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog::async_error方法的源码实现如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```",
+    "output": "FileLogger::async_error方法的源码实现如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释ServerLog::async_error这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释FileLogger::async_error这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerLog::async_error方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
+    "output": "FileLogger::async_error方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_error方法中的泛型是如何设计和使用的？",
+    "instruction": "FileLogger::async_error方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLog::async_error方法的泛型设计和使用如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLogger::async_error方法的泛型设计和使用如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_error方法的异步实现是如何工作的？",
+    "instruction": "FileLogger::async_error方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerLog::async_error方法的异步实现机制如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "FileLogger::async_error方法的异步实现机制如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_error方法的参数设计有什么考虑？",
+    "instruction": "FileLogger::async_error方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerLog::async_error方法的参数设计如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "FileLogger::async_error方法的参数设计如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n参数列表：\n- data: T\n- func: L\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ServerLog::async_error方法的返回值类型设计有什么特点？",
+    "instruction": "FileLogger::async_error方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerLog::async_error方法的返回值类型设计如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: ServerLogFuncTrait<T>` - ServerLog formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: ServerLogFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "FileLogger::async_error方法的返回值类型设计如下：\n\n```rust\n/// Logs error message asynchronously.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Error data to be logged, which will be converted to string slice.\n    /// - `L: FileLoggerFuncTrait<T>` - FileLogger formatting function.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to self.\n    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self\n    where\n        T: AsRef<str>,\n        L: FileLoggerFuncTrait<T>,\n    {\n        self.write_async(data, func, ERROR_DIR).await\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ServerLog结构体的源码是怎么实现的？",
+    "instruction": "FileLogger结构体的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLog结构体的源码实现如下：\n\n```rust\n/// Main configuration structure for log file output.\n///\n/// Controls where logs are stored and their maximum size limits.\n/// Use ServerLog::new() to create an instance with custom settings.\n#[derive(Clone)]\npub struct ServerLog {\n    /// The directory path where log files will be stored.\n    pub(super) path: String,\n    /// The maximum allowed size (in bytes) for individual log files.\n    /// Set to 0 to disable logging.\n    pub(super) limit_file_size: usize,\n}\n```",
+    "output": "FileLogger结构体的源码实现如下：\n\n```rust\n/// Main configuration structure for log file output.\n///\n/// Controls where logs are stored and their maximum size limits.\n/// Use FileLogger::new() to create an instance with custom settings.\n#[derive(Clone)]\npub struct FileLogger {\n    /// The directory path where log files will be stored.\n    pub(super) path: String,\n    /// The maximum allowed size (in bytes) for individual log files.\n    /// Set to 0 to disable logging.\n    pub(super) limit_file_size: usize,\n}\n```",
     "system": ""
   },
   {
-    "instruction": "ServerLogFuncTraittrait的源码是怎么实现的？",
+    "instruction": "FileLoggerFuncTraittrait的源码是怎么实现的？",
     "input": "",
-    "output": "ServerLogFuncTraittrait的源码实现如下：\n\n```rust\n/// Trait for log formatting functions.\n///\n/// Defines the interface for functions that format log data.\n/// Implemented automatically for any compatible Fn(T) -> String.\n///\n/// # Generic Parameters\n///\n/// - `AsRef<str>` - The type of data to be formatted, which will be converted to string slice.\npub trait ServerLogFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}\n```",
+    "output": "FileLoggerFuncTraittrait的源码实现如下：\n\n```rust\n/// Trait for log formatting functions.\n///\n/// Defines the interface for functions that format log data.\n/// Implemented automatically for any compatible Fn(T) -> String.\n///\n/// # Generic Parameters\n///\n/// - `AsRef<str>` - The type of data to be formatted, which will be converted to string slice.\npub trait FileLoggerFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}\n```",
     "system": ""
   },
   {
-    "instruction": "ServerLogFuncTraittrait中的泛型是如何设计和使用的？",
+    "instruction": "FileLoggerFuncTraittrait中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerLogFuncTraittrait的泛型设计和使用如下：\n\n```rust\n/// Trait for log formatting functions.\n///\n/// Defines the interface for functions that format log data.\n/// Implemented automatically for any compatible Fn(T) -> String.\n///\n/// # Generic Parameters\n///\n/// - `AsRef<str>` - The type of data to be formatted, which will be converted to string slice.\npub trait ServerLogFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "FileLoggerFuncTraittrait的泛型设计和使用如下：\n\n```rust\n/// Trait for log formatting functions.\n///\n/// Defines the interface for functions that format log data.\n/// Implemented automatically for any compatible Fn(T) -> String.\n///\n/// # Generic Parameters\n///\n/// - `AsRef<str>` - The type of data to be formatted, which will be converted to string slice.\npub trait FileLoggerFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
@@ -27056,121 +27068,121 @@
   {
     "instruction": "Logger::log_trace方法的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_trace方法的源码实现如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.trace(data, log_handler);\n    }\n```",
+    "output": "Logger::log_trace方法的源码实现如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.trace(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释Logger::log_trace这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_trace方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.trace(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "Logger::log_trace方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.trace(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "Logger::log_trace方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_trace方法的泛型设计和使用如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.trace(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Logger::log_trace方法的泛型设计和使用如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.trace(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "Logger::log_trace方法的参数设计有什么考虑？",
     "input": "",
-    "output": "Logger::log_trace方法的参数设计如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.trace(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Logger::log_trace方法的参数设计如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.trace(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "Logger::log_debug方法的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_debug方法的源码实现如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.debug(data, log_handler);\n    }\n```",
+    "output": "Logger::log_debug方法的源码实现如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.debug(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释Logger::log_debug这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_debug方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.debug(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "Logger::log_debug方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.debug(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "Logger::log_debug方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_debug方法的泛型设计和使用如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.debug(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Logger::log_debug方法的泛型设计和使用如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.debug(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "Logger::log_debug方法的参数设计有什么考虑？",
     "input": "",
-    "output": "Logger::log_debug方法的参数设计如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.debug(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Logger::log_debug方法的参数设计如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.debug(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "Logger::log_info方法的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_info方法的源码实现如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.info(data, log_handler);\n    }\n```",
+    "output": "Logger::log_info方法的源码实现如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.info(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释Logger::log_info这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_info方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.info(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "Logger::log_info方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.info(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "Logger::log_info方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_info方法的泛型设计和使用如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.info(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Logger::log_info方法的泛型设计和使用如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.info(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "Logger::log_info方法的参数设计有什么考虑？",
     "input": "",
-    "output": "Logger::log_info方法的参数设计如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.info(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Logger::log_info方法的参数设计如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.info(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "Logger::log_warn方法的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_warn方法的源码实现如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.warn(data, log_handler);\n    }\n```",
+    "output": "Logger::log_warn方法的源码实现如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.warn(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释Logger::log_warn这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_warn方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.warn(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "Logger::log_warn方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.warn(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "Logger::log_warn方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_warn方法的泛型设计和使用如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.warn(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Logger::log_warn方法的泛型设计和使用如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.warn(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "Logger::log_warn方法的参数设计有什么考虑？",
     "input": "",
-    "output": "Logger::log_warn方法的参数设计如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.warn(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Logger::log_warn方法的参数设计如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.warn(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "Logger::log_error方法的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_error方法的源码实现如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.error(data, log_handler);\n    }\n```",
+    "output": "Logger::log_error方法的源码实现如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.error(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释Logger::log_error这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_error方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.error(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "Logger::log_error方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.error(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "Logger::log_error方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_error方法的泛型设计和使用如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.error(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Logger::log_error方法的泛型设计和使用如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.error(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "Logger::log_error方法的参数设计有什么考虑？",
     "input": "",
-    "output": "Logger::log_error方法的参数设计如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        LOG.error(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Logger::log_error方法的参数设计如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.error(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {

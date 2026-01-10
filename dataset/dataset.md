@@ -3318,15 +3318,10 @@ cargo add hyperlane-log
 #[tokio::test]
 async fn test() {
     use crate::*;
-    let log: ServerLog = ServerLog::new("./logs", 1_024_000);
-    let error_str: String = String::from("custom error message");
-    log.error(error_str, |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    });
-    let info_str: String = String::from("custom info message");
-    log.info(info_str, |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
+    let log: FileLogger = FileLogger::new("./logs", 1_024_000);
+    let trace_str: String = String::from("custom trace message");
+    log.trace(trace_str, |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
         write_data
     });
     let debug_str: String = String::from("custom debug message");
@@ -3334,15 +3329,24 @@ async fn test() {
         let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     });
-    let async_error_str: String = String::from("custom async error message");
-    log.async_error(async_error_str, |error| {
+    let info_str: String = String::from("custom info message");
+    log.info(info_str, |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    });
+    let warn_str: String = String::from("custom warn message");
+    log.warn(warn_str, |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    });
+    let error_str: String = String::from("custom error message");
+    log.error(error_str, |error| {
         let write_data: String = format!("User error func => {error:?}\n");
         write_data
-    })
-    .await;
-    let async_info_str: String = String::from("custom async info message");
-    log.async_info(async_info_str, |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
+    });
+    let async_trace_str: String = String::from("custom async trace message");
+    log.async_trace(async_trace_str, |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
         write_data
     })
     .await;
@@ -3352,26 +3356,57 @@ async fn test() {
         write_data
     })
     .await;
+    let async_info_str: String = String::from("custom async info message");
+    log.async_info(async_info_str, |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    })
+    .await;
+    let async_warn_str: String = String::from("custom async warn message");
+    log.async_warn(async_warn_str, |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    })
+    .await;
+    let async_error_str: String = String::from("custom async error message");
+    log.async_error(async_error_str, |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    })
+    .await;
 }
 #[cfg(test)]
 #[tokio::test]
 async fn test_more_log_first() {
     use crate::*;
-    let log: ServerLog = ServerLog::new("./logs", DISABLE_LOG_FILE_SIZE);
-    log.error("error data => ", |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    });
-    log.info("info data => ", |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
+    let log: FileLogger = FileLogger::new("./logs", DISABLE_LOG_FILE_SIZE);
+    log.trace("trace data => ", |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
         write_data
     });
     log.debug("debug data => ", |debug| {
         let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     });
-    log.async_error("async error data => ", |error| {
+    log.info("info data => ", |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    });
+    log.warn("warn data => ", |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    });
+    log.error("error data => ", |error| {
         let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    });
+    log.async_trace("async trace data => ", |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
+    })
+    .await;
+    log.async_debug("async debug data => ", |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     })
     .await;
@@ -3380,8 +3415,13 @@ async fn test_more_log_first() {
         write_data
     })
     .await;
-    log.async_debug("async debug data => ", |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
+    log.async_warn("async warn data => ", |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    })
+    .await;
+    log.async_error("async error data => ", |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
         write_data
     })
     .await;
@@ -3391,7 +3431,15 @@ async fn test_more_log_first() {
 async fn test_more_log_second() {
     use crate::*;
     for _ in 0..10 {
-        let log: ServerLog = ServerLog::new("./logs", 512_000);
+        let log: FileLogger = FileLogger::new("./logs", 512_000);
+        log.trace("trace data!\n", common_log);
+        log.async_trace("async trace data!\n", common_log).await;
+        log.debug("debug data!\n", common_log);
+        log.async_debug("async debug data!\n", common_log).await;
+        log.info("info data!\n", common_log);
+        log.async_info("async info data!\n", common_log).await;
+        log.warn("warn data!\n", common_log);
+        log.async_warn("async warn data!\n", common_log).await;
         log.error("error data!\n", common_log);
         log.async_error("async error data!\n", common_log).await;
     }
@@ -3494,13 +3542,13 @@ pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
 # Path: hyperlane-log\src\log\impl.rs
 ```rust
 use crate::*;
-impl<F, T> ServerLogFuncTrait<T> for F
+impl<F, T> FileLoggerFuncTrait<T> for F
 where
     F: Fn(T) -> String + Send + Sync,
     T: AsRef<str>,
 {
 }
-impl Default for ServerLog {
+impl Default for FileLogger {
     #[inline(always)]
     fn default() -> Self {
         Self {
@@ -3509,7 +3557,7 @@ impl Default for ServerLog {
         }
     }
 }
-impl ServerLog {
+impl FileLogger {
     #[inline(always)]
     pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {
         Self {
@@ -3538,7 +3586,7 @@ impl ServerLog {
     fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         if self.is_disable() {
             return self;
@@ -3551,7 +3599,7 @@ impl ServerLog {
     async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         if self.is_disable() {
             return self;
@@ -3564,70 +3612,70 @@ impl ServerLog {
     pub fn trace<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_sync(data, func, TRACE_DIR)
     }
     pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_async(data, func, TRACE_DIR).await
     }
     pub fn debug<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_sync(data, func, DEBUG_DIR)
     }
     pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_async(data, func, DEBUG_DIR).await
     }
     pub fn info<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_sync(data, func, INFO_DIR)
     }
     pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_async(data, func, INFO_DIR).await
     }
     pub fn warn<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_sync(data, func, WARN_DIR)
     }
     pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_async(data, func, WARN_DIR).await
     }
     pub fn error<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_sync(data, func, ERROR_DIR)
     }
     pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
-        L: ServerLogFuncTrait<T>,
+        L: FileLoggerFuncTrait<T>,
     {
         self.write_async(data, func, ERROR_DIR).await
     }
@@ -3648,14 +3696,14 @@ pub use r#trait::*;
 # Path: hyperlane-log\src\log\struct.rs
 ```rust
 #[derive(Clone)]
-pub struct ServerLog {
+pub struct FileLogger {
     pub(super) path: String,
     pub(super) limit_file_size: usize,
 }
 ```
 # Path: hyperlane-log\src\log\trait.rs
 ```rust
-pub trait ServerLogFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
+pub trait FileLoggerFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
 ```
 # Path: hyperlane-macros\README.md
 ## hyperlane-macros
@@ -9569,31 +9617,31 @@ impl Logger {
     where
         T: AsRef<str>,
     {
-        LOG.trace(data, log_handler);
+        FILE_LOGGER.trace(data, log_handler);
     }
     pub fn log_debug<T>(data: T)
     where
         T: AsRef<str>,
     {
-        LOG.debug(data, log_handler);
+        FILE_LOGGER.debug(data, log_handler);
     }
     pub fn log_info<T>(data: T)
     where
         T: AsRef<str>,
     {
-        LOG.info(data, log_handler);
+        FILE_LOGGER.info(data, log_handler);
     }
     pub fn log_warn<T>(data: T)
     where
         T: AsRef<str>,
     {
-        LOG.warn(data, log_handler);
+        FILE_LOGGER.warn(data, log_handler);
     }
     pub fn log_error<T>(data: T)
     where
         T: AsRef<str>,
     {
-        LOG.error(data, log_handler);
+        FILE_LOGGER.error(data, log_handler);
     }
 }
 impl Log for Logger {
@@ -9685,11 +9733,11 @@ use hyperlane_utils::{
 ```rust
 use super::*;
 pub(super) static LOGGER: Logger = Logger;
-pub(super) static LOG: Lazy<ServerLog> = Lazy::new(|| {
-    let mut log: ServerLog = ServerLog::default();
-    log.path(SERVER_LOG_DIR);
-    log.limit_file_size(SERVER_LOG_SIZE);
-    log
+pub(super) static FILE_LOGGER: Lazy<FileLogger> = Lazy::new(|| {
+    let mut file_logger: FileLogger = FileLogger::default();
+    file_logger.path(SERVER_LOG_DIR);
+    file_logger.limit_file_size(SERVER_LOG_SIZE);
+    file_logger
 });
 ```
 # Path: hyperlane-quick-start\plugin\log\struct.rs
