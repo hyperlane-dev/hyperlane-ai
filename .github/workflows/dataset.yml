@@ -42,6 +42,8 @@ jobs:
         run: chmod +x ./*
 
       - name: Run update_dataset.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./update_dataset.sh
 
       - name: Configure git
@@ -51,6 +53,7 @@ jobs:
 
       - name: Add extra remotes
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
         run: |
@@ -60,20 +63,12 @@ jobs:
       - name: Commit and push changes
         run: |
           set -e
-
           if git status --porcelain | grep .; then
             git add .
             git commit -m "chore: update dataset"
-
-            # GitHub
             git push origin HEAD:master
-
-            # Gitee
             git push gitee HEAD:master
-
-            # GitCode
             git push gitcode HEAD:master
-
             echo "✅ Changes pushed to GitHub / Gitee / GitCode"
           else
             echo "ℹ️ No changes to commit"
