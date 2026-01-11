@@ -2244,21 +2244,39 @@
     "system": ""
   },
   {
-    "instruction": "init_config函数的源码是怎么实现的？",
+    "instruction": "runtime函数的源码是怎么实现的？",
     "input": "",
-    "output": "init_config函数的源码实现如下：\n\n```rust\n#[hyperlane(config: ServerConfig)]\nasync fn init_config(server: &Server) {\n    config.host(SERVER_HOST).await;\n    config.port(SERVER_PORT).await;\n    config.ttl(SERVER_TTI).await;\n    config.nodelay(SERVER_NODELAY).await;\n    config.request_config(RequestConfig::default()).await;\n    server.config(config).await;\n}\n```",
+    "output": "runtime函数的源码实现如下：\n\n```rust\nfn runtime() -> Runtime {\n    Builder::new_multi_thread()\n        .worker_threads(num_cpus::get_physical() << 1)\n        .thread_stack_size(1_048_576)\n        .max_blocking_threads(2_048)\n        .max_io_events_per_tick(1_024)\n        .enable_all()\n        .build()\n        .unwrap()\n}\n```",
     "system": ""
   },
   {
-    "instruction": "init_config函数的异步实现是如何工作的？",
+    "instruction": "runtime函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "init_config函数的异步实现机制如下：\n\n```rust\n#[hyperlane(config: ServerConfig)]\nasync fn init_config(server: &Server) {\n    config.host(SERVER_HOST).await;\n    config.port(SERVER_PORT).await;\n    config.ttl(SERVER_TTI).await;\n    config.nodelay(SERVER_NODELAY).await;\n    config.request_config(RequestConfig::default()).await;\n    server.config(config).await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "runtime函数的泛型设计和使用如下：\n\n```rust\nfn runtime() -> Runtime {\n    Builder::new_multi_thread()\n        .worker_threads(num_cpus::get_physical() << 1)\n        .thread_stack_size(1_048_576)\n        .max_blocking_threads(2_048)\n        .max_io_events_per_tick(1_024)\n        .enable_all()\n        .build()\n        .unwrap()\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "init_config函数的参数设计有什么考虑？",
+    "instruction": "runtime函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "init_config函数的参数设计如下：\n\n```rust\n#[hyperlane(config: ServerConfig)]\nasync fn init_config(server: &Server) {\n    config.host(SERVER_HOST).await;\n    config.port(SERVER_PORT).await;\n    config.ttl(SERVER_TTI).await;\n    config.nodelay(SERVER_NODELAY).await;\n    config.request_config(RequestConfig::default()).await;\n    server.config(config).await;\n}\n```\n\n参数列表：\n- server: &Server\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "runtime函数的返回值类型设计如下：\n\n```rust\nfn runtime() -> Runtime {\n    Builder::new_multi_thread()\n        .worker_threads(num_cpus::get_physical() << 1)\n        .thread_stack_size(1_048_576)\n        .max_blocking_threads(2_048)\n        .max_io_events_per_tick(1_024)\n        .enable_all()\n        .build()\n        .unwrap()\n}\n```\n\n返回类型：Runtime\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "init_server_config函数的源码是怎么实现的？",
+    "input": "",
+    "output": "init_server_config函数的源码实现如下：\n\n```rust\n#[hyperlane(config: ServerConfig)]\nasync fn init_server_config(server: &Server) {\n    config.host(SERVER_HOST).await;\n    config.port(SERVER_PORT).await;\n    config.ttl(SERVER_TTI).await;\n    config.nodelay(SERVER_NODELAY).await;\n    config.request_config(RequestConfig::default()).await;\n    server.config(config).await;\n    info!(\"Server initialization successful\");\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "init_server_config函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "init_server_config函数的异步实现机制如下：\n\n```rust\n#[hyperlane(config: ServerConfig)]\nasync fn init_server_config(server: &Server) {\n    config.host(SERVER_HOST).await;\n    config.port(SERVER_PORT).await;\n    config.ttl(SERVER_TTI).await;\n    config.nodelay(SERVER_NODELAY).await;\n    config.request_config(RequestConfig::default()).await;\n    server.config(config).await;\n    info!(\"Server initialization successful\");\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "init_server_config函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "init_server_config函数的参数设计如下：\n\n```rust\n#[hyperlane(config: ServerConfig)]\nasync fn init_server_config(server: &Server) {\n    config.host(SERVER_HOST).await;\n    config.port(SERVER_PORT).await;\n    config.ttl(SERVER_TTI).await;\n    config.nodelay(SERVER_NODELAY).await;\n    config.request_config(RequestConfig::default()).await;\n    server.config(config).await;\n    info!(\"Server initialization successful\");\n}\n```\n\n参数列表：\n- server: &Server\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -2280,51 +2298,33 @@
     "system": ""
   },
   {
-    "instruction": "runtime函数的源码是怎么实现的？",
-    "input": "",
-    "output": "runtime函数的源码实现如下：\n\n```rust\nfn runtime() -> Runtime {\n    Builder::new_multi_thread()\n        .worker_threads(num_cpus::get_physical() << 1)\n        .thread_stack_size(1_048_576)\n        .max_blocking_threads(2_048)\n        .max_io_events_per_tick(1_024)\n        .enable_all()\n        .build()\n        .unwrap()\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "runtime函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "runtime函数的泛型设计和使用如下：\n\n```rust\nfn runtime() -> Runtime {\n    Builder::new_multi_thread()\n        .worker_threads(num_cpus::get_physical() << 1)\n        .thread_stack_size(1_048_576)\n        .max_blocking_threads(2_048)\n        .max_io_events_per_tick(1_024)\n        .enable_all()\n        .build()\n        .unwrap()\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "runtime函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "runtime函数的返回值类型设计如下：\n\n```rust\nfn runtime() -> Runtime {\n    Builder::new_multi_thread()\n        .worker_threads(num_cpus::get_physical() << 1)\n        .thread_stack_size(1_048_576)\n        .max_blocking_threads(2_048)\n        .max_io_events_per_tick(1_024)\n        .enable_all()\n        .build()\n        .unwrap()\n}\n```\n\n返回类型：Runtime\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
     "instruction": "create_server函数的源码是怎么实现的？",
     "input": "",
-    "output": "create_server函数的源码实现如下：\n\n```rust\n#[hyperlane(server: Server)]\nasync fn create_server() {\n    init_log(LevelFilter::Info);\n    init_config(&server).await;\n    info!(\"Server initialization successful\");\n    let server_result: Result<ServerControlHook, ServerError> = server.run().await;\n    match server_result {\n        Ok(server_hook) => {\n            let host_port: String = format!(\"{SERVER_HOST}:{SERVER_PORT}\");\n            print_route_matcher(&server).await;\n            info!(\"Server listen in: {host_port}\");\n            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();\n            set_shutdown(shutdown);\n            server_hook.wait().await;\n        }\n        Err(server_error) => error!(\"Server run error: {server_error}\"),\n    }\n}\n```",
+    "output": "create_server函数的源码实现如下：\n\n```rust\n#[hyperlane(server: Server)]\nasync fn create_server() {\n    init_server_config(&server).await;\n    match server.run().await {\n        Ok(server_hook) => {\n            let host_port: String = format!(\"{SERVER_HOST}:{SERVER_PORT}\");\n            print_route_matcher(&server).await;\n            info!(\"Server listen in: {host_port}\");\n            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();\n            set_shutdown(shutdown);\n            server_hook.wait().await;\n        }\n        Err(server_error) => error!(\"Server run error: {server_error}\"),\n    }\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释create_server这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "create_server函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[hyperlane(server: Server)]\nasync fn create_server() {\n    init_log(LevelFilter::Info);\n    init_config(&server).await;\n    info!(\"Server initialization successful\");\n    let server_result: Result<ServerControlHook, ServerError> = server.run().await;\n    match server_result {\n        Ok(server_hook) => {\n            let host_port: String = format!(\"{SERVER_HOST}:{SERVER_PORT}\");\n            print_route_matcher(&server).await;\n            info!(\"Server listen in: {host_port}\");\n            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();\n            set_shutdown(shutdown);\n            server_hook.wait().await;\n        }\n        Err(server_error) => error!(\"Server run error: {server_error}\"),\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：18\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "output": "create_server函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[hyperlane(server: Server)]\nasync fn create_server() {\n    init_server_config(&server).await;\n    match server.run().await {\n        Ok(server_hook) => {\n            let host_port: String = format!(\"{SERVER_HOST}:{SERVER_PORT}\");\n            print_route_matcher(&server).await;\n            info!(\"Server listen in: {host_port}\");\n            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();\n            set_shutdown(shutdown);\n            server_hook.wait().await;\n        }\n        Err(server_error) => error!(\"Server run error: {server_error}\"),\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：15\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "create_server函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "create_server函数的泛型设计和使用如下：\n\n```rust\n#[hyperlane(server: Server)]\nasync fn create_server() {\n    init_log(LevelFilter::Info);\n    init_config(&server).await;\n    info!(\"Server initialization successful\");\n    let server_result: Result<ServerControlHook, ServerError> = server.run().await;\n    match server_result {\n        Ok(server_hook) => {\n            let host_port: String = format!(\"{SERVER_HOST}:{SERVER_PORT}\");\n            print_route_matcher(&server).await;\n            info!(\"Server listen in: {host_port}\");\n            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();\n            set_shutdown(shutdown);\n            server_hook.wait().await;\n        }\n        Err(server_error) => error!(\"Server run error: {server_error}\"),\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "create_server函数的泛型设计和使用如下：\n\n```rust\n#[hyperlane(server: Server)]\nasync fn create_server() {\n    init_server_config(&server).await;\n    match server.run().await {\n        Ok(server_hook) => {\n            let host_port: String = format!(\"{SERVER_HOST}:{SERVER_PORT}\");\n            print_route_matcher(&server).await;\n            info!(\"Server listen in: {host_port}\");\n            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();\n            set_shutdown(shutdown);\n            server_hook.wait().await;\n        }\n        Err(server_error) => error!(\"Server run error: {server_error}\"),\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "create_server函数的异步实现是如何工作的？",
     "input": "",
-    "output": "create_server函数的异步实现机制如下：\n\n```rust\n#[hyperlane(server: Server)]\nasync fn create_server() {\n    init_log(LevelFilter::Info);\n    init_config(&server).await;\n    info!(\"Server initialization successful\");\n    let server_result: Result<ServerControlHook, ServerError> = server.run().await;\n    match server_result {\n        Ok(server_hook) => {\n            let host_port: String = format!(\"{SERVER_HOST}:{SERVER_PORT}\");\n            print_route_matcher(&server).await;\n            info!(\"Server listen in: {host_port}\");\n            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();\n            set_shutdown(shutdown);\n            server_hook.wait().await;\n        }\n        Err(server_error) => error!(\"Server run error: {server_error}\"),\n    }\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "create_server函数的异步实现机制如下：\n\n```rust\n#[hyperlane(server: Server)]\nasync fn create_server() {\n    init_server_config(&server).await;\n    match server.run().await {\n        Ok(server_hook) => {\n            let host_port: String = format!(\"{SERVER_HOST}:{SERVER_PORT}\");\n            print_route_matcher(&server).await;\n            info!(\"Server listen in: {host_port}\");\n            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();\n            set_shutdown(shutdown);\n            server_hook.wait().await;\n        }\n        Err(server_error) => error!(\"Server run error: {server_error}\"),\n    }\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "run函数的源码是怎么实现的？",
     "input": "",
-    "output": "run函数的源码实现如下：\n\n```rust\npub fn run() {\n    runtime().block_on(create(create_server));\n}\n```",
+    "output": "run函数的源码实现如下：\n\n```rust\npub fn run() {\n    init_log();\n    runtime().block_on(create(create_server));\n}\n```",
     "system": ""
   },
   {
@@ -2378,13 +2378,7 @@
   {
     "instruction": "init_log函数的源码是怎么实现的？",
     "input": "",
-    "output": "init_log函数的源码实现如下：\n\n```rust\npub fn init_log(level: LevelFilter) {\n    Logger::init(level);\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "init_log函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "init_log函数的参数设计如下：\n\n```rust\npub fn init_log(level: LevelFilter) {\n    Logger::init(level);\n}\n```\n\n参数列表：\n- level: LevelFilter\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "init_log函数的源码实现如下：\n\n```rust\npub fn init_log() {\n    Logger::init(LOG_LEVEL_FILTER);\n}\n```",
     "system": ""
   },
   {
@@ -2502,6 +2496,12 @@
     "system": ""
   },
   {
+    "instruction": "LogMiddleware;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "LogMiddleware;结构体的源码实现如下：\n\n```rust\n#[response_middleware(2)]\npub struct LogMiddleware;\n```",
+    "system": ""
+  },
+  {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
     "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
@@ -2528,25 +2528,19 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "LogMiddleware;结构体的源码是怎么实现的？",
-    "input": "",
-    "output": "LogMiddleware;结构体的源码实现如下：\n\n```rust\n#[response_middleware(2)]\npub struct LogMiddleware;\n```",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -2592,21 +2586,129 @@
     "system": ""
   },
   {
+    "instruction": "HttpRequestMiddleware;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "HttpRequestMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(1)]\npub struct HttpRequestMiddleware;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "CrossMiddleware;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "CrossMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(2)]\npub struct CrossMiddleware;\n```",
+    "system": ""
+  },
+  {
     "instruction": "ResponseHeaderMiddleware;结构体的源码是怎么实现的？",
     "input": "",
-    "output": "ResponseHeaderMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(2)]\npub struct ResponseHeaderMiddleware;\n```",
+    "output": "ResponseHeaderMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(3)]\npub struct ResponseHeaderMiddleware;\n```",
     "system": ""
   },
   {
     "instruction": "ResponseStatusCodeMiddleware;结构体的源码是怎么实现的？",
     "input": "",
-    "output": "ResponseStatusCodeMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(3)]\npub struct ResponseStatusCodeMiddleware;\n```",
+    "output": "ResponseStatusCodeMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(4)]\npub struct ResponseStatusCodeMiddleware;\n```",
     "system": ""
   },
   {
     "instruction": "ResponseBodyMiddleware;结构体的源码是怎么实现的？",
     "input": "",
-    "output": "ResponseBodyMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(4)]\npub struct ResponseBodyMiddleware;\n```",
+    "output": "ResponseBodyMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(5)]\npub struct ResponseBodyMiddleware;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "OptionMethodMiddleware;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "OptionMethodMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(6)]\npub struct OptionMethodMiddleware;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "UpgradeMiddleware;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "UpgradeMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(7)]\npub struct UpgradeMiddleware;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.closed().await;\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.closed().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.closed().await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -2720,25 +2822,19 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    async fn handle(self, ctx: &Context) {}\n}\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "CrossMiddleware;结构体的源码是怎么实现的？",
-    "input": "",
-    "output": "CrossMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(1)]\npub struct CrossMiddleware;\n```",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -2768,25 +2864,19 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    async fn handle(self, ctx: &Context) {}\n}\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.aborted().await;\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.aborted().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "UpgradeMiddleware;结构体的源码是怎么实现的？",
-    "input": "",
-    "output": "UpgradeMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(5)]\npub struct UpgradeMiddleware;\n```",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.aborted().await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -2994,6 +3084,12 @@
     "system": ""
   },
   {
+    "instruction": "LOG_LEVEL_FILTER常量的源码是怎么实现的？",
+    "input": "",
+    "output": "LOG_LEVEL_FILTER常量的源码实现如下：\n\n```rust\n#[cfg(debug_assertions)]\npub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Debug;\n#[cfg(not(debug_assertions))]\npub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Info;\n```",
+    "system": ""
+  },
+  {
     "instruction": "INDEX_HTML常量的源码是怎么实现的？",
     "input": "",
     "output": "INDEX_HTML常量的源码实现如下：\n\n```rust\npub const INDEX_HTML: &str = include_str!(\"../../../resources/templates/index/index.html\");\n```",
@@ -3164,49 +3260,49 @@
   {
     "instruction": "Log::enabled方法的源码是怎么实现的？",
     "input": "",
-    "output": "Log::enabled方法的源码实现如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        #[cfg(debug_assertions)]\n        {\n            metadata.level() <= Level::Trace\n        }\n        #[cfg(not(debug_assertions))]\n        {\n            metadata.level() <= Level::Error\n        }\n    }\n```",
+    "output": "Log::enabled方法的源码实现如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= LOG_LEVEL_FILTER\n    }\n```",
     "system": ""
   },
   {
     "instruction": "Log::enabled方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Log::enabled方法的泛型设计和使用如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        #[cfg(debug_assertions)]\n        {\n            metadata.level() <= Level::Trace\n        }\n        #[cfg(not(debug_assertions))]\n        {\n            metadata.level() <= Level::Error\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Log::enabled方法的泛型设计和使用如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= LOG_LEVEL_FILTER\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "Log::enabled方法的参数设计有什么考虑？",
     "input": "",
-    "output": "Log::enabled方法的参数设计如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        #[cfg(debug_assertions)]\n        {\n            metadata.level() <= Level::Trace\n        }\n        #[cfg(not(debug_assertions))]\n        {\n            metadata.level() <= Level::Error\n        }\n    }\n```\n\n参数列表：\n- metadata: &Metadata\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Log::enabled方法的参数设计如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= LOG_LEVEL_FILTER\n    }\n```\n\n参数列表：\n- metadata: &Metadata\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "Log::enabled方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "Log::enabled方法的返回值类型设计如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        #[cfg(debug_assertions)]\n        {\n            metadata.level() <= Level::Trace\n        }\n        #[cfg(not(debug_assertions))]\n        {\n            metadata.level() <= Level::Error\n        }\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "Log::enabled方法的返回值类型设计如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= LOG_LEVEL_FILTER\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "Log::log方法的源码是怎么实现的？",
     "input": "",
-    "output": "Log::log方法的源码实现如下：\n\n```rust\nfn log(&self, record: &Record) {\n        let time_text: String = format!(\"{SPACE}{}{SPACE}\", time());\n        let level_text: String = format!(\"{SPACE}{}{SPACE}\", record.level());\n        let args_text: String = format!(\"{SPACE}{}{SPACE}\", record.args());\n        let write_file_data: String = format!(\"{} {}\", record.level(), record.args());\n        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let time_output: Output<'_> = time_output_builder\n            .text(&time_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(ColorType::Use(Color::Green))\n            .build();\n        let level_output: Output<'_> = level_output_builder\n            .text(&level_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        let args_output: Output<'_> = args_output_builder\n            .text(&args_text)\n            .bold(true)\n            .endl(true)\n            .color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        OutputListBuilder::new()\n            .add(time_output)\n            .add(level_output)\n            .add(args_output)\n            .run();\n        if self.enabled(record.metadata()) {\n            match record.metadata().level() {\n                Level::Trace => Self::log_trace(&write_file_data),\n                Level::Debug => Self::log_debug(&write_file_data),\n                Level::Info => Self::log_info(&write_file_data),\n                Level::Warn => Self::log_warn(&write_file_data),\n                Level::Error => Self::log_error(&write_file_data),\n            }\n        }\n    }\n```",
+    "output": "Log::log方法的源码实现如下：\n\n```rust\nfn log(&self, record: &Record) {\n        let time_text: String = format!(\"{SPACE}{}{SPACE}\", time());\n        let level_text: String = format!(\"{SPACE}{}{SPACE}\", record.level());\n        let args_text: String = format!(\"{SPACE}{}{SPACE}\", record.args());\n        let write_file_data: String = format!(\"{} {}\", record.level(), record.args());\n        match record.metadata().level() {\n            Level::Trace => Self::log_trace(&write_file_data),\n            Level::Debug => Self::log_debug(&write_file_data),\n            Level::Info => Self::log_info(&write_file_data),\n            Level::Warn => Self::log_warn(&write_file_data),\n            Level::Error => Self::log_error(&write_file_data),\n        }\n        if !self.enabled(record.metadata()) {\n            return;\n        }\n        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let time_output: Output<'_> = time_output_builder\n            .text(&time_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(ColorType::Use(Color::Green))\n            .build();\n        let level_output: Output<'_> = level_output_builder\n            .text(&level_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        let args_output: Output<'_> = args_output_builder\n            .text(&args_text)\n            .bold(true)\n            .endl(true)\n            .color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        OutputListBuilder::new()\n            .add(time_output)\n            .add(level_output)\n            .add(args_output)\n            .run();\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释Log::log这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "Log::log方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nfn log(&self, record: &Record) {\n        let time_text: String = format!(\"{SPACE}{}{SPACE}\", time());\n        let level_text: String = format!(\"{SPACE}{}{SPACE}\", record.level());\n        let args_text: String = format!(\"{SPACE}{}{SPACE}\", record.args());\n        let write_file_data: String = format!(\"{} {}\", record.level(), record.args());\n        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let time_output: Output<'_> = time_output_builder\n            .text(&time_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(ColorType::Use(Color::Green))\n            .build();\n        let level_output: Output<'_> = level_output_builder\n            .text(&level_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        let args_output: Output<'_> = args_output_builder\n            .text(&args_text)\n            .bold(true)\n            .endl(true)\n            .color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        OutputListBuilder::new()\n            .add(time_output)\n            .add(level_output)\n            .add(args_output)\n            .run();\n        if self.enabled(record.metadata()) {\n            match record.metadata().level() {\n                Level::Trace => Self::log_trace(&write_file_data),\n                Level::Debug => Self::log_debug(&write_file_data),\n                Level::Info => Self::log_info(&write_file_data),\n                Level::Warn => Self::log_warn(&write_file_data),\n                Level::Error => Self::log_error(&write_file_data),\n            }\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：49\n- 包含高级特性：泛型编程、生命周期管理",
+    "output": "Log::log方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nfn log(&self, record: &Record) {\n        let time_text: String = format!(\"{SPACE}{}{SPACE}\", time());\n        let level_text: String = format!(\"{SPACE}{}{SPACE}\", record.level());\n        let args_text: String = format!(\"{SPACE}{}{SPACE}\", record.args());\n        let write_file_data: String = format!(\"{} {}\", record.level(), record.args());\n        match record.metadata().level() {\n            Level::Trace => Self::log_trace(&write_file_data),\n            Level::Debug => Self::log_debug(&write_file_data),\n            Level::Info => Self::log_info(&write_file_data),\n            Level::Warn => Self::log_warn(&write_file_data),\n            Level::Error => Self::log_error(&write_file_data),\n        }\n        if !self.enabled(record.metadata()) {\n            return;\n        }\n        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let time_output: Output<'_> = time_output_builder\n            .text(&time_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(ColorType::Use(Color::Green))\n            .build();\n        let level_output: Output<'_> = level_output_builder\n            .text(&level_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        let args_output: Output<'_> = args_output_builder\n            .text(&args_text)\n            .bold(true)\n            .endl(true)\n            .color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        OutputListBuilder::new()\n            .add(time_output)\n            .add(level_output)\n            .add(args_output)\n            .run();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：50\n- 包含高级特性：泛型编程、生命周期管理",
     "system": ""
   },
   {
     "instruction": "Log::log方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Log::log方法的泛型设计和使用如下：\n\n```rust\nfn log(&self, record: &Record) {\n        let time_text: String = format!(\"{SPACE}{}{SPACE}\", time());\n        let level_text: String = format!(\"{SPACE}{}{SPACE}\", record.level());\n        let args_text: String = format!(\"{SPACE}{}{SPACE}\", record.args());\n        let write_file_data: String = format!(\"{} {}\", record.level(), record.args());\n        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let time_output: Output<'_> = time_output_builder\n            .text(&time_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(ColorType::Use(Color::Green))\n            .build();\n        let level_output: Output<'_> = level_output_builder\n            .text(&level_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        let args_output: Output<'_> = args_output_builder\n            .text(&args_text)\n            .bold(true)\n            .endl(true)\n            .color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        OutputListBuilder::new()\n            .add(time_output)\n            .add(level_output)\n            .add(args_output)\n            .run();\n        if self.enabled(record.metadata()) {\n            match record.metadata().level() {\n                Level::Trace => Self::log_trace(&write_file_data),\n                Level::Debug => Self::log_debug(&write_file_data),\n                Level::Info => Self::log_info(&write_file_data),\n                Level::Warn => Self::log_warn(&write_file_data),\n                Level::Error => Self::log_error(&write_file_data),\n            }\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Log::log方法的泛型设计和使用如下：\n\n```rust\nfn log(&self, record: &Record) {\n        let time_text: String = format!(\"{SPACE}{}{SPACE}\", time());\n        let level_text: String = format!(\"{SPACE}{}{SPACE}\", record.level());\n        let args_text: String = format!(\"{SPACE}{}{SPACE}\", record.args());\n        let write_file_data: String = format!(\"{} {}\", record.level(), record.args());\n        match record.metadata().level() {\n            Level::Trace => Self::log_trace(&write_file_data),\n            Level::Debug => Self::log_debug(&write_file_data),\n            Level::Info => Self::log_info(&write_file_data),\n            Level::Warn => Self::log_warn(&write_file_data),\n            Level::Error => Self::log_error(&write_file_data),\n        }\n        if !self.enabled(record.metadata()) {\n            return;\n        }\n        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let time_output: Output<'_> = time_output_builder\n            .text(&time_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(ColorType::Use(Color::Green))\n            .build();\n        let level_output: Output<'_> = level_output_builder\n            .text(&level_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        let args_output: Output<'_> = args_output_builder\n            .text(&args_text)\n            .bold(true)\n            .endl(true)\n            .color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        OutputListBuilder::new()\n            .add(time_output)\n            .add(level_output)\n            .add(args_output)\n            .run();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "Log::log方法的参数设计有什么考虑？",
     "input": "",
-    "output": "Log::log方法的参数设计如下：\n\n```rust\nfn log(&self, record: &Record) {\n        let time_text: String = format!(\"{SPACE}{}{SPACE}\", time());\n        let level_text: String = format!(\"{SPACE}{}{SPACE}\", record.level());\n        let args_text: String = format!(\"{SPACE}{}{SPACE}\", record.args());\n        let write_file_data: String = format!(\"{} {}\", record.level(), record.args());\n        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let time_output: Output<'_> = time_output_builder\n            .text(&time_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(ColorType::Use(Color::Green))\n            .build();\n        let level_output: Output<'_> = level_output_builder\n            .text(&level_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        let args_output: Output<'_> = args_output_builder\n            .text(&args_text)\n            .bold(true)\n            .endl(true)\n            .color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        OutputListBuilder::new()\n            .add(time_output)\n            .add(level_output)\n            .add(args_output)\n            .run();\n        if self.enabled(record.metadata()) {\n            match record.metadata().level() {\n                Level::Trace => Self::log_trace(&write_file_data),\n                Level::Debug => Self::log_debug(&write_file_data),\n                Level::Info => Self::log_info(&write_file_data),\n                Level::Warn => Self::log_warn(&write_file_data),\n                Level::Error => Self::log_error(&write_file_data),\n            }\n        }\n    }\n```\n\n参数列表：\n- record: &Record\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Log::log方法的参数设计如下：\n\n```rust\nfn log(&self, record: &Record) {\n        let time_text: String = format!(\"{SPACE}{}{SPACE}\", time());\n        let level_text: String = format!(\"{SPACE}{}{SPACE}\", record.level());\n        let args_text: String = format!(\"{SPACE}{}{SPACE}\", record.args());\n        let write_file_data: String = format!(\"{} {}\", record.level(), record.args());\n        match record.metadata().level() {\n            Level::Trace => Self::log_trace(&write_file_data),\n            Level::Debug => Self::log_debug(&write_file_data),\n            Level::Info => Self::log_info(&write_file_data),\n            Level::Warn => Self::log_warn(&write_file_data),\n            Level::Error => Self::log_error(&write_file_data),\n        }\n        if !self.enabled(record.metadata()) {\n            return;\n        }\n        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();\n        let time_output: Output<'_> = time_output_builder\n            .text(&time_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(ColorType::Use(Color::Green))\n            .build();\n        let level_output: Output<'_> = level_output_builder\n            .text(&level_text)\n            .bold(true)\n            .color(ColorType::Use(Color::White))\n            .bg_color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        let args_output: Output<'_> = args_output_builder\n            .text(&args_text)\n            .bold(true)\n            .endl(true)\n            .color(match record.level() {\n                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),\n                Level::Info | Level::Warn => ColorType::Use(Color::Blue),\n                Level::Error => ColorType::Use(Color::Red),\n            })\n            .build();\n        OutputListBuilder::new()\n            .add(time_output)\n            .add(level_output)\n            .add(args_output)\n            .run();\n    }\n```\n\n参数列表：\n- record: &Record\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {

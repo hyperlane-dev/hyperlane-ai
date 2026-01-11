@@ -1,4 +1,4 @@
-<!--2026-01-10 09:50:21-->
+<!--2026-01-11 01:55:35-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1219,25 +1219,35 @@ use super::*;
 mod r#fn;
 pub use r#fn::*;
 use super::{shutdown::*, *};
+use application::*;
 #[allow(unused_imports)]
 use hyperlane_app::*;
 use hyperlane_config::framework::*;
 use hyperlane_plugin::process::*;
-use hyperlane_utils::log::LevelFilter;
 use tokio::runtime::{Builder, Runtime};
 ```
 # Path: hyperlane-quick-start/init/framework/wait/fn.rs
 ```rust
-use crate::application::init_log;
 use super::*;
+fn runtime() -> Runtime {
+    Builder::new_multi_thread()
+        .worker_threads(num_cpus::get_physical() << 1)
+        .thread_stack_size(1_048_576)
+        .max_blocking_threads(2_048)
+        .max_io_events_per_tick(1_024)
+        .enable_all()
+        .build()
+        .unwrap()
+}
 #[hyperlane(config: ServerConfig)]
-async fn init_config(server: &Server) {
+async fn init_server_config(server: &Server) {
     config.host(SERVER_HOST).await;
     config.port(SERVER_PORT).await;
     config.ttl(SERVER_TTI).await;
     config.nodelay(SERVER_NODELAY).await;
     config.request_config(RequestConfig::default()).await;
     server.config(config).await;
+    info!("Server initialization successful");
 }
 async fn print_route_matcher(server: &Server) {
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
@@ -1255,23 +1265,10 @@ async fn print_route_matcher(server: &Server) {
         }
     }
 }
-fn runtime() -> Runtime {
-    Builder::new_multi_thread()
-        .worker_threads(num_cpus::get_physical() << 1)
-        .thread_stack_size(1_048_576)
-        .max_blocking_threads(2_048)
-        .max_io_events_per_tick(1_024)
-        .enable_all()
-        .build()
-        .unwrap()
-}
 #[hyperlane(server: Server)]
 async fn create_server() {
-    init_log(LevelFilter::Info);
-    init_config(&server).await;
-    info!("Server initialization successful");
-    let server_result: Result<ServerControlHook, ServerError> = server.run().await;
-    match server_result {
+    init_server_config(&server).await;
+    match server.run().await {
         Ok(server_hook) => {
             let host_port: String = format!("{SERVER_HOST}:{SERVER_PORT}");
             print_route_matcher(&server).await;
@@ -1284,6 +1281,7 @@ async fn create_server() {
     }
 }
 pub fn run() {
+    init_log();
     runtime().block_on(create(create_server));
 }
 ```
@@ -1322,14 +1320,14 @@ pub use log::*;
 ```rust
 mod r#fn;
 pub use r#fn::*;
+use hyperlane_config::application::log::*;
 use hyperlane_plugin::log::*;
-use hyperlane_utils::log::LevelFilter;
 ```
 # Path: hyperlane-quick-start/init/application/log/fn.rs
 ```rust
 use super::*;
-pub fn init_log(level: LevelFilter) {
-    Logger::init(level);
+pub fn init_log() {
+    Logger::init(LOG_LEVEL_FILTER);
 }
 ```
 # Path: hyperlane-quick-start/app/lib.rs
@@ -1508,26 +1506,20 @@ use super::*;
 ```
 # Path: hyperlane-quick-start/app/middleware/response/mod.rs
 ```rust
-pub mod log;
-pub mod send;
-pub use log::*;
-pub use send::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/response/send/mod.rs
-```rust
 mod r#impl;
-mod r#struct;
+pub mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/middleware/response/send/struct.rs
+# Path: hyperlane-quick-start/app/middleware/response/struct.rs
 ```rust
 use super::*;
 #[response_middleware(1)]
 pub struct SendMiddleware;
+#[response_middleware(2)]
+pub struct LogMiddleware;
 ```
-# Path: hyperlane-quick-start/app/middleware/response/send/impl.rs
+# Path: hyperlane-quick-start/app/middleware/response/impl.rs
 ```rust
 use super::*;
 impl ServerHook for SendMiddleware {
@@ -1541,23 +1533,6 @@ impl ServerHook for SendMiddleware {
     )]
     async fn handle(self, ctx: &Context) {}
 }
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/struct.rs
-```rust
-use super::*;
-#[response_middleware(2)]
-pub struct LogMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/impl.rs
-```rust
-use super::*;
 impl ServerHook for LogMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
@@ -1572,35 +1547,55 @@ impl ServerHook for LogMiddleware {
 ```
 # Path: hyperlane-quick-start/app/middleware/request/mod.rs
 ```rust
-pub mod cross;
-pub mod response;
-pub mod upgrade;
-pub use cross::*;
-pub use response::*;
-pub use upgrade::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/response/mod.rs
-```rust
 mod r#impl;
-mod r#struct;
+pub mod r#struct;
 pub use r#struct::*;
 use super::*;
 use hyperlane_config::application::templates::*;
 ```
-# Path: hyperlane-quick-start/app/middleware/request/response/struct.rs
+# Path: hyperlane-quick-start/app/middleware/request/struct.rs
 ```rust
 use super::*;
+#[request_middleware(1)]
+pub struct HttpRequestMiddleware;
 #[request_middleware(2)]
-pub struct ResponseHeaderMiddleware;
+pub struct CrossMiddleware;
 #[request_middleware(3)]
-pub struct ResponseStatusCodeMiddleware;
+pub struct ResponseHeaderMiddleware;
 #[request_middleware(4)]
+pub struct ResponseStatusCodeMiddleware;
+#[request_middleware(5)]
 pub struct ResponseBodyMiddleware;
+#[request_middleware(6)]
+pub struct OptionMethodMiddleware;
+#[request_middleware(7)]
+pub struct UpgradeMiddleware;
 ```
-# Path: hyperlane-quick-start/app/middleware/request/response/impl.rs
+# Path: hyperlane-quick-start/app/middleware/request/impl.rs
 ```rust
 use super::*;
+impl ServerHook for HttpRequestMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        reject(ctx.get_request_is_http().await),
+        send,
+    )]
+    async fn handle(self, ctx: &Context) {
+        ctx.closed().await;
+    }
+}
+impl ServerHook for CrossMiddleware {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_version(HttpVersion::Http1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
+    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
+    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
+    async fn handle(self, ctx: &Context) {}
+}
 impl ServerHook for ResponseHeaderMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
@@ -1631,50 +1626,18 @@ impl ServerHook for ResponseBodyMiddleware {
     #[response_body(INDEX_HTML.replace("{{ time }}", &time()))]
     async fn handle(self, ctx: &Context) {}
 }
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/struct.rs
-```rust
-use super::*;
-#[request_middleware(1)]
-pub struct CrossMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/impl.rs
-```rust
-use super::*;
-impl ServerHook for CrossMiddleware {
+impl ServerHook for OptionMethodMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[response_version(HttpVersion::Http1_1)]
-    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
-    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
-    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
-    async fn handle(self, ctx: &Context) {}
+    #[prologue_macros(
+        filter(ctx.get_request_is_options().await),
+        send
+    )]
+    async fn handle(self, ctx: &Context) {
+        ctx.aborted().await;
+    }
 }
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/struct.rs
-```rust
-use super::*;
-#[request_middleware(5)]
-pub struct UpgradeMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/impl.rs
-```rust
-use super::*;
 impl ServerHook for UpgradeMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
@@ -1835,6 +1798,7 @@ use super::*;
 # Path: hyperlane-quick-start/config/application/mod.rs
 ```rust
 pub mod hello;
+pub mod log;
 pub mod logo_img;
 pub mod not_found;
 pub mod templates;
@@ -1865,6 +1829,20 @@ pub const NOT_FOUND_HTML: &str = include_str!("../../../resources/static/not_fou
 ```rust
 mod r#const;
 pub use r#const::*;
+```
+# Path: hyperlane-quick-start/config/application/log/const.rs
+```rust
+use super::*;
+#[cfg(debug_assertions)]
+pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Debug;
+#[cfg(not(debug_assertions))]
+pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Info;
+```
+# Path: hyperlane-quick-start/config/application/log/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+use hyperlane_utils::log::LevelFilter;
 ```
 # Path: hyperlane-quick-start/config/application/templates/const.rs
 ```rust
@@ -1970,7 +1948,7 @@ mod r#static;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
-use hyperlane_config::framework::*;
+use hyperlane_config::{application::log::*, framework::*};
 use r#static::*;
 use hyperlane_utils::{
     log::{Level, LevelFilter, Log, Metadata, Record, set_logger, set_max_level},
@@ -2019,20 +1997,23 @@ impl Logger {
 }
 impl Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        #[cfg(debug_assertions)]
-        {
-            metadata.level() <= Level::Trace
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            metadata.level() <= Level::Error
-        }
+        metadata.level() <= LOG_LEVEL_FILTER
     }
     fn log(&self, record: &Record) {
         let time_text: String = format!("{SPACE}{}{SPACE}", time());
         let level_text: String = format!("{SPACE}{}{SPACE}", record.level());
         let args_text: String = format!("{SPACE}{}{SPACE}", record.args());
         let write_file_data: String = format!("{} {}", record.level(), record.args());
+        match record.metadata().level() {
+            Level::Trace => Self::log_trace(&write_file_data),
+            Level::Debug => Self::log_debug(&write_file_data),
+            Level::Info => Self::log_info(&write_file_data),
+            Level::Warn => Self::log_warn(&write_file_data),
+            Level::Error => Self::log_error(&write_file_data),
+        }
+        if !self.enabled(record.metadata()) {
+            return;
+        }
         let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
         let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();
         let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();
@@ -2067,15 +2048,6 @@ impl Log for Logger {
             .add(level_output)
             .add(args_output)
             .run();
-        if self.enabled(record.metadata()) {
-            match record.metadata().level() {
-                Level::Trace => Self::log_trace(&write_file_data),
-                Level::Debug => Self::log_debug(&write_file_data),
-                Level::Info => Self::log_info(&write_file_data),
-                Level::Warn => Self::log_warn(&write_file_data),
-                Level::Error => Self::log_error(&write_file_data),
-            }
-        }
     }
     fn flush(&self) {
         Server::flush_stdout_and_stderr();
