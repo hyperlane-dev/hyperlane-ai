@@ -1,4 +1,4 @@
-<!--2026-01-10 09:50:21-->
+<!--2026-01-12 01:51:58-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -25,6 +25,7 @@ pub use hyperlane_broadcast::*;
 pub use hyperlane_log::*;
 pub use hyperlane_macros::*;
 pub use hyperlane_plugin_websocket::*;
+pub use instrument_level::*;
 pub use lombok_macros::*;
 pub use recoverable_spawn::*;
 pub use recoverable_thread_pool::*;
@@ -42,7 +43,6 @@ pub use once_cell;
 pub use redis;
 pub use regex;
 pub use sea_orm;
-pub use serde;
 pub use serde_urlencoded;
 pub use serde_with;
 pub use serde_xml_rs;
@@ -50,6 +50,8 @@ pub use serde_yaml;
 pub use simd_json;
 pub use snafu;
 pub use sqlx;
+pub use tracing_log;
+pub use tracing_subscriber;
 pub use twox_hash;
 pub use url;
 pub use urlencoding;
@@ -1203,10 +1205,7 @@ cargo run restart -d
 pub mod application;
 pub mod framework;
 use hyperlane::*;
-use hyperlane_utils::{
-    log::{error, info},
-    *,
-};
+use hyperlane_utils::{log::*, *};
 ```
 # Path: hyperlane-quick-start/init/framework/mod.rs
 ```rust
@@ -1219,42 +1218,17 @@ use super::*;
 mod r#fn;
 pub use r#fn::*;
 use super::{shutdown::*, *};
+use application::*;
 #[allow(unused_imports)]
 use hyperlane_app::*;
 use hyperlane_config::framework::*;
 use hyperlane_plugin::process::*;
-use hyperlane_utils::log::LevelFilter;
 use tokio::runtime::{Builder, Runtime};
 ```
 # Path: hyperlane-quick-start/init/framework/wait/fn.rs
 ```rust
-use crate::application::init_log;
 use super::*;
-#[hyperlane(config: ServerConfig)]
-async fn init_config(server: &Server) {
-    config.host(SERVER_HOST).await;
-    config.port(SERVER_PORT).await;
-    config.ttl(SERVER_TTI).await;
-    config.nodelay(SERVER_NODELAY).await;
-    config.request_config(RequestConfig::default()).await;
-    server.config(config).await;
-}
-async fn print_route_matcher(server: &Server) {
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    for key in route_matcher.get_static_route().keys() {
-        info!("Static route: {key}");
-    }
-    for value in route_matcher.get_dynamic_route().values() {
-        for (route_pattern, _) in value {
-            info!("Dynamic route: {route_pattern}");
-        }
-    }
-    for value in route_matcher.get_regex_route().values() {
-        for (route_pattern, _) in value {
-            info!("Regex route: {route_pattern}");
-        }
-    }
-}
+#[instrument_trace]
 fn runtime() -> Runtime {
     Builder::new_multi_thread()
         .worker_threads(num_cpus::get_physical() << 1)
@@ -1265,25 +1239,58 @@ fn runtime() -> Runtime {
         .build()
         .unwrap()
 }
-#[hyperlane(server: Server)]
-async fn create_server() {
-    init_log(LevelFilter::Info);
-    init_config(&server).await;
+#[hyperlane(config: ServerConfig)]
+#[instrument_trace]
+async fn init_server_config(server: &Server) {
+    let mut request_config: RequestConfig = RequestConfig::default();
+    request_config
+        .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
+        .set_http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);
+    config.host(SERVER_HOST).await;
+    config.port(SERVER_PORT).await;
+    config.ttl(SERVER_TTI).await;
+    config.nodelay(SERVER_NODELAY).await;
+    config.request_config(request_config).await;
+    server.config(config.clone()).await;
+    debug!("Server config{COLON_SPACE}{:?}", config);
     info!("Server initialization successful");
-    let server_result: Result<ServerControlHook, ServerError> = server.run().await;
-    match server_result {
+}
+#[instrument_trace]
+async fn print_route_matcher(server: &Server) {
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    for key in route_matcher.get_static_route().keys() {
+        info!("Static route{COLON_SPACE}{key}");
+    }
+    for value in route_matcher.get_dynamic_route().values() {
+        for (route_pattern, _) in value {
+            info!("Dynamic route{COLON_SPACE}{route_pattern}");
+        }
+    }
+    for value in route_matcher.get_regex_route().values() {
+        for (route_pattern, _) in value {
+            info!("Regex route{COLON_SPACE}{route_pattern}");
+        }
+    }
+}
+#[hyperlane(server: Server)]
+#[instrument_trace]
+async fn create_server() {
+    init_server_config(&server).await;
+    match server.run().await {
         Ok(server_hook) => {
-            let host_port: String = format!("{SERVER_HOST}:{SERVER_PORT}");
+            let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
             print_route_matcher(&server).await;
-            info!("Server listen in: {host_port}");
+            info!("Server listen in{COLON_SPACE}{host_port}");
             let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();
             set_shutdown(shutdown);
             server_hook.wait().await;
         }
-        Err(server_error) => error!("Server run error: {server_error}"),
+        Err(server_error) => error!("Server run error{COLON_SPACE}{server_error}"),
     }
 }
+#[instrument_trace]
 pub fn run() {
+    init_log();
     runtime().block_on(create(create_server));
 }
 ```
@@ -1299,13 +1306,21 @@ use std::sync::{Arc, OnceLock};
 # Path: hyperlane-quick-start/init/framework/shutdown/fn.rs
 ```rust
 use super::*;
-pub fn set_shutdown(shutdown: SharedAsyncTaskFactory<()>) {
-    let _ = SHUTDOWN.set(shutdown);
+#[instrument_trace]
+fn default_shutdown() -> SharedAsyncTaskFactory<()> {
+    Arc::new(|| {
+        Box::pin(async {
+            warn!("Not set shutdown, using default");
+        })
+    })
 }
-pub fn shutdown() -> SharedAsyncTaskFactory<()> {
-    SHUTDOWN
-        .get_or_init(|| Arc::new(|| Box::pin(async {})))
-        .clone()
+#[instrument_trace]
+pub fn set_shutdown(shutdown: SharedAsyncTaskFactory<()>) {
+    drop(SHUTDOWN.set(shutdown));
+}
+#[instrument_trace]
+pub fn get_shutdown() -> SharedAsyncTaskFactory<()> {
+    SHUTDOWN.get_or_init(default_shutdown).clone()
 }
 ```
 # Path: hyperlane-quick-start/init/framework/shutdown/static.rs
@@ -1315,21 +1330,24 @@ pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/init/application/mod.rs
 ```rust
-mod log;
-pub use log::*;
+mod logger;
+use super::*;
+pub use logger::*;
 ```
-# Path: hyperlane-quick-start/init/application/log/mod.rs
+# Path: hyperlane-quick-start/init/application/logger/mod.rs
 ```rust
 mod r#fn;
+use super::*;
 pub use r#fn::*;
-use hyperlane_plugin::log::*;
-use hyperlane_utils::log::LevelFilter;
+use hyperlane_config::application::logger::*;
+use hyperlane_plugin::logger::*;
 ```
-# Path: hyperlane-quick-start/init/application/log/fn.rs
+# Path: hyperlane-quick-start/init/application/logger/fn.rs
 ```rust
 use super::*;
-pub fn init_log(level: LevelFilter) {
-    Logger::init(level);
+#[instrument_trace]
+pub fn init_log() {
+    Logger::init(LOG_LEVEL_FILTER);
 }
 ```
 # Path: hyperlane-quick-start/app/lib.rs
@@ -1346,10 +1364,7 @@ pub mod service;
 pub mod utils;
 pub mod view;
 use hyperlane::*;
-use hyperlane_utils::{
-    log::{error, info},
-    *,
-};
+use hyperlane_utils::{log::*, *};
 ```
 # Path: hyperlane-quick-start/app/model/mod.rs
 ```rust
@@ -1395,7 +1410,7 @@ pub enum ResponseCode {
 ```rust
 use super::*;
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, Data)]
+#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct ApiResponse<T>
 where
     T: Serialize + Default,
@@ -1410,6 +1425,7 @@ where
 ```rust
 use super::*;
 impl ResponseCode {
+    #[instrument_trace]
     pub fn default_message(&self) -> &'static str {
         match self {
             Self::Success => "Operation successful",
@@ -1427,6 +1443,17 @@ impl<T> ApiResponse<T>
 where
     T: Serialize + Default,
 {
+    #[instrument_trace]
+    pub fn default_success() -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::Success as i32)
+            .set_message("Success".to_string())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+    #[instrument_trace]
     pub fn success(data: T) -> Self {
         let mut instance: ApiResponse<T> = Self::default();
         instance
@@ -1436,6 +1463,7 @@ where
             .set_timestamp(Some(date()));
         instance
     }
+    #[instrument_trace]
     pub fn success_with_message(data: T, message: impl Into<String>) -> Self {
         let mut instance: ApiResponse<T> = Self::default();
         instance
@@ -1445,6 +1473,17 @@ where
             .set_timestamp(Some(date()));
         instance
     }
+    #[instrument_trace]
+    pub fn default_error() -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::InternalError as i32)
+            .set_message("Internal server error".to_string())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+    #[instrument_trace]
     pub fn error(message: impl Into<String>) -> Self {
         let mut instance: ApiResponse<T> = Self::default();
         instance
@@ -1454,20 +1493,23 @@ where
             .set_timestamp(Some(date()));
         instance
     }
-    pub fn error_with_code(code: ResponseCode, message: impl Into<String>) -> Self {
+    #[instrument_trace]
+    pub fn error_with_code(code: ResponseCode, message: impl ToString) -> Self {
         let mut instance: ApiResponse<T> = Self::default();
         instance
             .set_code(code as i32)
-            .set_message(message.into())
+            .set_message(message.to_string())
             .set_data(None)
             .set_timestamp(Some(date()));
         instance
     }
+    #[instrument_trace]
     pub fn to_json_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).unwrap_or_default()
     }
 }
 impl ApiResponse<()> {
+    #[instrument_trace]
     pub fn success_without_data(message: impl Into<String>) -> Self {
         let mut instance: ApiResponse<()> = Self::default();
         instance
@@ -1494,7 +1536,7 @@ use serde::{Deserialize, Serialize};
 # Path: hyperlane-quick-start/app/model/param/websocket/struct.rs
 ```rust
 use super::*;
-#[derive(Debug, Clone, Default, Data, Deserialize, Serialize)]
+#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct WebSocketMessage {
     pub name: String,
     pub message: String,
@@ -1508,29 +1550,26 @@ use super::*;
 ```
 # Path: hyperlane-quick-start/app/middleware/response/mod.rs
 ```rust
-pub mod log;
-pub mod send;
-pub use log::*;
-pub use send::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/response/send/mod.rs
-```rust
 mod r#impl;
-mod r#struct;
+pub mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/middleware/response/send/struct.rs
+# Path: hyperlane-quick-start/app/middleware/response/struct.rs
 ```rust
 use super::*;
 #[response_middleware(1)]
+#[derive(Clone, Copy, Data, Debug, Default)]
 pub struct SendMiddleware;
+#[response_middleware(2)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct LogMiddleware;
 ```
-# Path: hyperlane-quick-start/app/middleware/response/send/impl.rs
+# Path: hyperlane-quick-start/app/middleware/response/impl.rs
 ```rust
 use super::*;
 impl ServerHook for SendMiddleware {
+    #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
         Self
     }
@@ -1539,29 +1578,15 @@ impl ServerHook for SendMiddleware {
         reject(ctx.get_request_upgrade_type().await.is_ws()),
         send
     )]
+    #[instrument_trace]
     async fn handle(self, ctx: &Context) {}
 }
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/struct.rs
-```rust
-use super::*;
-#[response_middleware(2)]
-pub struct LogMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/response/log/impl.rs
-```rust
-use super::*;
 impl ServerHook for LogMiddleware {
+    #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
         Self
     }
+    #[instrument_trace]
     async fn handle(self, ctx: &Context) {
         let request: String = ctx.get_request().await.get_string();
         let response: String = ctx.get_response().await.get_string();
@@ -1572,36 +1597,68 @@ impl ServerHook for LogMiddleware {
 ```
 # Path: hyperlane-quick-start/app/middleware/request/mod.rs
 ```rust
-pub mod cross;
-pub mod response;
-pub mod upgrade;
-pub use cross::*;
-pub use response::*;
-pub use upgrade::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/response/mod.rs
-```rust
 mod r#impl;
-mod r#struct;
+pub mod r#struct;
 pub use r#struct::*;
 use super::*;
 use hyperlane_config::application::templates::*;
 ```
-# Path: hyperlane-quick-start/app/middleware/request/response/struct.rs
+# Path: hyperlane-quick-start/app/middleware/request/struct.rs
 ```rust
 use super::*;
+#[request_middleware(1)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct HttpRequestMiddleware;
 #[request_middleware(2)]
-pub struct ResponseHeaderMiddleware;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct CrossMiddleware;
 #[request_middleware(3)]
-pub struct ResponseStatusCodeMiddleware;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ResponseHeaderMiddleware;
 #[request_middleware(4)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ResponseStatusCodeMiddleware;
+#[request_middleware(5)]
+#[derive(Clone, Copy, Data, Debug, Default)]
 pub struct ResponseBodyMiddleware;
+#[request_middleware(6)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct OptionMethodMiddleware;
+#[request_middleware(7)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct UpgradeMiddleware;
 ```
-# Path: hyperlane-quick-start/app/middleware/request/response/impl.rs
+# Path: hyperlane-quick-start/app/middleware/request/impl.rs
 ```rust
 use super::*;
+impl ServerHook for HttpRequestMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        reject(ctx.get_request_is_http().await),
+        send,
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &Context) {
+        ctx.closed().await;
+    }
+}
+impl ServerHook for CrossMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[response_version(HttpVersion::Http1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
+    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
+    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
+    #[instrument_trace]
+    async fn handle(self, ctx: &Context) {}
+}
 impl ServerHook for ResponseHeaderMiddleware {
+    #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
         Self
     }
@@ -1612,70 +1669,46 @@ impl ServerHook for ResponseHeaderMiddleware {
         response_header(CONTENT_TYPE => content_type),
         response_header("SocketAddr" => socket_addr_string)
     )]
+    #[instrument_trace]
     async fn handle(self, ctx: &Context) {
         let socket_addr_string: String = ctx.get_socket_addr_string().await;
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
     }
 }
 impl ServerHook for ResponseStatusCodeMiddleware {
+    #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
         Self
     }
     #[response_status_code(200)]
+    #[instrument_trace]
     async fn handle(self, ctx: &Context) {}
 }
 impl ServerHook for ResponseBodyMiddleware {
+    #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
         Self
     }
     #[response_body(INDEX_HTML.replace("{{ time }}", &time()))]
+    #[instrument_trace]
     async fn handle(self, ctx: &Context) {}
 }
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/struct.rs
-```rust
-use super::*;
-#[request_middleware(1)]
-pub struct CrossMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/request/cross/impl.rs
-```rust
-use super::*;
-impl ServerHook for CrossMiddleware {
+impl ServerHook for OptionMethodMiddleware {
+    #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[response_version(HttpVersion::Http1_1)]
-    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
-    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
-    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
-    async fn handle(self, ctx: &Context) {}
+    #[prologue_macros(
+        filter(ctx.get_request_is_options().await),
+        send
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &Context) {
+        ctx.aborted().await;
+    }
 }
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/struct.rs
-```rust
-use super::*;
-#[request_middleware(5)]
-pub struct UpgradeMiddleware;
-```
-# Path: hyperlane-quick-start/app/middleware/request/upgrade/impl.rs
-```rust
-use super::*;
 impl ServerHook for UpgradeMiddleware {
+    #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
         Self
     }
@@ -1689,6 +1722,7 @@ impl ServerHook for UpgradeMiddleware {
         response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
         send
     )]
+    #[instrument_trace]
     async fn handle(self, ctx: &Context) {}
 }
 ```
@@ -1711,11 +1745,13 @@ use model::data_transfer::common::*;
 ```rust
 use super::*;
 #[task_panic]
+#[derive(Clone, Data, Debug, Default)]
 pub struct TaskPanicHook {
     pub(super) content_type: String,
     pub(super) response_body: String,
 }
 #[request_error]
+#[derive(Clone, Data, Debug, Default)]
 pub struct RequestErrorHook {
     pub(super) response_status_code: ResponseStatusCode,
     pub(super) content_type: String,
@@ -1727,6 +1763,7 @@ pub struct RequestErrorHook {
 use super::*;
 impl ServerHook for TaskPanicHook {
     #[task_panic_data(task_panic_data)]
+    #[instrument_trace]
     async fn new(ctx: &Context) -> Self {
         let content_type: String =
             ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
@@ -1744,8 +1781,10 @@ impl ServerHook for TaskPanicHook {
         response_header(CONTENT_TYPE, &self.content_type),
     )]
     #[epilogue_macros(response_body(&response_body), send)]
+    #[instrument_trace]
     async fn handle(self, ctx: &Context) {
-        error!("{}", self.response_body);
+        debug!("TaskPanicHook request => {}", ctx.get_request().await);
+        error!("TaskPanicHook => {}", self.response_body);
         let api_response: ApiResponse<()> =
             ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
         let response_body: Vec<u8> = api_response.to_json_bytes();
@@ -1753,6 +1792,7 @@ impl ServerHook for TaskPanicHook {
 }
 impl ServerHook for RequestErrorHook {
     #[request_error_data(request_error_data)]
+    #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
         let content_type: String =
             ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
@@ -1771,13 +1811,16 @@ impl ServerHook for RequestErrorHook {
         response_header(CONTENT_TYPE, &self.content_type),
     )]
     #[epilogue_macros(response_body(&response_body), send)]
+    #[instrument_trace]
     async fn handle(self, ctx: &Context) {
         if self.response_status_code == HttpStatus::BadRequest.code() {
             ctx.aborted().await;
+            warn!("Context aborted");
             return;
         }
         if self.response_status_code != HttpStatus::RequestTimeout.code() {
-            error!("{}", self.response_body);
+            debug!("RequestErrorHook request => {}", ctx.get_request().await);
+            error!("RequestErrorHook => {}", self.response_body);
         }
         let api_response: ApiResponse<()> =
             ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
@@ -1785,29 +1828,48 @@ impl ServerHook for RequestErrorHook {
     }
 }
 ```
+# Path: hyperlane-quick-start/app/view/mod.rs
+```rust
+mod favicon;
+use super::*;
+```
 # Path: hyperlane-quick-start/app/view/favicon/mod.rs
 ```rust
-mod r#fn;
-pub use r#fn::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
 use super::*;
-use hyperlane_config::business::logo_img::*;
+use hyperlane_config::application::logo_img::*;
 ```
-# Path: hyperlane-quick-start/app/view/favicon/fn.rs
+# Path: hyperlane-quick-start/app/view/favicon/struct.rs
 ```rust
 use super::*;
 #[route("/favicon.ico")]
-#[prologue_macros(
-  get,
-  response_status_code(301),
-  response_header(LOCATION => LOGO_IMG_URL)
-)]
-pub async fn ico(ctx: Context) {}
+pub struct FaviconRoute;
+```
+# Path: hyperlane-quick-start/app/view/favicon/impl.rs
+```rust
+use super::*;
+impl ServerHook for FaviconRoute {
+    #[instrument_trace]
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get,
+        response_status_code(301),
+        response_header(LOCATION => LOGO_IMG_URL)
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &Context) {}
+}
 ```
 # Path: hyperlane-quick-start/config/lib.rs
 ```rust
 pub mod application;
 pub mod framework;
 use hyperlane::*;
+use hyperlane_utils::log::*;
 ```
 # Path: hyperlane-quick-start/config/framework/const.rs
 ```rust
@@ -1819,12 +1881,14 @@ pub const SERVER_PORT: u16 = 65002;
 pub const SERVER_HOST: &str = DEFAULT_HOST;
 pub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;
 pub const SERVER_LOG_SIZE: usize = 100_024_000;
-pub const SERVER_LOG_DIR: &str = "./tmp/logs";
+pub const SERVER_LOG_DIR: &str = "./logs";
 pub const SERVER_INNER_PRINT: bool = true;
 pub const SERVER_INNER_LOG: bool = true;
 pub const SERVER_NODELAY: bool = false;
 pub const SERVER_TTI: u32 = 128;
-pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
+pub const SERVER_PID_FILE_PATH: &str = "./process/hyperlane.pid";
+pub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;
+pub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;
 ```
 # Path: hyperlane-quick-start/config/framework/mod.rs
 ```rust
@@ -1835,9 +1899,11 @@ use super::*;
 # Path: hyperlane-quick-start/config/application/mod.rs
 ```rust
 pub mod hello;
+pub mod logger;
 pub mod logo_img;
 pub mod not_found;
 pub mod templates;
+use super::*;
 ```
 # Path: hyperlane-quick-start/config/application/hello/const.rs
 ```rust
@@ -1856,6 +1922,20 @@ pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
 ```rust
 mod r#const;
 pub use r#const::*;
+```
+# Path: hyperlane-quick-start/config/application/logger/const.rs
+```rust
+use super::*;
+#[cfg(debug_assertions)]
+pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Trace;
+#[cfg(not(debug_assertions))]
+pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Info;
+```
+# Path: hyperlane-quick-start/config/application/logger/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+use super::*;
 ```
 # Path: hyperlane-quick-start/config/application/not_found/const.rs
 ```rust
@@ -1877,13 +1957,10 @@ pub use r#const::*;
 ```
 # Path: hyperlane-quick-start/plugin/lib.rs
 ```rust
-pub mod log;
+pub mod logger;
 pub mod process;
 use hyperlane::*;
-use hyperlane_utils::{
-    log::{error, info},
-    *,
-};
+use hyperlane_utils::{log::*, *};
 ```
 # Path: hyperlane-quick-start/plugin/process/const.rs
 ```rust
@@ -1905,12 +1982,14 @@ use std::{env::args, future::Future};
 # Path: hyperlane-quick-start/plugin/process/fn.rs
 ```rust
 use super::*;
+#[instrument_trace]
 pub async fn create<F, Fut>(server_hook: F)
 where
     F: Fn() -> Fut + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
     let args: Vec<String> = args().collect();
+    debug!("Process create args{COLON_SPACE}{args:?}");
     let mut manager: ServerManager = ServerManager::new();
     manager
         .set_pid_file(SERVER_PID_FILE_PATH)
@@ -1921,7 +2000,7 @@ where
             match manager.start_daemon().await {
                 Ok(_) => info!("Server started in background successfully"),
                 Err(error) => {
-                    error!("Error starting server in background: {error}")
+                    error!("Error starting server in background{COLON_SPACE}{error}")
                 }
             };
         } else {
@@ -1932,7 +2011,7 @@ where
     let stop_server = || async {
         match manager.stop().await {
             Ok(_) => info!("Server stopped successfully"),
-            Err(error) => error!("Error stopping server: {error}"),
+            Err(error) => error!("Error stopping server{COLON_SPACE}{error}"),
         };
     };
     let hot_restart_server = || async {
@@ -1941,7 +2020,7 @@ where
             .await
         {
             Ok(_) => info!("Server started successfully"),
-            Err(error) => error!("Error starting server in background: {error}"),
+            Err(error) => error!("Error starting server in background{COLON_SPACE}{error}"),
         }
     };
     let restart_server = || async {
@@ -1949,6 +2028,7 @@ where
         start_server().await;
     };
     if args.len() < 2 {
+        warn!("No additional command-line parameters, default startup");
         start_server().await;
         return;
     }
@@ -1958,34 +2038,110 @@ where
         CMD_RESTART => restart_server().await,
         CMD_HOT_RESTART => hot_restart_server().await,
         _ => {
-            error!("Invalid command: {command}");
+            error!("Invalid command{COLON_SPACE}{command}");
         }
     }
 }
 ```
-# Path: hyperlane-quick-start/plugin/log/mod.rs
+# Path: hyperlane-quick-start/plugin/logger/mod.rs
 ```rust
 mod r#impl;
 mod r#static;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
-use hyperlane_config::framework::*;
+use hyperlane_config::{application::logger::*, framework::*};
 use r#static::*;
-use hyperlane_utils::{
-    log::{Level, LevelFilter, Log, Metadata, Record, set_logger, set_max_level},
-    once_cell::sync::Lazy,
-};
+use hyperlane_utils::once_cell::sync::Lazy;
+use std::fmt::Arguments;
 ```
-# Path: hyperlane-quick-start/plugin/log/struct.rs
+# Path: hyperlane-quick-start/plugin/logger/struct.rs
 ```rust
 #[derive(Debug, Clone, Copy)]
 pub struct Logger;
 ```
-# Path: hyperlane-quick-start/plugin/log/impl.rs
+# Path: hyperlane-quick-start/plugin/logger/impl.rs
 ```rust
 use super::*;
+impl Log for Logger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= LOG_LEVEL_FILTER
+    }
+    fn log(&self, record: &Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let now_time: String = time();
+        let level: Level = record.level();
+        let args: &Arguments<'_> = record.args();
+        let file: Option<&str> = record.file();
+        let module_path: Option<&str> = record.module_path();
+        let target: &str = record.target();
+        let line: u32 = record.line().unwrap_or_default();
+        let location: &str = file.unwrap_or(module_path.unwrap_or(target));
+        let time_text: String = format!("{SPACE}{now_time}{SPACE}");
+        let level_text: String = format!("{SPACE}{level}{SPACE}");
+        let args_text: String = format!("{args}{SPACE}");
+        let location_text: String = format!("{SPACE}{location}{COLON}{line}{SPACE}");
+        let write_file_data: String = format!("{level}{location_text}{args}");
+        let color: ColorType = match record.level() {
+            Level::Trace => ColorType::Use(Color::Magenta),
+            Level::Debug => ColorType::Use(Color::Cyan),
+            Level::Info => ColorType::Use(Color::Green),
+            Level::Warn => ColorType::Use(Color::Yellow),
+            Level::Error => ColorType::Use(Color::Red),
+        };
+        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let mut location_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();
+        let time_output: Output<'_> = time_output_builder
+            .text(&time_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(ColorType::Use(Color::Black))
+            .build();
+        let level_output: Output<'_> = level_output_builder
+            .text(&level_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(color)
+            .build();
+        let location_output: Output<'_> = location_output_builder
+            .text(&location_text)
+            .bold(true)
+            .color(color)
+            .build();
+        let args_output: Output<'_> = args_output_builder
+            .text(&args_text)
+            .bold(true)
+            .color(color)
+            .endl(true)
+            .build();
+        OutputListBuilder::new()
+            .add(time_output)
+            .add(level_output)
+            .add(location_output)
+            .add(args_output)
+            .run();
+        match record.metadata().level() {
+            Level::Trace => Self::log_trace(&write_file_data),
+            Level::Debug => Self::log_debug(&write_file_data),
+            Level::Info => Self::log_info(&write_file_data),
+            Level::Warn => Self::log_warn(&write_file_data),
+            Level::Error => Self::log_error(&write_file_data),
+        }
+    }
+    fn flush(&self) {
+        Server::flush_stdout_and_stderr();
+    }
+}
 impl Logger {
+    #[instrument_trace]
+    pub fn init(level: LevelFilter) {
+        set_logger(&LOGGER).unwrap();
+        set_max_level(level);
+    }
     pub fn log_trace<T>(data: T)
     where
         T: AsRef<str>,
@@ -2017,78 +2173,8 @@ impl Logger {
         FILE_LOGGER.error(data, log_handler);
     }
 }
-impl Log for Logger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        #[cfg(debug_assertions)]
-        {
-            metadata.level() <= Level::Trace
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            metadata.level() <= Level::Error
-        }
-    }
-    fn log(&self, record: &Record) {
-        let time_text: String = format!("{SPACE}{}{SPACE}", time());
-        let level_text: String = format!("{SPACE}{}{SPACE}", record.level());
-        let args_text: String = format!("{SPACE}{}{SPACE}", record.args());
-        let write_file_data: String = format!("{} {}", record.level(), record.args());
-        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let time_output: Output<'_> = time_output_builder
-            .text(&time_text)
-            .bold(true)
-            .color(ColorType::Use(Color::White))
-            .bg_color(ColorType::Use(Color::Green))
-            .build();
-        let level_output: Output<'_> = level_output_builder
-            .text(&level_text)
-            .bold(true)
-            .color(ColorType::Use(Color::White))
-            .bg_color(match record.level() {
-                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),
-                Level::Info | Level::Warn => ColorType::Use(Color::Blue),
-                Level::Error => ColorType::Use(Color::Red),
-            })
-            .build();
-        let args_output: Output<'_> = args_output_builder
-            .text(&args_text)
-            .bold(true)
-            .endl(true)
-            .color(match record.level() {
-                Level::Trace | Level::Debug => ColorType::Use(Color::Yellow),
-                Level::Info | Level::Warn => ColorType::Use(Color::Blue),
-                Level::Error => ColorType::Use(Color::Red),
-            })
-            .build();
-        OutputListBuilder::new()
-            .add(time_output)
-            .add(level_output)
-            .add(args_output)
-            .run();
-        if self.enabled(record.metadata()) {
-            match record.metadata().level() {
-                Level::Trace => Self::log_trace(&write_file_data),
-                Level::Debug => Self::log_debug(&write_file_data),
-                Level::Info => Self::log_info(&write_file_data),
-                Level::Warn => Self::log_warn(&write_file_data),
-                Level::Error => Self::log_error(&write_file_data),
-            }
-        }
-    }
-    fn flush(&self) {
-        Server::flush_stdout_and_stderr();
-    }
-}
-impl Logger {
-    pub fn init(level: LevelFilter) {
-        set_logger(&LOGGER).unwrap();
-        set_max_level(level);
-    }
-}
 ```
-# Path: hyperlane-quick-start/plugin/log/static.rs
+# Path: hyperlane-quick-start/plugin/logger/static.rs
 ```rust
 use super::*;
 pub(super) static LOGGER: Logger = Logger;
@@ -6085,6 +6171,8 @@ cargo add hyperlane-macros
 ### Hook Macros
 - `#[prologue_hooks(function_name)]` - Execute specified function before the main handler function
 - `#[epilogue_hooks(function_name)]` - Execute specified function after the main handler function
+- `#[prologue_hooks(method::expression, another::method)]` - Supports method expressions for advanced hook configurations
+- `#[epilogue_hooks(method::expression, another::method)]` - Supports method expressions for advanced hook configurations
 - `#[task_panic]` - Execute function when a panic occurs within the server
 - `#[request_error]` - Execute function when a request error occurs within the server
 - `#[prologue_macros(macro1, macro2, ...)]` - Injects a list of macros before the decorated function.
@@ -6116,11 +6204,8 @@ cargo add hyperlane-macros
 ### Helper Tips
 - **Request related macros** (data extraction) use **`get`** operations - they retrieve/query data from the request
 - **Response related macros** (data setting) use **`set`** operations - they assign/configure response data
-- **Hook macros** For hook-related macros that support an `order` parameter, if `order` is not specified, the hook will have higher priority than hooks with a specified `order` (applies only to macros like `#[request_middleware]`, `#[response_middleware]`, `#[task_panic]`)
+- **Hook macros** For hook-related macros that support an `order` parameter, if `order` is not specified, the hook will have higher priority than hooks with a specified `order` (applies only to macros like `#[request_middleware]`, `#[response_middleware]`, `#[task_panic]`, `#[request_error]`)
 - **Multi-parameter support** Most data extraction macros support multiple parameters in a single call (e.g., `#[request_body(var1, var2)]`, `#[request_query("k1" => v1, "k2" => v2)]`). This reduces macro repetition and improves code readability.
-### Best Practice Warning
-- Request related macros are mostly query functions, while response related macros are mostly assignment functions.
-- When using `prologue_hooks` or `epilogue_hooks` macros, it is not recommended to combine them with other macros (such as `#[get]`, `#[post]`, `#[http]`, etc.) on the same function. These macros should be placed in the hook functions themselves. If you are not clear about how macros are expanded, combining them may lead to problematic code behavior.
 ## Contact
 # Path: hyperlane-macros/debug/src/main.rs
 ```rust
@@ -6279,13 +6364,13 @@ impl ServerHook for EpilogueHooks {
     #[response_status_code(200)]
     async fn handle(self, ctx: &Context) {}
 }
-async fn prologue_hooks_fn(ctx: Context) {
-    let hook = PrologueHooks::new(&ctx).await;
-    hook.handle(&ctx).await;
+async fn prologue_hooks_fn(ctx: &Context) {
+    let hook = PrologueHooks::new(ctx).await;
+    hook.handle(ctx).await;
 }
-async fn epilogue_hooks_fn(ctx: Context) {
-    let hook = EpilogueHooks::new(&ctx).await;
-    hook.handle(&ctx).await;
+async fn epilogue_hooks_fn(ctx: &Context) {
+    let hook = EpilogueHooks::new(ctx).await;
+    hook.handle(ctx).await;
 }
 #[route("/response")]
 struct Response;
@@ -7427,6 +7512,22 @@ async fn standalone_epilogue_macros_complex_handler(_ctx: &Context) {}
 async fn standalone_prologue_hooks_handler(_ctx: &Context) {}
 #[epilogue_hooks(epilogue_hooks_fn)]
 async fn standalone_epilogue_hooks_handler(_ctx: &Context) {}
+#[route("/hooks_expression")]
+struct HooksExpression;
+impl ServerHook for HooksExpression {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[get]
+    #[prologue_hooks(HooksExpression::new_hook, HooksExpression::method_hook)]
+    #[epilogue_hooks(HooksExpression::new_hook, HooksExpression::method_hook)]
+    #[response_body("hooks expression test")]
+    async fn handle(self, ctx: &Context) {}
+}
+impl HooksExpression {
+    async fn new_hook(_ctx: &Context) {}
+    async fn method_hook(_ctx: &Context) {}
+}
 #[hyperlane(server: Server)]
 #[hyperlane(config: ServerConfig)]
 #[tokio::main]
@@ -7884,12 +7985,12 @@ pub(crate) fn prologue_hooks_macro(
     item: TokenStream,
     position: Position,
 ) -> TokenStream {
-    let functions: Punctuated<Ident, Token![,]> =
+    let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
     inject(position, item, |context| {
-        let hook_calls = functions.iter().map(|function_name| {
+        let hook_calls = functions.iter().map(|function_expr| {
             quote! {
-                let _ = #function_name(#context.clone()).await;
+                let _ = #function_expr(#context).await;
             }
         });
         quote! {
@@ -7908,12 +8009,12 @@ pub(crate) fn epilogue_hooks_macro(
     item: TokenStream,
     position: Position,
 ) -> TokenStream {
-    let functions: Punctuated<Ident, Token![,]> =
+    let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
     inject(position, item, |context| {
-        let hook_calls = functions.iter().map(|function_name| {
+        let hook_calls = functions.iter().map(|function_expr| {
             quote! {
-                let _ = #function_name(#context.clone()).await;
+                let _ = #function_expr(#context).await;
             }
         });
         quote! {
