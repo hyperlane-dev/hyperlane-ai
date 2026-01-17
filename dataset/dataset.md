@@ -1,4 +1,4 @@
-<!--2026-01-16 18:40:42-->
+<!--2026-01-17 01:58:47-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -2206,6 +2206,7 @@ cargo add hyperlane-log
 ## Contact
 # Path: hyperlane-log/src/lib.rs
 ```rust
+#[cfg(test)]
 pub(crate) mod cfg;
 pub(crate) mod log;
 pub use log::*;
@@ -2215,10 +2216,10 @@ pub(crate) use std::fs::read_dir;
 ```
 # Path: hyperlane-log/src/cfg.rs
 ```rust
+use crate::*;
 #[cfg(test)]
 #[tokio::test]
 async fn test() {
-    use crate::*;
     let log: FileLogger = FileLogger::new("./logs", 1_024_000);
     let trace_str: String = String::from("custom trace message");
     log.trace(trace_str, |trace| {
@@ -2279,7 +2280,6 @@ async fn test() {
 #[cfg(test)]
 #[tokio::test]
 async fn test_more_log_first() {
-    use crate::*;
     let log: FileLogger = FileLogger::new("./logs", DISABLE_LOG_FILE_SIZE);
     log.trace("trace data => ", |trace| {
         let write_data: String = format!("User trace func => {trace:#?}\n");
@@ -2330,7 +2330,6 @@ async fn test_more_log_first() {
 #[cfg(test)]
 #[tokio::test]
 async fn test_more_log_second() {
-    use crate::*;
     for _ in 0..10 {
         let log: FileLogger = FileLogger::new("./logs", 512_000);
         log.trace("trace data!\n", common_log);
@@ -2344,6 +2343,113 @@ async fn test_more_log_second() {
         log.error("error data!\n", common_log);
         log.async_error("async error data!\n", common_log).await;
     }
+}
+#[cfg(test)]
+#[tokio::test]
+async fn test_set_log_level_dirs() {
+    let mut log: FileLogger = FileLogger::new("./test_logs", 1_024_000);
+    log.set_trace_dir("custom_trace")
+        .set_debug_dir("custom_debug")
+        .set_info_dir("custom_info")
+        .set_warn_dir("custom_warn")
+        .set_error_dir("custom_error");
+    assert_eq!(log.get_trace_dir(), "custom_trace");
+    assert_eq!(log.get_debug_dir(), "custom_debug");
+    assert_eq!(log.get_info_dir(), "custom_info");
+    assert_eq!(log.get_warn_dir(), "custom_warn");
+    assert_eq!(log.get_error_dir(), "custom_error");
+    log.trace("test trace message", common_log);
+    log.debug("test debug message", common_log);
+    log.info("test info message", common_log);
+    log.warn("test warn message", common_log);
+    log.error("test error message", common_log);
+    log.async_trace("async test trace message", common_log)
+        .await;
+    log.async_debug("async test debug message", common_log)
+        .await;
+    log.async_info("async test info message", common_log).await;
+    log.async_warn("async test warn message", common_log).await;
+    log.async_error("async test error message", common_log)
+        .await;
+}
+#[cfg(test)]
+#[tokio::test]
+async fn test_log_level_dir_constants() {
+    let log: FileLogger = FileLogger::default();
+    assert_eq!(log.get_trace_dir(), TRACE_DIR);
+    assert_eq!(log.get_debug_dir(), DEBUG_DIR);
+    assert_eq!(log.get_info_dir(), INFO_DIR);
+    assert_eq!(log.get_warn_dir(), WARN_DIR);
+    assert_eq!(log.get_error_dir(), ERROR_DIR);
+}
+#[cfg(test)]
+#[tokio::test]
+async fn test_log_level_dir_method_chaining() {
+    let mut log: FileLogger = FileLogger::new("./logs", 512_000);
+    let log_ref: &mut FileLogger = log
+        .set_trace_dir("chain_trace")
+        .set_debug_dir("chain_debug")
+        .set_info_dir("chain_info")
+        .set_warn_dir("chain_warn")
+        .set_error_dir("chain_error");
+    assert_eq!(log_ref.get_trace_dir(), "chain_trace");
+    assert_eq!(log_ref.get_debug_dir(), "chain_debug");
+    assert_eq!(log_ref.get_info_dir(), "chain_info");
+    assert_eq!(log_ref.get_warn_dir(), "chain_warn");
+    assert_eq!(log_ref.get_error_dir(), "chain_error");
+}
+#[cfg(test)]
+#[tokio::test]
+async fn test_log_level_dirs_with_special_characters() {
+    let mut log: FileLogger = FileLogger::new("./logs/special", 1_024_000);
+    log.set_trace_dir("trace-2024")
+        .set_debug_dir("debug_test")
+        .set_info_dir("info.logs")
+        .set_warn_dir("warn/logs")
+        .set_error_dir("error_logs");
+    log.trace("special trace message", common_log);
+    log.async_trace("async special trace message", common_log)
+        .await;
+    log.debug("special debug message", common_log);
+    log.async_debug("async special debug message", common_log)
+        .await;
+    log.info("special info message", common_log);
+    log.async_info("async special info message", common_log)
+        .await;
+    log.warn("special warn message", common_log);
+    log.async_warn("async special warn message", common_log)
+        .await;
+    log.error("special error message", common_log);
+    log.async_error("async special error message", common_log)
+        .await;
+}
+#[cfg(test)]
+#[tokio::test]
+async fn test_log_level_dirs_edge_cases() {
+    let mut log: FileLogger = FileLogger::new("./logs", 512_000);
+    log.set_trace_dir("")
+        .set_debug_dir("")
+        .set_info_dir("")
+        .set_warn_dir("")
+        .set_error_dir("");
+    assert_eq!(log.get_trace_dir(), "");
+    assert_eq!(log.get_debug_dir(), "");
+    assert_eq!(log.get_info_dir(), "");
+    assert_eq!(log.get_warn_dir(), "");
+    assert_eq!(log.get_error_dir(), "");
+    log.trace("empty dir trace", common_log);
+    log.debug("empty dir debug", common_log);
+    log.info("empty dir info", common_log);
+    log.warn("empty dir warn", common_log);
+    log.error("empty dir error", common_log);
+    log.set_trace_dir("valid_trace")
+        .set_debug_dir("valid_debug")
+        .set_info_dir("valid_info")
+        .set_warn_dir("valid_warn")
+        .set_error_dir("valid_error");
+    let long_dir_name: String = "a".repeat(200);
+    log.set_trace_dir(&long_dir_name);
+    assert_eq!(log.get_trace_dir().as_str(), long_dir_name.as_str());
 }
 ```
 # Path: hyperlane-log/src/log/trait.rs
@@ -2384,6 +2490,11 @@ pub use r#trait::*;
 pub struct FileLogger {
     pub(super) path: String,
     pub(super) limit_file_size: usize,
+    pub(super) trace_dir: String,
+    pub(super) debug_dir: String,
+    pub(super) info_dir: String,
+    pub(super) warn_dir: String,
+    pub(super) error_dir: String,
 }
 ```
 # Path: hyperlane-log/src/log/fn.rs
@@ -2470,6 +2581,11 @@ impl Default for FileLogger {
         Self {
             path: DEFAULT_LOG_DIR.to_owned(),
             limit_file_size: DEFAULT_LOG_FILE_SIZE,
+            trace_dir: TRACE_DIR.to_owned(),
+            debug_dir: DEBUG_DIR.to_owned(),
+            info_dir: INFO_DIR.to_owned(),
+            warn_dir: WARN_DIR.to_owned(),
+            error_dir: ERROR_DIR.to_owned(),
         }
     }
 }
@@ -2479,16 +2595,74 @@ impl FileLogger {
         Self {
             path: path.as_ref().to_owned(),
             limit_file_size,
+            trace_dir: TRACE_DIR.to_owned(),
+            debug_dir: DEBUG_DIR.to_owned(),
+            info_dir: INFO_DIR.to_owned(),
+            warn_dir: WARN_DIR.to_owned(),
+            error_dir: ERROR_DIR.to_owned(),
         }
     }
     #[inline(always)]
-    pub fn path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {
+    pub fn get_path(&self) -> &String {
+        &self.path
+    }
+    #[inline(always)]
+    pub fn get_limit_file_size(&self) -> &usize {
+        &self.limit_file_size
+    }
+    #[inline(always)]
+    pub fn get_trace_dir(&self) -> &String {
+        &self.trace_dir
+    }
+    #[inline(always)]
+    pub fn get_debug_dir(&self) -> &String {
+        &self.debug_dir
+    }
+    #[inline(always)]
+    pub fn get_info_dir(&self) -> &String {
+        &self.info_dir
+    }
+    #[inline(always)]
+    pub fn get_warn_dir(&self) -> &String {
+        &self.warn_dir
+    }
+    #[inline(always)]
+    pub fn get_error_dir(&self) -> &String {
+        &self.error_dir
+    }
+    #[inline(always)]
+    pub fn set_path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {
         self.path = path.as_ref().to_owned();
         self
     }
     #[inline(always)]
-    pub fn limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {
+    pub fn set_limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {
         self.limit_file_size = limit_file_size;
+        self
+    }
+    #[inline(always)]
+    pub fn set_trace_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.trace_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_debug_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.debug_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_info_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.info_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_warn_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.warn_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_error_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.error_dir = dir.as_ref().to_owned();
         self
     }
     #[inline(always)]
@@ -2530,70 +2704,70 @@ impl FileLogger {
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_sync(data, func, TRACE_DIR)
+        self.write_sync(data, func, &self.trace_dir)
     }
     pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_async(data, func, TRACE_DIR).await
+        self.write_async(data, func, &self.trace_dir).await
     }
     pub fn debug<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_sync(data, func, DEBUG_DIR)
+        self.write_sync(data, func, &self.debug_dir)
     }
     pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_async(data, func, DEBUG_DIR).await
+        self.write_async(data, func, &self.debug_dir).await
     }
     pub fn info<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_sync(data, func, INFO_DIR)
+        self.write_sync(data, func, &self.info_dir)
     }
     pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_async(data, func, INFO_DIR).await
+        self.write_async(data, func, &self.info_dir).await
     }
     pub fn warn<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_sync(data, func, WARN_DIR)
+        self.write_sync(data, func, &self.warn_dir)
     }
     pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_async(data, func, WARN_DIR).await
+        self.write_async(data, func, &self.warn_dir).await
     }
     pub fn error<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_sync(data, func, ERROR_DIR)
+        self.write_sync(data, func, &self.error_dir)
     }
     pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self
     where
         T: AsRef<str>,
         L: FileLoggerFuncTrait<T>,
     {
-        self.write_async(data, func, ERROR_DIR).await
+        self.write_async(data, func, &self.error_dir).await
     }
 }
 ```
