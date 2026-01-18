@@ -5516,19 +5516,19 @@
   {
     "instruction": "configure_stream函数的源码是怎么实现的？",
     "input": "",
-    "output": "configure_stream函数的源码实现如下：\n\n```rust\n/// Configures socket options for a newly accepted `TcpStream`.\n    ///\n    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpStream` - A reference to the `TcpStream` to configure.\n    async fn configure_stream(&self, stream: &TcpStream) {\n        let server_inner: ServerStateReadGuard = self.read().await;\n        let config: &ServerConfigInner = server_inner.get_config();\n        if let Some(nodelay) = config.get_nodelay() {\n            let _ = stream.set_nodelay(*nodelay);\n        }\n        if let Some(ttl) = config.get_ttl() {\n            let _ = stream.set_ttl(*ttl);\n        }\n    }\n```",
+    "output": "configure_stream函数的源码实现如下：\n\n```rust\n/// Configures socket options for a newly accepted `TcpStream`.\n    ///\n    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpStream` - A reference to the `TcpStream` to configure.\n    async fn configure_stream(&self, stream: &TcpStream) {\n        let server_inner: ServerStateReadGuard = self.read().await;\n        let config: &ServerConfigInner = server_inner.get_config();\n        if let Some(nodelay) = config.try_get_nodelay() {\n            let _ = stream.set_nodelay(*nodelay);\n        }\n        if let Some(ttl) = config.try_get_ttl() {\n            let _ = stream.set_ttl(*ttl);\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "configure_stream函数的异步实现是如何工作的？",
     "input": "",
-    "output": "configure_stream函数的异步实现机制如下：\n\n```rust\n/// Configures socket options for a newly accepted `TcpStream`.\n    ///\n    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpStream` - A reference to the `TcpStream` to configure.\n    async fn configure_stream(&self, stream: &TcpStream) {\n        let server_inner: ServerStateReadGuard = self.read().await;\n        let config: &ServerConfigInner = server_inner.get_config();\n        if let Some(nodelay) = config.get_nodelay() {\n            let _ = stream.set_nodelay(*nodelay);\n        }\n        if let Some(ttl) = config.get_ttl() {\n            let _ = stream.set_ttl(*ttl);\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "configure_stream函数的异步实现机制如下：\n\n```rust\n/// Configures socket options for a newly accepted `TcpStream`.\n    ///\n    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpStream` - A reference to the `TcpStream` to configure.\n    async fn configure_stream(&self, stream: &TcpStream) {\n        let server_inner: ServerStateReadGuard = self.read().await;\n        let config: &ServerConfigInner = server_inner.get_config();\n        if let Some(nodelay) = config.try_get_nodelay() {\n            let _ = stream.set_nodelay(*nodelay);\n        }\n        if let Some(ttl) = config.try_get_ttl() {\n            let _ = stream.set_ttl(*ttl);\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "configure_stream函数的参数设计有什么考虑？",
     "input": "",
-    "output": "configure_stream函数的参数设计如下：\n\n```rust\n/// Configures socket options for a newly accepted `TcpStream`.\n    ///\n    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpStream` - A reference to the `TcpStream` to configure.\n    async fn configure_stream(&self, stream: &TcpStream) {\n        let server_inner: ServerStateReadGuard = self.read().await;\n        let config: &ServerConfigInner = server_inner.get_config();\n        if let Some(nodelay) = config.get_nodelay() {\n            let _ = stream.set_nodelay(*nodelay);\n        }\n        if let Some(ttl) = config.get_ttl() {\n            let _ = stream.set_ttl(*ttl);\n        }\n    }\n```\n\n参数列表：\n- stream: &TcpStream\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "configure_stream函数的参数设计如下：\n\n```rust\n/// Configures socket options for a newly accepted `TcpStream`.\n    ///\n    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpStream` - A reference to the `TcpStream` to configure.\n    async fn configure_stream(&self, stream: &TcpStream) {\n        let server_inner: ServerStateReadGuard = self.read().await;\n        let config: &ServerConfigInner = server_inner.get_config();\n        if let Some(nodelay) = config.try_get_nodelay() {\n            let _ = stream.set_nodelay(*nodelay);\n        }\n        if let Some(ttl) = config.try_get_ttl() {\n            let _ = stream.set_ttl(*ttl);\n        }\n    }\n```\n\n参数列表：\n- stream: &TcpStream\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -6236,31 +6236,31 @@
   {
     "instruction": "try_get_stream函数的源码是怎么实现的？",
     "input": "",
-    "output": "try_get_stream函数的源码实现如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.get_stream().clone()\n    }\n```",
+    "output": "try_get_stream函数的源码实现如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.try_get_stream().clone()\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释try_get_stream这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "try_get_stream函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.get_stream().clone()\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：8\n- 包含高级特性：泛型编程、异步编程",
+    "output": "try_get_stream函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.try_get_stream().clone()\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：8\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "try_get_stream函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "try_get_stream函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.get_stream().clone()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "try_get_stream函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.try_get_stream().clone()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "try_get_stream函数的异步实现是如何工作的？",
     "input": "",
-    "output": "try_get_stream函数的异步实现机制如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.get_stream().clone()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "try_get_stream函数的异步实现机制如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.try_get_stream().clone()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "try_get_stream函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "try_get_stream函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.get_stream().clone()\n    }\n```\n\n返回类型：Option<ArcRwLockStream>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "try_get_stream函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the underlying network stream, if available.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ArcRwLockStream>` - The thread-safe, shareable network stream if it exists.\n    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {\n        self.read().await.try_get_stream().clone()\n    }\n```\n\n返回类型：Option<ArcRwLockStream>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -8792,19 +8792,19 @@
   {
     "instruction": "get_response_status_code函数的源码是怎么实现的？",
     "input": "",
-    "output": "get_response_status_code函数的源码实现如下：\n\n```rust\n/// Retrieves the status code of the response.\n    ///\n    /// # Returns\n    ///\n    /// - `ResponseStatusCode` - The status code of the response.\n    pub async fn get_response_status_code(&self) -> ResponseStatusCode {\n        *self.read().await.get_response().get_status_code()\n    }\n```",
+    "output": "get_response_status_code函数的源码实现如下：\n\n```rust\n/// Retrieves the status code of the response.\n    ///\n    /// # Returns\n    ///\n    /// - `ResponseStatusCode` - The status code of the response.\n    pub async fn get_response_status_code(&self) -> ResponseStatusCode {\n        self.read().await.get_response().get_status_code()\n    }\n```",
     "system": ""
   },
   {
     "instruction": "get_response_status_code函数的异步实现是如何工作的？",
     "input": "",
-    "output": "get_response_status_code函数的异步实现机制如下：\n\n```rust\n/// Retrieves the status code of the response.\n    ///\n    /// # Returns\n    ///\n    /// - `ResponseStatusCode` - The status code of the response.\n    pub async fn get_response_status_code(&self) -> ResponseStatusCode {\n        *self.read().await.get_response().get_status_code()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "get_response_status_code函数的异步实现机制如下：\n\n```rust\n/// Retrieves the status code of the response.\n    ///\n    /// # Returns\n    ///\n    /// - `ResponseStatusCode` - The status code of the response.\n    pub async fn get_response_status_code(&self) -> ResponseStatusCode {\n        self.read().await.get_response().get_status_code()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "get_response_status_code函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "get_response_status_code函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the status code of the response.\n    ///\n    /// # Returns\n    ///\n    /// - `ResponseStatusCode` - The status code of the response.\n    pub async fn get_response_status_code(&self) -> ResponseStatusCode {\n        *self.read().await.get_response().get_status_code()\n    }\n```\n\n返回类型：ResponseStatusCode\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "get_response_status_code函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the status code of the response.\n    ///\n    /// # Returns\n    ///\n    /// - `ResponseStatusCode` - The status code of the response.\n    pub async fn get_response_status_code(&self) -> ResponseStatusCode {\n        self.read().await.get_response().get_status_code()\n    }\n```\n\n返回类型：ResponseStatusCode\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -9906,15 +9906,15 @@
     "system": ""
   },
   {
-    "instruction": "SendBodyMiddleware结构体的源码是怎么实现的？",
+    "instruction": "RequestMiddleware结构体的源码是怎么实现的？",
     "input": "",
-    "output": "SendBodyMiddleware结构体的源码实现如下：\n\n```rust\nstruct SendBodyMiddleware {\n    socket_addr: String,\n}\n```",
+    "output": "RequestMiddleware结构体的源码实现如下：\n\n```rust\nstruct RequestMiddleware {\n    socket_addr: String,\n}\n```",
     "system": ""
   },
   {
-    "instruction": "SendBodyMiddleware结构体的字段设计有什么考虑？",
+    "instruction": "RequestMiddleware结构体的字段设计有什么考虑？",
     "input": "",
-    "output": "SendBodyMiddleware结构体的字段设计如下：\n\n```rust\nstruct SendBodyMiddleware {\n    socket_addr: String,\n}\n```\n\n字段列表：\n- socket_addr: String (私有)\n\n这种字段布局体现了良好的封装性和API设计原则。",
+    "output": "RequestMiddleware结构体的字段设计如下：\n\n```rust\nstruct RequestMiddleware {\n    socket_addr: String,\n}\n```\n\n字段列表：\n- socket_addr: String (私有)\n\n这种字段布局体现了良好的封装性和API设计原则。",
     "system": ""
   },
   {
@@ -9992,19 +9992,31 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(500)\n            .await\n            .clear_response_headers()\n            .await\n            .set_response_header(SERVER, HYPERLANE)\n            .await\n            .set_response_header(CONTENT_TYPE, &self.content_type)\n            .await\n            .set_response_body(&self.response_body)\n            .await\n            .send()\n            .await;\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(500)\n            .await\n            .clear_response_headers()\n            .await\n            .set_response_header(SERVER, HYPERLANE)\n            .await\n            .set_response_header(CONTENT_TYPE, &self.content_type)\n            .await\n            .set_response_body(&self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
+    "input": "",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(500)\n            .await\n            .clear_response_headers()\n            .await\n            .set_response_header(SERVER, HYPERLANE)\n            .await\n            .set_response_header(CONTENT_TYPE, &self.content_type)\n            .await\n            .set_response_body(&self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：20\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(500)\n            .await\n            .clear_response_headers()\n            .await\n            .set_response_header(SERVER, HYPERLANE)\n            .await\n            .set_response_header(CONTENT_TYPE, &self.content_type)\n            .await\n            .set_response_body(&self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(500)\n            .await\n            .clear_response_headers()\n            .await\n            .set_response_header(SERVER, HYPERLANE)\n            .await\n            .set_response_header(CONTENT_TYPE, &self.content_type)\n            .await\n            .set_response_body(&self.response_body)\n            .await\n            .send()\n            .await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(500)\n            .await\n            .clear_response_headers()\n            .await\n            .set_response_header(SERVER, HYPERLANE)\n            .await\n            .set_response_header(CONTENT_TYPE, &self.content_type)\n            .await\n            .set_response_body(&self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(500)\n            .await\n            .clear_response_headers()\n            .await\n            .set_response_header(SERVER, HYPERLANE)\n            .await\n            .set_response_header(CONTENT_TYPE, &self.content_type)\n            .await\n            .set_response_body(&self.response_body)\n            .await\n            .send()\n            .await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(500)\n            .await\n            .clear_response_headers()\n            .await\n            .set_response_header(SERVER, HYPERLANE)\n            .await\n            .set_response_header(CONTENT_TYPE, &self.content_type)\n            .await\n            .set_response_body(&self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -10034,19 +10046,31 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(self.response_status_code)\n            .await\n            .set_response_body(self.response_body)\n            .await\n            .send()\n            .await;\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(self.response_status_code)\n            .await\n            .set_response_body(self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
+    "input": "",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(self.response_status_code)\n            .await\n            .set_response_body(self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：14\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(self.response_status_code)\n            .await\n            .set_response_body(self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(self.response_status_code)\n            .await\n            .set_response_body(self.response_body)\n            .await\n            .send()\n            .await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(self.response_status_code)\n            .await\n            .set_response_body(self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(self.response_status_code)\n            .await\n            .set_response_body(self.response_body)\n            .await\n            .send()\n            .await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_version(HttpVersion::Http1_1)\n            .await\n            .set_response_status_code(self.response_status_code)\n            .await\n            .set_response_body(self.response_body)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -10118,19 +10142,31 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if !ctx.get_request().await.is_ws() {\n            return;\n        }\n        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {\n            let accept_key: String = WebSocketFrame::generate_accept_key(key);\n            ctx.set_response_version(HttpVersion::Http1_1)\n                .await\n                .set_response_status_code(101)\n                .await\n                .set_response_header(UPGRADE, WEBSOCKET)\n                .await\n                .set_response_header(CONNECTION, UPGRADE)\n                .await\n                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)\n                .await\n                .set_response_body(&vec![])\n                .await\n                .send()\n                .await;\n        }\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if !ctx.get_request().await.is_ws() {\n            return;\n        }\n        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {\n            let accept_key: String = WebSocketFrame::generate_accept_key(key);\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_version(HttpVersion::Http1_1)\n                .await\n                .set_response_status_code(101)\n                .await\n                .set_response_header(UPGRADE, WEBSOCKET)\n                .await\n                .set_response_header(CONNECTION, UPGRADE)\n                .await\n                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)\n                .await\n                .set_response_body(&vec![])\n                .await\n                .try_send()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n            }\n        }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
+    "input": "",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if !ctx.get_request().await.is_ws() {\n            return;\n        }\n        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {\n            let accept_key: String = WebSocketFrame::generate_accept_key(key);\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_version(HttpVersion::Http1_1)\n                .await\n                .set_response_status_code(101)\n                .await\n                .set_response_header(UPGRADE, WEBSOCKET)\n                .await\n                .set_response_header(CONNECTION, UPGRADE)\n                .await\n                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)\n                .await\n                .set_response_body(&vec![])\n                .await\n                .try_send()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n            }\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：26\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if !ctx.get_request().await.is_ws() {\n            return;\n        }\n        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {\n            let accept_key: String = WebSocketFrame::generate_accept_key(key);\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_version(HttpVersion::Http1_1)\n                .await\n                .set_response_status_code(101)\n                .await\n                .set_response_header(UPGRADE, WEBSOCKET)\n                .await\n                .set_response_header(CONNECTION, UPGRADE)\n                .await\n                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)\n                .await\n                .set_response_body(&vec![])\n                .await\n                .try_send()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n            }\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if !ctx.get_request().await.is_ws() {\n            return;\n        }\n        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {\n            let accept_key: String = WebSocketFrame::generate_accept_key(key);\n            ctx.set_response_version(HttpVersion::Http1_1)\n                .await\n                .set_response_status_code(101)\n                .await\n                .set_response_header(UPGRADE, WEBSOCKET)\n                .await\n                .set_response_header(CONNECTION, UPGRADE)\n                .await\n                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)\n                .await\n                .set_response_body(&vec![])\n                .await\n                .send()\n                .await;\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if !ctx.get_request().await.is_ws() {\n            return;\n        }\n        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {\n            let accept_key: String = WebSocketFrame::generate_accept_key(key);\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_version(HttpVersion::Http1_1)\n                .await\n                .set_response_status_code(101)\n                .await\n                .set_response_header(UPGRADE, WEBSOCKET)\n                .await\n                .set_response_header(CONNECTION, UPGRADE)\n                .await\n                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)\n                .await\n                .set_response_body(&vec![])\n                .await\n                .try_send()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if !ctx.get_request().await.is_ws() {\n            return;\n        }\n        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {\n            let accept_key: String = WebSocketFrame::generate_accept_key(key);\n            ctx.set_response_version(HttpVersion::Http1_1)\n                .await\n                .set_response_status_code(101)\n                .await\n                .set_response_header(UPGRADE, WEBSOCKET)\n                .await\n                .set_response_header(CONNECTION, UPGRADE)\n                .await\n                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)\n                .await\n                .set_response_body(&vec![])\n                .await\n                .send()\n                .await;\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if !ctx.get_request().await.is_ws() {\n            return;\n        }\n        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {\n            let accept_key: String = WebSocketFrame::generate_accept_key(key);\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_version(HttpVersion::Http1_1)\n                .await\n                .set_response_status_code(101)\n                .await\n                .set_response_header(UPGRADE, WEBSOCKET)\n                .await\n                .set_response_header(CONNECTION, UPGRADE)\n                .await\n                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)\n                .await\n                .set_response_body(&vec![])\n                .await\n                .try_send()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n            }\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -10160,19 +10196,31 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            return;\n        }\n        ctx.send().await;\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            return;\n        }\n        let send_result: Result<(), ResponseError> = ctx.try_send().await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
+    "input": "",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            return;\n        }\n        let send_result: Result<(), ResponseError> = ctx.try_send().await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：9\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            return;\n        }\n        let send_result: Result<(), ResponseError> = ctx.try_send().await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            return;\n        }\n        ctx.send().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            return;\n        }\n        let send_result: Result<(), ResponseError> = ctx.try_send().await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            return;\n        }\n        ctx.send().await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            return;\n        }\n        let send_result: Result<(), ResponseError> = ctx.try_send().await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -10244,49 +10292,61 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)\n            .await\n            .send()\n            .await;\n        for i in 0..10 {\n            ctx.set_response_body(&format!(\"data:{}{}\", i, HTTP_DOUBLE_BR))\n                .await\n                .send_body()\n                .await;\n        }\n        ctx.closed().await;\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        for i in 0..10 {\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_body(&format!(\"data:{}{}\", i, HTTP_DOUBLE_BR))\n                .await\n                .try_send_body()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n                return;\n            }\n        }\n        ctx.closed().await;\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
+    "input": "",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        for i in 0..10 {\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_body(&format!(\"data:{}{}\", i, HTTP_DOUBLE_BR))\n                .await\n                .try_send_body()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n                return;\n            }\n        }\n        ctx.closed().await;\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：22\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        for i in 0..10 {\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_body(&format!(\"data:{}{}\", i, HTTP_DOUBLE_BR))\n                .await\n                .try_send_body()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n                return;\n            }\n        }\n        ctx.closed().await;\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)\n            .await\n            .send()\n            .await;\n        for i in 0..10 {\n            ctx.set_response_body(&format!(\"data:{}{}\", i, HTTP_DOUBLE_BR))\n                .await\n                .send_body()\n                .await;\n        }\n        ctx.closed().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        for i in 0..10 {\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_body(&format!(\"data:{}{}\", i, HTTP_DOUBLE_BR))\n                .await\n                .try_send_body()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n                return;\n            }\n        }\n        ctx.closed().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)\n            .await\n            .send()\n            .await;\n        for i in 0..10 {\n            ctx.set_response_body(&format!(\"data:{}{}\", i, HTTP_DOUBLE_BR))\n                .await\n                .send_body()\n                .await;\n        }\n        ctx.closed().await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = ctx\n            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)\n            .await\n            .try_send()\n            .await;\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        for i in 0..10 {\n            let send_result: Result<(), ResponseError> = ctx\n                .set_response_body(&format!(\"data:{}{}\", i, HTTP_DOUBLE_BR))\n                .await\n                .try_send_body()\n                .await;\n            if send_result.is_err() {\n                ctx.aborted().await.closed().await;\n                return;\n            }\n        }\n        ctx.closed().await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "WebsocketRoute::send_body_hook方法的源码是怎么实现的？",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的源码实现如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.send_body_list_with_data(&frame_list).await;\n        } else {\n            ctx.send_body().await;\n        }\n    }\n```",
+    "output": "WebsocketRoute::send_body_hook方法的源码实现如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释WebsocketRoute::send_body_hook这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.send_body_list_with_data(&frame_list).await;\n        } else {\n            ctx.send_body().await;\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：9\n- 包含高级特性：泛型编程、异步编程",
+    "output": "WebsocketRoute::send_body_hook方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：12\n- 包含高级特性：泛型编程、异步编程、错误处理",
     "system": ""
   },
   {
     "instruction": "WebsocketRoute::send_body_hook方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的泛型设计和使用如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.send_body_list_with_data(&frame_list).await;\n        } else {\n            ctx.send_body().await;\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "WebsocketRoute::send_body_hook方法的泛型设计和使用如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "WebsocketRoute::send_body_hook方法的异步实现是如何工作的？",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的异步实现机制如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.send_body_list_with_data(&frame_list).await;\n        } else {\n            ctx.send_body().await;\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "WebsocketRoute::send_body_hook方法的异步实现机制如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "WebsocketRoute::send_body_hook方法的参数设计有什么考虑？",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的参数设计如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.send_body_list_with_data(&frame_list).await;\n        } else {\n            ctx.send_body().await;\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "WebsocketRoute::send_body_hook方法的参数设计如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -10418,25 +10478,25 @@
   {
     "instruction": "main函数的源码是怎么实现的？",
     "input": "",
-    "output": "main函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let server: Server = Server::new().await;\n    server.task_panic::<TaskPanicHook>().await;\n    server.request_error::<RequestErrorHook>().await;\n    server.request_middleware::<SendBodyMiddleware>().await;\n    server.request_middleware::<UpgradeMiddleware>().await;\n    server.response_middleware::<ResponseMiddleware>().await;\n    server.route::<RootRoute>(\"/\").await;\n    server.route::<SseRoute>(\"/sse\").await;\n    server.route::<WebsocketRoute>(\"/websocket\").await;\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\").await;\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\").await;\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    tokio::spawn(async move {\n        tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```",
+    "output": "main函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let server: Server = Server::new().await;\n    server.task_panic::<TaskPanicHook>().await;\n    server.request_error::<RequestErrorHook>().await;\n    server.request_middleware::<RequestMiddleware>().await;\n    server.request_middleware::<UpgradeMiddleware>().await;\n    server.response_middleware::<ResponseMiddleware>().await;\n    server.route::<RootRoute>(\"/\").await;\n    server.route::<SseRoute>(\"/sse\").await;\n    server.route::<WebsocketRoute>(\"/websocket\").await;\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\").await;\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\").await;\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    tokio::spawn(async move {\n        tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释main这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "main函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let server: Server = Server::new().await;\n    server.task_panic::<TaskPanicHook>().await;\n    server.request_error::<RequestErrorHook>().await;\n    server.request_middleware::<SendBodyMiddleware>().await;\n    server.request_middleware::<UpgradeMiddleware>().await;\n    server.response_middleware::<ResponseMiddleware>().await;\n    server.route::<RootRoute>(\"/\").await;\n    server.route::<SseRoute>(\"/sse\").await;\n    server.route::<WebsocketRoute>(\"/websocket\").await;\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\").await;\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\").await;\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    tokio::spawn(async move {\n        tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：21\n- 包含高级特性：泛型编程、异步编程",
+    "output": "main函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let server: Server = Server::new().await;\n    server.task_panic::<TaskPanicHook>().await;\n    server.request_error::<RequestErrorHook>().await;\n    server.request_middleware::<RequestMiddleware>().await;\n    server.request_middleware::<UpgradeMiddleware>().await;\n    server.response_middleware::<ResponseMiddleware>().await;\n    server.route::<RootRoute>(\"/\").await;\n    server.route::<SseRoute>(\"/sse\").await;\n    server.route::<WebsocketRoute>(\"/websocket\").await;\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\").await;\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\").await;\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    tokio::spawn(async move {\n        tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：21\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "main函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "main函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let server: Server = Server::new().await;\n    server.task_panic::<TaskPanicHook>().await;\n    server.request_error::<RequestErrorHook>().await;\n    server.request_middleware::<SendBodyMiddleware>().await;\n    server.request_middleware::<UpgradeMiddleware>().await;\n    server.response_middleware::<ResponseMiddleware>().await;\n    server.route::<RootRoute>(\"/\").await;\n    server.route::<SseRoute>(\"/sse\").await;\n    server.route::<WebsocketRoute>(\"/websocket\").await;\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\").await;\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\").await;\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    tokio::spawn(async move {\n        tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "main函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let server: Server = Server::new().await;\n    server.task_panic::<TaskPanicHook>().await;\n    server.request_error::<RequestErrorHook>().await;\n    server.request_middleware::<RequestMiddleware>().await;\n    server.request_middleware::<UpgradeMiddleware>().await;\n    server.response_middleware::<ResponseMiddleware>().await;\n    server.route::<RootRoute>(\"/\").await;\n    server.route::<SseRoute>(\"/sse\").await;\n    server.route::<WebsocketRoute>(\"/websocket\").await;\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\").await;\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\").await;\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    tokio::spawn(async move {\n        tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "main函数的异步实现是如何工作的？",
     "input": "",
-    "output": "main函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let server: Server = Server::new().await;\n    server.task_panic::<TaskPanicHook>().await;\n    server.request_error::<RequestErrorHook>().await;\n    server.request_middleware::<SendBodyMiddleware>().await;\n    server.request_middleware::<UpgradeMiddleware>().await;\n    server.response_middleware::<ResponseMiddleware>().await;\n    server.route::<RootRoute>(\"/\").await;\n    server.route::<SseRoute>(\"/sse\").await;\n    server.route::<WebsocketRoute>(\"/websocket\").await;\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\").await;\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\").await;\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    tokio::spawn(async move {\n        tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "main函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let server: Server = Server::new().await;\n    server.task_panic::<TaskPanicHook>().await;\n    server.request_error::<RequestErrorHook>().await;\n    server.request_middleware::<RequestMiddleware>().await;\n    server.request_middleware::<UpgradeMiddleware>().await;\n    server.response_middleware::<ResponseMiddleware>().await;\n    server.route::<RootRoute>(\"/\").await;\n    server.route::<SseRoute>(\"/sse\").await;\n    server.route::<WebsocketRoute>(\"/websocket\").await;\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\").await;\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\").await;\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    tokio::spawn(async move {\n        tokio::time::sleep(std::time::Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
@@ -10862,25 +10922,25 @@
   {
     "instruction": "get_panic_from_join_error函数的源码是怎么实现的？",
     "input": "",
-    "output": "get_panic_from_join_error函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn get_panic_from_join_error() {\n    let message: &'static str = \"Test panic message\";\n    let join_handle: JoinHandle<()> = spawn(async {\n        panic!(\"{}\", message.to_string());\n    });\n    let join_error: JoinError = join_handle.await.unwrap_err();\n    let panic_struct: PanicData = PanicData::from_join_error(join_error);\n    assert!(!panic_struct.get_message().is_none());\n    assert!(\n        panic_struct\n            .get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(message)\n    );\n}\n```",
+    "output": "get_panic_from_join_error函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn get_panic_from_join_error() {\n    let message: &'static str = \"Test panic message\";\n    let join_handle: JoinHandle<()> = spawn(async {\n        panic!(\"{}\", message.to_string());\n    });\n    let join_error: JoinError = join_handle.await.unwrap_err();\n    let panic_struct: PanicData = PanicData::from_join_error(join_error);\n    assert!(!panic_struct.try_get_message().is_none());\n    assert!(\n        panic_struct\n            .try_get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(message)\n    );\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释get_panic_from_join_error这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "get_panic_from_join_error函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn get_panic_from_join_error() {\n    let message: &'static str = \"Test panic message\";\n    let join_handle: JoinHandle<()> = spawn(async {\n        panic!(\"{}\", message.to_string());\n    });\n    let join_error: JoinError = join_handle.await.unwrap_err();\n    let panic_struct: PanicData = PanicData::from_join_error(join_error);\n    assert!(!panic_struct.get_message().is_none());\n    assert!(\n        panic_struct\n            .get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(message)\n    );\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：17\n- 包含高级特性：泛型编程、生命周期管理、异步编程",
+    "output": "get_panic_from_join_error函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn get_panic_from_join_error() {\n    let message: &'static str = \"Test panic message\";\n    let join_handle: JoinHandle<()> = spawn(async {\n        panic!(\"{}\", message.to_string());\n    });\n    let join_error: JoinError = join_handle.await.unwrap_err();\n    let panic_struct: PanicData = PanicData::from_join_error(join_error);\n    assert!(!panic_struct.try_get_message().is_none());\n    assert!(\n        panic_struct\n            .try_get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(message)\n    );\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：17\n- 包含高级特性：泛型编程、生命周期管理、异步编程",
     "system": ""
   },
   {
     "instruction": "get_panic_from_join_error函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "get_panic_from_join_error函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn get_panic_from_join_error() {\n    let message: &'static str = \"Test panic message\";\n    let join_handle: JoinHandle<()> = spawn(async {\n        panic!(\"{}\", message.to_string());\n    });\n    let join_error: JoinError = join_handle.await.unwrap_err();\n    let panic_struct: PanicData = PanicData::from_join_error(join_error);\n    assert!(!panic_struct.get_message().is_none());\n    assert!(\n        panic_struct\n            .get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(message)\n    );\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "get_panic_from_join_error函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn get_panic_from_join_error() {\n    let message: &'static str = \"Test panic message\";\n    let join_handle: JoinHandle<()> = spawn(async {\n        panic!(\"{}\", message.to_string());\n    });\n    let join_error: JoinError = join_handle.await.unwrap_err();\n    let panic_struct: PanicData = PanicData::from_join_error(join_error);\n    assert!(!panic_struct.try_get_message().is_none());\n    assert!(\n        panic_struct\n            .try_get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(message)\n    );\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "get_panic_from_join_error函数的异步实现是如何工作的？",
     "input": "",
-    "output": "get_panic_from_join_error函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn get_panic_from_join_error() {\n    let message: &'static str = \"Test panic message\";\n    let join_handle: JoinHandle<()> = spawn(async {\n        panic!(\"{}\", message.to_string());\n    });\n    let join_error: JoinError = join_handle.await.unwrap_err();\n    let panic_struct: PanicData = PanicData::from_join_error(join_error);\n    assert!(!panic_struct.get_message().is_none());\n    assert!(\n        panic_struct\n            .get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(message)\n    );\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "get_panic_from_join_error函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn get_panic_from_join_error() {\n    let message: &'static str = \"Test panic message\";\n    let join_handle: JoinHandle<()> = spawn(async {\n        panic!(\"{}\", message.to_string());\n    });\n    let join_error: JoinError = join_handle.await.unwrap_err();\n    let panic_struct: PanicData = PanicData::from_join_error(join_error);\n    assert!(!panic_struct.try_get_message().is_none());\n    assert!(\n        panic_struct\n            .try_get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(message)\n    );\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
@@ -11102,31 +11162,31 @@
   {
     "instruction": "panic_new函数的源码是怎么实现的？",
     "input": "",
-    "output": "panic_new函数的源码实现如下：\n\n```rust\n#[test]\nfn panic_new() {\n    let panic: PanicData = PanicData::new(\n        Some(\"message\".to_string()),\n        Some(\"location\".to_string()),\n        Some(\"payload\".to_string()),\n    );\n    assert_eq!(panic.get_message(), &Some(\"message\".to_string()));\n    assert_eq!(panic.get_location(), &Some(\"location\".to_string()));\n    assert_eq!(panic.get_payload(), &Some(\"payload\".to_string()));\n}\n```",
+    "output": "panic_new函数的源码实现如下：\n\n```rust\n#[test]\nfn panic_new() {\n    let panic: PanicData = PanicData::new(\n        Some(\"message\".to_string()),\n        Some(\"location\".to_string()),\n        Some(\"payload\".to_string()),\n    );\n    assert_eq!(panic.try_get_message(), &Some(\"message\".to_string()));\n    assert_eq!(panic.try_get_location(), &Some(\"location\".to_string()));\n    assert_eq!(panic.try_get_payload(), &Some(\"payload\".to_string()));\n}\n```",
     "system": ""
   },
   {
     "instruction": "from_join_error函数的源码是怎么实现的？",
     "input": "",
-    "output": "from_join_error函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn from_join_error() {\n    let handle: JoinHandle<()> = tokio::spawn(async {\n        panic!(\"test panic\");\n    });\n    let result: Result<(), JoinError> = handle.await;\n    assert!(result.is_err());\n    if let Err(join_error) = result {\n        let is_panic: bool = PanicData::from_join_error(join_error)\n            .get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(\"test panic\");\n        assert!(is_panic);\n    }\n}\n```",
+    "output": "from_join_error函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn from_join_error() {\n    let handle: JoinHandle<()> = tokio::spawn(async {\n        panic!(\"test panic\");\n    });\n    let result: Result<(), JoinError> = handle.await;\n    assert!(result.is_err());\n    if let Err(join_error) = result {\n        let is_panic: bool = PanicData::from_join_error(join_error)\n            .try_get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(\"test panic\");\n        assert!(is_panic);\n    }\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释from_join_error这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "from_join_error函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn from_join_error() {\n    let handle: JoinHandle<()> = tokio::spawn(async {\n        panic!(\"test panic\");\n    });\n    let result: Result<(), JoinError> = handle.await;\n    assert!(result.is_err());\n    if let Err(join_error) = result {\n        let is_panic: bool = PanicData::from_join_error(join_error)\n            .get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(\"test panic\");\n        assert!(is_panic);\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：16\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "output": "from_join_error函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn from_join_error() {\n    let handle: JoinHandle<()> = tokio::spawn(async {\n        panic!(\"test panic\");\n    });\n    let result: Result<(), JoinError> = handle.await;\n    assert!(result.is_err());\n    if let Err(join_error) = result {\n        let is_panic: bool = PanicData::from_join_error(join_error)\n            .try_get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(\"test panic\");\n        assert!(is_panic);\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：16\n- 包含高级特性：泛型编程、异步编程、错误处理",
     "system": ""
   },
   {
     "instruction": "from_join_error函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "from_join_error函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn from_join_error() {\n    let handle: JoinHandle<()> = tokio::spawn(async {\n        panic!(\"test panic\");\n    });\n    let result: Result<(), JoinError> = handle.await;\n    assert!(result.is_err());\n    if let Err(join_error) = result {\n        let is_panic: bool = PanicData::from_join_error(join_error)\n            .get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(\"test panic\");\n        assert!(is_panic);\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "from_join_error函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn from_join_error() {\n    let handle: JoinHandle<()> = tokio::spawn(async {\n        panic!(\"test panic\");\n    });\n    let result: Result<(), JoinError> = handle.await;\n    assert!(result.is_err());\n    if let Err(join_error) = result {\n        let is_panic: bool = PanicData::from_join_error(join_error)\n            .try_get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(\"test panic\");\n        assert!(is_panic);\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "from_join_error函数的异步实现是如何工作的？",
     "input": "",
-    "output": "from_join_error函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn from_join_error() {\n    let handle: JoinHandle<()> = tokio::spawn(async {\n        panic!(\"test panic\");\n    });\n    let result: Result<(), JoinError> = handle.await;\n    assert!(result.is_err());\n    if let Err(join_error) = result {\n        let is_panic: bool = PanicData::from_join_error(join_error)\n            .get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(\"test panic\");\n        assert!(is_panic);\n    }\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "from_join_error函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn from_join_error() {\n    let handle: JoinHandle<()> = tokio::spawn(async {\n        panic!(\"test panic\");\n    });\n    let result: Result<(), JoinError> = handle.await;\n    assert!(result.is_err());\n    if let Err(join_error) = result {\n        let is_panic: bool = PanicData::from_join_error(join_error)\n            .try_get_message()\n            .clone()\n            .unwrap_or_default()\n            .contains(\"test panic\");\n        assert!(is_panic);\n    }\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {

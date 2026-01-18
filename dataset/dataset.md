@@ -1,4 +1,4 @@
-<!--2026-01-18 06:39:04-->
+<!--2026-01-18 12:50:24-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -3355,10 +3355,10 @@ impl Server {
     async fn configure_stream(&self, stream: &TcpStream) {
         let server_inner: ServerStateReadGuard = self.read().await;
         let config: &ServerConfigInner = server_inner.get_config();
-        if let Some(nodelay) = config.get_nodelay() {
+        if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
-        if let Some(ttl) = config.get_ttl() {
+        if let Some(ttl) = config.try_get_ttl() {
             let _ = stream.set_ttl(*ttl);
         }
     }
@@ -3737,7 +3737,7 @@ impl Context {
         !self.get_closed().await && keep_alive
     }
     pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {
-        self.read().await.get_stream().clone()
+        self.read().await.try_get_stream().clone()
     }
     pub async fn get_stream(&self) -> ArcRwLockStream {
         self.try_get_stream().await.unwrap()
@@ -4198,7 +4198,7 @@ impl Context {
         self
     }
     pub async fn get_response_status_code(&self) -> ResponseStatusCode {
-        *self.read().await.get_response().get_status_code()
+        self.read().await.get_response().get_status_code()
     }
     pub async fn set_response_status_code(&self, status_code: ResponseStatusCode) -> &Self {
         self.write()
@@ -4539,7 +4539,8 @@ impl ServerHook for TaskPanicHook {
         }
     }
     async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
+        let send_result: Result<(), ResponseError> = ctx
+            .set_response_version(HttpVersion::Http1_1)
             .await
             .set_response_status_code(500)
             .await
@@ -4551,8 +4552,11 @@ impl ServerHook for TaskPanicHook {
             .await
             .set_response_body(&self.response_body)
             .await
-            .send()
+            .try_send()
             .await;
+        if send_result.is_err() {
+            ctx.aborted().await.closed().await;
+        }
     }
 }
 struct RequestErrorHook {
@@ -4569,20 +4573,24 @@ impl ServerHook for RequestErrorHook {
         }
     }
     async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
+        let send_result: Result<(), ResponseError> = ctx
+            .set_response_version(HttpVersion::Http1_1)
             .await
             .set_response_status_code(self.response_status_code)
             .await
             .set_response_body(self.response_body)
             .await
-            .send()
+            .try_send()
             .await;
+        if send_result.is_err() {
+            ctx.aborted().await.closed().await;
+        }
     }
 }
-struct SendBodyMiddleware {
+struct RequestMiddleware {
     socket_addr: String,
 }
-impl ServerHook for SendBodyMiddleware {
+impl ServerHook for RequestMiddleware {
     async fn new(ctx: &Context) -> Self {
         let socket_addr: String = ctx.get_socket_addr_string().await;
         Self { socket_addr }
@@ -4615,7 +4623,8 @@ impl ServerHook for UpgradeMiddleware {
         }
         if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.set_response_version(HttpVersion::Http1_1)
+            let send_result: Result<(), ResponseError> = ctx
+                .set_response_version(HttpVersion::Http1_1)
                 .await
                 .set_response_status_code(101)
                 .await
@@ -4627,8 +4636,11 @@ impl ServerHook for UpgradeMiddleware {
                 .await
                 .set_response_body(&vec![])
                 .await
-                .send()
+                .try_send()
                 .await;
+            if send_result.is_err() {
+                ctx.aborted().await.closed().await;
+            }
         }
     }
 }
@@ -4641,7 +4653,10 @@ impl ServerHook for ResponseMiddleware {
         if ctx.get_request().await.is_ws() {
             return;
         }
-        ctx.send().await;
+        let send_result: Result<(), ResponseError> = ctx.try_send().await;
+        if send_result.is_err() {
+            ctx.aborted().await.closed().await;
+        }
     }
 }
 struct RootRoute {
@@ -4676,15 +4691,24 @@ impl ServerHook for SseRoute {
         Self
     }
     async fn handle(self, ctx: &Context) {
-        ctx.set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+        let send_result: Result<(), ResponseError> = ctx
+            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
             .await
-            .send()
+            .try_send()
             .await;
+        if send_result.is_err() {
+            ctx.aborted().await.closed().await;
+        }
         for i in 0..10 {
-            ctx.set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
+            let send_result: Result<(), ResponseError> = ctx
+                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
                 .await
-                .send_body()
+                .try_send_body()
                 .await;
+            if send_result.is_err() {
+                ctx.aborted().await.closed().await;
+                return;
+            }
         }
         ctx.closed().await;
     }
@@ -4692,12 +4716,15 @@ impl ServerHook for SseRoute {
 struct WebsocketRoute;
 impl WebsocketRoute {
     async fn send_body_hook(&self, ctx: &Context) {
-        if ctx.get_request().await.is_ws() {
+        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {
             let body: ResponseBody = ctx.get_response_body().await;
             let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
-            ctx.send_body_list_with_data(&frame_list).await;
+            ctx.try_send_body_list_with_data(&frame_list).await
         } else {
-            ctx.send_body().await;
+            ctx.try_send_body().await
+        };
+        if send_result.is_err() {
+            ctx.aborted().await.closed().await;
         }
     }
 }
@@ -4742,7 +4769,7 @@ async fn main() {
     let server: Server = Server::new().await;
     server.task_panic::<TaskPanicHook>().await;
     server.request_error::<RequestErrorHook>().await;
-    server.request_middleware::<SendBodyMiddleware>().await;
+    server.request_middleware::<RequestMiddleware>().await;
     server.request_middleware::<UpgradeMiddleware>().await;
     server.response_middleware::<ResponseMiddleware>().await;
     server.route::<RootRoute>("/").await;
@@ -5095,10 +5122,10 @@ async fn get_panic_from_join_error() {
     });
     let join_error: JoinError = join_handle.await.unwrap_err();
     let panic_struct: PanicData = PanicData::from_join_error(join_error);
-    assert!(!panic_struct.get_message().is_none());
+    assert!(!panic_struct.try_get_message().is_none());
     assert!(
         panic_struct
-            .get_message()
+            .try_get_message()
             .clone()
             .unwrap_or_default()
             .contains(message)
@@ -5286,9 +5313,9 @@ fn panic_new() {
         Some("location".to_string()),
         Some("payload".to_string()),
     );
-    assert_eq!(panic.get_message(), &Some("message".to_string()));
-    assert_eq!(panic.get_location(), &Some("location".to_string()));
-    assert_eq!(panic.get_payload(), &Some("payload".to_string()));
+    assert_eq!(panic.try_get_message(), &Some("message".to_string()));
+    assert_eq!(panic.try_get_location(), &Some("location".to_string()));
+    assert_eq!(panic.try_get_payload(), &Some("payload".to_string()));
 }
 #[tokio::test]
 async fn from_join_error() {
@@ -5299,7 +5326,7 @@ async fn from_join_error() {
     assert!(result.is_err());
     if let Err(join_error) = result {
         let is_panic: bool = PanicData::from_join_error(join_error)
-            .get_message()
+            .try_get_message()
             .clone()
             .unwrap_or_default()
             .contains("test panic");
