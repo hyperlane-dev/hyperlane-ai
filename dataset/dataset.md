@@ -1,4 +1,4 @@
-<!--2026-01-18 12:50:24-->
+<!--2026-01-18 18:35:30-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1413,7 +1413,7 @@ use super::*;
 #[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct ApiResponse<T>
 where
-    T: Serialize + Default,
+    T: Clone + Default + Serialize,
 {
     code: i32,
     message: String,
@@ -1441,7 +1441,7 @@ impl ResponseCode {
 }
 impl<T> ApiResponse<T>
 where
-    T: Serialize + Default,
+    T: Clone + Default + Serialize,
 {
     #[instrument_trace]
     pub fn default_success() -> Self {
@@ -1576,7 +1576,7 @@ impl ServerHook for SendMiddleware {
     #[prologue_macros(
         http,
         reject(ctx.get_request_upgrade_type().await.is_ws()),
-        send
+        try_send
     )]
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {}
@@ -1780,7 +1780,7 @@ impl ServerHook for TaskPanicHook {
         response_version(HttpVersion::Http1_1),
         response_header(CONTENT_TYPE, &self.content_type),
     )]
-    #[epilogue_macros(response_body(&response_body), send)]
+    #[epilogue_macros(response_body(&response_body), try_send)]
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {
         debug!("TaskPanicHook request => {}", ctx.get_request().await);
@@ -1810,7 +1810,7 @@ impl ServerHook for RequestErrorHook {
         response_version(HttpVersion::Http1_1),
         response_header(CONTENT_TYPE, &self.content_type),
     )]
-    #[epilogue_macros(response_body(&response_body), send)]
+    #[epilogue_macros(response_body(&response_body), try_send)]
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {
         if self.response_status_code == HttpStatus::BadRequest.code() {
@@ -2180,8 +2180,8 @@ use super::*;
 pub(super) static LOGGER: Logger = Logger;
 pub(super) static FILE_LOGGER: Lazy<FileLogger> = Lazy::new(|| {
     let mut file_logger: FileLogger = FileLogger::default();
-    file_logger.path(SERVER_LOG_DIR);
-    file_logger.limit_file_size(SERVER_LOG_SIZE);
+    file_logger.set_path(SERVER_LOG_DIR);
+    file_logger.set_limit_file_size(SERVER_LOG_SIZE);
     file_logger
 });
 ```
@@ -3217,8 +3217,11 @@ impl Server {
             }
         };
     }
-    pub async fn config_str<C: ToString>(&self, config_str: C) -> &Self {
-        let config: ServerConfig = ServerConfig::from_json_str(&config_str.to_string()).unwrap();
+    pub async fn config_str<C>(&self, config_str: C) -> &Self
+    where
+        C: AsRef<str>,
+    {
+        let config: ServerConfig = ServerConfig::from_json_str(config_str.as_ref()).unwrap();
         self.write().await.set_config(config.get_inner().await);
         self
     }
@@ -3246,14 +3249,14 @@ impl Server {
             .push(server_hook_factory::<S>());
         self
     }
-    pub async fn route<S>(&self, path: impl ToString) -> &Self
+    pub async fn route<S>(&self, path: impl AsRef<str>) -> &Self
     where
         S: ServerHook,
     {
         self.write()
             .await
             .get_mut_route_matcher()
-            .add(&path.to_string(), server_hook_factory::<S>())
+            .add(path.as_ref(), server_hook_factory::<S>())
             .unwrap();
         self
     }
@@ -3278,8 +3281,11 @@ impl Server {
         self
     }
     #[inline(always)]
-    pub fn format_host_port<H: ToString>(host: H, port: u16) -> String {
-        format!("{}{COLON}{port}", host.to_string())
+    pub fn format_host_port<H>(host: H, port: u16) -> String
+    where
+        H: AsRef<str>,
+    {
+        format!("{}{COLON}{port}", host.as_ref())
     }
     #[inline(always)]
     pub fn try_flush_stdout() -> io::Result<()> {
@@ -4330,27 +4336,27 @@ impl Context {
     }
     pub async fn set_hook<K, F, Fut>(&self, key: K, hook: F) -> &Self
     where
-        K: ToString,
+        K: AsRef<str>,
         F: FnContextSendSyncStatic<Fut, ()>,
         Fut: FutureSendStatic<()>,
     {
         let hook_fn: HookHandler<()> =
             Arc::new(move |ctx: Context| -> SendableAsyncTask<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::Hook(key.to_string()), hook_fn)
+        self.set_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()), hook_fn)
             .await
     }
     pub async fn try_get_hook<K>(&self, key: K) -> Option<HookHandler<()>>
     where
-        K: ToString,
+        K: AsRef<str>,
     {
-        self.try_get_internal_attribute(InternalAttribute::Hook(key.to_string()))
+        self.try_get_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()))
             .await
     }
     pub async fn get_hook<K>(&self, key: K) -> HookHandler<()>
     where
-        K: ToString,
+        K: AsRef<str>,
     {
-        self.get_internal_attribute(InternalAttribute::Hook(key.to_string()))
+        self.get_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()))
             .await
     }
     pub async fn try_send(&self) -> Result<(), ResponseError> {
@@ -5349,7 +5355,7 @@ use crate::*;
 pub(crate) struct ServerConfigInner {
     #[get(pub(crate))]
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(pub(super), type(AsRef<str>))]
     pub(super) host: String,
     #[get(pub(crate))]
     #[get_mut(pub(super))]
@@ -5420,8 +5426,11 @@ impl ServerConfig {
     pub(crate) async fn get_inner(&self) -> ServerConfigInner {
         self.read().await.clone()
     }
-    pub async fn host<H: ToString>(&self, host: H) -> &Self {
-        self.write().await.set_host(host.to_string());
+    pub async fn host<H>(&self, host: H) -> &Self
+    where
+        H: AsRef<str>,
+    {
+        self.write().await.set_host(host);
         self
     }
     pub async fn port(&self, port: u16) -> &Self {
