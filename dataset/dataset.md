@@ -1,4 +1,4 @@
-<!--2026-01-18 18:35:30-->
+<!--2026-01-19 02:09:36-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -3281,7 +3281,7 @@ impl Server {
         self
     }
     #[inline(always)]
-    pub fn format_host_port<H>(host: H, port: u16) -> String
+    pub fn get_bind_addr<H>(host: H, port: u16) -> String
     where
         H: AsRef<str>,
     {
@@ -3343,9 +3343,9 @@ impl Server {
     }
     async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
         let config: ServerConfigInner = self.read().await.get_config().clone();
-        let host: String = config.get_host().clone();
-        let port: u16 = *config.get_port();
-        let addr: String = Self::format_host_port(host, port);
+        let host: &String = config.get_host();
+        let port: u16 = config.get_port();
+        let addr: String = Self::get_bind_addr(host, port);
         TcpListener::bind(&addr)
             .await
             .map_err(|error| ServerError::TcpBind(error.to_string()))
@@ -5357,7 +5357,7 @@ pub(crate) struct ServerConfigInner {
     #[get_mut(pub(super))]
     #[set(pub(super), type(AsRef<str>))]
     pub(super) host: String,
-    #[get(pub(crate))]
+    #[get(pub(crate), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) port: u16,
