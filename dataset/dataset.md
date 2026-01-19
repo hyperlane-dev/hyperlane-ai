@@ -1,4 +1,4 @@
-<!--2026-01-19 13:00:46-->
+<!--2026-01-19 18:39:50-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -3100,7 +3100,7 @@ pub(crate) struct ServerInner {
     pub(super) response_middleware: ServerHookList,
 }
 #[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
-pub struct Server(#[get(pub(super))] pub(super) ArcRwLock<ServerInner>);
+pub struct Server(#[get(pub(super))] pub(super) SharedServerState);
 ```
 # Path: hyperlane/src/server/impl.rs
 ```rust
@@ -3173,111 +3173,109 @@ impl HandlerState {
     }
 }
 impl Server {
-    #[inline(always)]
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let server: ServerInner = ServerInner::default();
         Self(arc_rwlock(server))
     }
-    #[inline(always)]
-    pub fn from(config: ServerConfig) -> Self {
-        let server: Self = Self::new();
-        server.config(config);
+    pub async fn from(config: ServerConfig) -> Self {
+        let server: Self = Self::new().await;
+        server.config(config).await;
         server
     }
-    #[inline(always)]
-    pub(super) fn read(&self) -> ServerStateReadGuard<'_> {
-        self.get_0().try_read().unwrap()
+    pub(super) async fn read(&self) -> ServerStateReadGuard<'_> {
+        self.get_0().read().await
     }
-    #[inline(always)]
-    fn write(&self) -> ServerStateWriteGuard<'_> {
-        self.get_0().try_write().unwrap()
+    async fn write(&self) -> ServerStateWriteGuard<'_> {
+        self.get_0().write().await
     }
-    #[inline(always)]
-    pub fn get_route_matcher(&self) -> RouteMatcher {
-        self.read().get_route_matcher().clone()
+    pub async fn get_route_matcher(&self) -> RouteMatcher {
+        self.read().await.get_route_matcher().clone()
     }
-    pub fn handle_hook(&self, hook: HookType) {
+    pub async fn handle_hook(&self, hook: HookType) {
         match hook {
             HookType::TaskPanic(_, hook) => {
-                self.write().get_mut_task_panic().push(hook());
+                self.write().await.get_mut_task_panic().push(hook());
             }
             HookType::RequestError(_, hook) => {
-                self.write().get_mut_request_error().push(hook());
+                self.write().await.get_mut_request_error().push(hook());
             }
             HookType::RequestMiddleware(_, hook) => {
-                self.write().get_mut_request_middleware().push(hook());
+                self.write().await.get_mut_request_middleware().push(hook());
             }
             HookType::Route(path, hook) => {
                 self.write()
+                    .await
                     .get_mut_route_matcher()
                     .add(path, hook())
                     .unwrap();
             }
             HookType::ResponseMiddleware(_, hook) => {
-                self.write().get_mut_response_middleware().push(hook());
+                self.write()
+                    .await
+                    .get_mut_response_middleware()
+                    .push(hook());
             }
         };
     }
-    pub fn config_str<C>(&self, config_str: C) -> &Self
+    pub async fn config_from_json_str<C>(&self, config_str: C) -> &Self
     where
         C: AsRef<str>,
     {
         let config: ServerConfig = ServerConfig::from_json_str(config_str.as_ref()).unwrap();
-        self.write().set_config(config.get_inner());
+        self.write().await.set_config(config.get_inner().await);
         self
     }
-    #[inline(always)]
-    pub fn config(&self, config: ServerConfig) -> &Self {
-        self.write().set_config(config.get_inner());
+    pub async fn config(&self, config: ServerConfig) -> &Self {
+        self.write().await.set_config(config.get_inner().await);
         self
     }
-    #[inline(always)]
-    pub fn task_panic<S>(&self) -> &Self
+    pub async fn task_panic<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
+            .await
             .get_mut_task_panic()
             .push(server_hook_factory::<S>());
         self
     }
-    #[inline(always)]
-    pub fn request_error<S>(&self) -> &Self
+    pub async fn request_error<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
+            .await
             .get_mut_request_error()
             .push(server_hook_factory::<S>());
         self
     }
-    #[inline(always)]
-    pub fn route<S>(&self, path: impl AsRef<str>) -> &Self
+    pub async fn route<S>(&self, path: impl AsRef<str>) -> &Self
     where
         S: ServerHook,
     {
         self.write()
+            .await
             .get_mut_route_matcher()
             .add(path.as_ref(), server_hook_factory::<S>())
             .unwrap();
         self
     }
-    #[inline(always)]
-    pub fn request_middleware<S>(&self) -> &Self
+    pub async fn request_middleware<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
+            .await
             .get_mut_request_middleware()
             .push(server_hook_factory::<S>());
         self
     }
-    #[inline(always)]
-    pub fn response_middleware<S>(&self) -> &Self
+    pub async fn response_middleware<S>(&self) -> &Self
     where
         S: ServerHook,
     {
         self.write()
+            .await
             .get_mut_response_middleware()
             .push(server_hook_factory::<S>());
         self
@@ -3318,7 +3316,7 @@ impl Server {
     async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
         let panic_clone: PanicData = panic.clone();
         ctx.cancel_aborted().await.set_task_panic(panic_clone).await;
-        for hook in self.read().get_task_panic().iter() {
+        for hook in self.read().await.get_task_panic().iter() {
             Box::pin(self.task_handler(ctx, hook, false)).await;
             if ctx.get_aborted().await {
                 return;
@@ -3344,7 +3342,7 @@ impl Server {
         }
     }
     async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        let config: ServerConfigInner = self.read().get_config().clone();
+        let config: ServerConfigInner = self.read().await.get_config().clone();
         let host: &String = config.get_host();
         let port: u16 = config.get_port();
         let addr: String = Self::get_bind_addr(host, port);
@@ -3354,15 +3352,14 @@ impl Server {
     }
     async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
-            self.configure_stream(&stream);
+            self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            self.spawn_connection_handler(stream);
+            self.spawn_connection_handler(stream).await;
         }
         Ok(())
     }
-    #[inline(always)]
-    fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfigInner = self.read().get_config().clone();
+    async fn configure_stream(&self, stream: &TcpStream) {
+        let config: ServerConfigInner = self.read().await.get_config().clone();
         if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
@@ -3370,9 +3367,9 @@ impl Server {
             let _ = stream.set_ttl(*ttl);
         }
     }
-    fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
+    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
-        let request_config: RequestConfig = *self.read().get_config().get_request_config();
+        let request_config: RequestConfig = *self.read().await.get_config().get_request_config();
         spawn(async move {
             server.handle_connection(stream, request_config).await;
         });
@@ -3382,7 +3379,7 @@ impl Server {
             .await
             .set_request_error_data(error.clone())
             .await;
-        for hook in self.read().get_request_error().iter() {
+        for hook in self.read().await.get_request_error().iter() {
             self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return;
@@ -3442,7 +3439,7 @@ impl Server {
         }
     }
     pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
-        for hook in self.read().get_request_middleware().iter() {
+        for hook in self.read().await.get_request_middleware().iter() {
             self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return true;
@@ -3453,6 +3450,7 @@ impl Server {
     pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
         if let Some(hook) = self
             .read()
+            .await
             .get_route_matcher()
             .try_resolve_route(ctx, path)
             .await
@@ -3465,7 +3463,7 @@ impl Server {
         false
     }
     pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
-        for hook in self.read().get_response_middleware().iter() {
+        for hook in self.read().await.get_response_middleware().iter() {
             self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted().await {
                 return true;
@@ -3508,6 +3506,7 @@ impl Server {
 # Path: hyperlane/src/server/type.rs
 ```rust
 use crate::*;
+pub(crate) type SharedServerState = ArcRwLock<ServerInner>;
 pub(crate) type SharedServerConfig = ArcRwLock<ServerConfigInner>;
 pub(crate) type ServerStateReadGuard<'a> = RwLockReadGuard<'a, ServerInner>;
 pub(crate) type ServerStateWriteGuard<'a> = RwLockWriteGuard<'a, ServerInner>;
@@ -3521,7 +3520,7 @@ pub use r#struct::*;
 # Path: hyperlane/src/panic/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, CustomDebug, Data, Default, New, PartialEq, Eq, DisplayDebug)]
+#[derive(CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter)]
 pub struct PanicData {
     #[get(pub)]
     #[set(pub(crate))]
@@ -3538,6 +3537,18 @@ pub struct PanicData {
 ```rust
 use crate::*;
 impl PanicData {
+    #[inline(always)]
+    pub(crate) fn new(
+        message: Option<String>,
+        location: Option<String>,
+        payload: Option<String>,
+    ) -> Self {
+        Self {
+            message,
+            location,
+            payload,
+        }
+    }
     #[inline(always)]
     fn try_extract_panic_message(panic_payload: &dyn Any) -> Option<String> {
         if let Some(s) = panic_payload.downcast_ref::<&str>() {
@@ -3577,11 +3588,11 @@ pub(crate) use r#type::*;
 use crate::*;
 #[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
 pub(crate) struct ContextInner {
-    #[get(pub(super), type(copy))]
+    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     aborted: bool,
-    #[get(pub(super), type(copy))]
+    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     closed: bool,
@@ -3695,7 +3706,7 @@ impl Context {
         Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
     pub async fn get_aborted(&self) -> bool {
-        self.read().await.get_aborted()
+        *self.read().await.get_aborted()
     }
     pub async fn set_aborted(&self, aborted: bool) -> &Self {
         self.write().await.set_aborted(aborted);
@@ -3710,7 +3721,7 @@ impl Context {
         self
     }
     pub async fn get_closed(&self) -> bool {
-        self.read().await.get_closed()
+        *self.read().await.get_closed()
     }
     pub async fn set_closed(&self, closed: bool) -> &Self {
         self.write().await.set_closed(closed);
@@ -3781,10 +3792,10 @@ impl Context {
     }
     pub async fn with_request<F, Fut, R>(&self, func: F) -> R
     where
-        F: Fn(&Request) -> Fut,
+        F: Fn(Request) -> Fut,
         Fut: FutureSendStatic<R>,
     {
-        func(self.read().await.get_request()).await
+        func(self.read().await.get_request().clone()).await
     }
     pub async fn get_request_string(&self) -> String {
         self.read().await.get_request().get_string()
@@ -4009,10 +4020,10 @@ impl Context {
     }
     pub async fn with_response<F, Fut, R>(&self, func: F) -> R
     where
-        F: Fn(&Response) -> Fut,
+        F: Fn(Response) -> Fut,
         Fut: FutureSendStatic<R>,
     {
-        func(self.read().await.get_response()).await
+        func(self.read().await.get_response().clone()).await
     }
     pub async fn get_response_string(&self) -> String {
         self.read().await.get_response().get_string()
@@ -4506,8 +4517,8 @@ pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
 use crate::*;
 #[tokio::test]
 async fn server_partial_eq() {
-    let server1: Server = Server::new();
-    let server2: Server = Server::new();
+    let server1: Server = Server::new().await;
+    let server2: Server = Server::new().await;
     assert_eq!(server1, server2);
     let server1_clone: Server = server1.clone();
     assert_eq!(server1, server1_clone);
@@ -4760,17 +4771,17 @@ impl ServerHook for DynamicRoute {
 }
 #[tokio::test]
 async fn main() {
-    let server: Server = Server::new();
-    server.task_panic::<TaskPanicHook>();
-    server.request_error::<RequestErrorHook>();
-    server.request_middleware::<RequestMiddleware>();
-    server.request_middleware::<UpgradeMiddleware>();
-    server.response_middleware::<ResponseMiddleware>();
-    server.route::<RootRoute>("/");
-    server.route::<SseRoute>("/sse");
-    server.route::<WebsocketRoute>("/websocket");
-    server.route::<DynamicRoute>("/dynamic/{routing}");
-    server.route::<DynamicRoute>("/regex/{file:^.*$}");
+    let server: Server = Server::new().await;
+    server.task_panic::<TaskPanicHook>().await;
+    server.request_error::<RequestErrorHook>().await;
+    server.request_middleware::<RequestMiddleware>().await;
+    server.request_middleware::<UpgradeMiddleware>().await;
+    server.response_middleware::<ResponseMiddleware>().await;
+    server.route::<RootRoute>("/").await;
+    server.route::<SseRoute>("/sse").await;
+    server.route::<WebsocketRoute>("/websocket").await;
+    server.route::<DynamicRoute>("/dynamic/{routing}").await;
+    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     tokio::spawn(async move {
@@ -4832,7 +4843,7 @@ impl ServerHook for TestRoute {
 async fn empty_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new().route::<TestRoute>(EMPTY_STR);
+            let _server: &Server = Server::new().await.route::<TestRoute>(EMPTY_STR).await;
         },
         &RouteError::EmptyPattern.to_string(),
     )
@@ -4843,21 +4854,27 @@ async fn duplicate_route() {
     assert_panic_message_contains(
         || async {
             let _server: &Server = Server::new()
+                .await
                 .route::<TestRoute>(ROOT_PATH)
-                .route::<TestRoute>(ROOT_PATH);
+                .await
+                .route::<TestRoute>(ROOT_PATH)
+                .await;
         },
         &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
     )
     .await;
 }
-#[test]
-fn get_route() {
-    let server: Server = Server::new();
+#[tokio::test]
+async fn get_route() {
+    let server: Server = Server::new().await;
     server
         .route::<TestRoute>(ROOT_PATH)
+        .await
         .route::<TestRoute>("/dynamic/{routing}")
-        .route::<TestRoute>("/regex/{file:^.*$}");
-    let route_matcher: RouteMatcher = server.get_route_matcher();
+        .await
+        .route::<TestRoute>("/regex/{file:^.*$}")
+        .await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
     for key in route_matcher.get_static_route().keys() {
         println!("Static route: {key}");
     }
@@ -4872,14 +4889,16 @@ fn get_route() {
         }
     }
 }
-#[test]
-fn segment_count_optimization() {
-    let server: Server = Server::new();
-    server.route::<TestRoute>("/users/{id}");
-    server.route::<TestRoute>("/users/{id}/posts");
-    server.route::<TestRoute>("/users/{id}/posts/{post_id}");
-    server.route::<TestRoute>("/api/v1/users/{id}");
-    let route_matcher: RouteMatcher = server.get_route_matcher();
+#[tokio::test]
+async fn segment_count_optimization() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/users/{id}").await;
+    server.route::<TestRoute>("/users/{id}/posts").await;
+    server
+        .route::<TestRoute>("/users/{id}/posts/{post_id}")
+        .await;
+    server.route::<TestRoute>("/api/v1/users/{id}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(
         route_matcher.get_dynamic_route().contains_key(&2),
         "Should have 2-segment routes"
@@ -4896,13 +4915,15 @@ fn segment_count_optimization() {
     assert_eq!(route_matcher.get_dynamic_route().get(&3).unwrap().len(), 1);
     assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
 }
-#[test]
-fn regex_route_segment_count() {
-    let server: Server = Server::new();
-    server.route::<TestRoute>("/files/{path:.*}");
-    server.route::<TestRoute>("/api/{version:\\d+}/users");
-    server.route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}");
-    let route_matcher: RouteMatcher = server.get_route_matcher();
+#[tokio::test]
+async fn regex_route_segment_count() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/files/{path:.*}").await;
+    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
+    server
+        .route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}")
+        .await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(
         route_matcher.get_regex_route().contains_key(&2),
         "Should have 2-segment regex routes"
@@ -4916,15 +4937,15 @@ fn regex_route_segment_count() {
         "Should have 4-segment regex routes"
     );
 }
-#[test]
-fn mixed_route_types() {
-    let server: Server = Server::new();
-    server.route::<TestRoute>("/");
-    server.route::<TestRoute>("/about");
-    server.route::<TestRoute>("/users/{id}");
-    server.route::<TestRoute>("/posts/{slug}");
-    server.route::<TestRoute>("/files/{path:.*}");
-    let route_matcher: RouteMatcher = server.get_route_matcher();
+#[tokio::test]
+async fn mixed_route_types() {
+    let server: Server = Server::new().await;
+    server.route::<TestRoute>("/").await;
+    server.route::<TestRoute>("/about").await;
+    server.route::<TestRoute>("/users/{id}").await;
+    server.route::<TestRoute>("/posts/{slug}").await;
+    server.route::<TestRoute>("/files/{path:.*}").await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert_eq!(route_matcher.get_static_route().len(), 2);
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
     assert!(route_matcher.get_regex_route().contains_key(&2));
@@ -4932,18 +4953,18 @@ fn mixed_route_types() {
 #[tokio::test]
 async fn large_dynamic_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new();
+    let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute>(&path).await;
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} dynamic routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher();
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_dynamic_route().is_empty());
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
@@ -4964,18 +4985,18 @@ async fn large_dynamic_routes() {
 #[tokio::test]
 async fn large_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new();
+    let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute>(&path).await;
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} regex routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher();
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_regex_route().is_empty());
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
@@ -4996,18 +5017,18 @@ async fn large_regex_routes() {
 #[tokio::test]
 async fn large_tail_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new();
+    let server: Server = Server::new().await;
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{path:.*}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute>(&path).await;
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} tail regex routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher();
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
     assert!(!route_matcher.get_regex_route().is_empty());
     let ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
@@ -5212,13 +5233,18 @@ async fn config_from_str() {
         }
     "#;
     let config: ServerConfig = ServerConfig::from_json_str(config_str).unwrap();
-    let new_config: ServerConfig = ServerConfig::new();
+    let new_config: ServerConfig = ServerConfig::new().await;
     new_config
         .host("0.0.0.0")
+        .await
         .port(80)
+        .await
         .request_config(RequestConfig::default())
+        .await
         .enable_nodelay()
-        .ttl(64);
+        .await
+        .ttl(64)
+        .await;
     assert_eq!(config, new_config);
 }
 ```
@@ -5244,7 +5270,11 @@ async fn server_send_sync() {
 }
 #[tokio::test]
 async fn server_clone_across_threads() {
-    let server: Server = Server::new().route::<TestSendRoute>("/test").clone();
+    let server: Server = Server::new()
+        .await
+        .route::<TestSendRoute>("/test")
+        .await
+        .clone();
     let server_clone: Server = server.clone();
     let handle: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread: Server = server_clone;
@@ -5255,7 +5285,13 @@ async fn server_clone_across_threads() {
 }
 #[tokio::test]
 async fn server_share_across_threads() {
-    let server: Arc<Server> = Arc::new(Server::new().route::<TestSendRoute>("/test").clone());
+    let server: Arc<Server> = Arc::new(
+        Server::new()
+            .await
+            .route::<TestSendRoute>("/test")
+            .await
+            .clone(),
+    );
     let server1: Arc<Server> = server.clone();
     let server2: Arc<Server> = server.clone();
     let handle1: JoinHandle<&'static str> = spawn(async move {
@@ -5377,55 +5413,45 @@ impl PartialEq for ServerConfig {
 impl Eq for ServerConfig {}
 impl ServerConfig {
     #[inline(always)]
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         Self::default()
     }
-    #[inline(always)]
-    fn read(&self) -> ConfigReadGuard<'_> {
-        self.get_0().try_read().unwrap()
+    async fn read(&self) -> ConfigReadGuard<'_> {
+        self.get_0().read().await
     }
-    #[inline(always)]
-    fn write(&self) -> ConfigWriteGuard<'_> {
-        self.get_0().try_write().unwrap()
+    async fn write(&self) -> ConfigWriteGuard<'_> {
+        self.get_0().write().await
     }
-    #[inline(always)]
-    pub(crate) fn get_inner(&self) -> ServerConfigInner {
-        self.read().clone()
+    pub(crate) async fn get_inner(&self) -> ServerConfigInner {
+        self.read().await.clone()
     }
-    #[inline(always)]
-    pub fn host<H>(&self, host: H) -> &Self
+    pub async fn host<H>(&self, host: H) -> &Self
     where
         H: AsRef<str>,
     {
-        self.write().set_host(host);
+        self.write().await.set_host(host);
         self
     }
-    #[inline(always)]
-    pub fn port(&self, port: u16) -> &Self {
-        self.write().set_port(port);
+    pub async fn port(&self, port: u16) -> &Self {
+        self.write().await.set_port(port);
         self
     }
-    #[inline(always)]
-    pub fn request_config(&self, request_config: RequestConfig) -> &Self {
-        self.write().set_request_config(request_config);
+    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
+        self.write().await.set_request_config(request_config);
         self
     }
-    #[inline(always)]
-    pub fn nodelay(&self, nodelay: bool) -> &Self {
-        self.write().set_nodelay(Some(nodelay));
+    pub async fn nodelay(&self, nodelay: bool) -> &Self {
+        self.write().await.set_nodelay(Some(nodelay));
         self
     }
-    #[inline(always)]
-    pub fn enable_nodelay(&self) -> &Self {
-        self.nodelay(true)
+    pub async fn enable_nodelay(&self) -> &Self {
+        self.nodelay(true).await
     }
-    #[inline(always)]
-    pub fn disable_nodelay(&self) -> &Self {
-        self.nodelay(false)
+    pub async fn disable_nodelay(&self) -> &Self {
+        self.nodelay(false).await
     }
-    #[inline(always)]
-    pub fn ttl(&self, ttl: u32) -> &Self {
-        self.write().set_ttl(Some(ttl));
+    pub async fn ttl(&self, ttl: u32) -> &Self {
+        self.write().await.set_ttl(Some(ttl));
         self
     }
     pub fn from_json_str(config_str: &str) -> Result<ServerConfig, serde_json::Error> {
