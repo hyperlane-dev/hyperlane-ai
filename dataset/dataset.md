@@ -1,4 +1,4 @@
-<!--2026-01-21 13:00:45-->
+<!--2026-01-21 18:52:04-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -12,53 +12,16 @@ cargo add hyperlane-utils
 ## Contact
 # Path: hyperlane-utils/src/lib.rs
 ```rust
-pub use bin_encode_decode::*;
-pub use chunkify::*;
-pub use clonelicious::*;
-pub use color_output::*;
-pub use compare_version::*;
-pub use file_operation::*;
-pub use future_fn::*;
-pub use hot_restart::*;
-pub use http_request::*;
-pub use hyperlane_broadcast::*;
-pub use hyperlane_log::*;
-pub use hyperlane_macros::*;
-pub use hyperlane_plugin_websocket::*;
-pub use instrument_level::*;
-pub use lombok_macros::*;
-pub use recoverable_spawn::*;
-pub use recoverable_thread_pool::*;
-pub use server_manager::*;
-pub use std_macro_extensions::*;
-pub use ahash;
-pub use bytemuck_derive;
-pub use chrono;
-pub use dotenvy;
-pub use futures;
-pub use hex;
-pub use log;
-pub use num_cpus;
-pub use once_cell;
-pub use redis;
-pub use regex;
-pub use sea_orm;
-pub use serde_urlencoded;
-pub use serde_with;
-pub use serde_xml_rs;
-pub use serde_yaml;
-pub use simd_json;
-pub use snafu;
-pub use sqlx;
-pub use tracing_log;
-pub use tracing_subscriber;
-pub use twox_hash;
-pub use url;
-pub use urlencoding;
-pub use utoipa;
-pub use utoipa_rapidoc;
-pub use utoipa_swagger_ui;
-pub use uuid;
+pub use {
+    ahash, bin_encode_decode::*, bytemuck_derive, chrono, chunkify::*, clonelicious::*,
+    color_output::*, compare_version::*, dotenvy, file_operation::*, future_fn::*, futures, hex,
+    hot_restart::*, http_request::*, hyperlane_broadcast::*, hyperlane_log::*, hyperlane_macros::*,
+    hyperlane_plugin_websocket::*, instrument_level::*, log, lombok_macros::*, num_cpus, once_cell,
+    recoverable_spawn::*, recoverable_thread_pool::*, redis, regex, sea_orm, serde_urlencoded,
+    serde_with, serde_xml_rs, serde_yaml, server_manager::*, simd_json, snafu, sqlx,
+    std_macro_extensions::*, tracing_log, tracing_subscriber, twox_hash, url, urlencoding, utoipa,
+    utoipa_rapidoc, utoipa_swagger_ui, uuid,
+};
 ```
 # Path: hyperlane-broadcast/README.md
 ## hyperlane-broadcast
@@ -75,15 +38,16 @@ cargo add hyperlane-broadcast
 ```rust
 mod broadcast;
 mod broadcast_map;
-pub use broadcast::*;
-pub use broadcast_map::*;
+pub use {broadcast::*, broadcast_map::*};
 use std::{fmt::Debug, hash::BuildHasherDefault};
-use dashmap::*;
-use tokio::sync::broadcast::{
-    error::SendError,
-    {Receiver, Sender},
+use {
+    dashmap::*,
+    tokio::sync::broadcast::{
+        error::SendError,
+        {Receiver, Sender},
+    },
+    twox_hash::XxHash3_64,
 };
-use twox_hash::XxHash3_64;
 ```
 # Path: hyperlane-broadcast/src/broadcast/trait.rs
 ```rust
@@ -96,13 +60,13 @@ pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
 ```
 # Path: hyperlane-broadcast/src/broadcast/mod.rs
 ```rust
-pub(crate) mod r#const;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) mod r#trait;
-pub(crate) mod r#type;
+mod r#const;
+mod r#impl;
+mod r#struct;
 #[cfg(test)]
 mod test;
+mod r#trait;
+mod r#type;
 pub use {r#const::*, r#struct::*, r#trait::*, r#type::*};
 ```
 # Path: hyperlane-broadcast/src/broadcast/struct.rs
@@ -172,12 +136,12 @@ pub trait BroadcastMapTrait: Clone + Debug {}
 ```
 # Path: hyperlane-broadcast/src/broadcast_map/mod.rs
 ```rust
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) mod r#trait;
-pub(crate) mod r#type;
+mod r#impl;
+mod r#struct;
 #[cfg(test)]
 mod test;
+mod r#trait;
+mod r#type;
 pub use {r#struct::*, r#trait::*, r#type::*};
 ```
 # Path: hyperlane-broadcast/src/broadcast_map/struct.rs
@@ -2841,18 +2805,20 @@ use std::{
     pin::Pin,
     sync::Arc,
 };
-use inventory::collect;
-use lombok_macros::*;
-use regex::Regex;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use tokio::{
-    net::{TcpListener, TcpStream},
-    spawn,
-    sync::{
-        RwLockReadGuard, RwLockWriteGuard,
-        watch::{Receiver, Sender, channel},
+use {
+    inventory::collect,
+    lombok_macros::*,
+    regex::Regex,
+    serde::{Deserialize, Serialize, de::DeserializeOwned},
+    tokio::{
+        net::{TcpListener, TcpStream},
+        spawn,
+        sync::{
+            RwLockReadGuard, RwLockWriteGuard,
+            watch::{Receiver, Sender, channel},
+        },
+        task::{JoinError, JoinHandle},
     },
-    task::{JoinError, JoinHandle},
 };
 ```
 # Path: hyperlane/src/hook/trait.rs
@@ -2868,12 +2834,12 @@ where
 ```
 # Path: hyperlane/src/hook/mod.rs
 ```rust
-pub(crate) mod r#enum;
-pub(crate) mod r#fn;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) mod r#trait;
-pub(crate) mod r#type;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+mod r#trait;
+mod r#type;
 pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*, r#type::*};
 ```
 # Path: hyperlane/src/hook/enum.rs
@@ -3067,11 +3033,11 @@ pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, Se
 ```
 # Path: hyperlane/src/server/mod.rs
 ```rust
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
+mod r#impl;
+mod r#struct;
 #[cfg(test)]
-pub(crate) mod test;
-pub(crate) mod r#type;
+mod test;
+mod r#type;
 pub use r#struct::*;
 pub(crate) use r#type::*;
 ```
@@ -3873,10 +3839,10 @@ async fn main() {
 ```
 # Path: hyperlane/src/panic/mod.rs
 ```rust
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
+mod r#impl;
+mod r#struct;
 #[cfg(test)]
-pub(crate) mod test;
+mod test;
 pub use r#struct::*;
 ```
 # Path: hyperlane/src/panic/struct.rs
@@ -3970,11 +3936,11 @@ async fn from_join_error() {
 ```
 # Path: hyperlane/src/context/mod.rs
 ```rust
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
+mod r#impl;
+mod r#struct;
 #[cfg(test)]
-pub(crate) mod test;
-pub(crate) mod r#type;
+mod test;
+mod r#type;
 pub use r#struct::*;
 pub(crate) use r#type::*;
 ```
@@ -4932,11 +4898,11 @@ async fn context_request_and_response() {
 ```
 # Path: hyperlane/src/attribute/mod.rs
 ```rust
-pub(crate) mod r#enum;
-pub(crate) mod r#impl;
+mod r#enum;
+mod r#impl;
 #[cfg(test)]
-pub(crate) mod test;
-pub(crate) mod r#type;
+mod test;
+mod r#type;
 pub use r#type::*;
 pub(crate) use r#enum::*;
 ```
@@ -5051,11 +5017,11 @@ async fn send_body_hook() {
 ```
 # Path: hyperlane/src/config/mod.rs
 ```rust
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
+mod r#impl;
+mod r#struct;
 #[cfg(test)]
-pub(crate) mod test;
-pub(crate) mod r#type;
+mod test;
+mod r#type;
 pub use r#struct::*;
 pub(crate) use r#type::*;
 ```
@@ -5181,32 +5147,17 @@ pub(crate) type ConfigWriteGuard<'a> = RwLockWriteGuard<'a, ServerConfigData>;
 use crate::*;
 #[tokio::test]
 async fn server_config_from_json() {
-    let config_str: &'static str = r#"
-        {
-            "host": "0.0.0.0",
-            "port": 80,           
-            "request_config": {
-                "buffer_size": 8192,
-                "max_request_line_length": 8192,
-                "max_path_length": 8192,
-                "max_query_length": 8192,
-                "max_header_line_length": 8192,
-                "max_header_count": 100,
-                "max_header_key_length": 8192,
-                "max_header_value_length": 8192,
-                "max_body_size": 2097152,
-                "max_ws_frame_size": 65536,
-                "max_ws_frames": 6000,
-                "http_read_timeout_ms": 6000,
-                "ws_read_timeout_ms": 1800000
-            },
-            "nodelay": true,            
-            "ttl": 64
-        }
+    let server_config_json: &'static str = r#"
+    {
+        "host": "0.0.0.0",
+        "port": 80,
+        "nodelay": true,
+        "ttl": 64
+    }
     "#;
-    let config: ServerConfig = ServerConfig::from_json(config_str).unwrap();
-    let new_config: ServerConfig = ServerConfig::new().await;
-    new_config
+    let server_config: ServerConfig = ServerConfig::from_json(server_config_json).unwrap();
+    let new_server_config: ServerConfig = ServerConfig::new().await;
+    new_server_config
         .host("0.0.0.0")
         .await
         .port(80)
@@ -5215,14 +5166,14 @@ async fn server_config_from_json() {
         .await
         .ttl(64)
         .await;
-    assert_eq!(config, new_config);
+    assert_eq!(server_config, new_server_config);
 }
 ```
 # Path: hyperlane/src/error/mod.rs
 ```rust
-pub(crate) mod r#enum;
+mod r#enum;
 #[cfg(test)]
-pub(crate) mod test;
+mod test;
 pub use r#enum::*;
 ```
 # Path: hyperlane/src/error/enum.rs
@@ -5277,12 +5228,12 @@ async fn route_error() {
 ```
 # Path: hyperlane/src/route/mod.rs
 ```rust
-pub(crate) mod r#enum;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
+mod r#enum;
+mod r#impl;
+mod r#struct;
 #[cfg(test)]
-pub(crate) mod test;
-pub(crate) mod r#type;
+mod test;
+mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
 ```
 # Path: hyperlane/src/route/enum.rs
@@ -6841,7 +6792,7 @@ impl ServerHook for Websocket3 {
         Self
     }
     #[ws]
-    #[ws_from_stream(RequestConfig::default(), request)]
+    #[ws_from_stream(&RequestConfigData::default(), request)]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
@@ -6855,7 +6806,7 @@ impl ServerHook for Websocket4 {
         Self
     }
     #[ws]
-    #[ws_from_stream(request, RequestConfig::default())]
+    #[ws_from_stream(request, &RequestConfigData::default())]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
@@ -6869,7 +6820,7 @@ impl ServerHook for Websocket5 {
         Self
     }
     #[ws]
-    #[ws_from_stream(RequestConfig::default())]
+    #[ws_from_stream(&RequestConfigData::default())]
     async fn handle(self, ctx: &Context) {
         let body: RequestBody = ctx.get_request_body().await;
         let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -6970,7 +6921,7 @@ impl ServerHook for RequestQueryOption {
         request_query_option("test" => request_query_option),
         response_body(&format!("request query: {request_query_option:?}")),
         send,
-        http_from_stream(RequestConfig::default())
+        http_from_stream(&RequestConfigData::default())
     )]
     #[prologue_macros(
         request_query_option("test" => request_query_option),
@@ -6989,7 +6940,7 @@ impl ServerHook for RequestQuery {
         request_query("test" => request_query),
         response_body(&format!("request query: {request_query}")),
         send,
-        http_from_stream(RequestConfig::default())
+        http_from_stream(&RequestConfigData::default())
     )]
     #[prologue_macros(
         request_query("test" => request_query),
@@ -7046,7 +6997,7 @@ impl ServerHook for RequestQuerys {
         request_querys(request_querys),
         response_body(&format!("request querys: {request_querys:?}")),
         send,
-        http_from_stream(RequestConfig::default(), _request)
+        http_from_stream(&RequestConfigData::default(), _request)
     )]
     #[prologue_macros(
         request_querys(request_querys),
@@ -7065,7 +7016,7 @@ impl ServerHook for RequestHeaders {
         request_headers(request_headers),
         response_body(&format!("request headers: {request_headers:?}")),
         send,
-        http_from_stream(_request, RequestConfig::default())
+        http_from_stream(_request, &RequestConfigData::default())
     )]
     #[prologue_macros(
         request_headers(request_headers),
@@ -7314,7 +7265,7 @@ impl ServerHook for InjectHttpStream {
     }
 }
 impl InjectHttpStream {
-    #[http_from_stream(RequestConfig::default(), _request)]
+    #[http_from_stream(&RequestConfigData::default(), _request)]
     async fn http_stream_handler_with_ref_self(&self, _ctx: &Context) {}
 }
 #[route("/inject/ws_stream")]
@@ -7328,7 +7279,7 @@ impl ServerHook for InjectWsStream {
     }
 }
 impl InjectWsStream {
-    #[ws_from_stream(_request)]
+    #[ws_from_stream(&RequestConfigData::default(), _request)]
     async fn websocket_stream_handler_with_ref_self(&self, _ctx: &Context) {}
 }
 #[route("/inject/complex_post")]
@@ -7706,17 +7657,17 @@ async fn standalone_route_param_option_handler(_ctx: &Context) {}
 async fn standalone_request_body_json_handler(_ctx: &Context) {}
 #[request_body_json_result(_user_result: TestData)]
 async fn standalone_request_body_json_result_handler(_ctx: &Context) {}
-#[http_from_stream(RequestConfig::default())]
+#[http_from_stream(&RequestConfigData::default())]
 async fn standalone_http_from_stream_with_config_handler(_ctx: &Context) {}
-#[ws_from_stream(RequestConfig::default())]
+#[ws_from_stream(&RequestConfigData::default())]
 async fn standalone_ws_from_stream_with_config_handler(_ctx: &Context) {}
 #[http_from_stream(_request)]
 async fn standalone_http_from_stream_with_request_handler(_ctx: &Context) {}
 #[ws_from_stream(_request)]
 async fn standalone_ws_from_stream_with_request_handler(_ctx: &Context) {}
-#[http_from_stream(RequestConfig::default(), _request)]
+#[http_from_stream(&RequestConfigData::default(), _request)]
 async fn standalone_http_from_stream_full_handler(_ctx: &Context) {}
-#[ws_from_stream(RequestConfig::default(), _request)]
+#[ws_from_stream(&RequestConfigData::default(), _request)]
 async fn standalone_ws_from_stream_full_handler(_ctx: &Context) {}
 #[send]
 async fn standalone_send_handler_2(_ctx: &Context) {}
@@ -7780,7 +7731,7 @@ impl HooksExpression {
 #[tokio::main]
 async fn main() {
     config.disable_nodelay().await;
-    server.config(config).await;
+    server.server_config(config).await;
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     tokio::spawn(async move {
@@ -7813,37 +7764,23 @@ mod response_middleware;
 mod route;
 mod send;
 mod stream;
-pub(crate) use aborted::*;
-pub(crate) use closed::*;
-pub(crate) use common::*;
-pub(crate) use filter::*;
-pub(crate) use flush::*;
-pub(crate) use from_stream::*;
-pub(crate) use hook::*;
-pub(crate) use host::*;
-pub(crate) use http::*;
-pub(crate) use hyperlane::*;
-pub(crate) use inject::*;
-pub(crate) use protocol::*;
-pub(crate) use referer::*;
-pub(crate) use reject::*;
-pub(crate) use request::*;
-pub(crate) use request_middleware::*;
-pub(crate) use response::*;
-pub(crate) use response_middleware::*;
-pub(crate) use route::*;
-pub(crate) use send::*;
-pub(crate) use stream::*;
-pub(crate) use ::hyperlane::inventory;
-pub(crate) use proc_macro::TokenStream;
-pub(crate) use proc_macro2::TokenStream as TokenStream2;
-pub(crate) use quote::quote;
-pub(crate) use syn::{
-    Ident, Token,
-    parse::{Parse, ParseStream, Parser, Result},
-    punctuated::Punctuated,
-    token::Comma,
-    *,
+use {
+    aborted::*, closed::*, common::*, filter::*, flush::*, from_stream::*, hook::*, host::*,
+    http::*, hyperlane::*, inject::*, protocol::*, referer::*, reject::*, request::*,
+    request_middleware::*, response::*, response_middleware::*, route::*, send::*, stream::*,
+};
+use {
+    ::hyperlane::inventory,
+    proc_macro::TokenStream,
+    proc_macro2::TokenStream as TokenStream2,
+    quote::quote,
+    syn::{
+        Ident, Token,
+        parse::{Parse, ParseStream, Parser, Result},
+        punctuated::Punctuated,
+        token::Comma,
+        *,
+    },
 };
 inventory::collect!(InjectableMacro);
 #[proc_macro_attribute]
@@ -8282,9 +8219,7 @@ mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#struct;
-pub(crate) use r#enum::*;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-macros/src/response/enum.rs
 ```rust
@@ -8462,7 +8397,7 @@ impl Parse for ResponseBodyData {
 ```
 # Path: hyperlane-macros/src/inject/mod.rs
 ```rust
-pub(crate) mod r#fn;
+mod r#fn;
 pub(crate) use r#fn::*;
 ```
 # Path: hyperlane-macros/src/inject/fn.rs
@@ -8525,7 +8460,7 @@ pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 ```
 # Path: hyperlane-macros/src/request_middleware/mod.rs
 ```rust
-pub(crate) mod r#fn;
+mod r#fn;
 pub(crate) use r#fn::*;
 ```
 # Path: hyperlane-macros/src/request_middleware/fn.rs
@@ -8553,11 +8488,10 @@ inventory::submit! {
 ```
 # Path: hyperlane-macros/src/hyperlane/mod.rs
 ```rust
-pub(crate) mod r#fn;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-macros/src/hyperlane/struct.rs
 ```rust
@@ -8640,8 +8574,7 @@ impl Parse for MultiHyperlaneAttr {
 mod r#fn;
 mod r#impl;
 mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+pub(crate) use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-macros/src/referer/struct.rs
 ```rust
@@ -8845,8 +8778,7 @@ impl_protocol_check_macro!(tls_macro, is_tls, "tls");
 mod r#fn;
 mod r#impl;
 mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+pub(crate) use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-macros/src/request/struct.rs
 ```rust
@@ -9820,14 +9752,14 @@ pub(crate) fn generate_stream(
         }
         (None, Some(variable_name)) => {
             quote! {
-                while let Ok(#variable_name) = #context.#method_ident(::hyperlane::RequestConfig::default()).await {
+                while let Ok(#variable_name) = #context.#method_ident(&::hyperlane::RequestConfigData::default()).await {
                     #(#stmts)*
                 }
             }
         }
         (None, None) => {
             quote! {
-                while #context.#method_ident(::hyperlane::RequestConfig::default()).await.is_ok() {
+                while #context.#method_ident(&::hyperlane::RequestConfigData::default()).await.is_ok() {
                     #(#stmts)*
                 }
             }
@@ -9976,11 +9908,10 @@ impl Parse for FromStreamData {
 ```
 # Path: hyperlane-macros/src/host/mod.rs
 ```rust
-pub(crate) mod r#fn;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-macros/src/host/struct.rs
 ```rust
@@ -10074,11 +10005,7 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 mod r#type;
-pub(crate) use r#const::*;
-pub(crate) use r#enum::*;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
-pub(crate) use r#type::*;
+pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#struct::*, r#type::*};
 ```
 # Path: hyperlane-macros/src/common/enum.rs
 ```rust
@@ -10295,11 +10222,17 @@ pub(crate) fn is_integer_literal(expr: &Expr) -> bool {
             if path.segments.len() == 2 {
                 let first = &path.segments[0];
                 let second = &path.segments[1];
-                if first.ident == "RequestConfig" && second.ident == "default" {
+                if first.ident == "RequestConfigData" && second.ident == "default" {
                     return true;
                 }
             }
         }
+    }
+    if let Expr::Reference(ExprReference {
+        expr: inner_expr, ..
+    }) = expr
+    {
+        return is_integer_literal(inner_expr);
     }
     false
 }
@@ -10330,8 +10263,7 @@ pub(crate) type MacroHandlerWithAttrPosition =
 mod r#fn;
 mod r#impl;
 mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+pub(crate) use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-macros/src/send/struct.rs
 ```rust
@@ -10509,7 +10441,7 @@ inventory::submit! {
 ```
 # Path: hyperlane-macros/src/response_middleware/mod.rs
 ```rust
-pub(crate) mod r#fn;
+mod r#fn;
 pub(crate) use r#fn::*;
 ```
 # Path: hyperlane-macros/src/response_middleware/fn.rs
@@ -10537,11 +10469,10 @@ inventory::submit! {
 ```
 # Path: hyperlane-macros/src/route/mod.rs
 ```rust
-pub(crate) mod r#fn;
-pub(crate) mod r#impl;
-pub(crate) mod r#struct;
-pub(crate) use r#fn::*;
-pub(crate) use r#struct::*;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-macros/src/route/struct.rs
 ```rust
