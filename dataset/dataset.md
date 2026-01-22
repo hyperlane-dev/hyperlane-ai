@@ -1,4 +1,4 @@
-<!--2026-01-21 18:52:04-->
+<!--2026-01-22 02:08:27-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1212,8 +1212,10 @@ cargo run restart -d
 ```rust
 pub mod application;
 pub mod framework;
-use hyperlane::*;
-use hyperlane_utils::{log::*, *};
+use {
+    hyperlane::*,
+    hyperlane_utils::{log::*, *},
+};
 ```
 # Path: hyperlane-quick-start/init/framework/mod.rs
 ```rust
@@ -1225,12 +1227,12 @@ use super::*;
 ```rust
 mod r#fn;
 pub use r#fn::*;
-use super::{shutdown::*, *};
-use application::*;
+use {
+    super::{shutdown::*, *},
+    application::*,
+};
 #[allow(unused_imports)]
-use hyperlane_app::*;
-use hyperlane_config::framework::*;
-use hyperlane_plugin::process::*;
+use {hyperlane_app::*, hyperlane_config::framework::*, hyperlane_plugin::process::*};
 use tokio::runtime::{Builder, Runtime};
 ```
 # Path: hyperlane-quick-start/init/framework/wait/fn.rs
@@ -1250,16 +1252,18 @@ fn runtime() -> Runtime {
 #[hyperlane(config: ServerConfig)]
 #[instrument_trace]
 async fn init_server_config(server: &Server) {
-    let mut request_config: RequestConfig = RequestConfig::default();
+    let request_config: RequestConfig = RequestConfig::default();
     request_config
-        .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
-        .set_http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);
+        .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
+        .await
+        .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
+        .await;
     config.host(SERVER_HOST).await;
     config.port(SERVER_PORT).await;
     config.ttl(SERVER_TTI).await;
     config.nodelay(SERVER_NODELAY).await;
-    config.request_config(request_config).await;
-    server.config(config.clone()).await;
+    server.server_config(config.clone()).await;
+    server.request_config(request_config).await;
     debug!("Server config{COLON_SPACE}{:?}", config);
     info!("Server initialization successful");
 }
@@ -1307,8 +1311,7 @@ pub fn run() {
 mod r#fn;
 mod r#static;
 pub use r#fn::*;
-use super::*;
-use r#static::*;
+use {super::*, r#static::*};
 use std::sync::{Arc, OnceLock};
 ```
 # Path: hyperlane-quick-start/init/framework/shutdown/fn.rs
@@ -1339,16 +1342,15 @@ pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
 # Path: hyperlane-quick-start/init/application/mod.rs
 ```rust
 mod logger;
-use super::*;
 pub use logger::*;
+use super::*;
 ```
 # Path: hyperlane-quick-start/init/application/logger/mod.rs
 ```rust
 mod r#fn;
-use super::*;
 pub use r#fn::*;
-use hyperlane_config::application::logger::*;
-use hyperlane_plugin::logger::*;
+use super::*;
+use {hyperlane_config::application::logger::*, hyperlane_plugin::logger::*};
 ```
 # Path: hyperlane-quick-start/init/application/logger/fn.rs
 ```rust
@@ -1371,8 +1373,13 @@ pub mod model;
 pub mod service;
 pub mod utils;
 pub mod view;
-use hyperlane::*;
-use hyperlane_utils::{log::*, *};
+use {
+    hyperlane::*,
+    hyperlane_utils::{log::*, *},
+    serde::{Deserialize, Serialize},
+    serde_with::skip_serializing_none,
+    utoipa::ToSchema,
+};
 ```
 # Path: hyperlane-quick-start/app/model/mod.rs
 ```rust
@@ -1380,9 +1387,6 @@ pub mod application;
 pub mod data_transfer;
 pub mod param;
 use super::*;
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
-use utoipa::ToSchema;
 ```
 # Path: hyperlane-quick-start/app/model/data_transfer/mod.rs
 ```rust
@@ -1394,8 +1398,7 @@ use super::*;
 mod r#enum;
 mod r#impl;
 mod r#struct;
-pub use r#enum::*;
-pub use r#struct::*;
+pub use {r#enum::*, r#struct::*};
 use super::*;
 ```
 # Path: hyperlane-quick-start/app/model/data_transfer/common/enum.rs
@@ -1559,7 +1562,7 @@ use super::*;
 # Path: hyperlane-quick-start/app/middleware/response/mod.rs
 ```rust
 mod r#impl;
-pub mod r#struct;
+mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
@@ -1606,10 +1609,9 @@ impl ServerHook for LogMiddleware {
 # Path: hyperlane-quick-start/app/middleware/request/mod.rs
 ```rust
 mod r#impl;
-pub mod r#struct;
+mod r#struct;
 pub use r#struct::*;
-use super::*;
-use hyperlane_config::application::templates::*;
+use {super::*, hyperlane_config::application::templates::*};
 ```
 # Path: hyperlane-quick-start/app/middleware/request/struct.rs
 ```rust
@@ -1738,7 +1740,6 @@ impl ServerHook for UpgradeMiddleware {
 ```rust
 pub mod application;
 pub mod framework;
-pub use framework::*;
 use super::*;
 ```
 # Path: hyperlane-quick-start/app/exception/framework/mod.rs
@@ -1746,8 +1747,7 @@ use super::*;
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
-use super::*;
-use model::data_transfer::common::*;
+use {super::*, model::data_transfer::common::*};
 ```
 # Path: hyperlane-quick-start/app/exception/framework/struct.rs
 ```rust
@@ -1761,6 +1761,7 @@ pub struct TaskPanicHook {
 #[request_error]
 #[derive(Clone, Data, Debug, Default)]
 pub struct RequestErrorHook {
+    #[get(type(copy))]
     pub(super) response_status_code: ResponseStatusCode,
     pub(super) content_type: String,
     pub(super) response_body: String,
@@ -1792,9 +1793,9 @@ impl ServerHook for TaskPanicHook {
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {
         debug!("TaskPanicHook request => {}", ctx.get_request().await);
-        error!("TaskPanicHook => {}", self.response_body);
+        error!("TaskPanicHook => {}", self.get_response_body());
         let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
+            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
         let response_body: Vec<u8> = api_response.to_json_bytes();
     }
 }
@@ -1812,7 +1813,7 @@ impl ServerHook for RequestErrorHook {
     }
     #[prologue_macros(
         response_version(HttpVersion::Http1_1),
-        response_status_code(self.response_status_code),
+        response_status_code(self.get_response_status_code()),
         clear_response_headers,
         response_header(SERVER => HYPERLANE),
         response_version(HttpVersion::Http1_1),
@@ -1821,17 +1822,17 @@ impl ServerHook for RequestErrorHook {
     #[epilogue_macros(response_body(&response_body), try_send)]
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {
-        if self.response_status_code == HttpStatus::BadRequest.code() {
+        if self.get_response_status_code() == HttpStatus::BadRequest.code() {
             ctx.aborted().await;
             warn!("Context aborted");
             return;
         }
-        if self.response_status_code != HttpStatus::RequestTimeout.code() {
+        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {
             debug!("RequestErrorHook request => {}", ctx.get_request().await);
-            error!("RequestErrorHook => {}", self.response_body);
+            error!("RequestErrorHook => {}", self.get_response_body());
         }
         let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, self.response_body);
+            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
         let response_body: Vec<u8> = api_response.to_json_bytes();
     }
 }
@@ -1876,8 +1877,7 @@ impl ServerHook for FaviconRoute {
 ```rust
 pub mod application;
 pub mod framework;
-use hyperlane::*;
-use hyperlane_utils::log::*;
+use {hyperlane::*, hyperlane_utils::log::*};
 ```
 # Path: hyperlane-quick-start/config/framework/const.rs
 ```rust
@@ -1967,8 +1967,10 @@ pub use r#const::*;
 ```rust
 pub mod logger;
 pub mod process;
-use hyperlane::*;
-use hyperlane_utils::{log::*, *};
+use {
+    hyperlane::*,
+    hyperlane_utils::{log::*, *},
+};
 ```
 # Path: hyperlane-quick-start/plugin/process/const.rs
 ```rust
@@ -1981,8 +1983,7 @@ pub const DAEMON_FLAG: &str = "-d";
 ```rust
 mod r#const;
 mod r#fn;
-pub use r#const::*;
-pub use r#fn::*;
+pub use {r#const::*, r#fn::*};
 use super::*;
 use hyperlane_config::framework::*;
 use std::{env::args, future::Future};
@@ -2057,11 +2058,10 @@ mod r#impl;
 mod r#static;
 mod r#struct;
 pub use r#struct::*;
-use super::*;
+use {super::*, r#static::*};
 use hyperlane_config::{application::logger::*, framework::*};
-use r#static::*;
-use hyperlane_utils::once_cell::sync::Lazy;
 use std::fmt::Arguments;
+use hyperlane_utils::once_cell::sync::Lazy;
 ```
 # Path: hyperlane-quick-start/plugin/logger/struct.rs
 ```rust
