@@ -6342,33 +6342,39 @@
     "system": ""
   },
   {
-    "instruction": "WebsocketRoute::send_body_hook方法的源码是怎么实现的？",
+    "instruction": "WebsocketRoute::try_send_body_hook方法的源码是怎么实现的？",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的源码实现如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```",
+    "output": "WebsocketRoute::try_send_body_hook方法的源码实现如下：\n\n```rust\nasync fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        send_result\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "请解释WebsocketRoute::send_body_hook这个方法的实现逻辑和设计思路。",
+    "instruction": "请解释WebsocketRoute::try_send_body_hook这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：12\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "output": "WebsocketRoute::try_send_body_hook方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        send_result\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：13\n- 包含高级特性：泛型编程、异步编程、错误处理",
     "system": ""
   },
   {
-    "instruction": "WebsocketRoute::send_body_hook方法中的泛型是如何设计和使用的？",
+    "instruction": "WebsocketRoute::try_send_body_hook方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的泛型设计和使用如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "WebsocketRoute::try_send_body_hook方法的泛型设计和使用如下：\n\n```rust\nasync fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        send_result\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "WebsocketRoute::send_body_hook方法的异步实现是如何工作的？",
+    "instruction": "WebsocketRoute::try_send_body_hook方法的异步实现是如何工作的？",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的异步实现机制如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "WebsocketRoute::try_send_body_hook方法的异步实现机制如下：\n\n```rust\nasync fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        send_result\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
-    "instruction": "WebsocketRoute::send_body_hook方法的参数设计有什么考虑？",
+    "instruction": "WebsocketRoute::try_send_body_hook方法的参数设计有什么考虑？",
     "input": "",
-    "output": "WebsocketRoute::send_body_hook方法的参数设计如下：\n\n```rust\nasync fn send_body_hook(&self, ctx: &Context) {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "WebsocketRoute::try_send_body_hook方法的参数设计如下：\n\n```rust\nasync fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        send_result\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "WebsocketRoute::try_send_body_hook方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "WebsocketRoute::try_send_body_hook方法的返回值类型设计如下：\n\n```rust\nasync fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {\n        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {\n            let body: ResponseBody = ctx.get_response_body().await;\n            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n            ctx.try_send_body_list_with_data(&frame_list).await\n        } else {\n            ctx.try_send_body().await\n        };\n        if send_result.is_err() {\n            ctx.aborted().await.closed().await;\n        }\n        send_result\n    }\n```\n\n返回类型：Result<(), ResponseError>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -6398,31 +6404,31 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    self.send_body_hook(ctx).await;\n                    continue;\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    self.send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    self.send_body_hook(ctx).await;\n                    continue;\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    self.send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：18\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    self.send_body_hook(ctx).await;\n                    continue;\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    self.send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    self.send_body_hook(ctx).await;\n                    continue;\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    self.send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    self.send_body_hook(ctx).await;\n                    continue;\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    self.send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &Context) {\n        loop {\n            match ctx.ws_from_stream(&RequestConfigData::default()).await {\n                Ok(_) => {\n                    let request_body: Vec<u8> = ctx.get_request_body().await;\n                    ctx.set_response_body(&request_body).await;\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.set_response_body(&error.to_string()).await;\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -8924,37 +8930,37 @@
   {
     "instruction": "set_response_header函数的源码是怎么实现的？",
     "input": "",
-    "output": "set_response_header函数的源码实现如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `K` - The key of the header to set.\n    /// - `V` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```",
+    "output": "set_response_header函数的源码实现如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the header to set.\n    /// - `AsRef<str>` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释set_response_header这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "set_response_header函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `K` - The key of the header to set.\n    /// - `V` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：18\n- 包含高级特性：泛型编程、异步编程、where子句约束",
+    "output": "set_response_header函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the header to set.\n    /// - `AsRef<str>` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：18\n- 包含高级特性：泛型编程、异步编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "set_response_header函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "set_response_header函数的泛型设计和使用如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `K` - The key of the header to set.\n    /// - `V` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "set_response_header函数的泛型设计和使用如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the header to set.\n    /// - `AsRef<str>` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "set_response_header函数的异步实现是如何工作的？",
     "input": "",
-    "output": "set_response_header函数的异步实现机制如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `K` - The key of the header to set.\n    /// - `V` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "set_response_header函数的异步实现机制如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the header to set.\n    /// - `AsRef<str>` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "set_response_header函数的参数设计有什么考虑？",
     "input": "",
-    "output": "set_response_header函数的参数设计如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `K` - The key of the header to set.\n    /// - `V` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n参数列表：\n- key: K\n- value: V\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "set_response_header函数的参数设计如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the header to set.\n    /// - `AsRef<str>` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n参数列表：\n- key: K\n- value: V\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "set_response_header函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "set_response_header函数的返回值类型设计如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `K` - The key of the header to set.\n    /// - `V` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "set_response_header函数的返回值类型设计如下：\n\n```rust\n/// Sets a response header with a new value, removing any existing values.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the header to set.\n    /// - `AsRef<str>` - The new value for the header.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - Reference to the modified context.\n    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AsRef<str>,\n    {\n        self.write().await.get_mut_response().set_header(key, value);\n        self\n    }\n```\n\n返回类型：&Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -9858,78 +9864,6 @@
     "system": ""
   },
   {
-    "instruction": "try_get_attribute函数的源码是怎么实现的？",
-    "input": "",
-    "output": "try_get_attribute函数的源码实现如下：\n\n```rust\n/// Attempts to retrieve a specific attribute by its key, casting it to the specified type.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.\n    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.read()\n            .await\n            .get_attributes()\n            .get(&Attribute::External(key.as_ref().to_owned()).to_string())\n            .and_then(|arc| arc.downcast_ref::<V>())\n            .cloned()\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释try_get_attribute这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "try_get_attribute函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Attempts to retrieve a specific attribute by its key, casting it to the specified type.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.\n    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.read()\n            .await\n            .get_attributes()\n            .get(&Attribute::External(key.as_ref().to_owned()).to_string())\n            .and_then(|arc| arc.downcast_ref::<V>())\n            .cloned()\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：9\n- 代码行数：21\n- 包含高级特性：泛型编程、异步编程、闭包、where子句约束",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_attribute函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "try_get_attribute函数的泛型设计和使用如下：\n\n```rust\n/// Attempts to retrieve a specific attribute by its key, casting it to the specified type.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.\n    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.read()\n            .await\n            .get_attributes()\n            .get(&Attribute::External(key.as_ref().to_owned()).to_string())\n            .and_then(|arc| arc.downcast_ref::<V>())\n            .cloned()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_attribute函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "try_get_attribute函数的异步实现机制如下：\n\n```rust\n/// Attempts to retrieve a specific attribute by its key, casting it to the specified type.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.\n    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.read()\n            .await\n            .get_attributes()\n            .get(&Attribute::External(key.as_ref().to_owned()).to_string())\n            .and_then(|arc| arc.downcast_ref::<V>())\n            .cloned()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_attribute函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "try_get_attribute函数的参数设计如下：\n\n```rust\n/// Attempts to retrieve a specific attribute by its key, casting it to the specified type.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.\n    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.read()\n            .await\n            .get_attributes()\n            .get(&Attribute::External(key.as_ref().to_owned()).to_string())\n            .and_then(|arc| arc.downcast_ref::<V>())\n            .cloned()\n    }\n```\n\n参数列表：\n- key: K\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_attribute函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "try_get_attribute函数的返回值类型设计如下：\n\n```rust\n/// Attempts to retrieve a specific attribute by its key, casting it to the specified type.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<V>` - The attribute value if it exists and can be cast to the specified type.\n    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.read()\n            .await\n            .get_attributes()\n            .get(&Attribute::External(key.as_ref().to_owned()).to_string())\n            .and_then(|arc| arc.downcast_ref::<V>())\n            .cloned()\n    }\n```\n\n返回类型：Option<V>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "get_attribute函数的源码是怎么实现的？",
-    "input": "",
-    "output": "get_attribute函数的源码实现如下：\n\n```rust\n/// Retrieves a specific attribute by its key, casting it to the specified type, panicking if not found.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    pub async fn get_attribute<K, V>(&self, key: K) -> V\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.try_get_attribute(key).await.unwrap()\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释get_attribute这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "get_attribute函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves a specific attribute by its key, casting it to the specified type, panicking if not found.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    pub async fn get_attribute<K, V>(&self, key: K) -> V\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.try_get_attribute(key).await.unwrap()\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：20\n- 包含高级特性：泛型编程、异步编程、where子句约束",
-    "system": ""
-  },
-  {
-    "instruction": "get_attribute函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "get_attribute函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves a specific attribute by its key, casting it to the specified type, panicking if not found.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    pub async fn get_attribute<K, V>(&self, key: K) -> V\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.try_get_attribute(key).await.unwrap()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "get_attribute函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "get_attribute函数的异步实现机制如下：\n\n```rust\n/// Retrieves a specific attribute by its key, casting it to the specified type, panicking if not found.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    pub async fn get_attribute<K, V>(&self, key: K) -> V\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.try_get_attribute(key).await.unwrap()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "get_attribute函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "get_attribute函数的参数设计如下：\n\n```rust\n/// Retrieves a specific attribute by its key, casting it to the specified type, panicking if not found.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    pub async fn get_attribute<K, V>(&self, key: K) -> V\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.try_get_attribute(key).await.unwrap()\n    }\n```\n\n参数列表：\n- key: K\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "get_attribute函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "get_attribute函数的返回值类型设计如下：\n\n```rust\n/// Retrieves a specific attribute by its key, casting it to the specified type, panicking if not found.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    pub async fn get_attribute<K, V>(&self, key: K) -> V\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.try_get_attribute(key).await.unwrap()\n    }\n```\n\n返回类型：V\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
     "instruction": "set_attribute函数的源码是怎么实现的？",
     "input": "",
     "output": "set_attribute函数的源码实现如下：\n\n```rust\n/// Sets an attribute in the context.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The key of the attribute to set.\n    /// - `AnySendSyncClone` - The value of the attribute.\n    ///\n    /// # Returns\n    ///\n    /// - `&Self` - A reference to the modified context.\n    pub async fn set_attribute<K, V>(&self, key: K, value: V) -> &Self\n    where\n        K: AsRef<str>,\n        V: AnySendSyncClone,\n    {\n        self.write().await.get_mut_attributes().insert(\n            Attribute::External(key.as_ref().to_owned()).to_string(),\n            Arc::new(value),\n        );\n        self\n    }\n```",
@@ -10058,37 +9992,37 @@
   {
     "instruction": "get_internal_attribute函数的源码是怎么实现的？",
     "input": "",
-    "output": "get_internal_attribute函数的源码实现如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```",
+    "output": "get_internal_attribute函数的源码实现如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释get_internal_attribute这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "get_internal_attribute函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：19\n- 包含高级特性：泛型编程、异步编程、where子句约束",
+    "output": "get_internal_attribute函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：19\n- 包含高级特性：泛型编程、异步编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "get_internal_attribute函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "get_internal_attribute函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "get_internal_attribute函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "get_internal_attribute函数的异步实现是如何工作的？",
     "input": "",
-    "output": "get_internal_attribute函数的异步实现机制如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "get_internal_attribute函数的异步实现机制如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "get_internal_attribute函数的参数设计有什么考虑？",
     "input": "",
-    "output": "get_internal_attribute函数的参数设计如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n参数列表：\n- key: InternalAttribute\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "get_internal_attribute函数的参数设计如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n参数列表：\n- key: InternalAttribute\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "get_internal_attribute函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "get_internal_attribute函数的返回值类型设计如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `V` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n返回类型：V\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "get_internal_attribute函数的返回值类型设计如下：\n\n```rust\n/// Retrieves an internal framework attribute.\n    ///\n    /// # Arguments\n    ///\n    /// - `InternalAttribute` - The internal attribute key to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `AnySendSyncClone` - The attribute value if it exists and can be cast to the specified type.\n    ///\n    /// # Panics\n    ///\n    /// - If the attribute is not found.\n    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V\n    where\n        V: AnySendSyncClone,\n    {\n        self.try_get_internal_attribute(key).await.unwrap()\n    }\n```\n\n返回类型：V\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -10832,19 +10766,7 @@
   {
     "instruction": "KEY常量的源码是怎么实现的？",
     "input": "",
-    "output": "KEY常量的源码实现如下：\n\n```rust\nconst KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n}\n\n#[tokio::test]\nasync fn send_body_hook() {\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释KEY这个常量的实现逻辑和设计思路。",
-    "input": "",
-    "output": "KEY常量的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nconst KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n}\n\n#[tokio::test]\nasync fn send_body_hook() {\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：11\n- 包含高级特性：异步编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "KEY常量的异步实现是如何工作的？",
-    "input": "",
-    "output": "KEY常量的异步实现机制如下：\n\n```rust\nconst KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n}\n\n#[tokio::test]\nasync fn send_body_hook() {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "KEY常量的源码实现如下：\n\n```rust\nconst KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {\n        assert_eq!(msg, PARAM);\n    };\n```",
     "system": ""
   },
   {
@@ -10910,19 +10832,25 @@
   {
     "instruction": "run_set_func函数的源码是怎么实现的？",
     "input": "",
-    "output": "run_set_func函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn run_set_func() {\n    let ctx: Context = Context::default();\n    const KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n}\n```",
+    "output": "run_set_func函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn run_set_func() {\n    let ctx: Context = Context::default();\n    const KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {\n        assert_eq!(msg, PARAM);\n    };\n    ctx.set_attribute(KEY, func).await;\n    let hyperlane = ctx\n        .get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY)\n        .await;\n    hyperlane(PARAM);\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释run_set_func这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "run_set_func函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn run_set_func() {\n    let ctx: Context = Context::default();\n    const KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：11\n- 包含高级特性：异步编程、闭包",
+    "output": "run_set_func函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn run_set_func() {\n    let ctx: Context = Context::default();\n    const KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {\n        assert_eq!(msg, PARAM);\n    };\n    ctx.set_attribute(KEY, func).await;\n    let hyperlane = ctx\n        .get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY)\n        .await;\n    hyperlane(PARAM);\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：19\n- 包含高级特性：泛型编程、异步编程、闭包",
+    "system": ""
+  },
+  {
+    "instruction": "run_set_func函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "run_set_func函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn run_set_func() {\n    let ctx: Context = Context::default();\n    const KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {\n        assert_eq!(msg, PARAM);\n    };\n    ctx.set_attribute(KEY, func).await;\n    let hyperlane = ctx\n        .get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY)\n        .await;\n    hyperlane(PARAM);\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "run_set_func函数的异步实现是如何工作的？",
     "input": "",
-    "output": "run_set_func函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn run_set_func() {\n    let ctx: Context = Context::default();\n    const KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "run_set_func函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn run_set_func() {\n    let ctx: Context = Context::default();\n    const KEY: &str = \"string\";\n    const PARAM: &str = \"test\";\n    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();\n    ctx.set_attribute(KEY, func).await;\n    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =\n        ctx.try_get_attribute(KEY).await.unwrap();\n    assert_eq!(get_key(PARAM), func(PARAM));\n    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {\n        assert_eq!(msg, PARAM);\n    };\n    ctx.set_attribute(KEY, func).await;\n    let hyperlane = ctx\n        .get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY)\n        .await;\n    hyperlane(PARAM);\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {

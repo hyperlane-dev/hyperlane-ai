@@ -1,4 +1,4 @@
-<!--2026-01-22 13:01:16-->
+<!--2026-01-22 18:41:15-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -3766,7 +3766,7 @@ impl ServerHook for SseRoute {
 }
 struct WebsocketRoute;
 impl WebsocketRoute {
-    async fn send_body_hook(&self, ctx: &Context) {
+    async fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {
         let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {
             let body: ResponseBody = ctx.get_response_body().await;
             let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
@@ -3777,6 +3777,7 @@ impl WebsocketRoute {
         if send_result.is_err() {
             ctx.aborted().await.closed().await;
         }
+        send_result
     }
 }
 impl ServerHook for WebsocketRoute {
@@ -3789,12 +3790,13 @@ impl ServerHook for WebsocketRoute {
                 Ok(_) => {
                     let request_body: Vec<u8> = ctx.get_request_body().await;
                     ctx.set_response_body(&request_body).await;
-                    self.send_body_hook(ctx).await;
-                    continue;
+                    if self.try_send_body_hook(ctx).await.is_err() {
+                        return;
+                    }
                 }
                 Err(error) => {
                     ctx.set_response_body(&error.to_string()).await;
-                    self.send_body_hook(ctx).await;
+                    let _ = self.try_send_body_hook(ctx).await;
                     return;
                 }
             }
@@ -4625,9 +4627,8 @@ impl Context {
     pub async fn get_attributes(&self) -> ThreadSafeAttributeStore {
         self.read().await.get_attributes().clone()
     }
-    pub async fn try_get_attribute<K, V>(&self, key: K) -> Option<V>
+    pub async fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
     where
-        K: AsRef<str>,
         V: AnySendSyncClone,
     {
         self.read()
@@ -4637,9 +4638,8 @@ impl Context {
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
     }
-    pub async fn get_attribute<K, V>(&self, key: K) -> V
+    pub async fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
     where
-        K: AsRef<str>,
         V: AnySendSyncClone,
     {
         self.try_get_attribute(key).await.unwrap()
@@ -5004,6 +5004,14 @@ async fn run_set_func() {
     let get_key: &(dyn Fn(&str) -> String + Send + Sync) =
         ctx.try_get_attribute(KEY).await.unwrap();
     assert_eq!(get_key(PARAM), func(PARAM));
+    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {
+        assert_eq!(msg, PARAM);
+    };
+    ctx.set_attribute(KEY, func).await;
+    let hyperlane = ctx
+        .get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY)
+        .await;
+    hyperlane(PARAM);
 }
 #[tokio::test]
 async fn send_body_hook() {
