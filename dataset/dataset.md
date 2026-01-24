@@ -1,4 +1,4 @@
-<!--2026-01-24 12:51:46-->
+<!--2026-01-24 18:37:28-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -16,11 +16,11 @@ pub use {
     ahash, bin_encode_decode::*, bytemuck_derive, chrono, chunkify::*, clonelicious::*,
     color_output::*, compare_version::*, dotenvy, file_operation::*, future_fn::*, futures, hex,
     hot_restart::*, http_request::*, hyperlane_broadcast::*, hyperlane_log::*, hyperlane_macros::*,
-    hyperlane_plugin_websocket::*, instrument_level::*, jsonwebtoken, log, lombok_macros::*,
-    num_cpus, once_cell, recoverable_spawn::*, recoverable_thread_pool::*, redis, regex, sea_orm,
-    serde_urlencoded, serde_with, serde_xml_rs, serde_yaml, server_manager::*, simd_json, snafu,
-    sqlx, std_macro_extensions::*, tracing_log, tracing_subscriber, twox_hash, url, urlencoding,
-    utoipa, utoipa_rapidoc, utoipa_swagger_ui, uuid,
+    hyperlane_plugin_websocket::*, instrument_level::*, jsonwebtoken, jwt_service::*, log,
+    lombok_macros::*, num_cpus, once_cell, recoverable_spawn::*, recoverable_thread_pool::*, redis,
+    regex, sea_orm, serde_urlencoded, serde_with, serde_xml_rs, serde_yaml, server_manager::*,
+    simd_json, snafu, sqlx, std_macro_extensions::*, tracing_log, tracing_subscriber, twox_hash,
+    url, urlencoding, utoipa, utoipa_rapidoc, utoipa_swagger_ui, uuid,
 };
 ```
 # Path: hyperlane-broadcast/README.md
@@ -1045,7 +1045,6 @@ async fn main() {
 ```
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
-[English](README.md) | [简体中文](README.ZH-CN.md)
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
 ## Official Documentation
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -1089,51 +1088,6 @@ cargo run restart -d
 | ETH              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 | BSC              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 ## Contact
-# Path: hyperlane-quick-start/README.ZH-CN.md
-## hyperlane-quick-start
-[English](README.md) | [简体中文](README.ZH-CN.md)
-> 这是一个轻量级、高性能且跨平台的 Rust HTTP 服务器库，基于 Tokio 构建。它通过提供中间件、WebSocket、服务器推送事件(SSE)和原始 TCP 通信的内置支持，简化了现代 Web 服务的开发。凭借在 Windows、Linux 和 macOS 上统一且符合人体工程学的 API，它使开发者能够以最小的开销和最大的灵活性构建强大、可扩展且事件驱动的网络应用程序。
-## 官方文档
-- [官方文档](https://docs.ltpp.vip/hyperlane/)
-## API 文档
-- [API 文档](https://docs.rs/hyperlane/latest/hyperlane/)
-## 运行
-### 运行
-```sh
-cargo run
-```
-### 热重启
-```sh
-cargo run hot-restart
-```
-### 在后台运行
-```sh
-cargo run -- -d
-```
-### 停止
-```sh
-cargo run stop
-```
-### 重启
-```sh
-cargo run restart
-```
-### 重启在后台运行
-```sh
-cargo run restart -d
-```
-## 性能测试
-- [性能测试](https://docs.ltpp.vip/hyperlane/speed)
-## 赞赏
-> 如果你觉得 `hyperlane` 对你有所帮助，欢迎捐赠
-### 微信支付
-### 支付宝支付
-### 虚拟货币支付
-| 虚拟货币 | 虚拟货币地址                               |
-| -------- | ------------------------------------------ |
-| BTC      | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
-| ETH      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-| BSC      | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 # Path: hyperlane-quick-start/resources/static/not_found/index.html
 ```html
 <!DOCTYPE html>
@@ -1217,6 +1171,100 @@ use {
     hyperlane_utils::{log::*, *},
 };
 ```
+# Path: hyperlane-quick-start/init/README.md
+## hyperlane-init
+> Hyperlane initialization module responsible for application bootstrap, configuration loading, and graceful shutdown coordination.
+## Overview
+The `hyperlane-init` module orchestrates the startup sequence of the hyperlane application. It ensures all components are properly initialized in the correct order and provides graceful shutdown capabilities.
+## Directory Structure
+```
+init/
+├── application/
+│   └── logger/         # Logger initialization
+├── framework/
+│   ├── shutdown/       # Shutdown coordination
+│   └── wait/           # Wait/pause utilities
+├── lib.rs
+└── Cargo.toml
+```
+## Initialization Sequence
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Application Startup                       │
+├─────────────────────────────────────────────────────────────┤
+│  1. Load Configuration                                       │
+│     ├── Load config files                                    │
+│     ├── Parse environment variables                          │
+│     └── Apply default values                                 │
+├─────────────────────────────────────────────────────────────┤
+│  2. Initialize Logging System                                │
+│     ├── Setup log level                                      │
+│     ├── Configure log targets                                │
+│     └── Initialize log subscribers                           │
+├─────────────────────────────────────────────────────────────┤
+│  3. Initialize Plugin System                                 │
+│     ├── Load plugin registry                                 │
+│     ├── Initialize plugins in dependency order               │
+│     └── Start all plugins                                    │
+├─────────────────────────────────────────────────────────────┤
+│  4. Initialize Application Components                        │
+│     ├── Initialize services                                  │
+│     ├── Register routes                                      │
+│     └── Setup middleware                                     │
+├─────────────────────────────────────────────────────────────┤
+│  5. Start Server                                             │
+│     ├── Bind to address                                      │
+│     ├── Accept connections                                   │
+│     └── Handle requests                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+## Features
+- **Sequential Initialization**: Components initialized in proper order
+- **Graceful Shutdown**: Coordinated shutdown with signal handling
+- **Error Propagation**: Initialization errors are properly reported
+- **Resource Cleanup**: Automatic cleanup of resources on shutdown
+- **Wait Groups**: Synchronization of async initialization tasks
+## Quick Start
+```rust
+use hyperlane_init::initialize;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let app = initialize().await?;
+    app.run().await?;
+    Ok(())
+}
+```
+## Shutdown Flow
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Shutdown Sequence                         │
+├─────────────────────────────────────────────────────────────┤
+│  1. Receive Shutdown Signal (SIGINT, SIGTERM, etc.)          │
+├─────────────────────────────────────────────────────────────┤
+│  2. Stop Accepting New Requests                              │
+├─────────────────────────────────────────────────────────────┤
+│  3. Wait for Active Requests to Complete                     │
+├─────────────────────────────────────────────────────────────┤
+│  4. Stop Plugins (in reverse dependency order)               │
+├─────────────────────────────────────────────────────────────┤
+│  5. Flush Logs                                               │
+├─────────────────────────────────────────────────────────────┤
+│  6. Close Connections                                        │
+├─────────────────────────────────────────────────────────────┤
+│  7. Release Resources                                        │
+└─────────────────────────────────────────────────────────────┘
+```
+## Dependencies
+```
+hyperlane-init ├── hyperlane-app     ← Workspace dependency
+├── hyperlane_config  ← Workspace dependency
+├── hyperlane_plugin  ← Workspace dependency
+├── serde             ← Workspace dependency
+├── tracing           ← Workspace dependency
+├── hyperlane         ← Workspace dependency
+└── hyperlane-utils   ← Workspace dependency
+```
+## Contact
 # Path: hyperlane-quick-start/init/framework/mod.rs
 ```rust
 pub mod shutdown;
@@ -1303,7 +1351,7 @@ async fn create_server() {
 #[instrument_trace]
 pub fn run() {
     init_log();
-    runtime().block_on(create(create_server));
+    runtime().block_on(create(SERVER_PID_FILE_PATH, create_server));
 }
 ```
 # Path: hyperlane-quick-start/init/framework/shutdown/mod.rs
@@ -1350,14 +1398,20 @@ use super::*;
 mod r#fn;
 pub use r#fn::*;
 use super::*;
-use {hyperlane_config::application::logger::*, hyperlane_plugin::logger::*};
+use {
+    hyperlane_config::{application::logger::*, framework::*},
+    hyperlane_plugin::logger::*,
+};
 ```
 # Path: hyperlane-quick-start/init/application/logger/fn.rs
 ```rust
 use super::*;
 #[instrument_trace]
 pub fn init_log() {
-    Logger::init(LOG_LEVEL_FILTER);
+    let mut file_logger: FileLogger = FileLogger::default();
+    file_logger.set_path(SERVER_LOG_DIR);
+    file_logger.set_limit_file_size(SERVER_LOG_SIZE);
+    Logger::init(LOG_LEVEL_FILTER, file_logger);
 }
 ```
 # Path: hyperlane-quick-start/app/lib.rs
@@ -1381,6 +1435,124 @@ use {
     utoipa::ToSchema,
 };
 ```
+# Path: hyperlane-quick-start/app/README.md
+## hyperlane-app
+> Hyperlane application module containing core application logic, controllers, services, and middleware components.
+## Overview
+The `hyperlane-app` module is the main application layer of the hyperlane framework. It implements the application logic following domain-driven design principles and provides controllers, services, and middleware components.
+## Directory Structure
+```
+app/
+├── aspect/            # AOP aspects
+├── controller/        # Request handlers
+├── domain/document/   # Domain models - Document
+├── exception/         # Exception handling
+│   ├── application/   # Application exceptions
+│   └── framework/     # Framework exceptions
+├── filter/            # Request/response filters
+├── mapper/            # Data mappers
+│   ├── dataset/
+│   └── document/
+├── middleware/        # Middleware components
+│   ├── request/
+│   └── response/
+├── model/             # Data models
+│   ├── application/
+│   ├── data_transfer/
+│   ├── param/
+│   └── user_model/
+├── service/           # Business logic services
+├── utils/             # Utility functions
+└── Cargo.toml
+```
+## Architecture
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      hyperlane-app                               │
+├─────────────────────────────────────────────────────────────────┤
+│  Controller Layer                                               │
+│  ├── Handles HTTP requests                                      │
+│  ├── Validates input                                            │
+│  └── Returns responses                                          │
+├─────────────────────────────────────────────────────────────────┤
+│  Service Layer                                                  │
+│  ├── Business logic implementation                              │
+│  ├── Transaction management                                     │
+│  └── Service composition                                        │
+├─────────────────────────────────────────────────────────────────┤
+│  Domain Layer                                                   │
+│  ├── Domain models                                              │
+│  ├── Value objects                                              │
+│  └── Domain events                                              │
+├─────────────────────────────────────────────────────────────────┤
+│  Middleware Layer                                               │
+│  ├── Request preprocessing                                      │
+│  ├── Response postprocessing                                    │
+│  └── Cross-cutting concerns                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+## Features
+- **Controller Pattern**: Structured request handling with derive macros
+- **Service Layer**: Business logic isolation and composition
+- **Middleware Stack**: Composable middleware for request processing
+- **Exception Handling**: Centralized exception management
+- **Data Mapping**: Clean separation between layers
+- **Filter Chain**: Request/response filtering
+## Quick Start
+### Creating a Controller
+```rust
+use hyperlane_app::{controller, Response, Json};
+#[controller("/api/users")]
+pub struct UserController;
+impl UserController {
+    #[get("/{id}")]
+    async fn get_user(id: u64) -> Result<Json<UserResponse>, AppError> {
+        let user = UserService::find_by_id(id).await?;
+        Ok(Json(user.into()))
+    }
+    #[post("/")]
+    async fn create_user(Json(req): Json<CreateUserRequest>) -> Result<Json<UserResponse>, AppError> {
+        let user = UserService::create(&req).await?;
+        Ok(Json(user.into()))
+    }
+}
+```
+### Creating a Service
+```rust
+use hyperlane_app::service;
+#[service]
+pub trait UserService {
+    async fn find_by_id(id: u64) -> Result<User, AppError>;
+    async fn create(req: &CreateUserRequest) -> Result<User, AppError>;
+    async fn update(id: u64, req: &UpdateUserRequest) -> Result<User, AppError>;
+    async fn delete(id: u64) -> Result<(), AppError>;
+}
+```
+### Middleware Usage
+```rust
+use hyperlane_app::middleware::RequestMiddleware;
+#[derive(Clone)]
+struct AuthMiddleware;
+#[async_trait::async_trait]
+impl RequestMiddleware for AuthMiddleware {
+    async fn handle(&self, req: &mut Request) -> Result<(), AppError> {
+        // Authentication logic
+        let token = req.headers().get("Authorization");
+        validate_token(token)?;
+        Ok(())
+    }
+}
+```
+## Dependencies
+```
+hyperlane-app ├── hyperlane_config  ← Workspace dependency
+├── hyperlane_plugin  ← Workspace dependency
+├── serde             ← Workspace dependency
+├── tracing           ← Workspace dependency
+├── hyperlane         ← Workspace dependency
+└── hyperlane-utils   ← Workspace dependency
+```
+## Contact
 # Path: hyperlane-quick-start/app/model/mod.rs
 ```rust
 pub mod application;
@@ -1611,7 +1783,7 @@ impl ServerHook for LogMiddleware {
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
-use {super::*, hyperlane_config::application::templates::*};
+use super::*;
 ```
 # Path: hyperlane-quick-start/app/middleware/request/struct.rs
 ```rust
@@ -1699,7 +1871,7 @@ impl ServerHook for ResponseBodyMiddleware {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[response_body(INDEX_HTML.replace("{{ time }}", &time()))]
+    #[response_body(format!("{HYPERLANE}{COLON_SPACE}{}", time()))]
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {}
 }
@@ -1879,6 +2051,54 @@ pub mod application;
 pub mod framework;
 use {hyperlane::*, hyperlane_utils::log::*};
 ```
+# Path: hyperlane-quick-start/config/README.md
+## hyperlane-config
+> Hyperlane configuration module providing comprehensive configuration management capabilities for the framework.
+## Overview
+The `hyperlane-config` module is responsible for all configuration-related operations in the hyperlane framework. It provides a flexible, type-safe configuration system that supports multiple formats and environments.
+## Directory Structure
+```
+config/
+├── application/          # Application configuration
+│   ├── hello/           # Hello route configuration
+│   └── logger/          # Logger configuration
+├── framework/           # Framework configuration
+└── Cargo.toml
+```
+## Features
+- **Multi-format Support**: Supports JSON, YAML, TOML configuration files
+- **Environment Variables**: Built-in environment variable override support
+- **Type Safety**: Strongly typed configuration with serde
+- **Hot Reload**: Automatic configuration reload on file changes
+- **Validation**: Configuration validation with descriptive error messages
+- **Layered Configuration**: Merge multiple configuration sources
+## Quick Start
+```rust
+use hyperlane_config::Config;
+#[derive(Debug, Deserialize)]
+pub struct AppConfig {
+    pub host: String,
+    pub port: u16,
+    pub workers: usize,
+}
+let config = AppConfig::load("config.json")?;
+println!("Server listening on {}:{}", config.host, config.port);
+```
+## Configuration Sources
+Configurations are loaded in the following priority order (highest to lowest):
+1. Command line arguments
+2. Environment variables
+3. `config.{env}.{ext}` (e.g., `config.production.json`)
+4. `config.{ext}` (e.g., `config.json`)
+5. Default values
+## Dependencies
+```
+hyperlane-config ├── serde          ← Workspace dependency
+├── tracing       ← Workspace dependency
+├── hyperlane     ← Workspace dependency
+└── hyperlane-utils ← Workspace dependency
+```
+## Contact
 # Path: hyperlane-quick-start/config/framework/const.rs
 ```rust
 use super::*;
@@ -1909,8 +2129,6 @@ use super::*;
 pub mod hello;
 pub mod logger;
 pub mod logo_img;
-pub mod not_found;
-pub mod templates;
 use super::*;
 ```
 # Path: hyperlane-quick-start/config/application/hello/const.rs
@@ -1945,24 +2163,6 @@ mod r#const;
 pub use r#const::*;
 use super::*;
 ```
-# Path: hyperlane-quick-start/config/application/not_found/const.rs
-```rust
-pub const NOT_FOUND_HTML: &str = include_str!("../../../resources/static/not_found/index.html");
-```
-# Path: hyperlane-quick-start/config/application/not_found/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/config/application/templates/const.rs
-```rust
-pub const INDEX_HTML: &str = include_str!("../../../resources/templates/index/index.html");
-```
-# Path: hyperlane-quick-start/config/application/templates/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
 # Path: hyperlane-quick-start/plugin/lib.rs
 ```rust
 pub mod logger;
@@ -1972,6 +2172,84 @@ use {
     hyperlane_utils::{log::*, *},
 };
 ```
+# Path: hyperlane-quick-start/plugin/README.md
+## hyperlane-plugin
+> A powerful and extensible plugin system for the hyperlane framework, providing modularity and customization capabilities.
+## Overview
+The `hyperlane-plugin` module provides a comprehensive plugin architecture that allows developers to extend the framework's functionality without modifying core code. Plugins can register routes, middleware, services, and event handlers.
+## Directory Structure
+```
+plugin/
+├── logger/              # Logger plugin implementation
+│   ├── impl.rs
+│   ├── mod.rs
+│   └── static.rs
+├── process/             # Process plugin implementation
+│   ├── fn.rs
+│   └── mod.rs
+├── lib.rs
+└── Cargo.toml
+```
+## Features
+- **Plugin Registration**: Simple trait-based plugin registration
+- **Lifecycle Hooks**: Initialize, start, stop, and shutdown hooks
+- **Dependency Management**: Automatic dependency resolution between plugins
+- **Dynamic Loading**: Runtime plugin loading and unloading
+- **Middleware Integration**: Plugins can register middleware
+- **Service Binding**: Plugins can expose services to other components
+## Plugin Lifecycle
+```
+┌─────────────┐
+│   Register  │  ← Plugin::register()
+└──────┬──────┘
+       ▼
+┌─────────────┐
+│  Initialize │  ← Plugin::initialize()
+└──────┬──────┘
+       ▼
+┌─────────────┐
+│    Start    │  ← Plugin::start()
+└──────┬──────┘
+       ▼
+┌─────────────┐
+│    Stop     │  ← Plugin::stop() (on shutdown)
+└──────┬──────┘
+       ▼
+┌─────────────┐
+│  Shutdown   │  ← Plugin::shutdown()
+└─────────────┘
+```
+## Quick Start
+```rust
+use hyperlane_plugin::{Plugin, PluginContext};
+#[derive(Default)]
+struct MyPlugin;
+impl Plugin for MyPlugin {
+    fn name(&self) -> &'static str {
+        "my-plugin"
+    }
+    fn initialize(&mut self, ctx: &PluginContext) -> Result<(), Box<dyn std::error::Error>> {
+        // Plugin initialization logic
+        Ok(())
+    }
+}
+// Register the plugin
+let plugin = MyPlugin::default();
+PluginManager::register(plugin);
+```
+## Built-in Plugins
+### Logger Plugin
+Provides structured logging capabilities with configurable log levels and outputs.
+### Process Plugin
+Handles process management including graceful shutdown and restart functionality.
+## Dependencies
+```
+hyperlane-plugin ├── serde          ← Workspace dependency
+├── tracing       ← Workspace dependency
+├── hyperlane     ← Workspace dependency
+└── hyperlane-utils ← Workspace dependency
+```
+## Contact
 # Path: hyperlane-quick-start/plugin/process/const.rs
 ```rust
 pub const CMD_STOP: &str = "stop";
@@ -1985,15 +2263,15 @@ mod r#const;
 mod r#fn;
 pub use {r#const::*, r#fn::*};
 use super::*;
-use hyperlane_config::framework::*;
 use std::{env::args, future::Future};
 ```
 # Path: hyperlane-quick-start/plugin/process/fn.rs
 ```rust
 use super::*;
 #[instrument_trace]
-pub async fn create<F, Fut>(server_hook: F)
+pub async fn create<P, F, Fut>(pid_path: P, server_hook: F)
 where
+    P: AsRef<str>,
     F: Fn() -> Fut + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
@@ -2001,7 +2279,7 @@ where
     debug!("Process create args{COLON_SPACE}{args:?}");
     let mut manager: ServerManager = ServerManager::new();
     manager
-        .set_pid_file(SERVER_PID_FILE_PATH)
+        .set_pid_file(pid_path.as_ref())
         .set_server_hook(server_hook);
     let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
     let start_server = || async {
@@ -2059,9 +2337,11 @@ mod r#static;
 mod r#struct;
 pub use r#struct::*;
 use {super::*, r#static::*};
-use hyperlane_config::{application::logger::*, framework::*};
 use std::fmt::Arguments;
-use hyperlane_utils::once_cell::sync::Lazy;
+use {
+    hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    hyperlane_utils::once_cell::sync::Lazy,
+};
 ```
 # Path: hyperlane-quick-start/plugin/logger/struct.rs
 ```rust
@@ -2073,7 +2353,7 @@ pub struct Logger;
 use super::*;
 impl Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= LOG_LEVEL_FILTER
+        metadata.level() <= max_level()
     }
     fn log(&self, record: &Record) {
         if !self.enabled(record.metadata()) {
@@ -2145,40 +2425,46 @@ impl Log for Logger {
     }
 }
 impl Logger {
-    #[instrument_trace]
-    pub fn init(level: LevelFilter) {
+    fn read() -> RwLockReadGuard<'static, FileLogger> {
+        FILE_LOGGER.try_read().unwrap()
+    }
+    fn write() -> RwLockWriteGuard<'static, FileLogger> {
+        FILE_LOGGER.try_write().unwrap()
+    }
+    pub fn init(level: LevelFilter, file_logger: FileLogger) {
         set_logger(&LOGGER).unwrap();
         set_max_level(level);
+        *Self::write() = file_logger;
     }
     pub fn log_trace<T>(data: T)
     where
         T: AsRef<str>,
     {
-        FILE_LOGGER.trace(data, log_handler);
+        Self::read().trace(data, log_handler);
     }
     pub fn log_debug<T>(data: T)
     where
         T: AsRef<str>,
     {
-        FILE_LOGGER.debug(data, log_handler);
+        Self::read().debug(data, log_handler);
     }
     pub fn log_info<T>(data: T)
     where
         T: AsRef<str>,
     {
-        FILE_LOGGER.info(data, log_handler);
+        Self::read().info(data, log_handler);
     }
     pub fn log_warn<T>(data: T)
     where
         T: AsRef<str>,
     {
-        FILE_LOGGER.warn(data, log_handler);
+        Self::read().warn(data, log_handler);
     }
     pub fn log_error<T>(data: T)
     where
         T: AsRef<str>,
     {
-        FILE_LOGGER.error(data, log_handler);
+        Self::read().error(data, log_handler);
     }
 }
 ```
@@ -2186,12 +2472,8 @@ impl Logger {
 ```rust
 use super::*;
 pub(super) static LOGGER: Logger = Logger;
-pub(super) static FILE_LOGGER: Lazy<FileLogger> = Lazy::new(|| {
-    let mut file_logger: FileLogger = FileLogger::default();
-    file_logger.set_path(SERVER_LOG_DIR);
-    file_logger.set_limit_file_size(SERVER_LOG_SIZE);
-    file_logger
-});
+pub(super) static FILE_LOGGER: Lazy<RwLock<FileLogger>> =
+    Lazy::new(|| RwLock::new(FileLogger::default()));
 ```
 # Path: hyperlane-quick-start/src/main.rs
 ```rust

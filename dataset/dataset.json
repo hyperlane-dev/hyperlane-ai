@@ -2426,7 +2426,7 @@
   {
     "instruction": "run函数的源码是怎么实现的？",
     "input": "",
-    "output": "run函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub fn run() {\n    init_log();\n    runtime().block_on(create(create_server));\n}\n```",
+    "output": "run函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub fn run() {\n    init_log();\n    runtime().block_on(create(SERVER_PID_FILE_PATH, create_server));\n}\n```",
     "system": ""
   },
   {
@@ -2498,7 +2498,7 @@
   {
     "instruction": "init_log函数的源码是怎么实现的？",
     "input": "",
-    "output": "init_log函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub fn init_log() {\n    Logger::init(LOG_LEVEL_FILTER);\n}\n```",
+    "output": "init_log函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub fn init_log() {\n    let mut file_logger: FileLogger = FileLogger::default();\n    file_logger.set_path(SERVER_LOG_DIR);\n    file_logger.set_limit_file_size(SERVER_LOG_SIZE);\n    Logger::init(LOG_LEVEL_FILTER, file_logger);\n}\n```",
     "system": ""
   },
   {
@@ -2978,19 +2978,19 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_body(format!(\"{HYPERLANE}{COLON_SPACE}{}\", time()))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_body(format!(\"{HYPERLANE}{COLON_SPACE}{}\", time()))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_body(INDEX_HTML.replace(\"{{ time }}\", &time()))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_body(format!(\"{HYPERLANE}{COLON_SPACE}{}\", time()))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -3270,18 +3270,6 @@
     "system": ""
   },
   {
-    "instruction": "NOT_FOUND_HTML常量的源码是怎么实现的？",
-    "input": "",
-    "output": "NOT_FOUND_HTML常量的源码实现如下：\n\n```rust\npub const NOT_FOUND_HTML: &str = include_str!(\"../../../resources/static/not_found/index.html\");\n```",
-    "system": ""
-  },
-  {
-    "instruction": "INDEX_HTML常量的源码是怎么实现的？",
-    "input": "",
-    "output": "INDEX_HTML常量的源码实现如下：\n\n```rust\npub const INDEX_HTML: &str = include_str!(\"../../../resources/templates/index/index.html\");\n```",
-    "system": ""
-  },
-  {
     "instruction": "CMD_STOP常量的源码是怎么实现的？",
     "input": "",
     "output": "CMD_STOP常量的源码实现如下：\n\n```rust\npub const CMD_STOP: &str = \"stop\";\npub const CMD_RESTART: &str = \"restart\";\npub const CMD_HOT_RESTART: &str = \"hot-restart\";\npub const DAEMON_FLAG: &str = \"-d\";\n```",
@@ -3290,31 +3278,31 @@
   {
     "instruction": "create函数的源码是怎么实现的？",
     "input": "",
-    "output": "create函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn create<F, Fut>(server_hook: F)\nwhere\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(SERVER_PID_FILE_PATH)\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```",
+    "output": "create函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn create<P, F, Fut>(pid_path: P, server_hook: F)\nwhere\n    P: AsRef<str>,\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(pid_path.as_ref())\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释create这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "create函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn create<F, Fut>(server_hook: F)\nwhere\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(SERVER_PID_FILE_PATH)\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：12\n- 代码行数：60\n- 包含高级特性：泛型编程、生命周期管理、异步编程、闭包、where子句约束",
+    "output": "create函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn create<P, F, Fut>(pid_path: P, server_hook: F)\nwhere\n    P: AsRef<str>,\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(pid_path.as_ref())\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：12\n- 代码行数：61\n- 包含高级特性：泛型编程、生命周期管理、异步编程、闭包、where子句约束",
     "system": ""
   },
   {
     "instruction": "create函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "create函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\npub async fn create<F, Fut>(server_hook: F)\nwhere\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(SERVER_PID_FILE_PATH)\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "create函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\npub async fn create<P, F, Fut>(pid_path: P, server_hook: F)\nwhere\n    P: AsRef<str>,\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(pid_path.as_ref())\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "create函数的异步实现是如何工作的？",
     "input": "",
-    "output": "create函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn create<F, Fut>(server_hook: F)\nwhere\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(SERVER_PID_FILE_PATH)\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "create函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn create<P, F, Fut>(pid_path: P, server_hook: F)\nwhere\n    P: AsRef<str>,\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(pid_path.as_ref())\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "create函数的参数设计有什么考虑？",
     "input": "",
-    "output": "create函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn create<F, Fut>(server_hook: F)\nwhere\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(SERVER_PID_FILE_PATH)\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```\n\n参数列表：\n- server_hook: F\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "create函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn create<P, F, Fut>(pid_path: P, server_hook: F)\nwhere\n    P: AsRef<str>,\n    F: Fn() -> Fut + Send + Sync + 'static,\n    Fut: Future<Output = ()> + Send + 'static,\n{\n    let args: Vec<String> = args().collect();\n    debug!(\"Process create args{COLON_SPACE}{args:?}\");\n    let mut manager: ServerManager = ServerManager::new();\n    manager\n        .set_pid_file(pid_path.as_ref())\n        .set_server_hook(server_hook);\n    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;\n    let start_server = || async {\n        if is_daemon {\n            match manager.start_daemon().await {\n                Ok(_) => info!(\"Server started in background successfully\"),\n                Err(error) => {\n                    error!(\"Error starting server in background{COLON_SPACE}{error}\")\n                }\n            };\n        } else {\n            info!(\"Server started successfully\");\n            manager.start().await;\n        }\n    };\n    let stop_server = || async {\n        match manager.stop().await {\n            Ok(_) => info!(\"Server stopped successfully\"),\n            Err(error) => error!(\"Error stopping server{COLON_SPACE}{error}\"),\n        };\n    };\n    let hot_restart_server = || async {\n        match manager\n            .watch_detached(&[\"--clear\", \"--skip-local-deps\", \"-q\", \"-x\", \"run\"])\n            .await\n        {\n            Ok(_) => info!(\"Server started successfully\"),\n            Err(error) => error!(\"Error starting server in background{COLON_SPACE}{error}\"),\n        }\n    };\n    let restart_server = || async {\n        stop_server().await;\n        start_server().await;\n    };\n    if args.len() < 2 {\n        warn!(\"No additional command-line parameters, default startup\");\n        start_server().await;\n        return;\n    }\n    let command: String = args[1].to_lowercase();\n    match command.as_str() {\n        CMD_STOP => stop_server().await,\n        CMD_RESTART => restart_server().await,\n        CMD_HOT_RESTART => hot_restart_server().await,\n        _ => {\n            error!(\"Invalid command{COLON_SPACE}{command}\");\n        }\n    }\n}\n```\n\n参数列表：\n- pid_path: P\n- server_hook: F\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -3326,25 +3314,25 @@
   {
     "instruction": "Log::enabled方法的源码是怎么实现的？",
     "input": "",
-    "output": "Log::enabled方法的源码实现如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= LOG_LEVEL_FILTER\n    }\n```",
+    "output": "Log::enabled方法的源码实现如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= max_level()\n    }\n```",
     "system": ""
   },
   {
     "instruction": "Log::enabled方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Log::enabled方法的泛型设计和使用如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= LOG_LEVEL_FILTER\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Log::enabled方法的泛型设计和使用如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= max_level()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "Log::enabled方法的参数设计有什么考虑？",
     "input": "",
-    "output": "Log::enabled方法的参数设计如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= LOG_LEVEL_FILTER\n    }\n```\n\n参数列表：\n- metadata: &Metadata\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Log::enabled方法的参数设计如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= max_level()\n    }\n```\n\n参数列表：\n- metadata: &Metadata\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "Log::enabled方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "Log::enabled方法的返回值类型设计如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= LOG_LEVEL_FILTER\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "Log::enabled方法的返回值类型设计如下：\n\n```rust\nfn enabled(&self, metadata: &Metadata) -> bool {\n        metadata.level() <= max_level()\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -3378,135 +3366,165 @@
     "system": ""
   },
   {
-    "instruction": "Logger::init方法的源码是怎么实现的？",
+    "instruction": "Logger::read方法的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::init方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn init(level: LevelFilter) {\n        set_logger(&LOGGER).unwrap();\n        set_max_level(level);\n    }\n```",
+    "output": "Logger::read方法的源码实现如下：\n\n```rust\nfn read() -> RwLockReadGuard<'static, FileLogger> {\n        FILE_LOGGER.try_read().unwrap()\n    }\n\n    fn write() -> RwLockWriteGuard<'static, FileLogger> {\n        FILE_LOGGER.try_write().unwrap()\n    }\n\n    pub fn init(level: LevelFilter, file_logger: FileLogger) {\n        set_logger(&LOGGER).unwrap();\n        set_max_level(level);\n        *Self::write() = file_logger;\n    }\n\n    pub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().trace(data, log_handler);\n    }\n\n    pub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().debug(data, log_handler);\n    }\n\n    pub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().info(data, log_handler);\n    }\n\n    pub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().warn(data, log_handler);\n    }\n\n    pub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().error(data, log_handler);\n    }\n}\n```",
     "system": ""
   },
   {
-    "instruction": "Logger::init方法的参数设计有什么考虑？",
+    "instruction": "请解释Logger::read这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::init方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn init(level: LevelFilter) {\n        set_logger(&LOGGER).unwrap();\n        set_max_level(level);\n    }\n```\n\n参数列表：\n- level: LevelFilter\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Logger::read方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nfn read() -> RwLockReadGuard<'static, FileLogger> {\n        FILE_LOGGER.try_read().unwrap()\n    }\n\n    fn write() -> RwLockWriteGuard<'static, FileLogger> {\n        FILE_LOGGER.try_write().unwrap()\n    }\n\n    pub fn init(level: LevelFilter, file_logger: FileLogger) {\n        set_logger(&LOGGER).unwrap();\n        set_max_level(level);\n        *Self::write() = file_logger;\n    }\n\n    pub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().trace(data, log_handler);\n    }\n\n    pub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().debug(data, log_handler);\n    }\n\n    pub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().info(data, log_handler);\n    }\n\n    pub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().warn(data, log_handler);\n    }\n\n    pub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().error(data, log_handler);\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：49\n- 包含高级特性：泛型编程、生命周期管理、where子句约束",
     "system": ""
   },
   {
-    "instruction": "Logger::log_trace方法的源码是怎么实现的？",
+    "instruction": "Logger::read方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_trace方法的源码实现如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.trace(data, log_handler);\n    }\n```",
+    "output": "Logger::read方法的泛型设计和使用如下：\n\n```rust\nfn read() -> RwLockReadGuard<'static, FileLogger> {\n        FILE_LOGGER.try_read().unwrap()\n    }\n\n    fn write() -> RwLockWriteGuard<'static, FileLogger> {\n        FILE_LOGGER.try_write().unwrap()\n    }\n\n    pub fn init(level: LevelFilter, file_logger: FileLogger) {\n        set_logger(&LOGGER).unwrap();\n        set_max_level(level);\n        *Self::write() = file_logger;\n    }\n\n    pub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().trace(data, log_handler);\n    }\n\n    pub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().debug(data, log_handler);\n    }\n\n    pub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().info(data, log_handler);\n    }\n\n    pub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().warn(data, log_handler);\n    }\n\n    pub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().error(data, log_handler);\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "请解释Logger::log_trace这个方法的实现逻辑和设计思路。",
+    "instruction": "Logger::read方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "Logger::log_trace方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.trace(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "Logger::read方法的返回值类型设计如下：\n\n```rust\nfn read() -> RwLockReadGuard<'static, FileLogger> {\n        FILE_LOGGER.try_read().unwrap()\n    }\n\n    fn write() -> RwLockWriteGuard<'static, FileLogger> {\n        FILE_LOGGER.try_write().unwrap()\n    }\n\n    pub fn init(level: LevelFilter, file_logger: FileLogger) {\n        set_logger(&LOGGER).unwrap();\n        set_max_level(level);\n        *Self::write() = file_logger;\n    }\n\n    pub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().trace(data, log_handler);\n    }\n\n    pub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().debug(data, log_handler);\n    }\n\n    pub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().info(data, log_handler);\n    }\n\n    pub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().warn(data, log_handler);\n    }\n\n    pub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().error(data, log_handler);\n    }\n}\n```\n\n返回类型：RwLockReadGuard<'static, FileLogger>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "Logger::log_trace方法中的泛型是如何设计和使用的？",
+    "instruction": "write函数的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_trace方法的泛型设计和使用如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.trace(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "write函数的源码实现如下：\n\n```rust\nfn write() -> RwLockWriteGuard<'static, FileLogger> {\n        FILE_LOGGER.try_write().unwrap()\n    }\n\n    pub fn init(level: LevelFilter, file_logger: FileLogger) {\n```",
     "system": ""
   },
   {
-    "instruction": "Logger::log_trace方法的参数设计有什么考虑？",
+    "instruction": "write函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_trace方法的参数设计如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.trace(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "write函数的泛型设计和使用如下：\n\n```rust\nfn write() -> RwLockWriteGuard<'static, FileLogger> {\n        FILE_LOGGER.try_write().unwrap()\n    }\n\n    pub fn init(level: LevelFilter, file_logger: FileLogger) {\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "Logger::log_debug方法的源码是怎么实现的？",
+    "instruction": "write函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "Logger::log_debug方法的源码实现如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.debug(data, log_handler);\n    }\n```",
+    "output": "write函数的返回值类型设计如下：\n\n```rust\nfn write() -> RwLockWriteGuard<'static, FileLogger> {\n        FILE_LOGGER.try_write().unwrap()\n    }\n\n    pub fn init(level: LevelFilter, file_logger: FileLogger) {\n```\n\n返回类型：RwLockWriteGuard<'static, FileLogger>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "请解释Logger::log_debug这个方法的实现逻辑和设计思路。",
+    "instruction": "log_trace函数的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_debug方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.debug(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "log_trace函数的源码实现如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().trace(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "Logger::log_debug方法中的泛型是如何设计和使用的？",
+    "instruction": "请解释log_trace这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_debug方法的泛型设计和使用如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.debug(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "log_trace函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().trace(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "Logger::log_debug方法的参数设计有什么考虑？",
+    "instruction": "log_trace函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_debug方法的参数设计如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.debug(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "log_trace函数的泛型设计和使用如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().trace(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "Logger::log_info方法的源码是怎么实现的？",
+    "instruction": "log_trace函数的参数设计有什么考虑？",
     "input": "",
-    "output": "Logger::log_info方法的源码实现如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.info(data, log_handler);\n    }\n```",
+    "output": "log_trace函数的参数设计如下：\n\n```rust\npub fn log_trace<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().trace(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "请解释Logger::log_info这个方法的实现逻辑和设计思路。",
+    "instruction": "log_debug函数的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_info方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.info(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "log_debug函数的源码实现如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().debug(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "Logger::log_info方法中的泛型是如何设计和使用的？",
+    "instruction": "请解释log_debug这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_info方法的泛型设计和使用如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.info(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "log_debug函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().debug(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "Logger::log_info方法的参数设计有什么考虑？",
+    "instruction": "log_debug函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_info方法的参数设计如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.info(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "log_debug函数的泛型设计和使用如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().debug(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "Logger::log_warn方法的源码是怎么实现的？",
+    "instruction": "log_debug函数的参数设计有什么考虑？",
     "input": "",
-    "output": "Logger::log_warn方法的源码实现如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.warn(data, log_handler);\n    }\n```",
+    "output": "log_debug函数的参数设计如下：\n\n```rust\npub fn log_debug<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().debug(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "请解释Logger::log_warn这个方法的实现逻辑和设计思路。",
+    "instruction": "log_info函数的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_warn方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.warn(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "log_info函数的源码实现如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().info(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "Logger::log_warn方法中的泛型是如何设计和使用的？",
+    "instruction": "请解释log_info这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_warn方法的泛型设计和使用如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.warn(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "log_info函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().info(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "Logger::log_warn方法的参数设计有什么考虑？",
+    "instruction": "log_info函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_warn方法的参数设计如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.warn(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "log_info函数的泛型设计和使用如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().info(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "Logger::log_error方法的源码是怎么实现的？",
+    "instruction": "log_info函数的参数设计有什么考虑？",
     "input": "",
-    "output": "Logger::log_error方法的源码实现如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.error(data, log_handler);\n    }\n```",
+    "output": "log_info函数的参数设计如下：\n\n```rust\npub fn log_info<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().info(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "请解释Logger::log_error这个方法的实现逻辑和设计思路。",
+    "instruction": "log_warn函数的源码是怎么实现的？",
     "input": "",
-    "output": "Logger::log_error方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.error(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "log_warn函数的源码实现如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().warn(data, log_handler);\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "Logger::log_error方法中的泛型是如何设计和使用的？",
+    "instruction": "请解释log_warn这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "Logger::log_error方法的泛型设计和使用如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.error(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "log_warn函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().warn(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
-    "instruction": "Logger::log_error方法的参数设计有什么考虑？",
+    "instruction": "log_warn函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Logger::log_error方法的参数设计如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        FILE_LOGGER.error(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "log_warn函数的泛型设计和使用如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().warn(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "log_warn函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "log_warn函数的参数设计如下：\n\n```rust\npub fn log_warn<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().warn(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "log_error函数的源码是怎么实现的？",
+    "input": "",
+    "output": "log_error函数的源码实现如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().error(data, log_handler);\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释log_error这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "log_error函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().error(data, log_handler);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、where子句约束",
+    "system": ""
+  },
+  {
+    "instruction": "log_error函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "log_error函数的泛型设计和使用如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().error(data, log_handler);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "log_error函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "log_error函数的参数设计如下：\n\n```rust\npub fn log_error<T>(data: T)\n    where\n        T: AsRef<str>,\n    {\n        Self::read().error(data, log_handler);\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
