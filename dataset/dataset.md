@@ -1,8 +1,8 @@
-<!--2026-01-24 18:37:28-->
+<!--2026-01-25 02:16:13-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
-[Api Docs](https://docs.rs/hyperlane-utils/latest/hyperlane_utils/)
+[Api Docs](https://docs.rs/hyperlane-utils/latest/)
 > A library providing utils for hyperlane.
 ## Installation
 To use this crate, you can run cmd:
@@ -26,7 +26,7 @@ pub use {
 # Path: hyperlane-broadcast/README.md
 ## hyperlane-broadcast
 [Official Documentation](https://docs.ltpp.vip/hyperlane-broadcast/)
-[Api Docs](https://docs.rs/hyperlane-broadcast/latest/hyperlane_broadcast/)
+[Api Docs](https://docs.rs/hyperlane-broadcast/latest/)
 > hyperlane-broadcast is a lightweight and ergonomic wrapper over Tokio’s broadcast channel designed for easy-to-use publish-subscribe messaging in async Rust applications. It simplifies the native Tokio broadcast API by providing a straightforward interface for broadcasting messages to multiple subscribers with minimal boilerplate.
 ## Installation
 To use this crate, you can run cmd:
@@ -252,7 +252,7 @@ pub async fn test_broadcast_map() {
 # Path: hyperlane-plugin-websocket/README.md
 ## hyperlane-plugin-websocket
 [Official Documentation](https://docs.ltpp.vip/hyperlane-plugin-websocket/)
-[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/http_type/)
+[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
 > A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with hyperlane-broadcast for efficient message dissemination.
 ## Installation
 To use this crate, you can run cmd:
@@ -1049,7 +1049,7 @@ async fn main() {
 ## Official Documentation
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
-- [Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
+- [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Run
 ### start
 ```sh
@@ -2484,7 +2484,7 @@ fn main() {
 # Path: hyperlane-log/README.md
 ## hyperlane-log
 [Official Documentation](https://docs.ltpp.vip/hyperlane-log/)
-[Api Docs](https://docs.rs/hyperlane-log/latest/hyperlane_log/)
+[Api Docs](https://docs.rs/hyperlane-log/latest/)
 > A Rust logging library that supports both asynchronous and synchronous logging. It provides multiple log levels, such as error, info, and debug. Users can define custom log handling methods and configure log file paths. The library supports log rotation, automatically creating a new log file when the current file reaches the specified size limit. It allows flexible logging configurations, making it suitable for both high-performance asynchronous applications and traditional synchronous logging scenarios. The asynchronous mode utilizes Tokio's async channels for efficient log buffering, while the synchronous mode writes logs directly to the file system.
 ## Installation
 To use this crate, you can run cmd:
@@ -3047,7 +3047,7 @@ async fn test_log_level_dirs_edge_cases() {
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
-[Api Docs](https://docs.rs/hyperlane/latest/hyperlane/)
+[Api Docs](https://docs.rs/hyperlane/latest/)
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
 ## Installation
 To use this crate, you can run cmd:
@@ -6177,7 +6177,7 @@ async fn large_tail_regex_routes() {
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
-[Api Docs](https://docs.rs/hyperlane-time/latest/hyperlane_time/)
+[Api Docs](https://docs.rs/hyperlane-time/latest/)
 > A library for fetching the current time based on the system's locale settings.
 ## Installation
 To use this crate, you can run cmd:
@@ -6526,7 +6526,7 @@ fn test_methods() {
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
-[Api Docs](https://docs.rs/hyperlane-macros/latest/hyperlane_macros/)
+[Api Docs](https://docs.rs/hyperlane-macros/latest/)
 > A comprehensive collection of procedural macros for building HTTP servers with enhanced functionality. This crate provides attribute macros that simplify HTTP request handling, protocol validation, response management, and request data extraction.
 ## Installation
 To use this crate, you can run cmd:
