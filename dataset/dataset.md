@@ -1,4 +1,4 @@
-<!--2026-01-25 18:37:29-->
+<!--2026-01-26 02:14:34-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1090,14 +1090,88 @@ cargo run restart -d
 ## Contact
 # Path: hyperlane-quick-start/resources/lib.rs
 ```rust
+mod sql;
 mod r#static;
 mod templates;
-pub use {r#static::*, templates::*};
+pub use {sql::*, r#static::*, templates::*};
 ```
 # Path: hyperlane-quick-start/resources/README.md
 ## hyperlane-resources
 > Hyperlane resources module containing various resources and utilities used by the framework.
 ## Contact
+# Path: hyperlane-quick-start/resources/sql/const.rs
+```rust
+pub const MYSQL_RECORD_SQL: &str = include_str!("./mysql/record.sql");
+pub const POSTGRESQL_CHAT_HISTORY_SQL: &str = include_str!("./postgresql/chat_history.sql");
+pub const POSTGRESQL_CREATE_INDEX_SQL: &str = include_str!("./postgresql/create_index.sql");
+pub const POSTGRESQL_RECORD_SQL: &str = include_str!("./postgresql/record.sql");
+pub const POSTGRESQL_SHORTLINK_SQL: &str = include_str!("./postgresql/shortlink.sql");
+pub const POSTGRESQL_TRACKING_RECORD_SQL: &str = include_str!("./postgresql/tracking_record.sql");
+```
+# Path: hyperlane-quick-start/resources/sql/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start/resources/sql/postgresql/create_index.sql
+```sql
+CREATE INDEX IF NOT EXISTS idx_chat_history_session_id ON chat_history (session_id);
+CREATE INDEX IF NOT EXISTS idx_chat_history_created_at ON chat_history (created_at);
+CREATE INDEX IF NOT EXISTS idx_tracking_socket_addr ON tracking_record (socket_addr);
+CREATE INDEX IF NOT EXISTS idx_tracking_timestamp ON tracking_record (timestamp);
+CREATE INDEX IF NOT EXISTS idx_tracking_created_at ON tracking_record (created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shortlink_url ON shortlink (url);
+CREATE INDEX IF NOT EXISTS idx_shortlink_created_at ON shortlink (created_at);
+```
+# Path: hyperlane-quick-start/resources/sql/postgresql/shortlink.sql
+```sql
+CREATE TABLE shortlink (
+    id SERIAL PRIMARY KEY,
+    url TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+# Path: hyperlane-quick-start/resources/sql/postgresql/tracking_record.sql
+```sql
+CREATE TABLE tracking_record (
+    id BIGSERIAL PRIMARY KEY,
+    socket_addr VARCHAR(255) NOT NULL,
+    headers TEXT NOT NULL,
+    body TEXT NOT NULL,
+    timestamp BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+# Path: hyperlane-quick-start/resources/sql/postgresql/record.sql
+```sql
+CREATE TABLE record (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(255) NOT NULL UNIQUE,
+    value TEXT
+)
+```
+# Path: hyperlane-quick-start/resources/sql/postgresql/chat_history.sql
+```sql
+CREATE TABLE chat_history (
+    id BIGSERIAL PRIMARY KEY,
+    session_id VARCHAR(255) NOT NULL,
+    sender_name VARCHAR(255) NOT NULL,
+    sender_type VARCHAR(50) NOT NULL,
+    message_type VARCHAR(50) NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+# Path: hyperlane-quick-start/resources/sql/mysql/record.sql
+```sql
+CREATE TABLE `record` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `key` VARCHAR(255) NOT NULL,
+    `value` TEXT,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_key` (`key`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci
+```
 # Path: hyperlane-quick-start/resources/static/const.rs
 ```rust
 pub const NOT_FOUND_HTML: &str = include_str!("./not_found/index.html");
@@ -1946,11 +2020,20 @@ use super::*;
 ```
 # Path: hyperlane-quick-start/plugin/lib.rs
 ```rust
+pub mod database;
+pub mod env;
 pub mod logger;
+pub mod mysql;
+pub mod postgresql;
 pub mod process;
+pub mod redis;
+pub use {database::*, env::*, logger::*, mysql::*, postgresql::*, process::*, redis::*};
+use hyperlane_resources::*;
 use {
     hyperlane::*,
     hyperlane_utils::{log::*, *},
+    once_cell::sync::Lazy,
+    sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
 };
 ```
 # Path: hyperlane-quick-start/plugin/README.md
@@ -2037,6 +2120,1399 @@ where
     }
 }
 ```
+# Path: hyperlane-quick-start/plugin/env/const.rs
+```rust
+pub const ENV_FILE_PATH: &str = "/shell/env";
+pub const DOCKER_COMPOSE_FILE_PATH: &str = "./docker-compose.yml";
+pub const ENV_KEY_GPT_API_URL: &str = "GPT_API_URL";
+pub const ENV_KEY_GPT_MODEL: &str = "GPT_MODEL";
+pub const ENV_KEY_MYSQL_HOST: &str = "MYSQL_HOST";
+pub const ENV_KEY_MYSQL_PORT: &str = "MYSQL_PORT";
+pub const ENV_KEY_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
+pub const ENV_KEY_MYSQL_USERNAME: &str = "MYSQL_USERNAME";
+pub const ENV_KEY_MYSQL_PASSWORD: &str = "MYSQL_PASSWORD";
+pub const ENV_KEY_POSTGRES_HOST: &str = "POSTGRES_HOST";
+pub const ENV_KEY_POSTGRES_PORT: &str = "POSTGRES_PORT";
+pub const ENV_KEY_POSTGRES_DATABASE: &str = "POSTGRES_DATABASE";
+pub const ENV_KEY_POSTGRES_USERNAME: &str = "POSTGRES_USERNAME";
+pub const ENV_KEY_POSTGRES_PASSWORD: &str = "POSTGRES_PASSWORD";
+pub const ENV_KEY_REDIS_HOST: &str = "REDIS_HOST";
+pub const ENV_KEY_REDIS_PORT: &str = "REDIS_PORT";
+pub const ENV_KEY_REDIS_USERNAME: &str = "REDIS_USERNAME";
+pub const ENV_KEY_REDIS_PASSWORD: &str = "REDIS_PASSWORD";
+pub const DEFAULT_MYSQL_PORT: usize = 3306;
+pub const DEFAULT_REDIS_PORT: usize = 6379;
+pub const DEFAULT_POSTGRESQL_PORT: usize = 5432;
+pub const DEFAULT_DB_HOST: &str = "127.0.0.1";
+pub const DOCKER_YAML_SERVICES: &str = "services";
+pub const DOCKER_YAML_ENVIRONMENT: &str = "environment";
+pub const DOCKER_YAML_PORTS: &str = "ports";
+pub const DOCKER_YAML_COMMAND: &str = "command";
+pub const DOCKER_SERVICE_MYSQL: &str = "mysql";
+pub const DOCKER_SERVICE_POSTGRESQL: &str = "postgresql";
+pub const DOCKER_SERVICE_REDIS: &str = "redis";
+pub const DOCKER_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
+pub const DOCKER_MYSQL_USER: &str = "MYSQL_USER";
+pub const DOCKER_MYSQL_PASSWORD: &str = "MYSQL_PASSWORD";
+pub const DOCKER_POSTGRES_DB: &str = "POSTGRES_DB";
+pub const DOCKER_POSTGRES_USER: &str = "POSTGRES_USER";
+pub const DOCKER_POSTGRES_PASSWORD: &str = "POSTGRES_PASSWORD";
+pub const DOCKER_REDIS_PASSWORD_FLAG: &str = "--requirepass";
+```
+# Path: hyperlane-quick-start/plugin/env/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use {r#const::*, r#fn::*, r#struct::*};
+use {super::*, mysql::*, postgresql::*, r#static::*};
+use std::sync::OnceLock;
+```
+# Path: hyperlane-quick-start/plugin/env/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Default)]
+pub struct MySqlInstanceConfig {
+    pub name: String,
+    pub host: String,
+    pub port: usize,
+    pub database: String,
+    pub username: String,
+    pub password: String,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct PostgreSqlInstanceConfig {
+    pub name: String,
+    pub host: String,
+    pub port: usize,
+    pub database: String,
+    pub username: String,
+    pub password: String,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct RedisInstanceConfig {
+    pub name: String,
+    pub host: String,
+    pub port: usize,
+    pub username: String,
+    pub password: String,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct EnvConfig {
+    pub gpt_api_url: String,
+    pub gpt_model: String,
+    pub mysql_instances: Vec<MySqlInstanceConfig>,
+    pub redis_instances: Vec<RedisInstanceConfig>,
+    pub postgresql_instances: Vec<PostgreSqlInstanceConfig>,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct DockerComposeConfig {
+    mysql_port: Option<usize>,
+    mysql_database: Option<String>,
+    mysql_username: Option<String>,
+    mysql_password: Option<String>,
+    redis_port: Option<usize>,
+    redis_username: Option<String>,
+    redis_password: Option<String>,
+    postgresql_port: Option<usize>,
+    postgresql_database: Option<String>,
+    postgresql_username: Option<String>,
+    postgresql_password: Option<String>,
+}
+```
+# Path: hyperlane-quick-start/plugin/env/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub fn get_global_env_config() -> &'static EnvConfig {
+    GLOBAL_ENV_CONFIG.get_or_init(EnvConfig::default)
+}
+#[instrument_trace]
+pub fn init_env_config() -> Result<(), String> {
+    let config: EnvConfig = EnvConfig::load()?;
+    GLOBAL_ENV_CONFIG
+        .set(config.clone())
+        .map_err(|_| "Failed to initialize global environment configuration".to_string())?;
+    info!("Environment Configuration Loaded Successfully");
+    info!(
+        "GPT API URL{COLON_SPACE}{}",
+        if config.gpt_api_url.is_empty() {
+            "(not set)"
+        } else {
+            &config.gpt_api_url
+        }
+    );
+    info!(
+        "GPT Model{COLON_SPACE}{}",
+        if config.gpt_model.is_empty() {
+            "(not set)"
+        } else {
+            &config.gpt_model
+        }
+    );
+    info!("MySQL Configuration:");
+    if config.mysql_instances.is_empty() {
+        info!("  (no MySQL instances configured)");
+    } else {
+        for instance in &config.mysql_instances {
+            info!(
+```
+# Path: hyperlane-quick-start/plugin/env/impl.rs
+```rust
+use super::*;
+impl MySqlInstanceConfig {
+    pub fn get_connection_url(&self) -> String {
+        format!(
+    #[instrument_trace]
+    pub fn load() -> Result<Self, String> {
+        let docker_config: DockerComposeConfig =
+            Self::load_from_docker_compose().unwrap_or_default();
+        if read_from_file::<Vec<u8>>(ENV_FILE_PATH).is_err() {
+            let mut data: String = String::new();
+            data.push_str(&format!("{ENV_KEY_GPT_API_URL}={BR}"));
+            data.push_str(&format!("{ENV_KEY_GPT_MODEL}={BR}"));
+            write_to_file(ENV_FILE_PATH, data.as_bytes()).map_err(|error| {
+                format!("Failed to create example env file{COLON_SPACE}{error}")
+            })?;
+        }
+        dotenvy::from_path(ENV_FILE_PATH)
+            .map_err(|error| format!("Failed to load env file{COLON_SPACE}{error}"))?;
+        let get_env = |key: &str| -> Option<String> { std::env::var(key).ok() };
+        let get_env_usize = |key: &str| -> Option<usize> {
+            std::env::var(key).ok().and_then(|value| value.parse().ok())
+        };
+        let mut config: EnvConfig = EnvConfig {
+            gpt_api_url: get_env(ENV_KEY_GPT_API_URL).unwrap_or_default(),
+            gpt_model: get_env(ENV_KEY_GPT_MODEL).unwrap_or_default(),
+            ..Default::default()
+        };
+        let default_mysql_host =
+            get_env(ENV_KEY_MYSQL_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
+        let default_mysql_port = docker_config
+            .try_get_mysql_port()
+            .or_else(|| get_env_usize(ENV_KEY_MYSQL_PORT))
+            .unwrap_or(DEFAULT_MYSQL_PORT);
+        let default_mysql_database = docker_config
+            .try_get_mysql_database()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_MYSQL_DATABASE))
+            .unwrap_or_default();
+        let default_mysql_username = docker_config
+            .try_get_mysql_username()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_MYSQL_USERNAME))
+            .unwrap_or_default();
+        let default_mysql_password = docker_config
+            .try_get_mysql_password()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_MYSQL_PASSWORD))
+            .unwrap_or_default();
+        let instance: MySqlInstanceConfig = MySqlInstanceConfig {
+            name: DEFAULT_MYSQL_INSTANCE_NAME.to_string(),
+            host: default_mysql_host,
+            port: default_mysql_port,
+            database: default_mysql_database,
+            username: default_mysql_username,
+            password: default_mysql_password,
+        };
+        config.mysql_instances.push(instance);
+        let mut instance_index: usize = 1;
+        loop {
+            let prefix: String = format!("MYSQL_{instance_index}_");
+            let host_key: String = format!("{prefix}HOST");
+            if let Some(host) = get_env(&host_key) {
+                let port_key: String = format!("{prefix}PORT");
+                let database_key: String = format!("{prefix}DATABASE");
+                let username_key: String = format!("{prefix}USERNAME");
+                let password_key: String = format!("{prefix}PASSWORD");
+                let instance_name: String = format!("mysql_{instance_index}");
+                let instance: MySqlInstanceConfig = MySqlInstanceConfig {
+                    name: instance_name,
+                    host,
+                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_MYSQL_PORT),
+                    database: get_env(&database_key).unwrap_or_default(),
+                    username: get_env(&username_key).unwrap_or_default(),
+                    password: get_env(&password_key).unwrap_or_default(),
+                };
+                config.mysql_instances.push(instance);
+                instance_index += 1;
+            } else {
+                break;
+            }
+        }
+        let default_postgres_host: String =
+            get_env(ENV_KEY_POSTGRES_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
+        let default_postgres_port: usize = docker_config
+            .try_get_postgresql_port()
+            .or_else(|| get_env_usize(ENV_KEY_POSTGRES_PORT))
+            .unwrap_or(DEFAULT_POSTGRESQL_PORT);
+        let default_postgres_database = docker_config
+            .try_get_postgresql_database()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_POSTGRES_DATABASE))
+            .unwrap_or_default();
+        let default_postgres_username = docker_config
+            .try_get_postgresql_username()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_POSTGRES_USERNAME))
+            .unwrap_or_default();
+        let default_postgres_password = docker_config
+            .try_get_postgresql_password()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_POSTGRES_PASSWORD))
+            .unwrap_or_default();
+        let instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig {
+            name: DEFAULT_POSTGRESQL_INSTANCE_NAME.to_string(),
+            host: default_postgres_host,
+            port: default_postgres_port,
+            database: default_postgres_database,
+            username: default_postgres_username,
+            password: default_postgres_password,
+        };
+        config.postgresql_instances.push(instance);
+        let mut instance_index: usize = 1;
+        loop {
+            let prefix: String = format!("POSTGRES_{instance_index}_");
+            let host_key: String = format!("{prefix}HOST");
+            if let Some(host) = get_env(&host_key) {
+                let port_key: String = format!("{prefix}PORT");
+                let database_key: String = format!("{prefix}DATABASE");
+                let username_key: String = format!("{prefix}USERNAME");
+                let password_key: String = format!("{prefix}PASSWORD");
+                let instance_name: String = format!("postgres_{instance_index}");
+                let instance = PostgreSqlInstanceConfig {
+                    name: instance_name,
+                    host,
+                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_POSTGRESQL_PORT),
+                    database: get_env(&database_key).unwrap_or_default(),
+                    username: get_env(&username_key).unwrap_or_default(),
+                    password: get_env(&password_key).unwrap_or_default(),
+                };
+                config.postgresql_instances.push(instance);
+                instance_index += 1;
+            } else {
+                break;
+            }
+        }
+        let default_redis_host: String =
+            get_env(ENV_KEY_REDIS_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
+        let default_redis_port: usize = docker_config
+            .try_get_redis_port()
+            .or_else(|| get_env_usize(ENV_KEY_REDIS_PORT))
+            .unwrap_or(DEFAULT_REDIS_PORT);
+        let default_redis_username = docker_config
+            .try_get_redis_username()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_REDIS_USERNAME))
+            .unwrap_or_default();
+        let default_redis_password = docker_config
+            .try_get_redis_password()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_REDIS_PASSWORD))
+            .unwrap_or_default();
+        let instance: RedisInstanceConfig = RedisInstanceConfig {
+            name: DEFAULT_REDIS_INSTANCE_NAME.to_string(),
+            host: default_redis_host,
+            port: default_redis_port,
+            username: default_redis_username,
+            password: default_redis_password,
+        };
+        config.redis_instances.push(instance);
+        let mut instance_index: usize = 1;
+        loop {
+            let prefix: String = format!("REDIS_{instance_index}_");
+            let host_key: String = format!("{prefix}HOST");
+            if let Some(host) = get_env(&host_key) {
+                let port_key: String = format!("{prefix}PORT");
+                let username_key: String = format!("{prefix}USERNAME");
+                let password_key: String = format!("{prefix}PASSWORD");
+                let instance_name: String = format!("redis_{instance_index}");
+                let instance: RedisInstanceConfig = RedisInstanceConfig {
+                    name: instance_name,
+                    host,
+                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_REDIS_PORT),
+                    username: get_env(&username_key).unwrap_or_default(),
+                    password: get_env(&password_key).unwrap_or_default(),
+                };
+                config.redis_instances.push(instance);
+                instance_index += 1;
+            } else {
+                break;
+            }
+        }
+        Ok(config)
+    }
+    #[instrument_trace]
+    fn load_from_docker_compose() -> Result<DockerComposeConfig, String> {
+        let docker_compose_content: Vec<u8> = read_from_file(DOCKER_COMPOSE_FILE_PATH)
+            .map_err(|error| format!("Failed to read docker-compose.yml{COLON_SPACE}{error}"))?;
+        let yaml: serde_yaml::Value = serde_yaml::from_slice(&docker_compose_content)
+            .map_err(|error| format!("Failed to parse docker-compose.yml{COLON_SPACE}{error}"))?;
+        let mut config: DockerComposeConfig = DockerComposeConfig::default();
+        if let Some(mysql) = yaml
+            .get(DOCKER_YAML_SERVICES)
+            .and_then(|services| services.get(DOCKER_SERVICE_MYSQL))
+        {
+            if let Some(env) = mysql.get(DOCKER_YAML_ENVIRONMENT) {
+                if let Some(database) = env
+                    .get(DOCKER_MYSQL_DATABASE)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_mysql_database(Some(database));
+                }
+                if let Some(username) = env
+                    .get(DOCKER_MYSQL_USER)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_mysql_username(Some(username));
+                }
+                if let Some(password) = env
+                    .get(DOCKER_MYSQL_PASSWORD)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_mysql_password(Some(password));
+                }
+            }
+            if let Some(ports) = mysql
+                .get(DOCKER_YAML_PORTS)
+                .and_then(|ports_value| ports_value.as_sequence())
+            {
+                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
+                    if let Some(host_port) = port_mapping.split(':').next() {
+                        if let Ok(port) = host_port.parse() {
+                            config.set_mysql_port(Some(port));
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(postgresql) = yaml
+            .get(DOCKER_YAML_SERVICES)
+            .and_then(|services| services.get(DOCKER_SERVICE_POSTGRESQL))
+        {
+            if let Some(env) = postgresql.get(DOCKER_YAML_ENVIRONMENT) {
+                if let Some(database) = env
+                    .get(DOCKER_POSTGRES_DB)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_postgresql_database(Some(database));
+                }
+                if let Some(username) = env
+                    .get(DOCKER_POSTGRES_USER)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_postgresql_username(Some(username));
+                }
+                if let Some(password) = env
+                    .get(DOCKER_POSTGRES_PASSWORD)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_postgresql_password(Some(password));
+                }
+            }
+            if let Some(ports) = postgresql
+                .get(DOCKER_YAML_PORTS)
+                .and_then(|ports_value| ports_value.as_sequence())
+            {
+                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
+                    if let Some(host_port) = port_mapping.split(':').next() {
+                        if let Ok(port) = host_port.parse() {
+                            config.set_postgresql_port(Some(port));
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(redis) = yaml
+            .get(DOCKER_YAML_SERVICES)
+            .and_then(|services| services.get(DOCKER_SERVICE_REDIS))
+        {
+            if let Some(command) = redis
+                .get(DOCKER_YAML_COMMAND)
+                .and_then(|command_value| command_value.as_str())
+            {
+                if let Some(password_part) = command.split(DOCKER_REDIS_PASSWORD_FLAG).nth(1) {
+                    config.set_redis_password(Some(password_part.trim().to_string()));
+                }
+            }
+            if let Some(ports) = redis
+                .get(DOCKER_YAML_PORTS)
+                .and_then(|ports_value| ports_value.as_sequence())
+            {
+                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
+                    if let Some(host_port) = port_mapping.split(':').next() {
+                        if let Ok(port) = host_port.parse() {
+                            config.set_redis_port(Some(port));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(config)
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/env/static.rs
+```rust
+use super::*;
+pub static GLOBAL_ENV_CONFIG: OnceLock<EnvConfig> = OnceLock::new();
+```
+# Path: hyperlane-quick-start/plugin/postgresql/const.rs
+```rust
+pub const DEFAULT_POSTGRESQL_INSTANCE_NAME: &str = "postgres_default";
+```
+# Path: hyperlane-quick-start/plugin/postgresql/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use {r#const::*, r#fn::*, r#struct::*};
+use {super::*, database::*, env::*, r#static::*};
+use std::{collections::HashMap, time::Instant};
+use {
+    once_cell::sync::Lazy,
+    sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
+    tokio::sync::{RwLock, RwLockWriteGuard},
+};
+```
+# Path: hyperlane-quick-start/plugin/postgresql/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, New)]
+pub struct PostgreSqlAutoCreation {
+    pub instance: PostgreSqlInstanceConfig,
+}
+```
+# Path: hyperlane-quick-start/plugin/postgresql/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn connection_postgresql_db<I>(instance_name: I) -> Result<DatabaseConnection, String>
+where
+    I: AsRef<str>,
+{
+    let instance_name_str: &str = instance_name.as_ref();
+    let env: &'static EnvConfig = get_global_env_config();
+    let instance: &PostgreSqlInstanceConfig = env
+        .get_postgresql_instance(instance_name_str)
+        .ok_or_else(|| format!("PostgreSQL instance '{instance_name_str}' not found"))?;
+    match perform_postgresql_auto_creation(instance).await {
+        Ok(result) => {
+            if result.has_changes() {
+                database::AutoCreationLogger::log_auto_creation_complete(
+                    database::PluginType::PostgreSQL,
+                    &result,
+                )
+                .await;
+            }
+        }
+        Err(error) => {
+            database::AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Auto-creation process",
+                database::PluginType::PostgreSQL,
+                Some(&instance.database),
+            )
+            .await;
+            if !error.should_continue() {
+                return Err(error.to_string());
+            }
+        }
+    }
+    let db_url: String = instance.get_connection_url();
+    Database::connect(&db_url).await.map_err(|error: DbErr| {
+        let error_msg: String = error.to_string();
+        let database_name: String = instance.database.clone();
+        let error_msg_clone: String = error_msg.clone();
+        tokio::spawn(async move {
+            database::AutoCreationLogger::log_connection_verification(
+                database::PluginType::PostgreSQL,
+                &database_name,
+                false,
+                Some(&error_msg_clone),
+            )
+            .await;
+        });
+        error_msg
+    })
+}
+#[instrument_trace]
+pub async fn get_postgresql_connection<I>(instance_name: I) -> Result<DatabaseConnection, String>
+where
+    I: AsRef<str>,
+{
+    let instance_name_str: &str = instance_name.as_ref();
+    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<DatabaseConnection, String>>> =
+        POSTGRESQL_CONNECTIONS.write().await;
+    if let Some(connection_result) = connections.get(instance_name_str) {
+        match connection_result {
+            Ok(conn) => return Ok(conn.clone()),
+            Err(_) => {
+                connections.remove(instance_name_str);
+            }
+        }
+    }
+    drop(connections);
+    let new_connection: Result<DatabaseConnection, String> =
+        connection_postgresql_db(instance_name_str).await;
+    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<DatabaseConnection, String>>> =
+        POSTGRESQL_CONNECTIONS.write().await;
+    match &new_connection {
+        Ok(conn) => {
+            connections.insert(instance_name_str.to_string(), Ok(conn.clone()));
+        }
+        Err(error) => {
+            connections.insert(instance_name_str.to_string(), Err(error.clone()));
+        }
+    }
+    new_connection
+}
+#[instrument_trace]
+pub async fn perform_postgresql_auto_creation(
+    instance: &PostgreSqlInstanceConfig,
+) -> Result<AutoCreationResult, AutoCreationError> {
+    let start_time: Instant = Instant::now();
+    let mut result: AutoCreationResult = AutoCreationResult::default();
+    AutoCreationLogger::log_auto_creation_start(
+        database::PluginType::PostgreSQL,
+        &instance.database,
+    )
+    .await;
+    let auto_creator: PostgreSqlAutoCreation = PostgreSqlAutoCreation::new(instance.clone());
+    match auto_creator.create_database_if_not_exists().await {
+        Ok(created) => {
+            result.database_created = created;
+        }
+        Err(error) => {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Database creation",
+                database::PluginType::PostgreSQL,
+                Some(&instance.database),
+            )
+            .await;
+            if !error.should_continue() {
+                result.duration = start_time.elapsed();
+                return Err(error);
+            }
+            result.errors.push(error.to_string());
+        }
+    }
+    match auto_creator.create_tables_if_not_exist().await {
+        Ok(tables) => {
+            result.tables_created = tables;
+        }
+        Err(error) => {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Table creation",
+                database::PluginType::PostgreSQL,
+                Some(&instance.database),
+            )
+            .await;
+            result.errors.push(error.to_string());
+        }
+    }
+    if let Err(error) = auto_creator.verify_connection().await {
+        AutoCreationLogger::log_auto_creation_error(
+            &error,
+            "Connection verification",
+            database::PluginType::PostgreSQL,
+            Some(&instance.database),
+        )
+        .await;
+        if !error.should_continue() {
+            result.duration = start_time.elapsed();
+            return Err(error);
+        }
+        result.errors.push(error.to_string());
+    }
+    result.duration = start_time.elapsed();
+    AutoCreationLogger::log_auto_creation_complete(database::PluginType::PostgreSQL, &result).await;
+    Ok(result)
+}
+```
+# Path: hyperlane-quick-start/plugin/postgresql/impl.rs
+```rust
+use super::*;
+impl Default for PostgreSqlAutoCreation {
+    #[instrument_trace]
+    fn default() -> Self {
+        let env: &'static EnvConfig = get_global_env_config();
+        if let Some(instance) = env.get_default_postgresql_instance() {
+            Self::new(instance.clone())
+        } else {
+            let default_instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig::default();
+            Self::new(default_instance)
+        }
+    }
+}
+impl PostgreSqlAutoCreation {
+    #[instrument_trace]
+    async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
+        let admin_url: String = self.instance.get_admin_url();
+        Database::connect(&admin_url).await.map_err(|error: DbErr| {
+            let error_msg: String = error.to_string();
+            if error_msg.contains("authentication failed") || error_msg.contains("permission") {
+                AutoCreationError::InsufficientPermissions(format!(
+                    "Cannot connect to PostgreSQL server for database creation{COLON_SPACE}{error_msg}"
+                ))
+            } else if error_msg.contains("timeout") || error_msg.contains("Connection refused") {
+                AutoCreationError::ConnectionFailed(format!(
+                    "Cannot connect to PostgreSQL server{COLON_SPACE}{error_msg}"
+                ))
+            } else {
+                AutoCreationError::DatabaseError(format!(
+                    "PostgreSQL connection error{COLON_SPACE}{error_msg}"
+                ))
+            }
+        })
+    }
+    #[instrument_trace]
+    async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
+        let db_url: String = self.instance.get_connection_url();
+        Database::connect(&db_url).await.map_err(|error: DbErr| {
+            AutoCreationError::ConnectionFailed(format!(
+                "Cannot connect to PostgreSQL database '{}'{COLON_SPACE}{error}",
+                self.instance.database,
+            ))
+        })
+    }
+    #[instrument_trace]
+    async fn database_exists(
+        &self,
+        connection: &DatabaseConnection,
+    ) -> Result<bool, AutoCreationError> {
+        let query: String = format!(
+            "SELECT 1 FROM pg_database WHERE datname = '{}'",
+            self.instance.database
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, query);
+        match connection.query_all(statement).await {
+            Ok(results) => Ok(!results.is_empty()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to check if database exists{COLON_SPACE}{error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    async fn create_database(
+        &self,
+        connection: &DatabaseConnection,
+    ) -> Result<bool, AutoCreationError> {
+        if self.database_exists(connection).await? {
+            AutoCreationLogger::log_database_exists(
+                &self.instance.database,
+                database::PluginType::PostgreSQL,
+            )
+            .await;
+            return Ok(false);
+        }
+        let create_query: String = format!(
+            "CREATE DATABASE \"{}\" WITH ENCODING='UTF8' LC_COLLATE='en_US.UTF-8' LC_CTYPE='en_US.UTF-8'",
+            self.instance.database
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, create_query);
+        match connection.execute(statement).await {
+            Ok(_) => {
+                AutoCreationLogger::log_database_created(
+                    &self.instance.database,
+                    database::PluginType::PostgreSQL,
+                )
+                .await;
+                Ok(true)
+            }
+            Err(error) => {
+                let error_msg: String = error.to_string();
+                if error_msg.contains("permission denied") || error_msg.contains("must be owner") {
+                    Err(AutoCreationError::InsufficientPermissions(format!(
+                        "Cannot create PostgreSQL database '{}'{COLON_SPACE}{}",
+                        self.instance.database, error_msg
+                    )))
+                } else if error_msg.contains("already exists") {
+                    AutoCreationLogger::log_database_exists(
+                        &self.instance.database,
+                        database::PluginType::PostgreSQL,
+                    )
+                    .await;
+                    Ok(false)
+                } else {
+                    Err(AutoCreationError::DatabaseError(format!(
+                        "Failed to create PostgreSQL database '{}'{COLON_SPACE}{}",
+                        self.instance.database, error_msg
+                    )))
+                }
+            }
+        }
+    }
+    #[instrument_trace]
+    async fn table_exists<T>(
+        &self,
+        connection: &DatabaseConnection,
+        table_name: T,
+    ) -> Result<bool, AutoCreationError>
+    where
+        T: AsRef<str>,
+    {
+        let table_name_str: &str = table_name.as_ref();
+        let query: String = format!(
+            "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table_name_str}'"
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, query);
+        match connection.query_all(statement).await {
+            Ok(results) => Ok(!results.is_empty()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to check if table '{table_name_str}' exists{COLON_SPACE}{error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    async fn create_table(
+        &self,
+        connection: &DatabaseConnection,
+        table: &database::TableSchema,
+    ) -> Result<(), AutoCreationError> {
+        let statement: Statement =
+            Statement::from_string(DatabaseBackend::Postgres, table.sql.clone());
+        match connection.execute(statement).await {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let error_msg: String = error.to_string();
+                if error_msg.contains("permission denied") {
+                    Err(AutoCreationError::InsufficientPermissions(format!(
+                        "Cannot create PostgreSQL table '{}'{COLON_SPACE}{}",
+                        table.name, error_msg
+                    )))
+                } else {
+                    Err(AutoCreationError::SchemaError(format!(
+                        "Failed to create PostgreSQL table '{}'{COLON_SPACE}{}",
+                        table.name, error_msg
+                    )))
+                }
+            }
+        }
+    }
+    #[instrument_trace]
+    async fn execute_sql<S>(
+        &self,
+        connection: &DatabaseConnection,
+        sql: S,
+    ) -> Result<(), AutoCreationError>
+    where
+        S: AsRef<str>,
+    {
+        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, sql.as_ref());
+        match connection.execute(statement).await {
+            Ok(_) => Ok(()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to execute SQL{COLON_SPACE}{error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    fn get_postgresql_schema(&self) -> DatabaseSchema {
+        let indexes: Vec<String> = POSTGRESQL_CREATE_INDEX_SQL
+            .split(';')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && !s.starts_with("--"))
+            .map(|s| format!("{s};"))
+            .collect();
+        let mut schema: DatabaseSchema = DatabaseSchema::default()
+            .add_table(TableSchema::new(
+                "record".to_string(),
+                POSTGRESQL_RECORD_SQL.to_string(),
+            ))
+            .add_table(TableSchema::new(
+                "chat_history".to_string(),
+                POSTGRESQL_CHAT_HISTORY_SQL.to_string(),
+            ))
+            .add_table(TableSchema::new(
+                "tracking_record".to_string(),
+                POSTGRESQL_TRACKING_RECORD_SQL.to_string(),
+            ))
+            .add_table(TableSchema::new(
+                "shortlink".to_string(),
+                POSTGRESQL_SHORTLINK_SQL.to_string(),
+            ));
+        for index in indexes {
+            schema = schema.add_index(index);
+        }
+        schema
+    }
+}
+impl DatabaseAutoCreation for PostgreSqlAutoCreation {
+    #[instrument_trace]
+    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
+        let admin_connection: DatabaseConnection = self.create_admin_connection().await?;
+        let result: Result<bool, AutoCreationError> = self.create_database(&admin_connection).await;
+        let _: Result<(), DbErr> = admin_connection.close().await;
+        result
+    }
+    #[instrument_trace]
+    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let schema: DatabaseSchema = self.get_postgresql_schema();
+        let mut created_tables: Vec<String> = Vec::new();
+        for table in schema.ordered_tables() {
+            if !self.table_exists(&connection, &table.name).await? {
+                self.create_table(&connection, table).await?;
+                created_tables.push(table.name.clone());
+                AutoCreationLogger::log_table_created(
+                    &table.name,
+                    &self.instance.database,
+                    database::PluginType::PostgreSQL,
+                )
+                .await;
+            } else {
+                AutoCreationLogger::log_table_exists(
+                    &table.name,
+                    &self.instance.database,
+                    database::PluginType::PostgreSQL,
+                )
+                .await;
+            }
+        }
+        for index_sql in &schema.indexes {
+            if let Err(error) = self.execute_sql(&connection, index_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Index creation",
+                    database::PluginType::PostgreSQL,
+                    Some(&self.instance.database),
+                )
+                .await;
+            }
+        }
+        for constraint_sql in &schema.constraints {
+            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Constraint creation",
+                    database::PluginType::PostgreSQL,
+                    Some(&self.instance.database),
+                )
+                .await;
+            }
+        }
+        let _: Result<(), DbErr> = connection.close().await;
+        AutoCreationLogger::log_tables_created(
+            &created_tables,
+            &self.instance.database,
+            database::PluginType::PostgreSQL,
+        )
+        .await;
+        Ok(created_tables)
+    }
+    #[instrument_trace]
+    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let statement: Statement =
+            Statement::from_string(DatabaseBackend::Postgres, "SELECT 1".to_string());
+        match connection.query_all(statement).await {
+            Ok(_) => {
+                let _: Result<(), DbErr> = connection.close().await;
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::PostgreSQL,
+                    &self.instance.database,
+                    true,
+                    None,
+                )
+                .await;
+                Ok(())
+            }
+            Err(error) => {
+                let _: Result<(), DbErr> = connection.close().await;
+                let error_msg: String = error.to_string();
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::PostgreSQL,
+                    &self.instance.database,
+                    false,
+                    Some(&error_msg),
+                )
+                .await;
+                Err(AutoCreationError::ConnectionFailed(format!(
+                    "PostgreSQL connection verification failed{COLON_SPACE}{error_msg}"
+                )))
+            }
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/postgresql/static.rs
+```rust
+use super::*;
+pub static POSTGRESQL_CONNECTIONS: Lazy<
+    RwLock<HashMap<String, Result<DatabaseConnection, String>>>,
+> = Lazy::new(|| RwLock::new(HashMap::new()));
+```
+# Path: hyperlane-quick-start/plugin/mysql/const.rs
+```rust
+pub const DEFAULT_MYSQL_INSTANCE_NAME: &str = "mysql_default";
+```
+# Path: hyperlane-quick-start/plugin/mysql/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use {r#const::*, r#fn::*, r#struct::*};
+use {super::*, database::*, env::*, r#static::*};
+use std::{collections::HashMap, time::Instant};
+use tokio::sync::{RwLock, RwLockWriteGuard};
+```
+# Path: hyperlane-quick-start/plugin/mysql/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, New)]
+pub struct MySqlAutoCreation {
+    pub instance: MySqlInstanceConfig,
+}
+```
+# Path: hyperlane-quick-start/plugin/mysql/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn connection_mysql_db<I>(instance_name: I) -> Result<DatabaseConnection, String>
+where
+    I: AsRef<str>,
+{
+    let instance_name_str: &str = instance_name.as_ref();
+    let env: &'static EnvConfig = get_global_env_config();
+    let instance: &MySqlInstanceConfig = env
+        .get_mysql_instance(instance_name_str)
+        .ok_or_else(|| format!("MySQL instance '{instance_name_str}' not found"))?;
+    match perform_mysql_auto_creation(instance).await {
+        Ok(result) => {
+            if result.has_changes() {
+                database::AutoCreationLogger::log_auto_creation_complete(
+                    database::PluginType::MySQL,
+                    &result,
+                )
+                .await;
+            }
+        }
+        Err(error) => {
+            database::AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Auto-creation process",
+                database::PluginType::MySQL,
+                Some(&instance.database),
+            )
+            .await;
+            if !error.should_continue() {
+                return Err(error.to_string());
+            }
+        }
+    }
+    let db_url: String = instance.get_connection_url();
+    Database::connect(&db_url).await.map_err(|error: DbErr| {
+        let error_msg: String = error.to_string();
+        let database_name: String = instance.database.clone();
+        let error_msg_clone: String = error_msg.clone();
+        tokio::spawn(async move {
+            database::AutoCreationLogger::log_connection_verification(
+                database::PluginType::MySQL,
+                &database_name,
+                false,
+                Some(&error_msg_clone),
+            )
+            .await;
+        });
+        error_msg
+    })
+}
+#[instrument_trace]
+pub async fn get_mysql_connection<I>(instance_name: I) -> Result<DatabaseConnection, String>
+where
+    I: AsRef<str>,
+{
+    let instance_name_str: &str = instance_name.as_ref();
+    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<DatabaseConnection, String>>> =
+        MYSQL_CONNECTIONS.write().await;
+    if let Some(connection_result) = connections.get(instance_name_str) {
+        match connection_result {
+            Ok(conn) => return Ok(conn.clone()),
+            Err(_) => {
+                connections.remove(instance_name_str);
+            }
+        }
+    }
+    drop(connections);
+    let new_connection: Result<DatabaseConnection, String> =
+        connection_mysql_db(instance_name_str).await;
+    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<DatabaseConnection, String>>> =
+        MYSQL_CONNECTIONS.write().await;
+    match &new_connection {
+        Ok(conn) => {
+            connections.insert(instance_name_str.to_string(), Ok(conn.clone()));
+        }
+        Err(error) => {
+            connections.insert(instance_name_str.to_string(), Err(error.clone()));
+        }
+    }
+    new_connection
+}
+#[instrument_trace]
+pub async fn perform_mysql_auto_creation(
+    instance: &MySqlInstanceConfig,
+) -> Result<AutoCreationResult, AutoCreationError> {
+    let start_time: Instant = Instant::now();
+    let mut result: AutoCreationResult = AutoCreationResult::default();
+    AutoCreationLogger::log_auto_creation_start(database::PluginType::MySQL, &instance.database)
+        .await;
+    let auto_creator: MySqlAutoCreation = MySqlAutoCreation::new(instance.clone());
+    match auto_creator.create_database_if_not_exists().await {
+        Ok(created) => {
+            result.database_created = created;
+        }
+        Err(error) => {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Database creation",
+                database::PluginType::MySQL,
+                Some(&instance.database),
+            )
+            .await;
+            if !error.should_continue() {
+                result.duration = start_time.elapsed();
+                return Err(error);
+            }
+            result.errors.push(error.to_string());
+        }
+    }
+    match auto_creator.create_tables_if_not_exist().await {
+        Ok(tables) => {
+            result.tables_created = tables;
+        }
+        Err(error) => {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Table creation",
+                database::PluginType::MySQL,
+                Some(&instance.database),
+            )
+            .await;
+            result.errors.push(error.to_string());
+        }
+    }
+    if let Err(error) = auto_creator.verify_connection().await {
+        AutoCreationLogger::log_auto_creation_error(
+            &error,
+            "Connection verification",
+            database::PluginType::MySQL,
+            Some(&instance.database),
+        )
+        .await;
+        if !error.should_continue() {
+            result.duration = start_time.elapsed();
+            return Err(error);
+        }
+        result.errors.push(error.to_string());
+    }
+    result.duration = start_time.elapsed();
+    AutoCreationLogger::log_auto_creation_complete(database::PluginType::MySQL, &result).await;
+    Ok(result)
+}
+```
+# Path: hyperlane-quick-start/plugin/mysql/impl.rs
+```rust
+use super::*;
+impl Default for MySqlAutoCreation {
+    #[instrument_trace]
+    fn default() -> Self {
+        let env: &'static EnvConfig = get_global_env_config();
+        if let Some(instance) = env.get_default_mysql_instance() {
+            Self::new(instance.clone())
+        } else {
+            let default_instance: MySqlInstanceConfig = MySqlInstanceConfig::default();
+            Self::new(default_instance)
+        }
+    }
+}
+impl MySqlAutoCreation {
+    #[instrument_trace]
+    async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
+        let admin_url: String = self.instance.get_admin_url();
+        Database::connect(&admin_url).await.map_err(|error: DbErr| {
+            let error_msg: String = error.to_string();
+            if error_msg.contains("Access denied") || error_msg.contains("permission") {
+                AutoCreationError::InsufficientPermissions(format!(
+                    "Cannot connect to MySQL server for database creation{COLON_SPACE}{error_msg}"
+                ))
+            } else if error_msg.contains("timeout") || error_msg.contains("Connection refused") {
+                AutoCreationError::ConnectionFailed(format!(
+                    "Cannot connect to MySQL server{COLON_SPACE}{error_msg}"
+                ))
+            } else {
+                AutoCreationError::DatabaseError(format!(
+                    "MySQL connection error{COLON_SPACE}{error_msg}"
+                ))
+            }
+        })
+    }
+    #[instrument_trace]
+    async fn database_exists(
+        &self,
+        connection: &DatabaseConnection,
+    ) -> Result<bool, AutoCreationError> {
+        let query: String = format!(
+            "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{}'",
+            self.instance.database
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, query);
+        match connection.query_all(statement).await {
+            Ok(results) => Ok(!results.is_empty()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to check if database exists{COLON_SPACE}{error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    async fn create_database(
+        &self,
+        connection: &DatabaseConnection,
+    ) -> Result<bool, AutoCreationError> {
+        if self.database_exists(connection).await? {
+            AutoCreationLogger::log_database_exists(
+                &self.instance.database,
+                database::PluginType::MySQL,
+            )
+            .await;
+            return Ok(false);
+        }
+        let create_query: String = format!(
+            "CREATE DATABASE IF NOT EXISTS `{}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
+            self.instance.database
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, create_query);
+        match connection.execute(statement).await {
+            Ok(_) => {
+                AutoCreationLogger::log_database_created(
+                    &self.instance.database,
+                    database::PluginType::MySQL,
+                )
+                .await;
+                Ok(true)
+            }
+            Err(error) => {
+                let error_msg: String = error.to_string();
+                if error_msg.contains("Access denied") || error_msg.contains("permission") {
+                    Err(AutoCreationError::InsufficientPermissions(format!(
+                        "Cannot create MySQL database '{}'{COLON_SPACE}{}",
+                        self.instance.database, error_msg
+                    )))
+                } else {
+                    Err(AutoCreationError::DatabaseError(format!(
+                        "Failed to create MySQL database '{}'{COLON_SPACE}{}",
+                        self.instance.database, error_msg
+                    )))
+                }
+            }
+        }
+    }
+    #[instrument_trace]
+    async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
+        let db_url: String = self.instance.get_connection_url();
+        Database::connect(&db_url).await.map_err(|error: DbErr| {
+            AutoCreationError::ConnectionFailed(format!(
+                "Cannot connect to MySQL database '{}'{COLON_SPACE}{}",
+                self.instance.database, error
+            ))
+        })
+    }
+    #[instrument_trace]
+    async fn table_exists<T>(
+        &self,
+        connection: &DatabaseConnection,
+        table_name: T,
+    ) -> Result<bool, AutoCreationError>
+    where
+        T: AsRef<str>,
+    {
+        let table_name_str: &str = table_name.as_ref();
+        let query: String = format!(
+            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{}' AND TABLE_NAME = '{table_name_str}'",
+            self.instance.database
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, query);
+        match connection.query_all(statement).await {
+            Ok(results) => Ok(!results.is_empty()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to check if table '{table_name_str}' exists{COLON_SPACE}{error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    async fn create_table(
+        &self,
+        connection: &DatabaseConnection,
+        table: &database::TableSchema,
+    ) -> Result<(), AutoCreationError> {
+        let statement: Statement =
+            Statement::from_string(DatabaseBackend::MySql, table.sql.clone());
+        match connection.execute(statement).await {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let error_msg: String = error.to_string();
+                if error_msg.contains("Access denied") || error_msg.contains("permission") {
+                    Err(AutoCreationError::InsufficientPermissions(format!(
+                        "Cannot create MySQL table '{}'{COLON_SPACE}{}",
+                        table.name, error_msg
+                    )))
+                } else {
+                    Err(AutoCreationError::SchemaError(format!(
+                        "Failed to create MySQL table '{}'{COLON_SPACE}{}",
+                        table.name, error_msg
+                    )))
+                }
+            }
+        }
+    }
+    #[instrument_trace]
+    async fn execute_sql<S>(
+        &self,
+        connection: &DatabaseConnection,
+        sql: S,
+    ) -> Result<(), AutoCreationError>
+    where
+        S: AsRef<str>,
+    {
+        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, sql.as_ref());
+        match connection.execute(statement).await {
+            Ok(_) => Ok(()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to execute SQL{COLON_SPACE}{error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    fn get_mysql_schema(&self) -> database::DatabaseSchema {
+        DatabaseSchema::default().add_table(TableSchema::new(
+            "record".to_string(),
+            MYSQL_RECORD_SQL.to_string(),
+        ))
+    }
+}
+impl DatabaseAutoCreation for MySqlAutoCreation {
+    #[instrument_trace]
+    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
+        let admin_connection: DatabaseConnection = self.create_admin_connection().await?;
+        let result: Result<bool, AutoCreationError> = self.create_database(&admin_connection).await;
+        let _: Result<(), DbErr> = admin_connection.close().await;
+        result
+    }
+    #[instrument_trace]
+    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let schema: DatabaseSchema = self.get_mysql_schema();
+        let mut created_tables: Vec<String> = Vec::new();
+        for table in schema.ordered_tables() {
+            if !self.table_exists(&connection, &table.name).await? {
+                self.create_table(&connection, table).await?;
+                created_tables.push(table.name.clone());
+                AutoCreationLogger::log_table_created(
+                    &table.name,
+                    &self.instance.database,
+                    database::PluginType::MySQL,
+                )
+                .await;
+            } else {
+                AutoCreationLogger::log_table_exists(
+                    &table.name,
+                    &self.instance.database,
+                    database::PluginType::MySQL,
+                )
+                .await;
+            }
+        }
+        for index_sql in &schema.indexes {
+            if let Err(error) = self.execute_sql(&connection, index_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Index creation",
+                    database::PluginType::MySQL,
+                    Some(&self.instance.database),
+                )
+                .await;
+            }
+        }
+        for constraint_sql in &schema.constraints {
+            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Constraint creation",
+                    database::PluginType::MySQL,
+                    Some(&self.instance.database),
+                )
+                .await;
+            }
+        }
+        let _: Result<(), DbErr> = connection.close().await;
+        AutoCreationLogger::log_tables_created(
+            &created_tables,
+            &self.instance.database,
+            database::PluginType::MySQL,
+        )
+        .await;
+        Ok(created_tables)
+    }
+    #[instrument_trace]
+    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
+        let db_url: String = self.instance.get_connection_url();
+        let connection: DatabaseConnection = Database::connect(&db_url).await.map_err(|error| {
+            AutoCreationError::ConnectionFailed(format!(
+                "Failed to verify MySQL connection{COLON_SPACE}{error}"
+            ))
+        })?;
+        let statement: Statement =
+            Statement::from_string(DatabaseBackend::MySql, "SELECT 1".to_string());
+        match connection.query_all(statement).await {
+            Ok(_) => {
+                let _: Result<(), DbErr> = connection.close().await;
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::MySQL,
+                    &self.instance.database,
+                    true,
+                    None,
+                )
+                .await;
+                Ok(())
+            }
+            Err(error) => {
+                let _: Result<(), DbErr> = connection.close().await;
+                let error_msg: String = error.to_string();
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::MySQL,
+                    &self.instance.database,
+                    false,
+                    Some(&error_msg),
+                )
+                .await;
+                Err(AutoCreationError::ConnectionFailed(format!(
+                    "MySQL connection verification failed{COLON_SPACE}{error_msg}"
+                )))
+            }
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/mysql/static.rs
+```rust
+use super::*;
+pub static MYSQL_CONNECTIONS: Lazy<RwLock<HashMap<String, Result<DatabaseConnection, String>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+```
 # Path: hyperlane-quick-start/plugin/logger/mod.rs
 ```rust
 mod r#impl;
@@ -2052,7 +3528,8 @@ use {
 ```
 # Path: hyperlane-quick-start/plugin/logger/struct.rs
 ```rust
-#[derive(Debug, Clone, Copy)]
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
 pub struct Logger;
 ```
 # Path: hyperlane-quick-start/plugin/logger/impl.rs
@@ -2181,6 +3658,902 @@ use super::*;
 pub(super) static LOGGER: Logger = Logger;
 pub(super) static FILE_LOGGER: Lazy<RwLock<FileLogger>> =
     Lazy::new(|| RwLock::new(FileLogger::default()));
+```
+# Path: hyperlane-quick-start/plugin/database/trait.rs
+```rust
+use super::*;
+pub trait DatabaseAutoCreation {
+    fn create_database_if_not_exists(
+        &self,
+    ) -> impl std::future::Future<Output = Result<bool, AutoCreationError>> + Send;
+    fn create_tables_if_not_exist(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<String>, AutoCreationError>> + Send;
+    fn verify_connection(
+        &self,
+    ) -> impl std::future::Future<Output = Result<(), AutoCreationError>> + Send;
+}
+```
+# Path: hyperlane-quick-start/plugin/database/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+mod r#trait;
+pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*};
+use {super::*, env::*};
+use std::{str::FromStr, time::Duration};
+```
+# Path: hyperlane-quick-start/plugin/database/enum.rs
+```rust
+#[derive(Debug, Clone)]
+pub enum AutoCreationError {
+    InsufficientPermissions(String),
+    ConnectionFailed(String),
+    SchemaError(String),
+    Timeout(String),
+    DatabaseError(String),
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PluginType {
+    MySQL,
+    PostgreSQL,
+    Redis,
+}
+```
+# Path: hyperlane-quick-start/plugin/database/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct AutoCreationErrorHandler;
+#[derive(Clone, Data, Debug)]
+pub struct ErrorContext {
+    pub plugin_name: String,
+    pub operation: String,
+    pub database_name: Option<String>,
+    pub error_type: String,
+    pub error_message: String,
+    pub should_continue: bool,
+    pub log_level: String,
+    pub recovery_suggestion: String,
+    pub timestamp: std::time::SystemTime,
+}
+#[derive(Clone, Data, Debug)]
+pub struct AutoCreationResult {
+    pub database_created: bool,
+    pub tables_created: Vec<String>,
+    pub errors: Vec<String>,
+    pub duration: Duration,
+}
+#[derive(Clone, Data, Debug, Default, New)]
+pub struct TableSchema {
+    pub name: String,
+    pub sql: String,
+    #[new(skip)]
+    pub dependencies: Vec<String>,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct DatabaseSchema {
+    pub tables: Vec<TableSchema>,
+    pub indexes: Vec<String>,
+    pub constraints: Vec<String>,
+}
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct AutoCreationConfig;
+#[derive(Clone, Data, Debug, Default)]
+pub struct PluginAutoCreationConfig {
+    pub plugin_name: String,
+}
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct AutoCreationLogger;
+```
+# Path: hyperlane-quick-start/plugin/database/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn initialize_auto_creation() -> Result<(), String> {
+    if let Err(error) = AutoCreationConfig::validate() {
+        return Err(format!(
+            "Auto-creation configuration validation failed{COLON_SPACE}{error}"
+        ));
+    }
+    let env: &'static EnvConfig = get_global_env_config();
+    let mut initialization_results: Vec<String> = Vec::new();
+    for instance in &env.mysql_instances {
+        match mysql::perform_mysql_auto_creation(instance).await {
+            Ok(result) => {
+                initialization_results.push(format!(
+                    "MySQL ({}) {COLON_SPACE}{}",
+                    instance.name,
+                    if result.has_changes() {
+                        "initialized with changes"
+                    } else {
+                        "verified"
+                    }
+                ));
+            }
+            Err(error) => {
+                if !error.should_continue() {
+                    return Err(format!(
+                        "MySQL ({}) auto-creation failed{COLON_SPACE}{error}",
+                        instance.name
+                    ));
+                }
+                initialization_results.push(format!(
+                    "MySQL ({}) : failed but continuing ({error})",
+                    instance.name
+                ));
+            }
+        }
+    }
+    for instance in &env.postgresql_instances {
+        match postgresql::perform_postgresql_auto_creation(instance).await {
+            Ok(result) => {
+                initialization_results.push(format!(
+                    "PostgreSQL ({}) {COLON_SPACE}{}",
+                    instance.name,
+                    if result.has_changes() {
+                        "initialized with changes"
+                    } else {
+                        "verified"
+                    }
+                ));
+            }
+            Err(error) => {
+                if !error.should_continue() {
+                    return Err(format!(
+                        "PostgreSQL ({}) auto-creation failed{COLON_SPACE}{error}",
+                        instance.name
+                    ));
+                }
+                initialization_results.push(format!(
+                    "PostgreSQL ({}) : failed but continuing ({error})",
+                    instance.name
+                ));
+            }
+        }
+    }
+    for instance in &env.redis_instances {
+        match redis::perform_redis_auto_creation(instance).await {
+            Ok(result) => {
+                initialization_results.push(format!(
+                    "Redis ({}) {COLON_SPACE}{}",
+                    instance.name,
+                    if result.has_changes() {
+                        "initialized with changes"
+                    } else {
+                        "verified"
+                    }
+                ));
+            }
+            Err(error) => {
+                if !error.should_continue() {
+                    return Err(format!(
+                        "Redis ({}) auto-creation failed{COLON_SPACE}{error}",
+                        instance.name
+                    ));
+                }
+                initialization_results.push(format!(
+                    "Redis ({}) : failed but continuing ({error})",
+                    instance.name
+                ));
+            }
+        }
+    }
+    if initialization_results.is_empty() {
+        info!("[AUTO-CREATION] No plugins enabled for auto-creation");
+    } else {
+        let results_summary: String = initialization_results.join(", ");
+        info!("[AUTO-CREATION] Initialization complete{COLON_SPACE}{results_summary}");
+    }
+    Ok(())
+}
+```
+# Path: hyperlane-quick-start/plugin/database/impl.rs
+```rust
+use super::*;
+impl PluginType {
+    #[instrument_trace]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::MySQL => "MySQL",
+            Self::PostgreSQL => "PostgreSQL",
+            Self::Redis => "Redis",
+        }
+    }
+}
+impl FromStr for PluginType {
+    type Err = ();
+    #[instrument_trace]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "MySQL" => Ok(Self::MySQL),
+            "PostgreSQL" => Ok(Self::PostgreSQL),
+            "Redis" => Ok(Self::Redis),
+            _ => Err(()),
+        }
+    }
+}
+impl std::fmt::Display for PluginType {
+    #[instrument_trace]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+impl AutoCreationError {
+    #[instrument_trace]
+    pub fn should_continue(&self) -> bool {
+        match self {
+            Self::InsufficientPermissions(_) => true,
+            Self::ConnectionFailed(_) => false,
+            Self::SchemaError(_) => true,
+            Self::Timeout(_) => true,
+            Self::DatabaseError(_) => true,
+        }
+    }
+    #[instrument_trace]
+    pub fn user_message(&self) -> &str {
+        match self {
+            Self::InsufficientPermissions(msg) => msg,
+            Self::ConnectionFailed(msg) => msg,
+            Self::SchemaError(msg) => msg,
+            Self::Timeout(msg) => msg,
+            Self::DatabaseError(msg) => msg,
+        }
+    }
+}
+impl std::fmt::Display for AutoCreationError {
+    #[instrument_trace]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InsufficientPermissions(msg) => {
+                write!(f, "Insufficient permissions{COLON_SPACE}{msg}")
+            }
+            Self::ConnectionFailed(msg) => write!(f, "Connection failed{COLON_SPACE}{msg}"),
+            Self::SchemaError(msg) => write!(f, "Schema error{COLON_SPACE}{msg}"),
+            Self::Timeout(msg) => write!(f, "Timeout{COLON_SPACE}{msg}"),
+            Self::DatabaseError(msg) => write!(f, "Database error{COLON_SPACE}{msg}"),
+        }
+    }
+}
+impl std::error::Error for AutoCreationError {}
+impl AutoCreationResult {
+    #[instrument_trace]
+    pub fn has_changes(&self) -> bool {
+        self.database_created || !self.tables_created.is_empty()
+    }
+    #[instrument_trace]
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+}
+impl Default for AutoCreationResult {
+    #[instrument_trace]
+    fn default() -> Self {
+        Self {
+            database_created: false,
+            tables_created: Vec::new(),
+            errors: Vec::new(),
+            duration: Duration::from_secs(0),
+        }
+    }
+}
+impl TableSchema {
+    #[instrument_trace]
+    pub fn with_dependency(mut self, dependency: String) -> Self {
+        self.dependencies.push(dependency);
+        self
+    }
+}
+impl DatabaseSchema {
+    #[instrument_trace]
+    pub fn add_table(mut self, table: TableSchema) -> Self {
+        self.tables.push(table);
+        self
+    }
+    #[instrument_trace]
+    pub fn add_index(mut self, index: String) -> Self {
+        self.indexes.push(index);
+        self
+    }
+    #[instrument_trace]
+    pub fn add_constraint(mut self, constraint: String) -> Self {
+        self.constraints.push(constraint);
+        self
+    }
+    #[instrument_trace]
+    pub fn ordered_tables(&self) -> Vec<&TableSchema> {
+        let mut ordered: Vec<&TableSchema> = Vec::new();
+        let mut remaining: Vec<&TableSchema> = self.tables.iter().collect();
+        while !remaining.is_empty() {
+            let mut added_any: bool = false;
+            remaining.retain(|table| {
+                let dependencies_satisfied = table.dependencies.iter().all(|dep| {
+                    ordered
+                        .iter()
+                        .any(|ordered_table: &&TableSchema| &ordered_table.name == dep)
+                });
+                if dependencies_satisfied {
+                    ordered.push(table);
+                    added_any = true;
+                    false
+                } else {
+                    true
+                }
+            });
+            if !added_any && !remaining.is_empty() {
+                for table in remaining {
+                    ordered.push(table);
+                }
+                break;
+            }
+        }
+        ordered
+    }
+}
+impl AutoCreationConfig {
+    #[instrument_trace]
+    pub fn get_env() -> &'static env::EnvConfig {
+        env::get_global_env_config()
+    }
+    #[instrument_trace]
+    pub fn validate() -> Result<(), String> {
+        let env: &'static EnvConfig = Self::get_env();
+        if env.mysql_instances.is_empty() {
+            return Err("At least one MySQL instance is required".to_string());
+        }
+        if env.postgresql_instances.is_empty() {
+            return Err("At least one PostgreSQL instance is required".to_string());
+        }
+        if env.redis_instances.is_empty() {
+            return Err("At least one Redis instance is required".to_string());
+        }
+        Ok(())
+    }
+    #[instrument_trace]
+    pub fn for_plugin(plugin_name: &str) -> PluginAutoCreationConfig {
+        PluginAutoCreationConfig {
+            plugin_name: plugin_name.to_string(),
+        }
+    }
+}
+impl PluginAutoCreationConfig {
+    #[instrument_trace]
+    pub fn is_plugin_enabled(&self) -> bool {
+        PluginType::from_str(&self.plugin_name).is_ok()
+    }
+    #[instrument_trace]
+    pub fn get_database_name(&self) -> String {
+        let env: &'static EnvConfig = AutoCreationConfig::get_env();
+        if let Ok(plugin_type) = PluginType::from_str(&self.plugin_name) {
+            match plugin_type {
+                PluginType::MySQL => {
+                    if let Some(instance) = env.get_default_mysql_instance() {
+                        instance.database.clone()
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+                PluginType::PostgreSQL => {
+                    if let Some(instance) = env.get_default_postgresql_instance() {
+                        instance.database.clone()
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+                PluginType::Redis => "default".to_string(),
+            }
+        } else {
+            "unknown".to_string()
+        }
+    }
+    #[instrument_trace]
+    pub fn get_connection_info(&self) -> String {
+        let env: &'static EnvConfig = AutoCreationConfig::get_env();
+        if let Ok(plugin_type) = PluginType::from_str(&self.plugin_name) {
+            match plugin_type {
+                PluginType::MySQL => {
+                    if let Some(instance) = env.get_default_mysql_instance() {
+                        format!("{}:{}:{}", instance.host, instance.port, instance.database)
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+                PluginType::PostgreSQL => {
+                    if let Some(instance) = env.get_default_postgresql_instance() {
+                        format!("{}:{}:{}", instance.host, instance.port, instance.database)
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+                PluginType::Redis => {
+                    if let Some(instance) = env.get_default_redis_instance() {
+                        format!("{}:{}", instance.host, instance.port)
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+            }
+        } else {
+            "unknown".to_string()
+        }
+    }
+}
+impl AutoCreationLogger {
+    #[instrument_trace]
+    pub async fn log_auto_creation_start(plugin_type: PluginType, database_name: &str) {
+        info!(
+            "[AUTO-CREATION] Starting auto-creation for {plugin_type} database '{database_name}'"
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_auto_creation_complete(plugin_type: PluginType, result: &AutoCreationResult) {
+        if result.has_errors() {
+            info!(
+                "[AUTO-CREATION] Auto-creation completed for {plugin_type} with warnings{COLON_SPACE}{}",
+                result.errors.join(", ")
+            );
+        } else {
+            info!("[AUTO-CREATION] Auto-creation completed successfully for {plugin_type}");
+        }
+    }
+    #[instrument_trace]
+    pub async fn log_auto_creation_error(
+        error: &AutoCreationError,
+        operation: &str,
+        plugin_type: PluginType,
+        database_name: Option<&str>,
+    ) {
+        error!(
+            "[AUTO-CREATION] {operation} failed for {plugin_type} database '{}'{COLON_SPACE}{error}",
+            database_name.unwrap_or("unknown")
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_connection_verification(
+        plugin_type: PluginType,
+        database_name: &str,
+        success: bool,
+        error: Option<&str>,
+    ) {
+        if success {
+            info!(
+                "[AUTO-CREATION] Connection verification successful for {plugin_type} database '{database_name}'"
+            );
+        } else {
+            error!(
+                "[AUTO-CREATION] Connection verification failed for {plugin_type} database '{database_name}'{COLON_SPACE}{}",
+                error.unwrap_or("Unknown error")
+            );
+        };
+    }
+    #[instrument_trace]
+    pub async fn log_database_created(database_name: &str, plugin_type: PluginType) {
+        info!(
+            "[AUTO-CREATION] Successfully created database '{database_name}' for {plugin_type} plugin"
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_database_exists(database_name: &str, plugin_type: PluginType) {
+        info!("[AUTO-CREATION] Database '{database_name}' already exists for {plugin_type} plugin");
+    }
+    #[instrument_trace]
+    pub async fn log_table_created(table_name: &str, database_name: &str, plugin_type: PluginType) {
+        info!(
+            "[AUTO-CREATION] Successfully created table '{table_name}' in database '{database_name}' for {plugin_type} plugin"
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_table_exists(table_name: &str, database_name: &str, plugin_type: PluginType) {
+        info!(
+            "[AUTO-CREATION] Table '{table_name}' already exists in database '{database_name}' for {plugin_type} plugin"
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_tables_created(
+        tables: &[String],
+        database_name: &str,
+        plugin_type: PluginType,
+    ) {
+        if tables.is_empty() {
+            info!(
+                "[AUTO-CREATION] No new tables created in database '{database_name}' for {plugin_type} plugin"
+            );
+        } else {
+            info!(
+                "[AUTO-CREATION] Created tables [{}] in database '{database_name}' for {plugin_type} plugin",
+                tables.join(", ")
+            );
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/redis/const.rs
+```rust
+pub const DEFAULT_REDIS_INSTANCE_NAME: &str = "redis_default";
+```
+# Path: hyperlane-quick-start/plugin/redis/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+mod r#type;
+pub use {r#const::*, r#fn::*, r#struct::*, r#type::*};
+use {super::*, database::*, env::*, hyperlane_utils::redis::*, r#static::*};
+use std::{collections::HashMap, sync::Arc, time::Instant};
+use tokio::sync::{RwLock, RwLockWriteGuard};
+```
+# Path: hyperlane-quick-start/plugin/redis/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, New)]
+pub struct RedisAutoCreation {
+    pub instance: RedisInstanceConfig,
+}
+```
+# Path: hyperlane-quick-start/plugin/redis/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn connection_redis_db<I>(instance_name: I) -> Result<Arc<Connection>, String>
+where
+    I: AsRef<str>,
+{
+    let instance_name_str: &str = instance_name.as_ref();
+    let env: &'static EnvConfig = get_global_env_config();
+    let instance: &RedisInstanceConfig = env
+        .get_redis_instance(instance_name_str)
+        .ok_or_else(|| format!("Redis instance '{instance_name_str}' not found"))?;
+    match perform_redis_auto_creation(instance).await {
+        Ok(result) => {
+            if result.has_changes() {
+                database::AutoCreationLogger::log_auto_creation_complete(
+                    database::PluginType::Redis,
+                    &result,
+                )
+                .await;
+            }
+        }
+        Err(error) => {
+            database::AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Auto-creation process",
+                database::PluginType::Redis,
+                Some(&instance.name),
+            )
+            .await;
+            if !error.should_continue() {
+                return Err(error.to_string());
+            }
+        }
+    }
+    let db_url: String = instance.get_connection_url();
+    let client: Client = Client::open(db_url).map_err(|error: redis::RedisError| {
+        let error_msg: String = error.to_string();
+        let instance_name_clone: String = instance_name_str.to_string();
+        let error_msg_clone: String = error_msg.clone();
+        tokio::spawn(async move {
+            database::AutoCreationLogger::log_connection_verification(
+                database::PluginType::Redis,
+                &instance_name_clone,
+                false,
+                Some(&error_msg_clone),
+            )
+            .await;
+        });
+        error_msg
+    })?;
+    let connection: Connection = client
+        .get_connection()
+        .map_err(|error: redis::RedisError| {
+            let error_msg: String = error.to_string();
+            let instance_name_clone: String = instance_name_str.to_string();
+            let error_msg_clone: String = error_msg.clone();
+            tokio::spawn(async move {
+                database::AutoCreationLogger::log_connection_verification(
+                    database::PluginType::Redis,
+                    &instance_name_clone,
+                    false,
+                    Some(&error_msg_clone),
+                )
+                .await;
+            });
+            error_msg
+        })?;
+    Ok(Arc::new(connection))
+}
+#[instrument_trace]
+pub async fn get_redis_connection<I>(instance_name: I) -> Result<Arc<Connection>, String>
+where
+    I: AsRef<str>,
+{
+    let instance_name_str: &str = instance_name.as_ref();
+    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<Arc<Connection>, String>>> =
+        REDIS_CONNECTIONS.write().await;
+    if let Some(connection_result) = connections.get(instance_name_str) {
+        match connection_result {
+            Ok(conn) => return Ok(conn.clone()),
+            Err(_) => {
+                connections.remove(instance_name_str);
+            }
+        }
+    }
+    drop(connections);
+    let new_connection: Result<Arc<Connection>, String> =
+        connection_redis_db(instance_name_str).await;
+    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<Arc<Connection>, String>>> =
+        REDIS_CONNECTIONS.write().await;
+    match &new_connection {
+        Ok(conn) => {
+            connections.insert(instance_name_str.to_string(), Ok(conn.clone()));
+        }
+        Err(error) => {
+            connections.insert(instance_name_str.to_string(), Err(error.clone()));
+        }
+    }
+    new_connection
+}
+#[instrument_trace]
+pub async fn perform_redis_auto_creation(
+    instance: &RedisInstanceConfig,
+) -> Result<AutoCreationResult, AutoCreationError> {
+    let start_time: Instant = Instant::now();
+    let mut result: AutoCreationResult = AutoCreationResult::default();
+    AutoCreationLogger::log_auto_creation_start(database::PluginType::Redis, &instance.name).await;
+    let auto_creator: RedisAutoCreation = RedisAutoCreation::new(instance.clone());
+    match auto_creator.create_database_if_not_exists().await {
+        Ok(created) => {
+            result.database_created = created;
+        }
+        Err(error) => {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Database validation",
+                database::PluginType::Redis,
+                Some(&instance.name),
+            )
+            .await;
+            if !error.should_continue() {
+                result.duration = start_time.elapsed();
+                return Err(error);
+            }
+            result.errors.push(error.to_string());
+        }
+    }
+    match auto_creator.create_tables_if_not_exist().await {
+        Ok(operations) => {
+            result.tables_created = operations;
+        }
+        Err(error) => {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Namespace setup",
+                database::PluginType::Redis,
+                Some(&instance.name),
+            )
+            .await;
+            result.errors.push(error.to_string());
+        }
+    }
+    if let Err(error) = auto_creator.verify_connection().await {
+        AutoCreationLogger::log_auto_creation_error(
+            &error,
+            "Connection verification",
+            database::PluginType::Redis,
+            Some(&instance.name),
+        )
+        .await;
+        if !error.should_continue() {
+            result.duration = start_time.elapsed();
+            return Err(error);
+        }
+        result.errors.push(error.to_string());
+    }
+    result.duration = start_time.elapsed();
+    AutoCreationLogger::log_auto_creation_complete(database::PluginType::Redis, &result).await;
+    Ok(result)
+}
+```
+# Path: hyperlane-quick-start/plugin/redis/impl.rs
+```rust
+use super::*;
+impl Default for RedisAutoCreation {
+    #[instrument_trace]
+    fn default() -> Self {
+        let env: &'static EnvConfig = get_global_env_config();
+        if let Some(instance) = env.get_default_redis_instance() {
+            Self::new(instance.clone())
+        } else {
+            let default_instance: RedisInstanceConfig = RedisInstanceConfig::default();
+            Self::new(default_instance)
+        }
+    }
+}
+impl RedisAutoCreation {
+    #[instrument_trace]
+    async fn create_mutable_connection(&self) -> Result<Connection, AutoCreationError> {
+        let db_url: String = self.instance.get_connection_url();
+        let client: Client = Client::open(db_url).map_err(|error: redis::RedisError| {
+            let error_msg: String = error.to_string();
+            if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
+                AutoCreationError::InsufficientPermissions(format!(
+                    "Redis authentication failed{COLON_SPACE}{error_msg}"
+                ))
+            } else if error_msg.contains("Connection refused") || error_msg.contains("timeout") {
+                AutoCreationError::ConnectionFailed(format!(
+                    "Cannot connect to Redis server{COLON_SPACE}{error_msg}"
+                ))
+            } else {
+                AutoCreationError::DatabaseError(format!(
+                    "Redis connection error{COLON_SPACE}{error_msg}"
+                ))
+            }
+        })?;
+        let connection: Connection =
+            client
+                .get_connection()
+                .map_err(|error: redis::RedisError| {
+                    let error_msg: String = error.to_string();
+                    if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
+                        AutoCreationError::InsufficientPermissions(format!(
+                            "Redis authentication failed{COLON_SPACE}{error_msg}"
+                        ))
+                    } else if error_msg.contains("Connection refused")
+                        || error_msg.contains("timeout")
+                    {
+                        AutoCreationError::ConnectionFailed(format!(
+                            "Cannot connect to Redis server{COLON_SPACE}{error_msg}"
+                        ))
+                    } else {
+                        AutoCreationError::DatabaseError(format!(
+                            "Redis connection error{COLON_SPACE}{error_msg}"
+                        ))
+                    }
+                })?;
+        Ok(connection)
+    }
+    #[instrument_trace]
+    async fn validate_redis_server(&self) -> Result<(), AutoCreationError> {
+        let mut conn: Connection = self.create_mutable_connection().await?;
+        let pong: String =
+            redis::cmd("PING")
+                .query(&mut conn)
+                .map_err(|error: redis::RedisError| {
+                    AutoCreationError::ConnectionFailed(format!(
+                        "Redis PING failed{COLON_SPACE}{error}"
+                    ))
+                })?;
+        if pong != "PONG" {
+            return Err(AutoCreationError::ConnectionFailed(
+                "Redis PING returned unexpected response".to_string(),
+            ));
+        }
+        let info: String = redis::cmd("INFO").arg("server").query(&mut conn).map_err(
+            |error: redis::RedisError| {
+                AutoCreationError::DatabaseError(format!(
+                    "Failed to get Redis server info{COLON_SPACE}{error}"
+                ))
+            },
+        )?;
+        if info.contains("redis_version:") {
+            AutoCreationLogger::log_connection_verification(
+                database::PluginType::Redis,
+                &self.instance.name,
+                true,
+                None,
+            )
+            .await;
+        }
+        Ok(())
+    }
+    #[instrument_trace]
+    async fn setup_redis_namespace(&self) -> Result<Vec<String>, AutoCreationError> {
+        let mut setup_operations: Vec<String> = Vec::new();
+        let mut conn: Connection = self.create_mutable_connection().await?;
+        let app_key: String = format!("{}:initialized", self.instance.name);
+        let exists: i32 = redis::cmd("EXISTS")
+            .arg(&app_key)
+            .query(&mut conn)
+            .map_err(|error: redis::RedisError| {
+                AutoCreationError::DatabaseError(format!(
+                    "Failed to check Redis key existence{COLON_SPACE}{error}"
+                ))
+            })?;
+        if exists == 0 {
+            let _: () = redis::cmd("SET")
+                .arg(&app_key)
+                .arg("true")
+                .query(&mut conn)
+                .map_err(|error: redis::RedisError| {
+                    AutoCreationError::DatabaseError(format!(
+                        "Failed to set Redis initialization key{COLON_SPACE}{error}"
+                    ))
+                })?;
+            setup_operations.push(app_key.clone());
+            let config_key: String = format!("{}:config:version", self.instance.name);
+            let _: () = redis::cmd("SET")
+                .arg(&config_key)
+                .arg("1.0.0")
+                .query(&mut conn)
+                .map_err(|error: redis::RedisError| {
+                    AutoCreationError::DatabaseError(format!(
+                        "Failed to set Redis config key{COLON_SPACE}{error}"
+                    ))
+                })?;
+            setup_operations.push(config_key);
+        }
+        Ok(setup_operations)
+    }
+}
+impl DatabaseAutoCreation for RedisAutoCreation {
+    #[instrument_trace]
+    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
+        self.validate_redis_server().await?;
+        AutoCreationLogger::log_database_exists(&self.instance.name, database::PluginType::Redis)
+            .await;
+        Ok(false)
+    }
+    #[instrument_trace]
+    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
+        let setup_operations: Vec<String> = self.setup_redis_namespace().await?;
+        if !setup_operations.is_empty() {
+            AutoCreationLogger::log_tables_created(
+                &setup_operations,
+                &self.instance.name,
+                database::PluginType::Redis,
+            )
+            .await;
+        } else {
+            AutoCreationLogger::log_tables_created(
+                &[],
+                &self.instance.name,
+                database::PluginType::Redis,
+            )
+            .await;
+        }
+        Ok(setup_operations)
+    }
+    #[instrument_trace]
+    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
+        match self.validate_redis_server().await {
+            Ok(_) => {
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::Redis,
+                    &self.instance.name,
+                    true,
+                    None,
+                )
+                .await;
+                Ok(())
+            }
+            Err(error) => {
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::Redis,
+                    &self.instance.name,
+                    false,
+                    Some(&error.to_string()),
+                )
+                .await;
+                Err(error)
+            }
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/redis/type.rs
+```rust
+use super::*;
+pub type RedisConnectionResult = Result<Arc<Connection>, String>;
+pub type RedisConnectionMap = HashMap<String, RedisConnectionResult>;
+```
+# Path: hyperlane-quick-start/plugin/redis/static.rs
+```rust
+use super::*;
+pub static REDIS_CONNECTIONS: Lazy<RwLock<RedisConnectionMap>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 ```
 # Path: hyperlane-quick-start/src/main.rs
 ```rust
