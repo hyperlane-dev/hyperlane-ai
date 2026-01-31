@@ -1,4 +1,4 @@
-from huggingface_hub import HfApi, HfFolder
+from huggingface_hub import HfApi
 import os
 import argparse
 from dotenv import load_dotenv
@@ -12,11 +12,9 @@ DATASET_DIR = "dataset"
 
 def upload_model_to_hub():
     api = HfApi()
-    token = HfFolder.get_token()
+    token = os.getenv("HF_TOKEN")
     if token is None:
-        print(
-            "Hugging Face token not found. Please log in using 'huggingface-cli login' or 'hf auth login'."
-        )
+        print("Hugging Face token not found. Please set HF_TOKEN environment variable.")
         return
     try:
         user_info = api.whoami(token=token)
@@ -62,11 +60,9 @@ def upload_model_to_hub():
 
 def upload_dataset_to_hub():
     api = HfApi()
-    token = HfFolder.get_token()
+    token = os.getenv("HF_TOKEN")
     if token is None:
-        print(
-            "Hugging Face token not found. Please log in using 'huggingface-cli login' or 'hf auth login'."
-        )
+        print("Hugging Face token not found. Please set HF_TOKEN environment variable.")
         return
     try:
         user_info = api.whoami(token=token)
