@@ -1,4 +1,4 @@
-<!--2026-01-26 06:45:37-->
+<!--2026-01-31 13:43:38-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -792,7 +792,7 @@ impl ServerHook for UpgradeHook {
         Self
     }
     async fn handle(self, ctx: &Context) {
-        if !ctx.get_request().await.is_ws() {
+        if !ctx.get_request_is_ws_upgrade_type().await {
             return;
         }
         if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
@@ -1090,88 +1090,14 @@ cargo run restart -d
 ## Contact
 # Path: hyperlane-quick-start/resources/lib.rs
 ```rust
-mod sql;
-mod r#static;
-mod templates;
-pub use {sql::*, r#static::*, templates::*};
+pub mod sql;
+pub mod r#static;
+pub mod templates;
 ```
 # Path: hyperlane-quick-start/resources/README.md
 ## hyperlane-resources
 > Hyperlane resources module containing various resources and utilities used by the framework.
 ## Contact
-# Path: hyperlane-quick-start/resources/sql/const.rs
-```rust
-pub const MYSQL_RECORD_SQL: &str = include_str!("./mysql/record.sql");
-pub const POSTGRESQL_CHAT_HISTORY_SQL: &str = include_str!("./postgresql/chat_history.sql");
-pub const POSTGRESQL_CREATE_INDEX_SQL: &str = include_str!("./postgresql/create_index.sql");
-pub const POSTGRESQL_RECORD_SQL: &str = include_str!("./postgresql/record.sql");
-pub const POSTGRESQL_SHORTLINK_SQL: &str = include_str!("./postgresql/shortlink.sql");
-pub const POSTGRESQL_TRACKING_RECORD_SQL: &str = include_str!("./postgresql/tracking_record.sql");
-```
-# Path: hyperlane-quick-start/resources/sql/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/resources/sql/postgresql/create_index.sql
-```sql
-CREATE INDEX IF NOT EXISTS idx_chat_history_session_id ON chat_history (session_id);
-CREATE INDEX IF NOT EXISTS idx_chat_history_created_at ON chat_history (created_at);
-CREATE INDEX IF NOT EXISTS idx_tracking_socket_addr ON tracking_record (socket_addr);
-CREATE INDEX IF NOT EXISTS idx_tracking_timestamp ON tracking_record (timestamp);
-CREATE INDEX IF NOT EXISTS idx_tracking_created_at ON tracking_record (created_at);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_shortlink_url ON shortlink (url);
-CREATE INDEX IF NOT EXISTS idx_shortlink_created_at ON shortlink (created_at);
-```
-# Path: hyperlane-quick-start/resources/sql/postgresql/shortlink.sql
-```sql
-CREATE TABLE shortlink (
-    id SERIAL PRIMARY KEY,
-    url TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-```
-# Path: hyperlane-quick-start/resources/sql/postgresql/tracking_record.sql
-```sql
-CREATE TABLE tracking_record (
-    id BIGSERIAL PRIMARY KEY,
-    socket_addr VARCHAR(255) NOT NULL,
-    headers TEXT NOT NULL,
-    body TEXT NOT NULL,
-    timestamp BIGINT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-```
-# Path: hyperlane-quick-start/resources/sql/postgresql/record.sql
-```sql
-CREATE TABLE record (
-    id SERIAL PRIMARY KEY,
-    key VARCHAR(255) NOT NULL UNIQUE,
-    value TEXT
-)
-```
-# Path: hyperlane-quick-start/resources/sql/postgresql/chat_history.sql
-```sql
-CREATE TABLE chat_history (
-    id BIGSERIAL PRIMARY KEY,
-    session_id VARCHAR(255) NOT NULL,
-    sender_name VARCHAR(255) NOT NULL,
-    sender_type VARCHAR(50) NOT NULL,
-    message_type VARCHAR(50) NOT NULL,
-    content TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-```
-# Path: hyperlane-quick-start/resources/sql/mysql/record.sql
-```sql
-CREATE TABLE `record` (
-    `id` INT NOT NULL AUTO_INCREMENT,
-    `key` VARCHAR(255) NOT NULL,
-    `value` TEXT,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_key` (`key`)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci
-```
 # Path: hyperlane-quick-start/resources/static/const.rs
 ```rust
 pub const NOT_FOUND_HTML: &str = include_str!("./not_found/index.html");
@@ -1279,56 +1205,29 @@ use {
 ## Contact
 # Path: hyperlane-quick-start/init/framework/mod.rs
 ```rust
+pub mod config;
+pub mod run;
+pub mod server;
 pub mod shutdown;
-pub mod wait;
 use super::*;
 ```
-# Path: hyperlane-quick-start/init/framework/wait/mod.rs
+# Path: hyperlane-quick-start/init/framework/server/mod.rs
 ```rust
 mod r#fn;
 pub use r#fn::*;
 use {
     super::{shutdown::*, *},
-    application::*,
+    application::{db::*, env::*, logger::*},
+    config::*,
 };
 #[allow(unused_imports)]
-use {hyperlane_app::*, hyperlane_config::framework::*, hyperlane_plugin::process::*};
-use tokio::runtime::{Builder, Runtime};
+use {hyperlane_app::*, hyperlane_config::framework::*};
 ```
-# Path: hyperlane-quick-start/init/framework/wait/fn.rs
+# Path: hyperlane-quick-start/init/framework/server/fn.rs
 ```rust
 use super::*;
 #[instrument_trace]
-fn runtime() -> Runtime {
-    Builder::new_multi_thread()
-        .worker_threads(num_cpus::get_physical() << 1)
-        .thread_stack_size(1_048_576)
-        .max_blocking_threads(2_048)
-        .max_io_events_per_tick(1_024)
-        .enable_all()
-        .build()
-        .unwrap()
-}
-#[hyperlane(config: ServerConfig)]
-#[instrument_trace]
-async fn init_server_config(server: &Server) {
-    let request_config: RequestConfig = RequestConfig::default();
-    request_config
-        .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
-        .await
-        .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
-        .await;
-    config.host(SERVER_HOST).await;
-    config.port(SERVER_PORT).await;
-    config.ttl(SERVER_TTI).await;
-    config.nodelay(SERVER_NODELAY).await;
-    server.server_config(config.clone()).await;
-    server.request_config(request_config).await;
-    debug!("Server config{COLON_SPACE}{:?}", config);
-    info!("Server initialization successful");
-}
-#[instrument_trace]
-async fn print_route_matcher(server: &Server) {
+pub async fn print_route_matcher(server: &Server) {
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     for key in route_matcher.get_static_route().keys() {
         info!("Static route{COLON_SPACE}{key}");
@@ -1346,8 +1245,14 @@ async fn print_route_matcher(server: &Server) {
 }
 #[hyperlane(server: Server)]
 #[instrument_trace]
-async fn create_server() {
+pub async fn create_server() {
+    init_log();
+    if let Err(error) = init_env_config() {
+        error!("{error}");
+    }
+    info!("Environment configuration loaded successfully");
     init_server_config(&server).await;
+    init_db().await;
     match server.run().await {
         Ok(server_hook) => {
             let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
@@ -1360,10 +1265,61 @@ async fn create_server() {
         Err(server_error) => error!("Server run error{COLON_SPACE}{server_error}"),
     }
 }
+```
+# Path: hyperlane-quick-start/init/framework/run/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use {super::*, server::*};
+use {hyperlane_config::framework::*, hyperlane_plugin::process::*};
+use tokio::runtime::{Builder, Runtime};
+```
+# Path: hyperlane-quick-start/init/framework/run/fn.rs
+```rust
+use super::*;
 #[instrument_trace]
-pub fn run() {
-    init_log();
+pub fn runtime() -> Runtime {
+    Builder::new_multi_thread()
+        .worker_threads(num_cpus::get_physical() << 1)
+        .thread_stack_size(1_048_576)
+        .max_blocking_threads(2_048)
+        .max_io_events_per_tick(1_024)
+        .enable_all()
+        .build()
+        .unwrap()
+}
+#[instrument_trace]
+pub fn block_on() {
     runtime().block_on(create(SERVER_PID_FILE_PATH, create_server));
+}
+```
+# Path: hyperlane-quick-start/init/framework/config/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+use hyperlane_config::framework::*;
+```
+# Path: hyperlane-quick-start/init/framework/config/fn.rs
+```rust
+use super::*;
+#[hyperlane(config: ServerConfig)]
+#[instrument_trace]
+pub async fn init_server_config(server: &Server) {
+    let request_config: RequestConfig = RequestConfig::default();
+    request_config
+        .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
+        .await
+        .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
+        .await;
+    config.host(SERVER_HOST).await;
+    config.port(SERVER_PORT).await;
+    config.ttl(SERVER_TTI).await;
+    config.nodelay(SERVER_NODELAY).await;
+    server.server_config(config.clone()).await;
+    server.request_config(request_config).await;
+    debug!("Server config{COLON_SPACE}{:?}", config);
+    info!("Server initialization successful");
 }
 ```
 # Path: hyperlane-quick-start/init/framework/shutdown/mod.rs
@@ -1401,9 +1357,54 @@ pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/init/application/mod.rs
 ```rust
-mod logger;
-pub use logger::*;
+pub mod db;
+pub mod env;
+pub mod logger;
 use super::*;
+```
+# Path: hyperlane-quick-start/init/application/db/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+use hyperlane_plugin::{database::*, mysql::*, postgresql::*, redis::*};
+use std::sync::Arc;
+use {redis::Connection, sea_orm::DatabaseConnection};
+```
+# Path: hyperlane-quick-start/init/application/db/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn init_db() {
+    let _: Result<DatabaseConnection, String> =
+        connection_mysql_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
+    let _: Result<DatabaseConnection, String> =
+        connection_postgresql_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
+    let _: Result<Arc<Connection>, String> = connection_redis_db(DEFAULT_REDIS_INSTANCE_NAME).await;
+    match initialize_auto_creation().await {
+        Ok(_) => {
+            info!("Auto-creation initialization successful");
+        }
+        Err(error) => {
+            error!("Auto-creation initialization failed{COLON_SPACE}{error}");
+        }
+    };
+}
+```
+# Path: hyperlane-quick-start/init/application/env/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+use hyperlane_plugin::env::*;
+```
+# Path: hyperlane-quick-start/init/application/env/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub fn init_env_config() -> Result<(), String> {
+    load_env_config()
+}
 ```
 # Path: hyperlane-quick-start/init/application/logger/mod.rs
 ```rust
@@ -1439,7 +1440,6 @@ pub mod model;
 pub mod service;
 pub mod utils;
 pub mod view;
-use hyperlane_resources::*;
 use {
     hyperlane::*,
     hyperlane_utils::{log::*, *},
@@ -1624,6 +1624,35 @@ pub struct WebSocketMessage {
     pub message: String,
 }
 ```
+# Path: hyperlane-quick-start/app/utils/mod.rs
+```rust
+pub mod send;
+use super::*;
+```
+# Path: hyperlane-quick-start/app/utils/send/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+```
+# Path: hyperlane-quick-start/app/utils/send/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {
+    let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {
+        let body: ResponseBody = ctx.get_response_body().await;
+        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        ctx.try_send_body_list_with_data(&frame_list).await
+    } else {
+        ctx.try_send_body().await
+    };
+    if send_result.is_err() {
+        ctx.aborted().await.closed().await;
+    }
+    send_result
+}
+```
 # Path: hyperlane-quick-start/app/middleware/mod.rs
 ```rust
 pub mod request;
@@ -1656,8 +1685,7 @@ impl ServerHook for SendMiddleware {
         Self
     }
     #[prologue_macros(
-        http,
-        reject(ctx.get_request_upgrade_type().await.is_ws()),
+        reject(ctx.get_request_is_ws_upgrade_type().await),
         try_send
     )]
     #[instrument_trace]
@@ -1670,8 +1698,8 @@ impl ServerHook for LogMiddleware {
     }
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {
-        let request: String = ctx.get_request().await.get_string();
-        let response: String = ctx.get_response().await.get_string();
+        let request: String = ctx.get_request_json_string().await;
+        let response: String = ctx.get_response_json_string().await;
         info!("{request}");
         info!("{response}");
     }
@@ -1683,6 +1711,7 @@ mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
+use hyperlane_resources::templates::*;
 ```
 # Path: hyperlane-quick-start/app/middleware/request/struct.rs
 ```rust
@@ -1718,7 +1747,7 @@ impl ServerHook for HttpRequestMiddleware {
         Self
     }
     #[prologue_macros(
-        reject(ctx.get_request_is_http().await),
+        reject(ctx.get_request_is_http_version().await),
         send,
     )]
     #[instrument_trace]
@@ -1780,7 +1809,7 @@ impl ServerHook for OptionMethodMiddleware {
         Self
     }
     #[prologue_macros(
-        filter(ctx.get_request_is_options().await),
+        filter(ctx.get_request_is_options_method().await),
         send
     )]
     #[instrument_trace]
@@ -1794,7 +1823,7 @@ impl ServerHook for UpgradeMiddleware {
         Self
     }
     #[prologue_macros(
-        ws,
+        ws_upgrade_type,
         response_version(HttpVersion::Http1_1),
         response_status_code(101),
         response_body(&vec![]),
@@ -1936,7 +1965,7 @@ impl ServerHook for FaviconRoute {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(301),
         response_header(LOCATION => LOGO_IMG_URL)
     )]
@@ -2027,8 +2056,6 @@ pub mod mysql;
 pub mod postgresql;
 pub mod process;
 pub mod redis;
-pub use {database::*, env::*, logger::*, mysql::*, postgresql::*, process::*, redis::*};
-use hyperlane_resources::*;
 use {
     hyperlane::*,
     hyperlane_utils::{log::*, *},
@@ -2126,6 +2153,10 @@ pub const ENV_FILE_PATH: &str = "/shell/env";
 pub const DOCKER_COMPOSE_FILE_PATH: &str = "./docker-compose.yml";
 pub const ENV_KEY_GPT_API_URL: &str = "GPT_API_URL";
 pub const ENV_KEY_GPT_MODEL: &str = "GPT_MODEL";
+pub const ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS: &str = "DB_CONNECTION_TIMEOUT_MILLIS";
+pub const DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS: u64 = 3000;
+pub const ENV_KEY_DB_RETRY_COOLDOWN_MILLIS: &str = "DB_RETRY_COOLDOWN_MILLIS";
+pub const DEFAULT_DB_RETRY_COOLDOWN_MILLIS: u64 = 30000;
 pub const ENV_KEY_MYSQL_HOST: &str = "MYSQL_HOST";
 pub const ENV_KEY_MYSQL_PORT: &str = "MYSQL_PORT";
 pub const ENV_KEY_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
@@ -2167,7 +2198,7 @@ mod r#impl;
 mod r#static;
 mod r#struct;
 pub use {r#const::*, r#fn::*, r#struct::*};
-use {super::*, mysql::*, postgresql::*, r#static::*};
+use {super::*, mysql::*, postgresql::*, redis::*, r#static::*};
 use std::sync::OnceLock;
 ```
 # Path: hyperlane-quick-start/plugin/env/struct.rs
@@ -2230,7 +2261,7 @@ pub fn get_global_env_config() -> &'static EnvConfig {
     GLOBAL_ENV_CONFIG.get_or_init(EnvConfig::default)
 }
 #[instrument_trace]
-pub fn init_env_config() -> Result<(), String> {
+pub fn load_env_config() -> Result<(), String> {
     let config: EnvConfig = EnvConfig::load()?;
     GLOBAL_ENV_CONFIG
         .set(config.clone())
@@ -2273,6 +2304,9 @@ impl MySqlInstanceConfig {
             let mut data: String = String::new();
             data.push_str(&format!("{ENV_KEY_GPT_API_URL}={BR}"));
             data.push_str(&format!("{ENV_KEY_GPT_MODEL}={BR}"));
+            data.push_str(&format!(
+                "{ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS}={DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS}{BR}"
+            ));
             write_to_file(ENV_FILE_PATH, data.as_bytes()).map_err(|error| {
                 format!("Failed to create example env file{COLON_SPACE}{error}")
             })?;
@@ -2578,26 +2612,47 @@ mod r#static;
 mod r#struct;
 pub use {r#const::*, r#fn::*, r#struct::*};
 use {super::*, database::*, env::*, r#static::*};
-use std::{collections::HashMap, time::Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 use {
     once_cell::sync::Lazy,
     sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
-    tokio::sync::{RwLock, RwLockWriteGuard},
+    tokio::{
+        sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+        time::timeout,
+    },
 };
 ```
 # Path: hyperlane-quick-start/plugin/postgresql/struct.rs
 ```rust
 use super::*;
-#[derive(Clone, Data, Debug, New)]
+#[derive(Clone, Data, Debug)]
 pub struct PostgreSqlAutoCreation {
     pub instance: PostgreSqlInstanceConfig,
+    pub schema: DatabaseSchema,
+}
+impl PostgreSqlAutoCreation {
+    pub fn new(instance: PostgreSqlInstanceConfig) -> Self {
+        Self {
+            instance,
+            schema: DatabaseSchema::default(),
+        }
+    }
+    pub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {
+        Self { instance, schema }
+    }
 }
 ```
 # Path: hyperlane-quick-start/plugin/postgresql/fn.rs
 ```rust
 use super::*;
 #[instrument_trace]
-pub async fn connection_postgresql_db<I>(instance_name: I) -> Result<DatabaseConnection, String>
+pub async fn connection_postgresql_db<I>(
+    instance_name: I,
+    schema: Option<DatabaseSchema>,
+) -> Result<DatabaseConnection, String>
 where
     I: AsRef<str>,
 {
@@ -2606,7 +2661,7 @@ where
     let instance: &PostgreSqlInstanceConfig = env
         .get_postgresql_instance(instance_name_str)
         .ok_or_else(|| format!("PostgreSQL instance '{instance_name_str}' not found"))?;
-    match perform_postgresql_auto_creation(instance).await {
+    match perform_postgresql_auto_creation(instance, schema.clone()).await {
         Ok(result) => {
             if result.has_changes() {
                 database::AutoCreationLogger::log_auto_creation_complete(
@@ -2630,7 +2685,16 @@ where
         }
     }
     let db_url: String = instance.get_connection_url();
-    Database::connect(&db_url).await.map_err(|error: DbErr| {
+    let timeout_duration: Duration = get_connection_timeout_duration();
+    let timeout_seconds: u64 = timeout_duration.as_secs();
+    let connection_result: Result<DatabaseConnection, DbErr> =
+        match timeout(timeout_duration, Database::connect(&db_url)).await {
+            Ok(result) => result,
+            Err(_) => Err(DbErr::Custom(format!(
+                "PostgreSQL connection timeout after {timeout_seconds} seconds"
+            ))),
+        };
+    connection_result.map_err(|error: DbErr| {
         let error_msg: String = error.to_string();
         let database_name: String = instance.database.clone();
         let error_msg_clone: String = error_msg.clone();
@@ -2647,39 +2711,61 @@ where
     })
 }
 #[instrument_trace]
-pub async fn get_postgresql_connection<I>(instance_name: I) -> Result<DatabaseConnection, String>
+pub async fn get_postgresql_connection<I>(
+    instance_name: I,
+    schema: Option<DatabaseSchema>,
+) -> Result<DatabaseConnection, String>
 where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<DatabaseConnection, String>>> =
-        POSTGRESQL_CONNECTIONS.write().await;
-    if let Some(connection_result) = connections.get(instance_name_str) {
-        match connection_result {
-            Ok(conn) => return Ok(conn.clone()),
-            Err(_) => {
-                connections.remove(instance_name_str);
+    let cooldown_duration: Duration = get_retry_cooldown_duration();
+    {
+        let connections: RwLockReadGuard<'_, HashMap<String, ConnectionCache<DatabaseConnection>>> =
+            POSTGRESQL_CONNECTIONS.read().await;
+        if let Some(cache) = connections.get(instance_name_str) {
+            match &cache.result {
+                Ok(conn) => return Ok(conn.clone()),
+                Err(error) => {
+                    if !cache.is_cooldown_expired(cooldown_duration) {
+                        return Err(error.clone());
+                    }
+                }
             }
         }
     }
-    drop(connections);
-    let new_connection: Result<DatabaseConnection, String> =
-        connection_postgresql_db(instance_name_str).await;
-    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<DatabaseConnection, String>>> =
-        POSTGRESQL_CONNECTIONS.write().await;
-    match &new_connection {
-        Ok(conn) => {
-            connections.insert(instance_name_str.to_string(), Ok(conn.clone()));
-        }
-        Err(error) => {
-            connections.insert(instance_name_str.to_string(), Err(error.clone()));
+    let mut connections: RwLockWriteGuard<
+        '_,
+        HashMap<String, ConnectionCache<DatabaseConnection>>,
+    > = POSTGRESQL_CONNECTIONS.write().await;
+    if let Some(cache) = connections.get(instance_name_str) {
+        match &cache.result {
+            Ok(conn) => return Ok(conn.clone()),
+            Err(error) => {
+                if !cache.is_cooldown_expired(cooldown_duration) {
+                    return Err(error.clone());
+                }
+            }
         }
     }
+    connections.remove(instance_name_str);
+    drop(connections);
+    let new_connection: Result<DatabaseConnection, String> =
+        connection_postgresql_db(instance_name_str, schema).await;
+    let mut connections: RwLockWriteGuard<
+        '_,
+        HashMap<String, ConnectionCache<DatabaseConnection>>,
+    > = POSTGRESQL_CONNECTIONS.write().await;
+    connections.insert(
+        instance_name_str.to_string(),
+        ConnectionCache::new(new_connection.clone()),
+    );
     new_connection
 }
 #[instrument_trace]
 pub async fn perform_postgresql_auto_creation(
     instance: &PostgreSqlInstanceConfig,
+    schema: Option<DatabaseSchema>,
 ) -> Result<AutoCreationResult, AutoCreationError> {
     let start_time: Instant = Instant::now();
     let mut result: AutoCreationResult = AutoCreationResult::default();
@@ -2688,7 +2774,10 @@ pub async fn perform_postgresql_auto_creation(
         &instance.database,
     )
     .await;
-    let auto_creator: PostgreSqlAutoCreation = PostgreSqlAutoCreation::new(instance.clone());
+    let auto_creator: PostgreSqlAutoCreation = match schema {
+        Some(s) => PostgreSqlAutoCreation::with_schema(instance.clone(), s),
+        None => PostgreSqlAutoCreation::new(instance.clone()),
+    };
     match auto_creator.create_database_if_not_exists().await {
         Ok(created) => {
             result.database_created = created;
@@ -2761,7 +2850,18 @@ impl PostgreSqlAutoCreation {
     #[instrument_trace]
     async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let admin_url: String = self.instance.get_admin_url();
-        Database::connect(&admin_url).await.map_err(|error: DbErr| {
+        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&admin_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "PostgreSQL admin connection timeout after {timeout_seconds} seconds"
+                    )));
+                }
+            };
+        connection_result.map_err(|error: DbErr| {
             let error_msg: String = error.to_string();
             if error_msg.contains("authentication failed") || error_msg.contains("permission") {
                 AutoCreationError::InsufficientPermissions(format!(
@@ -2781,7 +2881,23 @@ impl PostgreSqlAutoCreation {
     #[instrument_trace]
     async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let db_url: String = self.instance.get_connection_url();
-        Database::connect(&db_url).await.map_err(|error: DbErr| {
+        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> = match timeout(
+            timeout_duration,
+            Database::connect(&db_url),
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                return Err(AutoCreationError::Timeout(format!(
+                    "PostgreSQL database connection timeout after {timeout_seconds} seconds{COLON_SPACE}{}",
+                    self.instance.database
+                )));
+            }
+        };
+        connection_result.map_err(|error: DbErr| {
             AutoCreationError::ConnectionFailed(format!(
                 "Cannot connect to PostgreSQL database '{}'{COLON_SPACE}{error}",
                 self.instance.database,
@@ -2920,34 +3036,8 @@ impl PostgreSqlAutoCreation {
         }
     }
     #[instrument_trace]
-    fn get_postgresql_schema(&self) -> DatabaseSchema {
-        let indexes: Vec<String> = POSTGRESQL_CREATE_INDEX_SQL
-            .split(';')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty() && !s.starts_with("--"))
-            .map(|s| format!("{s};"))
-            .collect();
-        let mut schema: DatabaseSchema = DatabaseSchema::default()
-            .add_table(TableSchema::new(
-                "record".to_string(),
-                POSTGRESQL_RECORD_SQL.to_string(),
-            ))
-            .add_table(TableSchema::new(
-                "chat_history".to_string(),
-                POSTGRESQL_CHAT_HISTORY_SQL.to_string(),
-            ))
-            .add_table(TableSchema::new(
-                "tracking_record".to_string(),
-                POSTGRESQL_TRACKING_RECORD_SQL.to_string(),
-            ))
-            .add_table(TableSchema::new(
-                "shortlink".to_string(),
-                POSTGRESQL_SHORTLINK_SQL.to_string(),
-            ));
-        for index in indexes {
-            schema = schema.add_index(index);
-        }
-        schema
+    fn get_database_schema(&self) -> &DatabaseSchema {
+        &self.schema
     }
 }
 impl DatabaseAutoCreation for PostgreSqlAutoCreation {
@@ -2961,7 +3051,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
     #[instrument_trace]
     async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
         let connection: DatabaseConnection = self.create_target_connection().await?;
-        let schema: DatabaseSchema = self.get_postgresql_schema();
+        let schema: &DatabaseSchema = self.get_database_schema();
         let mut created_tables: Vec<String> = Vec::new();
         for table in schema.ordered_tables() {
             if !self.table_exists(&connection, &table.name).await? {
@@ -3052,7 +3142,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
 ```rust
 use super::*;
 pub static POSTGRESQL_CONNECTIONS: Lazy<
-    RwLock<HashMap<String, Result<DatabaseConnection, String>>>,
+    RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
 > = Lazy::new(|| RwLock::new(HashMap::new()));
 ```
 # Path: hyperlane-quick-start/plugin/mysql/const.rs
@@ -3068,8 +3158,14 @@ mod r#static;
 mod r#struct;
 pub use {r#const::*, r#fn::*, r#struct::*};
 use {super::*, database::*, env::*, r#static::*};
-use std::{collections::HashMap, time::Instant};
-use tokio::sync::{RwLock, RwLockWriteGuard};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
+use tokio::{
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    time::timeout,
+};
 ```
 # Path: hyperlane-quick-start/plugin/mysql/struct.rs
 ```rust
@@ -3077,13 +3173,18 @@ use super::*;
 #[derive(Clone, Data, Debug, New)]
 pub struct MySqlAutoCreation {
     pub instance: MySqlInstanceConfig,
+    #[new(skip)]
+    pub schema: DatabaseSchema,
 }
 ```
 # Path: hyperlane-quick-start/plugin/mysql/fn.rs
 ```rust
 use super::*;
 #[instrument_trace]
-pub async fn connection_mysql_db<I>(instance_name: I) -> Result<DatabaseConnection, String>
+pub async fn connection_mysql_db<I>(
+    instance_name: I,
+    schema: Option<DatabaseSchema>,
+) -> Result<DatabaseConnection, String>
 where
     I: AsRef<str>,
 {
@@ -3092,7 +3193,7 @@ where
     let instance: &MySqlInstanceConfig = env
         .get_mysql_instance(instance_name_str)
         .ok_or_else(|| format!("MySQL instance '{instance_name_str}' not found"))?;
-    match perform_mysql_auto_creation(instance).await {
+    match perform_mysql_auto_creation(instance, schema.clone()).await {
         Ok(result) => {
             if result.has_changes() {
                 database::AutoCreationLogger::log_auto_creation_complete(
@@ -3116,7 +3217,16 @@ where
         }
     }
     let db_url: String = instance.get_connection_url();
-    Database::connect(&db_url).await.map_err(|error: DbErr| {
+    let timeout_duration: Duration = get_connection_timeout_duration();
+    let timeout_seconds: u64 = timeout_duration.as_secs();
+    let connection_result: Result<DatabaseConnection, DbErr> =
+        match timeout(timeout_duration, Database::connect(&db_url)).await {
+            Ok(result) => result,
+            Err(_) => Err(DbErr::Custom(format!(
+                "MySQL connection timeout after {timeout_seconds} seconds"
+            ))),
+        };
+    connection_result.map_err(|error: DbErr| {
         let error_msg: String = error.to_string();
         let database_name: String = instance.database.clone();
         let error_msg_clone: String = error_msg.clone();
@@ -3133,45 +3243,70 @@ where
     })
 }
 #[instrument_trace]
-pub async fn get_mysql_connection<I>(instance_name: I) -> Result<DatabaseConnection, String>
+pub async fn get_mysql_connection<I>(
+    instance_name: I,
+    schema: Option<DatabaseSchema>,
+) -> Result<DatabaseConnection, String>
 where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<DatabaseConnection, String>>> =
-        MYSQL_CONNECTIONS.write().await;
-    if let Some(connection_result) = connections.get(instance_name_str) {
-        match connection_result {
-            Ok(conn) => return Ok(conn.clone()),
-            Err(_) => {
-                connections.remove(instance_name_str);
+    let cooldown_duration: Duration = get_retry_cooldown_duration();
+    {
+        let connections: RwLockReadGuard<'_, HashMap<String, ConnectionCache<DatabaseConnection>>> =
+            MYSQL_CONNECTIONS.read().await;
+        if let Some(cache) = connections.get(instance_name_str) {
+            match &cache.result {
+                Ok(conn) => return Ok(conn.clone()),
+                Err(error) => {
+                    if !cache.is_cooldown_expired(cooldown_duration) {
+                        return Err(error.clone());
+                    }
+                }
             }
         }
     }
-    drop(connections);
-    let new_connection: Result<DatabaseConnection, String> =
-        connection_mysql_db(instance_name_str).await;
-    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<DatabaseConnection, String>>> =
-        MYSQL_CONNECTIONS.write().await;
-    match &new_connection {
-        Ok(conn) => {
-            connections.insert(instance_name_str.to_string(), Ok(conn.clone()));
-        }
-        Err(error) => {
-            connections.insert(instance_name_str.to_string(), Err(error.clone()));
+    let mut connections: RwLockWriteGuard<
+        '_,
+        HashMap<String, ConnectionCache<DatabaseConnection>>,
+    > = MYSQL_CONNECTIONS.write().await;
+    if let Some(cache) = connections.get(instance_name_str) {
+        match &cache.result {
+            Ok(conn) => return Ok(conn.clone()),
+            Err(error) => {
+                if !cache.is_cooldown_expired(cooldown_duration) {
+                    return Err(error.clone());
+                }
+            }
         }
     }
+    connections.remove(instance_name_str);
+    drop(connections);
+    let new_connection: Result<DatabaseConnection, String> =
+        connection_mysql_db(instance_name_str, schema).await;
+    let mut connections: RwLockWriteGuard<
+        '_,
+        HashMap<String, ConnectionCache<DatabaseConnection>>,
+    > = MYSQL_CONNECTIONS.write().await;
+    connections.insert(
+        instance_name_str.to_string(),
+        ConnectionCache::new(new_connection.clone()),
+    );
     new_connection
 }
 #[instrument_trace]
 pub async fn perform_mysql_auto_creation(
     instance: &MySqlInstanceConfig,
+    schema: Option<DatabaseSchema>,
 ) -> Result<AutoCreationResult, AutoCreationError> {
     let start_time: Instant = Instant::now();
     let mut result: AutoCreationResult = AutoCreationResult::default();
     AutoCreationLogger::log_auto_creation_start(database::PluginType::MySQL, &instance.database)
         .await;
-    let auto_creator: MySqlAutoCreation = MySqlAutoCreation::new(instance.clone());
+    let auto_creator: MySqlAutoCreation = match schema {
+        Some(s) => MySqlAutoCreation::with_schema(instance.clone(), s),
+        None => MySqlAutoCreation::new(instance.clone()),
+    };
     match auto_creator.create_database_if_not_exists().await {
         Ok(created) => {
             result.database_created = created;
@@ -3242,9 +3377,24 @@ impl Default for MySqlAutoCreation {
 }
 impl MySqlAutoCreation {
     #[instrument_trace]
+    pub fn with_schema(instance: MySqlInstanceConfig, schema: DatabaseSchema) -> Self {
+        Self { instance, schema }
+    }
+    #[instrument_trace]
     async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let admin_url: String = self.instance.get_admin_url();
-        Database::connect(&admin_url).await.map_err(|error: DbErr| {
+        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&admin_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "MySQL admin connection timeout after {timeout_seconds} seconds"
+                    )));
+                }
+            };
+        connection_result.map_err(|error: DbErr| {
             let error_msg: String = error.to_string();
             if error_msg.contains("Access denied") || error_msg.contains("permission") {
                 AutoCreationError::InsufficientPermissions(format!(
@@ -3324,7 +3474,23 @@ impl MySqlAutoCreation {
     #[instrument_trace]
     async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let db_url: String = self.instance.get_connection_url();
-        Database::connect(&db_url).await.map_err(|error: DbErr| {
+        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> = match timeout(
+            timeout_duration,
+            Database::connect(&db_url),
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                return Err(AutoCreationError::Timeout(format!(
+                    "MySQL database connection timeout after {timeout_seconds} seconds{COLON_SPACE}{}",
+                    self.instance.database
+                )));
+            }
+        };
+        connection_result.map_err(|error: DbErr| {
             AutoCreationError::ConnectionFailed(format!(
                 "Cannot connect to MySQL database '{}'{COLON_SPACE}{}",
                 self.instance.database, error
@@ -3397,11 +3563,8 @@ impl MySqlAutoCreation {
         }
     }
     #[instrument_trace]
-    fn get_mysql_schema(&self) -> database::DatabaseSchema {
-        DatabaseSchema::default().add_table(TableSchema::new(
-            "record".to_string(),
-            MYSQL_RECORD_SQL.to_string(),
-        ))
+    fn get_database_schema(&self) -> &DatabaseSchema {
+        &self.schema
     }
 }
 impl DatabaseAutoCreation for MySqlAutoCreation {
@@ -3415,7 +3578,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
     #[instrument_trace]
     async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
         let connection: DatabaseConnection = self.create_target_connection().await?;
-        let schema: DatabaseSchema = self.get_mysql_schema();
+        let schema: &DatabaseSchema = self.get_database_schema();
         let mut created_tables: Vec<String> = Vec::new();
         for table in schema.ordered_tables() {
             if !self.table_exists(&connection, &table.name).await? {
@@ -3470,7 +3633,18 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
     #[instrument_trace]
     async fn verify_connection(&self) -> Result<(), AutoCreationError> {
         let db_url: String = self.instance.get_connection_url();
-        let connection: DatabaseConnection = Database::connect(&db_url).await.map_err(|error| {
+        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "Failed to verify MySQL connection within {timeout_seconds} seconds"
+                    )));
+                }
+            };
+        let connection: DatabaseConnection = connection_result.map_err(|error: DbErr| {
             AutoCreationError::ConnectionFailed(format!(
                 "Failed to verify MySQL connection{COLON_SPACE}{error}"
             ))
@@ -3510,7 +3684,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
 # Path: hyperlane-quick-start/plugin/mysql/static.rs
 ```rust
 use super::*;
-pub static MYSQL_CONNECTIONS: Lazy<RwLock<HashMap<String, Result<DatabaseConnection, String>>>> =
+pub static MYSQL_CONNECTIONS: Lazy<RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 ```
 # Path: hyperlane-quick-start/plugin/logger/mod.rs
@@ -3683,7 +3857,10 @@ mod r#struct;
 mod r#trait;
 pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*};
 use {super::*, env::*};
-use std::{str::FromStr, time::Duration};
+use std::{
+    str::FromStr,
+    time::{Duration, Instant},
+};
 ```
 # Path: hyperlane-quick-start/plugin/database/enum.rs
 ```rust
@@ -3705,6 +3882,25 @@ pub enum PluginType {
 # Path: hyperlane-quick-start/plugin/database/struct.rs
 ```rust
 use super::*;
+#[derive(Clone, Debug)]
+pub struct ConnectionCache<T: Clone> {
+    pub result: Result<T, String>,
+    pub last_attempt: Instant,
+}
+impl<T: Clone> ConnectionCache<T> {
+    pub fn new(result: Result<T, String>) -> Self {
+        Self {
+            result,
+            last_attempt: Instant::now(),
+        }
+    }
+    pub fn is_cooldown_expired(&self, cooldown_duration: Duration) -> bool {
+        self.last_attempt.elapsed() >= cooldown_duration
+    }
+    pub fn should_retry(&self, cooldown_duration: Duration) -> bool {
+        self.result.is_err() && self.is_cooldown_expired(cooldown_duration)
+    }
+}
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct AutoCreationErrorHandler;
 #[derive(Clone, Data, Debug)]
@@ -3752,7 +3948,31 @@ pub struct AutoCreationLogger;
 ```rust
 use super::*;
 #[instrument_trace]
+pub fn get_connection_timeout_duration() -> Duration {
+    let timeout_seconds: u64 = std::env::var(ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS)
+        .ok()
+        .and_then(|value: String| value.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS);
+    Duration::from_millis(timeout_seconds)
+}
+#[instrument_trace]
+pub fn get_retry_cooldown_duration() -> Duration {
+    let cooldown_millis: u64 = std::env::var(ENV_KEY_DB_RETRY_COOLDOWN_MILLIS)
+        .ok()
+        .and_then(|value: String| value.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_DB_RETRY_COOLDOWN_MILLIS);
+    Duration::from_millis(cooldown_millis)
+}
+#[instrument_trace]
 pub async fn initialize_auto_creation() -> Result<(), String> {
+    initialize_auto_creation_with_schema(None, None, None).await
+}
+#[instrument_trace]
+pub async fn initialize_auto_creation_with_schema(
+    mysql_schema: Option<DatabaseSchema>,
+    postgresql_schema: Option<DatabaseSchema>,
+    _redis_schema: Option<()>,
+) -> Result<(), String> {
     if let Err(error) = AutoCreationConfig::validate() {
         return Err(format!(
             "Auto-creation configuration validation failed{COLON_SPACE}{error}"
@@ -3761,7 +3981,7 @@ pub async fn initialize_auto_creation() -> Result<(), String> {
     let env: &'static EnvConfig = get_global_env_config();
     let mut initialization_results: Vec<String> = Vec::new();
     for instance in &env.mysql_instances {
-        match mysql::perform_mysql_auto_creation(instance).await {
+        match mysql::perform_mysql_auto_creation(instance, mysql_schema.clone()).await {
             Ok(result) => {
                 initialization_results.push(format!(
                     "MySQL ({}) {COLON_SPACE}{}",
@@ -3788,7 +4008,9 @@ pub async fn initialize_auto_creation() -> Result<(), String> {
         }
     }
     for instance in &env.postgresql_instances {
-        match postgresql::perform_postgresql_auto_creation(instance).await {
+        match postgresql::perform_postgresql_auto_creation(instance, postgresql_schema.clone())
+            .await
+        {
             Ok(result) => {
                 initialization_results.push(format!(
                     "PostgreSQL ({}) {COLON_SPACE}{}",
@@ -4182,9 +4404,18 @@ mod r#static;
 mod r#struct;
 mod r#type;
 pub use {r#const::*, r#fn::*, r#struct::*, r#type::*};
-use {super::*, database::*, env::*, hyperlane_utils::redis::*, r#static::*};
-use std::{collections::HashMap, sync::Arc, time::Instant};
-use tokio::sync::{RwLock, RwLockWriteGuard};
+use {super::*, database::*, env::*, r#static::*};
+use hyperlane_utils::redis::*;
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::{
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    task::{JoinHandle, spawn_blocking},
+    time::timeout,
+};
 ```
 # Path: hyperlane-quick-start/plugin/redis/struct.rs
 ```rust
@@ -4246,10 +4477,46 @@ where
         });
         error_msg
     })?;
-    let connection: Connection = client
-        .get_connection()
-        .map_err(|error: redis::RedisError| {
-            let error_msg: String = error.to_string();
+    let timeout_duration: Duration = get_connection_timeout_duration();
+    let timeout_seconds: u64 = timeout_duration.as_secs();
+    let connection_task: JoinHandle<Result<Connection, RedisError>> =
+        spawn_blocking(move || client.get_connection());
+    let connection: Connection = match timeout(timeout_duration, connection_task).await {
+        Ok(join_result) => match join_result {
+            Ok(result) => result.map_err(|error: redis::RedisError| {
+                let error_msg: String = error.to_string();
+                let instance_name_clone: String = instance_name_str.to_string();
+                let error_msg_clone: String = error_msg.clone();
+                tokio::spawn(async move {
+                    database::AutoCreationLogger::log_connection_verification(
+                        database::PluginType::Redis,
+                        &instance_name_clone,
+                        false,
+                        Some(&error_msg_clone),
+                    )
+                    .await;
+                });
+                error_msg
+            })?,
+            Err(_) => {
+                let error_msg: String = "Redis connection task failed".to_string();
+                let instance_name_clone: String = instance_name_str.to_string();
+                let error_msg_clone: String = error_msg.clone();
+                tokio::spawn(async move {
+                    database::AutoCreationLogger::log_connection_verification(
+                        database::PluginType::Redis,
+                        &instance_name_clone,
+                        false,
+                        Some(&error_msg_clone),
+                    )
+                    .await;
+                });
+                return Err(error_msg);
+            }
+        },
+        Err(_) => {
+            let error_msg: String =
+                format!("Redis connection timeout after {timeout_seconds} seconds");
             let instance_name_clone: String = instance_name_str.to_string();
             let error_msg_clone: String = error_msg.clone();
             tokio::spawn(async move {
@@ -4261,8 +4528,9 @@ where
                 )
                 .await;
             });
-            error_msg
-        })?;
+            return Err(error_msg);
+        }
+    };
     Ok(Arc::new(connection))
 }
 #[instrument_trace]
@@ -4271,29 +4539,40 @@ where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<Arc<Connection>, String>>> =
-        REDIS_CONNECTIONS.write().await;
-    if let Some(connection_result) = connections.get(instance_name_str) {
-        match connection_result {
-            Ok(conn) => return Ok(conn.clone()),
-            Err(_) => {
-                connections.remove(instance_name_str);
+    let cooldown_duration: Duration = get_retry_cooldown_duration();
+    {
+        let connections: RwLockReadGuard<'_, RedisConnectionMap> = REDIS_CONNECTIONS.read().await;
+        if let Some(cache) = connections.get(instance_name_str) {
+            match &cache.result {
+                Ok(conn) => return Ok(conn.clone()),
+                Err(error) => {
+                    if !cache.is_cooldown_expired(cooldown_duration) {
+                        return Err(error.clone());
+                    }
+                }
             }
         }
     }
+    let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> = REDIS_CONNECTIONS.write().await;
+    if let Some(cache) = connections.get(instance_name_str) {
+        match &cache.result {
+            Ok(conn) => return Ok(conn.clone()),
+            Err(error) => {
+                if !cache.is_cooldown_expired(cooldown_duration) {
+                    return Err(error.clone());
+                }
+            }
+        }
+    }
+    connections.remove(instance_name_str);
     drop(connections);
     let new_connection: Result<Arc<Connection>, String> =
         connection_redis_db(instance_name_str).await;
-    let mut connections: RwLockWriteGuard<'_, HashMap<String, Result<Arc<Connection>, String>>> =
-        REDIS_CONNECTIONS.write().await;
-    match &new_connection {
-        Ok(conn) => {
-            connections.insert(instance_name_str.to_string(), Ok(conn.clone()));
-        }
-        Err(error) => {
-            connections.insert(instance_name_str.to_string(), Err(error.clone()));
-        }
-    }
+    let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> = REDIS_CONNECTIONS.write().await;
+    connections.insert(
+        instance_name_str.to_string(),
+        ConnectionCache::new(new_connection.clone()),
+    );
     new_connection
 }
 #[instrument_trace]
@@ -4376,7 +4655,7 @@ impl RedisAutoCreation {
     #[instrument_trace]
     async fn create_mutable_connection(&self) -> Result<Connection, AutoCreationError> {
         let db_url: String = self.instance.get_connection_url();
-        let client: Client = Client::open(db_url).map_err(|error: redis::RedisError| {
+        let client: Client = Client::open(db_url).map_err(|error: RedisError| {
             let error_msg: String = error.to_string();
             if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
                 AutoCreationError::InsufficientPermissions(format!(
@@ -4392,10 +4671,13 @@ impl RedisAutoCreation {
                 ))
             }
         })?;
-        let connection: Connection =
-            client
-                .get_connection()
-                .map_err(|error: redis::RedisError| {
+        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_task: tokio::task::JoinHandle<Result<Connection, RedisError>> =
+            tokio::task::spawn_blocking(move || client.get_connection());
+        let connection: Connection = match timeout(timeout_duration, connection_task).await {
+            Ok(join_result) => match join_result {
+                Ok(result) => result.map_err(|error: RedisError| {
                     let error_msg: String = error.to_string();
                     if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
                         AutoCreationError::InsufficientPermissions(format!(
@@ -4412,32 +4694,45 @@ impl RedisAutoCreation {
                             "Redis connection error{COLON_SPACE}{error_msg}"
                         ))
                     }
-                })?;
+                })?,
+                Err(_) => {
+                    return Err(AutoCreationError::ConnectionFailed(
+                        "Redis connection task failed".to_string(),
+                    ));
+                }
+            },
+            Err(_) => {
+                return Err(AutoCreationError::Timeout(format!(
+                    "Redis connection timeout after {timeout_seconds} seconds"
+                )));
+            }
+        };
         Ok(connection)
     }
     #[instrument_trace]
     async fn validate_redis_server(&self) -> Result<(), AutoCreationError> {
         let mut conn: Connection = self.create_mutable_connection().await?;
-        let pong: String =
-            redis::cmd("PING")
-                .query(&mut conn)
-                .map_err(|error: redis::RedisError| {
-                    AutoCreationError::ConnectionFailed(format!(
-                        "Redis PING failed{COLON_SPACE}{error}"
-                    ))
-                })?;
+        let pong: String = redis::cmd("PING")
+            .query(&mut conn)
+            .map_err(|error: RedisError| {
+                AutoCreationError::ConnectionFailed(format!(
+                    "Redis PING failed{COLON_SPACE}{error}"
+                ))
+            })?;
         if pong != "PONG" {
             return Err(AutoCreationError::ConnectionFailed(
                 "Redis PING returned unexpected response".to_string(),
             ));
         }
-        let info: String = redis::cmd("INFO").arg("server").query(&mut conn).map_err(
-            |error: redis::RedisError| {
-                AutoCreationError::DatabaseError(format!(
-                    "Failed to get Redis server info{COLON_SPACE}{error}"
-                ))
-            },
-        )?;
+        let info: String =
+            redis::cmd("INFO")
+                .arg("server")
+                .query(&mut conn)
+                .map_err(|error: RedisError| {
+                    AutoCreationError::DatabaseError(format!(
+                        "Failed to get Redis server info{COLON_SPACE}{error}"
+                    ))
+                })?;
         if info.contains("redis_version:") {
             AutoCreationLogger::log_connection_verification(
                 database::PluginType::Redis,
@@ -4457,7 +4752,7 @@ impl RedisAutoCreation {
         let exists: i32 = redis::cmd("EXISTS")
             .arg(&app_key)
             .query(&mut conn)
-            .map_err(|error: redis::RedisError| {
+            .map_err(|error: RedisError| {
                 AutoCreationError::DatabaseError(format!(
                     "Failed to check Redis key existence{COLON_SPACE}{error}"
                 ))
@@ -4467,7 +4762,7 @@ impl RedisAutoCreation {
                 .arg(&app_key)
                 .arg("true")
                 .query(&mut conn)
-                .map_err(|error: redis::RedisError| {
+                .map_err(|error: RedisError| {
                     AutoCreationError::DatabaseError(format!(
                         "Failed to set Redis initialization key{COLON_SPACE}{error}"
                     ))
@@ -4478,7 +4773,7 @@ impl RedisAutoCreation {
                 .arg(&config_key)
                 .arg("1.0.0")
                 .query(&mut conn)
-                .map_err(|error: redis::RedisError| {
+                .map_err(|error: RedisError| {
                     AutoCreationError::DatabaseError(format!(
                         "Failed to set Redis config key{COLON_SPACE}{error}"
                     ))
@@ -4547,7 +4842,7 @@ impl DatabaseAutoCreation for RedisAutoCreation {
 ```rust
 use super::*;
 pub type RedisConnectionResult = Result<Arc<Connection>, String>;
-pub type RedisConnectionMap = HashMap<String, RedisConnectionResult>;
+pub type RedisConnectionMap = HashMap<String, ConnectionCache<Arc<Connection>>>;
 ```
 # Path: hyperlane-quick-start/plugin/redis/static.rs
 ```rust
@@ -4558,7 +4853,7 @@ pub static REDIS_CONNECTIONS: Lazy<RwLock<RedisConnectionMap>> =
 # Path: hyperlane-quick-start/src/main.rs
 ```rust
 fn main() {
-    hyperlane_init::framework::wait::run();
+    hyperlane_init::framework::run::block_on();
 }
 ```
 # Path: hyperlane-log/README.md
@@ -5219,7 +5514,9 @@ pub enum HookType {
 # Path: hyperlane/src/hook/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, Copy, Debug, DisplayDebug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, DisplayDebug, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize,
+)]
 pub struct DefaultServerHook;
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
 pub struct ServerControlHook {
@@ -5690,7 +5987,7 @@ impl Server {
             if progress {
                 Box::pin(self.handle_task_panic(ctx, join_error)).await;
             } else {
-                eprintln!("Panic occurred in panic handler: {:?}", join_error);
+                eprintln!("{}", join_error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
         }
@@ -5700,9 +5997,7 @@ impl Server {
         let host: &String = config.get_host();
         let port: u16 = config.get_port();
         let addr: String = Self::get_bind_addr(host, port);
-        TcpListener::bind(&addr)
-            .await
-            .map_err(|error| ServerError::TcpBind(error.to_string()))
+        Ok(TcpListener::bind(&addr).await?)
     }
     async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
@@ -6030,7 +6325,7 @@ impl ServerHook for UpgradeMiddleware {
         Self
     }
     async fn handle(self, ctx: &Context) {
-        if !ctx.get_request().await.is_ws() {
+        if !ctx.get_request_is_ws_upgrade_type().await {
             return;
         }
         if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
@@ -6062,7 +6357,7 @@ impl ServerHook for ResponseMiddleware {
         Self
     }
     async fn handle(self, ctx: &Context) {
-        if ctx.get_request().await.is_ws() {
+        if ctx.get_request_is_ws_upgrade_type().await {
             return;
         }
         let send_result: Result<(), ResponseError> = ctx.try_send().await;
@@ -6129,7 +6424,7 @@ impl ServerHook for SseRoute {
 struct WebsocketRoute;
 impl WebsocketRoute {
     async fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {
-        let send_result: Result<(), ResponseError> = if ctx.get_request().await.is_ws() {
+        let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {
             let body: ResponseBody = ctx.get_response_body().await;
             let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
             ctx.try_send_body_list_with_data(&frame_list).await
@@ -6212,7 +6507,9 @@ pub use r#struct::*;
 # Path: hyperlane/src/panic/struct.rs
 ```rust
 use crate::*;
-#[derive(CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter)]
+#[derive(
+    CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter, Deserialize, Serialize,
+)]
 pub struct PanicData {
     #[get(pub)]
     #[set(pub(crate))]
@@ -6548,8 +6845,17 @@ impl Context {
     {
         func(self.read().await.get_request().clone()).await
     }
-    pub async fn get_request_string(&self) -> String {
-        self.read().await.get_request().get_string()
+    pub async fn try_get_request_json_vec(&self) -> Result<Vec<u8>, serde_json::Error> {
+        self.read().await.get_request().try_json_vec()
+    }
+    pub async fn get_request_json_vec(&self) -> Vec<u8> {
+        self.read().await.get_request().json_vec()
+    }
+    pub async fn try_get_request_json_string(&self) -> Result<String, serde_json::Error> {
+        self.read().await.get_request().try_json_string()
+    }
+    pub async fn get_request_json_string(&self) -> String {
+        self.read().await.get_request().json_string()
     }
     pub async fn get_request_version(&self) -> RequestVersion {
         self.read().await.get_request().get_version().clone()
@@ -6599,8 +6905,8 @@ impl Context {
     pub async fn get_request_headers(&self) -> RequestHeaders {
         self.read().await.get_request().get_headers().clone()
     }
-    pub async fn get_request_headers_length(&self) -> usize {
-        self.read().await.get_request().get_headers_length()
+    pub async fn get_request_headers_size(&self) -> usize {
+        self.read().await.get_request().get_headers_size()
     }
     pub async fn try_get_request_header<K>(&self, key: K) -> Option<RequestHeadersValue>
     where
@@ -6642,16 +6948,16 @@ impl Context {
     where
         K: AsRef<str>,
     {
-        self.read().await.get_request().try_get_header_length(key)
+        self.read().await.get_request().try_get_header_size(key)
     }
     pub async fn get_request_header_len<K>(&self, key: K) -> usize
     where
         K: AsRef<str>,
     {
-        self.read().await.get_request().get_header_length(key)
+        self.read().await.get_request().get_header_size(key)
     }
-    pub async fn get_request_headers_values_length(&self) -> usize {
-        self.read().await.get_request().get_headers_values_length()
+    pub async fn get_request_headers_values_size(&self) -> usize {
+        self.read().await.get_request().get_headers_values_size()
     }
     pub async fn get_request_has_header<K>(&self, key: K) -> bool
     where
@@ -6687,71 +6993,74 @@ impl Context {
     pub async fn get_request_upgrade_type(&self) -> UpgradeType {
         self.read().await.get_request().get_upgrade_type()
     }
-    pub async fn get_request_is_ws(&self) -> bool {
-        self.read().await.get_request().is_ws()
+    pub async fn get_request_is_get_method(&self) -> bool {
+        self.read().await.get_request().is_get_method()
     }
-    pub async fn get_request_is_h2c(&self) -> bool {
-        self.read().await.get_request().is_h2c()
+    pub async fn get_request_is_post_method(&self) -> bool {
+        self.read().await.get_request().is_post_method()
     }
-    pub async fn get_request_is_tls(&self) -> bool {
-        self.read().await.get_request().is_tls()
+    pub async fn get_request_is_put_method(&self) -> bool {
+        self.read().await.get_request().is_put_method()
     }
-    pub async fn get_request_is_unknown_upgrade(&self) -> bool {
-        self.read().await.get_request().is_unknown_upgrade()
+    pub async fn get_request_is_delete_method(&self) -> bool {
+        self.read().await.get_request().is_delete_method()
     }
-    pub async fn get_request_is_http1_1_or_higher(&self) -> bool {
-        self.read().await.get_request().is_http1_1_or_higher()
+    pub async fn get_request_is_patch_method(&self) -> bool {
+        self.read().await.get_request().is_patch_method()
     }
-    pub async fn get_request_is_http0_9(&self) -> bool {
-        self.read().await.get_request().is_http0_9()
+    pub async fn get_request_is_head_method(&self) -> bool {
+        self.read().await.get_request().is_head_method()
     }
-    pub async fn get_request_is_http1_0(&self) -> bool {
-        self.read().await.get_request().is_http1_0()
+    pub async fn get_request_is_options_method(&self) -> bool {
+        self.read().await.get_request().is_options_method()
     }
-    pub async fn get_request_is_http1_1(&self) -> bool {
-        self.read().await.get_request().is_http1_1()
+    pub async fn get_request_is_connect_method(&self) -> bool {
+        self.read().await.get_request().is_connect_method()
     }
-    pub async fn get_request_is_http2(&self) -> bool {
-        self.read().await.get_request().is_http2()
+    pub async fn get_request_is_trace_method(&self) -> bool {
+        self.read().await.get_request().is_trace_method()
     }
-    pub async fn get_request_is_http3(&self) -> bool {
-        self.read().await.get_request().is_http3()
+    pub async fn get_request_is_unknown_method(&self) -> bool {
+        self.read().await.get_request().is_unknown_method()
+    }
+    pub async fn get_request_is_http0_9_version(&self) -> bool {
+        self.read().await.get_request().is_http0_9_version()
+    }
+    pub async fn get_request_is_http1_0_version(&self) -> bool {
+        self.read().await.get_request().is_http1_0_version()
+    }
+    pub async fn get_request_is_http1_1_version(&self) -> bool {
+        self.read().await.get_request().is_http1_1_version()
+    }
+    pub async fn get_request_is_http2_version(&self) -> bool {
+        self.read().await.get_request().is_http2_version()
+    }
+    pub async fn get_request_is_http3_version(&self) -> bool {
+        self.read().await.get_request().is_http3_version()
+    }
+    pub async fn get_request_is_http1_1_or_higher_version(&self) -> bool {
+        self.read()
+            .await
+            .get_request()
+            .is_http1_1_or_higher_version()
+    }
+    pub async fn get_request_is_http_version(&self) -> bool {
+        self.read().await.get_request().is_http_version()
     }
     pub async fn get_request_is_unknown_version(&self) -> bool {
         self.read().await.get_request().is_unknown_version()
     }
-    pub async fn get_request_is_http(&self) -> bool {
-        self.read().await.get_request().is_http()
+    pub async fn get_request_is_ws_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_ws_upgrade_type()
     }
-    pub async fn get_request_is_get(&self) -> bool {
-        self.read().await.get_request().is_get()
+    pub async fn get_request_is_h2c_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_h2c_upgrade_type()
     }
-    pub async fn get_request_is_post(&self) -> bool {
-        self.read().await.get_request().is_post()
+    pub async fn get_request_is_tls_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_tls_upgrade_type()
     }
-    pub async fn get_request_is_put(&self) -> bool {
-        self.read().await.get_request().is_put()
-    }
-    pub async fn get_request_is_delete(&self) -> bool {
-        self.read().await.get_request().is_delete()
-    }
-    pub async fn get_request_is_patch(&self) -> bool {
-        self.read().await.get_request().is_patch()
-    }
-    pub async fn get_request_is_head(&self) -> bool {
-        self.read().await.get_request().is_head()
-    }
-    pub async fn get_request_is_options(&self) -> bool {
-        self.read().await.get_request().is_options()
-    }
-    pub async fn get_request_is_connect(&self) -> bool {
-        self.read().await.get_request().is_connect()
-    }
-    pub async fn get_request_is_trace(&self) -> bool {
-        self.read().await.get_request().is_trace()
-    }
-    pub async fn get_request_is_unknown_method(&self) -> bool {
-        self.read().await.get_request().is_unknown_method()
+    pub async fn get_request_is_unknown_upgrade_type(&self) -> bool {
+        self.read().await.get_request().is_unknown_upgrade_type()
     }
     pub async fn get_request_is_enable_keep_alive(&self) -> bool {
         self.read().await.get_request().is_enable_keep_alive()
@@ -6776,8 +7085,17 @@ impl Context {
     {
         func(self.read().await.get_response().clone()).await
     }
-    pub async fn get_response_string(&self) -> String {
-        self.read().await.get_response().get_string()
+    pub async fn try_get_response_json_vec(&self) -> Result<Vec<u8>, serde_json::Error> {
+        self.read().await.get_response().try_json_vec()
+    }
+    pub async fn get_response_json_vec(&self) -> Vec<u8> {
+        self.read().await.get_response().json_vec()
+    }
+    pub async fn try_get_response_json_string(&self) -> Result<String, serde_json::Error> {
+        self.read().await.get_response().try_json_string()
+    }
+    pub async fn get_response_json_string(&self) -> String {
+        self.read().await.get_response().json_string()
     }
     pub async fn get_response_version(&self) -> ResponseVersion {
         self.read().await.get_response().get_version().clone()
@@ -6849,23 +7167,23 @@ impl Context {
             .get_response()
             .has_header_value(key, value)
     }
-    pub async fn get_response_headers_length(&self) -> usize {
-        self.read().await.get_response().get_headers_length()
+    pub async fn get_response_headers_size(&self) -> usize {
+        self.read().await.get_response().get_headers_size()
     }
-    pub async fn try_get_response_header_length<K>(&self, key: K) -> Option<usize>
+    pub async fn try_get_response_header_size<K>(&self, key: K) -> Option<usize>
     where
         K: AsRef<str>,
     {
-        self.read().await.get_response().try_get_header_length(key)
+        self.read().await.get_response().try_get_header_size(key)
     }
-    pub async fn get_response_header_length<K>(&self, key: K) -> usize
+    pub async fn get_response_header_size<K>(&self, key: K) -> usize
     where
         K: AsRef<str>,
     {
-        self.read().await.get_response().get_header_length(key)
+        self.read().await.get_response().get_header_size(key)
     }
-    pub async fn get_response_headers_values_length(&self) -> usize {
-        self.read().await.get_response().get_headers_values_length()
+    pub async fn get_response_headers_values_size(&self) -> usize {
+        self.read().await.get_response().get_headers_values_size()
     }
     pub async fn add_response_header<K, V>(&self, key: K, value: V) -> &Self
     where
@@ -7251,11 +7569,17 @@ async fn context_request_and_response() {
     let request: Request = Request::default();
     ctx.set_request(&request).await;
     let fetched_request: Request = ctx.get_request().await;
-    assert_eq!(request.get_string(), fetched_request.get_string());
+    assert!(request.try_json_vec().is_ok());
+    assert!(fetched_request.try_json_vec().is_ok());
+    assert_eq!(request.json_vec(), fetched_request.json_vec());
+    assert_eq!(request.json_string(), fetched_request.json_string());
     let response: Response = Response::default();
     ctx.set_response(&response).await;
     let fetched_response: Response = ctx.get_response().await;
-    assert_eq!(response.get_string(), fetched_response.get_string());
+    assert!(response.try_json_vec().is_ok());
+    assert!(fetched_response.try_json_vec().is_ok());
+    assert_eq!(response.json_vec(), fetched_response.json_vec());
+    assert_eq!(response.json_string(), fetched_response.json_string());
 }
 ```
 # Path: hyperlane/src/attribute/mod.rs
@@ -7271,12 +7595,12 @@ pub(crate) use r#enum::*;
 # Path: hyperlane/src/attribute/enum.rs
 ```rust
 use crate::*;
-#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
+#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug, Deserialize, Serialize)]
 pub(crate) enum Attribute {
     External(String),
     Internal(InternalAttribute),
 }
-#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug)]
+#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug, Deserialize, Serialize)]
 pub(crate) enum InternalAttribute {
     TaskPanicData,
     RequestErrorData,
@@ -7542,6 +7866,7 @@ async fn server_config_from_json() {
 # Path: hyperlane/src/error/mod.rs
 ```rust
 mod r#enum;
+mod r#impl;
 #[cfg(test)]
 mod test;
 pub use r#enum::*;
@@ -7549,7 +7874,7 @@ pub use r#enum::*;
 # Path: hyperlane/src/error/enum.rs
 ```rust
 use crate::*;
-#[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone)]
+#[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub enum ServerError {
     TcpBind(String),
     Unknown(String),
@@ -7557,11 +7882,20 @@ pub enum ServerError {
     InvalidHttpRequest(Request),
     Other(String),
 }
-#[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone)]
+#[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub enum RouteError {
     EmptyPattern,
     DuplicatePattern(String),
     InvalidRegexPattern(String),
+}
+```
+# Path: hyperlane/src/error/impl.rs
+```rust
+use crate::*;
+impl From<std::io::Error> for ServerError {
+    fn from(error: std::io::Error) -> Self {
+        ServerError::TcpBind(error.to_string())
+    }
 }
 ```
 # Path: hyperlane/src/error/test.rs
@@ -8620,26 +8954,30 @@ cargo add hyperlane-macros
 - `#[hyperlane(var1: Type1, var2: Type2, ...)]` - Supports multiple instance initialization in a single call
 ### HTTP Method Macros
 - `#[methods(method1, method2, ...)]` - Accepts multiple HTTP methods
-- `#[get]` - GET method handler
-- `#[post]` - POST method handler
-- `#[put]` - PUT method handler
-- `#[delete]` - DELETE method handler
-- `#[patch]` - PATCH method handler
-- `#[head]` - HEAD method handler
-- `#[options]` - OPTIONS method handler
-- `#[connect]` - CONNECT method handler
-- `#[trace]` - TRACE method handler
-### Protocol Check Macros
-- `#[ws]` - WebSocket check, ensures function only executes for WebSocket upgrade requests
-- `#[http]` - HTTP check, ensures function only executes for standard HTTP requests
-- `#[h2c]` - HTTP/2 Cleartext check, ensures function only executes for HTTP/2 cleartext requests
-- `#[http0_9]` - HTTP/0.9 check, ensures function only executes for HTTP/0.9 protocol requests
-- `#[http1_0]` - HTTP/1.0 check, ensures function only executes for HTTP/1.0 protocol requests
-- `#[http1_1]` - HTTP/1.1 check, ensures function only executes for HTTP/1.1 protocol requests
-- `#[http1_1_or_higher]` - HTTP/1.1 or higher version check, ensures function only executes for HTTP/1.1 or newer protocol versions
-- `#[http2]` - HTTP/2 check, ensures function only executes for HTTP/2 protocol requests
-- `#[http3]` - HTTP/3 check, ensures function only executes for HTTP/3 protocol requests
-- `#[tls]` - TLS check, ensures function only executes for TLS-secured connections
+- `#[get_method]` - GET method handler
+- `#[post_method]` - POST method handler
+- `#[put_method]` - PUT method handler
+- `#[delete_method]` - DELETE method handler
+- `#[patch_method]` - PATCH method handler
+- `#[head_method]` - HEAD method handler
+- `#[options_method]` - OPTIONS method handler
+- `#[connect_method]` - CONNECT method handler
+- `#[trace_method]` - TRACE method handler
+- `#[unknown_method]` - Unknown method handler
+### HTTP Version Macros
+- `#[http0_9_version]` - HTTP/0.9 check, ensures function only executes for HTTP/0.9 protocol requests
+- `#[http1_0_version]` - HTTP/1.0 check, ensures function only executes for HTTP/1.0 protocol requests
+- `#[http1_1_version]` - HTTP/1.1 check, ensures function only executes for HTTP/1.1 protocol requests
+- `#[http2_version]` - HTTP/2 check, ensures function only executes for HTTP/2 protocol requests
+- `#[http3_version]` - HTTP/3 check, ensures function only executes for HTTP/3 protocol requests
+- `#[http1_1_or_higher_version]` - HTTP/1.1 or higher version check, ensures function only executes for HTTP/1.1 or newer protocol versions
+- `#[http_version]` - HTTP check, ensures function only executes for standard HTTP requests
+- `#[unknown_version]` - Unknown version check, ensures function only executes for requests with unknown HTTP versions
+### Upgrade type Macros
+- `#[ws_upgrade_type]` - WebSocket check, ensures function only executes for WebSocket upgrade requests
+- `#[h2c_upgrade_type]` - HTTP/2 Cleartext check, ensures function only executes for HTTP/2 cleartext requests
+- `#[tls_upgrade_type]` - TLS check, ensures function only executes for TLS-secured connections
+- `#[unknown_upgrade_type]` - Unknown upgrade type check, ensures function only executes for requests with unknown upgrade types
 ### Response Setting Macros
 - `#[response_status_code(code)]` - Set response status code (supports literals and global constants)
 - `#[response_reason_phrase("phrase")]` - Set response reason phrase (supports literals and global constants)
@@ -8856,7 +9194,7 @@ impl ServerHook for UpgradeHook {
         Self
     }
     #[epilogue_macros(
-        ws,
+        ws_upgrade_type,
         response_body(&vec![]),
         response_status_code(101),
         response_header(UPGRADE => WEBSOCKET),
@@ -8896,7 +9234,7 @@ impl ServerHook for ResponseMiddleware2 {
         Self
     }
     #[prologue_macros(
-        reject(ctx.get_request().await.is_ws()),
+        reject(ctx.get_request_is_ws_upgrade_type().await),
         response_header(STEP => "response_middleware_2")
     )]
     #[epilogue_macros(try_send, flush)]
@@ -8909,7 +9247,7 @@ impl ServerHook for ResponseMiddleware3 {
         Self
     }
     #[prologue_macros(
-        ws,
+        ws_upgrade_type,
         response_header(STEP => "response_middleware_3")
     )]
     #[epilogue_macros(try_send, flush)]
@@ -8920,8 +9258,8 @@ impl ServerHook for PrologueHooks {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[get]
-    #[http]
+    #[get_method]
+    #[http_version]
     async fn handle(self, _ctx: &Context) {}
 }
 struct EpilogueHooks;
@@ -8953,147 +9291,100 @@ impl ServerHook for Response {
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/connect")]
-struct Connect;
-impl ServerHook for Connect {
+struct ConnectMethod;
+impl ServerHook for ConnectMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(connect, response_body("connect"))]
+    #[prologue_macros(connect_method, response_body("connect"))]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/delete")]
-struct Delete;
-impl ServerHook for Delete {
+struct DeleteMethod;
+impl ServerHook for DeleteMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(delete, response_body("delete"))]
+    #[prologue_macros(delete_method, response_body("delete"))]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/head")]
-struct Head;
-impl ServerHook for Head {
+struct HeadMethod;
+impl ServerHook for HeadMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(head, response_body("head"))]
+    #[prologue_macros(head_method, response_body("head"))]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/options")]
-struct Options;
-impl ServerHook for Options {
+struct OptionsMethod;
+impl ServerHook for OptionsMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(options, response_body("options"))]
+    #[prologue_macros(options_method, response_body("options"))]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/patch")]
-struct Patch;
-impl ServerHook for Patch {
+struct PatchMethod;
+impl ServerHook for PatchMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(patch, response_body("patch"))]
+    #[prologue_macros(patch_method, response_body("patch"))]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/put")]
-struct Put;
-impl ServerHook for Put {
+struct PutMethod;
+impl ServerHook for PutMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(put, response_body("put"))]
+    #[prologue_macros(put_method, response_body("put"))]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/trace")]
-struct Trace;
-impl ServerHook for Trace {
+struct TraceMethod;
+impl ServerHook for TraceMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(trace, response_body("trace"))]
+    #[prologue_macros(trace_method, response_body("trace"))]
     async fn handle(self, ctx: &Context) {}
 }
-#[route("/h2c")]
-struct H2c;
-impl ServerHook for H2c {
+#[route("/get_post_method")]
+struct GetPostMethod;
+impl ServerHook for GetPostMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(h2c, response_body("h2c"))]
+    #[closed]
+    #[prologue_macros(
+        http_version,
+        methods(get, post),
+        response_body("get_post_method"),
+        response_status_code(200),
+        response_reason_phrase("OK")
+    )]
     async fn handle(self, ctx: &Context) {}
 }
-#[route("/http")]
-struct HttpOnly;
-impl ServerHook for HttpOnly {
+#[route("/get_method")]
+struct GetMethod;
+impl ServerHook for GetMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(http, response_body("http"))]
+    #[prologue_macros(ws_upgrade_type, get_method, response_body("get_method"))]
     async fn handle(self, ctx: &Context) {}
 }
-#[route("/http0_9")]
-struct Http09;
-impl ServerHook for Http09 {
+#[route("/post_method")]
+struct PostMethod;
+impl ServerHook for PostMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(http0_9, response_body("http0_9"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http1_0")]
-struct Http10;
-impl ServerHook for Http10 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http1_0, response_body("http1_0"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http1_1")]
-struct Http11;
-impl ServerHook for Http11 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http1_1, response_body("http1_1"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http2")]
-struct Http2;
-impl ServerHook for Http2 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http2, response_body("http2"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http3")]
-struct Http3;
-impl ServerHook for Http3 {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http3, response_body("http3"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/tls")]
-struct Tls;
-impl ServerHook for Tls {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(tls, response_body("tls"))]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/http1_1_or_higher")]
-struct Http11OrHigher;
-impl ServerHook for Http11OrHigher {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[prologue_macros(http1_1_or_higher, response_body("http1_1_or_higher"))]
+    #[prologue_macros(post_method, response_body("post_method"), try_send)]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/unknown_method")]
@@ -9102,29 +9393,115 @@ impl ServerHook for UnknownMethod {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(
-        clear_response_headers,
-        filter(ctx.get_request().await.is_unknown_method()),
-        response_body("unknown_method")
-    )]
+    #[prologue_macros(unknown_method, response_body("unknown_method"), try_send)]
     async fn handle(self, ctx: &Context) {}
 }
-#[route("/get")]
-struct Get;
-impl ServerHook for Get {
+#[route("/http0_9_version")]
+struct Http09Version;
+impl ServerHook for Http09Version {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(ws, get, response_body("get"))]
+    #[prologue_macros(http0_9_version, response_body("http0_9_version"))]
     async fn handle(self, ctx: &Context) {}
 }
-#[route("/post")]
-struct Post;
-impl ServerHook for Post {
+#[route("/http1_0_version")]
+struct Http10Version;
+impl ServerHook for Http10Version {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[prologue_macros(post, response_body("post"), try_send)]
+    #[prologue_macros(http1_0_version, response_body("http1_0_version"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http1_1_version")]
+struct Http11Version;
+impl ServerHook for Http11Version {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http1_1_version, response_body("http1_1_version"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http2_version")]
+struct Http2Version;
+impl ServerHook for Http2Version {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http2_version, response_body("http2_version"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http3_version")]
+struct Http3Version;
+impl ServerHook for Http3Version {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http3_version, response_body("http3_version"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http1_1_or_higher_version")]
+struct Http11OrHigher;
+impl ServerHook for Http11OrHigher {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http1_1_or_higher_version, response_body("http1_1_or_higher_version"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/http_version")]
+struct HttpAllVersion;
+impl ServerHook for HttpAllVersion {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(http_version, response_body("http_version"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/unknown_version")]
+struct UnknownVersion;
+impl ServerHook for UnknownVersion {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(unknown_version, response_body("unknown_version"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/ws_upgrade_type")]
+struct WsUpgradeType;
+impl ServerHook for WsUpgradeType {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[ws_upgrade_type]
+    async fn handle(self, _ctx: &Context) {}
+}
+#[route("/h2c_upgrade_type")]
+struct H2cUpgradeType;
+impl ServerHook for H2cUpgradeType {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(h2c_upgrade_type, response_body("h2c_upgrade_type"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/tls_upgrade_type")]
+struct Tls;
+impl ServerHook for Tls {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(tls_upgrade_type, response_body("tls_upgrade_type"))]
+    async fn handle(self, ctx: &Context) {}
+}
+#[route("/unknown_upgrade_type")]
+struct UnknownUpgradeType;
+impl ServerHook for UnknownUpgradeType {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[prologue_macros(unknown_upgrade_type, response_body("unknown_upgrade_type"))]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/ws1")]
@@ -9133,7 +9510,7 @@ impl ServerHook for Websocket1 {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[ws]
+    #[ws_upgrade_type]
     #[ws_from_stream]
     async fn handle(self, ctx: &Context) {
         let body: RequestBody = ctx.get_request_body().await;
@@ -9147,7 +9524,7 @@ impl ServerHook for Websocket2 {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[ws]
+    #[ws_upgrade_type]
     #[ws_from_stream(request)]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
@@ -9161,7 +9538,7 @@ impl ServerHook for Websocket3 {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[ws]
+    #[ws_upgrade_type]
     #[ws_from_stream(&RequestConfigData::default(), request)]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
@@ -9175,7 +9552,7 @@ impl ServerHook for Websocket4 {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[ws]
+    #[ws_upgrade_type]
     #[ws_from_stream(request, &RequestConfigData::default())]
     async fn handle(self, ctx: &Context) {
         let body: &RequestBody = request.get_body();
@@ -9189,7 +9566,7 @@ impl ServerHook for Websocket5 {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[ws]
+    #[ws_upgrade_type]
     #[ws_from_stream(&RequestConfigData::default())]
     async fn handle(self, ctx: &Context) {
         let body: RequestBody = ctx.get_request_body().await;
@@ -9206,22 +9583,6 @@ impl ServerHook for Hook {
     #[prologue_hooks(prologue_hooks_fn)]
     #[epilogue_hooks(epilogue_hooks_fn)]
     #[response_body("Testing hook macro")]
-    async fn handle(self, ctx: &Context) {}
-}
-#[route("/get_post")]
-struct GetPost;
-impl ServerHook for GetPost {
-    async fn new(_ctx: &Context) -> Self {
-        Self
-    }
-    #[closed]
-    #[prologue_macros(
-        http,
-        methods(get, post),
-        response_body("get_post"),
-        response_status_code(200),
-        response_reason_phrase("OK")
-    )]
     async fn handle(self, ctx: &Context) {}
 }
 #[route("/attributes")]
@@ -9579,7 +9940,7 @@ impl ServerHook for InjectPostMethod {
     }
 }
 impl InjectPostMethod {
-    #[prologue_macros(post, response_body("post method with ref self"))]
+    #[prologue_macros(post_method, response_body("post method with ref self"))]
     async fn post_method_with_ref_self(&self, ctx: &Context) {}
 }
 #[route("/inject/send_flush")]
@@ -9623,6 +9984,8 @@ impl ServerHook for InjectMultipleMethods {
 impl InjectMultipleMethods {
     #[methods(get, post)]
     async fn multiple_methods_with_ref_self(&self, ctx: &Context) {}
+    #[unknown_method]
+    async fn unknown_method_with_ref_self(&self, ctx: &Context) {}
 }
 #[route("/inject/http_stream")]
 struct InjectHttpStream;
@@ -9664,8 +10027,8 @@ impl ServerHook for InjectComplexPost {
 }
 impl InjectComplexPost {
     #[prologue_macros(
-        post,
-        http,
+        post_method,
+        http_version,
         request_body(raw_body),
         response_status_code(201),
         response_header(CONTENT_TYPE => APPLICATION_JSON),
@@ -9675,9 +10038,9 @@ impl InjectComplexPost {
     async fn complex_post_handler_with_ref_self(&self, ctx: &Context) {}
 }
 impl InjectComplexPost {
-    #[post]
+    #[post_method]
     async fn test_with_bool_param(_a: bool, ctx: &Context) {}
-    #[get]
+    #[get_method]
     async fn test_with_multiple_params(_a: bool, ctx: &Context, _b: i32) {}
 }
 #[route("/test/send")]
@@ -9687,7 +10050,7 @@ impl ServerHook for TestSend {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
         response_body("Test send operation")
@@ -9702,7 +10065,7 @@ impl ServerHook for TestSendBody {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
         response_body("Test send body operation")
@@ -9717,7 +10080,7 @@ impl ServerHook for TestSendBodyWithData {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN)
     )]
@@ -9731,7 +10094,7 @@ impl ServerHook for TestTrySend {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
         response_body("Test try send operation")
@@ -9746,7 +10109,7 @@ impl ServerHook for TestTrySendBody {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
         response_body("Test try send body operation")
@@ -9761,7 +10124,7 @@ impl ServerHook for TestTrySendBodyWithData {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN)
     )]
@@ -9775,7 +10138,7 @@ impl ServerHook for TestTryFlush {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
         response_body("Test try flush operation")
@@ -9790,7 +10153,7 @@ impl ServerHook for TestAborted {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
         response_body("Test aborted operation")
@@ -9805,7 +10168,7 @@ impl ServerHook for TestClosed {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
         response_body("Test closed operation")
@@ -9820,7 +10183,7 @@ impl ServerHook for TestFlush {
         Self
     }
     #[prologue_macros(
-        get,
+        get_method,
         response_status_code(200),
         response_header(CONTENT_TYPE => TEXT_PLAIN),
         response_body("Test flush operation")
@@ -9830,7 +10193,7 @@ impl ServerHook for TestFlush {
 }
 #[response_body("standalone response body")]
 async fn standalone_response_body_handler(ctx: &Context) {}
-#[prologue_macros(get, response_body("standalone get handler"))]
+#[prologue_macros(get_method, response_body("standalone get handler"))]
 async fn standalone_get_handler(ctx: &Context) {}
 #[epilogue_macros(try_send, flush)]
 async fn standalone_send_and_flush_handler(ctx: &Context) {}
@@ -9850,19 +10213,15 @@ async fn standalone_closed_handler(ctx: &Context) {}
 async fn standalone_flush_handler(ctx: &Context) {}
 #[try_flush]
 async fn standalone_try_flush_handler(ctx: &Context) {}
-#[ws]
-async fn standalone_ws_handler(ctx: &Context) {}
 #[prologue_macros(
-    get,
-    http,
+    get_method,
+    http_version,
     response_status_code(200),
     response_header(CONTENT_TYPE => TEXT_PLAIN),
     response_body("standalone complex handler")
 )]
 #[epilogue_macros(try_send, flush)]
 async fn standalone_complex_get_handler(ctx: &Context) {}
-#[get]
-async fn standalone_get_handler_with_param(_a: bool, ctx: &Context) {}
 #[request_body(body1, body2, body3)]
 async fn test_multi_request_body(ctx: &Context) {
     println!("body1: {:?}, body2: {:?}, body3: {:?}", body1, body2, body3);
@@ -9951,37 +10310,51 @@ async fn standalone_response_header_handler(_ctx: &Context) {}
 async fn standalone_response_header_with_comma_handler(_ctx: &Context) {}
 #[response_version(HttpVersion::Http1_1)]
 async fn standalone_response_version_handler(_ctx: &Context) {}
-#[connect]
+#[connect_method]
 async fn standalone_connect_handler(_ctx: &Context) {}
-#[delete]
+#[delete_method]
 async fn standalone_delete_handler(_ctx: &Context) {}
-#[head]
+#[head_method]
 async fn standalone_head_handler(_ctx: &Context) {}
-#[options]
+#[options_method]
 async fn standalone_options_handler(_ctx: &Context) {}
-#[patch]
+#[patch_method]
 async fn standalone_patch_handler(_ctx: &Context) {}
-#[put]
+#[put_method]
 async fn standalone_put_handler(_ctx: &Context) {}
-#[h2c]
-async fn standalone_h2c_handler(_ctx: &Context) {}
-#[http0_9]
-async fn standalone_http0_9_handler(_ctx: &Context) {}
-#[http1_0]
-async fn standalone_http1_0_handler(_ctx: &Context) {}
-#[http1_1]
-async fn standalone_http1_1_handler(_ctx: &Context) {}
-#[http1_1_or_higher]
-async fn standalone_http1_1_or_higher_handler(_ctx: &Context) {}
-#[http3]
-async fn standalone_http3_handler(_ctx: &Context) {}
-#[tls]
-async fn standalone_tls_handler(_ctx: &Context) {}
+#[trace_method]
+async fn standalone_trace_handler(_ctx: &Context) {}
+#[get_method]
+async fn standalone_get_handler_with_param(_a: bool, ctx: &Context) {}
+#[unknown_method]
+async fn standalone_unknown_method_handler(_ctx: &Context) {}
 #[methods(get, post, put)]
 async fn standalone_methods_multiple_handler(_ctx: &Context) {}
-#[filter(_ctx.get_request().await.is_get())]
+#[http0_9_version]
+async fn standalone_http0_9_version_handler(_ctx: &Context) {}
+#[http1_0_version]
+async fn standalone_http1_0_version_handler(_ctx: &Context) {}
+#[http1_1_version]
+async fn standalone_http1_1_handler(_ctx: &Context) {}
+#[http2_version]
+async fn standalone_http2_version_handler(_ctx: &Context) {}
+#[http3_version]
+async fn standalone_http3_version_handler(_ctx: &Context) {}
+#[http1_1_or_higher_version]
+async fn standalone_http1_1_or_higher_version_handler(_ctx: &Context) {}
+#[unknown_version]
+async fn standalone_unknown_version_handler(_ctx: &Context) {}
+#[h2c_upgrade_type]
+async fn standalone_h2c_upgrade_type_handler(_ctx: &Context) {}
+#[tls_upgrade_type]
+async fn standalone_tls_upgrade_type_handler(_ctx: &Context) {}
+#[ws_upgrade_type]
+async fn standalone_ws_handler(ctx: &Context) {}
+#[unknown_upgrade_type]
+async fn standalone_unknown_upgrade_type_handler(_ctx: &Context) {}
+#[filter(_ctx.get_request_is_get_method().await)]
 async fn standalone_filter_handler(_ctx: &Context) {}
-#[reject(_ctx.get_request().await.is_post())]
+#[reject(_ctx.get_request_is_post_method().await)]
 async fn standalone_reject_handler(_ctx: &Context) {}
 #[reject_host("example.com")]
 async fn standalone_reject_host_handler(_ctx: &Context) {}
@@ -10062,7 +10435,7 @@ async fn standalone_closed_handler_2(_ctx: &Context) {}
 #[clear_response_headers]
 async fn standalone_clear_response_headers_handler(_ctx: &Context) {}
 #[prologue_macros(
-    get,
+    get_method,
     response_status_code(200),
     response_header(CONTENT_TYPE => TEXT_PLAIN),
     response_body("prologue macros test")
@@ -10086,7 +10459,7 @@ impl ServerHook for HooksExpression {
     async fn new(_ctx: &Context) -> Self {
         Self
     }
-    #[get]
+    #[get_method]
     #[prologue_hooks(HooksExpression::new_hook, HooksExpression::method_hook)]
     #[epilogue_hooks(HooksExpression::new_hook, HooksExpression::method_hook)]
     #[response_body("hooks expression test")]
@@ -10121,10 +10494,9 @@ mod flush;
 mod from_stream;
 mod hook;
 mod host;
-mod http;
 mod hyperlane;
 mod inject;
-mod protocol;
+mod method;
 mod referer;
 mod reject;
 mod request;
@@ -10134,10 +10506,12 @@ mod response_middleware;
 mod route;
 mod send;
 mod stream;
+mod upgrade;
+mod version;
 use {
     aborted::*, closed::*, common::*, filter::*, flush::*, from_stream::*, hook::*, host::*,
-    http::*, hyperlane::*, inject::*, protocol::*, referer::*, reject::*, request::*,
-    request_middleware::*, response::*, response_middleware::*, route::*, send::*, stream::*,
+    hyperlane::*, inject::*, method::*, referer::*, reject::*, request::*, request_middleware::*,
+    response::*, response_middleware::*, route::*, send::*, stream::*, upgrade::*, version::*,
 };
 use {
     ::hyperlane::inventory,
@@ -10162,52 +10536,96 @@ pub fn http_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
     http_from_stream_macro(attr, item)
 }
 #[proc_macro_attribute]
-pub fn get(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    get_handler(item, Position::Prologue)
+pub fn get_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    get_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn post(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    post_handler(item, Position::Prologue)
+pub fn post_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    post_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn put(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    put_handler(item, Position::Prologue)
+pub fn put_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    put_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn delete(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    delete_handler(item, Position::Prologue)
+pub fn delete_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    delete_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn patch(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    patch_handler(item, Position::Prologue)
+pub fn patch_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    patch_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn head(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    head_handler(item, Position::Prologue)
+pub fn head_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    head_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn options(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    options_handler(item, Position::Prologue)
+pub fn options_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    options_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn connect(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    connect_handler(item, Position::Prologue)
+pub fn connect_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    connect_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn trace(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    trace_handler(item, Position::Prologue)
+pub fn trace_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    trace_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn unknown_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    unknown_method_handler(item, Position::Prologue)
 }
 #[proc_macro_attribute]
 pub fn methods(attr: TokenStream, item: TokenStream) -> TokenStream {
     methods_macro(attr, item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn ws(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    ws_macro(item, Position::Prologue)
+pub fn http0_9_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    http0_9_version_macro(item, Position::Prologue)
 }
 #[proc_macro_attribute]
-pub fn http(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    http_macro(item, Position::Prologue)
+pub fn http1_0_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    http1_0_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn http1_1_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    http1_1_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn http2_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    http2_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn http3_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    http3_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn http1_1_or_higher_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    http1_1_or_higher_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn http_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    http_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn unknown_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    unknown_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn ws_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    ws_upgrade_type_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn h2c_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    h2c_upgrade_type_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn tls_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    tls_upgrade_type_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn unknown_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    unknown_upgrade_type_macro(item, Position::Prologue)
 }
 #[proc_macro_attribute]
 pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -10240,38 +10658,6 @@ pub fn aborted(_attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn closed(_attr: TokenStream, item: TokenStream) -> TokenStream {
     closed_macro(item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn h2c(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    h2c_macro(item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn http0_9(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    http0_9_macro(item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn http1_0(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    http1_0_macro(item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn http1_1(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    http1_1_macro(item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn http1_1_or_higher(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    http1_1_or_higher_macro(item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn http2(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    http2_macro(item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn http3(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    http3_macro(item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn tls(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    tls_macro(item, Position::Prologue)
 }
 #[proc_macro_attribute]
 pub fn filter(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -10856,6 +11242,95 @@ inventory::submit! {
     }
 }
 ```
+# Path: hyperlane-macros/src/method/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/method/fn.rs
+```rust
+use crate::*;
+pub(crate) fn create_method_check_ident(method: &str, span: proc_macro2::Span) -> Ident {
+    Ident::new(&format!("get_request_is_{method}_method"), span)
+}
+pub(crate) fn create_method_check(
+    method: &proc_macro2::Ident,
+    span: proc_macro2::Span,
+) -> impl FnOnce(&Ident) -> TokenStream2 {
+    let check_method: Ident = create_method_check_ident(&method.to_string(), span);
+    move |context| {
+        quote! {
+            if !#context.#check_method().await {
+                return;
+            }
+        }
+    }
+}
+pub(crate) fn methods_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let item_clone_1: TokenStream = item.clone();
+    let methods: RequestMethods = parse_macro_input!(attr as RequestMethods);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let sig: &Signature = &input_fn.sig;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let method_checks = methods.methods.iter().map(|method| {
+                let check_fn: Ident = create_method_check_ident(&method.to_string(), method.span());
+                quote! {
+                    #context.#check_fn().await
+                }
+            });
+            inject(position, item_clone_1, |_| {
+                quote! {
+                    if !(#(#method_checks)||*) {
+                        return;
+                    }
+                }
+            })
+        }
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "methods",
+        handler: Handler::WithAttrPosition(methods_macro),
+    }
+}
+macro_rules! impl_http_method_macro {
+    ($name:ident, $submit_name:ident, $method:ident) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_method_check(
+                    &proc_macro2::Ident::new(stringify!($method), proc_macro2::Span::call_site()),
+                    proc_macro2::Span::call_site(),
+                ),
+            )
+        }
+        inventory::submit! {
+            InjectableMacro {
+                name: stringify!($submit_name),
+                handler: Handler::NoAttrPosition($name),
+            }
+        }
+    };
+}
+impl_http_method_macro!(get_method_handler, get_method, get);
+impl_http_method_macro!(post_method_handler, post_method, post);
+impl_http_method_macro!(put_method_handler, put_method, put);
+impl_http_method_macro!(delete_method_handler, delete_method, delete);
+impl_http_method_macro!(patch_method_handler, patch_method, patch);
+impl_http_method_macro!(head_method_handler, head_method, head);
+impl_http_method_macro!(options_method_handler, options_method, options);
+impl_http_method_macro!(connect_method_handler, connect_method, connect);
+impl_http_method_macro!(trace_method_handler, trace_method, trace);
+impl_http_method_macro!(unknown_method_handler, unknown_method, unknown);
+```
 # Path: hyperlane-macros/src/hyperlane/mod.rs
 ```rust
 mod r#fn;
@@ -11070,78 +11545,6 @@ pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream 
         }
     })
 }
-```
-# Path: hyperlane-macros/src/protocol/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/protocol/fn.rs
-```rust
-use crate::*;
-pub(crate) fn ws_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            if !#context.get_request().await.is_ws() {
-                return;
-            }
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "ws",
-        handler: Handler::NoAttrPosition(ws_macro),
-    }
-}
-pub(crate) fn http_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            if !#context.get_request().await.is_http() {
-                return;
-            }
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "http",
-        handler: Handler::NoAttrPosition(http_macro),
-    }
-}
-macro_rules! impl_protocol_check_macro {
-    ($name:ident, $check:ident, $str_name:expr) => {
-        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
-            inject(position, item, |context| {
-                let check_fn = Ident::new(stringify!($check), proc_macro2::Span::call_site());
-                quote! {
-                    let request: ::hyperlane::Request = #context.get_request().await;
-                    if !request.#check_fn() {
-                        return;
-                    }
-                }
-            })
-        }
-        inventory::submit! {
-            InjectableMacro {
-                name: $str_name,
-                handler: Handler::NoAttrPosition($name),
-            }
-        }
-    };
-}
-impl_protocol_check_macro!(h2c_macro, is_h2c, "h2c");
-impl_protocol_check_macro!(http0_9_macro, is_http0_9, "http0_9");
-impl_protocol_check_macro!(http1_0_macro, is_http1_0, "http1_0");
-impl_protocol_check_macro!(http1_1_macro, is_http1_1, "http1_1");
-impl_protocol_check_macro!(
-    http1_1_or_higher_macro,
-    is_http1_1_or_higher,
-    "http1_1_or_higher"
-);
-impl_protocol_check_macro!(http2_macro, is_http2, "http2");
-impl_protocol_check_macro!(http3_macro, is_http3, "http3");
-impl_protocol_check_macro!(tls_macro, is_tls, "tls");
 ```
 # Path: hyperlane-macros/src/request/mod.rs
 ```rust
@@ -12067,6 +12470,60 @@ impl Parse for MultiRequestErrorData {
     }
 }
 ```
+# Path: hyperlane-macros/src/version/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/version/fn.rs
+```rust
+use crate::*;
+pub(crate) fn create_version_check(
+    version: &proc_macro2::Ident,
+    span: proc_macro2::Span,
+) -> impl FnOnce(&Ident) -> TokenStream2 {
+    let check_version: Ident = Ident::new(&format!("get_request_is_{version}_version"), span);
+    move |context| {
+        quote! {
+            if !#context.#check_version().await {
+                return;
+            }
+        }
+    }
+}
+macro_rules! impl_version_check_macro {
+    ($name:ident, $submit_name:ident, $version:ident) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_version_check(
+                    &proc_macro2::Ident::new(stringify!($version), proc_macro2::Span::call_site()),
+                    proc_macro2::Span::call_site(),
+                ),
+            )
+        }
+        inventory::submit! {
+            InjectableMacro {
+                name: stringify!($submit_name),
+                handler: Handler::NoAttrPosition($name),
+            }
+        }
+    };
+}
+impl_version_check_macro!(http0_9_version_macro, http0_9_version, http0_9);
+impl_version_check_macro!(http1_0_version_macro, http1_0_version, http1_0);
+impl_version_check_macro!(http1_1_version_macro, http1_1_version, http1_1);
+impl_version_check_macro!(http2_version_macro, http2_version, http2);
+impl_version_check_macro!(http3_version_macro, http3_version, http3);
+impl_version_check_macro!(
+    http1_1_or_higher_version_macro,
+    http1_1_or_higher_version,
+    http1_1_or_higher
+);
+impl_version_check_macro!(http_version_macro, http_version, http);
+impl_version_check_macro!(unknown_version_macro, unknown_version, unknown);
+```
 # Path: hyperlane-macros/src/aborted/mod.rs
 ```rust
 mod r#fn;
@@ -12275,6 +12732,56 @@ impl Parse for FromStreamData {
         })
     }
 }
+```
+# Path: hyperlane-macros/src/upgrade/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/upgrade/fn.rs
+```rust
+use crate::*;
+pub(crate) fn create_protocol_check(
+    upgrade_type: &proc_macro2::Ident,
+    span: proc_macro2::Span,
+) -> impl FnOnce(&Ident) -> TokenStream2 {
+    let check_upgrade: Ident =
+        Ident::new(&format!("get_request_is_{upgrade_type}_upgrade_type"), span);
+    move |context| {
+        quote! {
+            if !#context.#check_upgrade().await {
+                return;
+            }
+        }
+    }
+}
+macro_rules! impl_protocol_check_macro {
+    ($name:ident, $submit_name:ident, $upgrade_type:ident) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_protocol_check(
+                    &proc_macro2::Ident::new(
+                        stringify!($upgrade_type),
+                        proc_macro2::Span::call_site(),
+                    ),
+                    proc_macro2::Span::call_site(),
+                ),
+            )
+        }
+        inventory::submit! {
+            InjectableMacro {
+                name: stringify!($submit_name),
+                handler: Handler::NoAttrPosition($name),
+            }
+        }
+    };
+}
+impl_protocol_check_macro!(ws_upgrade_type_macro, ws_upgrade_type, ws);
+impl_protocol_check_macro!(h2c_upgrade_type_macro, h2c_upgrade_type, h2c);
+impl_protocol_check_macro!(tls_upgrade_type_macro, tls_upgrade_type, tls);
+impl_protocol_check_macro!(unknown_upgrade_type_macro, unknown_upgrade_type, unknown);
 ```
 # Path: hyperlane-macros/src/host/mod.rs
 ```rust
@@ -12881,88 +13388,6 @@ impl Parse for RouteAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let first_expr: Expr = input.parse()?;
         Ok(RouteAttr { path: first_expr })
-    }
-}
-```
-# Path: hyperlane-macros/src/http/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/http/fn.rs
-```rust
-use crate::*;
-macro_rules! impl_http_method_macro {
-    ($name:ident, $method:expr) => {
-        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
-            inject(
-                position,
-                item,
-                create_method_check($method, proc_macro2::Span::call_site()),
-            )
-        }
-        inventory::submit! {
-            InjectableMacro {
-                name: $method,
-                handler: Handler::NoAttrPosition($name),
-            }
-        }
-    };
-}
-impl_http_method_macro!(get_handler, "get");
-impl_http_method_macro!(post_handler, "post");
-impl_http_method_macro!(put_handler, "put");
-impl_http_method_macro!(delete_handler, "delete");
-impl_http_method_macro!(patch_handler, "patch");
-impl_http_method_macro!(head_handler, "head");
-impl_http_method_macro!(options_handler, "options");
-impl_http_method_macro!(connect_handler, "connect");
-impl_http_method_macro!(trace_handler, "trace");
-pub(crate) fn create_method_check(
-    method_name: &str,
-    span: proc_macro2::Span,
-) -> impl FnOnce(&Ident) -> TokenStream2 {
-    let check_method: Ident = Ident::new(&format!("is_{method_name}"), span);
-    move |context| {
-        quote! {
-            if !#context.get_request().await.#check_method() {
-                return;
-            }
-        }
-    }
-}
-pub(crate) fn methods_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let item_clone_1: TokenStream = item.clone();
-    let methods: RequestMethods = parse_macro_input!(attr as RequestMethods);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let sig: &Signature = &input_fn.sig;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let method_checks = methods.methods.iter().map(|method| {
-                let check_fn: Ident = Ident::new(&format!("is_{method}"), method.span());
-                quote! {
-                    #context.get_request().await.#check_fn()
-                }
-            });
-            inject(position, item_clone_1, |_| {
-                quote! {
-                    if !(#(#method_checks)||*) {
-                        return;
-                    }
-                }
-            })
-        }
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "methods",
-        handler: Handler::WithAttrPosition(methods_macro),
     }
 }
 ```
