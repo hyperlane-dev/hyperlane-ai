@@ -1,4 +1,4 @@
-<!--2026-02-01 02:49:06-->
+<!--2026-02-01 06:57:48-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1626,8 +1626,31 @@ pub struct WebSocketMessage {
 ```
 # Path: hyperlane-quick-start/app/utils/mod.rs
 ```rust
+pub mod json;
 pub mod send;
 use super::*;
+```
+# Path: hyperlane-quick-start/app/utils/json/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+```
+# Path: hyperlane-quick-start/app/utils/json/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn get_request_json(ctx: &Context) -> String {
+    let mut request: Request = ctx.get_request().await;
+    request.set_body(request.get_body().len().to_string().into_bytes());
+    serde_json::to_string(&request).unwrap_or(request.to_string())
+}
+#[instrument_trace]
+pub async fn get_response_json(ctx: &Context) -> String {
+    let mut response: Response = ctx.get_response().await;
+    response.set_body(response.get_body().len().to_string().into_bytes());
+    serde_json::to_string(&response).unwrap_or(response.to_string())
+}
 ```
 # Path: hyperlane-quick-start/app/utils/send/mod.rs
 ```rust
@@ -1657,7 +1680,7 @@ pub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {
 ```rust
 pub mod request;
 pub mod response;
-use super::*;
+use {super::*, utils::json::*};
 ```
 # Path: hyperlane-quick-start/app/middleware/response/mod.rs
 ```rust
@@ -1698,10 +1721,10 @@ impl ServerHook for LogMiddleware {
     }
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {
-        let request: String = ctx.get_request_json_string().await;
-        let response: String = ctx.get_response_json_string().await;
-        info!("{request}");
-        info!("{response}");
+        let request_json: String = get_request_json(ctx).await;
+        let response_json: String = get_response_json(ctx).await;
+        info!("{request_json}");
+        info!("{response_json}");
     }
 }
 ```
@@ -5467,7 +5490,6 @@ use {
     lombok_macros::*,
     regex::Regex,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
-    serde_json::Value,
     tokio::{
         net::{TcpListener, TcpStream},
         spawn,
@@ -6611,11 +6633,11 @@ pub(crate) use r#type::*;
 use crate::*;
 #[derive(Clone, CustomDebug, Data, Default, DisplayDebug)]
 pub(crate) struct ContextData {
-    #[get(pub(super))]
+    #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     aborted: bool,
-    #[get(pub(super))]
+    #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     closed: bool,
@@ -6755,7 +6777,7 @@ impl Context {
         Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
     pub async fn get_aborted(&self) -> bool {
-        *self.read().await.get_aborted()
+        self.read().await.get_aborted()
     }
     pub async fn set_aborted(&self, aborted: bool) -> &Self {
         self.write().await.set_aborted(aborted);
@@ -6770,7 +6792,7 @@ impl Context {
         self
     }
     pub async fn get_closed(&self) -> bool {
-        *self.read().await.get_closed()
+        self.read().await.get_closed()
     }
     pub async fn set_closed(&self, closed: bool) -> &Self {
         self.write().await.set_closed(closed);
@@ -6838,25 +6860,6 @@ impl Context {
     pub(crate) async fn set_request(&self, request_data: &Request) -> &Self {
         self.write().await.set_request(request_data.clone());
         self
-    }
-    pub async fn with_request<F, Fut, R>(&self, func: F) -> R
-    where
-        F: Fn(Request) -> Fut,
-        Fut: FutureSendStatic<R>,
-    {
-        func(self.read().await.get_request().clone()).await
-    }
-    pub async fn try_get_request_json_vec(&self) -> Result<Vec<u8>, serde_json::Error> {
-        self.read().await.get_request().try_json_vec()
-    }
-    pub async fn get_request_json_vec(&self) -> Vec<u8> {
-        self.read().await.get_request().json_vec()
-    }
-    pub async fn try_get_request_json_string(&self) -> Result<String, serde_json::Error> {
-        self.read().await.get_request().try_json_string()
-    }
-    pub async fn get_request_json_string(&self) -> String {
-        self.read().await.get_request().json_string()
     }
     pub async fn get_request_version(&self) -> RequestVersion {
         self.read().await.get_request().get_version().clone()
@@ -7078,64 +7081,6 @@ impl Context {
     {
         self.write().await.set_response(response.borrow().clone());
         self
-    }
-    pub async fn with_response<F, Fut, R>(&self, func: F) -> R
-    where
-        F: Fn(Response) -> Fut,
-        Fut: FutureSendStatic<R>,
-    {
-        func(self.read().await.get_response().clone()).await
-    }
-    pub async fn try_get_response_json_vec(&self) -> Result<Vec<u8>, serde_json::Error> {
-        self.read().await.get_response().try_json_vec()
-    }
-    pub async fn get_response_json_vec(&self) -> Vec<u8> {
-        self.read().await.get_response().json_vec()
-    }
-    pub async fn try_get_response_json_vec_filter<F>(
-        &self,
-        predicate: F,
-    ) -> Result<Vec<u8>, serde_json::Error>
-    where
-        F: FnMut(&(&String, &mut Value)) -> bool,
-    {
-        self.read()
-            .await
-            .get_response()
-            .try_json_vec_filter(predicate)
-    }
-    pub async fn get_response_json_vec_filter<F>(&self, predicate: F) -> Vec<u8>
-    where
-        F: FnMut(&(&String, &mut Value)) -> bool,
-    {
-        self.read().await.get_response().json_vec_filter(predicate)
-    }
-    pub async fn try_get_response_json_string(&self) -> Result<String, serde_json::Error> {
-        self.read().await.get_response().try_json_string()
-    }
-    pub async fn get_response_json_string(&self) -> String {
-        self.read().await.get_response().json_string()
-    }
-    pub async fn try_get_response_json_string_filter<F>(
-        &self,
-        predicate: F,
-    ) -> Result<String, serde_json::Error>
-    where
-        F: FnMut(&(&String, &mut Value)) -> bool,
-    {
-        self.read()
-            .await
-            .get_response()
-            .try_json_string_filter(predicate)
-    }
-    pub async fn get_response_json_string_filter<F>(&self, predicate: F) -> String
-    where
-        F: FnMut(&(&String, &mut Value)) -> bool,
-    {
-        self.read()
-            .await
-            .get_response()
-            .json_string_filter(predicate)
     }
     pub async fn get_response_version(&self) -> ResponseVersion {
         self.read().await.get_response().get_version().clone()
@@ -7604,22 +7549,16 @@ async fn context_route_params() {
     assert_eq!(name, None);
 }
 #[tokio::test]
-async fn context_request_and_response() {
+async fn context_request_and_response_string() {
     let ctx: Context = Context::default();
     let request: Request = Request::default();
     ctx.set_request(&request).await;
     let fetched_request: Request = ctx.get_request().await;
-    assert!(request.try_json_vec().is_ok());
-    assert!(fetched_request.try_json_vec().is_ok());
-    assert_eq!(request.json_vec(), fetched_request.json_vec());
-    assert_eq!(request.json_string(), fetched_request.json_string());
+    assert_eq!(request.to_string(), fetched_request.to_string());
     let response: Response = Response::default();
     ctx.set_response(&response).await;
     let fetched_response: Response = ctx.get_response().await;
-    assert!(response.try_json_vec().is_ok());
-    assert!(fetched_response.try_json_vec().is_ok());
-    assert_eq!(response.json_vec(), fetched_response.json_vec());
-    assert_eq!(response.json_string(), fetched_response.json_string());
+    assert_eq!(response.to_string(), fetched_response.to_string());
 }
 ```
 # Path: hyperlane/src/attribute/mod.rs
