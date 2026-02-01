@@ -1,4 +1,4 @@
-<!--2026-01-31 18:40:28-->
+<!--2026-02-01 02:49:06-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -72,7 +72,7 @@ pub use {r#const::*, r#struct::*, r#trait::*, r#type::*};
 # Path: hyperlane-broadcast/src/broadcast/struct.rs
 ```rust
 use crate::*;
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
 ```
 # Path: hyperlane-broadcast/src/broadcast/impl.rs
@@ -147,7 +147,7 @@ pub use {r#struct::*, r#trait::*, r#type::*};
 # Path: hyperlane-broadcast/src/broadcast_map/struct.rs
 ```rust
 use crate::*;
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>);
 ```
 # Path: hyperlane-broadcast/src/broadcast_map/impl.rs
@@ -299,7 +299,7 @@ pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
 # Path: hyperlane-plugin-websocket/src/enum.rs
 ```rust
 use crate::*;
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum BroadcastType<T: BroadcastTypeTrait> {
     PointToPoint(T, T),
     PointToGroup(T),
@@ -309,7 +309,7 @@ pub enum BroadcastType<T: BroadcastTypeTrait> {
 # Path: hyperlane-plugin-websocket/src/struct.rs
 ```rust
 use crate::*;
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct WebSocket {
     pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
 }
@@ -5467,6 +5467,7 @@ use {
     lombok_macros::*,
     regex::Regex,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
+    serde_json::Value,
     tokio::{
         net::{TcpListener, TcpStream},
         spawn,
@@ -5502,7 +5503,7 @@ pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*, r#type::*};
 # Path: hyperlane/src/hook/enum.rs
 ```rust
 use crate::*;
-#[derive(Clone, Debug, Copy, DisplayDebug)]
+#[derive(Clone, Copy, Debug, DisplayDebug)]
 pub enum HookType {
     TaskPanic(Option<isize>, ServerHookHandlerFactory),
     RequestError(Option<isize>, ServerHookHandlerFactory),
@@ -5515,7 +5516,7 @@ pub enum HookType {
 ```rust
 use crate::*;
 #[derive(
-    Clone, Copy, Debug, DisplayDebug, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize,
+    Clone, Copy, Debug, Deserialize, DisplayDebug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
 )]
 pub struct DefaultServerHook;
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
@@ -5708,7 +5709,7 @@ pub(crate) struct HandlerState {
     pub(super) stream: ArcRwLockStream,
     pub(super) request_config: RequestConfigData,
 }
-#[derive(Data, Clone, CustomDebug, DisplayDebug)]
+#[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub(crate) struct ServerData {
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -5743,7 +5744,7 @@ pub(crate) struct ServerData {
     #[set(pub(super))]
     pub(super) response_middleware: ServerHookList,
 }
-#[derive(Clone, Getter, CustomDebug, DisplayDebug, Default)]
+#[derive(Clone, CustomDebug, Default, DisplayDebug, Getter)]
 pub struct Server(#[get(pub(super))] pub(super) SharedServerState);
 ```
 # Path: hyperlane/src/server/impl.rs
@@ -6508,7 +6509,7 @@ pub use r#struct::*;
 ```rust
 use crate::*;
 #[derive(
-    CustomDebug, Default, PartialEq, Eq, Clone, Getter, DisplayDebug, Setter, Deserialize, Serialize,
+    Clone, CustomDebug, Default, Deserialize, DisplayDebug, Eq, Getter, PartialEq, Serialize, Setter,
 )]
 pub struct PanicData {
     #[get(pub)]
@@ -6608,7 +6609,7 @@ pub(crate) use r#type::*;
 # Path: hyperlane/src/context/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, Data, Default, CustomDebug, DisplayDebug)]
+#[derive(Clone, CustomDebug, Data, Default, DisplayDebug)]
 pub(crate) struct ContextData {
     #[get(pub(super))]
     #[get_mut(pub(super))]
@@ -6639,7 +6640,7 @@ pub(crate) struct ContextData {
     #[set(pub(super))]
     attributes: ThreadSafeAttributeStore,
 }
-#[derive(Clone, Default, Getter, CustomDebug, DisplayDebug)]
+#[derive(Clone, CustomDebug, Default, DisplayDebug, Getter)]
 pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextData>);
 ```
 # Path: hyperlane/src/context/impl.rs
@@ -7091,11 +7092,50 @@ impl Context {
     pub async fn get_response_json_vec(&self) -> Vec<u8> {
         self.read().await.get_response().json_vec()
     }
+    pub async fn try_get_response_json_vec_filter<F>(
+        &self,
+        predicate: F,
+    ) -> Result<Vec<u8>, serde_json::Error>
+    where
+        F: FnMut(&(&String, &mut Value)) -> bool,
+    {
+        self.read()
+            .await
+            .get_response()
+            .try_json_vec_filter(predicate)
+    }
+    pub async fn get_response_json_vec_filter<F>(&self, predicate: F) -> Vec<u8>
+    where
+        F: FnMut(&(&String, &mut Value)) -> bool,
+    {
+        self.read().await.get_response().json_vec_filter(predicate)
+    }
     pub async fn try_get_response_json_string(&self) -> Result<String, serde_json::Error> {
         self.read().await.get_response().try_json_string()
     }
     pub async fn get_response_json_string(&self) -> String {
         self.read().await.get_response().json_string()
+    }
+    pub async fn try_get_response_json_string_filter<F>(
+        &self,
+        predicate: F,
+    ) -> Result<String, serde_json::Error>
+    where
+        F: FnMut(&(&String, &mut Value)) -> bool,
+    {
+        self.read()
+            .await
+            .get_response()
+            .try_json_string_filter(predicate)
+    }
+    pub async fn get_response_json_string_filter<F>(&self, predicate: F) -> String
+    where
+        F: FnMut(&(&String, &mut Value)) -> bool,
+    {
+        self.read()
+            .await
+            .get_response()
+            .json_string_filter(predicate)
     }
     pub async fn get_response_version(&self) -> ResponseVersion {
         self.read().await.get_response().get_version().clone()
@@ -7595,12 +7635,12 @@ pub(crate) use r#enum::*;
 # Path: hyperlane/src/attribute/enum.rs
 ```rust
 use crate::*;
-#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug, Deserialize, Serialize)]
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum Attribute {
     External(String),
     Internal(InternalAttribute),
 }
-#[derive(CustomDebug, Clone, PartialEq, Eq, Hash, DisplayDebug, Deserialize, Serialize)]
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum InternalAttribute {
     TaskPanicData,
     RequestErrorData,
@@ -7722,7 +7762,7 @@ pub(crate) use r#type::*;
 # Path: hyperlane/src/config/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, Data, CustomDebug, DisplayDebug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub(crate) struct ServerConfigData {
     #[get(pub(crate))]
     #[get_mut(pub(super))]
@@ -7741,7 +7781,7 @@ pub(crate) struct ServerConfigData {
     #[set(pub(super))]
     pub(super) ttl: Option<u32>,
 }
-#[derive(Clone, Getter, CustomDebug, DisplayDebug)]
+#[derive(Clone, CustomDebug, DisplayDebug, Getter)]
 pub struct ServerConfig(#[get(pub(super))] pub(super) ArcRwLock<ServerConfigData>);
 ```
 # Path: hyperlane/src/config/impl.rs
@@ -7874,7 +7914,7 @@ pub use r#enum::*;
 # Path: hyperlane/src/error/enum.rs
 ```rust
 use crate::*;
-#[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub enum ServerError {
     TcpBind(String),
     Unknown(String),
@@ -7882,7 +7922,7 @@ pub enum ServerError {
     InvalidHttpRequest(Request),
     Other(String),
 }
-#[derive(CustomDebug, DisplayDebug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub enum RouteError {
     EmptyPattern,
     DuplicatePattern(String),
@@ -7953,12 +7993,12 @@ pub enum RouteSegment {
 # Path: hyperlane/src/route/struct.rs
 ```rust
 use crate::*;
-#[derive(Debug, Clone, Getter, DisplayDebug)]
+#[derive(Clone, Debug, DisplayDebug, Getter)]
 pub struct RoutePattern(
     #[get]
     pub(super) RouteSegmentList,
 );
-#[derive(Clone, CustomDebug, Getter, GetterMut, DisplayDebug, Setter)]
+#[derive(Clone, CustomDebug, DisplayDebug, Getter, GetterMut, Setter)]
 pub struct RouteMatcher {
     #[get]
     #[set(skip)]
@@ -8617,7 +8657,7 @@ use std::{
 ```
 # Path: hyperlane-time/src/enum.rs
 ```rust
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Lang {
     EnUsUtf8,
     #[default]
@@ -9125,7 +9165,7 @@ const CUSTOM_REASON: &str = "Accepted";
 const CUSTOM_HEADER_NAME: &str = "X-Custom-Header";
 const CUSTOM_HEADER_VALUE: &str = "custom-value";
 const RESPONSE_DATA: &str = "{\"status\": \"success\"}";
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct TestData {
     name: String,
     age: u32,
