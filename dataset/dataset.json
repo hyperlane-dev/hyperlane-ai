@@ -2558,7 +2558,7 @@
   {
     "instruction": "ResponseCode枚举的源码是怎么实现的？",
     "input": "",
-    "output": "ResponseCode枚举的源码实现如下：\n\n```rust\n#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]\n#[repr(i32)]\npub enum ResponseCode {\n    Success = 200,\n    BadRequest = 400,\n    Unauthorized = 401,\n    Forbidden = 403,\n    NotFound = 404,\n    InternalError = 500,\n    DatabaseError = 501,\n    BusinessError = 502,\n}\n```",
+    "output": "ResponseCode枚举的源码实现如下：\n\n```rust\n#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]\n#[repr(i32)]\npub enum ResponseCode {\n    Success = 200,\n    BadRequest = 400,\n    Unauthorized = 401,\n    Forbidden = 403,\n    NotFound = 404,\n    InternalError = 500,\n    DatabaseError = 501,\n    BusinessError = 502,\n}\n```",
     "system": ""
   },
   {
@@ -3920,43 +3920,7 @@
   {
     "instruction": "PostgreSqlAutoCreation结构体的源码是怎么实现的？",
     "input": "",
-    "output": "PostgreSqlAutoCreation结构体的源码实现如下：\n\n```rust\n#[derive(Clone, Data, Debug)]\npub struct PostgreSqlAutoCreation {\n    pub instance: PostgreSqlInstanceConfig,\n    pub schema: DatabaseSchema,\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "PostgreSqlAutoCreation::new方法的源码是怎么实现的？",
-    "input": "",
-    "output": "PostgreSqlAutoCreation::new方法的源码实现如下：\n\n```rust\npub fn new(instance: PostgreSqlInstanceConfig) -> Self {\n        Self {\n            instance,\n            schema: DatabaseSchema::default(),\n        }\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "PostgreSqlAutoCreation::new方法的参数设计有什么考虑？",
-    "input": "",
-    "output": "PostgreSqlAutoCreation::new方法的参数设计如下：\n\n```rust\npub fn new(instance: PostgreSqlInstanceConfig) -> Self {\n        Self {\n            instance,\n            schema: DatabaseSchema::default(),\n        }\n    }\n```\n\n参数列表：\n- instance: PostgreSqlInstanceConfig\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "PostgreSqlAutoCreation::new方法的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "PostgreSqlAutoCreation::new方法的返回值类型设计如下：\n\n```rust\npub fn new(instance: PostgreSqlInstanceConfig) -> Self {\n        Self {\n            instance,\n            schema: DatabaseSchema::default(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "PostgreSqlAutoCreation::with_schema方法的源码是怎么实现的？",
-    "input": "",
-    "output": "PostgreSqlAutoCreation::with_schema方法的源码实现如下：\n\n```rust\npub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {\n        Self { instance, schema }\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "PostgreSqlAutoCreation::with_schema方法的参数设计有什么考虑？",
-    "input": "",
-    "output": "PostgreSqlAutoCreation::with_schema方法的参数设计如下：\n\n```rust\npub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {\n        Self { instance, schema }\n    }\n```\n\n参数列表：\n- instance: PostgreSqlInstanceConfig\n- schema: DatabaseSchema\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "PostgreSqlAutoCreation::with_schema方法的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "PostgreSqlAutoCreation::with_schema方法的返回值类型设计如下：\n\n```rust\npub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {\n        Self { instance, schema }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "PostgreSqlAutoCreation结构体的源码实现如下：\n\n```rust\n#[derive(Clone, Data, Debug, New)]\npub struct PostgreSqlAutoCreation {\n    pub instance: PostgreSqlInstanceConfig,\n    #[new(skip)]\n    pub schema: DatabaseSchema,\n}\n```",
     "system": ""
   },
   {
@@ -4041,6 +4005,24 @@
     "instruction": "Default::default方法的返回值类型设计有什么特点？",
     "input": "",
     "output": "Default::default方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    fn default() -> Self {\n        let env: &'static EnvConfig = get_global_env_config();\n        if let Some(instance) = env.get_default_postgresql_instance() {\n            Self::new(instance.clone())\n        } else {\n            let default_instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig::default();\n            Self::new(default_instance)\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "PostgreSqlAutoCreation::with_schema方法的源码是怎么实现的？",
+    "input": "",
+    "output": "PostgreSqlAutoCreation::with_schema方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {\n        Self { instance, schema }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "PostgreSqlAutoCreation::with_schema方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "PostgreSqlAutoCreation::with_schema方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {\n        Self { instance, schema }\n    }\n```\n\n参数列表：\n- instance: PostgreSqlInstanceConfig\n- schema: DatabaseSchema\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "PostgreSqlAutoCreation::with_schema方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "PostgreSqlAutoCreation::with_schema方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {\n        Self { instance, schema }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -4970,13 +4952,13 @@
   {
     "instruction": "AutoCreationError枚举的源码是怎么实现的？",
     "input": "",
-    "output": "AutoCreationError枚举的源码实现如下：\n\n```rust\n#[derive(Debug, Clone)]\npub enum AutoCreationError {\n    InsufficientPermissions(String),\n    ConnectionFailed(String),\n    SchemaError(String),\n    Timeout(String),\n    DatabaseError(String),\n}\n```",
+    "output": "AutoCreationError枚举的源码实现如下：\n\n```rust\n#[derive(Clone, Debug)]\npub enum AutoCreationError {\n    InsufficientPermissions(String),\n    ConnectionFailed(String),\n    SchemaError(String),\n    Timeout(String),\n    DatabaseError(String),\n}\n```",
     "system": ""
   },
   {
     "instruction": "PluginType枚举的源码是怎么实现的？",
     "input": "",
-    "output": "PluginType枚举的源码实现如下：\n\n```rust\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum PluginType {\n    MySQL,\n    PostgreSQL,\n    Redis,\n}\n```",
+    "output": "PluginType枚举的源码实现如下：\n\n```rust\n#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub enum PluginType {\n    MySQL,\n    PostgreSQL,\n    Redis,\n}\n```",
     "system": ""
   },
   {

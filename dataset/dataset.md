@@ -1,4 +1,4 @@
-<!--2026-02-01 18:43:04-->
+<!--2026-02-02 02:38:22-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1475,7 +1475,7 @@ use super::*;
 # Path: hyperlane-quick-start/app/model/data_transfer/common/enum.rs
 ```rust
 use super::*;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[repr(i32)]
 pub enum ResponseCode {
     Success = 200,
@@ -2651,21 +2651,11 @@ use {
 # Path: hyperlane-quick-start/plugin/postgresql/struct.rs
 ```rust
 use super::*;
-#[derive(Clone, Data, Debug)]
+#[derive(Clone, Data, Debug, New)]
 pub struct PostgreSqlAutoCreation {
     pub instance: PostgreSqlInstanceConfig,
+    #[new(skip)]
     pub schema: DatabaseSchema,
-}
-impl PostgreSqlAutoCreation {
-    pub fn new(instance: PostgreSqlInstanceConfig) -> Self {
-        Self {
-            instance,
-            schema: DatabaseSchema::default(),
-        }
-    }
-    pub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {
-        Self { instance, schema }
-    }
 }
 ```
 # Path: hyperlane-quick-start/plugin/postgresql/fn.rs
@@ -2870,6 +2860,10 @@ impl Default for PostgreSqlAutoCreation {
     }
 }
 impl PostgreSqlAutoCreation {
+    #[instrument_trace]
+    pub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {
+        Self { instance, schema }
+    }
     #[instrument_trace]
     async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let admin_url: String = self.instance.get_admin_url();
@@ -3887,7 +3881,7 @@ use std::{
 ```
 # Path: hyperlane-quick-start/plugin/database/enum.rs
 ```rust
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum AutoCreationError {
     InsufficientPermissions(String),
     ConnectionFailed(String),
@@ -3895,7 +3889,7 @@ pub enum AutoCreationError {
     Timeout(String),
     DatabaseError(String),
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PluginType {
     MySQL,
     PostgreSQL,
