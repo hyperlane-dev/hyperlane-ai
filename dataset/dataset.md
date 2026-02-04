@@ -1,4 +1,4 @@
-<!--2026-02-04 07:00:36-->
+<!--2026-02-04 13:11:21-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1056,8 +1056,6 @@ async fn main() {
 │   ├── controller           # Interface control layer
 │   ├── domain               # Business domain layer
 │   ├── exception            # Exception handling layer
-│      ├── application       # Application exceptions
-│      ├── framework         # Framework exceptions
 │   ├── mapper               # Data mapping layer
 │   ├── middleware           # Middleware layer
 │   ├── model                # Data model layer
