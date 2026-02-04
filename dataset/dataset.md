@@ -1,4 +1,4 @@
-<!--2026-02-03 19:03:11-->
+<!--2026-02-04 02:29:16-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1050,6 +1050,42 @@ async fn main() {
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
+## Directory Structure
+```txt
+├── app                      # Application service
+│   ├── controller           # Interface control layer
+│   ├── domain               # Business domain layer
+│   ├── exception            # Exception handling layer
+│      ├── application       # Application exceptions
+│      ├── framework         # Framework exceptions
+│   ├── mapper               # Data mapping layer
+│   ├── middleware           # Middleware layer
+│   ├── model                # Data model layer
+│      ├── request           # Request parameter objects
+│      ├── response          # Response parameter objects
+│   ├── repository           # Data access layer
+│   ├── service              # Business logic layer
+│   ├── utils                # Utility layer
+│   ├── view                 # View layer
+├── config                   # Service configuration
+│   ├── application          # Application configuration
+│   ├── framework            # Framework configuration
+├── init                     # Service initialization
+│   ├── application          # Application initialization
+│   ├── framework            # Framework initialization
+├── plugin                   # Service plugins
+│   ├── database             # Database plugin
+│   ├── env                  # Environment variable plugin
+│   ├── logger               # Logging plugin
+│   ├── mysql                # MySQL plugin
+│   ├── postgresql           # PostgreSQL plugin
+│   ├── process              # Process management plugin
+│   ├── redis                # Redis plugin
+├── resources                # Service resources
+│   ├── sql                  # SQL files
+│   ├── static               # Static resource files
+│   ├── templates            # Template files
+```
 ## Run
 ### start
 ```sh
@@ -1074,6 +1110,14 @@ cargo run restart
 ### restarted in background
 ```sh
 cargo run restart -d
+```
+### fmt-derive
+```sh
+cargo run fmt-derive
+```
+### fmt
+```sh
+cargo run fmt
 ```
 ## Performance
 - [Performance](https://docs.ltpp.vip/hyperlane/speed)
@@ -1217,7 +1261,7 @@ mod r#fn;
 pub use r#fn::*;
 use {
     super::{shutdown::*, *},
-    application::{db::*, env::*, logger::*},
+    application::{db::*, env::*},
     config::*,
 };
 #[allow(unused_imports)]
@@ -1246,7 +1290,6 @@ pub async fn print_route_matcher(server: &Server) {
 #[hyperlane(server: Server)]
 #[instrument_trace]
 pub async fn create_server() {
-    init_log();
     if let Err(error) = init_env_config() {
         error!("{error}");
     }
@@ -1270,7 +1313,7 @@ pub async fn create_server() {
 ```rust
 mod r#fn;
 pub use r#fn::*;
-use {super::*, server::*};
+use {super::*, application::logger::*, server::*};
 use {hyperlane_config::framework::*, hyperlane_plugin::process::*};
 use tokio::runtime::{Builder, Runtime};
 ```
@@ -1290,6 +1333,7 @@ pub fn runtime() -> Runtime {
 }
 #[instrument_trace]
 pub fn block_on() {
+    init_log();
     runtime().block_on(create(SERVER_PID_FILE_PATH, create_server));
 }
 ```
@@ -1429,14 +1473,13 @@ pub fn init_log() {
 ```
 # Path: hyperlane-quick-start/app/lib.rs
 ```rust
-pub mod aspect;
 pub mod controller;
 pub mod domain;
 pub mod exception;
-pub mod filter;
 pub mod mapper;
 pub mod middleware;
 pub mod model;
+pub mod repository;
 pub mod service;
 pub mod utils;
 pub mod view;
@@ -1454,17 +1497,16 @@ use {
 ## Contact
 # Path: hyperlane-quick-start/app/model/mod.rs
 ```rust
-pub mod application;
-pub mod data_transfer;
-pub mod param;
+pub mod request;
+pub mod response;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/model/data_transfer/mod.rs
+# Path: hyperlane-quick-start/app/model/response/mod.rs
 ```rust
 pub mod common;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/model/data_transfer/common/mod.rs
+# Path: hyperlane-quick-start/app/model/response/common/mod.rs
 ```rust
 mod r#enum;
 mod r#impl;
@@ -1472,7 +1514,7 @@ mod r#struct;
 pub use {r#enum::*, r#struct::*};
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/model/data_transfer/common/enum.rs
+# Path: hyperlane-quick-start/app/model/response/common/enum.rs
 ```rust
 use super::*;
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
@@ -1488,7 +1530,7 @@ pub enum ResponseCode {
     BusinessError = 502,
 }
 ```
-# Path: hyperlane-quick-start/app/model/data_transfer/common/struct.rs
+# Path: hyperlane-quick-start/app/model/response/common/struct.rs
 ```rust
 use super::*;
 #[skip_serializing_none]
@@ -1497,13 +1539,17 @@ pub struct ApiResponse<T>
 where
     T: Clone + Default + Serialize,
 {
-    code: i32,
-    message: String,
-    data: Option<T>,
-    timestamp: Option<String>,
+    #[get(type(copy), pub(crate))]
+    pub(super) code: i32,
+    #[get(pub(crate))]
+    pub(super) message: String,
+    #[get(pub(crate))]
+    pub(super) data: Option<T>,
+    #[get(pub(crate))]
+    pub(super) timestamp: Option<String>,
 }
 ```
-# Path: hyperlane-quick-start/app/model/data_transfer/common/impl.rs
+# Path: hyperlane-quick-start/app/model/response/common/impl.rs
 ```rust
 use super::*;
 impl ResponseCode {
@@ -1601,27 +1647,6 @@ impl ApiResponse<()> {
             .set_timestamp(Some(date()));
         instance
     }
-}
-```
-# Path: hyperlane-quick-start/app/model/param/mod.rs
-```rust
-pub mod websocket;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/model/param/websocket/mod.rs
-```rust
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use serde::{Deserialize, Serialize};
-```
-# Path: hyperlane-quick-start/app/model/param/websocket/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]
-pub struct WebSocketMessage {
-    pub name: String,
-    pub message: String,
 }
 ```
 # Path: hyperlane-quick-start/app/utils/mod.rs
@@ -1871,7 +1896,7 @@ use super::*;
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
-use {super::*, model::data_transfer::common::*};
+use {super::*, model::response::common::*};
 ```
 # Path: hyperlane-quick-start/app/exception/framework/struct.rs
 ```rust
@@ -1879,15 +1904,19 @@ use super::*;
 #[task_panic]
 #[derive(Clone, Data, Debug, Default)]
 pub struct TaskPanicHook {
+    #[get(pub(crate))]
     pub(super) content_type: String,
+    #[get(pub(crate))]
     pub(super) response_body: String,
 }
 #[request_error]
 #[derive(Clone, Data, Debug, Default)]
 pub struct RequestErrorHook {
-    #[get(type(copy))]
+    #[get(type(copy), pub(crate))]
     pub(super) response_status_code: ResponseStatusCode,
+    #[get(pub(crate))]
     pub(super) content_type: String,
+    #[get(pub(crate))]
     pub(super) response_body: String,
 }
 ```
@@ -1898,10 +1927,8 @@ impl ServerHook for TaskPanicHook {
     #[task_panic_data(task_panic_data)]
     #[instrument_trace]
     async fn new(ctx: &Context) -> Self {
-        let content_type: String =
-            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
         Self {
-            content_type,
+            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
             response_body: task_panic_data.to_string(),
         }
     }
@@ -1910,7 +1937,6 @@ impl ServerHook for TaskPanicHook {
         response_status_code(500),
         clear_response_headers,
         response_header(SERVER => HYPERLANE),
-        response_version(HttpVersion::Http1_1),
         response_header(CONTENT_TYPE, &self.content_type),
     )]
     #[epilogue_macros(response_body(&response_body), try_send)]
@@ -1927,11 +1953,9 @@ impl ServerHook for RequestErrorHook {
     #[request_error_data(request_error_data)]
     #[instrument_trace]
     async fn new(_ctx: &Context) -> Self {
-        let content_type: String =
-            ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8);
         Self {
             response_status_code: request_error_data.get_http_status_code(),
-            content_type,
+            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
             response_body: request_error_data.to_string(),
         }
     }
@@ -1940,15 +1964,15 @@ impl ServerHook for RequestErrorHook {
         response_status_code(self.get_response_status_code()),
         clear_response_headers,
         response_header(SERVER => HYPERLANE),
-        response_version(HttpVersion::Http1_1),
         response_header(CONTENT_TYPE, &self.content_type),
+        response_header(TRACE => uuid::Uuid::new_v4().to_string()),
     )]
     #[epilogue_macros(response_body(&response_body), try_send)]
     #[instrument_trace]
     async fn handle(self, ctx: &Context) {
         if self.get_response_status_code() == HttpStatus::BadRequest.code() {
             ctx.aborted().await;
-            warn!("Context aborted");
+            debug!("Context aborted");
             return;
         }
         if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {
@@ -1978,6 +2002,7 @@ use hyperlane_config::application::logo_img::*;
 ```rust
 use super::*;
 #[route("/favicon.ico")]
+#[derive(Clone, Copy, Data, Debug, Default)]
 pub struct FaviconRoute;
 ```
 # Path: hyperlane-quick-start/app/view/favicon/impl.rs
@@ -2096,7 +2121,18 @@ use {
 pub const CMD_STOP: &str = "stop";
 pub const CMD_RESTART: &str = "restart";
 pub const CMD_HOT_RESTART: &str = "hot-restart";
+pub const CMD_FMT: &str = "fmt";
 pub const DAEMON_FLAG: &str = "-d";
+pub const EXCLUDED_DIRS: [&str; 8] = [
+    "../",
+    "tmp",
+    "logs",
+    ".git",
+    "target",
+    ".vscode",
+    ".github",
+    "node_modules",
+];
 ```
 # Path: hyperlane-quick-start/plugin/process/mod.rs
 ```rust
@@ -2104,11 +2140,153 @@ mod r#const;
 mod r#fn;
 pub use {r#const::*, r#fn::*};
 use super::*;
-use std::{env::args, future::Future};
+use std::{
+    env::args,
+    fs::{read_dir, read_to_string, write},
+    future::Future,
+    path::{Path, PathBuf},
+    process::Command,
+    str::Lines,
+};
 ```
 # Path: hyperlane-quick-start/plugin/process/fn.rs
 ```rust
 use super::*;
+#[instrument_trace]
+fn should_process_file(path: &Path) -> bool {
+    let path_str: String = path.to_string_lossy().to_string();
+    for excluded in EXCLUDED_DIRS.iter() {
+        if path_str.contains(excluded) {
+            return false;
+        }
+    }
+    true
+}
+#[instrument_trace]
+fn sort_derive_traits(content: &str) -> (String, bool) {
+    let mut result: String = String::new();
+    let mut changed: bool = false;
+    let lines: Lines<'_> = content.lines();
+    for line in lines {
+        let trimmed: &str = line.trim();
+        if trimmed.starts_with(HASH) && trimmed.contains("derive(") {
+            let start_idx: usize = match trimmed.find("derive(") {
+                Some(idx) => idx + 7,
+                None => {
+                    result.push_str(line);
+                    result.push_str(BR);
+                    continue;
+                }
+            };
+            let end_idx: usize = match trimmed[start_idx..].find(')') {
+                Some(idx) => start_idx + idx,
+                None => {
+                    result.push_str(line);
+                    result.push_str(BR);
+                    continue;
+                }
+            };
+            let inner: &str = &trimmed[start_idx..end_idx];
+            let traits: Vec<&str> = inner
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+            let mut sorted_traits: Vec<&str> = traits.clone();
+            sorted_traits.sort_by_key(|a| a.to_lowercase());
+            if traits != sorted_traits {
+                changed = true;
+            }
+            let sorted_inner: String = sorted_traits.join(", ");
+            let prefix: &str = &trimmed[..start_idx];
+            let suffix: &str = &trimmed[end_idx..];
+            let new_line: String = format!("{prefix}{sorted_inner}{suffix}");
+            let indent: &str = &line[..line.len() - line.trim_start().len()];
+            result.push_str(indent);
+            result.push_str(&new_line);
+            result.push_str(BR);
+        } else {
+            result.push_str(line);
+            result.push_str(BR);
+        }
+    }
+    (result, changed)
+}
+#[instrument_trace]
+fn process_derive_file(path: &Path) -> bool {
+    let content: String = match read_to_string(path) {
+        Ok(data) => data,
+        Err(_) => return false,
+    };
+    let (new_content, changed): (String, bool) = sort_derive_traits(&content);
+    if changed {
+        let _ = write(path, new_content);
+    }
+    changed
+}
+#[instrument_trace]
+fn fmt_derive_handler() {
+    let root_dir: &Path = Path::new(POINT);
+    let mut modified_count: usize = 0;
+    fn visit_dir(dir: &Path, modified_count: &mut usize) {
+        if let Ok(entries) = read_dir(dir) {
+            for entry in entries.flatten() {
+                let path: PathBuf = entry.path();
+                if path.is_dir() {
+                    if should_process_file(&path) {
+                        visit_dir(&path, modified_count);
+                    }
+                } else if path.extension().is_some_and(|ext| ext == "rs")
+                    && should_process_file(&path)
+                    && process_derive_file(&path)
+                {
+                    info!("Modified{COLON_SPACE}{}", path.display());
+                    *modified_count += 1;
+                }
+            }
+        }
+    }
+    visit_dir(root_dir, &mut modified_count);
+    info!("Total files modified{COLON_SPACE}{modified_count}");
+}
+#[instrument_trace]
+fn fmt_handler() {
+    info!("Running fmt-derive...");
+    fmt_derive_handler();
+    info!("Running cargo fmt...");
+    let fmt_output: std::process::Output = Command::new("cargo")
+        .args(["fmt"])
+        .output()
+        .expect("Failed to execute cargo fmt");
+    if fmt_output.status.success() {
+        info!("cargo fmt completed successfully");
+    } else {
+        error!(
+            "cargo fmt failed{COLON_SPACE}{}",
+            String::from_utf8_lossy(&fmt_output.stderr)
+        );
+    }
+    info!("Running cargo clippy --fix...");
+    let clippy_output: std::process::Output = Command::new("cargo")
+        .args([
+            "clippy",
+            "--fix",
+            "--workspace",
+            "--all-targets",
+            "--allow-dirty",
+        ])
+        .output()
+        .expect("Failed to execute cargo clippy");
+    if clippy_output.status.success() {
+        info!("cargo clippy --fix completed successfully");
+    } else {
+        error!(
+            "cargo clippy --fix failed{COLON_SPACE}{}",
+            String::from_utf8_lossy(&clippy_output.stderr)
+        );
+    }
+    info!("fmt command completed");
+}
 #[instrument_trace]
 pub async fn create<P, F, Fut>(pid_path: P, server_hook: F)
 where
@@ -2165,6 +2343,7 @@ where
         CMD_STOP => stop_server().await,
         CMD_RESTART => restart_server().await,
         CMD_HOT_RESTART => hot_restart_server().await,
+        CMD_FMT => fmt_handler(),
         _ => {
             error!("Invalid command{COLON_SPACE}{command}");
         }
@@ -2768,13 +2947,13 @@ where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let cooldown_duration: Duration = get_retry_cooldown_duration();
+    let duration: Duration = get_retry_duration();
     {
         if let Some(cache) = POSTGRESQL_CONNECTIONS.read().await.get(instance_name_str) {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
-                    if !cache.is_cooldown_expired(cooldown_duration) {
+                    if !cache.is_expired(duration) {
                         return Err(error.clone());
                     }
                 }
@@ -2789,7 +2968,7 @@ where
         match cache.try_get_result() {
             Ok(conn) => return Ok(conn.clone()),
             Err(error) => {
-                if !cache.is_cooldown_expired(cooldown_duration) {
+                if !cache.is_expired(duration) {
                     return Err(error.clone());
                 }
             }
@@ -3308,13 +3487,13 @@ where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let cooldown_duration: Duration = get_retry_cooldown_duration();
+    let duration: Duration = get_retry_duration();
     {
         if let Some(cache) = MYSQL_CONNECTIONS.read().await.get(instance_name_str) {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
-                    if !cache.is_cooldown_expired(cooldown_duration) {
+                    if !cache.is_expired(duration) {
                         return Err(error.clone());
                     }
                 }
@@ -3329,7 +3508,7 @@ where
         match cache.try_get_result() {
             Ok(conn) => return Ok(conn.clone()),
             Err(error) => {
-                if !cache.is_cooldown_expired(cooldown_duration) {
+                if !cache.is_expired(duration) {
                     return Err(error.clone());
                 }
             }
@@ -4030,12 +4209,12 @@ pub fn get_connection_timeout_duration() -> Duration {
     Duration::from_millis(timeout_seconds)
 }
 #[instrument_trace]
-pub fn get_retry_cooldown_duration() -> Duration {
-    let cooldown_millis: u64 = std::env::var(ENV_KEY_DB_RETRY_COOLDOWN_MILLIS)
+pub fn get_retry_duration() -> Duration {
+    let millis: u64 = std::env::var(ENV_KEY_DB_RETRY_COOLDOWN_MILLIS)
         .ok()
         .and_then(|value: String| value.parse::<u64>().ok())
         .unwrap_or(DEFAULT_DB_RETRY_COOLDOWN_MILLIS);
-    Duration::from_millis(cooldown_millis)
+    Duration::from_millis(millis)
 }
 #[instrument_trace]
 pub async fn initialize_auto_creation() -> Result<(), String> {
@@ -4158,12 +4337,12 @@ impl<T: Clone> ConnectionCache<T> {
         }
     }
     #[instrument_trace]
-    pub fn is_cooldown_expired(&self, cooldown_duration: Duration) -> bool {
-        self.get_last_attempt().elapsed() >= cooldown_duration
+    pub fn is_expired(&self, duration: Duration) -> bool {
+        self.get_last_attempt().elapsed() >= duration
     }
     #[instrument_trace]
-    pub fn should_retry(&self, cooldown_duration: Duration) -> bool {
-        self.try_get_result().is_err() && self.is_cooldown_expired(cooldown_duration)
+    pub fn should_retry(&self, duration: Duration) -> bool {
+        self.try_get_result().is_err() && self.is_expired(duration)
     }
 }
 impl PluginType {
@@ -4642,13 +4821,13 @@ where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let cooldown_duration: Duration = get_retry_cooldown_duration();
+    let duration: Duration = get_retry_duration();
     {
         if let Some(cache) = REDIS_CONNECTIONS.read().await.get(instance_name_str) {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
-                    if !cache.is_cooldown_expired(cooldown_duration) {
+                    if !cache.is_expired(duration) {
                         return Err(error.clone());
                     }
                 }
@@ -4660,7 +4839,7 @@ where
         match cache.try_get_result() {
             Ok(conn) => return Ok(conn.clone()),
             Err(error) => {
-                if !cache.is_cooldown_expired(cooldown_duration) {
+                if !cache.is_expired(duration) {
                     return Err(error.clone());
                 }
             }
