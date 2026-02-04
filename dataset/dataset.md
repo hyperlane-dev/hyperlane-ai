@@ -1,4 +1,4 @@
-<!--2026-02-04 02:29:16-->
+<!--2026-02-04 07:00:36-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1052,7 +1052,7 @@ async fn main() {
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Directory Structure
 ```txt
-├── app                      # Application service
+├── application              # Application service
 │   ├── controller           # Interface control layer
 │   ├── domain               # Business domain layer
 │   ├── exception            # Exception handling layer
@@ -1067,12 +1067,12 @@ async fn main() {
 │   ├── service              # Business logic layer
 │   ├── utils                # Utility layer
 │   ├── view                 # View layer
+├── bootstrap                     # Service initialization
+│   ├── application          # Application initialization
+│   ├── framework            # Framework initialization
 ├── config                   # Service configuration
 │   ├── application          # Application configuration
 │   ├── framework            # Framework configuration
-├── init                     # Service initialization
-│   ├── application          # Application initialization
-│   ├── framework            # Framework initialization
 ├── plugin                   # Service plugins
 │   ├── database             # Database plugin
 │   ├── env                  # Environment variable plugin
@@ -1091,10 +1091,6 @@ async fn main() {
 ```sh
 cargo run
 ```
-### hot-restart
-```sh
-cargo run hot-restart
-```
 ### started in background
 ```sh
 cargo run -- -d
@@ -1111,13 +1107,13 @@ cargo run restart
 ```sh
 cargo run restart -d
 ```
-### fmt-derive
+## Cli
 ```sh
-cargo run fmt-derive
+cargo install hyperlane-cli
 ```
-### fmt
+### help
 ```sh
-cargo run fmt
+hyperlane-cli -h
 ```
 ## Performance
 - [Performance](https://docs.ltpp.vip/hyperlane/speed)
@@ -1132,6 +1128,243 @@ cargo run fmt
 | ETH              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 | BSC              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 ## Contact
+# Path: hyperlane-quick-start/bootstrap/lib.rs
+```rust
+pub mod application;
+pub mod framework;
+use {
+    hyperlane::*,
+    hyperlane_utils::{log::*, *},
+};
+```
+# Path: hyperlane-quick-start/bootstrap/README.md
+## hyperlane-bootstrap
+> Hyperlane bootstrap crate providing application initialization and framework lifecycle management.
+## Contact
+# Path: hyperlane-quick-start/bootstrap/framework/mod.rs
+```rust
+pub mod config;
+pub mod run;
+pub mod server;
+pub mod shutdown;
+use super::*;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/server/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use {
+    super::{shutdown::*, *},
+    application::{db::*, env::*},
+    config::*,
+};
+#[allow(unused_imports)]
+use {hyperlane_application::*, hyperlane_config::framework::*};
+```
+# Path: hyperlane-quick-start/bootstrap/framework/server/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn print_route_matcher(server: &Server) {
+    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    for key in route_matcher.get_static_route().keys() {
+        info!("Static route{COLON_SPACE}{key}");
+    }
+    for value in route_matcher.get_dynamic_route().values() {
+        for (route_pattern, _) in value {
+            info!("Dynamic route{COLON_SPACE}{route_pattern}");
+        }
+    }
+    for value in route_matcher.get_regex_route().values() {
+        for (route_pattern, _) in value {
+            info!("Regex route{COLON_SPACE}{route_pattern}");
+        }
+    }
+}
+#[hyperlane(server: Server)]
+#[instrument_trace]
+pub async fn create_server() {
+    if let Err(error) = init_env_config() {
+        error!("{error}");
+    }
+    info!("Environment configuration loaded successfully");
+    init_server_config(&server).await;
+    init_db().await;
+    match server.run().await {
+        Ok(server_hook) => {
+            let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
+            print_route_matcher(&server).await;
+            info!("Server listen in{COLON_SPACE}{host_port}");
+            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();
+            set_shutdown(shutdown);
+            server_hook.wait().await;
+        }
+        Err(server_error) => error!("Server run error{COLON_SPACE}{server_error}"),
+    }
+}
+```
+# Path: hyperlane-quick-start/bootstrap/framework/run/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use {super::*, application::logger::*, server::*};
+use {hyperlane_config::framework::*, hyperlane_plugin::process::*};
+use tokio::runtime::{Builder, Runtime};
+```
+# Path: hyperlane-quick-start/bootstrap/framework/run/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub fn runtime() -> Runtime {
+    Builder::new_multi_thread()
+        .worker_threads(num_cpus::get_physical() << 1)
+        .thread_stack_size(1_048_576)
+        .max_blocking_threads(2_048)
+        .max_io_events_per_tick(1_024)
+        .enable_all()
+        .build()
+        .unwrap()
+}
+#[instrument_trace]
+pub fn block_on() {
+    init_log();
+    runtime().block_on(create(SERVER_PID_FILE_PATH, create_server));
+}
+```
+# Path: hyperlane-quick-start/bootstrap/framework/config/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+use hyperlane_config::framework::*;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/config/fn.rs
+```rust
+use super::*;
+#[hyperlane(config: ServerConfig)]
+#[instrument_trace]
+pub async fn init_server_config(server: &Server) {
+    let request_config: RequestConfig = RequestConfig::default();
+    request_config
+        .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
+        .await
+        .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
+        .await;
+    config.host(SERVER_HOST).await;
+    config.port(SERVER_PORT).await;
+    config.ttl(SERVER_TTI).await;
+    config.nodelay(SERVER_NODELAY).await;
+    server.server_config(config.clone()).await;
+    server.request_config(request_config).await;
+    debug!("Server config{COLON_SPACE}{:?}", config);
+    info!("Server initialization successful");
+}
+```
+# Path: hyperlane-quick-start/bootstrap/framework/shutdown/mod.rs
+```rust
+mod r#fn;
+mod r#static;
+pub use r#fn::*;
+use {super::*, r#static::*};
+use std::sync::{Arc, OnceLock};
+```
+# Path: hyperlane-quick-start/bootstrap/framework/shutdown/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+fn default_shutdown() -> SharedAsyncTaskFactory<()> {
+    Arc::new(|| {
+        Box::pin(async {
+            warn!("Not set shutdown, using default");
+        })
+    })
+}
+#[instrument_trace]
+pub fn set_shutdown(shutdown: SharedAsyncTaskFactory<()>) {
+    drop(SHUTDOWN.set(shutdown));
+}
+#[instrument_trace]
+pub fn get_shutdown() -> SharedAsyncTaskFactory<()> {
+    SHUTDOWN.get_or_init(default_shutdown).clone()
+}
+```
+# Path: hyperlane-quick-start/bootstrap/framework/shutdown/static.rs
+```rust
+use super::*;
+pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
+```
+# Path: hyperlane-quick-start/bootstrap/application/mod.rs
+```rust
+pub mod db;
+pub mod env;
+pub mod logger;
+use super::*;
+```
+# Path: hyperlane-quick-start/bootstrap/application/db/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+use hyperlane_plugin::{database::*, mysql::*, postgresql::*, redis::*};
+use std::sync::Arc;
+use {redis::Connection, sea_orm::DatabaseConnection};
+```
+# Path: hyperlane-quick-start/bootstrap/application/db/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn init_db() {
+    let _: Result<DatabaseConnection, String> =
+        connection_mysql_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
+    let _: Result<DatabaseConnection, String> =
+        connection_postgresql_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
+    let _: Result<Arc<Connection>, String> = connection_redis_db(DEFAULT_REDIS_INSTANCE_NAME).await;
+    match initialize_auto_creation().await {
+        Ok(_) => {
+            info!("Auto-creation initialization successful");
+        }
+        Err(error) => {
+            error!("Auto-creation initialization failed{COLON_SPACE}{error}");
+        }
+    };
+}
+```
+# Path: hyperlane-quick-start/bootstrap/application/env/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+use hyperlane_plugin::env::*;
+```
+# Path: hyperlane-quick-start/bootstrap/application/env/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub fn init_env_config() -> Result<(), String> {
+    load_env_config()
+}
+```
+# Path: hyperlane-quick-start/bootstrap/application/logger/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+use {
+    hyperlane_config::{application::logger::*, framework::*},
+    hyperlane_plugin::logger::*,
+};
+```
+# Path: hyperlane-quick-start/bootstrap/application/logger/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub fn init_log() {
+    let mut file_logger: FileLogger = FileLogger::default();
+    file_logger.set_path(SERVER_LOG_DIR);
+    file_logger.set_limit_file_size(SERVER_LOG_SIZE);
+    Logger::init(LOG_LEVEL_FILTER, file_logger);
+}
+```
 # Path: hyperlane-quick-start/resources/lib.rs
 ```rust
 pub mod sql;
@@ -1234,244 +1467,7 @@ pub use r#const::*;
   </body>
 </html>
 ```
-# Path: hyperlane-quick-start/init/lib.rs
-```rust
-pub mod application;
-pub mod framework;
-use {
-    hyperlane::*,
-    hyperlane_utils::{log::*, *},
-};
-```
-# Path: hyperlane-quick-start/init/README.md
-## hyperlane-init
-> Hyperlane initialization module responsible for application bootstrap, configuration loading, and graceful shutdown coordination.
-## Contact
-# Path: hyperlane-quick-start/init/framework/mod.rs
-```rust
-pub mod config;
-pub mod run;
-pub mod server;
-pub mod shutdown;
-use super::*;
-```
-# Path: hyperlane-quick-start/init/framework/server/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use {
-    super::{shutdown::*, *},
-    application::{db::*, env::*},
-    config::*,
-};
-#[allow(unused_imports)]
-use {hyperlane_app::*, hyperlane_config::framework::*};
-```
-# Path: hyperlane-quick-start/init/framework/server/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub async fn print_route_matcher(server: &Server) {
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    for key in route_matcher.get_static_route().keys() {
-        info!("Static route{COLON_SPACE}{key}");
-    }
-    for value in route_matcher.get_dynamic_route().values() {
-        for (route_pattern, _) in value {
-            info!("Dynamic route{COLON_SPACE}{route_pattern}");
-        }
-    }
-    for value in route_matcher.get_regex_route().values() {
-        for (route_pattern, _) in value {
-            info!("Regex route{COLON_SPACE}{route_pattern}");
-        }
-    }
-}
-#[hyperlane(server: Server)]
-#[instrument_trace]
-pub async fn create_server() {
-    if let Err(error) = init_env_config() {
-        error!("{error}");
-    }
-    info!("Environment configuration loaded successfully");
-    init_server_config(&server).await;
-    init_db().await;
-    match server.run().await {
-        Ok(server_hook) => {
-            let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
-            print_route_matcher(&server).await;
-            info!("Server listen in{COLON_SPACE}{host_port}");
-            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();
-            set_shutdown(shutdown);
-            server_hook.wait().await;
-        }
-        Err(server_error) => error!("Server run error{COLON_SPACE}{server_error}"),
-    }
-}
-```
-# Path: hyperlane-quick-start/init/framework/run/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use {super::*, application::logger::*, server::*};
-use {hyperlane_config::framework::*, hyperlane_plugin::process::*};
-use tokio::runtime::{Builder, Runtime};
-```
-# Path: hyperlane-quick-start/init/framework/run/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub fn runtime() -> Runtime {
-    Builder::new_multi_thread()
-        .worker_threads(num_cpus::get_physical() << 1)
-        .thread_stack_size(1_048_576)
-        .max_blocking_threads(2_048)
-        .max_io_events_per_tick(1_024)
-        .enable_all()
-        .build()
-        .unwrap()
-}
-#[instrument_trace]
-pub fn block_on() {
-    init_log();
-    runtime().block_on(create(SERVER_PID_FILE_PATH, create_server));
-}
-```
-# Path: hyperlane-quick-start/init/framework/config/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use super::*;
-use hyperlane_config::framework::*;
-```
-# Path: hyperlane-quick-start/init/framework/config/fn.rs
-```rust
-use super::*;
-#[hyperlane(config: ServerConfig)]
-#[instrument_trace]
-pub async fn init_server_config(server: &Server) {
-    let request_config: RequestConfig = RequestConfig::default();
-    request_config
-        .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
-        .await
-        .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
-        .await;
-    config.host(SERVER_HOST).await;
-    config.port(SERVER_PORT).await;
-    config.ttl(SERVER_TTI).await;
-    config.nodelay(SERVER_NODELAY).await;
-    server.server_config(config.clone()).await;
-    server.request_config(request_config).await;
-    debug!("Server config{COLON_SPACE}{:?}", config);
-    info!("Server initialization successful");
-}
-```
-# Path: hyperlane-quick-start/init/framework/shutdown/mod.rs
-```rust
-mod r#fn;
-mod r#static;
-pub use r#fn::*;
-use {super::*, r#static::*};
-use std::sync::{Arc, OnceLock};
-```
-# Path: hyperlane-quick-start/init/framework/shutdown/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-fn default_shutdown() -> SharedAsyncTaskFactory<()> {
-    Arc::new(|| {
-        Box::pin(async {
-            warn!("Not set shutdown, using default");
-        })
-    })
-}
-#[instrument_trace]
-pub fn set_shutdown(shutdown: SharedAsyncTaskFactory<()>) {
-    drop(SHUTDOWN.set(shutdown));
-}
-#[instrument_trace]
-pub fn get_shutdown() -> SharedAsyncTaskFactory<()> {
-    SHUTDOWN.get_or_init(default_shutdown).clone()
-}
-```
-# Path: hyperlane-quick-start/init/framework/shutdown/static.rs
-```rust
-use super::*;
-pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
-```
-# Path: hyperlane-quick-start/init/application/mod.rs
-```rust
-pub mod db;
-pub mod env;
-pub mod logger;
-use super::*;
-```
-# Path: hyperlane-quick-start/init/application/db/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use super::*;
-use hyperlane_plugin::{database::*, mysql::*, postgresql::*, redis::*};
-use std::sync::Arc;
-use {redis::Connection, sea_orm::DatabaseConnection};
-```
-# Path: hyperlane-quick-start/init/application/db/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub async fn init_db() {
-    let _: Result<DatabaseConnection, String> =
-        connection_mysql_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
-    let _: Result<DatabaseConnection, String> =
-        connection_postgresql_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
-    let _: Result<Arc<Connection>, String> = connection_redis_db(DEFAULT_REDIS_INSTANCE_NAME).await;
-    match initialize_auto_creation().await {
-        Ok(_) => {
-            info!("Auto-creation initialization successful");
-        }
-        Err(error) => {
-            error!("Auto-creation initialization failed{COLON_SPACE}{error}");
-        }
-    };
-}
-```
-# Path: hyperlane-quick-start/init/application/env/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use super::*;
-use hyperlane_plugin::env::*;
-```
-# Path: hyperlane-quick-start/init/application/env/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub fn init_env_config() -> Result<(), String> {
-    load_env_config()
-}
-```
-# Path: hyperlane-quick-start/init/application/logger/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use super::*;
-use {
-    hyperlane_config::{application::logger::*, framework::*},
-    hyperlane_plugin::logger::*,
-};
-```
-# Path: hyperlane-quick-start/init/application/logger/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub fn init_log() {
-    let mut file_logger: FileLogger = FileLogger::default();
-    file_logger.set_path(SERVER_LOG_DIR);
-    file_logger.set_limit_file_size(SERVER_LOG_SIZE);
-    Logger::init(LOG_LEVEL_FILTER, file_logger);
-}
-```
-# Path: hyperlane-quick-start/app/lib.rs
+# Path: hyperlane-quick-start/application/lib.rs
 ```rust
 pub mod controller;
 pub mod domain;
@@ -1491,22 +1487,22 @@ use {
     utoipa::ToSchema,
 };
 ```
-# Path: hyperlane-quick-start/app/README.md
-## hyperlane-app
+# Path: hyperlane-quick-start/application/README.md
+## hyperlane-application
 > Hyperlane application module containing core application logic, controllers, services, and middleware components.
 ## Contact
-# Path: hyperlane-quick-start/app/model/mod.rs
+# Path: hyperlane-quick-start/application/model/mod.rs
 ```rust
 pub mod request;
 pub mod response;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/model/response/mod.rs
+# Path: hyperlane-quick-start/application/model/response/mod.rs
 ```rust
 pub mod common;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/model/response/common/mod.rs
+# Path: hyperlane-quick-start/application/model/response/common/mod.rs
 ```rust
 mod r#enum;
 mod r#impl;
@@ -1514,7 +1510,7 @@ mod r#struct;
 pub use {r#enum::*, r#struct::*};
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/model/response/common/enum.rs
+# Path: hyperlane-quick-start/application/model/response/common/enum.rs
 ```rust
 use super::*;
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
@@ -1530,7 +1526,7 @@ pub enum ResponseCode {
     BusinessError = 502,
 }
 ```
-# Path: hyperlane-quick-start/app/model/response/common/struct.rs
+# Path: hyperlane-quick-start/application/model/response/common/struct.rs
 ```rust
 use super::*;
 #[skip_serializing_none]
@@ -1549,7 +1545,7 @@ where
     pub(super) timestamp: Option<String>,
 }
 ```
-# Path: hyperlane-quick-start/app/model/response/common/impl.rs
+# Path: hyperlane-quick-start/application/model/response/common/impl.rs
 ```rust
 use super::*;
 impl ResponseCode {
@@ -1649,19 +1645,19 @@ impl ApiResponse<()> {
     }
 }
 ```
-# Path: hyperlane-quick-start/app/utils/mod.rs
+# Path: hyperlane-quick-start/application/utils/mod.rs
 ```rust
 pub mod json;
 pub mod send;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/utils/json/mod.rs
+# Path: hyperlane-quick-start/application/utils/json/mod.rs
 ```rust
 mod r#fn;
 pub use r#fn::*;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/utils/json/fn.rs
+# Path: hyperlane-quick-start/application/utils/json/fn.rs
 ```rust
 use super::*;
 #[instrument_trace]
@@ -1677,13 +1673,13 @@ pub async fn get_response_json(ctx: &Context) -> String {
     serde_json::to_string(&response).unwrap_or(response.to_string())
 }
 ```
-# Path: hyperlane-quick-start/app/utils/send/mod.rs
+# Path: hyperlane-quick-start/application/utils/send/mod.rs
 ```rust
 mod r#fn;
 pub use r#fn::*;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/utils/send/fn.rs
+# Path: hyperlane-quick-start/application/utils/send/fn.rs
 ```rust
 use super::*;
 #[instrument_trace]
@@ -1701,20 +1697,20 @@ pub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {
     send_result
 }
 ```
-# Path: hyperlane-quick-start/app/middleware/mod.rs
+# Path: hyperlane-quick-start/application/middleware/mod.rs
 ```rust
 pub mod request;
 pub mod response;
 use {super::*, utils::json::*};
 ```
-# Path: hyperlane-quick-start/app/middleware/response/mod.rs
+# Path: hyperlane-quick-start/application/middleware/response/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/middleware/response/struct.rs
+# Path: hyperlane-quick-start/application/middleware/response/struct.rs
 ```rust
 use super::*;
 #[response_middleware(1)]
@@ -1724,7 +1720,7 @@ pub struct SendMiddleware;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct LogMiddleware;
 ```
-# Path: hyperlane-quick-start/app/middleware/response/impl.rs
+# Path: hyperlane-quick-start/application/middleware/response/impl.rs
 ```rust
 use super::*;
 impl ServerHook for SendMiddleware {
@@ -1753,7 +1749,7 @@ impl ServerHook for LogMiddleware {
     }
 }
 ```
-# Path: hyperlane-quick-start/app/middleware/request/mod.rs
+# Path: hyperlane-quick-start/application/middleware/request/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
@@ -1761,7 +1757,7 @@ pub use r#struct::*;
 use super::*;
 use hyperlane_resources::templates::*;
 ```
-# Path: hyperlane-quick-start/app/middleware/request/struct.rs
+# Path: hyperlane-quick-start/application/middleware/request/struct.rs
 ```rust
 use super::*;
 #[request_middleware(1)]
@@ -1786,7 +1782,7 @@ pub struct OptionMethodMiddleware;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct UpgradeMiddleware;
 ```
-# Path: hyperlane-quick-start/app/middleware/request/impl.rs
+# Path: hyperlane-quick-start/application/middleware/request/impl.rs
 ```rust
 use super::*;
 impl ServerHook for HttpRequestMiddleware {
@@ -1885,20 +1881,14 @@ impl ServerHook for UpgradeMiddleware {
     async fn handle(self, ctx: &Context) {}
 }
 ```
-# Path: hyperlane-quick-start/app/exception/mod.rs
-```rust
-pub mod application;
-pub mod framework;
-use super::*;
-```
-# Path: hyperlane-quick-start/app/exception/framework/mod.rs
+# Path: hyperlane-quick-start/application/exception/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use {super::*, model::response::common::*};
 ```
-# Path: hyperlane-quick-start/app/exception/framework/struct.rs
+# Path: hyperlane-quick-start/application/exception/struct.rs
 ```rust
 use super::*;
 #[task_panic]
@@ -1920,7 +1910,7 @@ pub struct RequestErrorHook {
     pub(super) response_body: String,
 }
 ```
-# Path: hyperlane-quick-start/app/exception/framework/impl.rs
+# Path: hyperlane-quick-start/application/exception/impl.rs
 ```rust
 use super::*;
 impl ServerHook for TaskPanicHook {
@@ -1985,12 +1975,12 @@ impl ServerHook for RequestErrorHook {
     }
 }
 ```
-# Path: hyperlane-quick-start/app/view/mod.rs
+# Path: hyperlane-quick-start/application/view/mod.rs
 ```rust
 mod favicon;
 use super::*;
 ```
-# Path: hyperlane-quick-start/app/view/favicon/mod.rs
+# Path: hyperlane-quick-start/application/view/favicon/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
@@ -1998,14 +1988,14 @@ pub use r#struct::*;
 use super::*;
 use hyperlane_config::application::logo_img::*;
 ```
-# Path: hyperlane-quick-start/app/view/favicon/struct.rs
+# Path: hyperlane-quick-start/application/view/favicon/struct.rs
 ```rust
 use super::*;
 #[route("/favicon.ico")]
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct FaviconRoute;
 ```
-# Path: hyperlane-quick-start/app/view/favicon/impl.rs
+# Path: hyperlane-quick-start/application/view/favicon/impl.rs
 ```rust
 use super::*;
 impl ServerHook for FaviconRoute {
@@ -2120,19 +2110,7 @@ use {
 ```rust
 pub const CMD_STOP: &str = "stop";
 pub const CMD_RESTART: &str = "restart";
-pub const CMD_HOT_RESTART: &str = "hot-restart";
-pub const CMD_FMT: &str = "fmt";
 pub const DAEMON_FLAG: &str = "-d";
-pub const EXCLUDED_DIRS: [&str; 8] = [
-    "../",
-    "tmp",
-    "logs",
-    ".git",
-    "target",
-    ".vscode",
-    ".github",
-    "node_modules",
-];
 ```
 # Path: hyperlane-quick-start/plugin/process/mod.rs
 ```rust
@@ -2140,153 +2118,11 @@ mod r#const;
 mod r#fn;
 pub use {r#const::*, r#fn::*};
 use super::*;
-use std::{
-    env::args,
-    fs::{read_dir, read_to_string, write},
-    future::Future,
-    path::{Path, PathBuf},
-    process::Command,
-    str::Lines,
-};
+use std::{env::args, future::Future};
 ```
 # Path: hyperlane-quick-start/plugin/process/fn.rs
 ```rust
 use super::*;
-#[instrument_trace]
-fn should_process_file(path: &Path) -> bool {
-    let path_str: String = path.to_string_lossy().to_string();
-    for excluded in EXCLUDED_DIRS.iter() {
-        if path_str.contains(excluded) {
-            return false;
-        }
-    }
-    true
-}
-#[instrument_trace]
-fn sort_derive_traits(content: &str) -> (String, bool) {
-    let mut result: String = String::new();
-    let mut changed: bool = false;
-    let lines: Lines<'_> = content.lines();
-    for line in lines {
-        let trimmed: &str = line.trim();
-        if trimmed.starts_with(HASH) && trimmed.contains("derive(") {
-            let start_idx: usize = match trimmed.find("derive(") {
-                Some(idx) => idx + 7,
-                None => {
-                    result.push_str(line);
-                    result.push_str(BR);
-                    continue;
-                }
-            };
-            let end_idx: usize = match trimmed[start_idx..].find(')') {
-                Some(idx) => start_idx + idx,
-                None => {
-                    result.push_str(line);
-                    result.push_str(BR);
-                    continue;
-                }
-            };
-            let inner: &str = &trimmed[start_idx..end_idx];
-            let traits: Vec<&str> = inner
-                .split(',')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .collect();
-            let mut sorted_traits: Vec<&str> = traits.clone();
-            sorted_traits.sort_by_key(|a| a.to_lowercase());
-            if traits != sorted_traits {
-                changed = true;
-            }
-            let sorted_inner: String = sorted_traits.join(", ");
-            let prefix: &str = &trimmed[..start_idx];
-            let suffix: &str = &trimmed[end_idx..];
-            let new_line: String = format!("{prefix}{sorted_inner}{suffix}");
-            let indent: &str = &line[..line.len() - line.trim_start().len()];
-            result.push_str(indent);
-            result.push_str(&new_line);
-            result.push_str(BR);
-        } else {
-            result.push_str(line);
-            result.push_str(BR);
-        }
-    }
-    (result, changed)
-}
-#[instrument_trace]
-fn process_derive_file(path: &Path) -> bool {
-    let content: String = match read_to_string(path) {
-        Ok(data) => data,
-        Err(_) => return false,
-    };
-    let (new_content, changed): (String, bool) = sort_derive_traits(&content);
-    if changed {
-        let _ = write(path, new_content);
-    }
-    changed
-}
-#[instrument_trace]
-fn fmt_derive_handler() {
-    let root_dir: &Path = Path::new(POINT);
-    let mut modified_count: usize = 0;
-    fn visit_dir(dir: &Path, modified_count: &mut usize) {
-        if let Ok(entries) = read_dir(dir) {
-            for entry in entries.flatten() {
-                let path: PathBuf = entry.path();
-                if path.is_dir() {
-                    if should_process_file(&path) {
-                        visit_dir(&path, modified_count);
-                    }
-                } else if path.extension().is_some_and(|ext| ext == "rs")
-                    && should_process_file(&path)
-                    && process_derive_file(&path)
-                {
-                    info!("Modified{COLON_SPACE}{}", path.display());
-                    *modified_count += 1;
-                }
-            }
-        }
-    }
-    visit_dir(root_dir, &mut modified_count);
-    info!("Total files modified{COLON_SPACE}{modified_count}");
-}
-#[instrument_trace]
-fn fmt_handler() {
-    info!("Running fmt-derive...");
-    fmt_derive_handler();
-    info!("Running cargo fmt...");
-    let fmt_output: std::process::Output = Command::new("cargo")
-        .args(["fmt"])
-        .output()
-        .expect("Failed to execute cargo fmt");
-    if fmt_output.status.success() {
-        info!("cargo fmt completed successfully");
-    } else {
-        error!(
-            "cargo fmt failed{COLON_SPACE}{}",
-            String::from_utf8_lossy(&fmt_output.stderr)
-        );
-    }
-    info!("Running cargo clippy --fix...");
-    let clippy_output: std::process::Output = Command::new("cargo")
-        .args([
-            "clippy",
-            "--fix",
-            "--workspace",
-            "--all-targets",
-            "--allow-dirty",
-        ])
-        .output()
-        .expect("Failed to execute cargo clippy");
-    if clippy_output.status.success() {
-        info!("cargo clippy --fix completed successfully");
-    } else {
-        error!(
-            "cargo clippy --fix failed{COLON_SPACE}{}",
-            String::from_utf8_lossy(&clippy_output.stderr)
-        );
-    }
-    info!("fmt command completed");
-}
 #[instrument_trace]
 pub async fn create<P, F, Fut>(pid_path: P, server_hook: F)
 where
@@ -2320,15 +2156,6 @@ where
             Err(error) => error!("Error stopping server{COLON_SPACE}{error}"),
         };
     };
-    let hot_restart_server = || async {
-        match manager
-            .watch_detached(&["--clear", "--skip-local-deps", "-q", "-x", "run"])
-            .await
-        {
-            Ok(_) => info!("Server started successfully"),
-            Err(error) => error!("Error starting server in background{COLON_SPACE}{error}"),
-        }
-    };
     let restart_server = || async {
         stop_server().await;
         start_server().await;
@@ -2342,8 +2169,6 @@ where
     match command.as_str() {
         CMD_STOP => stop_server().await,
         CMD_RESTART => restart_server().await,
-        CMD_HOT_RESTART => hot_restart_server().await,
-        CMD_FMT => fmt_handler(),
         _ => {
             error!("Invalid command{COLON_SPACE}{command}");
         }
@@ -2358,8 +2183,8 @@ pub const ENV_KEY_GPT_API_URL: &str = "GPT_API_URL";
 pub const ENV_KEY_GPT_MODEL: &str = "GPT_MODEL";
 pub const ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS: &str = "DB_CONNECTION_TIMEOUT_MILLIS";
 pub const DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS: u64 = 3000;
-pub const ENV_KEY_DB_RETRY_COOLDOWN_MILLIS: &str = "DB_RETRY_COOLDOWN_MILLIS";
-pub const DEFAULT_DB_RETRY_COOLDOWN_MILLIS: u64 = 30000;
+pub const ENV_KEY_DB_RETRY_INTERVAL_MILLIS: &str = "DB_RETRY_INTERVAL_MILLIS";
+pub const DEFAULT_DB_RETRY_INTERVAL_MILLIS: u64 = 30000;
 pub const ENV_KEY_MYSQL_HOST: &str = "MYSQL_HOST";
 pub const ENV_KEY_MYSQL_PORT: &str = "MYSQL_PORT";
 pub const ENV_KEY_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
@@ -3979,34 +3804,34 @@ impl Log for Logger {
             Level::Warn => ColorType::Use(Color::Yellow),
             Level::Error => ColorType::Use(Color::Red),
         };
-        let mut time_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let mut level_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let mut location_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let mut args_output_builder: OutputBuilder<'_> = OutputBuilder::new();
-        let time_output: Output<'_> = time_output_builder
+        let mut time_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut level_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut location_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut args_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let time_output: ColorOutput<'_> = time_output_builder
             .text(&time_text)
             .bold(true)
             .color(ColorType::Use(Color::White))
             .bg_color(ColorType::Use(Color::Black))
             .build();
-        let level_output: Output<'_> = level_output_builder
+        let level_output: ColorOutput<'_> = level_output_builder
             .text(&level_text)
             .bold(true)
             .color(ColorType::Use(Color::White))
             .bg_color(color)
             .build();
-        let location_output: Output<'_> = location_output_builder
+        let location_output: ColorOutput<'_> = location_output_builder
             .text(&location_text)
             .bold(true)
             .color(color)
             .build();
-        let args_output: Output<'_> = args_output_builder
+        let args_output: ColorOutput<'_> = args_output_builder
             .text(&args_text)
             .bold(true)
             .color(color)
             .endl(true)
             .build();
-        OutputListBuilder::new()
+        ColorOutputListBuilder::new()
             .add(time_output)
             .add(level_output)
             .add(location_output)
@@ -4210,10 +4035,10 @@ pub fn get_connection_timeout_duration() -> Duration {
 }
 #[instrument_trace]
 pub fn get_retry_duration() -> Duration {
-    let millis: u64 = std::env::var(ENV_KEY_DB_RETRY_COOLDOWN_MILLIS)
+    let millis: u64 = std::env::var(ENV_KEY_DB_RETRY_INTERVAL_MILLIS)
         .ok()
         .and_then(|value: String| value.parse::<u64>().ok())
-        .unwrap_or(DEFAULT_DB_RETRY_COOLDOWN_MILLIS);
+        .unwrap_or(DEFAULT_DB_RETRY_INTERVAL_MILLIS);
     Duration::from_millis(millis)
 }
 #[instrument_trace]
@@ -5138,7 +4963,7 @@ pub static REDIS_CONNECTIONS: Lazy<RwLock<RedisConnectionMap>> =
 # Path: hyperlane-quick-start/src/main.rs
 ```rust
 fn main() {
-    hyperlane_init::framework::run::block_on();
+    hyperlane_bootstrap::framework::run::block_on();
 }
 ```
 # Path: hyperlane-log/README.md
@@ -13629,6 +13454,197 @@ impl Parse for RouteAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let first_expr: Expr = input.parse()?;
         Ok(RouteAttr { path: first_expr })
+    }
+}
+```
+# Path: hyperlane-cli/README.md
+# hyperlane-cli
+[Official Documentation](https://docs.ltpp.vip/hyperlane-cli/)
+[Api Docs](https://docs.rs/hyperlane-cli/latest/)
+## Description
+> A command-line tool for Hyperlane framework.
+## Installation
+To install `hyperlane-cli` run cmd:
+```shell
+cargo add hyperlane-cli
+```
+## Contact
+# Path: hyperlane-cli/src/main.rs
+```rust
+mod command;
+mod config;
+use {command::*, config::*};
+use std::{
+    env::args,
+    process::{ExitStatus, Stdio, exit},
+};
+use tokio::process::Command;
+fn print_help() {
+    println!("hyperlane-cli [COMMAND] [OPTIONS]");
+    println!();
+    println!("Commands:");
+    println!("  fmt       Format Rust code using cargo fmt");
+    println!("  watch     Watch files and run cargo run using cargo-watch");
+    println!("  -h, --help      Print this help message");
+    println!("  -v, --version   Print version information");
+    println!();
+    println!("Fmt Options:");
+    println!("  --check         Check formatting without making changes");
+    println!("  --manifest-path <PATH>  Path to Cargo.toml");
+}
+fn print_version() {
+    println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
+}
+async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("fmt");
+    if args.check {
+        cmd.arg("--check");
+    }
+    if let Some(ref manifest_path) = args.manifest_path {
+        cmd.arg("--manifest-path").arg(manifest_path);
+    }
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("cargo fmt failed"));
+    }
+    Ok(())
+}
+async fn is_cargo_watch_installed() -> bool {
+    Command::new("cargo-watch")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .is_ok_and(|status: ExitStatus| status.success())
+}
+async fn install_cargo_watch() -> Result<(), std::io::Error> {
+    println!("cargo-watch not found, installing...");
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("install").arg("cargo-watch");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("failed to install cargo-watch"));
+    }
+    Ok(())
+}
+async fn execute_watch() -> Result<(), std::io::Error> {
+    if !is_cargo_watch_installed().await {
+        install_cargo_watch().await?;
+    }
+    let mut cmd: Command = Command::new("cargo-watch");
+    cmd.arg("--clear")
+        .arg("--skip-local-deps")
+        .arg("-q")
+        .arg("-x")
+        .arg("run");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("cargo-watch failed"));
+    }
+    Ok(())
+}
+#[tokio::main]
+async fn main() {
+    let args: Args = parse_args();
+    match args.command {
+        CommandType::Fmt => {
+            if let Err(error) = execute_fmt(&args).await {
+                eprintln!("fmt failed: {error}");
+                exit(1);
+            }
+        }
+        CommandType::Watch => {
+            if let Err(error) = execute_watch().await {
+                eprintln!("watch failed: {error}");
+                exit(1);
+            }
+        }
+        CommandType::Help => print_help(),
+        CommandType::Version => print_version(),
+    }
+}
+```
+# Path: hyperlane-cli/src/command/mod.rs
+```rust
+mod r#enum;
+pub use r#enum::*;
+```
+# Path: hyperlane-cli/src/command/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CommandType {
+    Fmt,
+    Watch,
+    Help,
+    Version,
+}
+```
+# Path: hyperlane-cli/src/config/mod.rs
+```rust
+mod r#fn;
+mod r#struct;
+pub use {r#fn::*, r#struct::*};
+```
+# Path: hyperlane-cli/src/config/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, Debug)]
+pub struct Args {
+    pub command: CommandType,
+    pub check: bool,
+    pub manifest_path: Option<String>,
+}
+```
+# Path: hyperlane-cli/src/config/fn.rs
+```rust
+use crate::*;
+pub fn parse_args() -> Args {
+    let raw_args: Vec<String> = args().collect();
+    let mut command: CommandType = CommandType::Help;
+    let mut check: bool = false;
+    let mut manifest_path: Option<String> = None;
+    let mut i: usize = 1;
+    while i < raw_args.len() {
+        let arg: &str = raw_args[i].as_str();
+        match arg {
+            "-h" | "--help" => {
+                command = CommandType::Help;
+            }
+            "-v" | "--version" => {
+                command = CommandType::Version;
+            }
+            "fmt" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Fmt;
+                }
+            }
+            "watch" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Watch;
+                }
+            }
+            "--check" => {
+                check = true;
+            }
+            "--manifest-path" => {
+                i += 1;
+                if i < raw_args.len() {
+                    manifest_path = Some(raw_args[i].clone());
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Args {
+        command,
+        check,
+        manifest_path,
     }
 }
 ```
