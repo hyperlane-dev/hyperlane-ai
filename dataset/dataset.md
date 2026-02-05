@@ -1,4 +1,4 @@
-<!--2026-02-05 13:13:41-->
+<!--2026-02-05 18:57:31-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -18,9 +18,10 @@ pub use {
     hot_restart::*, http_request::*, hyperlane_broadcast::*, hyperlane_log::*, hyperlane_macros::*,
     hyperlane_plugin_websocket::*, instrument_level::*, jsonwebtoken, jwt_service::*, log,
     lombok_macros::*, num_cpus, once_cell, recoverable_spawn::*, recoverable_thread_pool::*, redis,
-    regex, sea_orm, serde_urlencoded, serde_with, serde_xml_rs, serde_yaml, server_manager::*,
-    simd_json, snafu, sqlx, std_macro_extensions::*, tracing_log, tracing_subscriber, twox_hash,
-    url, urlencoding, utoipa, utoipa_rapidoc, utoipa_swagger_ui, uuid,
+    regex, sea_orm, serde_json, serde_urlencoded, serde_with, serde_xml_rs, serde_yaml,
+    server_manager::*, simd_json, snafu, sqlx, std_macro_extensions::*, tracing_log,
+    tracing_subscriber, twox_hash, url, urlencoding, utoipa, utoipa_rapidoc, utoipa_swagger_ui,
+    uuid,
 };
 ```
 # Path: hyperlane-broadcast/README.md
@@ -217,15 +218,21 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
         }
     }
     #[inline(always)]
-    pub fn send<K: AsRef<str>>(
-        &self,
-        key: K,
-        data: T,
-    ) -> Result<Option<ReceiverCount>, SendError<T>> {
+    pub fn try_send<K>(&self, key: K, data: T) -> Result<Option<ReceiverCount>, SendError<T>>
+    where
+        K: AsRef<str>,
+    {
         match self.get().get(key.as_ref()) {
             Some(sender) => sender.send(data).map(Some),
             None => Ok(None),
         }
+    }
+    #[inline(always)]
+    pub fn send<K>(&self, key: K, data: T) -> Option<ReceiverCount>
+    where
+        K: AsRef<str>,
+    {
+        self.try_send(key, data).unwrap()
     }
     #[inline(always)]
     pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>
@@ -251,11 +258,11 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 use crate::*;
 #[tokio::test]
 pub async fn test_broadcast_map() {
-    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
+    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
     broadcast_map.insert("test_key", 10);
-    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("test_key").unwrap();
-    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("test_key").unwrap();
-    let mut rec3: BroadcastMapReceiver<usize> =
+    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let mut rec3: BroadcastMapReceiver<u128> =
         broadcast_map.subscribe_or_insert("another_key", DEFAULT_BROADCAST_SENDER_CAPACITY);
     broadcast_map.send("test_key", 20).unwrap();
     broadcast_map.send("another_key", 10).unwrap();
@@ -265,31 +272,32 @@ pub async fn test_broadcast_map() {
 }
 #[tokio::test]
 pub async fn test_broadcast_map_unsubscribe() {
-    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
+    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
     broadcast_map.insert("test_key", 10);
-    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("test_key").unwrap();
-    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe("test_key");
+    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let removed: Option<Broadcast<u128>> = broadcast_map.unsubscribe("test_key");
     assert!(removed.is_some());
     drop(removed);
-    let not_exist: Option<Broadcast<usize>> = broadcast_map.unsubscribe("nonexistent_key");
+    let not_exist: Option<Broadcast<u128>> = broadcast_map.unsubscribe("nonexistent_key");
     assert!(not_exist.is_none());
     assert!(broadcast_map.subscribe("test_key").is_none());
-    let send_result: Result<Option<usize>, SendError<usize>> = broadcast_map.send("test_key", 30);
+    let send_result: Result<Option<ReceiverCount>, SendError<u128>> =
+        broadcast_map.try_send("test_key", 30);
     assert!(send_result.unwrap().is_none());
-    let result: Result<Result<usize, RecvError>, Elapsed> =
+    let result: Result<Result<u128, RecvError>, Elapsed> =
         timeout(Duration::from_millis(100), rec1.recv()).await;
     assert!(result.is_ok(), "recv should not timeout after unsubscribe");
     assert_eq!(result.unwrap(), Err(RecvError::Closed));
 }
 #[tokio::test]
 pub async fn test_broadcast_map_unsubscribe_and_reinsert() {
-    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
+    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
     broadcast_map.insert("test_key", 10);
     broadcast_map.subscribe("test_key").unwrap();
-    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe("test_key");
+    let removed: Option<Broadcast<u128>> = broadcast_map.unsubscribe("test_key");
     assert!(removed.is_some());
     broadcast_map.insert("test_key", 10);
-    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("test_key").unwrap();
+    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
     broadcast_map.send("test_key", 100).unwrap();
     assert_eq!(rec2.recv().await, Ok(100));
 }
@@ -303,6 +311,19 @@ pub async fn test_broadcast_map_unsubscribe_receiver_count() {
     let removed: Option<Broadcast<String>> = broadcast_map.unsubscribe("test_key");
     assert!(removed.is_some());
     assert_eq!(broadcast_map.receiver_count("test_key"), None);
+}
+#[tokio::test]
+pub async fn test_broadcast_map_send() {
+    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let count: Option<ReceiverCount> = broadcast_map.send("test_key", 42);
+    assert_eq!(count, Some(2));
+    assert_eq!(rec1.recv().await, Ok(42));
+    assert_eq!(rec2.recv().await, Ok(42));
+    let non_existent: Option<ReceiverCount> = broadcast_map.send("non_existent_key", 100);
+    assert_eq!(non_existent, None);
 }
 ```
 # Path: hyperlane-plugin-websocket/README.md
@@ -676,7 +697,7 @@ impl WebSocket {
         count.clamp(1, ReceiverCount::MAX) - 1
     }
     #[inline(always)]
-    pub fn send<T, B>(
+    pub fn try_send<T, B>(
         &self,
         broadcast_type: BroadcastType<B>,
         data: T,
@@ -686,7 +707,15 @@ impl WebSocket {
         B: BroadcastTypeTrait,
     {
         let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.send(&key, data.into())
+        self.broadcast_map.try_send(&key, data.into())
+    }
+    #[inline(always)]
+    pub fn send<T, B>(&self, broadcast_type: BroadcastType<B>, data: T) -> Option<ReceiverCount>
+    where
+        T: Into<Vec<u8>>,
+        B: BroadcastTypeTrait,
+    {
+        self.try_send(broadcast_type, data).unwrap()
     }
     pub async fn run<B>(&self, websocket_config: WebSocketConfig<B>)
     where
@@ -728,7 +757,7 @@ impl WebSocket {
                         break;
                     }
                     let body: ResponseBody = ctx.get_response_body().await;
-                    let is_err: bool = self.broadcast_map.send(&key, body).is_err();
+                    let is_err: bool = self.broadcast_map.try_send(&key, body).is_err();
                     sended_hook(&ctx).await;
                     if is_err || ctx.get_closed().await{
                         break;
@@ -909,13 +938,13 @@ impl ServerHook for ConnectedHook {
     }
     async fn handle(self, _ctx: &Context) {
         get_broadcast_map()
-            .send(self.group_broadcast_type, self.data.clone())
+            .try_send(self.group_broadcast_type, self.data.clone())
             .unwrap_or_else(|err| {
                 println!("[connected_hook]send group error => {:?}", err.to_string());
                 None
             });
         get_broadcast_map()
-            .send(self.private_broadcast_type, self.data)
+            .try_send(self.private_broadcast_type, self.data)
             .unwrap_or_else(|err| {
                 println!(
                     "[connected_hook]send private error => {:?}",
@@ -1124,7 +1153,7 @@ async fn main() {
 │   ├── service              # Business logic layer
 │   ├── utils                # Utility layer
 │   ├── view                 # View layer
-├── bootstrap                     # Service initialization
+├── bootstrap                # Service initialization
 │   ├── application          # Application initialization
 │   ├── framework            # Framework initialization
 ├── config                   # Service configuration
@@ -1201,22 +1230,17 @@ use {
 # Path: hyperlane-quick-start/bootstrap/framework/mod.rs
 ```rust
 pub mod config;
-pub mod run;
+pub mod runtime;
 pub mod server;
-pub mod shutdown;
 use super::*;
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/server/mod.rs
 ```rust
 mod r#fn;
 pub use r#fn::*;
-use {
-    super::{shutdown::*, *},
-    application::{db::*, env::*},
-    config::*,
-};
+use {super::*, config::*};
 #[allow(unused_imports)]
-use {hyperlane_application::*, hyperlane_config::framework::*};
+use {hyperlane_application::*, hyperlane_config::framework::*, hyperlane_plugin::shutdown::*};
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/server/fn.rs
 ```rust
@@ -1225,50 +1249,43 @@ use super::*;
 pub async fn print_route_matcher(server: &Server) {
     let route_matcher: RouteMatcher = server.get_route_matcher().await;
     for key in route_matcher.get_static_route().keys() {
-        info!("Static route{COLON_SPACE}{key}");
+        info!("Static route {key}");
     }
     for value in route_matcher.get_dynamic_route().values() {
         for (route_pattern, _) in value {
-            info!("Dynamic route{COLON_SPACE}{route_pattern}");
+            info!("Dynamic route {route_pattern}");
         }
     }
     for value in route_matcher.get_regex_route().values() {
         for (route_pattern, _) in value {
-            info!("Regex route{COLON_SPACE}{route_pattern}");
+            info!("Regex route {route_pattern}");
         }
     }
 }
 #[hyperlane(server: Server)]
 #[instrument_trace]
-pub async fn create_server() {
-    if let Err(error) = init_env_config() {
-        error!("{error}");
-    }
-    info!("Environment configuration loaded successfully");
+pub async fn init_server() {
     init_server_config(&server).await;
-    init_db().await;
     match server.run().await {
         Ok(server_hook) => {
             let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
             print_route_matcher(&server).await;
-            info!("Server listen in{COLON_SPACE}{host_port}");
-            let shutdown: SharedAsyncTaskFactory<()> = server_hook.get_shutdown_hook().clone();
-            set_shutdown(shutdown);
+            info!("Server listen in {host_port}");
+            set_shutdown(server_hook.get_shutdown_hook());
             server_hook.wait().await;
         }
-        Err(server_error) => error!("Server run error{COLON_SPACE}{server_error}"),
+        Err(server_error) => error!("Server run error {server_error}"),
     }
 }
 ```
-# Path: hyperlane-quick-start/bootstrap/framework/run/mod.rs
+# Path: hyperlane-quick-start/bootstrap/framework/runtime/mod.rs
 ```rust
 mod r#fn;
 pub use r#fn::*;
-use {super::*, application::logger::*, server::*};
-use {hyperlane_config::framework::*, hyperlane_plugin::process::*};
+use super::*;
 use tokio::runtime::{Builder, Runtime};
 ```
-# Path: hyperlane-quick-start/bootstrap/framework/run/fn.rs
+# Path: hyperlane-quick-start/bootstrap/framework/runtime/fn.rs
 ```rust
 use super::*;
 #[instrument_trace]
@@ -1281,11 +1298,6 @@ pub fn runtime() -> Runtime {
         .enable_all()
         .build()
         .unwrap()
-}
-#[instrument_trace]
-pub fn block_on() {
-    init_log();
-    runtime().block_on(create(SERVER_PID_FILE_PATH, create_server));
 }
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/config/mod.rs
@@ -1313,42 +1325,9 @@ pub async fn init_server_config(server: &Server) {
     config.nodelay(SERVER_NODELAY).await;
     server.server_config(config.clone()).await;
     server.request_config(request_config).await;
-    debug!("Server config{COLON_SPACE}{:?}", config);
+    debug!("Server config {:?}", config);
     info!("Server initialization successful");
 }
-```
-# Path: hyperlane-quick-start/bootstrap/framework/shutdown/mod.rs
-```rust
-mod r#fn;
-mod r#static;
-pub use r#fn::*;
-use {super::*, r#static::*};
-use std::sync::{Arc, OnceLock};
-```
-# Path: hyperlane-quick-start/bootstrap/framework/shutdown/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-fn default_shutdown() -> SharedAsyncTaskFactory<()> {
-    Arc::new(|| {
-        Box::pin(async {
-            warn!("Not set shutdown, using default");
-        })
-    })
-}
-#[instrument_trace]
-pub fn set_shutdown(shutdown: SharedAsyncTaskFactory<()>) {
-    drop(SHUTDOWN.set(shutdown));
-}
-#[instrument_trace]
-pub fn get_shutdown() -> SharedAsyncTaskFactory<()> {
-    SHUTDOWN.get_or_init(default_shutdown).clone()
-}
-```
-# Path: hyperlane-quick-start/bootstrap/framework/shutdown/static.rs
-```rust
-use super::*;
-pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/bootstrap/application/mod.rs
 ```rust
@@ -1381,7 +1360,7 @@ pub async fn init_db() {
             info!("Auto-creation initialization successful");
         }
         Err(error) => {
-            error!("Auto-creation initialization failed{COLON_SPACE}{error}");
+            error!("Auto-creation initialization failed {error}");
         }
     };
 }
@@ -2152,6 +2131,7 @@ pub mod mysql;
 pub mod postgresql;
 pub mod process;
 pub mod redis;
+pub mod shutdown;
 use {
     hyperlane::*,
     hyperlane_utils::{log::*, *},
@@ -2188,7 +2168,7 @@ where
     Fut: Future<Output = ()> + Send + 'static,
 {
     let args: Vec<String> = args().collect();
-    debug!("Process create args{COLON_SPACE}{args:?}");
+    debug!("Process create args {args:?}");
     let mut manager: ServerManager = ServerManager::new();
     manager
         .set_pid_file(pid_path.as_ref())
@@ -2199,7 +2179,7 @@ where
             match manager.start_daemon().await {
                 Ok(_) => info!("Server started in background successfully"),
                 Err(error) => {
-                    error!("Error starting server in background{COLON_SPACE}{error}")
+                    error!("Error starting server in background {error}")
                 }
             };
         } else {
@@ -2210,7 +2190,7 @@ where
     let stop_server = || async {
         match manager.stop().await {
             Ok(_) => info!("Server stopped successfully"),
-            Err(error) => error!("Error stopping server{COLON_SPACE}{error}"),
+            Err(error) => error!("Error stopping server {error}"),
         };
     };
     let restart_server = || async {
@@ -2227,14 +2207,14 @@ where
         CMD_STOP => stop_server().await,
         CMD_RESTART => restart_server().await,
         _ => {
-            error!("Invalid command{COLON_SPACE}{command}");
+            error!("Invalid command {command}");
         }
     }
 }
 ```
 # Path: hyperlane-quick-start/plugin/env/const.rs
 ```rust
-pub const ENV_FILE_PATH: &str = "/shell/env";
+pub const ENV_FILE_PATH: &str = "/shell/.env";
 pub const DOCKER_COMPOSE_FILE_PATH: &str = "./docker-compose.yml";
 pub const ENV_KEY_GPT_API_URL: &str = "GPT_API_URL";
 pub const ENV_KEY_GPT_MODEL: &str = "GPT_MODEL";
@@ -2386,26 +2366,26 @@ pub fn load_env_config() -> Result<(), String> {
         .map_err(|_| "Failed to initialize global environment configuration".to_string())?;
     info!("Environment Configuration Loaded Successfully");
     info!(
-        "GPT API URL{COLON_SPACE}{}",
-        if config.gpt_api_url.is_empty() {
+        "GPT API URL {}",
+        if config.get_gpt_api_url().is_empty() {
             "(not set)"
         } else {
-            &config.gpt_api_url
+            config.get_gpt_api_url()
         }
     );
     info!(
-        "GPT Model{COLON_SPACE}{}",
-        if config.gpt_model.is_empty() {
+        "GPT Model {}",
+        if config.get_gpt_model().is_empty() {
             "(not set)"
         } else {
-            &config.gpt_model
+            config.get_gpt_model()
         }
     );
     info!("MySQL Configuration:");
-    if config.mysql_instances.is_empty() {
+    if config.get_mysql_instances().is_empty() {
         info!("  (no MySQL instances configured)");
     } else {
-        for instance in &config.mysql_instances {
+        for instance in config.get_mysql_instances() {
             info!(
 ```
 # Path: hyperlane-quick-start/plugin/env/impl.rs
@@ -2425,12 +2405,11 @@ impl MySqlInstanceConfig {
             data.push_str(&format!(
                 "{ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS}={DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS}{BR}"
             ));
-            write_to_file(ENV_FILE_PATH, data.as_bytes()).map_err(|error| {
-                format!("Failed to create example env file{COLON_SPACE}{error}")
-            })?;
+            write_to_file(ENV_FILE_PATH, data.as_bytes())
+                .map_err(|error| format!("Failed to create example env file {error}"))?;
         }
         dotenvy::from_path(ENV_FILE_PATH)
-            .map_err(|error| format!("Failed to load env file{COLON_SPACE}{error}"))?;
+            .map_err(|error| format!("Failed to load env file {error}"))?;
         let get_env = |key: &str| -> Option<String> { std::env::var(key).ok() };
         let get_env_usize = |key: &str| -> Option<usize> {
             std::env::var(key).ok().and_then(|value| value.parse().ok())
@@ -2599,9 +2578,9 @@ impl MySqlInstanceConfig {
     #[instrument_trace]
     fn load_from_docker_compose() -> Result<DockerComposeConfig, String> {
         let docker_compose_content: Vec<u8> = read_from_file(DOCKER_COMPOSE_FILE_PATH)
-            .map_err(|error| format!("Failed to read docker-compose.yml{COLON_SPACE}{error}"))?;
+            .map_err(|error| format!("Failed to read docker-compose.yml {error}"))?;
         let yaml: serde_yaml::Value = serde_yaml::from_slice(&docker_compose_content)
-            .map_err(|error| format!("Failed to parse docker-compose.yml{COLON_SPACE}{error}"))?;
+            .map_err(|error| format!("Failed to parse docker-compose.yml {error}"))?;
         let mut config: DockerComposeConfig = DockerComposeConfig::default();
         if let Some(mysql) = yaml
             .get(DOCKER_YAML_SERVICES)
@@ -2977,16 +2956,14 @@ impl PostgreSqlAutoCreation {
             let error_msg: String = error.to_string();
             if error_msg.contains("authentication failed") || error_msg.contains("permission") {
                 AutoCreationError::InsufficientPermissions(format!(
-                    "Cannot connect to PostgreSQL server for database creation{COLON_SPACE}{error_msg}"
+                    "Cannot connect to PostgreSQL server for database creation {error_msg}"
                 ))
             } else if error_msg.contains("timeout") || error_msg.contains("Connection refused") {
                 AutoCreationError::ConnectionFailed(format!(
-                    "Cannot connect to PostgreSQL server{COLON_SPACE}{error_msg}"
+                    "Cannot connect to PostgreSQL server {error_msg}"
                 ))
             } else {
-                AutoCreationError::DatabaseError(format!(
-                    "PostgreSQL connection error{COLON_SPACE}{error_msg}"
-                ))
+                AutoCreationError::DatabaseError(format!("PostgreSQL connection error {error_msg}"))
             }
         })
     }
@@ -2995,23 +2972,19 @@ impl PostgreSqlAutoCreation {
         let db_url: String = self.instance.get_connection_url();
         let timeout_duration: Duration = get_connection_timeout_duration();
         let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> = match timeout(
-            timeout_duration,
-            Database::connect(&db_url),
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(_) => {
-                return Err(AutoCreationError::Timeout(format!(
-                    "PostgreSQL database connection timeout after {timeout_seconds} seconds{COLON_SPACE}{}",
-                    self.instance.get_database().as_str()
-                )));
-            }
-        };
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "PostgreSQL database connection timeout after {timeout_seconds} seconds {}",
+                        self.instance.get_database().as_str()
+                    )));
+                }
+            };
         connection_result.map_err(|error: DbErr| {
             AutoCreationError::ConnectionFailed(format!(
-                "Cannot connect to PostgreSQL database '{}'{COLON_SPACE}{error}",
+                "Cannot connect to PostgreSQL database '{}' {error}",
                 self.instance.get_database().as_str(),
             ))
         })
@@ -3029,7 +3002,7 @@ impl PostgreSqlAutoCreation {
         match connection.query_all(statement).await {
             Ok(results) => Ok(!results.is_empty()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to check if database exists{COLON_SPACE}{error}"
+                "Failed to check if database exists {error}"
             ))),
         }
     }
@@ -3064,7 +3037,7 @@ impl PostgreSqlAutoCreation {
                 let error_msg: String = error.to_string();
                 if error_msg.contains("permission denied") || error_msg.contains("must be owner") {
                     Err(AutoCreationError::InsufficientPermissions(format!(
-                        "Cannot create PostgreSQL database '{}'{COLON_SPACE}{}",
+                        "Cannot create PostgreSQL database '{}' {}",
                         self.instance.get_database().as_str(),
                         error_msg
                     )))
@@ -3077,7 +3050,7 @@ impl PostgreSqlAutoCreation {
                     Ok(false)
                 } else {
                     Err(AutoCreationError::DatabaseError(format!(
-                        "Failed to create PostgreSQL database '{}'{COLON_SPACE}{}",
+                        "Failed to create PostgreSQL database '{}' {}",
                         self.instance.get_database().as_str(),
                         error_msg
                     )))
@@ -3102,7 +3075,7 @@ impl PostgreSqlAutoCreation {
         match connection.query_all(statement).await {
             Ok(results) => Ok(!results.is_empty()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to check if table '{table_name_str}' exists{COLON_SPACE}{error}"
+                "Failed to check if table '{table_name_str}' exists {error}"
             ))),
         }
     }
@@ -3120,13 +3093,13 @@ impl PostgreSqlAutoCreation {
                 let error_msg: String = error.to_string();
                 if error_msg.contains("permission denied") {
                     Err(AutoCreationError::InsufficientPermissions(format!(
-                        "Cannot create PostgreSQL table '{}'{COLON_SPACE}{}",
+                        "Cannot create PostgreSQL table '{}' {}",
                         table.get_name(),
                         error_msg
                     )))
                 } else {
                     Err(AutoCreationError::SchemaError(format!(
-                        "Failed to create PostgreSQL table '{}'{COLON_SPACE}{}",
+                        "Failed to create PostgreSQL table '{}' {}",
                         table.get_name(),
                         error_msg
                     )))
@@ -3147,7 +3120,7 @@ impl PostgreSqlAutoCreation {
         match connection.execute(statement).await {
             Ok(_) => Ok(()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to execute SQL{COLON_SPACE}{error}"
+                "Failed to execute SQL {error}"
             ))),
         }
     }
@@ -3247,7 +3220,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
                 )
                 .await;
                 Err(AutoCreationError::ConnectionFailed(format!(
-                    "PostgreSQL connection verification failed{COLON_SPACE}{error_msg}"
+                    "PostgreSQL connection verification failed {error_msg}"
                 )))
             }
         }
@@ -3517,16 +3490,14 @@ impl MySqlAutoCreation {
             let error_msg: String = error.to_string();
             if error_msg.contains("Access denied") || error_msg.contains("permission") {
                 AutoCreationError::InsufficientPermissions(format!(
-                    "Cannot connect to MySQL server for database creation{COLON_SPACE}{error_msg}"
+                    "Cannot connect to MySQL server for database creation {error_msg}"
                 ))
             } else if error_msg.contains("timeout") || error_msg.contains("Connection refused") {
                 AutoCreationError::ConnectionFailed(format!(
-                    "Cannot connect to MySQL server{COLON_SPACE}{error_msg}"
+                    "Cannot connect to MySQL server {error_msg}"
                 ))
             } else {
-                AutoCreationError::DatabaseError(format!(
-                    "MySQL connection error{COLON_SPACE}{error_msg}"
-                ))
+                AutoCreationError::DatabaseError(format!("MySQL connection error {error_msg}"))
             }
         })
     }
@@ -3543,7 +3514,7 @@ impl MySqlAutoCreation {
         match connection.query_all(statement).await {
             Ok(results) => Ok(!results.is_empty()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to check if database exists{COLON_SPACE}{error}"
+                "Failed to check if database exists {error}"
             ))),
         }
     }
@@ -3578,13 +3549,13 @@ impl MySqlAutoCreation {
                 let error_msg: String = error.to_string();
                 if error_msg.contains("Access denied") || error_msg.contains("permission") {
                     Err(AutoCreationError::InsufficientPermissions(format!(
-                        "Cannot create MySQL database '{}'{COLON_SPACE}{}",
+                        "Cannot create MySQL database '{}' {}",
                         self.instance.get_database().as_str(),
                         error_msg
                     )))
                 } else {
                     Err(AutoCreationError::DatabaseError(format!(
-                        "Failed to create MySQL database '{}'{COLON_SPACE}{}",
+                        "Failed to create MySQL database '{}' {}",
                         self.instance.get_database().as_str(),
                         error_msg
                     )))
@@ -3597,23 +3568,19 @@ impl MySqlAutoCreation {
         let db_url: String = self.instance.get_connection_url();
         let timeout_duration: Duration = get_connection_timeout_duration();
         let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> = match timeout(
-            timeout_duration,
-            Database::connect(&db_url),
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(_) => {
-                return Err(AutoCreationError::Timeout(format!(
-                    "MySQL database connection timeout after {timeout_seconds} seconds{COLON_SPACE}{}",
-                    self.instance.get_database()
-                )));
-            }
-        };
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "MySQL database connection timeout after {timeout_seconds} seconds {}",
+                        self.instance.get_database()
+                    )));
+                }
+            };
         connection_result.map_err(|error: DbErr| {
             AutoCreationError::ConnectionFailed(format!(
-                "Cannot connect to MySQL database '{}'{COLON_SPACE}{}",
+                "Cannot connect to MySQL database '{}' {}",
                 self.instance.get_database().as_str(),
                 error
             ))
@@ -3637,7 +3604,7 @@ impl MySqlAutoCreation {
         match connection.query_all(statement).await {
             Ok(results) => Ok(!results.is_empty()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to check if table '{table_name_str}' exists{COLON_SPACE}{error}"
+                "Failed to check if table '{table_name_str}' exists {error}"
             ))),
         }
     }
@@ -3655,13 +3622,13 @@ impl MySqlAutoCreation {
                 let error_msg: String = error.to_string();
                 if error_msg.contains("Access denied") || error_msg.contains("permission") {
                     Err(AutoCreationError::InsufficientPermissions(format!(
-                        "Cannot create MySQL table '{}'{COLON_SPACE}{}",
+                        "Cannot create MySQL table '{}' {}",
                         table.get_name(),
                         error_msg
                     )))
                 } else {
                     Err(AutoCreationError::SchemaError(format!(
-                        "Failed to create MySQL table '{}'{COLON_SPACE}{}",
+                        "Failed to create MySQL table '{}' {}",
                         table.get_name(),
                         error_msg
                     )))
@@ -3682,7 +3649,7 @@ impl MySqlAutoCreation {
         match connection.execute(statement).await {
             Ok(_) => Ok(()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to execute SQL{COLON_SPACE}{error}"
+                "Failed to execute SQL {error}"
             ))),
         }
     }
@@ -3770,7 +3737,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
             };
         let connection: DatabaseConnection = connection_result.map_err(|error: DbErr| {
             AutoCreationError::ConnectionFailed(format!(
-                "Failed to verify MySQL connection{COLON_SPACE}{error}"
+                "Failed to verify MySQL connection {error}"
             ))
         })?;
         let statement: Statement =
@@ -3798,7 +3765,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
                 )
                 .await;
                 Err(AutoCreationError::ConnectionFailed(format!(
-                    "MySQL connection verification failed{COLON_SPACE}{error_msg}"
+                    "MySQL connection verification failed {error_msg}"
                 )))
             }
         }
@@ -4110,7 +4077,7 @@ pub async fn initialize_auto_creation_with_schema(
 ) -> Result<(), String> {
     if let Err(error) = AutoCreationConfig::validate() {
         return Err(format!(
-            "Auto-creation configuration validation failed{COLON_SPACE}{error}"
+            "Auto-creation configuration validation failed {error}"
         ));
     }
     let env: &'static EnvConfig = get_global_env_config();
@@ -4119,7 +4086,7 @@ pub async fn initialize_auto_creation_with_schema(
         match mysql::perform_mysql_auto_creation(instance, mysql_schema.clone()).await {
             Ok(result) => {
                 initialization_results.push(format!(
-                    "MySQL ({}) {COLON_SPACE}{}",
+                    "MySQL ({})  {}",
                     instance.get_name(),
                     if result.has_changes() {
                         "initialized with changes"
@@ -4131,7 +4098,7 @@ pub async fn initialize_auto_creation_with_schema(
             Err(error) => {
                 if !error.should_continue() {
                     return Err(format!(
-                        "MySQL ({}) auto-creation failed{COLON_SPACE}{error}",
+                        "MySQL ({}) auto-creation failed {error}",
                         instance.get_name()
                     ));
                 }
@@ -4148,7 +4115,7 @@ pub async fn initialize_auto_creation_with_schema(
         {
             Ok(result) => {
                 initialization_results.push(format!(
-                    "PostgreSQL ({}) {COLON_SPACE}{}",
+                    "PostgreSQL ({})  {}",
                     instance.get_name(),
                     if result.has_changes() {
                         "initialized with changes"
@@ -4160,7 +4127,7 @@ pub async fn initialize_auto_creation_with_schema(
             Err(error) => {
                 if !error.should_continue() {
                     return Err(format!(
-                        "PostgreSQL ({}) auto-creation failed{COLON_SPACE}{error}",
+                        "PostgreSQL ({}) auto-creation failed {error}",
                         instance.get_name()
                     ));
                 }
@@ -4175,7 +4142,7 @@ pub async fn initialize_auto_creation_with_schema(
         match redis::perform_redis_auto_creation(instance).await {
             Ok(result) => {
                 initialization_results.push(format!(
-                    "Redis ({}) {COLON_SPACE}{}",
+                    "Redis ({})  {}",
                     instance.get_name(),
                     if result.has_changes() {
                         "initialized with changes"
@@ -4187,7 +4154,7 @@ pub async fn initialize_auto_creation_with_schema(
             Err(error) => {
                 if !error.should_continue() {
                     return Err(format!(
-                        "Redis ({}) auto-creation failed{COLON_SPACE}{error}",
+                        "Redis ({}) auto-creation failed {error}",
                         instance.get_name()
                     ));
                 }
@@ -4202,7 +4169,7 @@ pub async fn initialize_auto_creation_with_schema(
         info!("[AUTO-CREATION] No plugins enabled for auto-creation");
     } else {
         let results_summary: String = initialization_results.join(", ");
-        info!("[AUTO-CREATION] Initialization complete{COLON_SPACE}{results_summary}");
+        info!("[AUTO-CREATION] Initialization complete {results_summary}");
     }
     Ok(())
 }
@@ -4282,12 +4249,12 @@ impl std::fmt::Display for AutoCreationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InsufficientPermissions(msg) => {
-                write!(f, "Insufficient permissions{COLON_SPACE}{msg}")
+                write!(f, "Insufficient permissions {msg}")
             }
-            Self::ConnectionFailed(msg) => write!(f, "Connection failed{COLON_SPACE}{msg}"),
-            Self::SchemaError(msg) => write!(f, "Schema error{COLON_SPACE}{msg}"),
-            Self::Timeout(msg) => write!(f, "Timeout{COLON_SPACE}{msg}"),
-            Self::DatabaseError(msg) => write!(f, "Database error{COLON_SPACE}{msg}"),
+            Self::ConnectionFailed(msg) => write!(f, "Connection failed {msg}"),
+            Self::SchemaError(msg) => write!(f, "Schema error {msg}"),
+            Self::Timeout(msg) => write!(f, "Timeout {msg}"),
+            Self::DatabaseError(msg) => write!(f, "Database error {msg}"),
         }
     }
 }
@@ -4476,7 +4443,7 @@ impl AutoCreationLogger {
     pub async fn log_auto_creation_complete(plugin_type: PluginType, result: &AutoCreationResult) {
         if result.has_errors() {
             info!(
-                "[AUTO-CREATION] Auto-creation completed for {plugin_type} with warnings{COLON_SPACE}{}",
+                "[AUTO-CREATION] Auto-creation completed for {plugin_type} with warnings {}",
                 result.get_errors().join(", ")
             );
         } else {
@@ -4491,7 +4458,7 @@ impl AutoCreationLogger {
         database_name: Option<&str>,
     ) {
         error!(
-            "[AUTO-CREATION] {operation} failed for {plugin_type} database '{}'{COLON_SPACE}{error}",
+            "[AUTO-CREATION] {operation} failed for {plugin_type} database '{}' {error}",
             database_name.unwrap_or("unknown")
         );
     }
@@ -4508,7 +4475,7 @@ impl AutoCreationLogger {
             );
         } else {
             error!(
-                "[AUTO-CREATION] Connection verification failed for {plugin_type} database '{database_name}'{COLON_SPACE}{}",
+                "[AUTO-CREATION] Connection verification failed for {plugin_type} database '{database_name}' {}",
                 error.unwrap_or("Unknown error")
             );
         };
@@ -4823,16 +4790,14 @@ impl RedisAutoCreation {
             let error_msg: String = error.to_string();
             if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
                 AutoCreationError::InsufficientPermissions(format!(
-                    "Redis authentication failed{COLON_SPACE}{error_msg}"
+                    "Redis authentication failed {error_msg}"
                 ))
             } else if error_msg.contains("Connection refused") || error_msg.contains("timeout") {
                 AutoCreationError::ConnectionFailed(format!(
-                    "Cannot connect to Redis server{COLON_SPACE}{error_msg}"
+                    "Cannot connect to Redis server {error_msg}"
                 ))
             } else {
-                AutoCreationError::DatabaseError(format!(
-                    "Redis connection error{COLON_SPACE}{error_msg}"
-                ))
+                AutoCreationError::DatabaseError(format!("Redis connection error {error_msg}"))
             }
         })?;
         let timeout_duration: Duration = get_connection_timeout_duration();
@@ -4845,17 +4810,17 @@ impl RedisAutoCreation {
                     let error_msg: String = error.to_string();
                     if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
                         AutoCreationError::InsufficientPermissions(format!(
-                            "Redis authentication failed{COLON_SPACE}{error_msg}"
+                            "Redis authentication failed {error_msg}"
                         ))
                     } else if error_msg.contains("Connection refused")
                         || error_msg.contains("timeout")
                     {
                         AutoCreationError::ConnectionFailed(format!(
-                            "Cannot connect to Redis server{COLON_SPACE}{error_msg}"
+                            "Cannot connect to Redis server {error_msg}"
                         ))
                     } else {
                         AutoCreationError::DatabaseError(format!(
-                            "Redis connection error{COLON_SPACE}{error_msg}"
+                            "Redis connection error {error_msg}"
                         ))
                     }
                 })?,
@@ -4879,9 +4844,7 @@ impl RedisAutoCreation {
         let pong: String = redis::cmd("PING")
             .query(&mut conn)
             .map_err(|error: RedisError| {
-                AutoCreationError::ConnectionFailed(format!(
-                    "Redis PING failed{COLON_SPACE}{error}"
-                ))
+                AutoCreationError::ConnectionFailed(format!("Redis PING failed {error}"))
             })?;
         if pong != "PONG" {
             return Err(AutoCreationError::ConnectionFailed(
@@ -4894,7 +4857,7 @@ impl RedisAutoCreation {
                 .query(&mut conn)
                 .map_err(|error: RedisError| {
                     AutoCreationError::DatabaseError(format!(
-                        "Failed to get Redis server info{COLON_SPACE}{error}"
+                        "Failed to get Redis server info {error}"
                     ))
                 })?;
         if info.contains("redis_version:") {
@@ -4918,7 +4881,7 @@ impl RedisAutoCreation {
             .query(&mut conn)
             .map_err(|error: RedisError| {
                 AutoCreationError::DatabaseError(format!(
-                    "Failed to check Redis key existence{COLON_SPACE}{error}"
+                    "Failed to check Redis key existence {error}"
                 ))
             })?;
         if exists == 0 {
@@ -4928,7 +4891,7 @@ impl RedisAutoCreation {
                 .query(&mut conn)
                 .map_err(|error: RedisError| {
                     AutoCreationError::DatabaseError(format!(
-                        "Failed to set Redis initialization key{COLON_SPACE}{error}"
+                        "Failed to set Redis initialization key {error}"
                     ))
                 })?;
             setup_operations.push(app_key.clone());
@@ -4939,7 +4902,7 @@ impl RedisAutoCreation {
                 .query(&mut conn)
                 .map_err(|error: RedisError| {
                     AutoCreationError::DatabaseError(format!(
-                        "Failed to set Redis config key{COLON_SPACE}{error}"
+                        "Failed to set Redis config key {error}"
                     ))
                 })?;
             setup_operations.push(config_key);
@@ -5017,10 +4980,60 @@ use super::*;
 pub static REDIS_CONNECTIONS: Lazy<RwLock<RedisConnectionMap>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 ```
+# Path: hyperlane-quick-start/plugin/shutdown/mod.rs
+```rust
+mod r#fn;
+mod r#static;
+pub use r#fn::*;
+use {super::*, r#static::*};
+use std::sync::{Arc, OnceLock};
+```
+# Path: hyperlane-quick-start/plugin/shutdown/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+fn default_shutdown() -> SharedAsyncTaskFactory<()> {
+    Arc::new(|| {
+        Box::pin(async {
+            warn!("Not set shutdown, using default");
+        })
+    })
+}
+#[instrument_trace]
+pub fn set_shutdown(shutdown: &SharedAsyncTaskFactory<()>) {
+    drop(SHUTDOWN.set(shutdown.clone()));
+}
+#[instrument_trace]
+pub fn get_shutdown() -> SharedAsyncTaskFactory<()> {
+    SHUTDOWN.get_or_init(default_shutdown).clone()
+}
+```
+# Path: hyperlane-quick-start/plugin/shutdown/static.rs
+```rust
+use super::*;
+pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
+```
 # Path: hyperlane-quick-start/src/main.rs
 ```rust
+use {
+    hyperlane_bootstrap::{
+        application::{db::*, env::*, logger::*},
+        framework::{runtime::*, server::*},
+    },
+    hyperlane_config::framework::*,
+    hyperlane_plugin::process::*,
+};
+use hyperlane_utils::log::*;
 fn main() {
-    hyperlane_bootstrap::framework::run::block_on();
+    init_log();
+    if let Err(error) = init_env_config() {
+        error!("{error}");
+    }
+    info!("Environment configuration loaded successfully");
+    runtime().block_on(async move {
+        init_db().await;
+        create(SERVER_PID_FILE_PATH, init_server).await;
+    });
 }
 ```
 # Path: hyperlane-log/README.md
