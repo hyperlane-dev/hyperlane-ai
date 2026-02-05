@@ -1,4 +1,4 @@
-<!--2026-02-05 02:31:28-->
+<!--2026-02-05 07:06:35-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -39,9 +39,16 @@ cargo add hyperlane-broadcast
 mod broadcast;
 mod broadcast_map;
 pub use {broadcast::*, broadcast_map::*};
+#[cfg(test)]
+use std::time::Duration;
 use std::{fmt::Debug, hash::BuildHasherDefault};
+#[cfg(test)]
+use tokio::{
+    sync::broadcast::error::RecvError,
+    time::{error::Elapsed, timeout},
+};
 use {
-    dashmap::*,
+    dashmap::{mapref::one::Ref, *},
     tokio::sync::broadcast::{
         error::SendError,
         {Receiver, Sender},
@@ -170,7 +177,7 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
         &self.0
     }
     #[inline(always)]
-    pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>
+    pub fn insert<K>(&self, key: K, capacity: Capacity) -> Option<Broadcast<T>>
     where
         K: AsRef<str>,
     {
@@ -178,22 +185,22 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
         self.get().insert(key.as_ref().to_owned(), broadcast)
     }
     #[inline(always)]
-    pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount
+    pub fn receiver_count<K>(&self, key: K) -> Option<ReceiverCount>
     where
         K: AsRef<str>,
     {
         self.get()
             .get(key.as_ref())
-            .map(|receiver| receiver.receiver_count())
+            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.receiver_count())
     }
     #[inline(always)]
-    pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>
+    pub fn subscribe<K>(&self, key: K) -> Option<BroadcastMapReceiver<T>>
     where
         K: AsRef<str>,
     {
         self.get()
             .get(key.as_ref())
-            .map(|receiver| receiver.subscribe())
+            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.subscribe())
     }
     #[inline(always)]
     pub fn subscribe_or_insert<K>(&self, key: K, capacity: Capacity) -> BroadcastMapReceiver<T>
@@ -210,11 +217,24 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
         }
     }
     #[inline(always)]
-    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T> {
+    pub fn send<K: AsRef<str>>(
+        &self,
+        key: K,
+        data: T,
+    ) -> Result<Option<ReceiverCount>, SendError<T>> {
         match self.get().get(key.as_ref()) {
             Some(sender) => sender.send(data).map(Some),
             None => Ok(None),
         }
+    }
+    #[inline(always)]
+    pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>
+    where
+        K: AsRef<str>,
+    {
+        self.get()
+            .remove(key.as_ref())
+            .map(|(_, broadcast): (String, Broadcast<T>)| broadcast)
     }
 }
 ```
@@ -222,13 +242,8 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
 ```rust
 use crate::*;
 pub type BroadcastMapSendError<T> = SendError<T>;
-pub type BroadcastMapSendResult<T> = Result<Option<ReceiverCount>, BroadcastMapSendError<T>>;
 pub type BroadcastMapReceiver<T> = Receiver<T>;
-pub type OptionBroadcast<T> = Option<Broadcast<T>>;
-pub type OptionBroadcastMapReceiver<T> = Option<BroadcastMapReceiver<T>>;
 pub type BroadcastMapSender<T> = Sender<T>;
-pub type OptionBroadcastMapSender<T> = Option<BroadcastMapSender<T>>;
-pub type OptionReceiverCount = Option<ReceiverCount>;
 pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDefault<XxHash3_64>>;
 ```
 # Path: hyperlane-broadcast/src/broadcast_map/test.rs
@@ -237,16 +252,57 @@ use crate::*;
 #[tokio::test]
 pub async fn test_broadcast_map() {
     let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
-    broadcast_map.insert("a", 10);
-    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
-    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("a").unwrap();
+    broadcast_map.insert("test_key", 10);
+    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("test_key").unwrap();
+    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("test_key").unwrap();
     let mut rec3: BroadcastMapReceiver<usize> =
-        broadcast_map.subscribe_or_insert("b", DEFAULT_BROADCAST_SENDER_CAPACITY);
-    broadcast_map.send("a", 20).unwrap();
-    broadcast_map.send("b", 10).unwrap();
+        broadcast_map.subscribe_or_insert("another_key", DEFAULT_BROADCAST_SENDER_CAPACITY);
+    broadcast_map.send("test_key", 20).unwrap();
+    broadcast_map.send("another_key", 10).unwrap();
     assert_eq!(rec1.recv().await, Ok(20));
     assert_eq!(rec2.recv().await, Ok(20));
     assert_eq!(rec3.recv().await, Ok(10));
+}
+#[tokio::test]
+pub async fn test_broadcast_map_unsubscribe() {
+    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe("test_key").unwrap();
+    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe("test_key");
+    assert!(removed.is_some());
+    drop(removed);
+    let not_exist: Option<Broadcast<usize>> = broadcast_map.unsubscribe("nonexistent_key");
+    assert!(not_exist.is_none());
+    assert!(broadcast_map.subscribe("test_key").is_none());
+    let send_result: Result<Option<usize>, SendError<usize>> = broadcast_map.send("test_key", 30);
+    assert!(send_result.unwrap().is_none());
+    let result: Result<Result<usize, RecvError>, Elapsed> =
+        timeout(Duration::from_millis(100), rec1.recv()).await;
+    assert!(result.is_ok(), "recv should not timeout after unsubscribe");
+    assert_eq!(result.unwrap(), Err(RecvError::Closed));
+}
+#[tokio::test]
+pub async fn test_broadcast_map_unsubscribe_and_reinsert() {
+    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    broadcast_map.subscribe("test_key").unwrap();
+    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe("test_key");
+    assert!(removed.is_some());
+    broadcast_map.insert("test_key", 10);
+    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe("test_key").unwrap();
+    broadcast_map.send("test_key", 100).unwrap();
+    assert_eq!(rec2.recv().await, Ok(100));
+}
+#[tokio::test]
+pub async fn test_broadcast_map_unsubscribe_receiver_count() {
+    let broadcast_map: BroadcastMap<String> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    let _rec1: BroadcastMapReceiver<String> = broadcast_map.subscribe("test_key").unwrap();
+    let _rec2: BroadcastMapReceiver<String> = broadcast_map.subscribe("test_key").unwrap();
+    assert_eq!(broadcast_map.receiver_count("test_key"), Some(2));
+    let removed: Option<Broadcast<String>> = broadcast_map.unsubscribe("test_key");
+    assert!(removed.is_some());
+    assert_eq!(broadcast_map.receiver_count("test_key"), None);
 }
 ```
 # Path: hyperlane-plugin-websocket/README.md
@@ -287,7 +343,10 @@ use std::{
     sync::Arc,
 };
 use {
-    hyperlane::{tokio::sync::broadcast::Receiver, *},
+    hyperlane::{
+        tokio::sync::broadcast::{Receiver, error::SendError},
+        *,
+    },
     hyperlane_broadcast::*,
 };
 ```
@@ -621,7 +680,7 @@ impl WebSocket {
         &self,
         broadcast_type: BroadcastType<B>,
         data: T,
-    ) -> BroadcastMapSendResult<Vec<u8>>
+    ) -> Result<Option<ReceiverCount>, SendError<Vec<u8>>>
     where
         T: Into<Vec<u8>>,
         B: BroadcastTypeTrait,

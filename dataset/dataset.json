@@ -278,91 +278,91 @@
   {
     "instruction": "insert函数的源码是怎么实现的？",
     "input": "",
-    "output": "insert函数的源码实现如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```",
+    "output": "insert函数的源码实现如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释insert这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "insert函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：20\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "insert函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：20\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "insert函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "insert函数的泛型设计和使用如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "insert函数的泛型设计和使用如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "insert函数的参数设计有什么考虑？",
     "input": "",
-    "output": "insert函数的参数设计如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```\n\n参数列表：\n- key: K\n- capacity: Capacity\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "insert函数的参数设计如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```\n\n参数列表：\n- key: K\n- capacity: Capacity\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "insert函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "insert函数的返回值类型设计如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> OptionBroadcast<T>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```\n\n返回类型：OptionBroadcast<T>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "insert函数的返回值类型设计如下：\n\n```rust\n/// Inserts a new broadcast channel into the map with a specified key and capacity.\n    ///\n    /// If a broadcast channel with the given key already exists, it will be replaced.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `capacity` - Maximum number of buffered messages.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - Previous broadcast channel if replaced.\n    #[inline(always)]\n    pub fn insert<K>(&self, key: K, capacity: Capacity) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        let broadcast: Broadcast<T> = Broadcast::new(capacity);\n        self.get().insert(key.as_ref().to_owned(), broadcast)\n    }\n```\n\n返回类型：Option<Broadcast<T>>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "receiver_count函数的源码是怎么实现的？",
     "input": "",
-    "output": "receiver_count函数的源码实现如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.receiver_count())\n    }\n```",
+    "output": "receiver_count函数的源码实现如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> Option<ReceiverCount>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.receiver_count())\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释receiver_count这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "receiver_count函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.receiver_count())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：18\n- 包含高级特性：泛型编程、闭包、where子句约束",
+    "output": "receiver_count函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> Option<ReceiverCount>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.receiver_count())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：7\n- 代码行数：18\n- 包含高级特性：泛型编程、生命周期管理、闭包、where子句约束",
     "system": ""
   },
   {
     "instruction": "receiver_count函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "receiver_count函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.receiver_count())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "receiver_count函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> Option<ReceiverCount>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.receiver_count())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "receiver_count函数的参数设计有什么考虑？",
     "input": "",
-    "output": "receiver_count函数的参数设计如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.receiver_count())\n    }\n```\n\n参数列表：\n- key: K\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "receiver_count函数的参数设计如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> Option<ReceiverCount>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.receiver_count())\n    }\n```\n\n参数列表：\n- key: K\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "receiver_count函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "receiver_count函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> OptionReceiverCount\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.receiver_count())\n    }\n```\n\n返回类型：OptionReceiverCount\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "receiver_count函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the number of active receivers for the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<ReceiverCount>` - Number of receivers if channel exists.\n    #[inline(always)]\n    pub fn receiver_count<K>(&self, key: K) -> Option<ReceiverCount>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.receiver_count())\n    }\n```\n\n返回类型：Option<ReceiverCount>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "subscribe函数的源码是怎么实现的？",
     "input": "",
-    "output": "subscribe函数的源码实现如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.subscribe())\n    }\n```",
+    "output": "subscribe函数的源码实现如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> Option<BroadcastMapReceiver<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.subscribe())\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释subscribe这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "subscribe函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.subscribe())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：18\n- 包含高级特性：泛型编程、闭包、where子句约束",
+    "output": "subscribe函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> Option<BroadcastMapReceiver<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.subscribe())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：7\n- 代码行数：18\n- 包含高级特性：泛型编程、生命周期管理、闭包、where子句约束",
     "system": ""
   },
   {
     "instruction": "subscribe函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "subscribe函数的泛型设计和使用如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.subscribe())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "subscribe函数的泛型设计和使用如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> Option<BroadcastMapReceiver<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.subscribe())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "subscribe函数的参数设计有什么考虑？",
     "input": "",
-    "output": "subscribe函数的参数设计如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.subscribe())\n    }\n```\n\n参数列表：\n- key: K\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "subscribe函数的参数设计如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> Option<BroadcastMapReceiver<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.subscribe())\n    }\n```\n\n参数列表：\n- key: K\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "subscribe函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "subscribe函数的返回值类型设计如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> OptionBroadcastMapReceiver<T>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver| receiver.subscribe())\n    }\n```\n\n返回类型：OptionBroadcastMapReceiver<T>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "subscribe函数的返回值类型设计如下：\n\n```rust\n/// Subscribes a new receiver to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<BroadcastReceiver<T>>` - New receiver if channel exists.\n    #[inline(always)]\n    pub fn subscribe<K>(&self, key: K) -> Option<BroadcastMapReceiver<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .get(key.as_ref())\n            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.subscribe())\n    }\n```\n\n返回类型：Option<BroadcastMapReceiver<T>>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -398,25 +398,49 @@
   {
     "instruction": "send函数的源码是怎么实现的？",
     "input": "",
-    "output": "send函数的源码实现如下：\n\n```rust\n/// Sends a message to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `data` - Message to broadcast.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<T>>` - Send result with receiver count or error.\n    #[inline(always)]\n    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T> {\n        match self.get().get(key.as_ref()) {\n            Some(sender) => sender.send(data).map(Some),\n            None => Ok(None),\n        }\n    }\n```",
+    "output": "send函数的源码实现如下：\n\n```rust\n/// Sends a message to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `data` - Message to broadcast.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<T>>` - Send result with receiver count or error.\n    #[inline(always)]\n    pub fn send<K: AsRef<str>>(\n        &self,\n        key: K,\n        data: T,\n    ) -> Result<Option<ReceiverCount>, SendError<T>> {\n        match self.get().get(key.as_ref()) {\n            Some(sender) => sender.send(data).map(Some),\n            None => Ok(None),\n        }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释send这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "send函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sends a message to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `data` - Message to broadcast.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<T>>` - Send result with receiver count or error.\n    #[inline(always)]\n    pub fn send<K: AsRef<str>>(\n        &self,\n        key: K,\n        data: T,\n    ) -> Result<Option<ReceiverCount>, SendError<T>> {\n        match self.get().get(key.as_ref()) {\n            Some(sender) => sender.send(data).map(Some),\n            None => Ok(None),\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：21\n- 包含高级特性：泛型编程、错误处理",
     "system": ""
   },
   {
     "instruction": "send函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "send函数的泛型设计和使用如下：\n\n```rust\n/// Sends a message to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `data` - Message to broadcast.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<T>>` - Send result with receiver count or error.\n    #[inline(always)]\n    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T> {\n        match self.get().get(key.as_ref()) {\n            Some(sender) => sender.send(data).map(Some),\n            None => Ok(None),\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "send函数的泛型设计和使用如下：\n\n```rust\n/// Sends a message to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `data` - Message to broadcast.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<T>>` - Send result with receiver count or error.\n    #[inline(always)]\n    pub fn send<K: AsRef<str>>(\n        &self,\n        key: K,\n        data: T,\n    ) -> Result<Option<ReceiverCount>, SendError<T>> {\n        match self.get().get(key.as_ref()) {\n            Some(sender) => sender.send(data).map(Some),\n            None => Ok(None),\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "send函数的参数设计有什么考虑？",
+    "instruction": "unsubscribe函数的源码是怎么实现的？",
     "input": "",
-    "output": "send函数的参数设计如下：\n\n```rust\n/// Sends a message to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `data` - Message to broadcast.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<T>>` - Send result with receiver count or error.\n    #[inline(always)]\n    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T> {\n        match self.get().get(key.as_ref()) {\n            Some(sender) => sender.send(data).map(Some),\n            None => Ok(None),\n        }\n    }\n```\n\n参数列表：\n- key: K\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "unsubscribe函数的源码实现如下：\n\n```rust\n/// Unsubscribes and removes the broadcast channel associated with the given key from the map.\n    ///\n    /// This operation effectively cancels all subscriptions to the channel by removing it from the map.\n    /// Any existing receivers will no longer receive new messages, and the channel will be dropped.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - The removed broadcast channel if it existed, or `None` if no channel was associated with the key.\n    #[inline(always)]\n    pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .remove(key.as_ref())\n            .map(|(_, broadcast): (String, Broadcast<T>)| broadcast)\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "send函数的返回值类型设计有什么特点？",
+    "instruction": "请解释unsubscribe这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "send函数的返回值类型设计如下：\n\n```rust\n/// Sends a message to the broadcast channel associated with the given key.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    /// - `data` - Message to broadcast.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<T>>` - Send result with receiver count or error.\n    #[inline(always)]\n    pub fn send<K: AsRef<str>>(&self, key: K, data: T) -> BroadcastMapSendResult<T> {\n        match self.get().get(key.as_ref()) {\n            Some(sender) => sender.send(data).map(Some),\n            None => Ok(None),\n        }\n    }\n```\n\n返回类型：BroadcastMapSendResult<T>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "unsubscribe函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Unsubscribes and removes the broadcast channel associated with the given key from the map.\n    ///\n    /// This operation effectively cancels all subscriptions to the channel by removing it from the map.\n    /// Any existing receivers will no longer receive new messages, and the channel will be dropped.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - The removed broadcast channel if it existed, or `None` if no channel was associated with the key.\n    #[inline(always)]\n    pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .remove(key.as_ref())\n            .map(|(_, broadcast): (String, Broadcast<T>)| broadcast)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：7\n- 代码行数：21\n- 包含高级特性：泛型编程、闭包、where子句约束",
+    "system": ""
+  },
+  {
+    "instruction": "unsubscribe函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "unsubscribe函数的泛型设计和使用如下：\n\n```rust\n/// Unsubscribes and removes the broadcast channel associated with the given key from the map.\n    ///\n    /// This operation effectively cancels all subscriptions to the channel by removing it from the map.\n    /// Any existing receivers will no longer receive new messages, and the channel will be dropped.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - The removed broadcast channel if it existed, or `None` if no channel was associated with the key.\n    #[inline(always)]\n    pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .remove(key.as_ref())\n            .map(|(_, broadcast): (String, Broadcast<T>)| broadcast)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "unsubscribe函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "unsubscribe函数的参数设计如下：\n\n```rust\n/// Unsubscribes and removes the broadcast channel associated with the given key from the map.\n    ///\n    /// This operation effectively cancels all subscriptions to the channel by removing it from the map.\n    /// Any existing receivers will no longer receive new messages, and the channel will be dropped.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - The removed broadcast channel if it existed, or `None` if no channel was associated with the key.\n    #[inline(always)]\n    pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .remove(key.as_ref())\n            .map(|(_, broadcast): (String, Broadcast<T>)| broadcast)\n    }\n```\n\n参数列表：\n- key: K\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "unsubscribe函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "unsubscribe函数的返回值类型设计如下：\n\n```rust\n/// Unsubscribes and removes the broadcast channel associated with the given key from the map.\n    ///\n    /// This operation effectively cancels all subscriptions to the channel by removing it from the map.\n    /// Any existing receivers will no longer receive new messages, and the channel will be dropped.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - Key convertible to `str`.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<Broadcast<T>>` - The removed broadcast channel if it existed, or `None` if no channel was associated with the key.\n    #[inline(always)]\n    pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>\n    where\n        K: AsRef<str>,\n    {\n        self.get()\n            .remove(key.as_ref())\n            .map(|(_, broadcast): (String, Broadcast<T>)| broadcast)\n    }\n```\n\n返回类型：Option<Broadcast<T>>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -432,18 +456,6 @@
     "system": ""
   },
   {
-    "instruction": "BroadcastMapSendResult类型别名的源码是怎么实现的？",
-    "input": "",
-    "output": "BroadcastMapSendResult类型别名的源码实现如下：\n\n```rust\n/// Represents the result of a broadcast map send operation, indicating either success with an optional receiver count or an error.\npub type BroadcastMapSendResult<T> = Result<Option<ReceiverCount>, BroadcastMapSendError<T>>;\n```",
-    "system": ""
-  },
-  {
-    "instruction": "BroadcastMapSendResult类型别名中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "BroadcastMapSendResult类型别名的泛型设计和使用如下：\n\n```rust\n/// Represents the result of a broadcast map send operation, indicating either success with an optional receiver count or an error.\npub type BroadcastMapSendResult<T> = Result<Option<ReceiverCount>, BroadcastMapSendError<T>>;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
     "instruction": "BroadcastMapReceiver类型别名的源码是怎么实现的？",
     "input": "",
     "output": "BroadcastMapReceiver类型别名的源码实现如下：\n\n```rust\n/// Represents a receiver endpoint for a broadcast channel within a map, allowing consumption of broadcasted messages.\npub type BroadcastMapReceiver<T> = Receiver<T>;\n```",
@@ -456,30 +468,6 @@
     "system": ""
   },
   {
-    "instruction": "OptionBroadcast类型别名的源码是怎么实现的？",
-    "input": "",
-    "output": "OptionBroadcast类型别名的源码实现如下：\n\n```rust\n/// Represents an optional broadcast channel.\npub type OptionBroadcast<T> = Option<Broadcast<T>>;\n```",
-    "system": ""
-  },
-  {
-    "instruction": "OptionBroadcast类型别名中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "OptionBroadcast类型别名的泛型设计和使用如下：\n\n```rust\n/// Represents an optional broadcast channel.\npub type OptionBroadcast<T> = Option<Broadcast<T>>;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "OptionBroadcastMapReceiver类型别名的源码是怎么实现的？",
-    "input": "",
-    "output": "OptionBroadcastMapReceiver类型别名的源码实现如下：\n\n```rust\n/// Represents an optional receiver endpoint for a broadcast channel within a map.\npub type OptionBroadcastMapReceiver<T> = Option<BroadcastMapReceiver<T>>;\n```",
-    "system": ""
-  },
-  {
-    "instruction": "OptionBroadcastMapReceiver类型别名中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "OptionBroadcastMapReceiver类型别名的泛型设计和使用如下：\n\n```rust\n/// Represents an optional receiver endpoint for a broadcast channel within a map.\npub type OptionBroadcastMapReceiver<T> = Option<BroadcastMapReceiver<T>>;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
     "instruction": "BroadcastMapSender类型别名的源码是怎么实现的？",
     "input": "",
     "output": "BroadcastMapSender类型别名的源码实现如下：\n\n```rust\n/// Represents a sender endpoint for a broadcast channel within a map, used to dispatch messages.\npub type BroadcastMapSender<T> = Sender<T>;\n```",
@@ -489,30 +477,6 @@
     "instruction": "BroadcastMapSender类型别名中的泛型是如何设计和使用的？",
     "input": "",
     "output": "BroadcastMapSender类型别名的泛型设计和使用如下：\n\n```rust\n/// Represents a sender endpoint for a broadcast channel within a map, used to dispatch messages.\npub type BroadcastMapSender<T> = Sender<T>;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "OptionBroadcastMapSender类型别名的源码是怎么实现的？",
-    "input": "",
-    "output": "OptionBroadcastMapSender类型别名的源码实现如下：\n\n```rust\n/// Represents an optional sender endpoint for a broadcast channel within a map.\npub type OptionBroadcastMapSender<T> = Option<BroadcastMapSender<T>>;\n```",
-    "system": ""
-  },
-  {
-    "instruction": "OptionBroadcastMapSender类型别名中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "OptionBroadcastMapSender类型别名的泛型设计和使用如下：\n\n```rust\n/// Represents an optional sender endpoint for a broadcast channel within a map.\npub type OptionBroadcastMapSender<T> = Option<BroadcastMapSender<T>>;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "OptionReceiverCount类型别名的源码是怎么实现的？",
-    "input": "",
-    "output": "OptionReceiverCount类型别名的源码实现如下：\n\n```rust\n/// Represents an optional count of active receivers.\npub type OptionReceiverCount = Option<ReceiverCount>;\n```",
-    "system": ""
-  },
-  {
-    "instruction": "OptionReceiverCount类型别名中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "OptionReceiverCount类型别名的泛型设计和使用如下：\n\n```rust\n/// Represents an optional count of active receivers.\npub type OptionReceiverCount = Option<ReceiverCount>;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
@@ -536,25 +500,97 @@
   {
     "instruction": "test_broadcast_map函数的源码是怎么实现的？",
     "input": "",
-    "output": "test_broadcast_map函数的源码实现如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"a\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"a\").unwrap();\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"a\").unwrap();\n    let mut rec3: BroadcastMapReceiver<usize> =\n        broadcast_map.subscribe_or_insert(\"b\", DEFAULT_BROADCAST_SENDER_CAPACITY);\n    broadcast_map.send(\"a\", 20).unwrap();\n    broadcast_map.send(\"b\", 10).unwrap();\n    assert_eq!(rec1.recv().await, Ok(20));\n    assert_eq!(rec2.recv().await, Ok(20));\n    assert_eq!(rec3.recv().await, Ok(10));\n}\n```",
+    "output": "test_broadcast_map函数的源码实现如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let mut rec3: BroadcastMapReceiver<usize> =\n        broadcast_map.subscribe_or_insert(\"another_key\", DEFAULT_BROADCAST_SENDER_CAPACITY);\n    broadcast_map.send(\"test_key\", 20).unwrap();\n    broadcast_map.send(\"another_key\", 10).unwrap();\n    assert_eq!(rec1.recv().await, Ok(20));\n    assert_eq!(rec2.recv().await, Ok(20));\n    assert_eq!(rec3.recv().await, Ok(10));\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释test_broadcast_map这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "test_broadcast_map函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"a\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"a\").unwrap();\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"a\").unwrap();\n    let mut rec3: BroadcastMapReceiver<usize> =\n        broadcast_map.subscribe_or_insert(\"b\", DEFAULT_BROADCAST_SENDER_CAPACITY);\n    broadcast_map.send(\"a\", 20).unwrap();\n    broadcast_map.send(\"b\", 10).unwrap();\n    assert_eq!(rec1.recv().await, Ok(20));\n    assert_eq!(rec2.recv().await, Ok(20));\n    assert_eq!(rec3.recv().await, Ok(10));\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：14\n- 包含高级特性：泛型编程、异步编程",
+    "output": "test_broadcast_map函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let mut rec3: BroadcastMapReceiver<usize> =\n        broadcast_map.subscribe_or_insert(\"another_key\", DEFAULT_BROADCAST_SENDER_CAPACITY);\n    broadcast_map.send(\"test_key\", 20).unwrap();\n    broadcast_map.send(\"another_key\", 10).unwrap();\n    assert_eq!(rec1.recv().await, Ok(20));\n    assert_eq!(rec2.recv().await, Ok(20));\n    assert_eq!(rec3.recv().await, Ok(10));\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：14\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "test_broadcast_map函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "test_broadcast_map函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"a\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"a\").unwrap();\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"a\").unwrap();\n    let mut rec3: BroadcastMapReceiver<usize> =\n        broadcast_map.subscribe_or_insert(\"b\", DEFAULT_BROADCAST_SENDER_CAPACITY);\n    broadcast_map.send(\"a\", 20).unwrap();\n    broadcast_map.send(\"b\", 10).unwrap();\n    assert_eq!(rec1.recv().await, Ok(20));\n    assert_eq!(rec2.recv().await, Ok(20));\n    assert_eq!(rec3.recv().await, Ok(10));\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "test_broadcast_map函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let mut rec3: BroadcastMapReceiver<usize> =\n        broadcast_map.subscribe_or_insert(\"another_key\", DEFAULT_BROADCAST_SENDER_CAPACITY);\n    broadcast_map.send(\"test_key\", 20).unwrap();\n    broadcast_map.send(\"another_key\", 10).unwrap();\n    assert_eq!(rec1.recv().await, Ok(20));\n    assert_eq!(rec2.recv().await, Ok(20));\n    assert_eq!(rec3.recv().await, Ok(10));\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "test_broadcast_map函数的异步实现是如何工作的？",
     "input": "",
-    "output": "test_broadcast_map函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"a\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"a\").unwrap();\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"a\").unwrap();\n    let mut rec3: BroadcastMapReceiver<usize> =\n        broadcast_map.subscribe_or_insert(\"b\", DEFAULT_BROADCAST_SENDER_CAPACITY);\n    broadcast_map.send(\"a\", 20).unwrap();\n    broadcast_map.send(\"b\", 10).unwrap();\n    assert_eq!(rec1.recv().await, Ok(20));\n    assert_eq!(rec2.recv().await, Ok(20));\n    assert_eq!(rec3.recv().await, Ok(10));\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "test_broadcast_map函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let mut rec3: BroadcastMapReceiver<usize> =\n        broadcast_map.subscribe_or_insert(\"another_key\", DEFAULT_BROADCAST_SENDER_CAPACITY);\n    broadcast_map.send(\"test_key\", 20).unwrap();\n    broadcast_map.send(\"another_key\", 10).unwrap();\n    assert_eq!(rec1.recv().await, Ok(20));\n    assert_eq!(rec2.recv().await, Ok(20));\n    assert_eq!(rec3.recv().await, Ok(10));\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe函数的源码实现如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    drop(removed);\n    let not_exist: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"nonexistent_key\");\n    assert!(not_exist.is_none());\n    assert!(broadcast_map.subscribe(\"test_key\").is_none());\n    let send_result: Result<Option<usize>, SendError<usize>> = broadcast_map.send(\"test_key\", 30);\n    assert!(send_result.unwrap().is_none());\n    let result: Result<Result<usize, RecvError>, Elapsed> =\n        timeout(Duration::from_millis(100), rec1.recv()).await;\n    assert!(result.is_ok(), \"recv should not timeout after unsubscribe\");\n    assert_eq!(result.unwrap(), Err(RecvError::Closed));\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释test_broadcast_map_unsubscribe这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    drop(removed);\n    let not_exist: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"nonexistent_key\");\n    assert!(not_exist.is_none());\n    assert!(broadcast_map.subscribe(\"test_key\").is_none());\n    let send_result: Result<Option<usize>, SendError<usize>> = broadcast_map.send(\"test_key\", 30);\n    assert!(send_result.unwrap().is_none());\n    let result: Result<Result<usize, RecvError>, Elapsed> =\n        timeout(Duration::from_millis(100), rec1.recv()).await;\n    assert!(result.is_ok(), \"recv should not timeout after unsubscribe\");\n    assert_eq!(result.unwrap(), Err(RecvError::Closed));\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：18\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    drop(removed);\n    let not_exist: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"nonexistent_key\");\n    assert!(not_exist.is_none());\n    assert!(broadcast_map.subscribe(\"test_key\").is_none());\n    let send_result: Result<Option<usize>, SendError<usize>> = broadcast_map.send(\"test_key\", 30);\n    assert!(send_result.unwrap().is_none());\n    let result: Result<Result<usize, RecvError>, Elapsed> =\n        timeout(Duration::from_millis(100), rec1.recv()).await;\n    assert!(result.is_ok(), \"recv should not timeout after unsubscribe\");\n    assert_eq!(result.unwrap(), Err(RecvError::Closed));\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec1: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    drop(removed);\n    let not_exist: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"nonexistent_key\");\n    assert!(not_exist.is_none());\n    assert!(broadcast_map.subscribe(\"test_key\").is_none());\n    let send_result: Result<Option<usize>, SendError<usize>> = broadcast_map.send(\"test_key\", 30);\n    assert!(send_result.unwrap().is_none());\n    let result: Result<Result<usize, RecvError>, Elapsed> =\n        timeout(Duration::from_millis(100), rec1.recv()).await;\n    assert!(result.is_ok(), \"recv should not timeout after unsubscribe\");\n    assert_eq!(result.unwrap(), Err(RecvError::Closed));\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe_and_reinsert函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe_and_reinsert函数的源码实现如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe_and_reinsert() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    broadcast_map.subscribe(\"test_key\").unwrap();\n    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    broadcast_map.send(\"test_key\", 100).unwrap();\n    assert_eq!(rec2.recv().await, Ok(100));\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释test_broadcast_map_unsubscribe_and_reinsert这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe_and_reinsert函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe_and_reinsert() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    broadcast_map.subscribe(\"test_key\").unwrap();\n    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    broadcast_map.send(\"test_key\", 100).unwrap();\n    assert_eq!(rec2.recv().await, Ok(100));\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：12\n- 包含高级特性：泛型编程、异步编程",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe_and_reinsert函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe_and_reinsert函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe_and_reinsert() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    broadcast_map.subscribe(\"test_key\").unwrap();\n    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    broadcast_map.send(\"test_key\", 100).unwrap();\n    assert_eq!(rec2.recv().await, Ok(100));\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe_and_reinsert函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe_and_reinsert函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe_and_reinsert() {\n    let broadcast_map: BroadcastMap<usize> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    broadcast_map.subscribe(\"test_key\").unwrap();\n    let removed: Option<Broadcast<usize>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    broadcast_map.insert(\"test_key\", 10);\n    let mut rec2: BroadcastMapReceiver<usize> = broadcast_map.subscribe(\"test_key\").unwrap();\n    broadcast_map.send(\"test_key\", 100).unwrap();\n    assert_eq!(rec2.recv().await, Ok(100));\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe_receiver_count函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe_receiver_count函数的源码实现如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe_receiver_count() {\n    let broadcast_map: BroadcastMap<String> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let _rec1: BroadcastMapReceiver<String> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let _rec2: BroadcastMapReceiver<String> = broadcast_map.subscribe(\"test_key\").unwrap();\n    assert_eq!(broadcast_map.receiver_count(\"test_key\"), Some(2));\n    let removed: Option<Broadcast<String>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    assert_eq!(broadcast_map.receiver_count(\"test_key\"), None);\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释test_broadcast_map_unsubscribe_receiver_count这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe_receiver_count函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe_receiver_count() {\n    let broadcast_map: BroadcastMap<String> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let _rec1: BroadcastMapReceiver<String> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let _rec2: BroadcastMapReceiver<String> = broadcast_map.subscribe(\"test_key\").unwrap();\n    assert_eq!(broadcast_map.receiver_count(\"test_key\"), Some(2));\n    let removed: Option<Broadcast<String>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    assert_eq!(broadcast_map.receiver_count(\"test_key\"), None);\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：11\n- 包含高级特性：泛型编程、异步编程",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe_receiver_count函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe_receiver_count函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe_receiver_count() {\n    let broadcast_map: BroadcastMap<String> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let _rec1: BroadcastMapReceiver<String> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let _rec2: BroadcastMapReceiver<String> = broadcast_map.subscribe(\"test_key\").unwrap();\n    assert_eq!(broadcast_map.receiver_count(\"test_key\"), Some(2));\n    let removed: Option<Broadcast<String>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    assert_eq!(broadcast_map.receiver_count(\"test_key\"), None);\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_broadcast_map_unsubscribe_receiver_count函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "test_broadcast_map_unsubscribe_receiver_count函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\npub async fn test_broadcast_map_unsubscribe_receiver_count() {\n    let broadcast_map: BroadcastMap<String> = BroadcastMap::new();\n    broadcast_map.insert(\"test_key\", 10);\n    let _rec1: BroadcastMapReceiver<String> = broadcast_map.subscribe(\"test_key\").unwrap();\n    let _rec2: BroadcastMapReceiver<String> = broadcast_map.subscribe(\"test_key\").unwrap();\n    assert_eq!(broadcast_map.receiver_count(\"test_key\"), Some(2));\n    let removed: Option<Broadcast<String>> = broadcast_map.unsubscribe(\"test_key\");\n    assert!(removed.is_some());\n    assert_eq!(broadcast_map.receiver_count(\"test_key\"), None);\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
@@ -1064,19 +1100,19 @@
   {
     "instruction": "WebSocket::send方法的源码是怎么实现的？",
     "input": "",
-    "output": "WebSocket::send方法的源码实现如下：\n\n```rust\n/// Sends data to all active receivers for a given broadcast type.\n    ///\n    /// # Type Parameters\n    ///\n    /// - `Into<Vec<u8>>`: The type of data to send, which must be convertible to `Vec<u8>`.\n    /// - `BroadcastTypeTrait`: The type implementing `BroadcastTypeTrait`.\n    ///\n    /// # Arguments\n    ///\n    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type to which to send the data.\n    /// - `Into<Vec<u8>>` - The data to send.\n    ///\n    /// # Returns\n    ///\n    /// - `BroadcastMapSendResult<Vec<u8>>` - A result indicating the success or failure of the send operation.\n    #[inline(always)]\n    pub fn send<T, B>(\n        &self,\n        broadcast_type: BroadcastType<B>,\n        data: T,\n    ) -> BroadcastMapSendResult<Vec<u8>>\n    where\n        T: Into<Vec<u8>>,\n        B: BroadcastTypeTrait,\n    {\n        let key: String = BroadcastType::get_key(broadcast_type);\n        self.broadcast_map.send(&key, data.into())\n    }\n```",
+    "output": "WebSocket::send方法的源码实现如下：\n\n```rust\n/// Sends data to all active receivers for a given broadcast type.\n    ///\n    /// # Type Parameters\n    ///\n    /// - `Into<Vec<u8>>`: The type of data to send, which must be convertible to `Vec<u8>`.\n    /// - `BroadcastTypeTrait`: The type implementing `BroadcastTypeTrait`.\n    ///\n    /// # Arguments\n    ///\n    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type to which to send the data.\n    /// - `Into<Vec<u8>>` - The data to send.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<Vec<u8>>>` - A result indicating the success or failure of the send operation.\n    #[inline(always)]\n    pub fn send<T, B>(\n        &self,\n        broadcast_type: BroadcastType<B>,\n        data: T,\n    ) -> Result<Option<ReceiverCount>, SendError<Vec<u8>>>\n    where\n        T: Into<Vec<u8>>,\n        B: BroadcastTypeTrait,\n    {\n        let key: String = BroadcastType::get_key(broadcast_type);\n        self.broadcast_map.send(&key, data.into())\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释WebSocket::send这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "WebSocket::send方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sends data to all active receivers for a given broadcast type.\n    ///\n    /// # Type Parameters\n    ///\n    /// - `Into<Vec<u8>>`: The type of data to send, which must be convertible to `Vec<u8>`.\n    /// - `BroadcastTypeTrait`: The type implementing `BroadcastTypeTrait`.\n    ///\n    /// # Arguments\n    ///\n    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type to which to send the data.\n    /// - `Into<Vec<u8>>` - The data to send.\n    ///\n    /// # Returns\n    ///\n    /// - `BroadcastMapSendResult<Vec<u8>>` - A result indicating the success or failure of the send operation.\n    #[inline(always)]\n    pub fn send<T, B>(\n        &self,\n        broadcast_type: BroadcastType<B>,\n        data: T,\n    ) -> BroadcastMapSendResult<Vec<u8>>\n    where\n        T: Into<Vec<u8>>,\n        B: BroadcastTypeTrait,\n    {\n        let key: String = BroadcastType::get_key(broadcast_type);\n        self.broadcast_map.send(&key, data.into())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：28\n- 包含高级特性：泛型编程、错误处理、where子句约束",
+    "output": "WebSocket::send方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sends data to all active receivers for a given broadcast type.\n    ///\n    /// # Type Parameters\n    ///\n    /// - `Into<Vec<u8>>`: The type of data to send, which must be convertible to `Vec<u8>`.\n    /// - `BroadcastTypeTrait`: The type implementing `BroadcastTypeTrait`.\n    ///\n    /// # Arguments\n    ///\n    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type to which to send the data.\n    /// - `Into<Vec<u8>>` - The data to send.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<Vec<u8>>>` - A result indicating the success or failure of the send operation.\n    #[inline(always)]\n    pub fn send<T, B>(\n        &self,\n        broadcast_type: BroadcastType<B>,\n        data: T,\n    ) -> Result<Option<ReceiverCount>, SendError<Vec<u8>>>\n    where\n        T: Into<Vec<u8>>,\n        B: BroadcastTypeTrait,\n    {\n        let key: String = BroadcastType::get_key(broadcast_type);\n        self.broadcast_map.send(&key, data.into())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：28\n- 包含高级特性：泛型编程、错误处理、where子句约束",
     "system": ""
   },
   {
     "instruction": "WebSocket::send方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "WebSocket::send方法的泛型设计和使用如下：\n\n```rust\n/// Sends data to all active receivers for a given broadcast type.\n    ///\n    /// # Type Parameters\n    ///\n    /// - `Into<Vec<u8>>`: The type of data to send, which must be convertible to `Vec<u8>`.\n    /// - `BroadcastTypeTrait`: The type implementing `BroadcastTypeTrait`.\n    ///\n    /// # Arguments\n    ///\n    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type to which to send the data.\n    /// - `Into<Vec<u8>>` - The data to send.\n    ///\n    /// # Returns\n    ///\n    /// - `BroadcastMapSendResult<Vec<u8>>` - A result indicating the success or failure of the send operation.\n    #[inline(always)]\n    pub fn send<T, B>(\n        &self,\n        broadcast_type: BroadcastType<B>,\n        data: T,\n    ) -> BroadcastMapSendResult<Vec<u8>>\n    where\n        T: Into<Vec<u8>>,\n        B: BroadcastTypeTrait,\n    {\n        let key: String = BroadcastType::get_key(broadcast_type);\n        self.broadcast_map.send(&key, data.into())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "WebSocket::send方法的泛型设计和使用如下：\n\n```rust\n/// Sends data to all active receivers for a given broadcast type.\n    ///\n    /// # Type Parameters\n    ///\n    /// - `Into<Vec<u8>>`: The type of data to send, which must be convertible to `Vec<u8>`.\n    /// - `BroadcastTypeTrait`: The type implementing `BroadcastTypeTrait`.\n    ///\n    /// # Arguments\n    ///\n    /// - `BroadcastType<BroadcastTypeTrait>` - The broadcast type to which to send the data.\n    /// - `Into<Vec<u8>>` - The data to send.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<Option<ReceiverCount>, SendError<Vec<u8>>>` - A result indicating the success or failure of the send operation.\n    #[inline(always)]\n    pub fn send<T, B>(\n        &self,\n        broadcast_type: BroadcastType<B>,\n        data: T,\n    ) -> Result<Option<ReceiverCount>, SendError<Vec<u8>>>\n    where\n        T: Into<Vec<u8>>,\n        B: BroadcastTypeTrait,\n    {\n        let key: String = BroadcastType::get_key(broadcast_type);\n        self.broadcast_map.send(&key, data.into())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
