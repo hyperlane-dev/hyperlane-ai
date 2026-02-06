@@ -1,4 +1,4 @@
-<!--2026-02-06 13:11:10-->
+<!--2026-02-06 18:59:12-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1342,7 +1342,6 @@ mod r#fn;
 pub use r#fn::*;
 use super::*;
 use hyperlane_plugin::{database::*, mysql::*, postgresql::*, redis::*};
-use std::sync::Arc;
 use {redis::Connection, sea_orm::DatabaseConnection};
 ```
 # Path: hyperlane-quick-start/bootstrap/application/db/fn.rs
@@ -1354,7 +1353,8 @@ pub async fn init_db() {
         connection_mysql_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
     let _: Result<DatabaseConnection, String> =
         connection_postgresql_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
-    let _: Result<Arc<Connection>, String> = connection_redis_db(DEFAULT_REDIS_INSTANCE_NAME).await;
+    let _: Result<ArcRwLock<Connection>, String> =
+        connection_redis_db(DEFAULT_REDIS_INSTANCE_NAME).await;
     match initialize_auto_creation().await {
         Ok(_) => {
             info!("Auto-creation initialization successful");
@@ -4533,7 +4533,6 @@ use {super::*, database::*, env::*, r#static::*};
 use hyperlane_utils::redis::*;
 use std::{
     collections::HashMap,
-    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{
@@ -4555,7 +4554,7 @@ pub struct RedisAutoCreation {
 ```rust
 use super::*;
 #[instrument_trace]
-pub async fn connection_redis_db<I>(instance_name: I) -> Result<Arc<Connection>, String>
+pub async fn connection_redis_db<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
 where
     I: AsRef<str>,
 {
@@ -4657,10 +4656,10 @@ where
             return Err(error_msg);
         }
     };
-    Ok(Arc::new(connection))
+    Ok(arc_rwlock(connection))
 }
 #[instrument_trace]
-pub async fn get_redis_connection<I>(instance_name: I) -> Result<Arc<Connection>, String>
+pub async fn get_redis_connection<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
 where
     I: AsRef<str>,
 {
@@ -4691,7 +4690,7 @@ where
     }
     connections.remove(instance_name_str);
     drop(connections);
-    let new_connection: Result<Arc<Connection>, String> =
+    let new_connection: Result<ArcRwLock<Connection>, String> =
         connection_redis_db(instance_name_str).await;
     let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> = REDIS_CONNECTIONS.write().await;
     connections.insert(
@@ -4966,8 +4965,7 @@ impl DatabaseAutoCreation for RedisAutoCreation {
 # Path: hyperlane-quick-start/plugin/redis/type.rs
 ```rust
 use super::*;
-pub type RedisConnectionResult = Result<Arc<Connection>, String>;
-pub type RedisConnectionMap = HashMap<String, ConnectionCache<Arc<Connection>>>;
+pub type RedisConnectionMap = HashMap<String, ConnectionCache<ArcRwLock<Connection>>>;
 ```
 # Path: hyperlane-quick-start/plugin/redis/static.rs
 ```rust
