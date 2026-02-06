@@ -2592,12 +2592,6 @@
     "system": ""
   },
   {
-    "instruction": "NOT_FOUND_HTML常量的源码是怎么实现的？",
-    "input": "",
-    "output": "NOT_FOUND_HTML常量的源码实现如下：\n\n```rust\npub const NOT_FOUND_HTML: &str = include_str!(\"./not_found/index.html\");\n```",
-    "system": ""
-  },
-  {
     "instruction": "TEMPLATES_INDEX_HTML常量的源码是怎么实现的？",
     "input": "",
     "output": "TEMPLATES_INDEX_HTML常量的源码实现如下：\n\n```rust\npub const TEMPLATES_INDEX_HTML: &str = include_str!(\"./index/index.html\");\n```",

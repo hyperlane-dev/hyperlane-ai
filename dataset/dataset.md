@@ -1,4 +1,4 @@
-<!--2026-02-06 07:02:40-->
+<!--2026-02-06 13:11:10-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1411,18 +1411,9 @@ pub mod templates;
 ## hyperlane-resources
 > Hyperlane resources module containing various resources and utilities used by the framework.
 ## Contact
-# Path: hyperlane-quick-start/resources/static/const.rs
-```rust
-pub const NOT_FOUND_HTML: &str = include_str!("./not_found/index.html");
-```
-# Path: hyperlane-quick-start/resources/static/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
 # Path: hyperlane-quick-start/resources/static/not_found/index.html
 ```html
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -1435,7 +1426,9 @@ pub use r#const::*;
       a {
         color: #1e90ff;
         text-decoration: none;
-        transition: color 0.3s, border-bottom-color 0.3s;
+        transition:
+          color 0.3s,
+          border-bottom-color 0.3s;
       }
       a:hover,
       a:focus {
@@ -1468,7 +1461,7 @@ pub use r#const::*;
 ```
 # Path: hyperlane-quick-start/resources/templates/index/index.html
 ```html
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -1481,7 +1474,9 @@ pub use r#const::*;
       a {
         color: #1e90ff;
         text-decoration: none;
-        transition: color 0.3s, border-bottom-color 0.3s;
+        transition:
+          color 0.3s,
+          border-bottom-color 0.3s;
       }
       a:hover,
       a:focus {
