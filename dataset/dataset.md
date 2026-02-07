@@ -1,4 +1,4 @@
-<!--2026-02-07 06:51:45-->
+<!--2026-02-07 13:00:03-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -2063,12 +2063,12 @@ pub const SERVER_PORT: u16 = 65002;
 pub const SERVER_HOST: &str = DEFAULT_HOST;
 pub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;
 pub const SERVER_LOG_SIZE: usize = 100_024_000;
-pub const SERVER_LOG_DIR: &str = "./logs";
+pub const SERVER_LOG_DIR: &str = "./tmp/logs";
 pub const SERVER_INNER_PRINT: bool = true;
 pub const SERVER_INNER_LOG: bool = true;
 pub const SERVER_NODELAY: bool = false;
 pub const SERVER_TTI: u32 = 128;
-pub const SERVER_PID_FILE_PATH: &str = "./process/hyperlane.pid";
+pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
 pub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;
 pub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;
 ```
@@ -2080,19 +2080,9 @@ use super::*;
 ```
 # Path: hyperlane-quick-start/config/application/mod.rs
 ```rust
-pub mod hello;
 pub mod logger;
 pub mod logo_img;
 use super::*;
-```
-# Path: hyperlane-quick-start/config/application/hello/const.rs
-```rust
-pub const NAME_KEY: &str = "name";
-```
-# Path: hyperlane-quick-start/config/application/hello/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
 ```
 # Path: hyperlane-quick-start/config/application/logo_img/const.rs
 ```rust
@@ -2209,7 +2199,7 @@ where
 ```
 # Path: hyperlane-quick-start/plugin/env/const.rs
 ```rust
-pub const ENV_FILE_PATH: &str = "/shell/.env";
+pub const ENV_FILE_PATH: &str = "./.env";
 pub const DOCKER_COMPOSE_FILE_PATH: &str = "./docker-compose.yml";
 pub const ENV_KEY_GPT_API_URL: &str = "GPT_API_URL";
 pub const ENV_KEY_GPT_MODEL: &str = "GPT_MODEL";
