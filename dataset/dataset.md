@@ -1,4 +1,4 @@
-<!--2026-02-07 13:00:03-->
+<!--2026-02-07 18:43:11-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -19,7 +19,7 @@ pub use {
     hyperlane_plugin_websocket::*, instrument_level::*, jsonwebtoken, jwt_service::*, log,
     lombok_macros::*, num_cpus, once_cell, recoverable_spawn::*, recoverable_thread_pool::*, redis,
     regex, rust_decimal, sea_orm, serde_json, serde_urlencoded, serde_with, serde_xml_rs,
-    serde_yaml, server_manager::*, sha2, simd_json, snafu, sqlx, std_macro_extensions::*,
+    serde_yaml, server_manager::*, sha2, simd_json, snafu, sqlx, std_macro_extensions::*, sysinfo,
     tracing_log, tracing_subscriber, twox_hash, url, urlencoding, utoipa, utoipa_rapidoc,
     utoipa_swagger_ui, uuid,
 };
@@ -2120,7 +2120,6 @@ pub mod shutdown;
 use {
     hyperlane::*,
     hyperlane_utils::{log::*, *},
-    once_cell::sync::Lazy,
     sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
 };
 ```
@@ -2340,7 +2339,7 @@ pub struct RedisInstanceConfig {
 ```rust
 use super::*;
 #[instrument_trace]
-pub fn get_global_env_config() -> &'static EnvConfig {
+pub fn get_or_init_global_env_config() -> &'static EnvConfig {
     GLOBAL_ENV_CONFIG.get_or_init(EnvConfig::default)
 }
 #[instrument_trace]
@@ -2696,10 +2695,10 @@ pub use {r#const::*, r#fn::*, r#struct::*};
 use {super::*, database::*, env::*, r#static::*};
 use std::{
     collections::HashMap,
+    sync::OnceLock,
     time::{Duration, Instant},
 };
 use {
-    once_cell::sync::Lazy,
     sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
     tokio::{
         sync::{RwLock, RwLockWriteGuard},
@@ -2723,6 +2722,11 @@ pub struct PostgreSqlAutoCreation {
 ```rust
 use super::*;
 #[instrument_trace]
+fn get_or_init_postgresql_connection_map()
+-> &'static RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>> {
+    POSTGRESQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
+}
+#[instrument_trace]
 pub async fn connection_postgresql_db<I>(
     instance_name: I,
     schema: Option<DatabaseSchema>,
@@ -2731,14 +2735,14 @@ where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let env: &'static EnvConfig = get_global_env_config();
+    let env: &'static EnvConfig = get_or_init_global_env_config();
     let instance: &PostgreSqlInstanceConfig = env
         .get_postgresql_instance(instance_name_str)
         .ok_or_else(|| format!("PostgreSQL instance '{instance_name_str}' not found"))?;
     match perform_postgresql_auto_creation(instance, schema.clone()).await {
         Ok(result) => {
             if result.has_changes() {
-                database::AutoCreationLogger::log_auto_creation_complete(
+                AutoCreationLogger::log_auto_creation_complete(
                     database::PluginType::PostgreSQL,
                     &result,
                 )
@@ -2746,7 +2750,7 @@ where
             }
         }
         Err(error) => {
-            database::AutoCreationLogger::log_auto_creation_error(
+            AutoCreationLogger::log_auto_creation_error(
                 &error,
                 "Auto-creation process",
                 database::PluginType::PostgreSQL,
@@ -2773,7 +2777,7 @@ where
         let database_name: String = instance.get_database().clone();
         let error_msg_clone: String = error_msg.clone();
         tokio::spawn(async move {
-            database::AutoCreationLogger::log_connection_verification(
+            AutoCreationLogger::log_connection_verification(
                 database::PluginType::PostgreSQL,
                 &database_name,
                 false,
@@ -2795,7 +2799,11 @@ where
     let instance_name_str: &str = instance_name.as_ref();
     let duration: Duration = get_retry_duration();
     {
-        if let Some(cache) = POSTGRESQL_CONNECTIONS.read().await.get(instance_name_str) {
+        if let Some(cache) = get_or_init_postgresql_connection_map()
+            .read()
+            .await
+            .get(instance_name_str)
+        {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
@@ -2809,7 +2817,7 @@ where
     let mut connections: RwLockWriteGuard<
         '_,
         HashMap<String, ConnectionCache<DatabaseConnection>>,
-    > = POSTGRESQL_CONNECTIONS.write().await;
+    > = get_or_init_postgresql_connection_map().write().await;
     if let Some(cache) = connections.get(instance_name_str) {
         match cache.try_get_result() {
             Ok(conn) => return Ok(conn.clone()),
@@ -2827,7 +2835,7 @@ where
     let mut connections: RwLockWriteGuard<
         '_,
         HashMap<String, ConnectionCache<DatabaseConnection>>,
-    > = POSTGRESQL_CONNECTIONS.write().await;
+    > = get_or_init_postgresql_connection_map().write().await;
     connections.insert(
         instance_name_str.to_string(),
         ConnectionCache::new(new_connection.clone()),
@@ -2909,7 +2917,7 @@ use super::*;
 impl Default for PostgreSqlAutoCreation {
     #[instrument_trace]
     fn default() -> Self {
-        let env: &'static EnvConfig = get_global_env_config();
+        let env: &'static EnvConfig = get_or_init_global_env_config();
         if let Some(instance) = env.get_default_postgresql_instance() {
             Self::new(instance.clone())
         } else {
@@ -3215,9 +3223,9 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
 # Path: hyperlane-quick-start/plugin/postgresql/static.rs
 ```rust
 use super::*;
-pub static POSTGRESQL_CONNECTIONS: Lazy<
+pub static POSTGRESQL_CONNECTIONS: OnceLock<
     RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
-> = Lazy::new(|| RwLock::new(HashMap::new()));
+> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/plugin/mysql/const.rs
 ```rust
@@ -3234,6 +3242,7 @@ pub use {r#const::*, r#fn::*, r#struct::*};
 use {super::*, database::*, env::*, r#static::*};
 use std::{
     collections::HashMap,
+    sync::OnceLock,
     time::{Duration, Instant},
 };
 use tokio::{
@@ -3257,6 +3266,11 @@ pub struct MySqlAutoCreation {
 ```rust
 use super::*;
 #[instrument_trace]
+fn get_or_init_mysql_connection_map()
+-> &'static RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>> {
+    MYSQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
+}
+#[instrument_trace]
 pub async fn connection_mysql_db<I>(
     instance_name: I,
     schema: Option<DatabaseSchema>,
@@ -3265,14 +3279,14 @@ where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let env: &'static EnvConfig = get_global_env_config();
+    let env: &'static EnvConfig = get_or_init_global_env_config();
     let instance: &MySqlInstanceConfig = env
         .get_mysql_instance(instance_name_str)
         .ok_or_else(|| format!("MySQL instance '{instance_name_str}' not found"))?;
     match perform_mysql_auto_creation(instance, schema.clone()).await {
         Ok(result) => {
             if result.has_changes() {
-                database::AutoCreationLogger::log_auto_creation_complete(
+                AutoCreationLogger::log_auto_creation_complete(
                     database::PluginType::MySQL,
                     &result,
                 )
@@ -3280,7 +3294,7 @@ where
             }
         }
         Err(error) => {
-            database::AutoCreationLogger::log_auto_creation_error(
+            AutoCreationLogger::log_auto_creation_error(
                 &error,
                 "Auto-creation process",
                 database::PluginType::MySQL,
@@ -3307,7 +3321,7 @@ where
         let database_name: String = instance.get_database().clone();
         let error_msg_clone: String = error_msg.clone();
         tokio::spawn(async move {
-            database::AutoCreationLogger::log_connection_verification(
+            AutoCreationLogger::log_connection_verification(
                 database::PluginType::MySQL,
                 &database_name,
                 false,
@@ -3329,7 +3343,11 @@ where
     let instance_name_str: &str = instance_name.as_ref();
     let duration: Duration = get_retry_duration();
     {
-        if let Some(cache) = MYSQL_CONNECTIONS.read().await.get(instance_name_str) {
+        if let Some(cache) = get_or_init_mysql_connection_map()
+            .read()
+            .await
+            .get(instance_name_str)
+        {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
@@ -3343,7 +3361,7 @@ where
     let mut connections: RwLockWriteGuard<
         '_,
         HashMap<String, ConnectionCache<DatabaseConnection>>,
-    > = MYSQL_CONNECTIONS.write().await;
+    > = get_or_init_mysql_connection_map().write().await;
     if let Some(cache) = connections.get(instance_name_str) {
         match cache.try_get_result() {
             Ok(conn) => return Ok(conn.clone()),
@@ -3361,7 +3379,7 @@ where
     let mut connections: RwLockWriteGuard<
         '_,
         HashMap<String, ConnectionCache<DatabaseConnection>>,
-    > = MYSQL_CONNECTIONS.write().await;
+    > = get_or_init_mysql_connection_map().write().await;
     connections.insert(
         instance_name_str.to_string(),
         ConnectionCache::new(new_connection.clone()),
@@ -3443,7 +3461,7 @@ use super::*;
 impl Default for MySqlAutoCreation {
     #[instrument_trace]
     fn default() -> Self {
-        let env: &'static EnvConfig = get_global_env_config();
+        let env: &'static EnvConfig = get_or_init_global_env_config();
         if let Some(instance) = env.get_default_mysql_instance() {
             Self::new(instance.clone())
         } else {
@@ -3760,27 +3778,33 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
 # Path: hyperlane-quick-start/plugin/mysql/static.rs
 ```rust
 use super::*;
-pub static MYSQL_CONNECTIONS: Lazy<RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
+pub static MYSQL_CONNECTIONS: OnceLock<
+    RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
+> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/plugin/logger/mod.rs
 ```rust
+mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
 pub use r#struct::*;
-use {super::*, r#static::*};
-use std::fmt::Arguments;
-use {
-    hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
-    hyperlane_utils::once_cell::sync::Lazy,
-};
+use {super::*, r#fn::*, r#static::*};
+use std::{fmt::Arguments, sync::OnceLock};
+use hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 ```
 # Path: hyperlane-quick-start/plugin/logger/struct.rs
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct Logger;
+```
+# Path: hyperlane-quick-start/plugin/logger/fn.rs
+```rust
+use super::*;
+pub(super) fn get_or_init_file_logger() -> &'static RwLock<FileLogger> {
+    FILE_LOGGER.get_or_init(|| RwLock::new(FileLogger::default()))
+}
 ```
 # Path: hyperlane-quick-start/plugin/logger/impl.rs
 ```rust
@@ -3860,10 +3884,10 @@ impl Log for Logger {
 }
 impl Logger {
     fn read() -> RwLockReadGuard<'static, FileLogger> {
-        FILE_LOGGER.try_read().unwrap()
+        get_or_init_file_logger().try_read().unwrap()
     }
     fn write() -> RwLockWriteGuard<'static, FileLogger> {
-        FILE_LOGGER.try_write().unwrap()
+        get_or_init_file_logger().try_write().unwrap()
     }
     pub fn init(level: LevelFilter, file_logger: FileLogger) {
         set_logger(&LOGGER).unwrap();
@@ -3910,8 +3934,7 @@ impl Logger {
 ```rust
 use super::*;
 pub(super) static LOGGER: Logger = Logger;
-pub(super) static FILE_LOGGER: Lazy<RwLock<FileLogger>> =
-    Lazy::new(|| RwLock::new(FileLogger::default()));
+pub(super) static FILE_LOGGER: OnceLock<RwLock<FileLogger>> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/plugin/database/trait.rs
 ```rust
@@ -4065,7 +4088,7 @@ pub async fn initialize_auto_creation_with_schema(
             "Auto-creation configuration validation failed {error}"
         ));
     }
-    let env: &'static EnvConfig = get_global_env_config();
+    let env: &'static EnvConfig = get_or_init_global_env_config();
     let mut initialization_results: Vec<String> = Vec::new();
     for instance in env.get_mysql_instances() {
         match mysql::perform_mysql_auto_creation(instance, mysql_schema.clone()).await {
@@ -4321,12 +4344,8 @@ impl DatabaseSchema {
 }
 impl AutoCreationConfig {
     #[instrument_trace]
-    pub fn get_env() -> &'static env::EnvConfig {
-        env::get_global_env_config()
-    }
-    #[instrument_trace]
     pub fn validate() -> Result<(), String> {
-        let env: &'static EnvConfig = Self::get_env();
+        let env: &'static EnvConfig = get_or_init_global_env_config();
         if env.get_mysql_instances().is_empty() {
             return Err("At least one MySQL instance is required".to_string());
         }
@@ -4352,7 +4371,7 @@ impl PluginAutoCreationConfig {
     }
     #[instrument_trace]
     pub fn get_database_name(&self) -> String {
-        let env: &'static EnvConfig = AutoCreationConfig::get_env();
+        let env: &'static EnvConfig = get_or_init_global_env_config();
         if let Ok(plugin_type) = PluginType::from_str(self.get_plugin_name()) {
             match plugin_type {
                 PluginType::MySQL => {
@@ -4377,7 +4396,7 @@ impl PluginAutoCreationConfig {
     }
     #[instrument_trace]
     pub fn get_connection_info(&self) -> String {
-        let env: &'static EnvConfig = AutoCreationConfig::get_env();
+        let env: &'static EnvConfig = get_or_init_global_env_config();
         if let Ok(plugin_type) = PluginType::from_str(self.get_plugin_name()) {
             match plugin_type {
                 PluginType::MySQL => {
@@ -4523,6 +4542,7 @@ use {super::*, database::*, env::*, r#static::*};
 use hyperlane_utils::redis::*;
 use std::{
     collections::HashMap,
+    sync::OnceLock,
     time::{Duration, Instant},
 };
 use tokio::{
@@ -4544,19 +4564,23 @@ pub struct RedisAutoCreation {
 ```rust
 use super::*;
 #[instrument_trace]
+fn get_redis_connection_map() -> &'static RwLock<RedisConnectionMap> {
+    REDIS_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
+}
+#[instrument_trace]
 pub async fn connection_redis_db<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
 where
     I: AsRef<str>,
 {
     let instance_name_str: &str = instance_name.as_ref();
-    let env: &'static EnvConfig = get_global_env_config();
+    let env: &'static EnvConfig = get_or_init_global_env_config();
     let instance: &RedisInstanceConfig = env
         .get_redis_instance(instance_name_str)
         .ok_or_else(|| format!("Redis instance '{instance_name_str}' not found"))?;
     match perform_redis_auto_creation(instance).await {
         Ok(result) => {
             if result.has_changes() {
-                database::AutoCreationLogger::log_auto_creation_complete(
+                AutoCreationLogger::log_auto_creation_complete(
                     database::PluginType::Redis,
                     &result,
                 )
@@ -4564,7 +4588,7 @@ where
             }
         }
         Err(error) => {
-            database::AutoCreationLogger::log_auto_creation_error(
+            AutoCreationLogger::log_auto_creation_error(
                 &error,
                 "Auto-creation process",
                 database::PluginType::Redis,
@@ -4582,7 +4606,7 @@ where
         let instance_name_clone: String = instance_name_str.to_string();
         let error_msg_clone: String = error_msg.clone();
         tokio::spawn(async move {
-            database::AutoCreationLogger::log_connection_verification(
+            AutoCreationLogger::log_connection_verification(
                 database::PluginType::Redis,
                 &instance_name_clone,
                 false,
@@ -4603,7 +4627,7 @@ where
                 let instance_name_clone: String = instance_name_str.to_string();
                 let error_msg_clone: String = error_msg.clone();
                 tokio::spawn(async move {
-                    database::AutoCreationLogger::log_connection_verification(
+                    AutoCreationLogger::log_connection_verification(
                         database::PluginType::Redis,
                         &instance_name_clone,
                         false,
@@ -4618,7 +4642,7 @@ where
                 let instance_name_clone: String = instance_name_str.to_string();
                 let error_msg_clone: String = error_msg.clone();
                 tokio::spawn(async move {
-                    database::AutoCreationLogger::log_connection_verification(
+                    AutoCreationLogger::log_connection_verification(
                         database::PluginType::Redis,
                         &instance_name_clone,
                         false,
@@ -4635,7 +4659,7 @@ where
             let instance_name_clone: String = instance_name_str.to_string();
             let error_msg_clone: String = error_msg.clone();
             tokio::spawn(async move {
-                database::AutoCreationLogger::log_connection_verification(
+                AutoCreationLogger::log_connection_verification(
                     database::PluginType::Redis,
                     &instance_name_clone,
                     false,
@@ -4656,7 +4680,11 @@ where
     let instance_name_str: &str = instance_name.as_ref();
     let duration: Duration = get_retry_duration();
     {
-        if let Some(cache) = REDIS_CONNECTIONS.read().await.get(instance_name_str) {
+        if let Some(cache) = get_redis_connection_map()
+            .read()
+            .await
+            .get(instance_name_str)
+        {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
@@ -4667,7 +4695,8 @@ where
             }
         }
     }
-    let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> = REDIS_CONNECTIONS.write().await;
+    let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
+        get_redis_connection_map().write().await;
     if let Some(cache) = connections.get(instance_name_str) {
         match cache.try_get_result() {
             Ok(conn) => return Ok(conn.clone()),
@@ -4682,7 +4711,8 @@ where
     drop(connections);
     let new_connection: Result<ArcRwLock<Connection>, String> =
         connection_redis_db(instance_name_str).await;
-    let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> = REDIS_CONNECTIONS.write().await;
+    let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
+        get_redis_connection_map().write().await;
     connections.insert(
         instance_name_str.to_string(),
         ConnectionCache::new(new_connection.clone()),
@@ -4757,7 +4787,7 @@ use super::*;
 impl Default for RedisAutoCreation {
     #[instrument_trace]
     fn default() -> Self {
-        let env: &'static EnvConfig = get_global_env_config();
+        let env: &'static EnvConfig = get_or_init_global_env_config();
         if let Some(instance) = env.get_default_redis_instance() {
             Self::new(instance.clone())
         } else {
@@ -4960,8 +4990,7 @@ pub type RedisConnectionMap = HashMap<String, ConnectionCache<ArcRwLock<Connecti
 # Path: hyperlane-quick-start/plugin/redis/static.rs
 ```rust
 use super::*;
-pub static REDIS_CONNECTIONS: Lazy<RwLock<RedisConnectionMap>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
+pub static REDIS_CONNECTIONS: OnceLock<RwLock<RedisConnectionMap>> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/plugin/shutdown/mod.rs
 ```rust
@@ -4987,7 +5016,7 @@ pub fn set_shutdown(shutdown: &SharedAsyncTaskFactory<()>) {
     drop(SHUTDOWN.set(shutdown.clone()));
 }
 #[instrument_trace]
-pub fn get_shutdown() -> SharedAsyncTaskFactory<()> {
+pub fn get_or_init_shutdown() -> SharedAsyncTaskFactory<()> {
     SHUTDOWN.get_or_init(default_shutdown).clone()
 }
 ```
@@ -6563,6 +6592,8 @@ impl ServerHook for SseRoute {
     async fn handle(self, ctx: &Context) {
         let send_result: Result<(), ResponseError> = ctx
             .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .await
+            .set_response_body(&vec![])
             .await
             .try_send()
             .await;
