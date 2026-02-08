@@ -1,4 +1,4 @@
-<!--2026-02-08 06:58:09-->
+<!--2026-02-08 13:01:12-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1217,7 +1217,9 @@ hyperlane-cli -h
 # Path: hyperlane-quick-start/bootstrap/lib.rs
 ```rust
 pub mod application;
+pub mod common;
 pub mod framework;
+use common::*;
 use {
     hyperlane::*,
     hyperlane_utils::{log::*, *},
@@ -1253,8 +1255,7 @@ pub struct ServerBootstrap;
 ```rust
 use super::*;
 impl ServerBootstrap {
-    #[instrument_trace]
-    pub async fn print_route_matcher(server: &Server) {
+    async fn print_route_matcher(server: &Server) {
         let route_matcher: RouteMatcher = server.get_route_matcher().await;
         for key in route_matcher.get_static_route().keys() {
             info!("Static route {key}");
@@ -1270,10 +1271,16 @@ impl ServerBootstrap {
             }
         }
     }
+}
+impl BootstrapAsyncInit for ServerBootstrap {
     #[hyperlane(server: Server)]
-    #[instrument_trace]
-    pub async fn init() {
-        ConfigBootstrap::init(&server).await;
+    async fn init() -> Self {
+        let config: ConfigBootstrap = ConfigBootstrap::init().await;
+        server
+            .request_config(config.get_request_config().clone())
+            .await
+            .server_config(config.get_server_config().clone())
+            .await;
         match server.run().await {
             Ok(server_hook) => {
                 let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
@@ -1284,6 +1291,7 @@ impl ServerBootstrap {
             }
             Err(server_error) => error!("Server run error {server_error}"),
         }
+        Self
     }
 }
 ```
@@ -1298,23 +1306,25 @@ use tokio::runtime::{Builder, Runtime};
 # Path: hyperlane-quick-start/bootstrap/framework/runtime/struct.rs
 ```rust
 use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct RuntimeBootstrap;
+#[derive(Data, Debug)]
+pub struct RuntimeBootstrap {
+    pub(super) runtime: Runtime,
+}
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/runtime/impl.rs
 ```rust
 use super::*;
-impl RuntimeBootstrap {
-    #[instrument_trace]
-    pub fn init() -> Runtime {
-        Builder::new_multi_thread()
+impl BootstrapSyncInit for RuntimeBootstrap {
+    fn init() -> Self {
+        let runtime: Runtime = Builder::new_multi_thread()
             .worker_threads(num_cpus::get_physical() << 1)
             .thread_stack_size(1_048_576)
             .max_blocking_threads(2_048)
             .max_io_events_per_tick(1_024)
             .enable_all()
             .build()
-            .unwrap()
+            .unwrap();
+        Self { runtime }
     }
 }
 ```
@@ -1329,30 +1339,34 @@ use hyperlane_config::framework::*;
 # Path: hyperlane-quick-start/bootstrap/framework/config/struct.rs
 ```rust
 use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct ConfigBootstrap;
+#[derive(Clone, Data, Debug, Default)]
+pub struct ConfigBootstrap {
+    pub(super) server_config: ServerConfig,
+    pub(super) request_config: RequestConfig,
+}
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/config/impl.rs
 ```rust
 use super::*;
-impl ConfigBootstrap {
-    #[hyperlane(config: ServerConfig)]
-    #[instrument_trace]
-    pub async fn init(server: &Server) {
+impl BootstrapAsyncInit for ConfigBootstrap {
+    #[hyperlane(server_config: ServerConfig)]
+    async fn init() -> Self {
         let request_config: RequestConfig = RequestConfig::default();
         request_config
             .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
             .await
             .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
             .await;
-        config.host(SERVER_HOST).await;
-        config.port(SERVER_PORT).await;
-        config.ttl(SERVER_TTI).await;
-        config.nodelay(SERVER_NODELAY).await;
-        server.server_config(config.clone()).await;
-        server.request_config(request_config).await;
-        debug!("Server config {:?}", config);
+        server_config.host(SERVER_HOST).await;
+        server_config.port(SERVER_PORT).await;
+        server_config.ttl(SERVER_TTI).await;
+        server_config.nodelay(SERVER_NODELAY).await;
+        debug!("Server config {server_config:?}");
         info!("Server initialization successful");
+        Self {
+            server_config,
+            request_config,
+        }
     }
 }
 ```
@@ -1369,7 +1383,7 @@ mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
-use hyperlane_plugin::{database::*, mysql::*, postgresql::*, redis::*};
+use hyperlane_plugin::{common::*, database::*, mysql::*, postgresql::*, redis::*};
 use {redis::Connection, sea_orm::DatabaseConnection};
 ```
 # Path: hyperlane-quick-start/bootstrap/application/db/struct.rs
@@ -1381,15 +1395,14 @@ pub struct DbBootstrap;
 # Path: hyperlane-quick-start/bootstrap/application/db/impl.rs
 ```rust
 use super::*;
-impl DbBootstrap {
-    #[instrument_trace]
-    pub async fn init() {
+impl BootstrapAsyncInit for DbBootstrap {
+    async fn init() -> Self {
         let _: Result<DatabaseConnection, String> =
             MySqlPlugin::connection_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
         let _: Result<DatabaseConnection, String> =
             PostgreSqlPlugin::connection_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
         let _: Result<ArcRwLock<Connection>, String> =
-            RedisPlugin::connection_db(DEFAULT_REDIS_INSTANCE_NAME).await;
+            RedisPlugin::connection_db(DEFAULT_REDIS_INSTANCE_NAME, None).await;
         match DatabasePlugin::initialize_auto_creation().await {
             Ok(_) => {
                 info!("Auto-creation initialization successful");
@@ -1398,6 +1411,7 @@ impl DbBootstrap {
                 error!("Auto-creation initialization failed {error}");
             }
         };
+        Self
     }
 }
 ```
@@ -1418,10 +1432,12 @@ pub struct EnvBootstrap;
 # Path: hyperlane-quick-start/bootstrap/application/env/impl.rs
 ```rust
 use super::*;
-impl EnvBootstrap {
-    #[instrument_trace]
-    pub fn init() -> Result<(), String> {
-        EnvPlugin::try_get_config()
+impl BootstrapSyncInit for EnvBootstrap {
+    fn init() -> Self {
+        if let Err(error) = EnvPlugin::try_get_config() {
+            error!("{error}");
+        }
+        Self
     }
 }
 ```
@@ -1445,15 +1461,29 @@ pub struct LoggerBootstrap;
 # Path: hyperlane-quick-start/bootstrap/application/logger/impl.rs
 ```rust
 use super::*;
-impl LoggerBootstrap {
-    #[instrument_trace]
-    pub fn init() {
+impl BootstrapSyncInit for LoggerBootstrap {
+    fn init() -> Self {
         let mut file_logger: FileLogger = FileLogger::default();
         file_logger.set_path(SERVER_LOG_DIR);
         file_logger.set_limit_file_size(SERVER_LOG_SIZE);
         Logger::init(LOG_LEVEL_FILTER, file_logger);
+        Self
     }
 }
+```
+# Path: hyperlane-quick-start/bootstrap/common/trait.rs
+```rust
+pub trait BootstrapSyncInit {
+    fn init() -> Self;
+}
+pub trait BootstrapAsyncInit {
+    fn init() -> impl Future<Output = Self> + Send;
+}
+```
+# Path: hyperlane-quick-start/bootstrap/common/mod.rs
+```rust
+mod r#trait;
+pub use r#trait::*;
 ```
 # Path: hyperlane-quick-start/resources/lib.rs
 ```rust
@@ -2163,6 +2193,7 @@ use super::*;
 ```
 # Path: hyperlane-quick-start/plugin/lib.rs
 ```rust
+pub mod common;
 pub mod database;
 pub mod env;
 pub mod logger;
@@ -2171,6 +2202,7 @@ pub mod postgresql;
 pub mod process;
 pub mod redis;
 pub mod shutdown;
+use common::*;
 use {
     hyperlane::*,
     hyperlane_utils::{log::*, *},
@@ -2402,11 +2434,14 @@ pub struct RedisInstanceConfig {
 # Path: hyperlane-quick-start/plugin/env/impl.rs
 ```rust
 use super::*;
-impl EnvPlugin {
+impl GetOrInit for EnvPlugin {
+    type Instance = EnvConfig;
     #[instrument_trace]
-    pub fn get_or_init() -> &'static EnvConfig {
+    fn get_or_init() -> &'static Self::Instance {
         GLOBAL_ENV_CONFIG.get_or_init(EnvConfig::default)
     }
+}
+impl EnvPlugin {
     #[instrument_trace]
     pub fn try_get_config() -> Result<(), String> {
         let config: EnvConfig = EnvConfig::load()?;
@@ -2781,25 +2816,36 @@ pub struct PostgreSqlAutoCreation {
 # Path: hyperlane-quick-start/plugin/postgresql/impl.rs
 ```rust
 use super::*;
-impl PostgreSqlPlugin {
+impl GetOrInit for PostgreSqlPlugin {
+    type Instance = RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>;
     #[instrument_trace]
-    pub fn get_or_init() -> &'static RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>> {
+    fn get_or_init() -> &'static Self::Instance {
         POSTGRESQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
     }
+}
+impl DatabaseConnectionPlugin for PostgreSqlPlugin {
+    type InstanceConfig = PostgreSqlInstanceConfig;
+    type AutoCreation = PostgreSqlAutoCreation;
+    type Connection = DatabaseConnection;
+    type ConnectionCache = RwLock<HashMap<String, ConnectionCache<Self::Connection>>>;
     #[instrument_trace]
-    pub async fn connection_db<I>(
+    fn plugin_type() -> PluginType {
+        PluginType::PostgreSQL
+    }
+    #[instrument_trace]
+    async fn connection_db<I>(
         instance_name: I,
         schema: Option<DatabaseSchema>,
-    ) -> Result<DatabaseConnection, String>
+    ) -> Result<Self::Connection, String>
     where
-        I: AsRef<str>,
+        I: AsRef<str> + Send,
     {
         let instance_name_str: &str = instance_name.as_ref();
         let env: &'static EnvConfig = EnvPlugin::get_or_init();
         let instance: &PostgreSqlInstanceConfig = env
             .get_postgresql_instance(instance_name_str)
             .ok_or_else(|| format!("PostgreSQL instance '{instance_name_str}' not found"))?;
-        match PostgreSqlPlugin::perform_auto_creation(instance, schema.clone()).await {
+        match Self::perform_auto_creation(instance, schema.clone()).await {
             Ok(result) => {
                 if result.has_changes() {
                     AutoCreationLogger::log_auto_creation_complete(PluginType::PostgreSQL, &result)
@@ -2846,21 +2892,17 @@ impl PostgreSqlPlugin {
         })
     }
     #[instrument_trace]
-    pub async fn get_connection<I>(
+    async fn get_connection<I>(
         instance_name: I,
         schema: Option<DatabaseSchema>,
-    ) -> Result<DatabaseConnection, String>
+    ) -> Result<Self::Connection, String>
     where
-        I: AsRef<str>,
+        I: AsRef<str> + Send,
     {
         let instance_name_str: &str = instance_name.as_ref();
         let duration: Duration = DatabasePlugin::get_retry_duration();
         {
-            if let Some(cache) = PostgreSqlPlugin::get_or_init()
-                .read()
-                .await
-                .get(instance_name_str)
-            {
+            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
                 match cache.try_get_result() {
                     Ok(conn) => return Ok(conn.clone()),
                     Err(error) => {
@@ -2874,7 +2916,7 @@ impl PostgreSqlPlugin {
         let mut connections: RwLockWriteGuard<
             '_,
             HashMap<String, ConnectionCache<DatabaseConnection>>,
-        > = PostgreSqlPlugin::get_or_init().write().await;
+        > = Self::get_or_init().write().await;
         if let Some(cache) = connections.get(instance_name_str) {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
@@ -2888,11 +2930,11 @@ impl PostgreSqlPlugin {
         connections.remove(instance_name_str);
         drop(connections);
         let new_connection: Result<DatabaseConnection, String> =
-            PostgreSqlPlugin::connection_db(instance_name_str, schema).await;
+            Self::connection_db(instance_name_str, schema).await;
         let mut connections: RwLockWriteGuard<
             '_,
             HashMap<String, ConnectionCache<DatabaseConnection>>,
-        > = PostgreSqlPlugin::get_or_init().write().await;
+        > = Self::get_or_init().write().await;
         connections.insert(
             instance_name_str.to_string(),
             ConnectionCache::new(new_connection.clone()),
@@ -2900,8 +2942,8 @@ impl PostgreSqlPlugin {
         new_connection
     }
     #[instrument_trace]
-    pub async fn perform_auto_creation(
-        instance: &PostgreSqlInstanceConfig,
+    async fn perform_auto_creation(
+        instance: &Self::InstanceConfig,
         schema: Option<DatabaseSchema>,
     ) -> Result<AutoCreationResult, AutoCreationError> {
         let start_time: Instant = Instant::now();
@@ -2981,10 +3023,6 @@ impl Default for PostgreSqlAutoCreation {
     }
 }
 impl PostgreSqlAutoCreation {
-    #[instrument_trace]
-    pub fn with_schema(instance: PostgreSqlInstanceConfig, schema: DatabaseSchema) -> Self {
-        Self { instance, schema }
-    }
     #[instrument_trace]
     async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let admin_url: String = self.instance.get_admin_url();
@@ -3177,6 +3215,21 @@ impl PostgreSqlAutoCreation {
     }
 }
 impl DatabaseAutoCreation for PostgreSqlAutoCreation {
+    type InstanceConfig = PostgreSqlInstanceConfig;
+    #[instrument_trace]
+    fn new(instance: Self::InstanceConfig) -> Self {
+        Self {
+            instance,
+            schema: DatabaseSchema::default(),
+        }
+    }
+    #[instrument_trace]
+    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
+    where
+        Self: Sized,
+    {
+        Self { instance, schema }
+    }
     #[instrument_trace]
     async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
         let admin_connection: DatabaseConnection = self.create_admin_connection().await?;
@@ -3321,25 +3374,36 @@ pub struct MySqlAutoCreation {
 # Path: hyperlane-quick-start/plugin/mysql/impl.rs
 ```rust
 use super::*;
-impl MySqlPlugin {
+impl GetOrInit for MySqlPlugin {
+    type Instance = RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>;
     #[instrument_trace]
-    fn get_or_init() -> &'static RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>> {
+    fn get_or_init() -> &'static Self::Instance {
         MYSQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
     }
+}
+impl DatabaseConnectionPlugin for MySqlPlugin {
+    type InstanceConfig = MySqlInstanceConfig;
+    type AutoCreation = MySqlAutoCreation;
+    type Connection = DatabaseConnection;
+    type ConnectionCache = RwLock<HashMap<String, ConnectionCache<Self::Connection>>>;
     #[instrument_trace]
-    pub async fn connection_db<I>(
+    fn plugin_type() -> PluginType {
+        PluginType::MySQL
+    }
+    #[instrument_trace]
+    async fn connection_db<I>(
         instance_name: I,
         schema: Option<DatabaseSchema>,
-    ) -> Result<DatabaseConnection, String>
+    ) -> Result<Self::Connection, String>
     where
-        I: AsRef<str>,
+        I: AsRef<str> + Send,
     {
         let instance_name_str: &str = instance_name.as_ref();
         let env: &'static EnvConfig = EnvPlugin::get_or_init();
         let instance: &MySqlInstanceConfig = env
             .get_mysql_instance(instance_name_str)
             .ok_or_else(|| format!("MySQL instance '{instance_name_str}' not found"))?;
-        match MySqlPlugin::perform_auto_creation(instance, schema.clone()).await {
+        match Self::perform_auto_creation(instance, schema.clone()).await {
             Ok(result) => {
                 if result.has_changes() {
                     AutoCreationLogger::log_auto_creation_complete(PluginType::MySQL, &result)
@@ -3386,21 +3450,17 @@ impl MySqlPlugin {
         })
     }
     #[instrument_trace]
-    pub async fn get_connection<I>(
+    async fn get_connection<I>(
         instance_name: I,
         schema: Option<DatabaseSchema>,
-    ) -> Result<DatabaseConnection, String>
+    ) -> Result<Self::Connection, String>
     where
-        I: AsRef<str>,
+        I: AsRef<str> + Send,
     {
         let instance_name_str: &str = instance_name.as_ref();
         let duration: Duration = DatabasePlugin::get_retry_duration();
         {
-            if let Some(cache) = MySqlPlugin::get_or_init()
-                .read()
-                .await
-                .get(instance_name_str)
-            {
+            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
                 match cache.try_get_result() {
                     Ok(conn) => return Ok(conn.clone()),
                     Err(error) => {
@@ -3414,7 +3474,7 @@ impl MySqlPlugin {
         let mut connections: RwLockWriteGuard<
             '_,
             HashMap<String, ConnectionCache<DatabaseConnection>>,
-        > = MySqlPlugin::get_or_init().write().await;
+        > = Self::get_or_init().write().await;
         if let Some(cache) = connections.get(instance_name_str) {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
@@ -3428,11 +3488,11 @@ impl MySqlPlugin {
         connections.remove(instance_name_str);
         drop(connections);
         let new_connection: Result<DatabaseConnection, String> =
-            MySqlPlugin::connection_db(instance_name_str, schema).await;
+            Self::connection_db(instance_name_str, schema).await;
         let mut connections: RwLockWriteGuard<
             '_,
             HashMap<String, ConnectionCache<DatabaseConnection>>,
-        > = MySqlPlugin::get_or_init().write().await;
+        > = Self::get_or_init().write().await;
         connections.insert(
             instance_name_str.to_string(),
             ConnectionCache::new(new_connection.clone()),
@@ -3440,8 +3500,8 @@ impl MySqlPlugin {
         new_connection
     }
     #[instrument_trace]
-    pub async fn perform_auto_creation(
-        instance: &MySqlInstanceConfig,
+    async fn perform_auto_creation(
+        instance: &Self::InstanceConfig,
         schema: Option<DatabaseSchema>,
     ) -> Result<AutoCreationResult, AutoCreationError> {
         let start_time: Instant = Instant::now();
@@ -3480,7 +3540,7 @@ impl MySqlPlugin {
                     &error,
                     "Table creation",
                     PluginType::MySQL,
-                    Some(instance.get_database()),
+                    Some(instance.get_database().as_str()),
                 )
                 .await;
                 result.get_mut_errors().push(error.to_string());
@@ -3491,7 +3551,7 @@ impl MySqlPlugin {
                 &error,
                 "Connection verification",
                 PluginType::MySQL,
-                Some(instance.get_database()),
+                Some(instance.get_database().as_str()),
             )
             .await;
             if !error.should_continue() {
@@ -3518,10 +3578,6 @@ impl Default for MySqlAutoCreation {
     }
 }
 impl MySqlAutoCreation {
-    #[instrument_trace]
-    pub fn with_schema(instance: MySqlInstanceConfig, schema: DatabaseSchema) -> Self {
-        Self { instance, schema }
-    }
     #[instrument_trace]
     async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let admin_url: String = self.instance.get_admin_url();
@@ -3709,6 +3765,21 @@ impl MySqlAutoCreation {
     }
 }
 impl DatabaseAutoCreation for MySqlAutoCreation {
+    type InstanceConfig = MySqlInstanceConfig;
+    #[instrument_trace]
+    fn new(instance: Self::InstanceConfig) -> Self {
+        Self {
+            instance,
+            schema: DatabaseSchema::default(),
+        }
+    }
+    #[instrument_trace]
+    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
+    where
+        Self: Sized,
+    {
+        Self { instance, schema }
+    }
     #[instrument_trace]
     async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
         let admin_connection: DatabaseConnection = self.create_admin_connection().await?;
@@ -3850,8 +3921,9 @@ pub struct Logger;
 # Path: hyperlane-quick-start/plugin/logger/impl.rs
 ```rust
 use super::*;
-impl LoggerPlugin {
-    pub fn get_or_init() -> &'static RwLock<FileLogger> {
+impl GetOrInit for LoggerPlugin {
+    type Instance = RwLock<FileLogger>;
+    fn get_or_init() -> &'static Self::Instance {
         FILE_LOGGER.get_or_init(|| RwLock::new(FileLogger::default()))
     }
 }
@@ -3982,28 +4054,64 @@ use super::*;
 pub(super) static LOGGER: Logger = Logger;
 pub(super) static FILE_LOGGER: OnceLock<RwLock<FileLogger>> = OnceLock::new();
 ```
-# Path: hyperlane-quick-start/plugin/database/trait.rs
+# Path: hyperlane-quick-start/plugin/common/trait.rs
 ```rust
 use super::*;
-pub trait DatabaseAutoCreation {
+pub trait GetOrInit: Clone + Copy + Default + Send + Sync + 'static {
+    type Instance: Send + Sync + 'static;
+    fn get_or_init() -> &'static Self::Instance;
+}
+pub trait DatabaseConnectionPlugin: Clone + Copy + Default + Send + Sync + 'static {
+    type InstanceConfig: Clone + Send + Sync + 'static;
+    type AutoCreation: DatabaseAutoCreation<InstanceConfig = Self::InstanceConfig>;
+    type Connection: Clone + Send + Sync + 'static;
+    type ConnectionCache: Send + Sync + 'static;
+    fn plugin_type() -> PluginType;
+    fn connection_db<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> impl Future<Output = Result<Self::Connection, String>> + Send
+    where
+        I: AsRef<str> + Send;
+    fn get_connection<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> impl Future<Output = Result<Self::Connection, String>> + Send
+    where
+        I: AsRef<str> + Send;
+    fn perform_auto_creation(
+        instance: &Self::InstanceConfig,
+        schema: Option<DatabaseSchema>,
+    ) -> impl Future<Output = Result<AutoCreationResult, AutoCreationError>> + Send;
+}
+pub trait DatabaseAutoCreation: Clone + Send + Sync + 'static {
+    type InstanceConfig;
+    fn new(instance: Self::InstanceConfig) -> Self;
+    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
+    where
+        Self: Sized;
     fn create_database_if_not_exists(
         &self,
-    ) -> impl std::future::Future<Output = Result<bool, AutoCreationError>> + Send;
+    ) -> impl Future<Output = Result<bool, AutoCreationError>> + Send;
     fn create_tables_if_not_exist(
         &self,
-    ) -> impl std::future::Future<Output = Result<Vec<String>, AutoCreationError>> + Send;
-    fn verify_connection(
-        &self,
-    ) -> impl std::future::Future<Output = Result<(), AutoCreationError>> + Send;
+    ) -> impl Future<Output = Result<Vec<String>, AutoCreationError>> + Send;
+    fn verify_connection(&self) -> impl Future<Output = Result<(), AutoCreationError>> + Send;
 }
+```
+# Path: hyperlane-quick-start/plugin/common/mod.rs
+```rust
+mod r#trait;
+pub use r#trait::*;
+use crate::database::{AutoCreationError, AutoCreationResult, DatabaseSchema, PluginType};
+use std::future::Future;
 ```
 # Path: hyperlane-quick-start/plugin/database/mod.rs
 ```rust
 mod r#enum;
 mod r#impl;
 mod r#struct;
-mod r#trait;
-pub use {r#enum::*, r#struct::*, r#trait::*};
+pub use {r#enum::*, r#struct::*};
 use {super::*, env::*, mysql::*, postgresql::*, redis::*};
 use std::{
     str::FromStr,
@@ -4194,7 +4302,7 @@ impl DatabasePlugin {
             }
         }
         for instance in env.get_redis_instances() {
-            match RedisPlugin::perform_auto_creation(instance).await {
+            match RedisPlugin::perform_auto_creation(instance, None).await {
                 Ok(result) => {
                     initialization_results.push(format!(
                         "Redis ({})  {}",
@@ -4604,27 +4712,44 @@ pub struct RedisPlugin;
 pub struct RedisAutoCreation {
     #[get(pub(crate))]
     pub(super) instance: RedisInstanceConfig,
+    #[new(skip)]
+    #[get(pub(crate))]
+    pub(super) schema: DatabaseSchema,
 }
 ```
 # Path: hyperlane-quick-start/plugin/redis/impl.rs
 ```rust
 use super::*;
-impl RedisPlugin {
+impl GetOrInit for RedisPlugin {
+    type Instance = RwLock<RedisConnectionMap>;
     #[instrument_trace]
-    fn get_or_init() -> &'static RwLock<RedisConnectionMap> {
+    fn get_or_init() -> &'static Self::Instance {
         REDIS_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
     }
+}
+impl DatabaseConnectionPlugin for RedisPlugin {
+    type InstanceConfig = RedisInstanceConfig;
+    type AutoCreation = RedisAutoCreation;
+    type Connection = ArcRwLock<Connection>;
+    type ConnectionCache = RwLock<RedisConnectionMap>;
     #[instrument_trace]
-    pub async fn connection_db<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
+    fn plugin_type() -> PluginType {
+        PluginType::Redis
+    }
+    #[instrument_trace]
+    async fn connection_db<I>(
+        instance_name: I,
+        _schema: Option<DatabaseSchema>,
+    ) -> Result<Self::Connection, String>
     where
-        I: AsRef<str>,
+        I: AsRef<str> + Send,
     {
         let instance_name_str: &str = instance_name.as_ref();
         let env: &'static EnvConfig = EnvPlugin::get_or_init();
         let instance: &RedisInstanceConfig = env
             .get_redis_instance(instance_name_str)
             .ok_or_else(|| format!("Redis instance '{instance_name_str}' not found"))?;
-        match Self::perform_auto_creation(instance).await {
+        match Self::perform_auto_creation(instance, _schema).await {
             Ok(result) => {
                 if result.has_changes() {
                     AutoCreationLogger::log_auto_creation_complete(
@@ -4720,9 +4845,12 @@ impl RedisPlugin {
         Ok(arc_rwlock(connection))
     }
     #[instrument_trace]
-    pub async fn get_connection<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
+    async fn get_connection<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<Self::Connection, String>
     where
-        I: AsRef<str>,
+        I: AsRef<str> + Send,
     {
         let instance_name_str: &str = instance_name.as_ref();
         let duration: Duration = DatabasePlugin::get_retry_duration();
@@ -4753,7 +4881,7 @@ impl RedisPlugin {
         connections.remove(instance_name_str);
         drop(connections);
         let new_connection: Result<ArcRwLock<Connection>, String> =
-            Self::connection_db(instance_name_str).await;
+            Self::connection_db(instance_name_str, schema).await;
         let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
             Self::get_or_init().write().await;
         connections.insert(
@@ -4763,8 +4891,9 @@ impl RedisPlugin {
         new_connection
     }
     #[instrument_trace]
-    pub async fn perform_auto_creation(
-        instance: &RedisInstanceConfig,
+    async fn perform_auto_creation(
+        instance: &Self::InstanceConfig,
+        schema: Option<DatabaseSchema>,
     ) -> Result<AutoCreationResult, AutoCreationError> {
         let start_time: Instant = Instant::now();
         let mut result: AutoCreationResult = AutoCreationResult::default();
@@ -4773,7 +4902,10 @@ impl RedisPlugin {
             instance.get_name(),
         )
         .await;
-        let auto_creator: RedisAutoCreation = RedisAutoCreation::new(instance.clone());
+        let auto_creator: RedisAutoCreation = match schema {
+            Some(s) => RedisAutoCreation::with_schema(instance.clone(), s),
+            None => RedisAutoCreation::new(instance.clone()),
+        };
         match auto_creator.create_database_if_not_exists().await {
             Ok(created) => {
                 result.set_database_created(created);
@@ -4967,6 +5099,21 @@ impl RedisAutoCreation {
     }
 }
 impl DatabaseAutoCreation for RedisAutoCreation {
+    type InstanceConfig = RedisInstanceConfig;
+    #[instrument_trace]
+    fn new(instance: Self::InstanceConfig) -> Self {
+        Self {
+            instance,
+            schema: DatabaseSchema::default(),
+        }
+    }
+    #[instrument_trace]
+    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
+    where
+        Self: Sized,
+    {
+        Self { instance, schema }
+    }
     #[instrument_trace]
     async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
         self.validate_redis_server().await?;
@@ -5052,6 +5199,12 @@ pub struct ShutdownPlugin;
 # Path: hyperlane-quick-start/plugin/shutdown/impl.rs
 ```rust
 use super::*;
+impl GetOrInit for ShutdownPlugin {
+    type Instance = SharedAsyncTaskFactory<()>;
+    fn get_or_init() -> &'static Self::Instance {
+        SHUTDOWN.get_or_init(Self::get_init)
+    }
+}
 impl ShutdownPlugin {
     #[instrument_trace]
     pub fn get_init() -> SharedAsyncTaskFactory<()> {
@@ -5060,10 +5213,6 @@ impl ShutdownPlugin {
                 warn!("Not set shutdown, using default");
             })
         })
-    }
-    #[instrument_trace]
-    pub fn get_or_init() -> SharedAsyncTaskFactory<()> {
-        SHUTDOWN.get_or_init(Self::get_init).clone()
     }
     #[instrument_trace]
     pub fn set(shutdown: &SharedAsyncTaskFactory<()>) {
@@ -5081,6 +5230,7 @@ pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
 use {
     hyperlane_bootstrap::{
         application::{db::*, env::*, logger::*},
+        common::*,
         framework::{runtime::*, server::*},
     },
     hyperlane_config::framework::*,
@@ -5089,13 +5239,14 @@ use {
 use hyperlane_utils::log::*;
 fn main() {
     LoggerBootstrap::init();
-    if let Err(error) = EnvBootstrap::init() {
-        error!("{error}");
-    }
+    EnvBootstrap::init();
     info!("Environment configuration loaded successfully");
-    RuntimeBootstrap::init().block_on(async move {
+    RuntimeBootstrap::init().get_runtime().block_on(async move {
         DbBootstrap::init().await;
-        ProcessPlugin::create(SERVER_PID_FILE_PATH, ServerBootstrap::init).await;
+        ProcessPlugin::create(SERVER_PID_FILE_PATH, || async {
+            ServerBootstrap::init().await;
+        })
+        .await;
     });
 }
 ```
