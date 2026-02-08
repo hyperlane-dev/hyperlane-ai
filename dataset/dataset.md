@@ -1,4 +1,4 @@
-<!--2026-02-08 02:54:27-->
+<!--2026-02-08 06:58:09-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1236,97 +1236,124 @@ use super::*;
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/server/mod.rs
 ```rust
-mod r#fn;
-pub use r#fn::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
 use {super::*, config::*};
 #[allow(unused_imports)]
 use {hyperlane_application::*, hyperlane_config::framework::*, hyperlane_plugin::shutdown::*};
 ```
-# Path: hyperlane-quick-start/bootstrap/framework/server/fn.rs
+# Path: hyperlane-quick-start/bootstrap/framework/server/struct.rs
 ```rust
 use super::*;
-#[instrument_trace]
-pub async fn print_route_matcher(server: &Server) {
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
-    for key in route_matcher.get_static_route().keys() {
-        info!("Static route {key}");
-    }
-    for value in route_matcher.get_dynamic_route().values() {
-        for (route_pattern, _) in value {
-            info!("Dynamic route {route_pattern}");
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ServerBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/server/impl.rs
+```rust
+use super::*;
+impl ServerBootstrap {
+    #[instrument_trace]
+    pub async fn print_route_matcher(server: &Server) {
+        let route_matcher: RouteMatcher = server.get_route_matcher().await;
+        for key in route_matcher.get_static_route().keys() {
+            info!("Static route {key}");
+        }
+        for value in route_matcher.get_dynamic_route().values() {
+            for (route_pattern, _) in value {
+                info!("Dynamic route {route_pattern}");
+            }
+        }
+        for value in route_matcher.get_regex_route().values() {
+            for (route_pattern, _) in value {
+                info!("Regex route {route_pattern}");
+            }
         }
     }
-    for value in route_matcher.get_regex_route().values() {
-        for (route_pattern, _) in value {
-            info!("Regex route {route_pattern}");
+    #[hyperlane(server: Server)]
+    #[instrument_trace]
+    pub async fn init() {
+        ConfigBootstrap::init(&server).await;
+        match server.run().await {
+            Ok(server_hook) => {
+                let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
+                Self::print_route_matcher(&server).await;
+                info!("Server listen in {host_port}");
+                ShutdownPlugin::set(server_hook.get_shutdown_hook());
+                server_hook.wait().await;
+            }
+            Err(server_error) => error!("Server run error {server_error}"),
         }
-    }
-}
-#[hyperlane(server: Server)]
-#[instrument_trace]
-pub async fn init_server() {
-    init_server_config(&server).await;
-    match server.run().await {
-        Ok(server_hook) => {
-            let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
-            print_route_matcher(&server).await;
-            info!("Server listen in {host_port}");
-            set_shutdown(server_hook.get_shutdown_hook());
-            server_hook.wait().await;
-        }
-        Err(server_error) => error!("Server run error {server_error}"),
     }
 }
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/runtime/mod.rs
 ```rust
-mod r#fn;
-pub use r#fn::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
 use super::*;
 use tokio::runtime::{Builder, Runtime};
 ```
-# Path: hyperlane-quick-start/bootstrap/framework/runtime/fn.rs
+# Path: hyperlane-quick-start/bootstrap/framework/runtime/struct.rs
 ```rust
 use super::*;
-#[instrument_trace]
-pub fn runtime() -> Runtime {
-    Builder::new_multi_thread()
-        .worker_threads(num_cpus::get_physical() << 1)
-        .thread_stack_size(1_048_576)
-        .max_blocking_threads(2_048)
-        .max_io_events_per_tick(1_024)
-        .enable_all()
-        .build()
-        .unwrap()
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct RuntimeBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/runtime/impl.rs
+```rust
+use super::*;
+impl RuntimeBootstrap {
+    #[instrument_trace]
+    pub fn init() -> Runtime {
+        Builder::new_multi_thread()
+            .worker_threads(num_cpus::get_physical() << 1)
+            .thread_stack_size(1_048_576)
+            .max_blocking_threads(2_048)
+            .max_io_events_per_tick(1_024)
+            .enable_all()
+            .build()
+            .unwrap()
+    }
 }
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/config/mod.rs
 ```rust
-mod r#fn;
-pub use r#fn::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
 use super::*;
 use hyperlane_config::framework::*;
 ```
-# Path: hyperlane-quick-start/bootstrap/framework/config/fn.rs
+# Path: hyperlane-quick-start/bootstrap/framework/config/struct.rs
 ```rust
 use super::*;
-#[hyperlane(config: ServerConfig)]
-#[instrument_trace]
-pub async fn init_server_config(server: &Server) {
-    let request_config: RequestConfig = RequestConfig::default();
-    request_config
-        .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
-        .await
-        .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
-        .await;
-    config.host(SERVER_HOST).await;
-    config.port(SERVER_PORT).await;
-    config.ttl(SERVER_TTI).await;
-    config.nodelay(SERVER_NODELAY).await;
-    server.server_config(config.clone()).await;
-    server.request_config(request_config).await;
-    debug!("Server config {:?}", config);
-    info!("Server initialization successful");
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ConfigBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/config/impl.rs
+```rust
+use super::*;
+impl ConfigBootstrap {
+    #[hyperlane(config: ServerConfig)]
+    #[instrument_trace]
+    pub async fn init(server: &Server) {
+        let request_config: RequestConfig = RequestConfig::default();
+        request_config
+            .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
+            .await
+            .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
+            .await;
+        config.host(SERVER_HOST).await;
+        config.port(SERVER_PORT).await;
+        config.ttl(SERVER_TTI).await;
+        config.nodelay(SERVER_NODELAY).await;
+        server.server_config(config.clone()).await;
+        server.request_config(request_config).await;
+        debug!("Server config {:?}", config);
+        info!("Server initialization successful");
+    }
 }
 ```
 # Path: hyperlane-quick-start/bootstrap/application/mod.rs
@@ -1338,67 +1365,94 @@ use super::*;
 ```
 # Path: hyperlane-quick-start/bootstrap/application/db/mod.rs
 ```rust
-mod r#fn;
-pub use r#fn::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
 use super::*;
 use hyperlane_plugin::{database::*, mysql::*, postgresql::*, redis::*};
 use {redis::Connection, sea_orm::DatabaseConnection};
 ```
-# Path: hyperlane-quick-start/bootstrap/application/db/fn.rs
+# Path: hyperlane-quick-start/bootstrap/application/db/struct.rs
 ```rust
 use super::*;
-#[instrument_trace]
-pub async fn init_db() {
-    let _: Result<DatabaseConnection, String> =
-        connection_mysql_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
-    let _: Result<DatabaseConnection, String> =
-        connection_postgresql_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
-    let _: Result<ArcRwLock<Connection>, String> =
-        connection_redis_db(DEFAULT_REDIS_INSTANCE_NAME).await;
-    match initialize_auto_creation().await {
-        Ok(_) => {
-            info!("Auto-creation initialization successful");
-        }
-        Err(error) => {
-            error!("Auto-creation initialization failed {error}");
-        }
-    };
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct DbBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/application/db/impl.rs
+```rust
+use super::*;
+impl DbBootstrap {
+    #[instrument_trace]
+    pub async fn init() {
+        let _: Result<DatabaseConnection, String> =
+            MySqlPlugin::connection_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
+        let _: Result<DatabaseConnection, String> =
+            PostgreSqlPlugin::connection_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
+        let _: Result<ArcRwLock<Connection>, String> =
+            RedisPlugin::connection_db(DEFAULT_REDIS_INSTANCE_NAME).await;
+        match DatabasePlugin::initialize_auto_creation().await {
+            Ok(_) => {
+                info!("Auto-creation initialization successful");
+            }
+            Err(error) => {
+                error!("Auto-creation initialization failed {error}");
+            }
+        };
+    }
 }
 ```
 # Path: hyperlane-quick-start/bootstrap/application/env/mod.rs
 ```rust
-mod r#fn;
-pub use r#fn::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
 use super::*;
 use hyperlane_plugin::env::*;
 ```
-# Path: hyperlane-quick-start/bootstrap/application/env/fn.rs
+# Path: hyperlane-quick-start/bootstrap/application/env/struct.rs
 ```rust
 use super::*;
-#[instrument_trace]
-pub fn init_env_config() -> Result<(), String> {
-    load_env_config()
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct EnvBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/application/env/impl.rs
+```rust
+use super::*;
+impl EnvBootstrap {
+    #[instrument_trace]
+    pub fn init() -> Result<(), String> {
+        EnvPlugin::try_get_config()
+    }
 }
 ```
 # Path: hyperlane-quick-start/bootstrap/application/logger/mod.rs
 ```rust
-mod r#fn;
-pub use r#fn::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
 use super::*;
 use {
     hyperlane_config::{application::logger::*, framework::*},
     hyperlane_plugin::logger::*,
 };
 ```
-# Path: hyperlane-quick-start/bootstrap/application/logger/fn.rs
+# Path: hyperlane-quick-start/bootstrap/application/logger/struct.rs
 ```rust
 use super::*;
-#[instrument_trace]
-pub fn init_log() {
-    let mut file_logger: FileLogger = FileLogger::default();
-    file_logger.set_path(SERVER_LOG_DIR);
-    file_logger.set_limit_file_size(SERVER_LOG_SIZE);
-    Logger::init(LOG_LEVEL_FILTER, file_logger);
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct LoggerBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/application/logger/impl.rs
+```rust
+use super::*;
+impl LoggerBootstrap {
+    #[instrument_trace]
+    pub fn init() {
+        let mut file_logger: FileLogger = FileLogger::default();
+        file_logger.set_path(SERVER_LOG_DIR);
+        file_logger.set_limit_file_size(SERVER_LOG_SIZE);
+        Logger::init(LOG_LEVEL_FILTER, file_logger);
+    }
 }
 ```
 # Path: hyperlane-quick-start/resources/lib.rs
@@ -2136,62 +2190,71 @@ pub const DAEMON_FLAG: &str = "-d";
 # Path: hyperlane-quick-start/plugin/process/mod.rs
 ```rust
 mod r#const;
-mod r#fn;
-pub use {r#const::*, r#fn::*};
-use super::*;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use {super::*, r#const::*};
 use std::{env::args, future::Future};
 ```
-# Path: hyperlane-quick-start/plugin/process/fn.rs
+# Path: hyperlane-quick-start/plugin/process/struct.rs
 ```rust
 use super::*;
-#[instrument_trace]
-pub async fn create<P, F, Fut>(pid_path: P, server_hook: F)
-where
-    P: AsRef<str>,
-    F: Fn() -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = ()> + Send + 'static,
-{
-    let args: Vec<String> = args().collect();
-    debug!("Process create args {args:?}");
-    let mut manager: ServerManager = ServerManager::new();
-    manager
-        .set_pid_file(pid_path.as_ref())
-        .set_server_hook(server_hook);
-    let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
-    let start_server = || async {
-        if is_daemon {
-            match manager.start_daemon().await {
-                Ok(_) => info!("Server started in background successfully"),
-                Err(error) => {
-                    error!("Error starting server in background {error}")
-                }
-            };
-        } else {
-            info!("Server started successfully");
-            manager.start().await;
-        }
-    };
-    let stop_server = || async {
-        match manager.stop().await {
-            Ok(_) => info!("Server stopped successfully"),
-            Err(error) => error!("Error stopping server {error}"),
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ProcessPlugin;
+```
+# Path: hyperlane-quick-start/plugin/process/impl.rs
+```rust
+use super::*;
+impl ProcessPlugin {
+    #[instrument_trace]
+    pub async fn create<P, F, Fut>(pid_path: P, server_hook: F)
+    where
+        P: AsRef<str>,
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let args: Vec<String> = args().collect();
+        debug!("Process create args {args:?}");
+        let mut manager: ServerManager = ServerManager::new();
+        manager
+            .set_pid_file(pid_path.as_ref())
+            .set_server_hook(server_hook);
+        let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
+        let start_server = || async {
+            if is_daemon {
+                match manager.start_daemon().await {
+                    Ok(_) => info!("Server started in background successfully"),
+                    Err(error) => {
+                        error!("Error starting server in background {error}")
+                    }
+                };
+            } else {
+                info!("Server started successfully");
+                manager.start().await;
+            }
         };
-    };
-    let restart_server = || async {
-        stop_server().await;
-        start_server().await;
-    };
-    if args.len() < 2 {
-        warn!("No additional command-line parameters, default startup");
-        start_server().await;
-        return;
-    }
-    let command: String = args[1].to_lowercase();
-    match command.as_str() {
-        CMD_STOP => stop_server().await,
-        CMD_RESTART => restart_server().await,
-        _ => {
-            error!("Invalid command {command}");
+        let stop_server = || async {
+            match manager.stop().await {
+                Ok(_) => info!("Server stopped successfully"),
+                Err(error) => error!("Error stopping server {error}"),
+            };
+        };
+        let restart_server = || async {
+            stop_server().await;
+            start_server().await;
+        };
+        if args.len() < 2 {
+            warn!("No additional command-line parameters, default startup");
+            start_server().await;
+            return;
+        }
+        let command: String = args[1].to_lowercase();
+        match command.as_str() {
+            CMD_STOP => stop_server().await,
+            CMD_RESTART => restart_server().await,
+            _ => {
+                error!("Invalid command {command}");
+            }
         }
     }
 }
@@ -2242,17 +2305,18 @@ pub const DOCKER_REDIS_PASSWORD_FLAG: &str = "--requirepass";
 # Path: hyperlane-quick-start/plugin/env/mod.rs
 ```rust
 mod r#const;
-mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
-pub use {r#const::*, r#fn::*, r#struct::*};
+pub use {r#const::*, r#struct::*};
 use {super::*, mysql::*, postgresql::*, redis::*, r#static::*};
 use std::sync::OnceLock;
 ```
 # Path: hyperlane-quick-start/plugin/env/struct.rs
 ```rust
 use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct EnvPlugin;
 #[derive(Clone, Data, Debug, Default)]
 pub struct DockerComposeConfig {
     #[get(pub(crate))]
@@ -2335,49 +2399,43 @@ pub struct RedisInstanceConfig {
     pub(super) username: String,
 }
 ```
-# Path: hyperlane-quick-start/plugin/env/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub fn get_or_init_global_env_config() -> &'static EnvConfig {
-    GLOBAL_ENV_CONFIG.get_or_init(EnvConfig::default)
-}
-#[instrument_trace]
-pub fn load_env_config() -> Result<(), String> {
-    let config: EnvConfig = EnvConfig::load()?;
-    GLOBAL_ENV_CONFIG
-        .set(config.clone())
-        .map_err(|_| "Failed to initialize global environment configuration".to_string())?;
-    info!("Environment Configuration Loaded Successfully");
-    info!(
-        "GPT API URL {}",
-        if config.get_gpt_api_url().is_empty() {
-            "(not set)"
-        } else {
-            config.get_gpt_api_url()
-        }
-    );
-    info!(
-        "GPT Model {}",
-        if config.get_gpt_model().is_empty() {
-            "(not set)"
-        } else {
-            config.get_gpt_model()
-        }
-    );
-    info!("MySQL Configuration:");
-    if config.get_mysql_instances().is_empty() {
-        info!("  (no MySQL instances configured)");
-    } else {
-        for instance in config.get_mysql_instances() {
-            info!(
-```
 # Path: hyperlane-quick-start/plugin/env/impl.rs
 ```rust
 use super::*;
-impl MySqlInstanceConfig {
-    pub(crate) fn get_connection_url(&self) -> String {
-        format!(
+impl EnvPlugin {
+    #[instrument_trace]
+    pub fn get_or_init() -> &'static EnvConfig {
+        GLOBAL_ENV_CONFIG.get_or_init(EnvConfig::default)
+    }
+    #[instrument_trace]
+    pub fn try_get_config() -> Result<(), String> {
+        let config: EnvConfig = EnvConfig::load()?;
+        GLOBAL_ENV_CONFIG
+            .set(config.clone())
+            .map_err(|_| "Failed to initialize global environment configuration".to_string())?;
+        info!("Environment Configuration Loaded Successfully");
+        info!(
+            "GPT API URL {}",
+            if config.get_gpt_api_url().is_empty() {
+                "(not set)"
+            } else {
+                config.get_gpt_api_url()
+            }
+        );
+        info!(
+            "GPT Model {}",
+            if config.get_gpt_model().is_empty() {
+                "(not set)"
+            } else {
+                config.get_gpt_model()
+            }
+        );
+        info!("MySQL Configuration:");
+        if config.get_mysql_instances().is_empty() {
+            info!("  (no MySQL instances configured)");
+        } else {
+            for instance in config.get_mysql_instances() {
+                info!(
     #[instrument_trace]
     pub(crate) fn load() -> Result<Self, String> {
         let docker_config: DockerComposeConfig =
@@ -2687,11 +2745,10 @@ pub const DEFAULT_POSTGRESQL_INSTANCE_NAME: &str = "postgres_default";
 # Path: hyperlane-quick-start/plugin/postgresql/mod.rs
 ```rust
 mod r#const;
-mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
-pub use {r#const::*, r#fn::*, r#struct::*};
+pub use {r#const::*, r#struct::*};
 use {super::*, database::*, env::*, r#static::*};
 use std::{
     collections::HashMap,
@@ -2701,6 +2758,7 @@ use std::{
 use {
     sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
     tokio::{
+        spawn,
         sync::{RwLock, RwLockWriteGuard},
         time::timeout,
     },
@@ -2709,6 +2767,8 @@ use {
 # Path: hyperlane-quick-start/plugin/postgresql/struct.rs
 ```rust
 use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct PostgreSqlPlugin;
 #[derive(Clone, Data, Debug, New)]
 pub struct PostgreSqlAutoCreation {
     #[get(pub(crate))]
@@ -2718,92 +2778,104 @@ pub struct PostgreSqlAutoCreation {
     pub(super) schema: DatabaseSchema,
 }
 ```
-# Path: hyperlane-quick-start/plugin/postgresql/fn.rs
+# Path: hyperlane-quick-start/plugin/postgresql/impl.rs
 ```rust
 use super::*;
-#[instrument_trace]
-fn get_or_init_postgresql_connection_map()
--> &'static RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>> {
-    POSTGRESQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
-}
-#[instrument_trace]
-pub async fn connection_postgresql_db<I>(
-    instance_name: I,
-    schema: Option<DatabaseSchema>,
-) -> Result<DatabaseConnection, String>
-where
-    I: AsRef<str>,
-{
-    let instance_name_str: &str = instance_name.as_ref();
-    let env: &'static EnvConfig = get_or_init_global_env_config();
-    let instance: &PostgreSqlInstanceConfig = env
-        .get_postgresql_instance(instance_name_str)
-        .ok_or_else(|| format!("PostgreSQL instance '{instance_name_str}' not found"))?;
-    match perform_postgresql_auto_creation(instance, schema.clone()).await {
-        Ok(result) => {
-            if result.has_changes() {
-                AutoCreationLogger::log_auto_creation_complete(
-                    database::PluginType::PostgreSQL,
-                    &result,
+impl PostgreSqlPlugin {
+    #[instrument_trace]
+    pub fn get_or_init() -> &'static RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>> {
+        POSTGRESQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
+    }
+    #[instrument_trace]
+    pub async fn connection_db<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<DatabaseConnection, String>
+    where
+        I: AsRef<str>,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        let instance: &PostgreSqlInstanceConfig = env
+            .get_postgresql_instance(instance_name_str)
+            .ok_or_else(|| format!("PostgreSQL instance '{instance_name_str}' not found"))?;
+        match PostgreSqlPlugin::perform_auto_creation(instance, schema.clone()).await {
+            Ok(result) => {
+                if result.has_changes() {
+                    AutoCreationLogger::log_auto_creation_complete(PluginType::PostgreSQL, &result)
+                        .await;
+                }
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Auto-creation process",
+                    PluginType::PostgreSQL,
+                    Some(instance.get_database().as_str()),
                 )
                 .await;
+                if !error.should_continue() {
+                    return Err(error.to_string());
+                }
             }
         }
-        Err(error) => {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Auto-creation process",
-                database::PluginType::PostgreSQL,
-                Some(instance.get_database().as_str()),
-            )
-            .await;
-            if !error.should_continue() {
-                return Err(error.to_string());
-            }
-        }
+        let db_url: String = instance.get_connection_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => Err(DbErr::Custom(format!(
+                    "PostgreSQL connection timeout after {timeout_seconds} seconds"
+                ))),
+            };
+        connection_result.map_err(|error: DbErr| {
+            let error_msg: String = error.to_string();
+            let database_name: String = instance.get_database().clone();
+            let error_msg_clone: String = error_msg.clone();
+            spawn(async move {
+                AutoCreationLogger::log_connection_verification(
+                    PluginType::PostgreSQL,
+                    &database_name,
+                    false,
+                    Some(&error_msg_clone),
+                )
+                .await;
+            });
+            error_msg
+        })
     }
-    let db_url: String = instance.get_connection_url();
-    let timeout_duration: Duration = get_connection_timeout_duration();
-    let timeout_seconds: u64 = timeout_duration.as_secs();
-    let connection_result: Result<DatabaseConnection, DbErr> =
-        match timeout(timeout_duration, Database::connect(&db_url)).await {
-            Ok(result) => result,
-            Err(_) => Err(DbErr::Custom(format!(
-                "PostgreSQL connection timeout after {timeout_seconds} seconds"
-            ))),
-        };
-    connection_result.map_err(|error: DbErr| {
-        let error_msg: String = error.to_string();
-        let database_name: String = instance.get_database().clone();
-        let error_msg_clone: String = error_msg.clone();
-        tokio::spawn(async move {
-            AutoCreationLogger::log_connection_verification(
-                database::PluginType::PostgreSQL,
-                &database_name,
-                false,
-                Some(&error_msg_clone),
-            )
-            .await;
-        });
-        error_msg
-    })
-}
-#[instrument_trace]
-pub async fn get_postgresql_connection<I>(
-    instance_name: I,
-    schema: Option<DatabaseSchema>,
-) -> Result<DatabaseConnection, String>
-where
-    I: AsRef<str>,
-{
-    let instance_name_str: &str = instance_name.as_ref();
-    let duration: Duration = get_retry_duration();
+    #[instrument_trace]
+    pub async fn get_connection<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<DatabaseConnection, String>
+    where
+        I: AsRef<str>,
     {
-        if let Some(cache) = get_or_init_postgresql_connection_map()
-            .read()
-            .await
-            .get(instance_name_str)
+        let instance_name_str: &str = instance_name.as_ref();
+        let duration: Duration = DatabasePlugin::get_retry_duration();
         {
+            if let Some(cache) = PostgreSqlPlugin::get_or_init()
+                .read()
+                .await
+                .get(instance_name_str)
+            {
+                match cache.try_get_result() {
+                    Ok(conn) => return Ok(conn.clone()),
+                    Err(error) => {
+                        if !cache.is_expired(duration) {
+                            return Err(error.clone());
+                        }
+                    }
+                }
+            }
+        }
+        let mut connections: RwLockWriteGuard<
+            '_,
+            HashMap<String, ConnectionCache<DatabaseConnection>>,
+        > = PostgreSqlPlugin::get_or_init().write().await;
+        if let Some(cache) = connections.get(instance_name_str) {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
@@ -2813,60 +2885,75 @@ where
                 }
             }
         }
+        connections.remove(instance_name_str);
+        drop(connections);
+        let new_connection: Result<DatabaseConnection, String> =
+            PostgreSqlPlugin::connection_db(instance_name_str, schema).await;
+        let mut connections: RwLockWriteGuard<
+            '_,
+            HashMap<String, ConnectionCache<DatabaseConnection>>,
+        > = PostgreSqlPlugin::get_or_init().write().await;
+        connections.insert(
+            instance_name_str.to_string(),
+            ConnectionCache::new(new_connection.clone()),
+        );
+        new_connection
     }
-    let mut connections: RwLockWriteGuard<
-        '_,
-        HashMap<String, ConnectionCache<DatabaseConnection>>,
-    > = get_or_init_postgresql_connection_map().write().await;
-    if let Some(cache) = connections.get(instance_name_str) {
-        match cache.try_get_result() {
-            Ok(conn) => return Ok(conn.clone()),
+    #[instrument_trace]
+    pub async fn perform_auto_creation(
+        instance: &PostgreSqlInstanceConfig,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<AutoCreationResult, AutoCreationError> {
+        let start_time: Instant = Instant::now();
+        let mut result: AutoCreationResult = AutoCreationResult::default();
+        AutoCreationLogger::log_auto_creation_start(
+            PluginType::PostgreSQL,
+            instance.get_database(),
+        )
+        .await;
+        let auto_creator: PostgreSqlAutoCreation = match schema {
+            Some(s) => PostgreSqlAutoCreation::with_schema(instance.clone(), s),
+            None => PostgreSqlAutoCreation::new(instance.clone()),
+        };
+        match auto_creator.create_database_if_not_exists().await {
+            Ok(created) => {
+                result.set_database_created(created);
+            }
             Err(error) => {
-                if !cache.is_expired(duration) {
-                    return Err(error.clone());
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Database creation",
+                    PluginType::PostgreSQL,
+                    Some(instance.get_database().as_str()),
+                )
+                .await;
+                if !error.should_continue() {
+                    result.set_duration(start_time.elapsed());
+                    return Err(error);
                 }
+                result.get_mut_errors().push(error.to_string());
             }
         }
-    }
-    connections.remove(instance_name_str);
-    drop(connections);
-    let new_connection: Result<DatabaseConnection, String> =
-        connection_postgresql_db(instance_name_str, schema).await;
-    let mut connections: RwLockWriteGuard<
-        '_,
-        HashMap<String, ConnectionCache<DatabaseConnection>>,
-    > = get_or_init_postgresql_connection_map().write().await;
-    connections.insert(
-        instance_name_str.to_string(),
-        ConnectionCache::new(new_connection.clone()),
-    );
-    new_connection
-}
-#[instrument_trace]
-pub async fn perform_postgresql_auto_creation(
-    instance: &PostgreSqlInstanceConfig,
-    schema: Option<DatabaseSchema>,
-) -> Result<AutoCreationResult, AutoCreationError> {
-    let start_time: Instant = Instant::now();
-    let mut result: AutoCreationResult = AutoCreationResult::default();
-    AutoCreationLogger::log_auto_creation_start(
-        database::PluginType::PostgreSQL,
-        instance.get_database(),
-    )
-    .await;
-    let auto_creator: PostgreSqlAutoCreation = match schema {
-        Some(s) => PostgreSqlAutoCreation::with_schema(instance.clone(), s),
-        None => PostgreSqlAutoCreation::new(instance.clone()),
-    };
-    match auto_creator.create_database_if_not_exists().await {
-        Ok(created) => {
-            result.set_database_created(created);
+        match auto_creator.create_tables_if_not_exist().await {
+            Ok(tables) => {
+                result.set_tables_created(tables);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Table creation",
+                    PluginType::PostgreSQL,
+                    Some(instance.get_database().as_str()),
+                )
+                .await;
+                result.get_mut_errors().push(error.to_string());
+            }
         }
-        Err(error) => {
+        if let Err(error) = auto_creator.verify_connection().await {
             AutoCreationLogger::log_auto_creation_error(
                 &error,
-                "Database creation",
-                database::PluginType::PostgreSQL,
+                "Connection verification",
+                PluginType::PostgreSQL,
                 Some(instance.get_database().as_str()),
             )
             .await;
@@ -2876,48 +2963,15 @@ pub async fn perform_postgresql_auto_creation(
             }
             result.get_mut_errors().push(error.to_string());
         }
+        result.set_duration(start_time.elapsed());
+        AutoCreationLogger::log_auto_creation_complete(PluginType::PostgreSQL, &result).await;
+        Ok(result)
     }
-    match auto_creator.create_tables_if_not_exist().await {
-        Ok(tables) => {
-            result.set_tables_created(tables);
-        }
-        Err(error) => {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Table creation",
-                database::PluginType::PostgreSQL,
-                Some(instance.get_database().as_str()),
-            )
-            .await;
-            result.get_mut_errors().push(error.to_string());
-        }
-    }
-    if let Err(error) = auto_creator.verify_connection().await {
-        AutoCreationLogger::log_auto_creation_error(
-            &error,
-            "Connection verification",
-            database::PluginType::PostgreSQL,
-            Some(instance.get_database().as_str()),
-        )
-        .await;
-        if !error.should_continue() {
-            result.set_duration(start_time.elapsed());
-            return Err(error);
-        }
-        result.get_mut_errors().push(error.to_string());
-    }
-    result.set_duration(start_time.elapsed());
-    AutoCreationLogger::log_auto_creation_complete(database::PluginType::PostgreSQL, &result).await;
-    Ok(result)
 }
-```
-# Path: hyperlane-quick-start/plugin/postgresql/impl.rs
-```rust
-use super::*;
 impl Default for PostgreSqlAutoCreation {
     #[instrument_trace]
     fn default() -> Self {
-        let env: &'static EnvConfig = get_or_init_global_env_config();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
         if let Some(instance) = env.get_default_postgresql_instance() {
             Self::new(instance.clone())
         } else {
@@ -2934,7 +2988,7 @@ impl PostgreSqlAutoCreation {
     #[instrument_trace]
     async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let admin_url: String = self.instance.get_admin_url();
-        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
         let timeout_seconds: u64 = timeout_duration.as_secs();
         let connection_result: Result<DatabaseConnection, DbErr> =
             match timeout(timeout_duration, Database::connect(&admin_url)).await {
@@ -2963,7 +3017,7 @@ impl PostgreSqlAutoCreation {
     #[instrument_trace]
     async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let db_url: String = self.instance.get_connection_url();
-        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
         let timeout_seconds: u64 = timeout_duration.as_secs();
         let connection_result: Result<DatabaseConnection, DbErr> =
             match timeout(timeout_duration, Database::connect(&db_url)).await {
@@ -3007,7 +3061,7 @@ impl PostgreSqlAutoCreation {
         if self.database_exists(connection).await? {
             AutoCreationLogger::log_database_exists(
                 self.instance.get_database().as_str(),
-                database::PluginType::PostgreSQL,
+                PluginType::PostgreSQL,
             )
             .await;
             return Ok(false);
@@ -3021,7 +3075,7 @@ impl PostgreSqlAutoCreation {
             Ok(_) => {
                 AutoCreationLogger::log_database_created(
                     self.instance.get_database().as_str(),
-                    database::PluginType::PostgreSQL,
+                    PluginType::PostgreSQL,
                 )
                 .await;
                 Ok(true)
@@ -3037,7 +3091,7 @@ impl PostgreSqlAutoCreation {
                 } else if error_msg.contains("already exists") {
                     AutoCreationLogger::log_database_exists(
                         self.instance.get_database().as_str(),
-                        database::PluginType::PostgreSQL,
+                        PluginType::PostgreSQL,
                     )
                     .await;
                     Ok(false)
@@ -3076,7 +3130,7 @@ impl PostgreSqlAutoCreation {
     async fn create_table(
         &self,
         connection: &DatabaseConnection,
-        table: &database::TableSchema,
+        table: &TableSchema,
     ) -> Result<(), AutoCreationError> {
         let statement: Statement =
             Statement::from_string(DatabaseBackend::Postgres, table.get_sql().clone());
@@ -3142,14 +3196,14 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
                 AutoCreationLogger::log_table_created(
                     table.get_name(),
                     self.instance.get_database().as_str(),
-                    database::PluginType::PostgreSQL,
+                    PluginType::PostgreSQL,
                 )
                 .await;
             } else {
                 AutoCreationLogger::log_table_exists(
                     table.get_name(),
                     self.instance.get_database().as_str(),
-                    database::PluginType::PostgreSQL,
+                    PluginType::PostgreSQL,
                 )
                 .await;
             }
@@ -3159,7 +3213,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
                 AutoCreationLogger::log_auto_creation_error(
                     &error,
                     "Index creation",
-                    database::PluginType::PostgreSQL,
+                    PluginType::PostgreSQL,
                     Some(self.instance.get_database().as_str()),
                 )
                 .await;
@@ -3170,7 +3224,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
                 AutoCreationLogger::log_auto_creation_error(
                     &error,
                     "Constraint creation",
-                    database::PluginType::PostgreSQL,
+                    PluginType::PostgreSQL,
                     Some(self.instance.get_database().as_str()),
                 )
                 .await;
@@ -3180,7 +3234,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
         AutoCreationLogger::log_tables_created(
             &created_tables,
             self.instance.get_database().as_str(),
-            database::PluginType::PostgreSQL,
+            PluginType::PostgreSQL,
         )
         .await;
         Ok(created_tables)
@@ -3194,7 +3248,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
             Ok(_) => {
                 let _: Result<(), DbErr> = connection.close().await;
                 AutoCreationLogger::log_connection_verification(
-                    database::PluginType::PostgreSQL,
+                    PluginType::PostgreSQL,
                     self.instance.get_database().as_str(),
                     true,
                     None,
@@ -3206,7 +3260,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
                 let _: Result<(), DbErr> = connection.close().await;
                 let error_msg: String = error.to_string();
                 AutoCreationLogger::log_connection_verification(
-                    database::PluginType::PostgreSQL,
+                    PluginType::PostgreSQL,
                     self.instance.get_database().as_str(),
                     false,
                     Some(&error_msg),
@@ -3234,11 +3288,10 @@ pub const DEFAULT_MYSQL_INSTANCE_NAME: &str = "mysql_default";
 # Path: hyperlane-quick-start/plugin/mysql/mod.rs
 ```rust
 mod r#const;
-mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
-pub use {r#const::*, r#fn::*, r#struct::*};
+pub use {r#const::*, r#struct::*};
 use {super::*, database::*, env::*, r#static::*};
 use std::{
     collections::HashMap,
@@ -3246,6 +3299,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{
+    spawn,
     sync::{RwLock, RwLockWriteGuard},
     time::timeout,
 };
@@ -3253,6 +3307,8 @@ use tokio::{
 # Path: hyperlane-quick-start/plugin/mysql/struct.rs
 ```rust
 use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct MySqlPlugin;
 #[derive(Clone, Data, Debug, New)]
 pub struct MySqlAutoCreation {
     #[get(pub(crate))]
@@ -3262,92 +3318,104 @@ pub struct MySqlAutoCreation {
     pub(super) schema: DatabaseSchema,
 }
 ```
-# Path: hyperlane-quick-start/plugin/mysql/fn.rs
+# Path: hyperlane-quick-start/plugin/mysql/impl.rs
 ```rust
 use super::*;
-#[instrument_trace]
-fn get_or_init_mysql_connection_map()
--> &'static RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>> {
-    MYSQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
-}
-#[instrument_trace]
-pub async fn connection_mysql_db<I>(
-    instance_name: I,
-    schema: Option<DatabaseSchema>,
-) -> Result<DatabaseConnection, String>
-where
-    I: AsRef<str>,
-{
-    let instance_name_str: &str = instance_name.as_ref();
-    let env: &'static EnvConfig = get_or_init_global_env_config();
-    let instance: &MySqlInstanceConfig = env
-        .get_mysql_instance(instance_name_str)
-        .ok_or_else(|| format!("MySQL instance '{instance_name_str}' not found"))?;
-    match perform_mysql_auto_creation(instance, schema.clone()).await {
-        Ok(result) => {
-            if result.has_changes() {
-                AutoCreationLogger::log_auto_creation_complete(
-                    database::PluginType::MySQL,
-                    &result,
+impl MySqlPlugin {
+    #[instrument_trace]
+    fn get_or_init() -> &'static RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>> {
+        MYSQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
+    }
+    #[instrument_trace]
+    pub async fn connection_db<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<DatabaseConnection, String>
+    where
+        I: AsRef<str>,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        let instance: &MySqlInstanceConfig = env
+            .get_mysql_instance(instance_name_str)
+            .ok_or_else(|| format!("MySQL instance '{instance_name_str}' not found"))?;
+        match MySqlPlugin::perform_auto_creation(instance, schema.clone()).await {
+            Ok(result) => {
+                if result.has_changes() {
+                    AutoCreationLogger::log_auto_creation_complete(PluginType::MySQL, &result)
+                        .await;
+                }
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Auto-creation process",
+                    PluginType::MySQL,
+                    Some(instance.get_database().as_str()),
                 )
                 .await;
+                if !error.should_continue() {
+                    return Err(error.to_string());
+                }
             }
         }
-        Err(error) => {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Auto-creation process",
-                database::PluginType::MySQL,
-                Some(instance.get_database().as_str()),
-            )
-            .await;
-            if !error.should_continue() {
-                return Err(error.to_string());
-            }
-        }
+        let db_url: String = instance.get_connection_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => Err(DbErr::Custom(format!(
+                    "MySQL connection timeout after {timeout_seconds} seconds"
+                ))),
+            };
+        connection_result.map_err(|error: DbErr| {
+            let error_msg: String = error.to_string();
+            let database_name: String = instance.get_database().clone();
+            let error_msg_clone: String = error_msg.clone();
+            spawn(async move {
+                AutoCreationLogger::log_connection_verification(
+                    PluginType::MySQL,
+                    &database_name,
+                    false,
+                    Some(&error_msg_clone),
+                )
+                .await;
+            });
+            error_msg
+        })
     }
-    let db_url: String = instance.get_connection_url();
-    let timeout_duration: Duration = get_connection_timeout_duration();
-    let timeout_seconds: u64 = timeout_duration.as_secs();
-    let connection_result: Result<DatabaseConnection, DbErr> =
-        match timeout(timeout_duration, Database::connect(&db_url)).await {
-            Ok(result) => result,
-            Err(_) => Err(DbErr::Custom(format!(
-                "MySQL connection timeout after {timeout_seconds} seconds"
-            ))),
-        };
-    connection_result.map_err(|error: DbErr| {
-        let error_msg: String = error.to_string();
-        let database_name: String = instance.get_database().clone();
-        let error_msg_clone: String = error_msg.clone();
-        tokio::spawn(async move {
-            AutoCreationLogger::log_connection_verification(
-                database::PluginType::MySQL,
-                &database_name,
-                false,
-                Some(&error_msg_clone),
-            )
-            .await;
-        });
-        error_msg
-    })
-}
-#[instrument_trace]
-pub async fn get_mysql_connection<I>(
-    instance_name: I,
-    schema: Option<DatabaseSchema>,
-) -> Result<DatabaseConnection, String>
-where
-    I: AsRef<str>,
-{
-    let instance_name_str: &str = instance_name.as_ref();
-    let duration: Duration = get_retry_duration();
+    #[instrument_trace]
+    pub async fn get_connection<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<DatabaseConnection, String>
+    where
+        I: AsRef<str>,
     {
-        if let Some(cache) = get_or_init_mysql_connection_map()
-            .read()
-            .await
-            .get(instance_name_str)
+        let instance_name_str: &str = instance_name.as_ref();
+        let duration: Duration = DatabasePlugin::get_retry_duration();
         {
+            if let Some(cache) = MySqlPlugin::get_or_init()
+                .read()
+                .await
+                .get(instance_name_str)
+            {
+                match cache.try_get_result() {
+                    Ok(conn) => return Ok(conn.clone()),
+                    Err(error) => {
+                        if !cache.is_expired(duration) {
+                            return Err(error.clone());
+                        }
+                    }
+                }
+            }
+        }
+        let mut connections: RwLockWriteGuard<
+            '_,
+            HashMap<String, ConnectionCache<DatabaseConnection>>,
+        > = MySqlPlugin::get_or_init().write().await;
+        if let Some(cache) = connections.get(instance_name_str) {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
@@ -3357,60 +3425,72 @@ where
                 }
             }
         }
+        connections.remove(instance_name_str);
+        drop(connections);
+        let new_connection: Result<DatabaseConnection, String> =
+            MySqlPlugin::connection_db(instance_name_str, schema).await;
+        let mut connections: RwLockWriteGuard<
+            '_,
+            HashMap<String, ConnectionCache<DatabaseConnection>>,
+        > = MySqlPlugin::get_or_init().write().await;
+        connections.insert(
+            instance_name_str.to_string(),
+            ConnectionCache::new(new_connection.clone()),
+        );
+        new_connection
     }
-    let mut connections: RwLockWriteGuard<
-        '_,
-        HashMap<String, ConnectionCache<DatabaseConnection>>,
-    > = get_or_init_mysql_connection_map().write().await;
-    if let Some(cache) = connections.get(instance_name_str) {
-        match cache.try_get_result() {
-            Ok(conn) => return Ok(conn.clone()),
+    #[instrument_trace]
+    pub async fn perform_auto_creation(
+        instance: &MySqlInstanceConfig,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<AutoCreationResult, AutoCreationError> {
+        let start_time: Instant = Instant::now();
+        let mut result: AutoCreationResult = AutoCreationResult::default();
+        AutoCreationLogger::log_auto_creation_start(PluginType::MySQL, instance.get_database())
+            .await;
+        let auto_creator: MySqlAutoCreation = match schema {
+            Some(s) => MySqlAutoCreation::with_schema(instance.clone(), s),
+            None => MySqlAutoCreation::new(instance.clone()),
+        };
+        match auto_creator.create_database_if_not_exists().await {
+            Ok(created) => {
+                result.set_database_created(created);
+            }
             Err(error) => {
-                if !cache.is_expired(duration) {
-                    return Err(error.clone());
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Database creation",
+                    PluginType::MySQL,
+                    Some(instance.get_database()),
+                )
+                .await;
+                if !error.should_continue() {
+                    result.set_duration(start_time.elapsed());
+                    return Err(error);
                 }
+                result.get_mut_errors().push(error.to_string());
             }
         }
-    }
-    connections.remove(instance_name_str);
-    drop(connections);
-    let new_connection: Result<DatabaseConnection, String> =
-        connection_mysql_db(instance_name_str, schema).await;
-    let mut connections: RwLockWriteGuard<
-        '_,
-        HashMap<String, ConnectionCache<DatabaseConnection>>,
-    > = get_or_init_mysql_connection_map().write().await;
-    connections.insert(
-        instance_name_str.to_string(),
-        ConnectionCache::new(new_connection.clone()),
-    );
-    new_connection
-}
-#[instrument_trace]
-pub async fn perform_mysql_auto_creation(
-    instance: &MySqlInstanceConfig,
-    schema: Option<DatabaseSchema>,
-) -> Result<AutoCreationResult, AutoCreationError> {
-    let start_time: Instant = Instant::now();
-    let mut result: AutoCreationResult = AutoCreationResult::default();
-    AutoCreationLogger::log_auto_creation_start(
-        database::PluginType::MySQL,
-        instance.get_database(),
-    )
-    .await;
-    let auto_creator: MySqlAutoCreation = match schema {
-        Some(s) => MySqlAutoCreation::with_schema(instance.clone(), s),
-        None => MySqlAutoCreation::new(instance.clone()),
-    };
-    match auto_creator.create_database_if_not_exists().await {
-        Ok(created) => {
-            result.set_database_created(created);
+        match auto_creator.create_tables_if_not_exist().await {
+            Ok(tables) => {
+                result.set_tables_created(tables);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Table creation",
+                    PluginType::MySQL,
+                    Some(instance.get_database()),
+                )
+                .await;
+                result.get_mut_errors().push(error.to_string());
+            }
         }
-        Err(error) => {
+        if let Err(error) = auto_creator.verify_connection().await {
             AutoCreationLogger::log_auto_creation_error(
                 &error,
-                "Database creation",
-                database::PluginType::MySQL,
+                "Connection verification",
+                PluginType::MySQL,
                 Some(instance.get_database()),
             )
             .await;
@@ -3420,48 +3500,15 @@ pub async fn perform_mysql_auto_creation(
             }
             result.get_mut_errors().push(error.to_string());
         }
+        result.set_duration(start_time.elapsed());
+        AutoCreationLogger::log_auto_creation_complete(PluginType::MySQL, &result).await;
+        Ok(result)
     }
-    match auto_creator.create_tables_if_not_exist().await {
-        Ok(tables) => {
-            result.set_tables_created(tables);
-        }
-        Err(error) => {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Table creation",
-                database::PluginType::MySQL,
-                Some(instance.get_database()),
-            )
-            .await;
-            result.get_mut_errors().push(error.to_string());
-        }
-    }
-    if let Err(error) = auto_creator.verify_connection().await {
-        AutoCreationLogger::log_auto_creation_error(
-            &error,
-            "Connection verification",
-            database::PluginType::MySQL,
-            Some(instance.get_database()),
-        )
-        .await;
-        if !error.should_continue() {
-            result.set_duration(start_time.elapsed());
-            return Err(error);
-        }
-        result.get_mut_errors().push(error.to_string());
-    }
-    result.set_duration(start_time.elapsed());
-    AutoCreationLogger::log_auto_creation_complete(database::PluginType::MySQL, &result).await;
-    Ok(result)
 }
-```
-# Path: hyperlane-quick-start/plugin/mysql/impl.rs
-```rust
-use super::*;
 impl Default for MySqlAutoCreation {
     #[instrument_trace]
     fn default() -> Self {
-        let env: &'static EnvConfig = get_or_init_global_env_config();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
         if let Some(instance) = env.get_default_mysql_instance() {
             Self::new(instance.clone())
         } else {
@@ -3478,7 +3525,7 @@ impl MySqlAutoCreation {
     #[instrument_trace]
     async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let admin_url: String = self.instance.get_admin_url();
-        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
         let timeout_seconds: u64 = timeout_duration.as_secs();
         let connection_result: Result<DatabaseConnection, DbErr> =
             match timeout(timeout_duration, Database::connect(&admin_url)).await {
@@ -3529,7 +3576,7 @@ impl MySqlAutoCreation {
         if self.database_exists(connection).await? {
             AutoCreationLogger::log_database_exists(
                 self.instance.get_database().as_str(),
-                database::PluginType::MySQL,
+                PluginType::MySQL,
             )
             .await;
             return Ok(false);
@@ -3543,7 +3590,7 @@ impl MySqlAutoCreation {
             Ok(_) => {
                 AutoCreationLogger::log_database_created(
                     self.instance.get_database().as_str(),
-                    database::PluginType::MySQL,
+                    PluginType::MySQL,
                 )
                 .await;
                 Ok(true)
@@ -3569,7 +3616,7 @@ impl MySqlAutoCreation {
     #[instrument_trace]
     async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
         let db_url: String = self.instance.get_connection_url();
-        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
         let timeout_seconds: u64 = timeout_duration.as_secs();
         let connection_result: Result<DatabaseConnection, DbErr> =
             match timeout(timeout_duration, Database::connect(&db_url)).await {
@@ -3615,7 +3662,7 @@ impl MySqlAutoCreation {
     async fn create_table(
         &self,
         connection: &DatabaseConnection,
-        table: &database::TableSchema,
+        table: &TableSchema,
     ) -> Result<(), AutoCreationError> {
         let statement: Statement =
             Statement::from_string(DatabaseBackend::MySql, table.get_sql().clone());
@@ -3681,14 +3728,14 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
                 AutoCreationLogger::log_table_created(
                     table.get_name(),
                     self.instance.get_database().as_str(),
-                    database::PluginType::MySQL,
+                    PluginType::MySQL,
                 )
                 .await;
             } else {
                 AutoCreationLogger::log_table_exists(
                     table.get_name(),
                     self.instance.get_database().as_str(),
-                    database::PluginType::MySQL,
+                    PluginType::MySQL,
                 )
                 .await;
             }
@@ -3698,7 +3745,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
                 AutoCreationLogger::log_auto_creation_error(
                     &error,
                     "Index creation",
-                    database::PluginType::MySQL,
+                    PluginType::MySQL,
                     Some(self.instance.get_database().as_str()),
                 )
                 .await;
@@ -3709,7 +3756,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
                 AutoCreationLogger::log_auto_creation_error(
                     &error,
                     "Constraint creation",
-                    database::PluginType::MySQL,
+                    PluginType::MySQL,
                     Some(self.instance.get_database().as_str()),
                 )
                 .await;
@@ -3719,7 +3766,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
         AutoCreationLogger::log_tables_created(
             &created_tables,
             self.instance.get_database().as_str(),
-            database::PluginType::MySQL,
+            PluginType::MySQL,
         )
         .await;
         Ok(created_tables)
@@ -3727,7 +3774,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
     #[instrument_trace]
     async fn verify_connection(&self) -> Result<(), AutoCreationError> {
         let db_url: String = self.instance.get_connection_url();
-        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
         let timeout_seconds: u64 = timeout_duration.as_secs();
         let connection_result: Result<DatabaseConnection, DbErr> =
             match timeout(timeout_duration, Database::connect(&db_url)).await {
@@ -3749,7 +3796,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
             Ok(_) => {
                 let _: Result<(), DbErr> = connection.close().await;
                 AutoCreationLogger::log_connection_verification(
-                    database::PluginType::MySQL,
+                    PluginType::MySQL,
                     self.instance.get_database().as_str(),
                     true,
                     None,
@@ -3761,7 +3808,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
                 let _: Result<(), DbErr> = connection.close().await;
                 let error_msg: String = error.to_string();
                 AutoCreationLogger::log_connection_verification(
-                    database::PluginType::MySQL,
+                    PluginType::MySQL,
                     self.instance.get_database().as_str(),
                     false,
                     Some(&error_msg),
@@ -3784,12 +3831,11 @@ pub static MYSQL_CONNECTIONS: OnceLock<
 ```
 # Path: hyperlane-quick-start/plugin/logger/mod.rs
 ```rust
-mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
 pub use r#struct::*;
-use {super::*, r#fn::*, r#static::*};
+use {super::*, r#static::*};
 use std::{fmt::Arguments, sync::OnceLock};
 use hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 ```
@@ -3797,18 +3843,18 @@ use hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
+pub struct LoggerPlugin;
+#[derive(Clone, Copy, Data, Debug, Default)]
 pub struct Logger;
-```
-# Path: hyperlane-quick-start/plugin/logger/fn.rs
-```rust
-use super::*;
-pub(super) fn get_or_init_file_logger() -> &'static RwLock<FileLogger> {
-    FILE_LOGGER.get_or_init(|| RwLock::new(FileLogger::default()))
-}
 ```
 # Path: hyperlane-quick-start/plugin/logger/impl.rs
 ```rust
 use super::*;
+impl LoggerPlugin {
+    pub fn get_or_init() -> &'static RwLock<FileLogger> {
+        FILE_LOGGER.get_or_init(|| RwLock::new(FileLogger::default()))
+    }
+}
 impl Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= max_level()
@@ -3884,10 +3930,10 @@ impl Log for Logger {
 }
 impl Logger {
     fn read() -> RwLockReadGuard<'static, FileLogger> {
-        get_or_init_file_logger().try_read().unwrap()
+        LoggerPlugin::get_or_init().try_read().unwrap()
     }
     fn write() -> RwLockWriteGuard<'static, FileLogger> {
-        get_or_init_file_logger().try_write().unwrap()
+        LoggerPlugin::get_or_init().try_write().unwrap()
     }
     pub fn init(level: LevelFilter, file_logger: FileLogger) {
         set_logger(&LOGGER).unwrap();
@@ -3954,12 +4000,11 @@ pub trait DatabaseAutoCreation {
 # Path: hyperlane-quick-start/plugin/database/mod.rs
 ```rust
 mod r#enum;
-mod r#fn;
 mod r#impl;
 mod r#struct;
 mod r#trait;
-pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*};
-use {super::*, env::*};
+pub use {r#enum::*, r#struct::*, r#trait::*};
+use {super::*, env::*, mysql::*, postgresql::*, redis::*};
 use std::{
     str::FromStr,
     time::{Duration, Instant},
@@ -3985,6 +4030,8 @@ pub enum PluginType {
 # Path: hyperlane-quick-start/plugin/database/struct.rs
 ```rust
 use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct DatabasePlugin;
 #[derive(Clone, Data, Debug)]
 pub struct ConnectionCache<T: Clone> {
     #[get(type(copy), pub(crate))]
@@ -4054,137 +4101,134 @@ pub struct PluginAutoCreationConfig {
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct AutoCreationLogger;
 ```
-# Path: hyperlane-quick-start/plugin/database/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub fn get_connection_timeout_duration() -> Duration {
-    let timeout_seconds: u64 = std::env::var(ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS)
-        .ok()
-        .and_then(|value: String| value.parse::<u64>().ok())
-        .unwrap_or(DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS);
-    Duration::from_millis(timeout_seconds)
-}
-#[instrument_trace]
-pub fn get_retry_duration() -> Duration {
-    let millis: u64 = std::env::var(ENV_KEY_DB_RETRY_INTERVAL_MILLIS)
-        .ok()
-        .and_then(|value: String| value.parse::<u64>().ok())
-        .unwrap_or(DEFAULT_DB_RETRY_INTERVAL_MILLIS);
-    Duration::from_millis(millis)
-}
-#[instrument_trace]
-pub async fn initialize_auto_creation() -> Result<(), String> {
-    initialize_auto_creation_with_schema(None, None, None).await
-}
-#[instrument_trace]
-pub async fn initialize_auto_creation_with_schema(
-    mysql_schema: Option<DatabaseSchema>,
-    postgresql_schema: Option<DatabaseSchema>,
-    _redis_schema: Option<()>,
-) -> Result<(), String> {
-    if let Err(error) = AutoCreationConfig::validate() {
-        return Err(format!(
-            "Auto-creation configuration validation failed {error}"
-        ));
-    }
-    let env: &'static EnvConfig = get_or_init_global_env_config();
-    let mut initialization_results: Vec<String> = Vec::new();
-    for instance in env.get_mysql_instances() {
-        match mysql::perform_mysql_auto_creation(instance, mysql_schema.clone()).await {
-            Ok(result) => {
-                initialization_results.push(format!(
-                    "MySQL ({})  {}",
-                    instance.get_name(),
-                    if result.has_changes() {
-                        "initialized with changes"
-                    } else {
-                        "verified"
-                    }
-                ));
-            }
-            Err(error) => {
-                if !error.should_continue() {
-                    return Err(format!(
-                        "MySQL ({}) auto-creation failed {error}",
-                        instance.get_name()
-                    ));
-                }
-                initialization_results.push(format!(
-                    "MySQL ({}) : failed but continuing ({error})",
-                    instance.get_name()
-                ));
-            }
-        }
-    }
-    for instance in env.get_postgresql_instances() {
-        match postgresql::perform_postgresql_auto_creation(instance, postgresql_schema.clone())
-            .await
-        {
-            Ok(result) => {
-                initialization_results.push(format!(
-                    "PostgreSQL ({})  {}",
-                    instance.get_name(),
-                    if result.has_changes() {
-                        "initialized with changes"
-                    } else {
-                        "verified"
-                    }
-                ));
-            }
-            Err(error) => {
-                if !error.should_continue() {
-                    return Err(format!(
-                        "PostgreSQL ({}) auto-creation failed {error}",
-                        instance.get_name()
-                    ));
-                }
-                initialization_results.push(format!(
-                    "PostgreSQL ({}) : failed but continuing ({error})",
-                    instance.get_name()
-                ));
-            }
-        }
-    }
-    for instance in env.get_redis_instances() {
-        match redis::perform_redis_auto_creation(instance).await {
-            Ok(result) => {
-                initialization_results.push(format!(
-                    "Redis ({})  {}",
-                    instance.get_name(),
-                    if result.has_changes() {
-                        "initialized with changes"
-                    } else {
-                        "verified"
-                    }
-                ));
-            }
-            Err(error) => {
-                if !error.should_continue() {
-                    return Err(format!(
-                        "Redis ({}) auto-creation failed {error}",
-                        instance.get_name()
-                    ));
-                }
-                initialization_results.push(format!(
-                    "Redis ({}) : failed but continuing ({error})",
-                    instance.get_name()
-                ));
-            }
-        }
-    }
-    if initialization_results.is_empty() {
-        info!("[AUTO-CREATION] No plugins enabled for auto-creation");
-    } else {
-        let results_summary: String = initialization_results.join(", ");
-        info!("[AUTO-CREATION] Initialization complete {results_summary}");
-    }
-    Ok(())
-}
-```
 # Path: hyperlane-quick-start/plugin/database/impl.rs
 ```rust
 use super::*;
+impl DatabasePlugin {
+    #[instrument_trace]
+    pub fn get_connection_timeout_duration() -> Duration {
+        let timeout_seconds: u64 = std::env::var(ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS)
+            .ok()
+            .and_then(|value: String| value.parse::<u64>().ok())
+            .unwrap_or(DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS);
+        Duration::from_millis(timeout_seconds)
+    }
+    #[instrument_trace]
+    pub fn get_retry_duration() -> Duration {
+        let millis: u64 = std::env::var(ENV_KEY_DB_RETRY_INTERVAL_MILLIS)
+            .ok()
+            .and_then(|value: String| value.parse::<u64>().ok())
+            .unwrap_or(DEFAULT_DB_RETRY_INTERVAL_MILLIS);
+        Duration::from_millis(millis)
+    }
+    #[instrument_trace]
+    pub async fn initialize_auto_creation() -> Result<(), String> {
+        Self::initialize_auto_creation_with_schema(None, None, None).await
+    }
+    #[instrument_trace]
+    pub async fn initialize_auto_creation_with_schema(
+        mysql_schema: Option<DatabaseSchema>,
+        postgresql_schema: Option<DatabaseSchema>,
+        _redis_schema: Option<()>,
+    ) -> Result<(), String> {
+        if let Err(error) = AutoCreationConfig::validate() {
+            return Err(format!(
+                "Auto-creation configuration validation failed {error}"
+            ));
+        }
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        let mut initialization_results: Vec<String> = Vec::new();
+        for instance in env.get_mysql_instances() {
+            match MySqlPlugin::perform_auto_creation(instance, mysql_schema.clone()).await {
+                Ok(result) => {
+                    initialization_results.push(format!(
+                        "MySQL ({})  {}",
+                        instance.get_name(),
+                        if result.has_changes() {
+                            "initialized with changes"
+                        } else {
+                            "verified"
+                        }
+                    ));
+                }
+                Err(error) => {
+                    if !error.should_continue() {
+                        return Err(format!(
+                            "MySQL ({}) auto-creation failed {error}",
+                            instance.get_name()
+                        ));
+                    }
+                    initialization_results.push(format!(
+                        "MySQL ({}) : failed but continuing ({error})",
+                        instance.get_name()
+                    ));
+                }
+            }
+        }
+        for instance in env.get_postgresql_instances() {
+            match PostgreSqlPlugin::perform_auto_creation(instance, postgresql_schema.clone()).await
+            {
+                Ok(result) => {
+                    initialization_results.push(format!(
+                        "PostgreSQL ({})  {}",
+                        instance.get_name(),
+                        if result.has_changes() {
+                            "initialized with changes"
+                        } else {
+                            "verified"
+                        }
+                    ));
+                }
+                Err(error) => {
+                    if !error.should_continue() {
+                        return Err(format!(
+                            "PostgreSQL ({}) auto-creation failed {error}",
+                            instance.get_name()
+                        ));
+                    }
+                    initialization_results.push(format!(
+                        "PostgreSQL ({}) : failed but continuing ({error})",
+                        instance.get_name()
+                    ));
+                }
+            }
+        }
+        for instance in env.get_redis_instances() {
+            match RedisPlugin::perform_auto_creation(instance).await {
+                Ok(result) => {
+                    initialization_results.push(format!(
+                        "Redis ({})  {}",
+                        instance.get_name(),
+                        if result.has_changes() {
+                            "initialized with changes"
+                        } else {
+                            "verified"
+                        }
+                    ));
+                }
+                Err(error) => {
+                    if !error.should_continue() {
+                        return Err(format!(
+                            "Redis ({}) auto-creation failed {error}",
+                            instance.get_name()
+                        ));
+                    }
+                    initialization_results.push(format!(
+                        "Redis ({}) : failed but continuing ({error})",
+                        instance.get_name()
+                    ));
+                }
+            }
+        }
+        if initialization_results.is_empty() {
+            info!("[AUTO-CREATION] No plugins enabled for auto-creation");
+        } else {
+            let results_summary: String = initialization_results.join(", ");
+            info!("[AUTO-CREATION] Initialization complete {results_summary}");
+        }
+        Ok(())
+    }
+}
 impl<T: Clone> ConnectionCache<T> {
     #[instrument_trace]
     pub fn new(result: Result<T, String>) -> Self {
@@ -4345,7 +4389,7 @@ impl DatabaseSchema {
 impl AutoCreationConfig {
     #[instrument_trace]
     pub fn validate() -> Result<(), String> {
-        let env: &'static EnvConfig = get_or_init_global_env_config();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
         if env.get_mysql_instances().is_empty() {
             return Err("At least one MySQL instance is required".to_string());
         }
@@ -4371,7 +4415,7 @@ impl PluginAutoCreationConfig {
     }
     #[instrument_trace]
     pub fn get_database_name(&self) -> String {
-        let env: &'static EnvConfig = get_or_init_global_env_config();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
         if let Ok(plugin_type) = PluginType::from_str(self.get_plugin_name()) {
             match plugin_type {
                 PluginType::MySQL => {
@@ -4396,7 +4440,7 @@ impl PluginAutoCreationConfig {
     }
     #[instrument_trace]
     pub fn get_connection_info(&self) -> String {
-        let env: &'static EnvConfig = get_or_init_global_env_config();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
         if let Ok(plugin_type) = PluginType::from_str(self.get_plugin_name()) {
             match plugin_type {
                 PluginType::MySQL => {
@@ -4532,12 +4576,11 @@ pub const DEFAULT_REDIS_INSTANCE_NAME: &str = "redis_default";
 # Path: hyperlane-quick-start/plugin/redis/mod.rs
 ```rust
 mod r#const;
-mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
 mod r#type;
-pub use {r#const::*, r#fn::*, r#struct::*, r#type::*};
+pub use {r#const::*, r#struct::*, r#type::*};
 use {super::*, database::*, env::*, r#static::*};
 use hyperlane_utils::redis::*;
 use std::{
@@ -4546,6 +4589,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{
+    spawn,
     sync::{RwLock, RwLockWriteGuard},
     task::{JoinHandle, spawn_blocking},
     time::timeout,
@@ -4554,94 +4598,114 @@ use tokio::{
 # Path: hyperlane-quick-start/plugin/redis/struct.rs
 ```rust
 use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct RedisPlugin;
 #[derive(Clone, Data, Debug, New)]
 pub struct RedisAutoCreation {
     #[get(pub(crate))]
     pub(super) instance: RedisInstanceConfig,
 }
 ```
-# Path: hyperlane-quick-start/plugin/redis/fn.rs
+# Path: hyperlane-quick-start/plugin/redis/impl.rs
 ```rust
 use super::*;
-#[instrument_trace]
-fn get_redis_connection_map() -> &'static RwLock<RedisConnectionMap> {
-    REDIS_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
-}
-#[instrument_trace]
-pub async fn connection_redis_db<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
-where
-    I: AsRef<str>,
-{
-    let instance_name_str: &str = instance_name.as_ref();
-    let env: &'static EnvConfig = get_or_init_global_env_config();
-    let instance: &RedisInstanceConfig = env
-        .get_redis_instance(instance_name_str)
-        .ok_or_else(|| format!("Redis instance '{instance_name_str}' not found"))?;
-    match perform_redis_auto_creation(instance).await {
-        Ok(result) => {
-            if result.has_changes() {
-                AutoCreationLogger::log_auto_creation_complete(
-                    database::PluginType::Redis,
-                    &result,
-                )
-                .await;
-            }
-        }
-        Err(error) => {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Auto-creation process",
-                database::PluginType::Redis,
-                Some(instance.get_name().as_str()),
-            )
-            .await;
-            if !error.should_continue() {
-                return Err(error.to_string());
-            }
-        }
+impl RedisPlugin {
+    #[instrument_trace]
+    fn get_or_init() -> &'static RwLock<RedisConnectionMap> {
+        REDIS_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
     }
-    let db_url: String = instance.get_connection_url();
-    let client: Client = Client::open(db_url).map_err(|error: redis::RedisError| {
-        let error_msg: String = error.to_string();
-        let instance_name_clone: String = instance_name_str.to_string();
-        let error_msg_clone: String = error_msg.clone();
-        tokio::spawn(async move {
-            AutoCreationLogger::log_connection_verification(
-                database::PluginType::Redis,
-                &instance_name_clone,
-                false,
-                Some(&error_msg_clone),
-            )
-            .await;
-        });
-        error_msg
-    })?;
-    let timeout_duration: Duration = get_connection_timeout_duration();
-    let timeout_seconds: u64 = timeout_duration.as_secs();
-    let connection_task: JoinHandle<Result<Connection, RedisError>> =
-        spawn_blocking(move || client.get_connection());
-    let connection: Connection = match timeout(timeout_duration, connection_task).await {
-        Ok(join_result) => match join_result {
-            Ok(result) => result.map_err(|error: redis::RedisError| {
-                let error_msg: String = error.to_string();
-                let instance_name_clone: String = instance_name_str.to_string();
-                let error_msg_clone: String = error_msg.clone();
-                tokio::spawn(async move {
-                    AutoCreationLogger::log_connection_verification(
+    #[instrument_trace]
+    pub async fn connection_db<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
+    where
+        I: AsRef<str>,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        let instance: &RedisInstanceConfig = env
+            .get_redis_instance(instance_name_str)
+            .ok_or_else(|| format!("Redis instance '{instance_name_str}' not found"))?;
+        match Self::perform_auto_creation(instance).await {
+            Ok(result) => {
+                if result.has_changes() {
+                    AutoCreationLogger::log_auto_creation_complete(
                         database::PluginType::Redis,
-                        &instance_name_clone,
-                        false,
-                        Some(&error_msg_clone),
+                        &result,
                     )
                     .await;
-                });
-                error_msg
-            })?,
+                }
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Auto-creation process",
+                    database::PluginType::Redis,
+                    Some(instance.get_name().as_str()),
+                )
+                .await;
+                if !error.should_continue() {
+                    return Err(error.to_string());
+                }
+            }
+        }
+        let db_url: String = instance.get_connection_url();
+        let client: Client = Client::open(db_url).map_err(|error: redis::RedisError| {
+            let error_msg: String = error.to_string();
+            let instance_name_clone: String = instance_name_str.to_string();
+            let error_msg_clone: String = error_msg.clone();
+            spawn(async move {
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::Redis,
+                    &instance_name_clone,
+                    false,
+                    Some(&error_msg_clone),
+                )
+                .await;
+            });
+            error_msg
+        })?;
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_task: JoinHandle<Result<Connection, RedisError>> =
+            spawn_blocking(move || client.get_connection());
+        let connection: Connection = match timeout(timeout_duration, connection_task).await {
+            Ok(join_result) => match join_result {
+                Ok(result) => result.map_err(|error: redis::RedisError| {
+                    let error_msg: String = error.to_string();
+                    let instance_name_clone: String = instance_name_str.to_string();
+                    let error_msg_clone: String = error_msg.clone();
+                    spawn(async move {
+                        AutoCreationLogger::log_connection_verification(
+                            database::PluginType::Redis,
+                            &instance_name_clone,
+                            false,
+                            Some(&error_msg_clone),
+                        )
+                        .await;
+                    });
+                    error_msg
+                })?,
+                Err(_) => {
+                    let error_msg: String = "Redis connection task failed".to_string();
+                    let instance_name_clone: String = instance_name_str.to_string();
+                    let error_msg_clone: String = error_msg.clone();
+                    spawn(async move {
+                        AutoCreationLogger::log_connection_verification(
+                            database::PluginType::Redis,
+                            &instance_name_clone,
+                            false,
+                            Some(&error_msg_clone),
+                        )
+                        .await;
+                    });
+                    return Err(error_msg);
+                }
+            },
             Err(_) => {
-                let error_msg: String = "Redis connection task failed".to_string();
+                let error_msg: String =
+                    format!("Redis connection timeout after {timeout_seconds} seconds");
                 let instance_name_clone: String = instance_name_str.to_string();
                 let error_msg_clone: String = error_msg.clone();
-                tokio::spawn(async move {
+                spawn(async move {
                     AutoCreationLogger::log_connection_verification(
                         database::PluginType::Redis,
                         &instance_name_clone,
@@ -4652,39 +4716,31 @@ where
                 });
                 return Err(error_msg);
             }
-        },
-        Err(_) => {
-            let error_msg: String =
-                format!("Redis connection timeout after {timeout_seconds} seconds");
-            let instance_name_clone: String = instance_name_str.to_string();
-            let error_msg_clone: String = error_msg.clone();
-            tokio::spawn(async move {
-                AutoCreationLogger::log_connection_verification(
-                    database::PluginType::Redis,
-                    &instance_name_clone,
-                    false,
-                    Some(&error_msg_clone),
-                )
-                .await;
-            });
-            return Err(error_msg);
-        }
-    };
-    Ok(arc_rwlock(connection))
-}
-#[instrument_trace]
-pub async fn get_redis_connection<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
-where
-    I: AsRef<str>,
-{
-    let instance_name_str: &str = instance_name.as_ref();
-    let duration: Duration = get_retry_duration();
+        };
+        Ok(arc_rwlock(connection))
+    }
+    #[instrument_trace]
+    pub async fn get_connection<I>(instance_name: I) -> Result<ArcRwLock<Connection>, String>
+    where
+        I: AsRef<str>,
     {
-        if let Some(cache) = get_redis_connection_map()
-            .read()
-            .await
-            .get(instance_name_str)
+        let instance_name_str: &str = instance_name.as_ref();
+        let duration: Duration = DatabasePlugin::get_retry_duration();
         {
+            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
+                match cache.try_get_result() {
+                    Ok(conn) => return Ok(conn.clone()),
+                    Err(error) => {
+                        if !cache.is_expired(duration) {
+                            return Err(error.clone());
+                        }
+                    }
+                }
+            }
+        }
+        let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
+            Self::get_or_init().write().await;
+        if let Some(cache) = connections.get(instance_name_str) {
             match cache.try_get_result() {
                 Ok(conn) => return Ok(conn.clone()),
                 Err(error) => {
@@ -4694,48 +4750,68 @@ where
                 }
             }
         }
+        connections.remove(instance_name_str);
+        drop(connections);
+        let new_connection: Result<ArcRwLock<Connection>, String> =
+            Self::connection_db(instance_name_str).await;
+        let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
+            Self::get_or_init().write().await;
+        connections.insert(
+            instance_name_str.to_string(),
+            ConnectionCache::new(new_connection.clone()),
+        );
+        new_connection
     }
-    let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
-        get_redis_connection_map().write().await;
-    if let Some(cache) = connections.get(instance_name_str) {
-        match cache.try_get_result() {
-            Ok(conn) => return Ok(conn.clone()),
+    #[instrument_trace]
+    pub async fn perform_auto_creation(
+        instance: &RedisInstanceConfig,
+    ) -> Result<AutoCreationResult, AutoCreationError> {
+        let start_time: Instant = Instant::now();
+        let mut result: AutoCreationResult = AutoCreationResult::default();
+        AutoCreationLogger::log_auto_creation_start(
+            database::PluginType::Redis,
+            instance.get_name(),
+        )
+        .await;
+        let auto_creator: RedisAutoCreation = RedisAutoCreation::new(instance.clone());
+        match auto_creator.create_database_if_not_exists().await {
+            Ok(created) => {
+                result.set_database_created(created);
+            }
             Err(error) => {
-                if !cache.is_expired(duration) {
-                    return Err(error.clone());
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Database validation",
+                    database::PluginType::Redis,
+                    Some(instance.get_name().as_str()),
+                )
+                .await;
+                if !error.should_continue() {
+                    result.set_duration(start_time.elapsed());
+                    return Err(error);
                 }
+                result.get_mut_errors().push(error.to_string());
             }
         }
-    }
-    connections.remove(instance_name_str);
-    drop(connections);
-    let new_connection: Result<ArcRwLock<Connection>, String> =
-        connection_redis_db(instance_name_str).await;
-    let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
-        get_redis_connection_map().write().await;
-    connections.insert(
-        instance_name_str.to_string(),
-        ConnectionCache::new(new_connection.clone()),
-    );
-    new_connection
-}
-#[instrument_trace]
-pub async fn perform_redis_auto_creation(
-    instance: &RedisInstanceConfig,
-) -> Result<AutoCreationResult, AutoCreationError> {
-    let start_time: Instant = Instant::now();
-    let mut result: AutoCreationResult = AutoCreationResult::default();
-    AutoCreationLogger::log_auto_creation_start(database::PluginType::Redis, instance.get_name())
-        .await;
-    let auto_creator: RedisAutoCreation = RedisAutoCreation::new(instance.clone());
-    match auto_creator.create_database_if_not_exists().await {
-        Ok(created) => {
-            result.set_database_created(created);
+        match auto_creator.create_tables_if_not_exist().await {
+            Ok(operations) => {
+                result.set_tables_created(operations);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Namespace setup",
+                    database::PluginType::Redis,
+                    Some(instance.get_name().as_str()),
+                )
+                .await;
+                result.get_mut_errors().push(error.to_string());
+            }
         }
-        Err(error) => {
+        if let Err(error) = auto_creator.verify_connection().await {
             AutoCreationLogger::log_auto_creation_error(
                 &error,
-                "Database validation",
+                "Connection verification",
                 database::PluginType::Redis,
                 Some(instance.get_name().as_str()),
             )
@@ -4746,49 +4822,15 @@ pub async fn perform_redis_auto_creation(
             }
             result.get_mut_errors().push(error.to_string());
         }
+        result.set_duration(start_time.elapsed());
+        AutoCreationLogger::log_auto_creation_complete(database::PluginType::Redis, &result).await;
+        Ok(result)
     }
-    match auto_creator.create_tables_if_not_exist().await {
-        Ok(operations) => {
-            result.set_tables_created(operations);
-        }
-        Err(error) => {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Namespace setup",
-                database::PluginType::Redis,
-                Some(instance.get_name().as_str()),
-            )
-            .await;
-            result.get_mut_errors().push(error.to_string());
-        }
-    }
-    if let Err(error) = auto_creator.verify_connection().await {
-        AutoCreationLogger::log_auto_creation_error(
-            &error,
-            "Connection verification",
-            database::PluginType::Redis,
-            Some(instance.get_name().as_str()),
-        )
-        .await;
-        if !error.should_continue() {
-            result.set_duration(start_time.elapsed());
-            return Err(error);
-        }
-        result.get_mut_errors().push(error.to_string());
-    }
-    result.set_duration(start_time.elapsed());
-    AutoCreationLogger::log_auto_creation_complete(database::PluginType::Redis, &result).await;
-    Ok(result)
 }
-```
-# Path: hyperlane-quick-start/plugin/redis/impl.rs
-```rust
-use super::*;
 impl Default for RedisAutoCreation {
     #[instrument_trace]
     fn default() -> Self {
-        let env: &'static EnvConfig = get_or_init_global_env_config();
-        if let Some(instance) = env.get_default_redis_instance() {
+        if let Some(instance) = EnvPlugin::get_or_init().get_default_redis_instance() {
             Self::new(instance.clone())
         } else {
             let default_instance: RedisInstanceConfig = RedisInstanceConfig::default();
@@ -4814,10 +4856,10 @@ impl RedisAutoCreation {
                 AutoCreationError::DatabaseError(format!("Redis connection error {error_msg}"))
             }
         })?;
-        let timeout_duration: Duration = get_connection_timeout_duration();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
         let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_task: tokio::task::JoinHandle<Result<Connection, RedisError>> =
-            tokio::task::spawn_blocking(move || client.get_connection());
+        let connection_task: JoinHandle<Result<Connection, RedisError>> =
+            spawn_blocking(move || client.get_connection());
         let connection: Connection = match timeout(timeout_duration, connection_task).await {
             Ok(join_result) => match join_result {
                 Ok(result) => result.map_err(|error: RedisError| {
@@ -4994,30 +5036,39 @@ pub static REDIS_CONNECTIONS: OnceLock<RwLock<RedisConnectionMap>> = OnceLock::n
 ```
 # Path: hyperlane-quick-start/plugin/shutdown/mod.rs
 ```rust
-mod r#fn;
+mod r#impl;
 mod r#static;
-pub use r#fn::*;
+mod r#struct;
+pub use r#struct::*;
 use {super::*, r#static::*};
 use std::sync::{Arc, OnceLock};
 ```
-# Path: hyperlane-quick-start/plugin/shutdown/fn.rs
+# Path: hyperlane-quick-start/plugin/shutdown/struct.rs
 ```rust
 use super::*;
-#[instrument_trace]
-fn default_shutdown() -> SharedAsyncTaskFactory<()> {
-    Arc::new(|| {
-        Box::pin(async {
-            warn!("Not set shutdown, using default");
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ShutdownPlugin;
+```
+# Path: hyperlane-quick-start/plugin/shutdown/impl.rs
+```rust
+use super::*;
+impl ShutdownPlugin {
+    #[instrument_trace]
+    pub fn get_init() -> SharedAsyncTaskFactory<()> {
+        Arc::new(|| {
+            Box::pin(async {
+                warn!("Not set shutdown, using default");
+            })
         })
-    })
-}
-#[instrument_trace]
-pub fn set_shutdown(shutdown: &SharedAsyncTaskFactory<()>) {
-    drop(SHUTDOWN.set(shutdown.clone()));
-}
-#[instrument_trace]
-pub fn get_or_init_shutdown() -> SharedAsyncTaskFactory<()> {
-    SHUTDOWN.get_or_init(default_shutdown).clone()
+    }
+    #[instrument_trace]
+    pub fn get_or_init() -> SharedAsyncTaskFactory<()> {
+        SHUTDOWN.get_or_init(Self::get_init).clone()
+    }
+    #[instrument_trace]
+    pub fn set(shutdown: &SharedAsyncTaskFactory<()>) {
+        drop(SHUTDOWN.set(shutdown.clone()));
+    }
 }
 ```
 # Path: hyperlane-quick-start/plugin/shutdown/static.rs
@@ -5037,14 +5088,14 @@ use {
 };
 use hyperlane_utils::log::*;
 fn main() {
-    init_log();
-    if let Err(error) = init_env_config() {
+    LoggerBootstrap::init();
+    if let Err(error) = EnvBootstrap::init() {
         error!("{error}");
     }
     info!("Environment configuration loaded successfully");
-    runtime().block_on(async move {
-        init_db().await;
-        create(SERVER_PID_FILE_PATH, init_server).await;
+    RuntimeBootstrap::init().block_on(async move {
+        DbBootstrap::init().await;
+        ProcessPlugin::create(SERVER_PID_FILE_PATH, ServerBootstrap::init).await;
     });
 }
 ```
@@ -10619,6 +10670,30 @@ impl HooksExpression {
     async fn new_hook(_ctx: &Context) {}
     async fn method_hook(_ctx: &Context) {}
 }
+#[route("/server_config")]
+struct MultiServerConfig;
+impl ServerHook for MultiServerConfig {
+    async fn new(_ctx: &Context) -> Self {
+        Self
+    }
+    #[get_method]
+    #[response_body("multi server config test")]
+    async fn handle(self, ctx: &Context) {}
+}
+impl MultiServerConfig {
+    #[hyperlane(server_config: ServerConfig)]
+    async fn server_config_1() -> ServerConfig {
+        server_config
+    }
+    #[hyperlane(server_config: ServerConfig)]
+    async fn server_config_2(self) -> ServerConfig {
+        server_config
+    }
+    #[hyperlane(server_config: ServerConfig)]
+    async fn server_config_3(&self) -> ServerConfig {
+        server_config
+    }
+}
 #[hyperlane(server: Server)]
 #[hyperlane(config: ServerConfig)]
 #[tokio::main]
@@ -11504,11 +11579,8 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
     let vis: &Visibility = &input_fn.vis;
     let sig: &Signature = &input_fn.sig;
     let block: &Block = &input_fn.block;
-    let ident: &Ident = &sig.ident;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
     let stmts: &Vec<Stmt> = &block.stmts;
-    let inputs: &Punctuated<FnArg, token::Comma> = &sig.inputs;
-    let output: &ReturnType = &sig.output;
     let mut init_statements: Vec<TokenStream2> = Vec::new();
     for (var_name, type_name) in &multi_hyperlane.params {
         init_statements.push(quote! {
@@ -11527,7 +11599,7 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
     }
     let gen_code: TokenStream2 = quote! {
         #(#attrs)*
-        #vis async fn #ident(#inputs) #output {
+        #vis #sig {
             #(#init_statements)*
             #(#stmts)*
         }
