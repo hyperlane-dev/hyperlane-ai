@@ -1,4 +1,4 @@
-<!--2026-02-11 13:22:00-->
+<!--2026-02-11 19:18:40-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -13778,15 +13778,23 @@ cargo add hyperlane-cli
 ## Contact
 # Path: hyperlane-cli/src/main.rs
 ```rust
+mod bump;
 mod command;
 mod config;
 mod fmt;
 mod help;
+mod new;
+mod publish;
 mod version;
 mod watch;
-pub(crate) use {command::*, config::*, fmt::*, help::*, version::*, watch::*};
+pub(crate) use {
+    bump::*, command::*, config::*, fmt::*, help::*, new::*, publish::*, version::*, watch::*,
+};
 pub(crate) use std::{
+    collections::{HashMap, VecDeque},
     env::args,
+    fs::{read_to_string, write},
+    path::{Path, PathBuf},
     process::{ExitStatus, Stdio, exit},
 };
 pub(crate) use tokio::process::Command;
@@ -13803,6 +13811,58 @@ async fn main() {
         CommandType::Watch => {
             if let Err(error) = execute_watch().await {
                 eprintln!("watch failed: {error}");
+                exit(1);
+            }
+        }
+        CommandType::Bump => {
+            let manifest_path: String = args
+                .manifest_path
+                .unwrap_or_else(|| "Cargo.toml".to_string());
+            let bump_type: BumpVersionType = args.bump_type.unwrap_or(BumpVersionType::Patch);
+            match execute_bump(&manifest_path, &bump_type) {
+                Ok(new_version) => {
+                    println!("Version bumped to {new_version}");
+                }
+                Err(error) => {
+                    eprintln!("bump failed: {error}");
+                    exit(1);
+                }
+            }
+        }
+        CommandType::Publish => {
+            let manifest_path: String = args
+                .manifest_path
+                .unwrap_or_else(|| "Cargo.toml".to_string());
+            let max_retries: u32 = args.max_retries;
+            match execute_publish(&manifest_path, max_retries).await {
+                Ok(results) => {
+                    let failed_count: usize = results
+                        .iter()
+                        .filter(|r: &&PublishResult| !r.success)
+                        .count();
+                    if failed_count > 0 {
+                        eprintln!("Publish completed with {failed_count} failures");
+                        exit(1);
+                    } else {
+                        println!("All packages published successfully");
+                    }
+                }
+                Err(error) => {
+                    eprintln!("publish failed: {error}");
+                    exit(1);
+                }
+            }
+        }
+        CommandType::New => {
+            if let Some(project_name) = args.project_name {
+                if let Err(error) = execute_new(&project_name).await {
+                    eprintln!("new failed: {error}");
+                    exit(1);
+                }
+            } else {
+                eprintln!(
+                    "Error: Project name is required. Usage: hyperlane-cli new <PROJECT_NAME>"
+                );
                 exit(1);
             }
         }
@@ -13855,6 +13915,121 @@ pub(crate) async fn execute_watch() -> Result<(), std::io::Error> {
         return Err(std::io::Error::other("cargo-watch failed"));
     }
     Ok(())
+}
+```
+# Path: hyperlane-cli/src/new/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+```
+# Path: hyperlane-cli/src/new/enum.rs
+```rust
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum NewError {
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Git is not installed or not found in PATH")]
+    GitNotFound,
+    #[error("Project directory '{0}' already exists")]
+    ProjectExists(String),
+    #[error("Git clone failed: {0}")]
+    CloneFailed(String),
+    #[error("Invalid project name: {0}")]
+    InvalidName(String),
+}
+```
+# Path: hyperlane-cli/src/new/struct.rs
+```rust
+#[derive(Clone, Debug)]
+pub(crate) struct NewProjectConfig {
+    pub project_name: String,
+    pub template_url: String,
+}
+```
+# Path: hyperlane-cli/src/new/fn.rs
+```rust
+use crate::*;
+fn validate_project_name(name: &str) -> Result<(), NewError> {
+    if name.is_empty() {
+        return Err(NewError::InvalidName(
+            "Project name cannot be empty".to_string(),
+        ));
+    }
+    if name.contains('/') || name.contains('\\') || name.contains(':') {
+        return Err(NewError::InvalidName(
+            "Project name contains invalid characters".to_string(),
+        ));
+    }
+    if name.starts_with('.') || name.starts_with('-') {
+        return Err(NewError::InvalidName(
+            "Project name cannot start with '.' or '-'".to_string(),
+        ));
+    }
+    Ok(())
+}
+async fn check_git_available() -> Result<(), NewError> {
+    let output: std::process::Output = Command::new("git")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .await
+        .map_err(|_| NewError::GitNotFound)?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(NewError::GitNotFound)
+    }
+}
+async fn git_clone(config: &NewProjectConfig) -> Result<(), NewError> {
+    let project_path: PathBuf = PathBuf::from(&config.project_name);
+    if project_path.exists() {
+        return Err(NewError::ProjectExists(config.project_name.clone()));
+    }
+    let output: std::process::Output = Command::new("git")
+        .arg("clone")
+        .arg(&config.template_url)
+        .arg(&config.project_name)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await
+        .map_err(NewError::IoError)?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr: String = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(NewError::CloneFailed(stderr))
+    }
+}
+pub(crate) async fn execute_new(project_name: &str) -> Result<(), NewError> {
+    validate_project_name(project_name)?;
+    check_git_available().await?;
+    let config: NewProjectConfig = NewProjectConfig::new(project_name.to_string());
+    println!(
+        "Creating new project '{}' from template...",
+        config.project_name
+    );
+    git_clone(&config).await?;
+    println!("Successfully created project '{}'", config.project_name);
+    println!("  cd {}", config.project_name);
+    println!("  cargo build");
+    Ok(())
+}
+```
+# Path: hyperlane-cli/src/new/impl.rs
+```rust
+use crate::*;
+impl NewProjectConfig {
+    pub(crate) fn new(project_name: String) -> Self {
+        Self {
+            project_name,
+            template_url: "https://github.com/hyperlane-dev/hyperlane-quick-start".to_string(),
+        }
+    }
 }
 ```
 # Path: hyperlane-cli/src/fmt/mod.rs
@@ -13948,8 +14123,281 @@ pub(crate) use r#enum::*;
 pub(crate) enum CommandType {
     Fmt,
     Watch,
+    Bump,
+    Publish,
+    New,
     Help,
     Version,
+}
+```
+# Path: hyperlane-cli/src/publish/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#struct;
+pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+```
+# Path: hyperlane-cli/src/publish/enum.rs
+```rust
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum PublishError {
+    #[error("Failed to parse Cargo.toml")]
+    ManifestParseError,
+    #[error("Circular dependency detected")]
+    CircularDependency,
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+}
+```
+# Path: hyperlane-cli/src/publish/struct.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Package {
+    pub name: String,
+    pub version: String,
+    pub path: std::path::PathBuf,
+    pub local_dependencies: Vec<String>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct PublishResult {
+    pub package_name: String,
+    pub success: bool,
+    pub error: Option<String>,
+    pub retries: u32,
+}
+```
+# Path: hyperlane-cli/src/publish/fn.rs
+```rust
+use crate::*;
+fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError> {
+    let content: String = read_to_string(workspace_root)?;
+    let doc: toml::Value =
+        toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
+    let mut packages: Vec<Package> = Vec::new();
+    if let Some(workspace) = doc.get("workspace") {
+        if let Some(members) = workspace.get("members").and_then(|m| m.as_array()) {
+            for member in members {
+                if let Some(pattern) = member.as_str() {
+                    let base_path: &Path = workspace_root.parent().unwrap_or(workspace_root);
+                    expand_pattern(base_path, pattern, &mut packages)?;
+                }
+            }
+        }
+    }
+    if packages.is_empty() {
+        let package: Package = read_single_package(workspace_root)?;
+        packages.push(package);
+    }
+    Ok(packages)
+}
+fn expand_pattern(
+    base_path: &Path,
+    pattern: &str,
+    packages: &mut Vec<Package>,
+) -> Result<(), PublishError> {
+    if pattern.contains('*') {
+        let parent: &Path = Path::new(pattern).parent().unwrap_or(Path::new("."));
+        let full_parent: PathBuf = base_path.join(parent);
+        if full_parent.is_dir() {
+            for entry in std::fs::read_dir(&full_parent)? {
+                let entry: std::fs::DirEntry = entry?;
+                let path: PathBuf = entry.path();
+                if path.is_dir() {
+                    let cargo_toml: PathBuf = path.join("Cargo.toml");
+                    if cargo_toml.exists() {
+                        let package: Package = read_package_manifest(&cargo_toml)?;
+                        packages.push(package);
+                    }
+                }
+            }
+        }
+    } else {
+        let cargo_toml: PathBuf = base_path.join(pattern).join("Cargo.toml");
+        if cargo_toml.exists() {
+            let package: Package = read_package_manifest(&cargo_toml)?;
+            packages.push(package);
+        }
+    }
+    Ok(())
+}
+fn read_single_package(manifest_path: &Path) -> Result<Package, PublishError> {
+    read_package_manifest(manifest_path)
+}
+fn read_package_manifest(manifest_path: &Path) -> Result<Package, PublishError> {
+    let content: String = read_to_string(manifest_path)?;
+    let doc: toml::Value =
+        toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
+    let package_table: &toml::Value = doc.get("package").ok_or(PublishError::ManifestParseError)?;
+    let name: String = package_table
+        .get("name")
+        .and_then(|n: &toml::Value| n.as_str())
+        .ok_or(PublishError::ManifestParseError)?
+        .to_string();
+    let version: String = package_table
+        .get("version")
+        .and_then(|v: &toml::Value| v.as_str())
+        .ok_or(PublishError::ManifestParseError)?
+        .to_string();
+    let path: PathBuf = manifest_path
+        .parent()
+        .filter(|p: &&Path| !p.as_os_str().is_empty())
+        .map_or_else(|| PathBuf::from("."), |p: &Path| p.to_path_buf());
+    let local_dependencies: Vec<String> = extract_local_dependencies(&doc, manifest_path)?;
+    Ok(Package {
+        name,
+        version,
+        path,
+        local_dependencies,
+    })
+}
+fn extract_local_dependencies(
+    doc: &toml::Value,
+    _manifest_path: &Path,
+) -> Result<Vec<String>, PublishError> {
+    let mut deps: Vec<String> = Vec::new();
+    let dep_sections: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+    for section in &dep_sections {
+        if let Some(table) = doc.get(section).and_then(|s| s.as_table()) {
+            for (dep_name, dep_value) in table {
+                let is_local: bool = match dep_value {
+                    toml::Value::Table(t) => {
+                        t.get("path").is_some()
+                            || t.get("workspace")
+                                .and_then(|w| w.as_bool())
+                                .unwrap_or(false)
+                    }
+                    _ => false,
+                };
+                if is_local {
+                    deps.push(dep_name.clone());
+                }
+            }
+        }
+    }
+    Ok(deps)
+}
+fn topological_sort(packages: &[Package]) -> Result<Vec<Package>, PublishError> {
+    let mut in_degree: HashMap<String, usize> = HashMap::new();
+    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
+    let package_map: HashMap<String, Package> = packages
+        .iter()
+        .map(|p| (p.name.clone(), p.clone()))
+        .collect();
+    for package in packages {
+        in_degree.entry(package.name.clone()).or_insert(0);
+        for dep in &package.local_dependencies {
+            if package_map.contains_key(dep) {
+                graph
+                    .entry(dep.clone())
+                    .or_default()
+                    .push(package.name.clone());
+                *in_degree.entry(package.name.clone()).or_insert(0) += 1;
+            }
+        }
+    }
+    let mut queue: VecDeque<String> = VecDeque::new();
+    for (name, degree) in &in_degree {
+        if *degree == 0 {
+            queue.push_back(name.clone());
+        }
+    }
+    let mut result: Vec<Package> = Vec::new();
+    while let Some(name) = queue.pop_front() {
+        if let Some(package) = package_map.get(&name) {
+            result.push(package.clone());
+        }
+        if let Some(dependents) = graph.get(&name) {
+            for dependent in dependents {
+                if let Some(degree) = in_degree.get_mut(dependent) {
+                    *degree -= 1;
+                    if *degree == 0 {
+                        queue.push_back(dependent.clone());
+                    }
+                }
+            }
+        }
+    }
+    if result.len() != packages.len() {
+        return Err(PublishError::CircularDependency);
+    }
+    Ok(result)
+}
+async fn publish_package_with_retry(package: &Package, max_retries: u32) -> PublishResult {
+    let mut attempt: u32 = 0;
+    let mut last_error: Option<String> = None;
+    while attempt <= max_retries {
+        match publish_single_package(package).await {
+            Ok(()) => {
+                return PublishResult {
+                    package_name: package.name.clone(),
+                    success: true,
+                    error: None,
+                    retries: attempt,
+                };
+            }
+            Err(error) => {
+                last_error = Some(error.to_string());
+                attempt += 1;
+                if attempt <= max_retries {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(2_u64.pow(attempt))).await;
+                }
+            }
+        }
+    }
+    PublishResult {
+        package_name: package.name.clone(),
+        success: false,
+        error: last_error,
+        retries: attempt - 1,
+    }
+}
+async fn publish_single_package(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
+    let output: std::process::Output = Command::new("cargo")
+        .arg("publish")
+        .arg("--allow-dirty")
+        .current_dir(&package.path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr: String = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(stderr.into())
+    }
+}
+pub(crate) async fn execute_publish(
+    manifest_path: &str,
+    max_retries: u32,
+) -> Result<Vec<PublishResult>, PublishError> {
+    let path: &Path = Path::new(manifest_path);
+    let packages: Vec<Package> = discover_packages(path)?;
+    if packages.is_empty() {
+        return Ok(Vec::new());
+    }
+    let sorted_packages: Vec<Package> = topological_sort(&packages)?;
+    let mut results: Vec<PublishResult> = Vec::new();
+    for package in sorted_packages {
+        println!("Publishing {} v{}...", package.name, package.version);
+        let result: PublishResult = publish_package_with_retry(&package, max_retries).await;
+        if result.success {
+            if result.retries == 0 {
+                println!("Successfully published {}", result.package_name,);
+            } else {
+                println!(
+                    "Successfully published {} (retried {} times)",
+                    result.package_name, result.retries
+                );
+            }
+        } else if let Some(error) = &result.error {
+            eprintln!("Failed to publish {}: {error}", result.package_name);
+        } else {
+            eprintln!("Failed to publish {}", result.package_name);
+        }
+        results.push(result);
+    }
+    Ok(results)
 }
 ```
 # Path: hyperlane-cli/src/config/mod.rs
@@ -13966,6 +14414,9 @@ pub struct Args {
     pub command: CommandType,
     pub check: bool,
     pub manifest_path: Option<String>,
+    pub bump_type: Option<BumpVersionType>,
+    pub max_retries: u32,
+    pub project_name: Option<String>,
 }
 ```
 # Path: hyperlane-cli/src/config/fn.rs
@@ -13976,6 +14427,9 @@ pub(crate) fn parse_args() -> Args {
     let mut command: CommandType = CommandType::Help;
     let mut check: bool = false;
     let mut manifest_path: Option<String> = None;
+    let mut bump_type: Option<BumpVersionType> = None;
+    let mut max_retries: u32 = 3;
+    let mut project_name: Option<String> = None;
     let mut i: usize = 1;
     while i < raw_args.len() {
         let arg: &str = raw_args[i].as_str();
@@ -13996,6 +14450,51 @@ pub(crate) fn parse_args() -> Args {
                     command = CommandType::Watch;
                 }
             }
+            "bump" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Bump;
+                }
+            }
+            "publish" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Publish;
+                }
+            }
+            "new" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::New;
+                    i += 1;
+                    if i < raw_args.len()
+                        && !raw_args[i].starts_with("--")
+                        && !raw_args[i].starts_with("-")
+                    {
+                        project_name = Some(raw_args[i].clone());
+                    } else {
+                        i -= 1;
+                    }
+                }
+            }
+            "--patch" => {
+                bump_type = Some(BumpVersionType::Patch);
+            }
+            "--minor" => {
+                bump_type = Some(BumpVersionType::Minor);
+            }
+            "--major" => {
+                bump_type = Some(BumpVersionType::Major);
+            }
+            "--release" => {
+                bump_type = Some(BumpVersionType::Release);
+            }
+            "--alpha" => {
+                bump_type = Some(BumpVersionType::Alpha);
+            }
+            "--beta" => {
+                bump_type = Some(BumpVersionType::Beta);
+            }
+            "--rc" => {
+                bump_type = Some(BumpVersionType::Rc);
+            }
             "--check" => {
                 check = true;
             }
@@ -14003,6 +14502,14 @@ pub(crate) fn parse_args() -> Args {
                 i += 1;
                 if i < raw_args.len() {
                     manifest_path = Some(raw_args[i].clone());
+                }
+            }
+            "--max-retries" => {
+                i += 1;
+                if i < raw_args.len() {
+                    if let Ok(n) = raw_args[i].parse::<u32>() {
+                        max_retries = n;
+                    }
                 }
             }
             _ => {}
@@ -14013,6 +14520,9 @@ pub(crate) fn parse_args() -> Args {
         command,
         check,
         manifest_path,
+        bump_type,
+        max_retries,
+        project_name,
     }
 }
 ```
@@ -14027,13 +14537,228 @@ pub(crate) fn print_help() {
     println!("hyperlane-cli [COMMAND] [OPTIONS]");
     println!();
     println!("Commands:");
+    println!("  bump      Bump version in Cargo.toml");
     println!("  fmt       Format Rust code using cargo fmt");
     println!("  watch     Watch files and run cargo run using cargo-watch");
+    println!("  publish   Publish packages in monorepo with topological ordering");
+    println!("  new       Create a new project from template");
     println!("  -h, --help      Print this help message");
     println!("  -v, --version   Print version information");
+    println!();
+    println!("New Options:");
+    println!("  <PROJECT_NAME>  Name of the project to create");
+    println!();
+    println!("Bump Options:");
+    println!("  --patch         Bump patch version (0.1.0 -> 0.1.1) [default]");
+    println!("  --minor         Bump minor version (0.1.0 -> 0.2.0)");
+    println!("  --major         Bump major version (0.1.0 -> 1.0.0)");
+    println!(
+        "  --alpha         Add or bump alpha version (0.1.0 -> 0.1.0-alpha, 0.1.0-alpha -> 0.1.0-alpha.1)"
+    );
+    println!(
+        "  --beta          Add or bump beta version (0.1.0 -> 0.1.0-beta, 0.1.0-alpha.2 -> 0.1.0-beta.1)"
+    );
+    println!(
+        "  --rc            Add or bump rc version (0.1.0 -> 0.1.0-rc, 0.1.0-beta.1 -> 0.1.0-rc.1)"
+    );
+    println!("  --release       Remove pre-release identifier (0.1.0-alpha -> 0.1.0)");
+    println!("  --manifest-path <PATH>  Path to Cargo.toml [default: Cargo.toml]");
     println!();
     println!("Fmt Options:");
     println!("  --check         Check formatting without making changes");
     println!("  --manifest-path <PATH>  Path to Cargo.toml");
+    println!();
+    println!("Publish Options:");
+    println!("  --manifest-path <PATH>  Path to workspace Cargo.toml [default: Cargo.toml]");
+    println!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
+}
+```
+# Path: hyperlane-cli/src/bump/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#struct;
+pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+```
+# Path: hyperlane-cli/src/bump/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BumpVersionType {
+    Patch,
+    Minor,
+    Major,
+    Release,
+    Alpha,
+    Beta,
+    Rc,
+}
+```
+# Path: hyperlane-cli/src/bump/struct.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Version {
+    pub major: u64,
+    pub minor: u64,
+    pub patch: u64,
+    pub prerelease: Option<String>,
+}
+```
+# Path: hyperlane-cli/src/bump/fn.rs
+```rust
+use crate::*;
+fn parse_version(version_str: &str) -> Option<Version> {
+    let parts: Vec<&str> = version_str.split('-').collect();
+    let version_part: &str = parts.first()?;
+    let prerelease: Option<String> = parts.get(1).map(|s: &&str| s.to_string());
+    let nums: Vec<&str> = version_part.split('.').collect();
+    if nums.len() != 3 {
+        return None;
+    }
+    let major: u64 = nums.first()?.parse().ok()?;
+    let minor: u64 = nums.get(1)?.parse().ok()?;
+    let patch: u64 = nums.get(2)?.parse().ok()?;
+    Some(Version {
+        major,
+        minor,
+        patch,
+        prerelease,
+    })
+}
+fn parse_prerelease(prerelease: &str) -> Option<(&str, u64)> {
+    let parts: Vec<&str> = prerelease.split('.').collect();
+    let pre_type: &str = parts.first()?;
+    let number: u64 = parts
+        .get(1)
+        .and_then(|s: &&str| s.parse().ok())
+        .unwrap_or(0);
+    Some((pre_type, number))
+}
+fn get_next_prerelease(current: Option<&String>, target_type: &str) -> String {
+    match current {
+        Some(pre) => {
+            if let Some((pre_type, number)) = parse_prerelease(pre) {
+                if pre_type == target_type && number > 0 {
+                    return format!("{}.{}", target_type, number + 1);
+                }
+            }
+            format!("{target_type}.1")
+        }
+        None => target_type.to_string(),
+    }
+}
+fn version_to_string(version: &Version) -> String {
+    let base: String = format!("{}.{}.{}", version.major, version.minor, version.patch);
+    match &version.prerelease {
+        Some(pre) => format!("{base}-{pre}"),
+        None => base,
+    }
+}
+fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
+    match bump_type {
+        BumpVersionType::Patch => Version {
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch + 1,
+            prerelease: None,
+        },
+        BumpVersionType::Minor => Version {
+            major: version.major,
+            minor: version.minor + 1,
+            patch: 0,
+            prerelease: None,
+        },
+        BumpVersionType::Major => Version {
+            major: version.major + 1,
+            minor: 0,
+            patch: 0,
+            prerelease: None,
+        },
+        BumpVersionType::Release => Version {
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+            prerelease: None,
+        },
+        BumpVersionType::Alpha => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "alpha");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+        BumpVersionType::Beta => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "beta");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+        BumpVersionType::Rc => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "rc");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+    }
+}
+fn find_version_position(line: &str) -> Option<(usize, usize)> {
+    let trimmed: &str = line.trim();
+    if !trimmed.starts_with("version") || !trimmed.contains('=') {
+        return None;
+    }
+    let eq_pos: usize = line.find('=')?;
+    let after_eq: &str = &line[eq_pos + 1..];
+    let quote_start: usize = after_eq.find('"')?;
+    let after_first_quote: &str = &after_eq[quote_start + 1..];
+    let quote_end: usize = after_first_quote.find('"')?;
+    let version_start: usize = eq_pos + 1 + quote_start + 1;
+    let version_end: usize = version_start + quote_end;
+    Some((version_start, version_end))
+}
+pub(crate) fn execute_bump(
+    manifest_path: &str,
+    bump_type: &BumpVersionType,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let path: &Path = Path::new(manifest_path);
+    let content: String = read_to_string(path)?;
+    let mut new_version: Option<String> = None;
+    let mut found_version: bool = false;
+    let mut updated_content: String = content.clone();
+    for line in content.lines() {
+        if found_version {
+            break;
+        }
+        if let Some((version_start, version_end)) = find_version_position(line) {
+            let version_str: &str = &line[version_start..version_end];
+            if let Some(version) = parse_version(version_str) {
+                let bumped: Version = bump_version(&version, bump_type);
+                let version_string: String = version_to_string(&bumped);
+                new_version = Some(version_string.clone());
+                let new_line: String = format!(
+                    "{}{}{}",
+                    &line[..version_start],
+                    version_string,
+                    &line[version_end..]
+                );
+                updated_content = updated_content.replacen(line, &new_line, 1);
+                found_version = true;
+            }
+        }
+    }
+    if !found_version {
+        return Err("version field not found in Cargo.toml".into());
+    }
+    write(path, updated_content)?;
+    match new_version {
+        Some(v) => Ok(v),
+        None => Err("failed to bump version".into()),
+    }
 }
 ```
