@@ -1,4 +1,4 @@
-<!--2026-02-11 07:09:26-->
+<!--2026-02-11 13:22:00-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -13780,81 +13780,16 @@ cargo add hyperlane-cli
 ```rust
 mod command;
 mod config;
-use {command::*, config::*};
-use std::{
+mod fmt;
+mod help;
+mod version;
+mod watch;
+pub(crate) use {command::*, config::*, fmt::*, help::*, version::*, watch::*};
+pub(crate) use std::{
     env::args,
     process::{ExitStatus, Stdio, exit},
 };
-use tokio::process::Command;
-fn print_help() {
-    println!("hyperlane-cli [COMMAND] [OPTIONS]");
-    println!();
-    println!("Commands:");
-    println!("  fmt       Format Rust code using cargo fmt");
-    println!("  watch     Watch files and run cargo run using cargo-watch");
-    println!("  -h, --help      Print this help message");
-    println!("  -v, --version   Print version information");
-    println!();
-    println!("Fmt Options:");
-    println!("  --check         Check formatting without making changes");
-    println!("  --manifest-path <PATH>  Path to Cargo.toml");
-}
-fn print_version() {
-    println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
-}
-async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("fmt");
-    if args.check {
-        cmd.arg("--check");
-    }
-    if let Some(ref manifest_path) = args.manifest_path {
-        cmd.arg("--manifest-path").arg(manifest_path);
-    }
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("cargo fmt failed"));
-    }
-    Ok(())
-}
-async fn is_cargo_watch_installed() -> bool {
-    Command::new("cargo-watch")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .is_ok_and(|status: ExitStatus| status.success())
-}
-async fn install_cargo_watch() -> Result<(), std::io::Error> {
-    println!("cargo-watch not found, installing...");
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("install").arg("cargo-watch");
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("failed to install cargo-watch"));
-    }
-    Ok(())
-}
-async fn execute_watch() -> Result<(), std::io::Error> {
-    if !is_cargo_watch_installed().await {
-        install_cargo_watch().await?;
-    }
-    let mut cmd: Command = Command::new("cargo-watch");
-    cmd.arg("--clear")
-        .arg("--skip-local-deps")
-        .arg("-q")
-        .arg("-x")
-        .arg("run");
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("cargo-watch failed"));
-    }
-    Ok(())
-}
+pub(crate) use tokio::process::Command;
 #[tokio::main]
 async fn main() {
     let args: Args = parse_args();
@@ -13876,15 +13811,141 @@ async fn main() {
     }
 }
 ```
+# Path: hyperlane-cli/src/watch/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-cli/src/watch/fn.rs
+```rust
+use crate::*;
+async fn is_cargo_watch_installed() -> bool {
+    Command::new("cargo-watch")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .is_ok_and(|status: ExitStatus| status.success())
+}
+async fn install_cargo_watch() -> Result<(), std::io::Error> {
+    println!("cargo-watch not found, installing...");
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("install").arg("cargo-watch");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("failed to install cargo-watch"));
+    }
+    Ok(())
+}
+pub(crate) async fn execute_watch() -> Result<(), std::io::Error> {
+    if !is_cargo_watch_installed().await {
+        install_cargo_watch().await?;
+    }
+    let mut cmd: Command = Command::new("cargo-watch");
+    cmd.arg("--clear")
+        .arg("--skip-local-deps")
+        .arg("-q")
+        .arg("-x")
+        .arg("run");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("cargo-watch failed"));
+    }
+    Ok(())
+}
+```
+# Path: hyperlane-cli/src/fmt/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-cli/src/fmt/fn.rs
+```rust
+use crate::*;
+async fn is_cargo_clippy_installed() -> bool {
+    Command::new("cargo")
+        .arg("clippy")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .is_ok_and(|status: ExitStatus| status.success())
+}
+async fn install_cargo_clippy() -> Result<(), std::io::Error> {
+    println!("cargo-clippy not found, installing...");
+    let mut cmd: Command = Command::new("rustup");
+    cmd.arg("component").arg("add").arg("clippy");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("failed to install cargo-clippy"));
+    }
+    Ok(())
+}
+async fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {
+    if !is_cargo_clippy_installed().await {
+        install_cargo_clippy().await?;
+    }
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("clippy")
+        .arg("--fix")
+        .arg("--workspace")
+        .arg("--all-targets")
+        .arg("--allow-dirty");
+    if let Some(ref manifest_path) = args.manifest_path {
+        cmd.arg("--manifest-path").arg(manifest_path);
+    }
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("cargo clippy --fix failed"));
+    }
+    Ok(())
+}
+pub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("fmt");
+    if args.check {
+        cmd.arg("--check");
+    }
+    if let Some(ref manifest_path) = args.manifest_path {
+        cmd.arg("--manifest-path").arg(manifest_path);
+    }
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("cargo fmt failed"));
+    }
+    if !args.check {
+        execute_clippy_fix(args).await?;
+    }
+    Ok(())
+}
+```
+# Path: hyperlane-cli/src/version/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-cli/src/version/fn.rs
+```rust
+pub(crate) fn print_version() {
+    println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
+}
+```
 # Path: hyperlane-cli/src/command/mod.rs
 ```rust
 mod r#enum;
-pub use r#enum::*;
+pub(crate) use r#enum::*;
 ```
 # Path: hyperlane-cli/src/command/enum.rs
 ```rust
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CommandType {
+pub(crate) enum CommandType {
     Fmt,
     Watch,
     Help,
@@ -13895,7 +13956,7 @@ pub enum CommandType {
 ```rust
 mod r#fn;
 mod r#struct;
-pub use {r#fn::*, r#struct::*};
+pub(crate) use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/config/struct.rs
 ```rust
@@ -13910,7 +13971,7 @@ pub struct Args {
 # Path: hyperlane-cli/src/config/fn.rs
 ```rust
 use crate::*;
-pub fn parse_args() -> Args {
+pub(crate) fn parse_args() -> Args {
     let raw_args: Vec<String> = args().collect();
     let mut command: CommandType = CommandType::Help;
     let mut check: bool = false;
@@ -13953,5 +14014,26 @@ pub fn parse_args() -> Args {
         check,
         manifest_path,
     }
+}
+```
+# Path: hyperlane-cli/src/help/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-cli/src/help/fn.rs
+```rust
+pub(crate) fn print_help() {
+    println!("hyperlane-cli [COMMAND] [OPTIONS]");
+    println!();
+    println!("Commands:");
+    println!("  fmt       Format Rust code using cargo fmt");
+    println!("  watch     Watch files and run cargo run using cargo-watch");
+    println!("  -h, --help      Print this help message");
+    println!("  -v, --version   Print version information");
+    println!();
+    println!("Fmt Options:");
+    println!("  --check         Check formatting without making changes");
+    println!("  --manifest-path <PATH>  Path to Cargo.toml");
 }
 ```

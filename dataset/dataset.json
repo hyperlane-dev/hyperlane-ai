@@ -32148,144 +32148,6 @@
     "system": ""
   },
   {
-    "instruction": "print_help函数的源码是怎么实现的？",
-    "input": "",
-    "output": "print_help函数的源码实现如下：\n\n```rust\n/// Print help message\nfn print_help() {\n    println!(\"hyperlane-cli [COMMAND] [OPTIONS]\");\n    println!();\n    println!(\"Commands:\");\n    println!(\"  fmt       Format Rust code using cargo fmt\");\n    println!(\"  watch     Watch files and run cargo run using cargo-watch\");\n    println!(\"  -h, --help      Print this help message\");\n    println!(\"  -v, --version   Print version information\");\n    println!();\n    println!(\"Fmt Options:\");\n    println!(\"  --check         Check formatting without making changes\");\n    println!(\"  --manifest-path <PATH>  Path to Cargo.toml\");\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "print_help函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "print_help函数的泛型设计和使用如下：\n\n```rust\n/// Print help message\nfn print_help() {\n    println!(\"hyperlane-cli [COMMAND] [OPTIONS]\");\n    println!();\n    println!(\"Commands:\");\n    println!(\"  fmt       Format Rust code using cargo fmt\");\n    println!(\"  watch     Watch files and run cargo run using cargo-watch\");\n    println!(\"  -h, --help      Print this help message\");\n    println!(\"  -v, --version   Print version information\");\n    println!();\n    println!(\"Fmt Options:\");\n    println!(\"  --check         Check formatting without making changes\");\n    println!(\"  --manifest-path <PATH>  Path to Cargo.toml\");\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "print_version函数的源码是怎么实现的？",
-    "input": "",
-    "output": "print_version函数的源码实现如下：\n\n```rust\n/// Print version\nfn print_version() {\n    println!(\"hyperlane-cli {}\", env!(\"CARGO_PKG_VERSION\"));\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "execute_fmt函数的源码是怎么实现的？",
-    "input": "",
-    "output": "execute_fmt函数的源码实现如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    Ok(())\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释execute_fmt这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "execute_fmt函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    Ok(())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：23\n- 包含高级特性：泛型编程、异步编程、错误处理",
-    "system": ""
-  },
-  {
-    "instruction": "execute_fmt函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "execute_fmt函数的泛型设计和使用如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    Ok(())\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "execute_fmt函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "execute_fmt函数的异步实现机制如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    Ok(())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "execute_fmt函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "execute_fmt函数的参数设计如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    Ok(())\n}\n```\n\n参数列表：\n- args: &Args\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "execute_fmt函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "execute_fmt函数的返回值类型设计如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    Ok(())\n}\n```\n\n返回类型：Result<(), std::io::Error>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "is_cargo_watch_installed函数的源码是怎么实现的？",
-    "input": "",
-    "output": "is_cargo_watch_installed函数的源码实现如下：\n\n```rust\n/// Check if cargo-watch is installed\n///\n/// # Returns\n/// - `bool`: True if cargo-watch is available\nasync fn is_cargo_watch_installed() -> bool {\n    Command::new(\"cargo-watch\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释is_cargo_watch_installed这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "is_cargo_watch_installed函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Check if cargo-watch is installed\n///\n/// # Returns\n/// - `bool`: True if cargo-watch is available\nasync fn is_cargo_watch_installed() -> bool {\n    Command::new(\"cargo-watch\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：13\n- 包含高级特性：异步编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "is_cargo_watch_installed函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "is_cargo_watch_installed函数的异步实现机制如下：\n\n```rust\n/// Check if cargo-watch is installed\n///\n/// # Returns\n/// - `bool`: True if cargo-watch is available\nasync fn is_cargo_watch_installed() -> bool {\n    Command::new(\"cargo-watch\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "is_cargo_watch_installed函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "is_cargo_watch_installed函数的返回值类型设计如下：\n\n```rust\n/// Check if cargo-watch is installed\n///\n/// # Returns\n/// - `bool`: True if cargo-watch is available\nasync fn is_cargo_watch_installed() -> bool {\n    Command::new(\"cargo-watch\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "install_cargo_watch函数的源码是怎么实现的？",
-    "input": "",
-    "output": "install_cargo_watch函数的源码实现如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释install_cargo_watch这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "install_cargo_watch函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：15\n- 包含高级特性：泛型编程、异步编程、错误处理",
-    "system": ""
-  },
-  {
-    "instruction": "install_cargo_watch函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "install_cargo_watch函数的泛型设计和使用如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "install_cargo_watch函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "install_cargo_watch函数的异步实现机制如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "install_cargo_watch函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "install_cargo_watch函数的返回值类型设计如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```\n\n返回类型：Result<(), std::io::Error>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "execute_watch函数的源码是怎么实现的？",
-    "input": "",
-    "output": "execute_watch函数的源码实现如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释execute_watch这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "execute_watch函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：21\n- 包含高级特性：泛型编程、异步编程、错误处理",
-    "system": ""
-  },
-  {
-    "instruction": "execute_watch函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "execute_watch函数的泛型设计和使用如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "execute_watch函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "execute_watch函数的异步实现机制如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "execute_watch函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "execute_watch函数的返回值类型设计如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```\n\n返回类型：Result<(), std::io::Error>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
     "instruction": "main函数的源码是怎么实现的？",
     "input": "",
     "output": "main函数的源码实现如下：\n\n```rust\n#[tokio::main]\nasync fn main() {\n    let args: Args = parse_args();\n    match args.command {\n        CommandType::Fmt => {\n            if let Err(error) = execute_fmt(&args).await {\n                eprintln!(\"fmt failed: {error}\");\n                exit(1);\n            }\n        }\n        CommandType::Watch => {\n            if let Err(error) = execute_watch().await {\n                eprintln!(\"watch failed: {error}\");\n                exit(1);\n            }\n        }\n        CommandType::Help => print_help(),\n        CommandType::Version => print_version(),\n    }\n}\n```",
@@ -32298,9 +32160,219 @@
     "system": ""
   },
   {
+    "instruction": "is_cargo_watch_installed函数的源码是怎么实现的？",
+    "input": "",
+    "output": "is_cargo_watch_installed函数的源码实现如下：\n\n```rust\n/// Check if cargo-watch is installed\n///\n/// # Returns\n///\n/// - `bool`: True if cargo-watch is available\nasync fn is_cargo_watch_installed() -> bool {\n    Command::new(\"cargo-watch\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释is_cargo_watch_installed这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "is_cargo_watch_installed函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Check if cargo-watch is installed\n///\n/// # Returns\n///\n/// - `bool`: True if cargo-watch is available\nasync fn is_cargo_watch_installed() -> bool {\n    Command::new(\"cargo-watch\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：14\n- 包含高级特性：异步编程、闭包",
+    "system": ""
+  },
+  {
+    "instruction": "is_cargo_watch_installed函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "is_cargo_watch_installed函数的异步实现机制如下：\n\n```rust\n/// Check if cargo-watch is installed\n///\n/// # Returns\n///\n/// - `bool`: True if cargo-watch is available\nasync fn is_cargo_watch_installed() -> bool {\n    Command::new(\"cargo-watch\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "is_cargo_watch_installed函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "is_cargo_watch_installed函数的返回值类型设计如下：\n\n```rust\n/// Check if cargo-watch is installed\n///\n/// # Returns\n///\n/// - `bool`: True if cargo-watch is available\nasync fn is_cargo_watch_installed() -> bool {\n    Command::new(\"cargo-watch\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "install_cargo_watch函数的源码是怎么实现的？",
+    "input": "",
+    "output": "install_cargo_watch函数的源码实现如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释install_cargo_watch这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "install_cargo_watch函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：16\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "install_cargo_watch函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "install_cargo_watch函数的泛型设计和使用如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "install_cargo_watch函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "install_cargo_watch函数的异步实现机制如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "install_cargo_watch函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "install_cargo_watch函数的返回值类型设计如下：\n\n```rust\n/// Install cargo-watch using cargo install\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_watch() -> Result<(), std::io::Error> {\n    println!(\"cargo-watch not found, installing...\");\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"install\").arg(\"cargo-watch\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-watch\"));\n    }\n    Ok(())\n}\n```\n\n返回类型：Result<(), std::io::Error>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_watch函数的源码是怎么实现的？",
+    "input": "",
+    "output": "execute_watch函数的源码实现如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释execute_watch这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "execute_watch函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：22\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "execute_watch函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "execute_watch函数的泛型设计和使用如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_watch函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "execute_watch函数的异步实现机制如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_watch函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "execute_watch函数的返回值类型设计如下：\n\n```rust\n/// Execute watch command using cargo-watch\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_watch() -> Result<(), std::io::Error> {\n    if !is_cargo_watch_installed().await {\n        install_cargo_watch().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo-watch\");\n    cmd.arg(\"--clear\")\n        .arg(\"--skip-local-deps\")\n        .arg(\"-q\")\n        .arg(\"-x\")\n        .arg(\"run\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo-watch failed\"));\n    }\n    Ok(())\n}\n```\n\n返回类型：Result<(), std::io::Error>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "is_cargo_clippy_installed函数的源码是怎么实现的？",
+    "input": "",
+    "output": "is_cargo_clippy_installed函数的源码实现如下：\n\n```rust\n/// Check if cargo-clippy is installed\n///\n/// # Returns\n///\n/// - `bool`: True if cargo-clippy is available\nasync fn is_cargo_clippy_installed() -> bool {\n    Command::new(\"cargo\")\n        .arg(\"clippy\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释is_cargo_clippy_installed这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "is_cargo_clippy_installed函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Check if cargo-clippy is installed\n///\n/// # Returns\n///\n/// - `bool`: True if cargo-clippy is available\nasync fn is_cargo_clippy_installed() -> bool {\n    Command::new(\"cargo\")\n        .arg(\"clippy\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：15\n- 包含高级特性：异步编程、闭包",
+    "system": ""
+  },
+  {
+    "instruction": "is_cargo_clippy_installed函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "is_cargo_clippy_installed函数的异步实现机制如下：\n\n```rust\n/// Check if cargo-clippy is installed\n///\n/// # Returns\n///\n/// - `bool`: True if cargo-clippy is available\nasync fn is_cargo_clippy_installed() -> bool {\n    Command::new(\"cargo\")\n        .arg(\"clippy\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "is_cargo_clippy_installed函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "is_cargo_clippy_installed函数的返回值类型设计如下：\n\n```rust\n/// Check if cargo-clippy is installed\n///\n/// # Returns\n///\n/// - `bool`: True if cargo-clippy is available\nasync fn is_cargo_clippy_installed() -> bool {\n    Command::new(\"cargo\")\n        .arg(\"clippy\")\n        .arg(\"--version\")\n        .stdout(Stdio::null())\n        .stderr(Stdio::null())\n        .status()\n        .await\n        .is_ok_and(|status: ExitStatus| status.success())\n}\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "install_cargo_clippy函数的源码是怎么实现的？",
+    "input": "",
+    "output": "install_cargo_clippy函数的源码实现如下：\n\n```rust\n/// Install cargo-clippy using rustup\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_clippy() -> Result<(), std::io::Error> {\n    println!(\"cargo-clippy not found, installing...\");\n    let mut cmd: Command = Command::new(\"rustup\");\n    cmd.arg(\"component\").arg(\"add\").arg(\"clippy\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-clippy\"));\n    }\n    Ok(())\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释install_cargo_clippy这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "install_cargo_clippy函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Install cargo-clippy using rustup\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_clippy() -> Result<(), std::io::Error> {\n    println!(\"cargo-clippy not found, installing...\");\n    let mut cmd: Command = Command::new(\"rustup\");\n    cmd.arg(\"component\").arg(\"add\").arg(\"clippy\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-clippy\"));\n    }\n    Ok(())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：16\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "install_cargo_clippy函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "install_cargo_clippy函数的泛型设计和使用如下：\n\n```rust\n/// Install cargo-clippy using rustup\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_clippy() -> Result<(), std::io::Error> {\n    println!(\"cargo-clippy not found, installing...\");\n    let mut cmd: Command = Command::new(\"rustup\");\n    cmd.arg(\"component\").arg(\"add\").arg(\"clippy\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-clippy\"));\n    }\n    Ok(())\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "install_cargo_clippy函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "install_cargo_clippy函数的异步实现机制如下：\n\n```rust\n/// Install cargo-clippy using rustup\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_clippy() -> Result<(), std::io::Error> {\n    println!(\"cargo-clippy not found, installing...\");\n    let mut cmd: Command = Command::new(\"rustup\");\n    cmd.arg(\"component\").arg(\"add\").arg(\"clippy\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-clippy\"));\n    }\n    Ok(())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "install_cargo_clippy函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "install_cargo_clippy函数的返回值类型设计如下：\n\n```rust\n/// Install cargo-clippy using rustup\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn install_cargo_clippy() -> Result<(), std::io::Error> {\n    println!(\"cargo-clippy not found, installing...\");\n    let mut cmd: Command = Command::new(\"rustup\");\n    cmd.arg(\"component\").arg(\"add\").arg(\"clippy\");\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"failed to install cargo-clippy\"));\n    }\n    Ok(())\n}\n```\n\n返回类型：Result<(), std::io::Error>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_clippy_fix函数的源码是怎么实现的？",
+    "input": "",
+    "output": "execute_clippy_fix函数的源码实现如下：\n\n```rust\n/// Execute clippy fix command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {\n    if !is_cargo_clippy_installed().await {\n        install_cargo_clippy().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"clippy\")\n        .arg(\"--fix\")\n        .arg(\"--workspace\")\n        .arg(\"--all-targets\")\n        .arg(\"--allow-dirty\");\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo clippy --fix failed\"));\n    }\n    Ok(())\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释execute_clippy_fix这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "execute_clippy_fix函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Execute clippy fix command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {\n    if !is_cargo_clippy_installed().await {\n        install_cargo_clippy().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"clippy\")\n        .arg(\"--fix\")\n        .arg(\"--workspace\")\n        .arg(\"--all-targets\")\n        .arg(\"--allow-dirty\");\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo clippy --fix failed\"));\n    }\n    Ok(())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：27\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "execute_clippy_fix函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "execute_clippy_fix函数的泛型设计和使用如下：\n\n```rust\n/// Execute clippy fix command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {\n    if !is_cargo_clippy_installed().await {\n        install_cargo_clippy().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"clippy\")\n        .arg(\"--fix\")\n        .arg(\"--workspace\")\n        .arg(\"--all-targets\")\n        .arg(\"--allow-dirty\");\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo clippy --fix failed\"));\n    }\n    Ok(())\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_clippy_fix函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "execute_clippy_fix函数的异步实现机制如下：\n\n```rust\n/// Execute clippy fix command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {\n    if !is_cargo_clippy_installed().await {\n        install_cargo_clippy().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"clippy\")\n        .arg(\"--fix\")\n        .arg(\"--workspace\")\n        .arg(\"--all-targets\")\n        .arg(\"--allow-dirty\");\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo clippy --fix failed\"));\n    }\n    Ok(())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_clippy_fix函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "execute_clippy_fix函数的参数设计如下：\n\n```rust\n/// Execute clippy fix command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {\n    if !is_cargo_clippy_installed().await {\n        install_cargo_clippy().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"clippy\")\n        .arg(\"--fix\")\n        .arg(\"--workspace\")\n        .arg(\"--all-targets\")\n        .arg(\"--allow-dirty\");\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo clippy --fix failed\"));\n    }\n    Ok(())\n}\n```\n\n参数列表：\n- args: &Args\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_clippy_fix函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "execute_clippy_fix函数的返回值类型设计如下：\n\n```rust\n/// Execute clippy fix command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n/// - `Result<(), std::io::Error>`: Success or error\nasync fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {\n    if !is_cargo_clippy_installed().await {\n        install_cargo_clippy().await?;\n    }\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"clippy\")\n        .arg(\"--fix\")\n        .arg(\"--workspace\")\n        .arg(\"--all-targets\")\n        .arg(\"--allow-dirty\");\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo clippy --fix failed\"));\n    }\n    Ok(())\n}\n```\n\n返回类型：Result<(), std::io::Error>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_fmt函数的源码是怎么实现的？",
+    "input": "",
+    "output": "execute_fmt函数的源码实现如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    if !args.check {\n        execute_clippy_fix(args).await?;\n    }\n    Ok(())\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释execute_fmt这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "execute_fmt函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    if !args.check {\n        execute_clippy_fix(args).await?;\n    }\n    Ok(())\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：27\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "execute_fmt函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "execute_fmt函数的泛型设计和使用如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    if !args.check {\n        execute_clippy_fix(args).await?;\n    }\n    Ok(())\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_fmt函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "execute_fmt函数的异步实现机制如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    if !args.check {\n        execute_clippy_fix(args).await?;\n    }\n    Ok(())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "execute_fmt函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "execute_fmt函数的返回值类型设计如下：\n\n```rust\n/// Execute fmt command\n///\n/// # Arguments\n/// - `args`: The parsed arguments\n///\n/// # Returns\n///\n/// - `Result<(), std::io::Error>`: Success or error\npub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {\n    let mut cmd: Command = Command::new(\"cargo\");\n    cmd.arg(\"fmt\");\n    if args.check {\n        cmd.arg(\"--check\");\n    }\n    if let Some(ref manifest_path) = args.manifest_path {\n        cmd.arg(\"--manifest-path\").arg(manifest_path);\n    }\n    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());\n    let status: ExitStatus = cmd.status().await?;\n    if !status.success() {\n        return Err(std::io::Error::other(\"cargo fmt failed\"));\n    }\n    if !args.check {\n        execute_clippy_fix(args).await?;\n    }\n    Ok(())\n}\n```\n\n返回类型：Result<(), std::io::Error>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "print_version函数的源码是怎么实现的？",
+    "input": "",
+    "output": "print_version函数的源码实现如下：\n\n```rust\n/// Print version\npub(crate) fn print_version() {\n    println!(\"hyperlane-cli {}\", env!(\"CARGO_PKG_VERSION\"));\n}\n```",
+    "system": ""
+  },
+  {
     "instruction": "CommandType枚举的源码是怎么实现的？",
     "input": "",
-    "output": "CommandType枚举的源码实现如下：\n\n```rust\n/// Available commands\n#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub enum CommandType {\n    /// Format code using cargo fmt\n    Fmt,\n    /// Watch files using cargo-watch\n    Watch,\n    /// Show help\n    Help,\n    /// Show version\n    Version,\n}\n```",
+    "output": "CommandType枚举的源码实现如下：\n\n```rust\n/// Available commands\n#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub(crate) enum CommandType {\n    /// Format code using cargo fmt\n    Fmt,\n    /// Watch files using cargo-watch\n    Watch,\n    /// Show help\n    Help,\n    /// Show version\n    Version,\n}\n```",
     "system": ""
   },
   {
@@ -32318,25 +32390,37 @@
   {
     "instruction": "parse_args函数的源码是怎么实现的？",
     "input": "",
-    "output": "parse_args函数的源码实现如下：\n\n```rust\n/// Parse command line arguments\n///\n/// # Returns\n///\n/// - `Args`: Parsed arguments\npub fn parse_args() -> Args {\n    let raw_args: Vec<String> = args().collect();\n    let mut command: CommandType = CommandType::Help;\n    let mut check: bool = false;\n    let mut manifest_path: Option<String> = None;\n    let mut i: usize = 1;\n    while i < raw_args.len() {\n        let arg: &str = raw_args[i].as_str();\n        match arg {\n            \"-h\" | \"--help\" => {\n                command = CommandType::Help;\n            }\n            \"-v\" | \"--version\" => {\n                command = CommandType::Version;\n            }\n            \"fmt\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Fmt;\n                }\n            }\n            \"watch\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Watch;\n                }\n            }\n            \"--check\" => {\n                check = true;\n            }\n            \"--manifest-path\" => {\n                i += 1;\n                if i < raw_args.len() {\n                    manifest_path = Some(raw_args[i].clone());\n                }\n            }\n            _ => {}\n        }\n        i += 1;\n    }\n    Args {\n        command,\n        check,\n        manifest_path,\n    }\n}\n```",
+    "output": "parse_args函数的源码实现如下：\n\n```rust\n/// Parse command line arguments\n///\n/// # Returns\n///\n/// - `Args`: Parsed arguments\npub(crate) fn parse_args() -> Args {\n    let raw_args: Vec<String> = args().collect();\n    let mut command: CommandType = CommandType::Help;\n    let mut check: bool = false;\n    let mut manifest_path: Option<String> = None;\n    let mut i: usize = 1;\n    while i < raw_args.len() {\n        let arg: &str = raw_args[i].as_str();\n        match arg {\n            \"-h\" | \"--help\" => {\n                command = CommandType::Help;\n            }\n            \"-v\" | \"--version\" => {\n                command = CommandType::Version;\n            }\n            \"fmt\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Fmt;\n                }\n            }\n            \"watch\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Watch;\n                }\n            }\n            \"--check\" => {\n                check = true;\n            }\n            \"--manifest-path\" => {\n                i += 1;\n                if i < raw_args.len() {\n                    manifest_path = Some(raw_args[i].clone());\n                }\n            }\n            _ => {}\n        }\n        i += 1;\n    }\n    Args {\n        command,\n        check,\n        manifest_path,\n    }\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释parse_args这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "parse_args函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Parse command line arguments\n///\n/// # Returns\n///\n/// - `Args`: Parsed arguments\npub fn parse_args() -> Args {\n    let raw_args: Vec<String> = args().collect();\n    let mut command: CommandType = CommandType::Help;\n    let mut check: bool = false;\n    let mut manifest_path: Option<String> = None;\n    let mut i: usize = 1;\n    while i < raw_args.len() {\n        let arg: &str = raw_args[i].as_str();\n        match arg {\n            \"-h\" | \"--help\" => {\n                command = CommandType::Help;\n            }\n            \"-v\" | \"--version\" => {\n                command = CommandType::Version;\n            }\n            \"fmt\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Fmt;\n                }\n            }\n            \"watch\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Watch;\n                }\n            }\n            \"--check\" => {\n                check = true;\n            }\n            \"--manifest-path\" => {\n                i += 1;\n                if i < raw_args.len() {\n                    manifest_path = Some(raw_args[i].clone());\n                }\n            }\n            _ => {}\n        }\n        i += 1;\n    }\n    Args {\n        command,\n        check,\n        manifest_path,\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：49\n- 包含高级特性：泛型编程、闭包",
+    "output": "parse_args函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Parse command line arguments\n///\n/// # Returns\n///\n/// - `Args`: Parsed arguments\npub(crate) fn parse_args() -> Args {\n    let raw_args: Vec<String> = args().collect();\n    let mut command: CommandType = CommandType::Help;\n    let mut check: bool = false;\n    let mut manifest_path: Option<String> = None;\n    let mut i: usize = 1;\n    while i < raw_args.len() {\n        let arg: &str = raw_args[i].as_str();\n        match arg {\n            \"-h\" | \"--help\" => {\n                command = CommandType::Help;\n            }\n            \"-v\" | \"--version\" => {\n                command = CommandType::Version;\n            }\n            \"fmt\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Fmt;\n                }\n            }\n            \"watch\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Watch;\n                }\n            }\n            \"--check\" => {\n                check = true;\n            }\n            \"--manifest-path\" => {\n                i += 1;\n                if i < raw_args.len() {\n                    manifest_path = Some(raw_args[i].clone());\n                }\n            }\n            _ => {}\n        }\n        i += 1;\n    }\n    Args {\n        command,\n        check,\n        manifest_path,\n    }\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：49\n- 包含高级特性：泛型编程、闭包",
     "system": ""
   },
   {
     "instruction": "parse_args函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "parse_args函数的泛型设计和使用如下：\n\n```rust\n/// Parse command line arguments\n///\n/// # Returns\n///\n/// - `Args`: Parsed arguments\npub fn parse_args() -> Args {\n    let raw_args: Vec<String> = args().collect();\n    let mut command: CommandType = CommandType::Help;\n    let mut check: bool = false;\n    let mut manifest_path: Option<String> = None;\n    let mut i: usize = 1;\n    while i < raw_args.len() {\n        let arg: &str = raw_args[i].as_str();\n        match arg {\n            \"-h\" | \"--help\" => {\n                command = CommandType::Help;\n            }\n            \"-v\" | \"--version\" => {\n                command = CommandType::Version;\n            }\n            \"fmt\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Fmt;\n                }\n            }\n            \"watch\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Watch;\n                }\n            }\n            \"--check\" => {\n                check = true;\n            }\n            \"--manifest-path\" => {\n                i += 1;\n                if i < raw_args.len() {\n                    manifest_path = Some(raw_args[i].clone());\n                }\n            }\n            _ => {}\n        }\n        i += 1;\n    }\n    Args {\n        command,\n        check,\n        manifest_path,\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "parse_args函数的泛型设计和使用如下：\n\n```rust\n/// Parse command line arguments\n///\n/// # Returns\n///\n/// - `Args`: Parsed arguments\npub(crate) fn parse_args() -> Args {\n    let raw_args: Vec<String> = args().collect();\n    let mut command: CommandType = CommandType::Help;\n    let mut check: bool = false;\n    let mut manifest_path: Option<String> = None;\n    let mut i: usize = 1;\n    while i < raw_args.len() {\n        let arg: &str = raw_args[i].as_str();\n        match arg {\n            \"-h\" | \"--help\" => {\n                command = CommandType::Help;\n            }\n            \"-v\" | \"--version\" => {\n                command = CommandType::Version;\n            }\n            \"fmt\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Fmt;\n                }\n            }\n            \"watch\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Watch;\n                }\n            }\n            \"--check\" => {\n                check = true;\n            }\n            \"--manifest-path\" => {\n                i += 1;\n                if i < raw_args.len() {\n                    manifest_path = Some(raw_args[i].clone());\n                }\n            }\n            _ => {}\n        }\n        i += 1;\n    }\n    Args {\n        command,\n        check,\n        manifest_path,\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "parse_args函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "parse_args函数的返回值类型设计如下：\n\n```rust\n/// Parse command line arguments\n///\n/// # Returns\n///\n/// - `Args`: Parsed arguments\npub fn parse_args() -> Args {\n    let raw_args: Vec<String> = args().collect();\n    let mut command: CommandType = CommandType::Help;\n    let mut check: bool = false;\n    let mut manifest_path: Option<String> = None;\n    let mut i: usize = 1;\n    while i < raw_args.len() {\n        let arg: &str = raw_args[i].as_str();\n        match arg {\n            \"-h\" | \"--help\" => {\n                command = CommandType::Help;\n            }\n            \"-v\" | \"--version\" => {\n                command = CommandType::Version;\n            }\n            \"fmt\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Fmt;\n                }\n            }\n            \"watch\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Watch;\n                }\n            }\n            \"--check\" => {\n                check = true;\n            }\n            \"--manifest-path\" => {\n                i += 1;\n                if i < raw_args.len() {\n                    manifest_path = Some(raw_args[i].clone());\n                }\n            }\n            _ => {}\n        }\n        i += 1;\n    }\n    Args {\n        command,\n        check,\n        manifest_path,\n    }\n}\n```\n\n返回类型：Args\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "parse_args函数的返回值类型设计如下：\n\n```rust\n/// Parse command line arguments\n///\n/// # Returns\n///\n/// - `Args`: Parsed arguments\npub(crate) fn parse_args() -> Args {\n    let raw_args: Vec<String> = args().collect();\n    let mut command: CommandType = CommandType::Help;\n    let mut check: bool = false;\n    let mut manifest_path: Option<String> = None;\n    let mut i: usize = 1;\n    while i < raw_args.len() {\n        let arg: &str = raw_args[i].as_str();\n        match arg {\n            \"-h\" | \"--help\" => {\n                command = CommandType::Help;\n            }\n            \"-v\" | \"--version\" => {\n                command = CommandType::Version;\n            }\n            \"fmt\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Fmt;\n                }\n            }\n            \"watch\" => {\n                if command == CommandType::Help || command == CommandType::Version {\n                    command = CommandType::Watch;\n                }\n            }\n            \"--check\" => {\n                check = true;\n            }\n            \"--manifest-path\" => {\n                i += 1;\n                if i < raw_args.len() {\n                    manifest_path = Some(raw_args[i].clone());\n                }\n            }\n            _ => {}\n        }\n        i += 1;\n    }\n    Args {\n        command,\n        check,\n        manifest_path,\n    }\n}\n```\n\n返回类型：Args\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "print_help函数的源码是怎么实现的？",
+    "input": "",
+    "output": "print_help函数的源码实现如下：\n\n```rust\n/// Print help message\npub(crate) fn print_help() {\n    println!(\"hyperlane-cli [COMMAND] [OPTIONS]\");\n    println!();\n    println!(\"Commands:\");\n    println!(\"  fmt       Format Rust code using cargo fmt\");\n    println!(\"  watch     Watch files and run cargo run using cargo-watch\");\n    println!(\"  -h, --help      Print this help message\");\n    println!(\"  -v, --version   Print version information\");\n    println!();\n    println!(\"Fmt Options:\");\n    println!(\"  --check         Check formatting without making changes\");\n    println!(\"  --manifest-path <PATH>  Path to Cargo.toml\");\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "print_help函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "print_help函数的泛型设计和使用如下：\n\n```rust\n/// Print help message\npub(crate) fn print_help() {\n    println!(\"hyperlane-cli [COMMAND] [OPTIONS]\");\n    println!();\n    println!(\"Commands:\");\n    println!(\"  fmt       Format Rust code using cargo fmt\");\n    println!(\"  watch     Watch files and run cargo run using cargo-watch\");\n    println!(\"  -h, --help      Print this help message\");\n    println!(\"  -v, --version   Print version information\");\n    println!();\n    println!(\"Fmt Options:\");\n    println!(\"  --check         Check formatting without making changes\");\n    println!(\"  --manifest-path <PATH>  Path to Cargo.toml\");\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   }
 ]
