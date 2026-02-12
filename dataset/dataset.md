@@ -1,4 +1,4 @@
-<!--2026-02-12 07:09:10-->
+<!--2026-02-12 13:20:00-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -13785,17 +13785,20 @@ mod fmt;
 mod help;
 mod new;
 mod publish;
+mod template;
 mod version;
 mod watch;
 pub(crate) use {
-    bump::*, command::*, config::*, fmt::*, help::*, new::*, publish::*, version::*, watch::*,
+    bump::*, command::*, config::*, fmt::*, help::*, new::*, publish::*, template::*, version::*,
+    watch::*,
 };
 pub(crate) use std::{
     collections::{HashMap, VecDeque},
     env::args,
-    fs::{read_to_string, write},
+    fs::{create_dir_all, read_to_string, write},
     path::{Path, PathBuf},
     process::{ExitStatus, Stdio, exit},
+    str::FromStr,
 };
 pub(crate) use tokio::process::Command;
 #[tokio::main]
@@ -13866,6 +13869,36 @@ async fn main() {
                 exit(1);
             }
         }
+        CommandType::Template => {
+            let template_type: TemplateType = match args.template_type {
+                Some(tt) => tt,
+                None => {
+                    eprintln!(
+                        "Error: Template type is required. Usage: hyperlane-cli template <TYPE> [SUBTYPE] <NAME>"
+                    );
+                    exit(1);
+                }
+            };
+            let component_name: String = match args.component_name {
+                Some(cn) => cn,
+                None => {
+                    eprintln!(
+                        "Error: Component name is required. Usage: hyperlane-cli template <TYPE> [SUBTYPE] <NAME>"
+                    );
+                    exit(1);
+                }
+            };
+            if template_type == TemplateType::Model && args.model_sub_type.is_none() {
+                eprintln!("Error: Model type requires subtype (application|request|response)");
+                exit(1);
+            }
+            if let Err(error) =
+                execute_template(template_type, &component_name, args.model_sub_type).await
+            {
+                eprintln!("template failed: {error}");
+                exit(1);
+            }
+        }
         CommandType::Help => print_help(),
         CommandType::Version => print_version(),
     }
@@ -13917,12 +13950,529 @@ pub(crate) async fn execute_watch() -> Result<(), std::io::Error> {
     Ok(())
 }
 ```
+# Path: hyperlane-cli/src/template/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+#[cfg(test)]
+mod test;
+pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+```
+# Path: hyperlane-cli/src/template/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TemplateType {
+    Controller,
+    Domain,
+    Exception,
+    Mapper,
+    Model,
+    Repository,
+    Service,
+    Utils,
+    View,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ModelSubType {
+    Application,
+    Request,
+    Response,
+}
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum TemplateError {
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Invalid template type: {0}")]
+    InvalidTemplateType(String),
+    #[error("Invalid model subtype: {0}")]
+    InvalidModelSubType(String),
+    #[error("Directory '{0}' already exists")]
+    DirectoryExists(String),
+}
+```
+# Path: hyperlane-cli/src/template/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, Debug)]
+pub(crate) struct TemplateConfig {
+    pub template_type: TemplateType,
+    pub component_name: String,
+    pub model_sub_type: Option<ModelSubType>,
+    pub base_directory: String,
+}
+```
+# Path: hyperlane-cli/src/template/fn.rs
+```rust
+use crate::*;
+fn get_directory_name(template_type: &TemplateType) -> String {
+    match template_type {
+        TemplateType::Controller => "controller".to_string(),
+        TemplateType::Domain => "domain".to_string(),
+        TemplateType::Exception => "exception".to_string(),
+        TemplateType::Mapper => "mapper".to_string(),
+        TemplateType::Model => "model".to_string(),
+        TemplateType::Repository => "repository".to_string(),
+        TemplateType::Service => "service".to_string(),
+        TemplateType::Utils => "utils".to_string(),
+        TemplateType::View => "view".to_string(),
+    }
+}
+fn get_model_sub_type_name(sub_type: &ModelSubType) -> String {
+    match sub_type {
+        ModelSubType::Application => "application".to_string(),
+        ModelSubType::Request => "request".to_string(),
+        ModelSubType::Response => "response".to_string(),
+    }
+}
+fn ensure_directory(path: &Path) -> Result<(), TemplateError> {
+    if !path.exists() {
+        create_dir_all(path)?;
+    }
+    Ok(())
+}
+fn write_mod_rs(path: &Path, modules: &[&str]) -> Result<(), TemplateError> {
+    let mut content: String = String::new();
+    for module in modules {
+        let mod_name: String = if module.starts_with("r#") {
+            module.to_string()
+        } else {
+            format!("r#{module}")
+        };
+        content.push_str(&format!("mod {mod_name};\n"));
+    }
+    content.push('\n');
+    let mut pub_use_parts: Vec<String> = Vec::new();
+    for module in modules {
+        let raw_name: &str = if let Some(stripped) = module.strip_prefix("r#") {
+            stripped
+        } else {
+            module
+        };
+        let mod_name: String = if module.starts_with("r#") {
+            module.to_string()
+        } else {
+            format!("r#{module}")
+        };
+        if raw_name == "const" || raw_name == "static" {
+            pub_use_parts.push(mod_name);
+        } else if raw_name == "enum" || raw_name == "fn" {
+            pub_use_parts.push(format!("{mod_name}::*"));
+        } else if raw_name == "struct" {
+            pub_use_parts.push(mod_name);
+        }
+    }
+    if !pub_use_parts.is_empty() {
+        content.push_str("pub use {");
+        content.push_str(&pub_use_parts.join(", "));
+        content.push_str("};\n");
+    }
+    content.push('\n');
+    content.push_str("use super::*;\n");
+    write(path, content)?;
+    Ok(())
+}
+fn write_empty_mod_rs(path: &Path) -> Result<(), TemplateError> {
+    write(path, "\n")?;
+    Ok(())
+}
+fn create_controller_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir)?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["fn", "impl", "struct"])?;
+    let fn_rs: PathBuf = target_dir.join("fn.rs");
+    write(&fn_rs, "use super::*;\n")?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n")?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n")?;
+    Ok(())
+}
+fn create_view_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
+    ensure_directory(target_dir)?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["fn", "impl", "struct"])?;
+    let fn_rs: PathBuf = target_dir.join("fn.rs");
+    write(&fn_rs, "use super::*;\n")?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n")?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n")?;
+    Ok(())
+}
+fn create_service_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
+    ensure_directory(target_dir)?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["impl", "struct"])?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n")?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n")?;
+    Ok(())
+}
+fn create_domain_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
+    ensure_directory(target_dir)?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["impl", "struct"])?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n")?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n")?;
+    Ok(())
+}
+fn create_mapper_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
+    ensure_directory(target_dir)?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(
+        &mod_rs,
+        &["const", "enum", "fn", "impl", "static", "struct"],
+    )?;
+    let const_rs: PathBuf = target_dir.join("const.rs");
+    write(&const_rs, "use super::*;\n")?;
+    let enum_rs: PathBuf = target_dir.join("enum.rs");
+    write(&enum_rs, "use super::*;\n")?;
+    let fn_rs: PathBuf = target_dir.join("fn.rs");
+    write(&fn_rs, "use super::*;\n")?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n")?;
+    let static_rs: PathBuf = target_dir.join("static.rs");
+    write(&static_rs, "use super::*;\n")?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n")?;
+    Ok(())
+}
+fn create_utils_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
+    ensure_directory(target_dir)?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["fn"])?;
+    let fn_rs: PathBuf = target_dir.join("fn.rs");
+    write(&fn_rs, "use super::*;\n")?;
+    Ok(())
+}
+fn create_exception_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir)?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_empty_mod_rs(&mod_rs)?;
+    Ok(())
+}
+fn create_repository_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir)?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["impl", "struct"])?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n")?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n")?;
+    Ok(())
+}
+fn create_model_template(
+    target_dir: &Path,
+    _component_name: &str,
+    sub_type: &ModelSubType,
+) -> Result<(), TemplateError> {
+    let sub_type_name: String = get_model_sub_type_name(sub_type);
+    let model_dir: PathBuf = target_dir.join(&sub_type_name);
+    ensure_directory(&model_dir)?;
+    let mod_rs: PathBuf = model_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["struct"])?;
+    let struct_rs: PathBuf = model_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n")?;
+    Ok(())
+}
+pub(crate) async fn execute_template(
+    template_type: TemplateType,
+    component_name: &str,
+    model_sub_type: Option<ModelSubType>,
+) -> Result<(), TemplateError> {
+    let config: TemplateConfig =
+        TemplateConfig::new(template_type, component_name.to_string(), model_sub_type);
+    let base_path: PathBuf = PathBuf::from(&config.base_directory);
+    let dir_name: String = get_directory_name(&config.template_type);
+    let type_dir: PathBuf = base_path.join(&dir_name);
+    let target_dir: PathBuf = type_dir.join(&config.component_name);
+    if target_dir.exists() {
+        return Err(TemplateError::DirectoryExists(
+            target_dir.to_string_lossy().to_string(),
+        ));
+    }
+    ensure_directory(&type_dir)?;
+    match config.template_type {
+        TemplateType::Controller => {
+            create_controller_template(&target_dir, &config.component_name)?
+        }
+        TemplateType::View => create_view_template(&target_dir, &config.component_name)?,
+        TemplateType::Service => create_service_template(&target_dir, &config.component_name)?,
+        TemplateType::Domain => create_domain_template(&target_dir, &config.component_name)?,
+        TemplateType::Mapper => create_mapper_template(&target_dir, &config.component_name)?,
+        TemplateType::Utils => create_utils_template(&target_dir, &config.component_name)?,
+        TemplateType::Exception => create_exception_template(&target_dir, &config.component_name)?,
+        TemplateType::Repository => {
+            create_repository_template(&target_dir, &config.component_name)?
+        }
+        TemplateType::Model => {
+            let sub_type: ModelSubType = config.model_sub_type.ok_or_else(|| {
+                TemplateError::InvalidModelSubType("Missing model subtype".to_string())
+            })?;
+            create_model_template(&target_dir, &config.component_name, &sub_type)?;
+        }
+    }
+    let _: Result<(), std::io::Error> = crate::fmt::format_path(&target_dir).await;
+    println!(
+        "Created {} '{}' at {}",
+        dir_name,
+        config.component_name,
+        target_dir.display()
+    );
+    Ok(())
+}
+```
+# Path: hyperlane-cli/src/template/impl.rs
+```rust
+use crate::*;
+impl FromStr for TemplateType {
+    type Err = TemplateError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "controller" => Ok(Self::Controller),
+            "domain" => Ok(Self::Domain),
+            "exception" => Ok(Self::Exception),
+            "mapper" => Ok(Self::Mapper),
+            "model" => Ok(Self::Model),
+            "repository" => Ok(Self::Repository),
+            "service" => Ok(Self::Service),
+            "utils" => Ok(Self::Utils),
+            "view" => Ok(Self::View),
+            _ => Err(TemplateError::InvalidTemplateType(s.to_string())),
+        }
+    }
+}
+impl TemplateConfig {
+    pub(crate) fn new(
+        template_type: TemplateType,
+        component_name: String,
+        model_sub_type: Option<ModelSubType>,
+    ) -> Self {
+        Self {
+            template_type,
+            component_name,
+            model_sub_type,
+            base_directory: "./application".to_string(),
+        }
+    }
+}
+impl FromStr for ModelSubType {
+    type Err = TemplateError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "application" => Ok(Self::Application),
+            "request" => Ok(Self::Request),
+            "response" => Ok(Self::Response),
+            _ => Err(TemplateError::InvalidModelSubType(s.to_string())),
+        }
+    }
+}
+```
+# Path: hyperlane-cli/src/template/test.rs
+```rust
+use std::str::FromStr;
+use crate::*;
+#[test]
+fn test_template_config_new() {
+    let config: TemplateConfig =
+        TemplateConfig::new(TemplateType::Controller, "test".to_string(), None);
+    assert_eq!(config.template_type, TemplateType::Controller);
+    assert_eq!(config.component_name, "test");
+    assert_eq!(config.model_sub_type, None);
+    assert_eq!(config.base_directory, "./application");
+}
+#[test]
+fn test_template_config_with_model_sub_type() {
+    let config: TemplateConfig = TemplateConfig::new(
+        TemplateType::Model,
+        "test".to_string(),
+        Some(ModelSubType::Request),
+    );
+    assert_eq!(config.template_type, TemplateType::Model);
+    assert_eq!(config.model_sub_type, Some(ModelSubType::Request));
+}
+#[test]
+fn test_template_config_clone() {
+    let config: TemplateConfig =
+        TemplateConfig::new(TemplateType::Service, "test".to_string(), None);
+    let cloned: TemplateConfig = config.clone();
+    assert_eq!(cloned.template_type, config.template_type);
+    assert_eq!(cloned.component_name, config.component_name);
+    assert_eq!(cloned.model_sub_type, config.model_sub_type);
+    assert_eq!(cloned.base_directory, config.base_directory);
+}
+#[test]
+fn test_template_config_debug() {
+    let config: TemplateConfig =
+        TemplateConfig::new(TemplateType::Controller, "test".to_string(), None);
+    let debug_str: String = format!("{config:?}");
+    assert!(debug_str.contains("Controller"));
+    assert!(debug_str.contains("test"));
+}
+#[test]
+fn test_template_error_display() {
+    let error1: TemplateError = TemplateError::InvalidModelSubType("bad".to_string());
+    assert!(error1.to_string().contains("bad"));
+    let error2: TemplateError = TemplateError::DirectoryExists("/path".to_string());
+    assert!(error2.to_string().contains("/path"));
+}
+#[test]
+fn test_template_error_from_io() {
+    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
+    let template_error: TemplateError = TemplateError::from(io_error);
+    assert!(template_error.to_string().contains("IO error"));
+}
+#[test]
+fn test_template_error_debug() {
+    let error: TemplateError = TemplateError::InvalidModelSubType("test".to_string());
+    let debug_str: String = format!("{error:?}");
+    assert!(debug_str.contains("InvalidModelSubType"));
+}
+#[test]
+fn test_template_type_equality() {
+    assert_eq!(TemplateType::Controller, TemplateType::Controller);
+    assert_ne!(TemplateType::Controller, TemplateType::Service);
+}
+#[test]
+fn test_model_sub_type_equality() {
+    assert_eq!(ModelSubType::Request, ModelSubType::Request);
+    assert_ne!(ModelSubType::Request, ModelSubType::Response);
+}
+#[test]
+fn test_template_type_debug() {
+    let ty: TemplateType = TemplateType::Controller;
+    let debug_str: String = format!("{ty:?}");
+    assert_eq!(debug_str, "Controller");
+}
+#[test]
+fn test_model_sub_type_debug() {
+    let ty: ModelSubType = ModelSubType::Application;
+    let debug_str: String = format!("{ty:?}");
+    assert_eq!(debug_str, "Application");
+}
+#[test]
+fn test_all_template_types() {
+    let _ = TemplateType::Controller;
+    let _ = TemplateType::Domain;
+    let _ = TemplateType::Exception;
+    let _ = TemplateType::Mapper;
+    let _ = TemplateType::Model;
+    let _ = TemplateType::Repository;
+    let _ = TemplateType::Service;
+    let _ = TemplateType::Utils;
+    let _ = TemplateType::View;
+}
+#[test]
+fn test_all_model_sub_types() {
+    let _ = ModelSubType::Application;
+    let _ = ModelSubType::Request;
+    let _ = ModelSubType::Response;
+}
+#[test]
+fn test_parse_template_type_valid() {
+    assert_eq!(
+        TemplateType::from_str("controller").ok(),
+        Some(TemplateType::Controller)
+    );
+    assert_eq!(
+        TemplateType::from_str("Controller").ok(),
+        Some(TemplateType::Controller)
+    );
+    assert_eq!(
+        TemplateType::from_str("CONTROLLER").ok(),
+        Some(TemplateType::Controller)
+    );
+    assert_eq!(
+        TemplateType::from_str("domain").ok(),
+        Some(TemplateType::Domain)
+    );
+    assert_eq!(
+        TemplateType::from_str("exception").ok(),
+        Some(TemplateType::Exception)
+    );
+    assert_eq!(
+        TemplateType::from_str("mapper").ok(),
+        Some(TemplateType::Mapper)
+    );
+    assert_eq!(
+        TemplateType::from_str("model").ok(),
+        Some(TemplateType::Model)
+    );
+    assert_eq!(
+        TemplateType::from_str("repository").ok(),
+        Some(TemplateType::Repository)
+    );
+    assert_eq!(
+        TemplateType::from_str("service").ok(),
+        Some(TemplateType::Service)
+    );
+    assert_eq!(
+        TemplateType::from_str("utils").ok(),
+        Some(TemplateType::Utils)
+    );
+    assert_eq!(
+        TemplateType::from_str("view").ok(),
+        Some(TemplateType::View)
+    );
+}
+#[test]
+fn test_parse_template_type_invalid() {
+    assert_eq!(TemplateType::from_str("invalid").ok(), None);
+    assert_eq!(TemplateType::from_str("").ok(), None);
+    assert_eq!(TemplateType::from_str("unknown").ok(), None);
+}
+#[test]
+fn test_parse_model_sub_type_valid() {
+    assert_eq!(
+        ModelSubType::from_str("application").ok(),
+        Some(ModelSubType::Application)
+    );
+    assert_eq!(
+        ModelSubType::from_str("Application").ok(),
+        Some(ModelSubType::Application)
+    );
+    assert_eq!(
+        ModelSubType::from_str("APPLICATION").ok(),
+        Some(ModelSubType::Application)
+    );
+    assert_eq!(
+        ModelSubType::from_str("request").ok(),
+        Some(ModelSubType::Request)
+    );
+    assert_eq!(
+        ModelSubType::from_str("response").ok(),
+        Some(ModelSubType::Response)
+    );
+}
+#[test]
+fn test_parse_model_sub_type_invalid() {
+    assert_eq!(ModelSubType::from_str("invalid").ok(), None);
+    assert_eq!(ModelSubType::from_str("").ok(), None);
+    assert_eq!(ModelSubType::from_str("unknown").ok(), None);
+}
+```
 # Path: hyperlane-cli/src/new/mod.rs
 ```rust
 mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#struct;
+#[cfg(test)]
+mod test;
 pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/new/enum.rs
@@ -14032,9 +14582,60 @@ impl NewProjectConfig {
     }
 }
 ```
+# Path: hyperlane-cli/src/new/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_new_project_config_creation() {
+    let config: NewProjectConfig = NewProjectConfig::new("test-project".to_string());
+    assert_eq!(config.project_name, "test-project");
+    assert_eq!(
+        config.template_url,
+        "https://github.com/hyperlane-dev/hyperlane-quick-start"
+    );
+}
+#[test]
+fn test_new_error_display() {
+    let error1: NewError = NewError::GitNotFound;
+    assert!(error1.to_string().contains("Git is not installed"));
+    let error2: NewError = NewError::ProjectExists("test".to_string());
+    assert!(error2.to_string().contains("test"));
+    let error3: NewError = NewError::CloneFailed("network error".to_string());
+    assert!(error3.to_string().contains("network error"));
+    let error4: NewError = NewError::InvalidName("bad name".to_string());
+    assert!(error4.to_string().contains("bad name"));
+}
+#[test]
+fn test_new_error_from_io() {
+    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
+    let new_error: NewError = NewError::from(io_error);
+    assert!(new_error.to_string().contains("test"));
+}
+#[test]
+fn test_new_error_debug() {
+    let error: NewError = NewError::GitNotFound;
+    let debug_str: String = format!("{error:?}");
+    assert!(debug_str.contains("GitNotFound"));
+}
+#[test]
+fn test_new_project_config_clone() {
+    let config: NewProjectConfig = NewProjectConfig::new("test".to_string());
+    let cloned: NewProjectConfig = config.clone();
+    assert_eq!(cloned.project_name, config.project_name);
+    assert_eq!(cloned.template_url, config.template_url);
+}
+#[test]
+fn test_new_project_config_debug() {
+    let config: NewProjectConfig = NewProjectConfig::new("test".to_string());
+    let debug_str: String = format!("{config:?}");
+    assert!(debug_str.contains("test"));
+}
+```
 # Path: hyperlane-cli/src/fmt/mod.rs
 ```rust
 mod r#fn;
+#[cfg(test)]
+mod test;
 pub(crate) use r#fn::*;
 ```
 # Path: hyperlane-cli/src/fmt/fn.rs
@@ -14100,16 +14701,48 @@ pub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
     }
     Ok(())
 }
+pub(crate) async fn format_path(path: &std::path::Path) -> Result<(), std::io::Error> {
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("fmt").arg("--").arg(path);
+    cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    cmd.status().await?;
+    Ok(())
+}
+```
+# Path: hyperlane-cli/src/fmt/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_format_path_integration() {
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_fmt");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let test_file: PathBuf = tmp_dir.join("test.rs");
+    std::fs::write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
+    let rt: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
+    let result: Result<(), std::io::Error> = rt.block_on(format_path(&tmp_dir));
+    assert!(result.is_ok());
+}
 ```
 # Path: hyperlane-cli/src/version/mod.rs
 ```rust
 mod r#fn;
+#[cfg(test)]
+mod test;
 pub(crate) use r#fn::*;
 ```
 # Path: hyperlane-cli/src/version/fn.rs
 ```rust
 pub(crate) fn print_version() {
     println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
+}
+```
+# Path: hyperlane-cli/src/version/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_print_version_runs() {
+    print_version();
 }
 ```
 # Path: hyperlane-cli/src/command/mod.rs
@@ -14126,6 +14759,7 @@ pub(crate) enum CommandType {
     Bump,
     Publish,
     New,
+    Template,
     Help,
     Version,
 }
@@ -14135,6 +14769,8 @@ pub(crate) enum CommandType {
 mod r#enum;
 mod r#fn;
 mod r#struct;
+#[cfg(test)]
+mod test;
 pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/publish/enum.rs
@@ -14400,10 +15036,109 @@ pub(crate) async fn execute_publish(
     Ok(results)
 }
 ```
+# Path: hyperlane-cli/src/publish/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_package_creation() {
+    let package: Package = Package {
+        name: "test-package".to_string(),
+        version: "0.1.0".to_string(),
+        path: std::path::PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    assert_eq!(package.name, "test-package");
+    assert_eq!(package.version, "0.1.0");
+    assert!(package.local_dependencies.is_empty());
+}
+#[test]
+fn test_package_clone() {
+    let package: Package = Package {
+        name: "test-package".to_string(),
+        version: "0.1.0".to_string(),
+        path: std::path::PathBuf::from("."),
+        local_dependencies: vec!["dep1".to_string()],
+    };
+    let cloned: Package = package.clone();
+    assert_eq!(cloned.name, package.name);
+    assert_eq!(cloned.version, package.version);
+    assert_eq!(cloned.local_dependencies.len(), 1);
+}
+#[test]
+fn test_package_equality() {
+    let package1: Package = Package {
+        name: "test".to_string(),
+        version: "0.1.0".to_string(),
+        path: std::path::PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    let package2: Package = Package {
+        name: "test".to_string(),
+        version: "0.1.0".to_string(),
+        path: std::path::PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    assert_eq!(package1, package2);
+}
+#[test]
+fn test_publish_result_success() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: true,
+        error: None,
+        retries: 0,
+    };
+    assert_eq!(result.package_name, "test");
+    assert!(result.success);
+    assert!(result.error.is_none());
+    assert_eq!(result.retries, 0);
+}
+#[test]
+fn test_publish_result_failure() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: false,
+        error: Some("network error".to_string()),
+        retries: 3,
+    };
+    assert!(!result.success);
+    assert_eq!(result.error, Some("network error".to_string()));
+    assert_eq!(result.retries, 3);
+}
+#[test]
+fn test_publish_result_clone() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: true,
+        error: None,
+        retries: 0,
+    };
+    let cloned: PublishResult = result.clone();
+    assert_eq!(cloned.package_name, result.package_name);
+    assert_eq!(cloned.success, result.success);
+    assert_eq!(cloned.error, result.error);
+    assert_eq!(cloned.retries, result.retries);
+}
+#[test]
+fn test_publish_error_display() {
+    let error1: PublishError = PublishError::ManifestParseError;
+    assert!(error1.to_string().contains("Failed to parse"));
+    let error2: PublishError = PublishError::CircularDependency;
+    assert!(error2.to_string().contains("Circular dependency"));
+}
+#[test]
+fn test_publish_error_from_io() {
+    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
+    let publish_error: PublishError = PublishError::from(io_error);
+    assert!(publish_error.to_string().contains("IO error"));
+}
+```
 # Path: hyperlane-cli/src/config/mod.rs
 ```rust
 mod r#fn;
 mod r#struct;
+#[cfg(test)]
+mod test;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/config/struct.rs
@@ -14417,10 +15152,14 @@ pub struct Args {
     pub bump_type: Option<BumpVersionType>,
     pub max_retries: u32,
     pub project_name: Option<String>,
+    pub template_type: Option<TemplateType>,
+    pub model_sub_type: Option<ModelSubType>,
+    pub component_name: Option<String>,
 }
 ```
 # Path: hyperlane-cli/src/config/fn.rs
 ```rust
+use std::str::FromStr;
 use crate::*;
 pub(crate) fn parse_args() -> Args {
     let raw_args: Vec<String> = args().collect();
@@ -14430,6 +15169,9 @@ pub(crate) fn parse_args() -> Args {
     let mut bump_type: Option<BumpVersionType> = None;
     let mut max_retries: u32 = 3;
     let mut project_name: Option<String> = None;
+    let mut template_type: Option<TemplateType> = None;
+    let mut model_sub_type: Option<ModelSubType> = None;
+    let mut component_name: Option<String> = None;
     let mut i: usize = 1;
     while i < raw_args.len() {
         let arg: &str = raw_args[i].as_str();
@@ -14470,6 +15212,37 @@ pub(crate) fn parse_args() -> Args {
                     {
                         project_name = Some(raw_args[i].clone());
                     } else {
+                        i -= 1;
+                    }
+                }
+            }
+            "template" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Template;
+                    i += 1;
+                    if i < raw_args.len()
+                        && !raw_args[i].starts_with("--")
+                        && !raw_args[i].starts_with("-")
+                    {
+                        let type_str: &str = &raw_args[i];
+                        template_type = TemplateType::from_str(type_str).ok();
+                        i += 1;
+                        if template_type == Some(TemplateType::Model)
+                            && i < raw_args.len()
+                            && !raw_args[i].starts_with("--")
+                            && !raw_args[i].starts_with("-")
+                        {
+                            let sub_type_str: &str = &raw_args[i];
+                            model_sub_type = ModelSubType::from_str(sub_type_str).ok();
+                            i += 1;
+                        }
+                        if i < raw_args.len()
+                            && !raw_args[i].starts_with("--")
+                            && !raw_args[i].starts_with("-")
+                        {
+                            component_name = Some(raw_args[i].clone());
+                            i += 1;
+                        }
                         i -= 1;
                     }
                 }
@@ -14523,7 +15296,107 @@ pub(crate) fn parse_args() -> Args {
         bump_type,
         max_retries,
         project_name,
+        template_type,
+        model_sub_type,
+        component_name,
     }
+}
+```
+# Path: hyperlane-cli/src/config/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_args_default_values() {
+    let args: Args = Args {
+        command: CommandType::Help,
+        check: false,
+        manifest_path: None,
+        bump_type: None,
+        max_retries: 3,
+        project_name: None,
+        template_type: None,
+        model_sub_type: None,
+        component_name: None,
+    };
+    assert!(!args.check);
+    assert_eq!(args.max_retries, 3);
+    assert!(args.manifest_path.is_none());
+    assert!(args.bump_type.is_none());
+    assert!(args.project_name.is_none());
+    assert!(args.template_type.is_none());
+    assert!(args.model_sub_type.is_none());
+    assert!(args.component_name.is_none());
+}
+#[test]
+fn test_args_with_values() {
+    let args: Args = Args {
+        command: CommandType::Bump,
+        check: true,
+        manifest_path: Some("./test/Cargo.toml".to_string()),
+        bump_type: Some(BumpVersionType::Minor),
+        max_retries: 5,
+        project_name: Some("test-project".to_string()),
+        template_type: Some(TemplateType::Controller),
+        model_sub_type: None,
+        component_name: Some("test".to_string()),
+    };
+    assert!(args.check);
+    assert_eq!(args.max_retries, 5);
+    assert_eq!(args.manifest_path, Some("./test/Cargo.toml".to_string()));
+    assert_eq!(args.bump_type, Some(BumpVersionType::Minor));
+    assert_eq!(args.project_name, Some("test-project".to_string()));
+    assert_eq!(args.template_type, Some(TemplateType::Controller));
+    assert_eq!(args.component_name, Some("test".to_string()));
+}
+#[test]
+fn test_args_with_model_subtype() {
+    let args: Args = Args {
+        command: CommandType::Template,
+        check: false,
+        manifest_path: None,
+        bump_type: None,
+        max_retries: 3,
+        project_name: None,
+        template_type: Some(TemplateType::Model),
+        model_sub_type: Some(ModelSubType::Request),
+        component_name: Some("user".to_string()),
+    };
+    assert_eq!(args.template_type, Some(TemplateType::Model));
+    assert_eq!(args.model_sub_type, Some(ModelSubType::Request));
+    assert_eq!(args.component_name, Some("user".to_string()));
+}
+#[test]
+fn test_command_type_enum_values() {
+    let _: CommandType = CommandType::Fmt;
+    let _: CommandType = CommandType::Watch;
+    let _: CommandType = CommandType::Bump;
+    let _: CommandType = CommandType::Publish;
+    let _: CommandType = CommandType::New;
+    let _: CommandType = CommandType::Template;
+    let _: CommandType = CommandType::Help;
+    let _: CommandType = CommandType::Version;
+}
+#[test]
+fn test_args_clone() {
+    let args: Args = Args {
+        command: CommandType::Bump,
+        check: true,
+        manifest_path: Some("./test/Cargo.toml".to_string()),
+        bump_type: Some(BumpVersionType::Minor),
+        max_retries: 5,
+        project_name: Some("test-project".to_string()),
+        template_type: Some(TemplateType::Controller),
+        model_sub_type: None,
+        component_name: Some("test".to_string()),
+    };
+    let cloned: Args = args.clone();
+    assert_eq!(cloned.check, args.check);
+    assert_eq!(cloned.max_retries, args.max_retries);
+    assert_eq!(cloned.manifest_path, args.manifest_path);
+    assert_eq!(cloned.bump_type, args.bump_type);
+    assert_eq!(cloned.project_name, args.project_name);
+    assert_eq!(cloned.template_type, args.template_type);
+    assert_eq!(cloned.component_name, args.component_name);
 }
 ```
 # Path: hyperlane-cli/src/help/mod.rs
@@ -14542,6 +15415,9 @@ pub(crate) fn print_help() {
     println!("  watch     Watch files and run cargo run using cargo-watch");
     println!("  publish   Publish packages in monorepo with topological ordering");
     println!("  new       Create a new project from template");
+    println!(
+        "  template  Generate template components (controller|domain|exception|mapper|model|repository|service|utils|view)"
+    );
     println!("  -h, --help      Print this help message");
     println!("  -v, --version   Print version information");
     println!();
@@ -14578,6 +15454,8 @@ pub(crate) fn print_help() {
 mod r#enum;
 mod r#fn;
 mod r#struct;
+#[cfg(test)]
+mod test;
 pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/bump/enum.rs
@@ -14760,5 +15638,190 @@ pub(crate) fn execute_bump(
         Some(v) => Ok(v),
         None => Err("failed to bump version".into()),
     }
+}
+```
+# Path: hyperlane-cli/src/bump/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_bump_version_type_enum() {
+    assert_eq!(BumpVersionType::Patch, BumpVersionType::Patch);
+    assert_eq!(BumpVersionType::Minor, BumpVersionType::Minor);
+    assert_eq!(BumpVersionType::Major, BumpVersionType::Major);
+    assert_eq!(BumpVersionType::Release, BumpVersionType::Release);
+    assert_eq!(BumpVersionType::Alpha, BumpVersionType::Alpha);
+    assert_eq!(BumpVersionType::Beta, BumpVersionType::Beta);
+    assert_eq!(BumpVersionType::Rc, BumpVersionType::Rc);
+}
+#[test]
+fn test_version_struct_creation() {
+    let version: Version = Version {
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: Some("alpha.1".to_string()),
+    };
+    assert_eq!(version.major, 1);
+    assert_eq!(version.minor, 2);
+    assert_eq!(version.patch, 3);
+    assert_eq!(version.prerelease, Some("alpha.1".to_string()));
+}
+#[test]
+fn test_version_clone() {
+    let version: Version = Version {
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: Some("beta".to_string()),
+    };
+    let cloned: Version = version.clone();
+    assert_eq!(cloned.major, version.major);
+    assert_eq!(cloned.minor, version.minor);
+    assert_eq!(cloned.patch, version.patch);
+    assert_eq!(cloned.prerelease, version.prerelease);
+}
+#[test]
+fn test_execute_bump_integration() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.1");
+    let updated_content: String = std::fs::read_to_string(&manifest_path).unwrap();
+    assert!(updated_content.contains("version = \"0.1.1\""));
+}
+#[test]
+fn test_execute_bump_minor() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_minor");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Minor);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.2.0");
+}
+#[test]
+fn test_execute_bump_major() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_major");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Major);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "1.0.0");
+}
+#[test]
+fn test_execute_bump_alpha() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_alpha");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Alpha);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-alpha");
+}
+#[test]
+fn test_execute_bump_beta() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_beta");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-alpha.2"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Beta);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-beta.1");
+}
+#[test]
+fn test_execute_bump_rc() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_rc");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-beta.1"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Rc);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-rc.1");
+}
+#[test]
+fn test_execute_bump_release() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_release");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-alpha"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Release);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0");
+}
+#[test]
+fn test_execute_bump_no_version_field() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_no_version");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
+    assert!(result.is_err());
 }
 ```
