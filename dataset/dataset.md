@@ -1,4 +1,4 @@
-<!--2026-02-15 02:42:08-->
+<!--2026-02-15 06:58:53-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -32,12 +32,12 @@ pub use {http_type::*, inventory};
 use std::time::{Duration, Instant};
 use std::{
     any::Any,
-    borrow::Borrow,
     cmp::Ordering,
     collections::{HashMap, HashSet},
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
+    mem::take,
     net::SocketAddr,
     pin::Pin,
     sync::Arc,
@@ -46,14 +46,11 @@ use {
     inventory::collect,
     lombok_macros::*,
     regex::Regex,
-    serde::{Deserialize, Serialize, de::DeserializeOwned},
+    serde::{Deserialize, Serialize},
     tokio::{
         net::{TcpListener, TcpStream},
         spawn,
-        sync::{
-            RwLockReadGuard, RwLockWriteGuard,
-            watch::{Receiver, Sender, channel},
-        },
+        sync::watch::{Receiver, Sender, channel},
         task::{JoinError, JoinHandle},
     },
 };
@@ -64,45 +61,25 @@ mod r#impl;
 mod r#struct;
 #[cfg(test)]
 mod test;
-mod r#type;
 pub use r#struct::*;
-pub(crate) use r#type::*;
 ```
 # Path: hyperlane/src/context/impl.rs
 ```rust
 use crate::*;
-impl From<ContextData> for Context {
+impl From<Server> for Context {
     #[inline(always)]
-    fn from(ctx: ContextData) -> Self {
-        Self(arc_rwlock(ctx))
-    }
-}
-impl From<ServerData> for ContextData {
-    #[inline(always)]
-    fn from(server_data: ServerData) -> Self {
-        let mut internal_ctx: ContextData = ContextData::default();
-        internal_ctx.set_server_data(server_data);
-        internal_ctx
-    }
-}
-impl From<ServerData> for Context {
-    #[inline(always)]
-    fn from(server_data: ServerData) -> Self {
-        let ctx_data: ContextData = server_data.into();
-        ctx_data.into()
+    fn from(server: Server) -> Self {
+        let mut ctx: Context = Context::default();
+        ctx.set_server(Arc::new(server));
+        ctx
     }
 }
 impl From<&ArcRwLockStream> for Context {
     #[inline(always)]
     fn from(stream: &ArcRwLockStream) -> Self {
-        let request: Request = Request::default();
-        let mut internal_ctx: ContextData = ContextData::default();
-        internal_ctx
-            .set_stream(Some(stream.clone()))
-            .set_request(request.clone())
-            .get_mut_response()
-            .set_version(request.get_version().clone());
-        internal_ctx.into()
+        let mut ctx: Context = Context::default();
+        ctx.set_stream(Some(stream.clone()));
+        ctx
     }
 }
 impl From<ArcRwLockStream> for Context {
@@ -111,7 +88,7 @@ impl From<ArcRwLockStream> for Context {
         (&stream).into()
     }
 }
-impl PartialEq for ContextData {
+impl PartialEq for Context {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.get_aborted() == other.get_aborted()
@@ -121,134 +98,66 @@ impl PartialEq for ContextData {
             && self.get_route_params() == other.get_route_params()
             && self.get_attributes().len() == other.get_attributes().len()
             && self.try_get_stream().is_some() == other.try_get_stream().is_some()
-            && self.get_server_data() == other.get_server_data()
+            && self.get_server() == other.get_server()
     }
 }
-impl Eq for ContextData {}
-impl PartialEq for Context {
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(self.get_0(), other.get_0()) {
-            return true;
-        }
-        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
-            *s == *o
-        } else {
-            false
-        }
-    }
-}
+impl Eq for Context {}
 impl Context {
     #[inline(always)]
-    pub(crate) fn new(
-        stream: &ArcRwLockStream,
-        request: &Request,
-        server_data: ServerData,
-    ) -> Context {
-        let mut internal_ctx: ContextData = ContextData::default();
-        internal_ctx
-            .set_stream(Some(stream.clone()))
+    pub(crate) fn new(stream: &ArcRwLockStream, request: &Request, server: &ArcServer) -> Context {
+        let mut ctx: Context = Context::default();
+        ctx.set_stream(Some(stream.clone()))
             .set_request(request.clone())
-            .set_server_data(server_data)
+            .set_server(server.clone())
             .get_mut_response()
             .set_version(request.get_version().clone());
-        internal_ctx.into()
+        ctx
     }
-    async fn read(&self) -> ContextReadGuard<'_> {
-        self.get_0().read().await
-    }
-    async fn write(&self) -> ContextWriteGuard<'_> {
-        self.get_0().write().await
-    }
-    pub async fn http_from_stream(&self) -> Result<Request, RequestError> {
-        if self.get_aborted().await {
+    pub async fn http_from_stream(&mut self) -> Result<Request, RequestError> {
+        if self.get_aborted() {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let request_res: Result<Request, RequestError> = Request::http_from_stream(
-                stream,
-                self.read().await.get_server_data().get_request_config(),
-            )
-            .await;
+        if let Some(stream) = self.try_get_stream().as_ref() {
+            let request_res: Result<Request, RequestError> =
+                Request::http_from_stream(stream, self.get_server().get_request_config()).await;
             if let Ok(request) = request_res.as_ref() {
-                self.set_request(request).await;
+                self.set_request(request.clone());
             }
             return request_res;
         };
         Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
-    pub async fn ws_from_stream(&self) -> Result<Request, RequestError> {
-        if self.get_aborted().await {
+    pub async fn ws_from_stream(&mut self) -> Result<Request, RequestError> {
+        if self.get_aborted() {
             return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
         }
-        if let Some(stream) = self.try_get_stream().await.as_ref() {
-            let last_request: Request = self.get_request().await;
+        if let Some(stream) = self.try_get_stream().as_ref() {
+            let last_request: &Request = self.get_request();
             let request_res: Result<Request, RequestError> = last_request
-                .ws_from_stream(
-                    stream,
-                    self.read().await.get_server_data().get_request_config(),
-                )
+                .ws_from_stream(stream, self.get_server().get_request_config())
                 .await;
             match request_res.as_ref() {
                 Ok(request) => {
-                    self.set_request(request).await;
+                    self.set_request(request.clone());
                 }
                 Err(_) => {
-                    self.set_request(&last_request).await;
+                    self.set_request(last_request.clone());
                 }
             }
             return request_res;
         };
         Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
     }
-    pub async fn get_server_data(&self) -> ServerData {
-        self.read().await.get_server_data().clone()
+    #[inline(always)]
+    pub fn is_terminated(&self) -> bool {
+        self.get_aborted() || self.get_closed()
     }
-    pub async fn get_aborted(&self) -> bool {
-        self.read().await.get_aborted()
-    }
-    pub async fn set_aborted(&self, aborted: bool) -> &Self {
-        self.write().await.set_aborted(aborted);
-        self
-    }
-    pub async fn aborted(&self) -> &Self {
-        self.set_aborted(true).await;
-        self
-    }
-    pub async fn cancel_aborted(&self) -> &Self {
-        self.set_aborted(false).await;
-        self
-    }
-    pub async fn get_closed(&self) -> bool {
-        self.read().await.get_closed()
-    }
-    pub async fn set_closed(&self, closed: bool) -> &Self {
-        self.write().await.set_closed(closed);
-        self
-    }
-    pub async fn closed(&self) -> &Self {
-        self.set_closed(true).await;
-        self
-    }
-    pub async fn cancel_closed(&self) -> &Self {
-        self.set_closed(false).await;
-        self
-    }
-    pub async fn is_terminated(&self) -> bool {
-        self.get_aborted().await || self.get_closed().await
-    }
-    pub async fn is_keep_alive(&self, keep_alive: bool) -> bool {
-        !self.get_closed().await && keep_alive
-    }
-    pub async fn try_get_stream(&self) -> Option<ArcRwLockStream> {
-        self.read().await.try_get_stream().clone()
-    }
-    pub async fn get_stream(&self) -> ArcRwLockStream {
-        self.try_get_stream().await.unwrap()
+    #[inline(always)]
+    pub(crate) fn is_keep_alive(&self, keep_alive: bool) -> bool {
+        !self.get_closed() && keep_alive
     }
     pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {
         self.try_get_stream()
-            .await
             .as_ref()?
             .read()
             .await
@@ -282,581 +191,132 @@ impl Context {
     pub async fn get_socket_port(&self) -> SocketPort {
         self.try_get_socket_port().await.unwrap()
     }
-    pub async fn get_request(&self) -> Request {
-        self.read().await.get_request().clone()
-    }
-    pub(crate) async fn set_request(&self, request_data: &Request) -> &Self {
-        self.write().await.set_request(request_data.clone());
-        self
-    }
-    pub async fn get_request_version(&self) -> RequestVersion {
-        self.read().await.get_request().get_version().clone()
-    }
-    pub async fn get_request_method(&self) -> RequestMethod {
-        self.read().await.get_request().get_method().clone()
-    }
-    pub async fn get_request_host(&self) -> RequestHost {
-        self.read().await.get_request().get_host().clone()
-    }
-    pub async fn get_request_path(&self) -> RequestPath {
-        self.read().await.get_request().get_path().clone()
-    }
-    pub async fn get_request_querys(&self) -> RequestQuerys {
-        self.read().await.get_request().get_querys().clone()
-    }
-    pub async fn try_get_request_query<K>(&self, key: K) -> Option<RequestQuerysValue>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_query(key)
-    }
-    pub async fn get_request_query<K>(&self, key: K) -> RequestQuerysValue
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_query(key)
-    }
-    pub async fn get_request_body(&self) -> RequestBody {
-        self.read().await.get_request().get_body().clone()
-    }
-    pub async fn get_request_body_string(&self) -> String {
-        self.read().await.get_request().get_body_string()
-    }
-    pub async fn try_get_request_body_json<J>(&self) -> Result<J, serde_json::Error>
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_request().try_get_body_json()
-    }
-    pub async fn get_request_body_json<J>(&self) -> J
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_request().get_body_json()
-    }
-    pub async fn get_request_headers(&self) -> RequestHeaders {
-        self.read().await.get_request().get_headers().clone()
-    }
-    pub async fn get_request_headers_size(&self) -> usize {
-        self.read().await.get_request().get_headers_size()
-    }
-    pub async fn try_get_request_header<K>(&self, key: K) -> Option<RequestHeadersValue>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header(key)
-    }
-    pub async fn get_request_header<K>(&self, key: K) -> RequestHeadersValue
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_header(key)
-    }
-    pub async fn try_get_request_header_front<K>(&self, key: K) -> Option<RequestHeadersValueItem>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header_front(key)
-    }
-    pub async fn get_request_header_front<K>(&self, key: K) -> RequestHeadersValueItem
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_header_front(key)
-    }
-    pub async fn try_get_request_header_back<K>(&self, key: K) -> Option<RequestHeadersValueItem>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header_back(key)
-    }
-    pub async fn get_request_header_back<K>(&self, key: K) -> RequestHeadersValueItem
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_header_back(key)
-    }
-    pub async fn try_get_request_header_len<K>(&self, key: K) -> Option<usize>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().try_get_header_size(key)
-    }
-    pub async fn get_request_header_len<K>(&self, key: K) -> usize
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().get_header_size(key)
-    }
-    pub async fn get_request_headers_values_size(&self) -> usize {
-        self.read().await.get_request().get_headers_values_size()
-    }
-    pub async fn get_request_has_header<K>(&self, key: K) -> bool
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_request().has_header(key)
-    }
-    pub async fn get_request_has_header_value<K, V>(&self, key: K, value: V) -> bool
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.read().await.get_request().has_header_value(key, value)
-    }
-    pub async fn get_request_cookies(&self) -> Cookies {
-        self.try_get_request_header_back(COOKIE)
-            .await
-            .map(|data| Cookie::parse(&data))
-            .unwrap_or_default()
-    }
-    pub async fn try_get_request_cookie<K>(&self, key: K) -> Option<CookieValue>
-    where
-        K: AsRef<str>,
-    {
-        self.get_request_cookies().await.get(key.as_ref()).cloned()
-    }
-    pub async fn get_request_cookie<K>(&self, key: K) -> CookieValue
-    where
-        K: AsRef<str>,
-    {
-        self.try_get_request_cookie(key).await.unwrap()
-    }
-    pub async fn get_request_upgrade_type(&self) -> UpgradeType {
-        self.read().await.get_request().get_upgrade_type()
-    }
-    pub async fn get_request_is_get_method(&self) -> bool {
-        self.read().await.get_request().is_get_method()
-    }
-    pub async fn get_request_is_post_method(&self) -> bool {
-        self.read().await.get_request().is_post_method()
-    }
-    pub async fn get_request_is_put_method(&self) -> bool {
-        self.read().await.get_request().is_put_method()
-    }
-    pub async fn get_request_is_delete_method(&self) -> bool {
-        self.read().await.get_request().is_delete_method()
-    }
-    pub async fn get_request_is_patch_method(&self) -> bool {
-        self.read().await.get_request().is_patch_method()
-    }
-    pub async fn get_request_is_head_method(&self) -> bool {
-        self.read().await.get_request().is_head_method()
-    }
-    pub async fn get_request_is_options_method(&self) -> bool {
-        self.read().await.get_request().is_options_method()
-    }
-    pub async fn get_request_is_connect_method(&self) -> bool {
-        self.read().await.get_request().is_connect_method()
-    }
-    pub async fn get_request_is_trace_method(&self) -> bool {
-        self.read().await.get_request().is_trace_method()
-    }
-    pub async fn get_request_is_unknown_method(&self) -> bool {
-        self.read().await.get_request().is_unknown_method()
-    }
-    pub async fn get_request_is_http0_9_version(&self) -> bool {
-        self.read().await.get_request().is_http0_9_version()
-    }
-    pub async fn get_request_is_http1_0_version(&self) -> bool {
-        self.read().await.get_request().is_http1_0_version()
-    }
-    pub async fn get_request_is_http1_1_version(&self) -> bool {
-        self.read().await.get_request().is_http1_1_version()
-    }
-    pub async fn get_request_is_http2_version(&self) -> bool {
-        self.read().await.get_request().is_http2_version()
-    }
-    pub async fn get_request_is_http3_version(&self) -> bool {
-        self.read().await.get_request().is_http3_version()
-    }
-    pub async fn get_request_is_http1_1_or_higher_version(&self) -> bool {
-        self.read()
-            .await
-            .get_request()
-            .is_http1_1_or_higher_version()
-    }
-    pub async fn get_request_is_http_version(&self) -> bool {
-        self.read().await.get_request().is_http_version()
-    }
-    pub async fn get_request_is_unknown_version(&self) -> bool {
-        self.read().await.get_request().is_unknown_version()
-    }
-    pub async fn get_request_is_ws_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_ws_upgrade_type()
-    }
-    pub async fn get_request_is_h2c_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_h2c_upgrade_type()
-    }
-    pub async fn get_request_is_tls_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_tls_upgrade_type()
-    }
-    pub async fn get_request_is_unknown_upgrade_type(&self) -> bool {
-        self.read().await.get_request().is_unknown_upgrade_type()
-    }
-    pub async fn get_request_is_enable_keep_alive(&self) -> bool {
-        self.read().await.get_request().is_enable_keep_alive()
-    }
-    pub async fn get_request_is_disable_keep_alive(&self) -> bool {
-        self.read().await.get_request().is_disable_keep_alive()
-    }
-    pub async fn get_response(&self) -> Response {
-        self.read().await.get_response().clone()
-    }
-    pub async fn set_response<T>(&self, response: T) -> &Self
-    where
-        T: Borrow<Response>,
-    {
-        self.write().await.set_response(response.borrow().clone());
-        self
-    }
-    pub async fn get_response_version(&self) -> ResponseVersion {
-        self.read().await.get_response().get_version().clone()
-    }
-    pub async fn set_response_version(&self, version: ResponseVersion) -> &Self {
-        self.write().await.get_mut_response().set_version(version);
-        self
-    }
-    pub async fn get_response_headers(&self) -> ResponseHeaders {
-        self.read().await.get_response().get_headers().clone()
-    }
-    pub async fn try_get_response_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().try_get_header(key)
-    }
-    pub async fn get_response_header<K>(&self, key: K) -> ResponseHeadersValue
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().get_header(key)
-    }
-    pub async fn set_response_header<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.write().await.get_mut_response().set_header(key, value);
-        self
-    }
-    pub async fn try_get_response_header_front<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().try_get_header_front(key)
-    }
-    pub async fn get_response_header_front<K>(&self, key: K) -> ResponseHeadersValueItem
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().get_header_front(key)
-    }
-    pub async fn try_get_response_header_back<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().try_get_header_back(key)
-    }
-    pub async fn get_response_header_back<K>(&self, key: K) -> ResponseHeadersValueItem
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().get_header_back(key)
-    }
-    pub async fn get_response_has_header<K>(&self, key: K) -> bool
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().has_header(key)
-    }
-    pub async fn get_response_header_value<K, V>(&self, key: K, value: V) -> bool
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.read()
-            .await
-            .get_response()
-            .has_header_value(key, value)
-    }
-    pub async fn get_response_headers_size(&self) -> usize {
-        self.read().await.get_response().get_headers_size()
-    }
-    pub async fn try_get_response_header_size<K>(&self, key: K) -> Option<usize>
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().try_get_header_size(key)
-    }
-    pub async fn get_response_header_size<K>(&self, key: K) -> usize
-    where
-        K: AsRef<str>,
-    {
-        self.read().await.get_response().get_header_size(key)
-    }
-    pub async fn get_response_headers_values_size(&self) -> usize {
-        self.read().await.get_response().get_headers_values_size()
-    }
-    pub async fn add_response_header<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.write().await.get_mut_response().add_header(key, value);
-        self
-    }
-    pub async fn remove_response_header<K>(&self, key: K) -> &Self
-    where
-        K: AsRef<str>,
-    {
-        self.write().await.get_mut_response().remove_header(key);
-        self
-    }
-    pub async fn remove_response_header_value<K, V>(&self, key: K, value: V) -> &Self
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.write()
-            .await
-            .get_mut_response()
-            .remove_header_value(key, value);
-        self
-    }
-    pub async fn clear_response_headers(&self) -> &Self {
-        self.write().await.get_mut_response().clear_headers();
-        self
-    }
-    pub async fn get_response_cookies(&self) -> Cookies {
-        self.try_get_response_header_back(COOKIE)
-            .await
-            .map(|data| Cookie::parse(&data))
-            .unwrap_or_default()
-    }
-    pub async fn try_get_response_cookie<K>(&self, key: K) -> Option<CookieValue>
-    where
-        K: AsRef<str>,
-    {
-        self.get_response_cookies().await.get(key.as_ref()).cloned()
-    }
-    pub async fn get_response_cookie<K>(&self, key: K) -> CookieValue
-    where
-        K: AsRef<str>,
-    {
-        self.try_get_response_cookie(key).await.unwrap()
-    }
-    pub async fn get_response_body(&self) -> ResponseBody {
-        self.read().await.get_response().get_body().clone()
-    }
-    pub async fn set_response_body<B>(&self, body: B) -> &Self
-    where
-        B: AsRef<[u8]>,
-    {
-        self.write().await.get_mut_response().set_body(body);
-        self
-    }
-    pub async fn get_response_body_string(&self) -> String {
-        self.read().await.get_response().get_body_string()
-    }
-    pub async fn try_get_response_body_json<J>(&self) -> Result<J, serde_json::Error>
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_response().try_get_body_json()
-    }
-    pub async fn get_response_body_json<J>(&self) -> J
-    where
-        J: DeserializeOwned,
-    {
-        self.read().await.get_response().get_body_json()
-    }
-    pub async fn get_response_reason_phrase(&self) -> ResponseReasonPhrase {
-        self.read().await.get_response().get_reason_phrase().clone()
-    }
-    pub async fn set_response_reason_phrase<P>(&self, reason_phrase: P) -> &Self
-    where
-        P: AsRef<str>,
-    {
-        self.write()
-            .await
-            .get_mut_response()
-            .set_reason_phrase(reason_phrase);
-        self
-    }
-    pub async fn get_response_status_code(&self) -> ResponseStatusCode {
-        self.read().await.get_response().get_status_code()
-    }
-    pub async fn set_response_status_code(&self, status_code: ResponseStatusCode) -> &Self {
-        self.write()
-            .await
-            .get_mut_response()
-            .set_status_code(status_code);
-        self
-    }
-    pub async fn get_route_params(&self) -> RouteParams {
-        self.read().await.get_route_params().clone()
-    }
-    pub(crate) async fn set_route_params(&self, params: RouteParams) -> &Self {
-        self.write().await.set_route_params(params);
-        self
-    }
-    pub async fn try_get_route_param<T>(&self, name: T) -> Option<String>
+    #[inline(always)]
+    pub fn try_get_route_param<T>(&self, name: T) -> Option<String>
     where
         T: AsRef<str>,
     {
-        self.read()
-            .await
-            .get_route_params()
-            .get(name.as_ref())
-            .cloned()
+        self.get_route_params().get(name.as_ref()).cloned()
     }
-    pub async fn get_route_param<T>(&self, name: T) -> String
+    #[inline(always)]
+    pub fn get_route_param<T>(&self, name: T) -> String
     where
         T: AsRef<str>,
     {
-        self.try_get_route_param(name).await.unwrap()
+        self.try_get_route_param(name).unwrap()
     }
-    pub async fn get_attributes(&self) -> ThreadSafeAttributeStore {
-        self.read().await.get_attributes().clone()
-    }
-    pub async fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
+    #[inline(always)]
+    pub fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
     where
         V: AnySendSyncClone,
     {
-        self.read()
-            .await
-            .get_attributes()
+        self.get_attributes()
             .get(&Attribute::External(key.as_ref().to_owned()).to_string())
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
     }
-    pub async fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
+    #[inline(always)]
+    pub fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
     where
         V: AnySendSyncClone,
     {
-        self.try_get_attribute(key).await.unwrap()
+        self.try_get_attribute(key).unwrap()
     }
-    pub async fn set_attribute<K, V>(&self, key: K, value: V) -> &Self
+    #[inline(always)]
+    pub fn set_attribute<K, V>(&mut self, key: K, value: V) -> &mut Self
     where
         K: AsRef<str>,
         V: AnySendSyncClone,
     {
-        self.write().await.get_mut_attributes().insert(
+        self.get_mut_attributes().insert(
             Attribute::External(key.as_ref().to_owned()).to_string(),
             Arc::new(value),
         );
         self
     }
-    pub async fn remove_attribute<K>(&self, key: K) -> &Self
+    #[inline(always)]
+    pub fn remove_attribute<K>(&mut self, key: K) -> &mut Self
     where
         K: AsRef<str>,
     {
-        self.write()
-            .await
-            .get_mut_attributes()
+        self.get_mut_attributes()
             .remove(&Attribute::External(key.as_ref().to_owned()).to_string());
         self
     }
-    pub async fn clear_attribute(&self) -> &Self {
-        self.write().await.get_mut_attributes().clear();
+    #[inline(always)]
+    pub fn clear_attribute(&mut self) -> &mut Self {
+        self.get_mut_attributes().clear();
         self
     }
-    async fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
+    #[inline(always)]
+    fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
     where
         V: AnySendSyncClone,
     {
-        self.read()
-            .await
-            .get_attributes()
+        self.get_attributes()
             .get(&Attribute::Internal(key).to_string())
             .and_then(|arc| arc.downcast_ref::<V>())
             .cloned()
     }
-    async fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
+    #[inline(always)]
+    fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
     where
         V: AnySendSyncClone,
     {
-        self.try_get_internal_attribute(key).await.unwrap()
+        self.try_get_internal_attribute(key).unwrap()
     }
-    async fn set_internal_attribute<V>(&self, key: InternalAttribute, value: V) -> &Self
+    #[inline(always)]
+    fn set_internal_attribute<V>(&mut self, key: InternalAttribute, value: V) -> &mut Self
     where
         V: AnySendSyncClone,
     {
-        self.write()
-            .await
-            .get_mut_attributes()
+        self.get_mut_attributes()
             .insert(Attribute::Internal(key).to_string(), Arc::new(value));
         self
     }
-    pub(crate) async fn set_task_panic(&self, panic_data: PanicData) -> &Self {
+    #[inline(always)]
+    pub(crate) fn set_task_panic(&mut self, panic_data: PanicData) -> &mut Self {
         self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
-            .await
     }
-    pub async fn try_get_task_panic_data(&self) -> Option<PanicData> {
+    #[inline(always)]
+    pub fn try_get_task_panic_data(&self) -> Option<PanicData> {
         self.try_get_internal_attribute(InternalAttribute::TaskPanicData)
-            .await
     }
-    pub async fn get_task_panic_data(&self) -> PanicData {
+    #[inline(always)]
+    pub fn get_task_panic_data(&self) -> PanicData {
         self.get_internal_attribute(InternalAttribute::TaskPanicData)
-            .await
     }
-    pub(crate) async fn set_request_error_data(&self, request_error: RequestError) -> &Self {
+    #[inline(always)]
+    pub(crate) fn set_request_error_data(&mut self, request_error: RequestError) -> &mut Self {
         self.set_internal_attribute(InternalAttribute::RequestErrorData, request_error)
-            .await
     }
-    pub async fn try_get_request_error_data(&self) -> Option<RequestError> {
+    #[inline(always)]
+    pub fn try_get_request_error_data(&self) -> Option<RequestError> {
         self.try_get_internal_attribute(InternalAttribute::RequestErrorData)
-            .await
     }
-    pub async fn get_request_error_data(&self) -> RequestError {
+    #[inline(always)]
+    pub fn get_request_error_data(&self) -> RequestError {
         self.get_internal_attribute(InternalAttribute::RequestErrorData)
-            .await
     }
-    pub async fn set_hook<K, F, Fut>(&self, key: K, hook: F) -> &Self
-    where
-        K: AsRef<str>,
-        F: FnContextSendSyncStatic<Fut, ()>,
-        Fut: FutureSendStatic<()>,
-    {
-        let hook_fn: HookHandler<()> =
-            Arc::new(move |ctx: Context| -> SendableAsyncTask<()> { Box::pin(hook(ctx)) });
-        self.set_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()), hook_fn)
-            .await
-    }
-    pub async fn try_get_hook<K>(&self, key: K) -> Option<HookHandler<()>>
-    where
-        K: AsRef<str>,
-    {
-        self.try_get_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()))
-            .await
-    }
-    pub async fn get_hook<K>(&self, key: K) -> HookHandler<()>
-    where
-        K: AsRef<str>,
-    {
-        self.get_internal_attribute(InternalAttribute::Hook(key.as_ref().to_owned()))
-            .await
-    }
-    pub async fn try_send(&self) -> Result<(), ResponseError> {
-        if self.is_terminated().await {
+    pub async fn try_send(&mut self) -> Result<(), ResponseError> {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        let response_data: ResponseData = self.write().await.get_mut_response().build();
-        if let Some(stream) = self.try_get_stream().await {
+        let response_data: ResponseData = self.get_mut_response().build();
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_send(response_data).await;
         }
         Err(ResponseError::NotFoundStream)
     }
-    pub async fn send(&self) {
+    pub async fn send(&mut self) {
         self.try_send().await.unwrap();
     }
     pub async fn try_send_body(&self) -> Result<(), ResponseError> {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        let response_body: ResponseBody = self.get_response_body().await;
-        self.try_send_body_with_data(response_body).await
+        self.try_send_body_with_data(self.get_response().get_body())
+            .await
     }
     pub async fn send_body(&self) {
         self.try_send_body().await.unwrap();
@@ -865,10 +325,10 @@ impl Context {
     where
         D: AsRef<[u8]>,
     {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await {
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_send_body(data).await;
         }
         Err(ResponseError::NotFoundStream)
@@ -884,10 +344,10 @@ impl Context {
         I: IntoIterator<Item = D>,
         D: AsRef<[u8]>,
     {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await {
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_send_body_list(data_iter).await;
         }
         Err(ResponseError::NotFoundStream)
@@ -907,10 +367,10 @@ impl Context {
         I: IntoIterator<Item = D>,
         D: AsRef<[u8]>,
     {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await {
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_send_body_list(data_iter).await;
         }
         Err(ResponseError::NotFoundStream)
@@ -923,10 +383,10 @@ impl Context {
         self.try_send_body_list_with_data(data_iter).await.unwrap()
     }
     pub async fn try_flush(&self) -> Result<(), ResponseError> {
-        if self.is_terminated().await {
+        if self.is_terminated() {
             return Err(ResponseError::Terminated);
         }
-        if let Some(stream) = self.try_get_stream().await {
+        if let Some(stream) = self.try_get_stream() {
             return stream.try_flush().await;
         }
         Err(ResponseError::NotFoundStream)
@@ -940,93 +400,74 @@ impl Context {
 ```rust
 use crate::*;
 #[derive(Clone, CustomDebug, Data, Default, DisplayDebug)]
-pub(crate) struct ContextData {
-    #[get(pub(super), type(copy))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
+pub struct Context {
+    #[get(type(copy))]
     aborted: bool,
-    #[get(pub(super), type(copy))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[get(type(copy))]
     closed: bool,
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[get(pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
     stream: Option<ArcRwLockStream>,
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
+    #[get_mut(skip)]
     #[set(pub(super))]
     request: Request,
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
     response: Response,
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
     route_params: RouteParams,
-    #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     attributes: ThreadSafeAttributeStore,
-    #[get(pub(super))]
-    #[get_mut(pub(super))]
+    #[get_mut(skip)]
     #[set(pub(super))]
-    server_data: ServerData,
+    server: ArcServer,
 }
-#[derive(Clone, CustomDebug, Default, DisplayDebug, Getter)]
-pub struct Context(#[get(pub(super))] pub(super) ArcRwLock<ContextData>);
-```
-# Path: hyperlane/src/context/type.rs
-```rust
-use crate::*;
-pub(crate) type ContextWriteGuard<'a> = RwLockWriteGuard<'a, ContextData>;
-pub(crate) type ContextReadGuard<'a> = RwLockReadGuard<'a, ContextData>;
 ```
 # Path: hyperlane/src/context/test.rs
 ```rust
 use crate::*;
 #[tokio::test]
 async fn context_aborted_and_closed() {
-    let ctx: Context = Context::default();
-    assert!(!ctx.get_aborted().await);
-    ctx.aborted().await;
-    assert!(ctx.get_aborted().await);
-    ctx.cancel_aborted().await;
-    assert!(!ctx.get_aborted().await);
-    assert!(!ctx.get_closed().await);
-    ctx.closed().await;
-    assert!(ctx.get_closed().await);
-    ctx.cancel_closed().await;
-    assert!(!ctx.get_closed().await);
-    assert!(!ctx.is_terminated().await);
-    ctx.aborted().await;
-    assert!(ctx.is_terminated().await);
-    ctx.cancel_aborted().await;
-    ctx.closed().await;
-    assert!(ctx.is_terminated().await);
+    let mut ctx: Context = Context::default();
+    assert!(!ctx.get_aborted());
+    ctx.set_aborted(true);
+    assert!(ctx.get_aborted());
+    ctx.set_aborted(false);
+    assert!(!ctx.get_aborted());
+    assert!(!ctx.get_closed());
+    ctx.set_closed(true);
+    assert!(ctx.get_closed());
+    ctx.set_closed(false);
+    assert!(!ctx.get_closed());
+    assert!(!ctx.is_terminated());
+    ctx.set_aborted(true);
+    assert!(ctx.is_terminated());
+    ctx.set_aborted(false);
+    ctx.set_closed(true);
+    assert!(ctx.is_terminated());
 }
 #[tokio::test]
 async fn context_route_params() {
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let mut params: RouteParams = RouteParams::default();
     params.insert("id".to_string(), "123".to_string());
-    ctx.set_route_params(params).await;
-    let id: Option<String> = ctx.try_get_route_param("id").await;
+    ctx.set_route_params(params);
+    let id: Option<String> = ctx.try_get_route_param("id");
     assert_eq!(id, Some("123".to_string()));
-    let name: Option<String> = ctx.try_get_route_param("name").await;
+    let name: Option<String> = ctx.try_get_route_param("name");
     assert_eq!(name, None);
 }
 #[tokio::test]
 async fn context_request_and_response_string() {
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let request: Request = Request::default();
-    ctx.set_request(&request).await;
-    let fetched_request: Request = ctx.get_request().await;
+    ctx.set_request(request.clone());
+    let fetched_request: &Request = ctx.get_request();
     assert_eq!(request.to_string(), fetched_request.to_string());
     let response: Response = Response::default();
-    ctx.set_response(&response).await;
-    let fetched_response: Response = ctx.get_response().await;
+    ctx.set_response(response.clone());
+    let fetched_response: &Response = ctx.get_response();
     assert_eq!(response.to_string(), fetched_response.to_string());
 }
 ```
@@ -1132,9 +573,9 @@ async fn from_join_error() {
 # Path: hyperlane/src/hook/trait.rs
 ```rust
 use crate::*;
-pub trait FnContextSendSync<R>: Fn(Context) -> R + Send + Sync {}
-pub trait FnContextPinBoxSendSync<T>: FnContextSendSync<SendableAsyncTask<T>> {}
-pub trait FnContextSendSyncStatic<Fut, T>: FnContextSendSync<Fut> + 'static
+pub trait FnContext<R>: Fn(&mut Context) -> R + Send + Sync {}
+pub trait FnContextPinBox<T>: FnContext<SendableAsyncTask<T>> {}
+pub trait FnContextStatic<Fut, T>: FnContext<Fut> + 'static
 where
     Fut: Future<Output = T> + Send,
 {
@@ -1158,10 +599,12 @@ pub fn server_hook_factory<R>() -> ServerHookHandler
 where
     R: ServerHook,
 {
-    Arc::new(move |ctx: &Context| -> SendableAsyncTask<()> {
-        let ctx: Context = ctx.clone();
+    Arc::new(move |ctx: &mut Context| -> SendableAsyncTask<Context> {
+        let mut take_ctx: Context = take(ctx);
+        ctx.set_stream(take_ctx.try_get_stream().clone());
         Box::pin(async move {
-            R::new(&ctx).await.handle(&ctx).await;
+            R::new(&mut take_ctx).await.handle(&mut take_ctx).await;
+            take_ctx
         })
     })
 }
@@ -1180,11 +623,11 @@ pub fn assert_hook_unique_order(list: Vec<HookType>) {
 # Path: hyperlane/src/hook/impl.rs
 ```rust
 use crate::*;
-impl<F, R> FnContextSendSync<R> for F where F: Fn(Context) -> R + Send + Sync {}
-impl<F, T> FnContextPinBoxSendSync<T> for F where F: FnContextSendSync<SendableAsyncTask<T>> {}
-impl<F, Fut, T> FnContextSendSyncStatic<Fut, T> for F
+impl<F, R> FnContext<R> for F where F: Fn(&mut Context) -> R + Send + Sync {}
+impl<F, T> FnContextPinBox<T> for F where F: FnContext<SendableAsyncTask<T>> {}
+impl<F, Fut, T> FnContextStatic<Fut, T> for F
 where
-    F: FnContextSendSync<Fut> + 'static,
+    F: FnContext<Fut> + 'static,
     Fut: Future<Output = T> + Send,
 {
 }
@@ -1236,7 +679,7 @@ impl PartialEq for HookType {
 }
 impl Eq for HookType {}
 impl Hash for HookType {
-    #[inline(always)]
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
             HookType::TaskPanic(order, factory) => {
@@ -1290,10 +733,10 @@ impl HookType {
     }
 }
 impl ServerHook for DefaultServerHook {
-    async fn new(_: &Context) -> Self {
+    async fn new(_: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, _: &Context) {}
+    async fn handle(self, _: &mut Context) {}
 }
 ```
 # Path: hyperlane/src/hook/struct.rs
@@ -1318,13 +761,13 @@ pub struct ServerControlHook {
 # Path: hyperlane/src/hook/type.rs
 ```rust
 use crate::*;
-pub type HookHandler<T> = Arc<dyn FnContextPinBoxSendSync<T>>;
+pub type HookHandler<T> = Arc<dyn FnContextPinBox<T>>;
 pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
 pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
 pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
-pub type ServerHookHandler = Arc<dyn Fn(&Context) -> SendableAsyncTask<()> + Send + Sync>;
+pub type ServerHookHandler = Arc<dyn Fn(&mut Context) -> SendableAsyncTask<Context> + Send + Sync>;
 pub type ServerHookList = Vec<ServerHookHandler>;
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
 pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
@@ -1347,123 +790,40 @@ mod r#impl;
 mod r#struct;
 #[cfg(test)]
 mod test;
-mod r#type;
 pub use r#struct::*;
-pub(crate) use r#type::*;
 ```
 # Path: hyperlane/src/config/impl.rs
 ```rust
 use crate::*;
-impl Default for ServerConfigData {
+impl Default for ServerConfig {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            host: DEFAULT_HOST.to_owned(),
-            port: DEFAULT_WEB_PORT,
+            address: Server::format_bind_address(DEFAULT_HOST, DEFAULT_WEB_PORT),
             nodelay: DEFAULT_NODELAY,
             ttl: DEFAULT_TTI,
         }
     }
 }
-impl Default for ServerConfig {
-    #[inline(always)]
-    fn default() -> Self {
-        Self(arc_rwlock(ServerConfigData::default()))
-    }
-}
-impl PartialEq for ServerConfig {
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(self.get_0(), other.get_0()) {
-            return true;
-        }
-        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
-            *s == *o
-        } else {
-            false
-        }
-    }
-}
-impl Eq for ServerConfig {}
-impl From<ServerConfigData> for ServerConfig {
-    #[inline(always)]
-    fn from(ctx: ServerConfigData) -> Self {
-        Self(arc_rwlock(ctx))
-    }
-}
 impl ServerConfig {
-    pub async fn new() -> Self {
-        Self::default()
-    }
-    async fn read(&self) -> ConfigReadGuard<'_> {
-        self.get_0().read().await
-    }
-    async fn write(&self) -> ConfigWriteGuard<'_> {
-        self.get_0().write().await
-    }
-    pub(crate) async fn get_data(&self) -> ServerConfigData {
-        self.read().await.clone()
-    }
-    pub async fn host<H>(&self, host: H) -> &Self
-    where
-        H: AsRef<str>,
-    {
-        self.write().await.set_host(host);
-        self
-    }
-    pub async fn port(&self, port: u16) -> &Self {
-        self.write().await.set_port(port);
-        self
-    }
-    pub async fn nodelay(&self, nodelay: bool) -> &Self {
-        self.write().await.set_nodelay(Some(nodelay));
-        self
-    }
-    pub async fn enable_nodelay(&self) -> &Self {
-        self.nodelay(true).await
-    }
-    pub async fn disable_nodelay(&self) -> &Self {
-        self.nodelay(false).await
-    }
-    pub async fn ttl(&self, ttl: u32) -> &Self {
-        self.write().await.set_ttl(Some(ttl));
-        self
-    }
-    pub fn from_json<C>(json: C) -> Result<ServerConfig, serde_json::Error>
+    pub fn from_json<C>(json: C) -> Result<Self, serde_json::Error>
     where
         C: AsRef<str>,
     {
-        serde_json::from_str(json.as_ref()).map(|data: ServerConfigData| Self::from(data))
+        serde_json::from_str(json.as_ref())
     }
 }
 ```
 # Path: hyperlane/src/config/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
-pub struct ServerConfigData {
-    #[get_mut(pub(super))]
-    #[set(pub(super), type(AsRef<str>))]
-    pub(super) host: String,
-    #[get(type(copy))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) port: u16,
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
+#[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
+pub struct ServerConfig {
+    #[set(type(AsRef<str>))]
+    pub(super) address: String,
     pub(super) nodelay: Option<bool>,
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
     pub(super) ttl: Option<u32>,
 }
-#[derive(Clone, CustomDebug, DisplayDebug, Getter)]
-pub struct ServerConfig(#[get(pub(super))] pub(super) ArcRwLock<ServerConfigData>);
-```
-# Path: hyperlane/src/config/type.rs
-```rust
-use crate::*;
-pub(crate) type ConfigReadGuard<'a> = RwLockReadGuard<'a, ServerConfigData>;
-pub(crate) type ConfigWriteGuard<'a> = RwLockWriteGuard<'a, ServerConfigData>;
 ```
 # Path: hyperlane/src/config/test.rs
 ```rust
@@ -1472,23 +832,17 @@ use crate::*;
 async fn server_config_from_json() {
     let server_config_json: &'static str = r#"
     {
-        "host": "0.0.0.0",
-        "port": 80,
+        "address": "0.0.0.0:80",
         "nodelay": true,
         "ttl": 64
     }
     "#;
     let server_config: ServerConfig = ServerConfig::from_json(server_config_json).unwrap();
-    let new_server_config: ServerConfig = ServerConfig::new().await;
+    let mut new_server_config: ServerConfig = ServerConfig::default();
     new_server_config
-        .host("0.0.0.0")
-        .await
-        .port(80)
-        .await
-        .enable_nodelay()
-        .await
-        .ttl(64)
-        .await;
+        .set_address("0.0.0.0:80")
+        .set_nodelay(Some(true))
+        .set_ttl(Some(64));
     assert_eq!(server_config, new_server_config);
 }
 ```
@@ -1499,18 +853,17 @@ mod r#struct;
 #[cfg(test)]
 mod test;
 mod r#type;
-pub use r#struct::*;
-pub(crate) use r#type::*;
+pub use {r#struct::*, r#type::*};
 ```
 # Path: hyperlane/src/server/impl.rs
 ```rust
 use crate::*;
-impl Default for ServerData {
+impl Default for Server {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            server_config: ServerConfigData::default(),
-            request_config: RequestConfigData::default(),
+            server_config: ServerConfig::default(),
+            request_config: RequestConfig::default(),
             task_panic: vec![],
             request_error: vec![],
             route_matcher: RouteMatcher::new(),
@@ -1519,7 +872,8 @@ impl Default for ServerData {
         }
     }
 }
-impl PartialEq for ServerData {
+impl PartialEq for Server {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.get_server_config() == other.get_server_config()
             && self.get_request_config() == other.get_request_config()
@@ -1550,145 +904,112 @@ impl PartialEq for ServerData {
                 .all(|(a, b)| Arc::ptr_eq(a, b))
     }
 }
-impl Eq for ServerData {}
-impl PartialEq for Server {
+impl Eq for Server {}
+impl From<ServerConfig> for Server {
     #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        if Arc::ptr_eq(self.get_0(), other.get_0()) {
-            return true;
-        }
-        if let (Ok(s), Ok(o)) = (self.get_0().try_read(), other.get_0().try_read()) {
-            *s == *o
-        } else {
-            false
+    fn from(server_config: ServerConfig) -> Self {
+        Self {
+            server_config,
+            ..Default::default()
         }
     }
 }
-impl Eq for Server {}
-impl HandlerState {
+impl From<RequestConfig> for Server {
     #[inline(always)]
-    pub(super) fn new(stream: ArcRwLockStream, request_config: RequestConfigData) -> Self {
+    fn from(request_config: RequestConfig) -> Self {
         Self {
-            stream,
             request_config,
+            ..Default::default()
         }
     }
 }
 impl Server {
-    pub async fn new() -> Self {
-        let server: ServerData = ServerData::default();
-        Self(arc_rwlock(server))
-    }
-    async fn read(&self) -> ServerStateReadGuard<'_> {
-        self.get_0().read().await
-    }
-    async fn write(&self) -> ServerStateWriteGuard<'_> {
-        self.get_0().write().await
-    }
-    pub async fn get_route_matcher(&self) -> RouteMatcher {
-        self.read().await.get_route_matcher().clone()
-    }
-    pub async fn handle_hook(&self, hook: HookType) {
+    #[inline]
+    pub fn handle_hook(&mut self, hook: HookType) {
         match hook {
             HookType::TaskPanic(_, hook) => {
-                self.write().await.get_mut_task_panic().push(hook());
+                self.get_mut_task_panic().push(hook());
             }
             HookType::RequestError(_, hook) => {
-                self.write().await.get_mut_request_error().push(hook());
+                self.get_mut_request_error().push(hook());
             }
             HookType::RequestMiddleware(_, hook) => {
-                self.write().await.get_mut_request_middleware().push(hook());
+                self.get_mut_request_middleware().push(hook());
             }
             HookType::Route(path, hook) => {
-                self.write()
-                    .await
-                    .get_mut_route_matcher()
-                    .add(path, hook())
-                    .unwrap();
+                self.get_mut_route_matcher().add(path, hook()).unwrap();
             }
             HookType::ResponseMiddleware(_, hook) => {
-                self.write()
-                    .await
-                    .get_mut_response_middleware()
-                    .push(hook());
+                self.get_mut_response_middleware().push(hook());
             }
         };
     }
-    pub async fn config_from_json<C>(&self, json: C) -> &Self
+    #[inline]
+    pub fn config_from_json<C>(&mut self, json: C) -> &mut Self
     where
         C: AsRef<str>,
     {
-        let config: ServerConfig = ServerConfig::from_json(json).unwrap();
-        self.write()
-            .await
-            .set_server_config(config.get_data().await);
+        let config: ServerConfig = serde_json::from_str(json.as_ref()).unwrap();
+        self.set_server_config(config);
         self
     }
-    pub async fn server_config(&self, config: ServerConfig) -> &Self {
-        self.write()
-            .await
-            .set_server_config(config.get_data().await);
+    #[inline(always)]
+    pub fn server_config(&mut self, config: ServerConfig) -> &mut Self {
+        self.set_server_config(config);
         self
     }
-    pub async fn request_config(&self, request_config: RequestConfig) -> &Self {
-        self.write()
-            .await
-            .set_request_config(request_config.get_data().await);
+    #[inline(always)]
+    pub fn request_config(&mut self, request_config: RequestConfig) -> &mut Self {
+        self.set_request_config(request_config);
         self
     }
-    pub async fn task_panic<S>(&self) -> &Self
+    #[inline(always)]
+    pub fn task_panic<S>(&mut self) -> &mut Self
     where
         S: ServerHook,
     {
-        self.write()
-            .await
-            .get_mut_task_panic()
-            .push(server_hook_factory::<S>());
+        self.get_mut_task_panic().push(server_hook_factory::<S>());
         self
     }
-    pub async fn request_error<S>(&self) -> &Self
+    #[inline(always)]
+    pub fn request_error<S>(&mut self) -> &mut Self
     where
         S: ServerHook,
     {
-        self.write()
-            .await
-            .get_mut_request_error()
-            .push(server_hook_factory::<S>());
-        self
-    }
-    pub async fn route<S>(&self, path: impl AsRef<str>) -> &Self
-    where
-        S: ServerHook,
-    {
-        self.write()
-            .await
-            .get_mut_route_matcher()
-            .add(path.as_ref(), server_hook_factory::<S>())
-            .unwrap();
-        self
-    }
-    pub async fn request_middleware<S>(&self) -> &Self
-    where
-        S: ServerHook,
-    {
-        self.write()
-            .await
-            .get_mut_request_middleware()
-            .push(server_hook_factory::<S>());
-        self
-    }
-    pub async fn response_middleware<S>(&self) -> &Self
-    where
-        S: ServerHook,
-    {
-        self.write()
-            .await
-            .get_mut_response_middleware()
+        self.get_mut_request_error()
             .push(server_hook_factory::<S>());
         self
     }
     #[inline(always)]
-    pub fn get_bind_addr<H>(host: H, port: u16) -> String
+    pub fn route<S>(&mut self, path: impl AsRef<str>) -> &mut Self
+    where
+        S: ServerHook,
+    {
+        self.get_mut_route_matcher()
+            .add(path.as_ref(), server_hook_factory::<S>())
+            .unwrap();
+        self
+    }
+    #[inline(always)]
+    pub fn request_middleware<S>(&mut self) -> &mut Self
+    where
+        S: ServerHook,
+    {
+        self.get_mut_request_middleware()
+            .push(server_hook_factory::<S>());
+        self
+    }
+    #[inline(always)]
+    pub fn response_middleware<S>(&mut self) -> &mut Self
+    where
+        S: ServerHook,
+    {
+        self.get_mut_response_middleware()
+            .push(server_hook_factory::<S>());
+        self
+    }
+    #[inline(always)]
+    pub fn format_bind_address<H>(host: H, port: u16) -> String
     where
         H: AsRef<str>,
     {
@@ -1720,43 +1041,45 @@ impl Server {
         Self::flush_stdout();
         Self::flush_stderr();
     }
-    async fn handle_panic_with_context(&self, ctx: &Context, panic: &PanicData) {
-        let panic_clone: PanicData = panic.clone();
-        ctx.cancel_aborted().await.set_task_panic(panic_clone).await;
-        for hook in self.read().await.get_task_panic().iter() {
+    async fn handle_panic_with_context(&self, ctx: &mut Context, panic: &PanicData) {
+        ctx.set_task_panic(panic.clone());
+        for hook in self.get_task_panic().iter() {
             Box::pin(self.task_handler(ctx, hook, false)).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return;
             }
         }
+        ctx.set_aborted(true);
     }
-    async fn handle_task_panic(&self, ctx: &Context, join_error: JoinError) {
+    async fn handle_task_panic(&self, ctx: &mut Context, join_error: JoinError) {
         let panic: PanicData = PanicData::from_join_error(join_error);
-        ctx.set_response_status_code(HttpStatus::InternalServerError.code())
-            .await;
-        self.handle_panic_with_context(ctx, &panic).await;
+        ctx.get_mut_response()
+            .set_status_code(HttpStatus::InternalServerError.code());
+        self.handle_panic_with_context(ctx, &panic).await
     }
-    async fn task_handler(&self, ctx: &Context, hook: &ServerHookHandler, progress: bool) {
-        if let Err(join_error) = spawn(hook(ctx)).await
-            && join_error.is_panic()
-        {
-            if progress {
-                Box::pin(self.handle_task_panic(ctx, join_error)).await;
-            } else {
+    async fn task_handler(&self, ctx: &mut Context, hook: &ServerHookHandler, progress: bool) {
+        match spawn(hook(ctx)).await {
+            Ok(result_ctx) => {
+                *ctx = result_ctx;
+            }
+            Err(join_error) => {
+                if !join_error.is_panic() {
+                    return;
+                }
+                if progress {
+                    Box::pin(self.handle_task_panic(ctx, join_error)).await;
+                    return;
+                }
                 eprintln!("{}", join_error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
-        }
+        };
     }
     async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        let config: ServerConfigData = self.read().await.get_server_config().clone();
-        let host: &String = config.get_host();
-        let port: u16 = config.get_port();
-        let addr: String = Self::get_bind_addr(host, port);
-        Ok(TcpListener::bind(&addr).await?)
+        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)
     }
     async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
-        while let Ok((stream, _socket_addr)) = tcp_listener.accept().await {
+        while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
             self.spawn_connection_handler(stream).await;
@@ -1764,7 +1087,7 @@ impl Server {
         Ok(())
     }
     async fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfigData = self.read().await.get_server_config().clone();
+        let config: ServerConfig = self.get_server_config().clone();
         if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
@@ -1774,60 +1097,53 @@ impl Server {
     }
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server: Server = self.clone();
-        let request_config: RequestConfigData = *self.read().await.get_request_config();
         spawn(async move {
-            server.handle_connection(stream, request_config).await;
+            server.handle_connection(stream).await;
         });
     }
-    pub async fn handle_request_error(&self, ctx: &Context, error: &RequestError) {
-        ctx.cancel_aborted()
-            .await
-            .set_request_error_data(error.clone())
-            .await;
-        for hook in self.read().await.get_request_error().iter() {
+    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
+        ctx.set_request_error_data(error.clone());
+        for hook in self.get_request_error().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return;
             }
         }
+        ctx.set_aborted(true);
     }
-    async fn handle_connection(&self, stream: ArcRwLockStream, request_config: RequestConfigData) {
-        match Request::http_from_stream(&stream, &request_config).await {
+    async fn handle_connection(&self, stream: ArcRwLockStream) {
+        let server: ArcServer = Arc::new(self.clone());
+        match Request::http_from_stream(&stream, server.get_request_config()).await {
             Ok(request) => {
-                let hook: HandlerState = HandlerState::new(stream, request_config);
+                let hook: HandlerState = HandlerState::new(stream, server);
                 self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
-                self.handle_request_error(&stream.into(), &error).await;
+                self.handle_request_error(&mut stream.into(), &error).await;
             }
         }
     }
     async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
-        let ctx: &Context = &Context::new(state.get_stream(), request, self.read().await.clone());
+        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());
         let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive).await;
+            return ctx.is_keep_alive(keep_alive);
         }
         if self.handle_route_matcher(ctx, route).await {
-            return ctx.is_keep_alive(keep_alive).await;
+            return ctx.is_keep_alive(keep_alive);
         }
         if self.handle_response_middleware(ctx).await {
-            return ctx.is_keep_alive(keep_alive).await;
+            return ctx.is_keep_alive(keep_alive);
         }
-        if let Some(panic) = ctx.try_get_task_panic_data().await {
-            ctx.set_response_status_code(HttpStatus::InternalServerError.code())
-                .await;
-            self.handle_panic_with_context(ctx, &panic).await;
-        }
-        ctx.is_keep_alive(keep_alive).await
+        ctx.is_keep_alive(keep_alive)
     }
     async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
         if !self.request_hook(state, request).await {
             return;
         }
         let stream: &ArcRwLockStream = state.get_stream();
-        let request_config: &RequestConfigData = state.get_request_config();
+        let request_config: &RequestConfig = state.get_server().get_request_config();
         loop {
             match Request::http_from_stream(stream, request_config).await {
                 Ok(new_request) => {
@@ -1836,41 +1152,35 @@ impl Server {
                     }
                 }
                 Err(error) => {
-                    self.handle_request_error(&state.get_stream().into(), &error)
+                    self.handle_request_error(&mut state.get_stream().into(), &error)
                         .await;
                     return;
                 }
             }
         }
     }
-    pub(super) async fn handle_request_middleware(&self, ctx: &Context) -> bool {
-        for hook in self.read().await.get_request_middleware().iter() {
+    pub(super) async fn handle_request_middleware(&self, ctx: &mut Context) -> bool {
+        for hook in self.get_request_middleware().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return true;
             }
         }
         false
     }
-    pub(super) async fn handle_route_matcher(&self, ctx: &Context, path: &str) -> bool {
-        if let Some(hook) = self
-            .read()
-            .await
-            .get_route_matcher()
-            .try_resolve_route(ctx, path)
-            .await
-        {
+    pub(super) async fn handle_route_matcher(&self, ctx: &mut Context, path: &str) -> bool {
+        if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path) {
             self.task_handler(ctx, &hook, true).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return true;
             }
         }
         false
     }
-    pub(super) async fn handle_response_middleware(&self, ctx: &Context) -> bool {
-        for hook in self.read().await.get_response_middleware().iter() {
+    pub(super) async fn handle_response_middleware(&self, ctx: &mut Context) -> bool {
+        for hook in self.get_response_middleware().iter() {
             self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted().await {
+            if ctx.get_aborted() {
                 return true;
             }
         }
@@ -1911,71 +1221,92 @@ impl Server {
 # Path: hyperlane/src/server/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, CustomDebug, DisplayDebug, Getter)]
+#[derive(Clone, CustomDebug, DisplayDebug, Getter, New)]
 pub(crate) struct HandlerState {
     pub(super) stream: ArcRwLockStream,
-    pub(super) request_config: RequestConfigData,
+    pub(super) server: ArcServer,
 }
-#[derive(Clone, CustomDebug, Data, DisplayDebug)]
-pub struct ServerData {
-    #[get_mut(pub(super))]
+#[derive(Clone, CustomDebug, Data, DisplayDebug, New)]
+pub struct Server {
+    #[get_mut(skip)]
     #[set(pub(super))]
-    pub(super) server_config: ServerConfigData,
-    #[get_mut(pub(super))]
+    pub(super) server_config: ServerConfig,
+    #[get_mut(skip)]
     #[set(pub(super))]
-    pub(super) request_config: RequestConfigData,
+    pub(super) request_config: RequestConfig,
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(skip)]
     pub(super) route_matcher: RouteMatcher,
     #[debug(skip)]
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(skip)]
     pub(super) request_error: ServerHookList,
     #[debug(skip)]
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(skip)]
     pub(super) task_panic: ServerHookList,
     #[debug(skip)]
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(skip)]
     pub(super) request_middleware: ServerHookList,
     #[debug(skip)]
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(skip)]
     pub(super) response_middleware: ServerHookList,
 }
-#[derive(Clone, CustomDebug, Default, DisplayDebug, Getter)]
-pub struct Server(#[get(pub(super))] pub(super) ArcRwLock<ServerData>);
 ```
 # Path: hyperlane/src/server/type.rs
 ```rust
 use crate::*;
-pub(crate) type ServerStateReadGuard<'a> = RwLockReadGuard<'a, ServerData>;
-pub(crate) type ServerStateWriteGuard<'a> = RwLockWriteGuard<'a, ServerData>;
+pub type ArcServer = Arc<Server>;
 ```
 # Path: hyperlane/src/server/test.rs
 ```rust
 use crate::*;
 #[tokio::test]
 async fn server_partial_eq() {
-    let server1: Server = Server::new().await;
-    let server2: Server = Server::new().await;
+    let server1: Server = Server::default();
+    let server2: Server = Server::default();
     assert_eq!(server1, server2);
     let server1_clone: Server = server1.clone();
     assert_eq!(server1, server1_clone);
 }
 #[tokio::test]
+async fn server_from_server_config() {
+    let mut server_config: ServerConfig = ServerConfig::default();
+    server_config.set_nodelay(Some(true));
+    let server: Server = server_config.clone().into();
+    assert_eq!(server.get_request_config(), &RequestConfig::default());
+    assert_eq!(server.get_server_config(), &server_config);
+    assert!(server.get_task_panic().is_empty());
+    assert!(server.get_request_error().is_empty());
+    assert!(server.get_request_middleware().is_empty());
+    assert!(server.get_response_middleware().is_empty());
+}
+#[tokio::test]
+async fn server_from_request_config() {
+    let mut request_config: RequestConfig = RequestConfig::default();
+    request_config.set_buffer_size(KB_1);
+    let server: Server = request_config.into();
+    assert_eq!(server.get_request_config(), &request_config);
+    assert_eq!(server.get_server_config(), &ServerConfig::default());
+    assert!(server.get_task_panic().is_empty());
+    assert!(server.get_request_error().is_empty());
+    assert!(server.get_request_middleware().is_empty());
+    assert!(server.get_response_middleware().is_empty());
+}
+#[tokio::test]
 async fn server_inner_partial_eq() {
-    let inner1: ServerData = ServerData::default();
-    let inner2: ServerData = ServerData::default();
+    let inner1: Server = Server::default();
+    let inner2: Server = Server::default();
     assert_eq!(inner1, inner2);
 }
 struct TestSendRoute;
 impl ServerHook for TestSendRoute {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, _ctx: &Context) {}
+    async fn handle(self, _ctx: &mut Context) {}
 }
 #[tokio::test]
 async fn server_send_sync() {
@@ -1988,11 +1319,8 @@ async fn server_send_sync() {
 }
 #[tokio::test]
 async fn server_clone_across_threads() {
-    let server: Server = Server::new()
-        .await
-        .route::<TestSendRoute>("/test")
-        .await
-        .clone();
+    let mut server: Server = Server::default();
+    server.route::<TestSendRoute>("/test");
     let server_clone: Server = server.clone();
     let handle: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread: Server = server_clone;
@@ -2003,13 +1331,9 @@ async fn server_clone_across_threads() {
 }
 #[tokio::test]
 async fn server_share_across_threads() {
-    let server: Arc<Server> = Arc::new(
-        Server::new()
-            .await
-            .route::<TestSendRoute>("/test")
-            .await
-            .clone(),
-    );
+    let mut server: Server = Server::default();
+    server.route::<TestSendRoute>("/test");
+    let server: Arc<Server> = Arc::new(server);
     let server1: Arc<Server> = server.clone();
     let server2: Arc<Server> = server.clone();
     let handle1: JoinHandle<&'static str> = spawn(async move {
@@ -2030,8 +1354,8 @@ struct TaskPanicHook {
     content_type: String,
 }
 impl ServerHook for TaskPanicHook {
-    async fn new(ctx: &Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
+    async fn new(ctx: &mut Context) -> Self {
+        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
         let response_body: String = error.to_string();
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
         Self {
@@ -2039,24 +1363,16 @@ impl ServerHook for TaskPanicHook {
             content_type,
         }
     }
-    async fn handle(self, ctx: &Context) {
-        let send_result: Result<(), ResponseError> = ctx
-            .set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .try_send()
-            .await;
-        if send_result.is_err() {
-            ctx.aborted().await.closed().await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(500)
+            .clear_headers()
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONTENT_TYPE, &self.content_type)
+            .set_body(&self.response_body);
+        if ctx.try_send().await.is_err() {
+            ctx.set_aborted(true).set_closed(true);
         }
     }
 }
@@ -2065,26 +1381,20 @@ struct RequestErrorHook {
     response_body: String,
 }
 impl ServerHook for RequestErrorHook {
-    async fn new(ctx: &Context) -> Self {
-        let request_error: RequestError =
-            ctx.try_get_request_error_data().await.unwrap_or_default();
+    async fn new(ctx: &mut Context) -> Self {
+        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
         Self {
             response_status_code: request_error.get_http_status_code(),
             response_body: request_error.to_string(),
         }
     }
-    async fn handle(self, ctx: &Context) {
-        let send_result: Result<(), ResponseError> = ctx
-            .set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(self.response_status_code)
-            .await
-            .set_response_body(self.response_body)
-            .await
-            .try_send()
-            .await;
-        if send_result.is_err() {
-            ctx.aborted().await.closed().await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(self.response_status_code)
+            .set_body(self.response_body);
+        if ctx.try_send().await.is_err() {
+            ctx.set_aborted(true).set_closed(true);
         }
     }
 }
@@ -2092,71 +1402,56 @@ struct RequestMiddleware {
     socket_addr: String,
 }
 impl ServerHook for RequestMiddleware {
-    async fn new(ctx: &Context) -> Self {
+    async fn new(ctx: &mut Context) -> Self {
         let socket_addr: String = ctx.get_socket_addr_string().await;
         Self { socket_addr }
     }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(200)
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONNECTION, KEEP_ALIVE)
-            .await
-            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-            .await
-            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .await
-            .set_response_header("SocketAddr", &self.socket_addr)
-            .await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(200)
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONNECTION, KEEP_ALIVE)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .set_header("SocketAddr", &self.socket_addr);
     }
 }
 struct UpgradeMiddleware;
 impl ServerHook for UpgradeMiddleware {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &Context) {
-        if !ctx.get_request_is_ws_upgrade_type().await {
+    async fn handle(self, ctx: &mut Context) {
+        if !ctx.get_request().is_ws_upgrade_type() {
             return;
         }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            let send_result: Result<(), ResponseError> = ctx
-                .set_response_version(HttpVersion::Http1_1)
-                .await
-                .set_response_status_code(101)
-                .await
-                .set_response_header(UPGRADE, WEBSOCKET)
-                .await
-                .set_response_header(CONNECTION, UPGRADE)
-                .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .await
-                .set_response_body(&vec![])
-                .await
-                .try_send()
-                .await;
-            if send_result.is_err() {
-                ctx.aborted().await.closed().await;
+            ctx.get_mut_response()
+                .set_version(HttpVersion::Http1_1)
+                .set_status_code(101)
+                .set_header(UPGRADE, WEBSOCKET)
+                .set_header(CONNECTION, UPGRADE)
+                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .set_body(vec![]);
+            if ctx.try_send().await.is_err() {
+                ctx.set_aborted(true).set_closed(true);
             }
         }
     }
 }
 struct ResponseMiddleware;
 impl ServerHook for ResponseMiddleware {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &Context) {
-        if ctx.get_request_is_ws_upgrade_type().await {
+    async fn handle(self, ctx: &mut Context) {
+        if ctx.get_request().is_ws_upgrade_type() {
             return;
         }
-        let send_result: Result<(), ResponseError> = ctx.try_send().await;
-        if send_result.is_err() {
-            ctx.aborted().await.closed().await;
+        if ctx.try_send().await.is_err() {
+            ctx.set_aborted(true).set_closed(true);
         }
     }
 }
@@ -2166,9 +1461,8 @@ struct RootRoute {
     cookie2: String,
 }
 impl ServerHook for RootRoute {
-    async fn new(ctx: &Context) -> Self {
-        let path: RequestPath = ctx.get_request_path().await;
-        let response_body: String = format!("Hello hyperlane => {}", path);
+    async fn new(ctx: &mut Context) -> Self {
+        let response_body: String = format!("Hello hyperlane => {}", ctx.get_request().get_path());
         let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
         let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
         Self {
@@ -2177,78 +1471,69 @@ impl ServerHook for RootRoute {
             cookie2,
         }
     }
-    async fn handle(self, ctx: &Context) {
-        ctx.add_response_header(SET_COOKIE, &self.cookie1)
-            .await
-            .add_response_header(SET_COOKIE, &self.cookie2)
-            .await
-            .set_response_body(&self.response_body)
-            .await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .add_header(SET_COOKIE, &self.cookie1)
+            .add_header(SET_COOKIE, &self.cookie2)
+            .set_body(&self.response_body);
     }
 }
 struct SseRoute;
 impl ServerHook for SseRoute {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &Context) {
-        let send_result: Result<(), ResponseError> = ctx
-            .set_response_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .await
-            .set_response_body(&vec![])
-            .await
-            .try_send()
-            .await;
-        if send_result.is_err() {
-            ctx.aborted().await.closed().await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .set_body(vec![]);
+        if ctx.try_send().await.is_err() {
+            ctx.set_aborted(true).set_closed(true);
             return;
         }
         for i in 0..10 {
-            let send_result: Result<(), ResponseError> = ctx
-                .set_response_body(&format!("data:{}{}", i, HTTP_DOUBLE_BR))
-                .await
-                .try_send_body()
-                .await;
-            if send_result.is_err() {
-                ctx.aborted().await.closed().await;
+            ctx.get_mut_response()
+                .set_body(format!("data:{i}{HTTP_DOUBLE_BR}"));
+            if ctx.try_send_body().await.is_err() {
+                ctx.set_aborted(true).set_closed(true);
                 return;
             }
         }
-        ctx.closed().await;
+        ctx.set_aborted(true).set_closed(true);
     }
 }
 struct WebsocketRoute;
 impl WebsocketRoute {
-    async fn try_send_body_hook(&self, ctx: &Context) -> Result<(), ResponseError> {
-        let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {
-            let body: ResponseBody = ctx.get_response_body().await;
-            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+    async fn try_send_body_hook(&self, ctx: &mut Context) -> Result<(), ResponseError> {
+        let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {
+            let body: &ResponseBody = ctx.get_response().get_body();
+            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
             ctx.try_send_body_list_with_data(&frame_list).await
         } else {
             ctx.try_send_body().await
         };
         if send_result.is_err() {
-            ctx.aborted().await.closed().await;
+            ctx.set_aborted(true).set_closed(true);
         }
         send_result
     }
 }
 impl ServerHook for WebsocketRoute {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &Context) {
+    async fn handle(self, ctx: &mut Context) {
         loop {
             match ctx.ws_from_stream().await {
                 Ok(_) => {
-                    let request_body: Vec<u8> = ctx.get_request_body().await;
-                    ctx.set_response_body(&request_body).await;
+                    let body: Vec<u8> = ctx.get_request().get_body().clone();
+                    ctx.get_mut_response().set_body(body);
                     if self.try_send_body_hook(ctx).await.is_err() {
                         return;
                     }
                 }
                 Err(error) => {
-                    ctx.set_response_body(&error.to_string()).await;
+                    ctx.get_mut_response().set_body(error.to_string());
                     let _ = self.try_send_body_hook(ctx).await;
                     return;
                 }
@@ -2260,29 +1545,54 @@ struct DynamicRoute {
     params: RouteParams,
 }
 impl ServerHook for DynamicRoute {
-    async fn new(ctx: &Context) -> Self {
+    async fn new(ctx: &mut Context) -> Self {
         Self {
-            params: ctx.get_route_params().await,
+            params: ctx.get_route_params().clone(),
         }
     }
-    async fn handle(mut self, _ctx: &Context) {
+    async fn handle(mut self, _ctx: &mut Context) {
         self.params.insert("key".to_owned(), "value".to_owned());
         panic!("Test panic {:?}", self.params);
     }
 }
+struct GetAllRoutes;
+impl ServerHook for GetAllRoutes {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        let route_matcher: RouteMatcher = ctx.get_server().get_route_matcher().clone();
+        let mut response_body: String = String::new();
+        for key in route_matcher.get_static_route().keys() {
+            response_body.push_str(&format!("Static route: {key}\n"));
+        }
+        for value in route_matcher.get_dynamic_route().values() {
+            for (route_pattern, _) in value {
+                response_body.push_str(&format!("Dynamic route: {route_pattern}\n"));
+            }
+        }
+        for value in route_matcher.get_regex_route().values() {
+            for (route_pattern, _) in value {
+                response_body.push_str(&format!("Regex route: {route_pattern}\n"));
+            }
+        }
+        ctx.get_mut_response().set_body(&response_body);
+    }
+}
 #[tokio::test]
 async fn main() {
-    let server: Server = Server::new().await;
-    server.task_panic::<TaskPanicHook>().await;
-    server.request_error::<RequestErrorHook>().await;
-    server.request_middleware::<RequestMiddleware>().await;
-    server.request_middleware::<UpgradeMiddleware>().await;
-    server.response_middleware::<ResponseMiddleware>().await;
-    server.route::<RootRoute>("/").await;
-    server.route::<SseRoute>("/sse").await;
-    server.route::<WebsocketRoute>("/websocket").await;
-    server.route::<DynamicRoute>("/dynamic/{routing}").await;
-    server.route::<DynamicRoute>("/regex/{file:^.*$}").await;
+    let mut server: Server = Server::default();
+    server.task_panic::<TaskPanicHook>();
+    server.request_error::<RequestErrorHook>();
+    server.request_middleware::<RequestMiddleware>();
+    server.request_middleware::<UpgradeMiddleware>();
+    server.response_middleware::<ResponseMiddleware>();
+    server.route::<RootRoute>("/");
+    server.route::<SseRoute>("/sse");
+    server.route::<WebsocketRoute>("/websocket");
+    server.route::<GetAllRoutes>("/get/all/routes");
+    server.route::<DynamicRoute>("/dynamic/{routing}");
+    server.route::<DynamicRoute>("/regex/{file:^.*$}");
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     tokio::spawn(async move {
@@ -2606,20 +1916,20 @@ impl RouteMatcher {
         }
         Ok(())
     }
-    pub(crate) async fn try_resolve_route(
+    pub(crate) fn try_resolve_route(
         &self,
-        ctx: &Context,
+        ctx: &mut Context,
         path: &str,
     ) -> Option<ServerHookHandler> {
         if let Some(hook) = self.get_static_route().get(path) {
-            ctx.set_route_params(RouteParams::default()).await;
+            ctx.set_route_params(RouteParams::default());
             return Some(hook.clone());
         }
         let path_segment_count: usize = Self::count_path_segments(path);
         if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
             for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
-                    ctx.set_route_params(params).await;
+                    ctx.set_route_params(params);
                     return Some(hook.clone());
                 }
             }
@@ -2627,7 +1937,7 @@ impl RouteMatcher {
         if let Some(routes) = self.get_regex_route().get(&path_segment_count) {
             for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
-                    ctx.set_route_params(params).await;
+                    ctx.set_route_params(params);
                     return Some(hook.clone());
                 }
             }
@@ -2641,7 +1951,7 @@ impl RouteMatcher {
                     && path_segment_count >= segment_count
                     && let Some(params) = pattern.try_match_path(path)
                 {
-                    ctx.set_route_params(params).await;
+                    ctx.set_route_params(params);
                     return Some(hook.clone());
                 }
             }
@@ -2723,12 +2033,12 @@ struct TestRoute {
 }
 #[cfg(test)]
 impl ServerHook for TestRoute {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self {
             data: String::new(),
         }
     }
-    async fn handle(mut self, _ctx: &Context) {
+    async fn handle(mut self, _ctx: &mut Context) {
         self.data = String::from("test");
     }
 }
@@ -2736,7 +2046,7 @@ impl ServerHook for TestRoute {
 async fn empty_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new().await.route::<TestRoute>(EMPTY_STR).await;
+            let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
         },
         &RouteError::EmptyPattern.to_string(),
     )
@@ -2746,12 +2056,9 @@ async fn empty_route() {
 async fn duplicate_route() {
     assert_panic_message_contains(
         || async {
-            let _server: &Server = Server::new()
-                .await
+            let _server: &Server = Server::default()
                 .route::<TestRoute>(ROOT_PATH)
-                .await
-                .route::<TestRoute>(ROOT_PATH)
-                .await;
+                .route::<TestRoute>(ROOT_PATH);
         },
         &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
     )
@@ -2759,15 +2066,12 @@ async fn duplicate_route() {
 }
 #[tokio::test]
 async fn get_route() {
-    let server: Server = Server::new().await;
+    let mut server: Server = Server::default();
     server
         .route::<TestRoute>(ROOT_PATH)
-        .await
         .route::<TestRoute>("/dynamic/{routing}")
-        .await
-        .route::<TestRoute>("/regex/{file:^.*$}")
-        .await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+        .route::<TestRoute>("/regex/{file:^.*$}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     for key in route_matcher.get_static_route().keys() {
         println!("Static route: {key}");
     }
@@ -2784,14 +2088,12 @@ async fn get_route() {
 }
 #[tokio::test]
 async fn segment_count_optimization() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/users/{id}").await;
-    server.route::<TestRoute>("/users/{id}/posts").await;
-    server
-        .route::<TestRoute>("/users/{id}/posts/{post_id}")
-        .await;
-    server.route::<TestRoute>("/api/v1/users/{id}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/users/{id}");
+    server.route::<TestRoute>("/users/{id}/posts");
+    server.route::<TestRoute>("/users/{id}/posts/{post_id}");
+    server.route::<TestRoute>("/api/v1/users/{id}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_dynamic_route().contains_key(&2),
         "Should have 2-segment routes"
@@ -2810,13 +2112,11 @@ async fn segment_count_optimization() {
 }
 #[tokio::test]
 async fn regex_route_segment_count() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/files/{path:.*}").await;
-    server.route::<TestRoute>("/api/{version:\\d+}/users").await;
-    server
-        .route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}")
-        .await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/files/{path:.*}");
+    server.route::<TestRoute>("/api/{version:\\d+}/users");
+    server.route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_regex_route().contains_key(&2),
         "Should have 2-segment regex routes"
@@ -2832,13 +2132,13 @@ async fn regex_route_segment_count() {
 }
 #[tokio::test]
 async fn mixed_route_types() {
-    let server: Server = Server::new().await;
-    server.route::<TestRoute>("/").await;
-    server.route::<TestRoute>("/about").await;
-    server.route::<TestRoute>("/users/{id}").await;
-    server.route::<TestRoute>("/posts/{slug}").await;
-    server.route::<TestRoute>("/files/{path:.*}").await;
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/");
+    server.route::<TestRoute>("/about");
+    server.route::<TestRoute>("/users/{id}");
+    server.route::<TestRoute>("/posts/{slug}");
+    server.route::<TestRoute>("/files/{path:.*}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert_eq!(route_matcher.get_static_route().len(), 2);
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
     assert!(route_matcher.get_regex_route().contains_key(&2));
@@ -2846,24 +2146,24 @@ async fn mixed_route_types() {
 #[tokio::test]
 async fn large_dynamic_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
+    let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id}}");
-        server.route::<TestRoute>(&path).await;
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} dynamic routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(!route_matcher.get_dynamic_route().is_empty());
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -2878,24 +2178,24 @@ async fn large_dynamic_routes() {
 #[tokio::test]
 async fn large_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
+    let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
-        server.route::<TestRoute>(&path).await;
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} regex routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(!route_matcher.get_regex_route().is_empty());
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -2910,24 +2210,24 @@ async fn large_regex_routes() {
 #[tokio::test]
 async fn large_tail_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
-    let server: Server = Server::new().await;
+    let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{path:.*}}");
-        server.route::<TestRoute>(&path).await;
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
         "Inserted {} tail regex routes in: {:?}",
         ROUTE_COUNT, insert_duration
     );
-    let route_matcher: RouteMatcher = server.get_route_matcher().await;
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(!route_matcher.get_regex_route().is_empty());
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/some/nested/path");
-        let _ = route_matcher.try_resolve_route(&ctx, &path).await;
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -2992,28 +2292,28 @@ pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
 use crate::*;
 #[tokio::test]
 async fn get_panic_from_context() {
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     let set_panic: PanicData = PanicData::new(
         Some("test".to_string()),
         Some("test".to_string()),
         Some("test".to_string()),
     );
-    ctx.set_task_panic(set_panic.clone()).await;
-    let get_panic: PanicData = ctx.try_get_task_panic_data().await.unwrap();
+    ctx.set_task_panic(set_panic.clone());
+    let get_panic: PanicData = ctx.try_get_task_panic_data().unwrap();
     assert_eq!(set_panic, get_panic);
 }
 #[tokio::test]
 async fn context_attributes() {
-    let ctx: Context = Context::default();
-    ctx.set_attribute("key1", "value1".to_string()).await;
-    let value: Option<String> = ctx.try_get_attribute("key1").await;
+    let mut ctx: Context = Context::default();
+    ctx.set_attribute("key1", "value1".to_string());
+    let value: Option<String> = ctx.try_get_attribute("key1");
     assert_eq!(value, Some("value1".to_string()));
-    ctx.remove_attribute("key1").await;
-    let value: Option<String> = ctx.try_get_attribute("key1").await;
+    ctx.remove_attribute("key1");
+    let value: Option<String> = ctx.try_get_attribute("key1");
     assert_eq!(value, None);
-    ctx.set_attribute("key2", 123).await;
-    ctx.clear_attribute().await;
-    let value: Option<i32> = ctx.try_get_attribute("key2").await;
+    ctx.set_attribute("key2", 123);
+    ctx.clear_attribute();
+    let value: Option<i32> = ctx.try_get_attribute("key2");
     assert_eq!(value, None);
 }
 #[tokio::test]
@@ -3035,31 +2335,19 @@ async fn get_panic_from_join_error() {
 }
 #[tokio::test]
 async fn run_set_func() {
-    let ctx: Context = Context::default();
+    let mut ctx: Context = Context::default();
     const KEY: &str = "string";
     const PARAM: &str = "test";
     let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
-    ctx.set_attribute(KEY, func).await;
-    let get_key: &(dyn Fn(&str) -> String + Send + Sync) =
-        ctx.try_get_attribute(KEY).await.unwrap();
+    ctx.set_attribute(KEY, func);
+    let get_key: &(dyn Fn(&str) -> String + Send + Sync) = ctx.try_get_attribute(KEY).unwrap();
     assert_eq!(get_key(PARAM), func(PARAM));
     let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {
         assert_eq!(msg, PARAM);
     };
-    ctx.set_attribute(KEY, func).await;
-    let hyperlane = ctx
-        .get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY)
-        .await;
+    ctx.set_attribute(KEY, func);
+    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY);
     hyperlane(PARAM);
-}
-#[tokio::test]
-async fn send_body_hook() {
-    let ctx: Context = Context::default();
-    async fn send_body_hook_fn(ctx: Context) {
-        let _ = ctx.send_body().await;
-    }
-    ctx.set_hook("send_body", send_body_hook_fn).await;
-    assert!(ctx.try_get_hook("send_body").await.is_some());
 }
 ```
 # Path: hyperlane/src/attribute/enum.rs
@@ -3070,11 +2358,10 @@ pub(crate) enum Attribute {
     External(String),
     Internal(InternalAttribute),
 }
-#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum InternalAttribute {
     TaskPanicData,
     RequestErrorData,
-    Hook(String),
 }
 ```
 # Path: hyperlane/src/error/mod.rs
@@ -3089,6 +2376,7 @@ pub use r#enum::*;
 ```rust
 use crate::*;
 impl From<std::io::Error> for ServerError {
+    #[inline(always)]
     fn from(error: std::io::Error) -> Self {
         ServerError::TcpBind(error.to_string())
     }
