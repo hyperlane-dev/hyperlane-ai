@@ -1,4 +1,4 @@
-<!--2026-02-15 06:58:53-->
+<!--2026-02-15 13:02:18-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -37,10 +37,9 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
-    mem::take,
     net::SocketAddr,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 use {
     inventory::collect,
@@ -66,11 +65,40 @@ pub use r#struct::*;
 # Path: hyperlane/src/context/impl.rs
 ```rust
 use crate::*;
-impl From<Server> for Context {
+impl Default for Context {
     #[inline(always)]
-    fn from(server: Server) -> Self {
+    fn default() -> Self {
+        Self {
+            aborted: false,
+            closed: false,
+            stream: None,
+            request: Request::default(),
+            response: Response::default(),
+            route_params: RouteParams::default(),
+            attributes: ThreadSafeAttributeStore::default(),
+            server: default_server(),
+        }
+    }
+}
+impl PartialEq for Context {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.get_aborted() == other.get_aborted()
+            && self.get_closed() == other.get_closed()
+            && self.get_request() == other.get_request()
+            && self.get_response() == other.get_response()
+            && self.get_route_params() == other.get_route_params()
+            && self.get_attributes().len() == other.get_attributes().len()
+            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
+            && self.get_server() == other.get_server()
+    }
+}
+impl Eq for Context {}
+impl From<&'static Server> for Context {
+    #[inline(always)]
+    fn from(server: &'static Server) -> Self {
         let mut ctx: Context = Context::default();
-        ctx.set_server(Arc::new(server));
+        ctx.set_server(server);
         ctx
     }
 }
@@ -88,27 +116,62 @@ impl From<ArcRwLockStream> for Context {
         (&stream).into()
     }
 }
-impl PartialEq for Context {
+impl From<usize> for Context {
     #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        self.get_aborted() == other.get_aborted()
-            && self.get_closed() == other.get_closed()
-            && self.get_request() == other.get_request()
-            && self.get_response() == other.get_response()
-            && self.get_route_params() == other.get_route_params()
-            && self.get_attributes().len() == other.get_attributes().len()
-            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
-            && self.get_server() == other.get_server()
+    fn from(addr: usize) -> Self {
+        let ctx: &Context = addr.into();
+        ctx.clone()
     }
 }
-impl Eq for Context {}
+impl From<usize> for &'static Context {
+    #[inline(always)]
+    fn from(addr: usize) -> &'static Context {
+        unsafe { &*(addr as *const Context) }
+    }
+}
+impl From<usize> for &'static mut Context {
+    #[inline(always)]
+    fn from(addr: usize) -> &'static mut Context {
+        unsafe { &mut *(addr as *mut Context) }
+    }
+}
+impl From<&Context> for usize {
+    #[inline(always)]
+    fn from(ctx: &Context) -> Self {
+        ctx as *const Context as usize
+    }
+}
+impl From<&mut Context> for usize {
+    #[inline(always)]
+    fn from(ctx: &mut Context) -> Self {
+        ctx as *mut Context as usize
+    }
+}
+impl AsRef<Context> for Context {
+    #[inline(always)]
+    fn as_ref(&self) -> &Context {
+        let addr: usize = (self as &Context).into();
+        addr.into()
+    }
+}
+impl AsMut<Context> for Context {
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut Context {
+        let addr: usize = (self as &mut Context).into();
+        addr.into()
+    }
+}
 impl Context {
     #[inline(always)]
-    pub(crate) fn new(stream: &ArcRwLockStream, request: &Request, server: &ArcServer) -> Context {
+    pub(crate) fn new(
+        stream: &ArcRwLockStream,
+        request: &Request,
+        server: &'static Server,
+    ) -> Context {
         let mut ctx: Context = Context::default();
         ctx.set_stream(Some(stream.clone()))
             .set_request(request.clone())
-            .set_server(server.clone())
+            .set_server(server)
             .get_mut_response()
             .set_version(request.get_version().clone());
         ctx
@@ -399,36 +462,72 @@ impl Context {
 # Path: hyperlane/src/context/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, CustomDebug, Data, Default, DisplayDebug)]
+#[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
     #[get(type(copy))]
-    aborted: bool,
+    pub(super) aborted: bool,
     #[get(type(copy))]
-    closed: bool,
+    pub(super) closed: bool,
     #[get(pub(crate))]
     #[get_mut(skip)]
     #[set(pub(crate))]
-    stream: Option<ArcRwLockStream>,
+    pub(super) stream: Option<ArcRwLockStream>,
     #[get_mut(skip)]
     #[set(pub(super))]
-    request: Request,
-    response: Response,
+    pub(super) request: Request,
+    pub(super) response: Response,
     #[get_mut(skip)]
     #[set(pub(crate))]
-    route_params: RouteParams,
+    pub(super) route_params: RouteParams,
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    attributes: ThreadSafeAttributeStore,
+    pub(super) attributes: ThreadSafeAttributeStore,
     #[get_mut(skip)]
     #[set(pub(super))]
-    server: ArcServer,
+    pub(super) server: &'static Server,
 }
 ```
 # Path: hyperlane/src/context/test.rs
 ```rust
 use crate::*;
-#[tokio::test]
-async fn context_aborted_and_closed() {
+#[test]
+fn context_from_usize() {
+    let mut ctx: Context = Context::default();
+    ctx.set_aborted(true);
+    let ctx_address: usize = (&ctx).into();
+    let ctx_from_addr: Context = ctx_address.into();
+    assert_eq!(ctx.get_aborted(), ctx_from_addr.get_aborted());
+}
+#[test]
+fn context_ref_from_usize() {
+    let mut ctx: Context = Context::default();
+    ctx.set_closed(true);
+    let ctx_address: usize = (&ctx).into();
+    let ctx_ref: &Context = ctx_address.into();
+    assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
+}
+#[test]
+fn context_mut_from_usize() {
+    let mut ctx: Context = Context::default();
+    let ctx_address: usize = (&mut ctx).into();
+    let ctx_mut: &mut Context = ctx_address.into();
+    ctx_mut.set_aborted(true);
+    assert!(ctx_mut.get_aborted());
+}
+#[test]
+fn context_ref_into_usize() {
+    let ctx: Context = Context::default();
+    let ctx_address: usize = (&ctx).into();
+    assert!(ctx_address > 0);
+}
+#[test]
+fn context_mut_into_usize() {
+    let mut ctx: Context = Context::default();
+    let ctx_address: usize = (&mut ctx).into();
+    assert!(ctx_address > 0);
+}
+#[test]
+fn context_aborted_and_closed() {
     let mut ctx: Context = Context::default();
     assert!(!ctx.get_aborted());
     ctx.set_aborted(true);
@@ -447,8 +546,8 @@ async fn context_aborted_and_closed() {
     ctx.set_closed(true);
     assert!(ctx.is_terminated());
 }
-#[tokio::test]
-async fn context_route_params() {
+#[test]
+fn context_route_params() {
     let mut ctx: Context = Context::default();
     let mut params: RouteParams = RouteParams::default();
     params.insert("id".to_string(), "123".to_string());
@@ -458,8 +557,8 @@ async fn context_route_params() {
     let name: Option<String> = ctx.try_get_route_param("name");
     assert_eq!(name, None);
 }
-#[tokio::test]
-async fn context_request_and_response_string() {
+#[test]
+fn context_request_and_response_string() {
     let mut ctx: Context = Context::default();
     let request: Request = Request::default();
     ctx.set_request(request.clone());
@@ -469,6 +568,24 @@ async fn context_request_and_response_string() {
     ctx.set_response(response.clone());
     let fetched_response: &Response = ctx.get_response();
     assert_eq!(response.to_string(), fetched_response.to_string());
+}
+#[test]
+fn context_as_ref() {
+    let ctx: Context = Context::default();
+    let ctx_ref: &Context = ctx.as_ref();
+    assert_eq!(ctx.get_aborted(), ctx_ref.get_aborted());
+    assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
+    assert_eq!(ctx.get_request(), ctx_ref.get_request());
+    assert_eq!(ctx.get_response(), ctx_ref.get_response());
+}
+#[test]
+fn context_as_mut() {
+    let mut ctx: Context = Context::default();
+    ctx.set_aborted(true);
+    let ctx_mut: &mut Context = ctx.as_mut();
+    assert!(ctx_mut.get_aborted());
+    ctx_mut.set_closed(true);
+    assert!(ctx.get_closed());
 }
 ```
 # Path: hyperlane/src/panic/mod.rs
@@ -574,7 +691,7 @@ async fn from_join_error() {
 ```rust
 use crate::*;
 pub trait FnContext<R>: Fn(&mut Context) -> R + Send + Sync {}
-pub trait FnContextPinBox<T>: FnContext<SendableAsyncTask<T>> {}
+pub trait FnContextPinBox<T>: FnContext<FutureBox<T>> {}
 pub trait FnContextStatic<Fut, T>: FnContext<Fut> + 'static
 where
     Fut: Future<Output = T> + Send,
@@ -595,16 +712,23 @@ pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*, r#type::*};
 ```rust
 use crate::*;
 #[inline(always)]
+pub fn default_server_control_hook_handler() -> ServerControlHookHandler<()> {
+    Arc::new(|| Box::pin(async {}))
+}
+#[inline(always)]
+pub fn default_server_hook_handler() -> ServerHookHandler {
+    Arc::new(|_: &mut Context| -> FutureBox<()> { Box::pin(async move {}) })
+}
+#[inline(always)]
 pub fn server_hook_factory<R>() -> ServerHookHandler
 where
     R: ServerHook,
 {
-    Arc::new(move |ctx: &mut Context| -> SendableAsyncTask<Context> {
-        let mut take_ctx: Context = take(ctx);
-        ctx.set_stream(take_ctx.try_get_stream().clone());
+    Arc::new(move |ctx: &mut Context| -> FutureBox<()> {
+        let ctx_address: usize = ctx.into();
         Box::pin(async move {
-            R::new(&mut take_ctx).await.handle(&mut take_ctx).await;
-            take_ctx
+            let ctx: &mut Context = ctx_address.into();
+            R::new(ctx).await.handle(ctx).await;
         })
     })
 }
@@ -624,7 +748,7 @@ pub fn assert_hook_unique_order(list: Vec<HookType>) {
 ```rust
 use crate::*;
 impl<F, R> FnContext<R> for F where F: Fn(&mut Context) -> R + Send + Sync {}
-impl<F, T> FnContextPinBox<T> for F where F: FnContext<SendableAsyncTask<T>> {}
+impl<F, T> FnContextPinBox<T> for F where F: FnContext<FutureBox<T>> {}
 impl<F, Fut, T> FnContextStatic<Fut, T> for F
 where
     F: FnContext<Fut> + 'static,
@@ -633,13 +757,13 @@ where
 }
 impl<T, R> FutureSendStatic<R> for T where T: Future<Output = R> + Send + 'static {}
 impl<T, O> FutureSend<O> for T where T: Future<Output = O> + Send {}
-impl<T, O> FnPinBoxFutureSend<O> for T where T: Fn() -> SendableAsyncTask<O> + Send + Sync {}
+impl<T, O> FutureFn<O> for T where T: Fn() -> FutureBox<O> + Send + Sync {}
 impl Default for ServerControlHook {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            wait_hook: Arc::new(|| Box::pin(async {})),
-            shutdown_hook: Arc::new(|| Box::pin(async {})),
+            wait_hook: default_server_control_hook_handler(),
+            shutdown_hook: default_server_control_hook_handler(),
         }
     }
 }
@@ -751,11 +875,11 @@ pub struct ServerControlHook {
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(crate))]
-    pub(super) wait_hook: SharedAsyncTaskFactory<()>,
+    pub(super) wait_hook: ServerControlHookHandler<()>,
     #[debug(skip)]
     #[get(pub)]
     #[set(pub(crate))]
-    pub(super) shutdown_hook: SharedAsyncTaskFactory<()>,
+    pub(super) shutdown_hook: ServerControlHookHandler<()>,
 }
 ```
 # Path: hyperlane/src/hook/type.rs
@@ -764,10 +888,10 @@ use crate::*;
 pub type HookHandler<T> = Arc<dyn FnContextPinBox<T>>;
 pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
 pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
-pub type SendableAsyncTask<T> = Pin<Box<dyn Future<Output = T> + Send>>;
-pub type SharedAsyncTaskFactory<T> = Arc<dyn FnPinBoxFutureSend<T>>;
+pub type FutureBox<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+pub type ServerControlHookHandler<T> = Arc<dyn FutureFn<T>>;
 pub type ServerHookHandlerFactory = fn() -> ServerHookHandler;
-pub type ServerHookHandler = Arc<dyn Fn(&mut Context) -> SendableAsyncTask<Context> + Send + Sync>;
+pub type ServerHookHandler = Arc<dyn Fn(&mut Context) -> FutureBox<()> + Send + Sync>;
 pub type ServerHookList = Vec<ServerHookHandler>;
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
 pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
@@ -828,8 +952,8 @@ pub struct ServerConfig {
 # Path: hyperlane/src/config/test.rs
 ```rust
 use crate::*;
-#[tokio::test]
-async fn server_config_from_json() {
+#[test]
+fn server_config_from_json() {
     let server_config_json: &'static str = r#"
     {
         "address": "0.0.0.0:80",
@@ -848,12 +972,22 @@ async fn server_config_from_json() {
 ```
 # Path: hyperlane/src/server/mod.rs
 ```rust
+mod r#fn;
 mod r#impl;
 mod r#struct;
 #[cfg(test)]
 mod test;
 mod r#type;
 pub use {r#struct::*, r#type::*};
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane/src/server/fn.rs
+```rust
+use crate::*;
+pub(crate) fn default_server() -> &'static Server {
+    static DEFAULT_SERVER: OnceLock<Server> = OnceLock::new();
+    DEFAULT_SERVER.get_or_init(Server::default)
+}
 ```
 # Path: hyperlane/src/server/impl.rs
 ```rust
@@ -905,6 +1039,51 @@ impl PartialEq for Server {
     }
 }
 impl Eq for Server {}
+impl From<usize> for Server {
+    #[inline(always)]
+    fn from(addr: usize) -> Self {
+        let server: &Server = addr.into();
+        server.clone()
+    }
+}
+impl From<usize> for &'static Server {
+    #[inline(always)]
+    fn from(addr: usize) -> &'static Server {
+        unsafe { &*(addr as *const Server) }
+    }
+}
+impl From<usize> for &'static mut Server {
+    #[inline(always)]
+    fn from(addr: usize) -> &'static mut Server {
+        unsafe { &mut *(addr as *mut Server) }
+    }
+}
+impl From<&Server> for usize {
+    #[inline(always)]
+    fn from(server: &Server) -> Self {
+        server as *const Server as usize
+    }
+}
+impl From<&mut Server> for usize {
+    #[inline(always)]
+    fn from(server: &mut Server) -> Self {
+        server as *mut Server as usize
+    }
+}
+impl AsRef<Server> for Server {
+    #[inline(always)]
+    fn as_ref(&self) -> &Server {
+        let addr: usize = (self as &Server).into();
+        addr.into()
+    }
+}
+impl AsMut<Server> for Server {
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut Server {
+        let addr: usize = (self as &mut Server).into();
+        addr.into()
+    }
+}
 impl From<ServerConfig> for Server {
     #[inline(always)]
     fn from(server_config: ServerConfig) -> Self {
@@ -1042,14 +1221,16 @@ impl Server {
         Self::flush_stderr();
     }
     async fn handle_panic_with_context(&self, ctx: &mut Context, panic: &PanicData) {
-        ctx.set_task_panic(panic.clone());
+        ctx.set_aborted(false)
+            .set_closed(false)
+            .set_task_panic(panic.clone());
         for hook in self.get_task_panic().iter() {
             Box::pin(self.task_handler(ctx, hook, false)).await;
             if ctx.get_aborted() {
                 return;
             }
         }
-        ctx.set_aborted(true);
+        ctx.set_aborted(true).set_closed(true);
     }
     async fn handle_task_panic(&self, ctx: &mut Context, join_error: JoinError) {
         let panic: PanicData = PanicData::from_join_error(join_error);
@@ -1058,21 +1239,16 @@ impl Server {
         self.handle_panic_with_context(ctx, &panic).await
     }
     async fn task_handler(&self, ctx: &mut Context, hook: &ServerHookHandler, progress: bool) {
-        match spawn(hook(ctx)).await {
-            Ok(result_ctx) => {
-                *ctx = result_ctx;
+        if let Err(join_error) = spawn(hook(ctx)).await {
+            if !join_error.is_panic() {
+                return;
             }
-            Err(join_error) => {
-                if !join_error.is_panic() {
-                    return;
-                }
-                if progress {
-                    Box::pin(self.handle_task_panic(ctx, join_error)).await;
-                    return;
-                }
-                eprintln!("{}", join_error);
-                let _ = Self::try_flush_stdout_and_stderr();
+            if progress {
+                Box::pin(self.handle_task_panic(ctx, join_error)).await;
+                return;
             }
+            eprintln!("{}", join_error);
+            let _ = Self::try_flush_stdout_and_stderr();
         };
     }
     async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
@@ -1096,26 +1272,29 @@ impl Server {
         }
     }
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
-        let server: Server = self.clone();
+        let server_address: usize = self.into();
         spawn(async move {
+            let server: &'static Server = server_address.into();
             server.handle_connection(stream).await;
         });
     }
     pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
-        ctx.set_request_error_data(error.clone());
+        ctx.set_aborted(false)
+            .set_closed(false)
+            .set_request_error_data(error.clone());
         for hook in self.get_request_error().iter() {
             self.task_handler(ctx, hook, true).await;
             if ctx.get_aborted() {
                 return;
             }
         }
-        ctx.set_aborted(true);
+        ctx.set_aborted(true).set_closed(true);
     }
     async fn handle_connection(&self, stream: ArcRwLockStream) {
-        let server: ArcServer = Arc::new(self.clone());
-        match Request::http_from_stream(&stream, server.get_request_config()).await {
+        match Request::http_from_stream(&stream, self.get_request_config()).await {
             Ok(request) => {
-                let hook: HandlerState = HandlerState::new(stream, server);
+                let server_address: usize = self.into();
+                let hook: HandlerState = HandlerState::new(stream, server_address.into());
                 self.handle_http_requests(&hook, &request).await;
             }
             Err(error) => {
@@ -1195,13 +1374,13 @@ impl Server {
             let _ = server.accept_connections(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
-        let wait_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
+        let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
                 let _ = wait_receiver_clone.changed().await;
             })
         });
-        let shutdown_hook: SharedAsyncTaskFactory<()> = Arc::new(move || {
+        let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
                 let _ = shutdown_sender_clone.send(());
@@ -1224,7 +1403,7 @@ use crate::*;
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, New)]
 pub(crate) struct HandlerState {
     pub(super) stream: ArcRwLockStream,
-    pub(super) server: ArcServer,
+    pub(super) server: &'static Server,
 }
 #[derive(Clone, CustomDebug, Data, DisplayDebug, New)]
 pub struct Server {
@@ -1263,16 +1442,45 @@ pub type ArcServer = Arc<Server>;
 # Path: hyperlane/src/server/test.rs
 ```rust
 use crate::*;
-#[tokio::test]
-async fn server_partial_eq() {
+#[test]
+fn server_partial_eq() {
     let server1: Server = Server::default();
     let server2: Server = Server::default();
     assert_eq!(server1, server2);
     let server1_clone: Server = server1.clone();
     assert_eq!(server1, server1_clone);
 }
-#[tokio::test]
-async fn server_from_server_config() {
+#[test]
+fn server_from_usize() {
+    let mut server: Server = Server::default();
+    server.set_request_config(RequestConfig::default());
+    let server_address: usize = (&server).into();
+    let server_from_addr: Server = server_address.into();
+    assert_eq!(
+        server.get_request_config(),
+        server_from_addr.get_request_config()
+    );
+}
+#[test]
+fn server_ref_from_usize() {
+    let mut server: Server = Server::default();
+    server.set_server_config(ServerConfig::default());
+    let server_address: usize = (&server).into();
+    let server_ref: &Server = server_address.into();
+    assert_eq!(server.get_server_config(), server_ref.get_server_config());
+}
+#[test]
+fn server_mut_from_usize() {
+    let mut server: Server = Server::default();
+    let server_address: usize = (&mut server).into();
+    let server_mut: &mut Server = server_address.into();
+    let mut config: ServerConfig = ServerConfig::default();
+    config.set_nodelay(Some(true));
+    server_mut.set_server_config(config);
+    assert!(server_mut.get_server_config().try_get_nodelay().is_some());
+}
+#[test]
+fn server_from_server_config() {
     let mut server_config: ServerConfig = ServerConfig::default();
     server_config.set_nodelay(Some(true));
     let server: Server = server_config.clone().into();
@@ -1283,8 +1491,8 @@ async fn server_from_server_config() {
     assert!(server.get_request_middleware().is_empty());
     assert!(server.get_response_middleware().is_empty());
 }
-#[tokio::test]
-async fn server_from_request_config() {
+#[test]
+fn server_from_request_config() {
     let mut request_config: RequestConfig = RequestConfig::default();
     request_config.set_buffer_size(KB_1);
     let server: Server = request_config.into();
@@ -1295,11 +1503,40 @@ async fn server_from_request_config() {
     assert!(server.get_request_middleware().is_empty());
     assert!(server.get_response_middleware().is_empty());
 }
-#[tokio::test]
-async fn server_inner_partial_eq() {
+#[test]
+fn server_inner_partial_eq() {
     let inner1: Server = Server::default();
     let inner2: Server = Server::default();
     assert_eq!(inner1, inner2);
+}
+#[test]
+fn server_ref_into_usize() {
+    let server: Server = Server::default();
+    let server_address: usize = (&server).into();
+    assert!(server_address > 0);
+}
+#[test]
+fn server_mut_into_usize() {
+    let mut server: Server = Server::default();
+    let server_address: usize = (&mut server).into();
+    assert!(server_address > 0);
+}
+#[test]
+fn server_as_ref() {
+    let mut server: Server = Server::default();
+    server.set_server_config(ServerConfig::default());
+    let server_ref: &Server = server.as_ref();
+    assert_eq!(server.get_server_config(), server_ref.get_server_config());
+    assert_eq!(server.get_request_config(), server_ref.get_request_config());
+}
+#[test]
+fn server_as_mut() {
+    let mut server: Server = Server::default();
+    let server_mut: &mut Server = server.as_mut();
+    let mut config: ServerConfig = ServerConfig::default();
+    config.set_nodelay(Some(true));
+    server_mut.set_server_config(config);
+    assert!(server.get_server_config().try_get_nodelay().is_some());
 }
 struct TestSendRoute;
 impl ServerHook for TestSendRoute {
@@ -1308,8 +1545,8 @@ impl ServerHook for TestSendRoute {
     }
     async fn handle(self, _ctx: &mut Context) {}
 }
-#[tokio::test]
-async fn server_send_sync() {
+#[test]
+fn server_send_sync() {
     fn assert_send<T: Send>() {}
     fn assert_sync<T: Sync>() {}
     fn assert_send_sync<T: Send + Sync>() {}
@@ -1561,7 +1798,7 @@ impl ServerHook for GetAllRoutes {
         Self
     }
     async fn handle(self, ctx: &mut Context) {
-        let route_matcher: RouteMatcher = ctx.get_server().get_route_matcher().clone();
+        let route_matcher: &RouteMatcher = ctx.get_server().get_route_matcher();
         let mut response_body: String = String::new();
         for key in route_matcher.get_static_route().keys() {
             response_body.push_str(&format!("Static route: {key}\n"));
@@ -1997,41 +2234,9 @@ pub(crate) type PathComponentList<'a> = Vec<&'a str>;
 # Path: hyperlane/src/route/test.rs
 ```rust
 use crate::*;
-#[cfg(test)]
-async fn assert_panic_message_contains<F, Fut>(future_factory: F, expected_msg: &str)
-where
-    F: Fn() -> Fut + Send + 'static,
-    Fut: Future<Output = ()> + Send + 'static,
-{
-    let result: Result<(), JoinError> = spawn(future_factory()).await;
-    assert!(
-        result.is_err(),
-        "Expected panic, but task completed successfully"
-    );
-    let join_err: JoinError = result.unwrap_err();
-    if !join_err.is_panic() {
-        panic!("Task failed but was not a panic");
-    }
-    let panic_payload: Box<dyn Any + Send> = join_err.into_panic();
-    let panic_msg: &str = if let Some(s) = panic_payload.downcast_ref::<&str>() {
-        s
-    } else if let Some(s) = panic_payload.downcast_ref::<String>() {
-        s.as_str()
-    } else {
-        "Unknown panic type"
-    };
-    assert!(
-        panic_msg.contains(expected_msg),
-        "Expected panic message to contain: '{}', but got: '{}'",
-        expected_msg,
-        panic_msg
-    );
-}
-#[cfg(test)]
 struct TestRoute {
     data: String,
 }
-#[cfg(test)]
 impl ServerHook for TestRoute {
     async fn new(_ctx: &mut Context) -> Self {
         Self {
@@ -2042,30 +2247,20 @@ impl ServerHook for TestRoute {
         self.data = String::from("test");
     }
 }
-#[tokio::test]
-async fn empty_route() {
-    assert_panic_message_contains(
-        || async {
-            let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
-        },
-        &RouteError::EmptyPattern.to_string(),
-    )
-    .await;
+#[test]
+#[should_panic(expected = "EmptyPattern")]
+fn empty_route() {
+    let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
 }
-#[tokio::test]
-async fn duplicate_route() {
-    assert_panic_message_contains(
-        || async {
-            let _server: &Server = Server::default()
-                .route::<TestRoute>(ROOT_PATH)
-                .route::<TestRoute>(ROOT_PATH);
-        },
-        &RouteError::DuplicatePattern(ROOT_PATH.to_string()).to_string(),
-    )
-    .await;
+#[test]
+#[should_panic(expected = "DuplicatePattern")]
+fn duplicate_route() {
+    let _server: &Server = Server::default()
+        .route::<TestRoute>(ROOT_PATH)
+        .route::<TestRoute>(ROOT_PATH);
 }
-#[tokio::test]
-async fn get_route() {
+#[test]
+fn get_route() {
     let mut server: Server = Server::default();
     server
         .route::<TestRoute>(ROOT_PATH)
@@ -2086,8 +2281,8 @@ async fn get_route() {
         }
     }
 }
-#[tokio::test]
-async fn segment_count_optimization() {
+#[test]
+fn segment_count_optimization() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/users/{id}");
     server.route::<TestRoute>("/users/{id}/posts");
@@ -2110,8 +2305,8 @@ async fn segment_count_optimization() {
     assert_eq!(route_matcher.get_dynamic_route().get(&3).unwrap().len(), 1);
     assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
 }
-#[tokio::test]
-async fn regex_route_segment_count() {
+#[test]
+fn regex_route_segment_count() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/files/{path:.*}");
     server.route::<TestRoute>("/api/{version:\\d+}/users");
@@ -2130,8 +2325,8 @@ async fn regex_route_segment_count() {
         "Should have 4-segment regex routes"
     );
 }
-#[tokio::test]
-async fn mixed_route_types() {
+#[test]
+fn mixed_route_types() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/");
     server.route::<TestRoute>("/about");
@@ -2143,8 +2338,8 @@ async fn mixed_route_types() {
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
     assert!(route_matcher.get_regex_route().contains_key(&2));
 }
-#[tokio::test]
-async fn large_dynamic_routes() {
+#[test]
+fn large_dynamic_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -2175,8 +2370,8 @@ async fn large_dynamic_routes() {
         match_duration / ROUTE_COUNT
     );
 }
-#[tokio::test]
-async fn large_regex_routes() {
+#[test]
+fn large_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -2207,8 +2402,8 @@ async fn large_regex_routes() {
         match_duration / ROUTE_COUNT
     );
 }
-#[tokio::test]
-async fn large_tail_regex_routes() {
+#[test]
+fn large_tail_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -2290,8 +2485,8 @@ pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
 # Path: hyperlane/src/attribute/test.rs
 ```rust
 use crate::*;
-#[tokio::test]
-async fn get_panic_from_context() {
+#[test]
+fn get_panic_from_context() {
     let mut ctx: Context = Context::default();
     let set_panic: PanicData = PanicData::new(
         Some("test".to_string()),
@@ -2302,8 +2497,8 @@ async fn get_panic_from_context() {
     let get_panic: PanicData = ctx.try_get_task_panic_data().unwrap();
     assert_eq!(set_panic, get_panic);
 }
-#[tokio::test]
-async fn context_attributes() {
+#[test]
+fn context_attributes() {
     let mut ctx: Context = Context::default();
     ctx.set_attribute("key1", "value1".to_string());
     let value: Option<String> = ctx.try_get_attribute("key1");
@@ -2333,8 +2528,8 @@ async fn get_panic_from_join_error() {
             .contains(message)
     );
 }
-#[tokio::test]
-async fn run_set_func() {
+#[test]
+fn run_set_func() {
     let mut ctx: Context = Context::default();
     const KEY: &str = "string";
     const PARAM: &str = "test";
@@ -2385,8 +2580,8 @@ impl From<std::io::Error> for ServerError {
 # Path: hyperlane/src/error/test.rs
 ```rust
 use crate::*;
-#[tokio::test]
-async fn server_error() {
+#[test]
+fn server_error() {
     let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
     let new_tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
     assert_eq!(tcp_bind_error, new_tcp_bind_error);
@@ -2401,8 +2596,8 @@ async fn server_error() {
     let new_other_error: ServerError = ServerError::Other("other error".to_string());
     assert_eq!(other_error, new_other_error);
 }
-#[tokio::test]
-async fn route_error() {
+#[test]
+fn route_error() {
     let empty_pattern_error: RouteError = RouteError::EmptyPattern;
     assert_eq!(empty_pattern_error, RouteError::EmptyPattern);
     let duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
@@ -3144,7 +3339,6 @@ use std::{
         NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
         NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
     },
-    sync::Arc,
 };
 use {
     hyperlane::{
@@ -3266,34 +3460,24 @@ where
         }
     }
 }
-impl<B> Default for WebSocketConfig<B>
+impl<'a, B> WebSocketConfig<'a, B>
 where
     B: BroadcastTypeTrait,
 {
     #[inline(always)]
-    fn default() -> Self {
-        let default_hook: ServerHookHandler = Arc::new(|_ctx| Box::pin(async {}));
+    pub fn new(context: &'a mut Context) -> Self {
         Self {
-            context: Context::default(),
+            context,
             capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
             broadcast_type: BroadcastType::default(),
-            connected_hook: default_hook.clone(),
-            request_hook: default_hook.clone(),
-            sended_hook: default_hook.clone(),
-            closed_hook: default_hook,
+            connected_hook: default_server_hook_handler(),
+            request_hook: default_server_hook_handler(),
+            sended_hook: default_server_hook_handler(),
+            closed_hook: default_server_hook_handler(),
         }
     }
 }
-impl<B> WebSocketConfig<B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-impl<B> WebSocketConfig<B>
+impl<'a, B> WebSocketConfig<'a, B>
 where
     B: BroadcastTypeTrait,
 {
@@ -3303,7 +3487,7 @@ where
         self
     }
     #[inline(always)]
-    pub fn set_context(mut self, context: Context) -> Self {
+    pub fn set_context(mut self, context: &'a mut Context) -> Self {
         self.context = context;
         self
     }
@@ -3313,8 +3497,8 @@ where
         self
     }
     #[inline(always)]
-    pub fn get_context(&self) -> &Context {
-        &self.context
+    pub fn get_context(&mut self) -> &mut Context {
+        self.context
     }
     #[inline(always)]
     pub fn get_capacity(&self) -> Capacity {
@@ -3460,50 +3644,44 @@ impl WebSocket {
     {
         self.try_send(broadcast_type, data).unwrap()
     }
-    pub async fn run<B>(&self, websocket_config: WebSocketConfig<B>)
+    pub async fn run<B>(&self, mut websocket_config: WebSocketConfig<'_, B>)
     where
         B: BroadcastTypeTrait,
     {
-        let ctx: Context = websocket_config.get_context().clone();
-        if ctx.to_string() == Context::default().to_string() {
-            panic!("Context must be set");
-        }
         let capacity: Capacity = websocket_config.get_capacity();
         let broadcast_type: BroadcastType<B> = websocket_config.get_broadcast_type().clone();
+        let connected_hook: ServerHookHandler = websocket_config.get_connected_hook().clone();
+        let sended_hook: ServerHookHandler = websocket_config.get_sended_hook().clone();
+        let request_hook: ServerHookHandler = websocket_config.get_request_hook().clone();
+        let closed_hook: ServerHookHandler = websocket_config.get_closed_hook().clone();
+        let ctx: &mut Context = websocket_config.get_context();
         let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
             BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
             BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
             BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
         };
         let key: String = BroadcastType::get_key(broadcast_type);
-        websocket_config.get_connected_hook()(&ctx).await;
-        let sended_hook: &ServerHookHandler = websocket_config.get_sended_hook();
-        let request_hook: &ServerHookHandler = websocket_config.get_request_hook();
-        let closed_hook: &ServerHookHandler = websocket_config.get_closed_hook();
-        let result_handle = || async {
-            ctx.aborted().await;
-            ctx.closed().await;
-        };
+        connected_hook(ctx).await;
         loop {
             tokio::select! {
                 request_res = ctx.ws_from_stream() => {
                     let mut is_err: bool = false;
                     if request_res.is_ok() {
-                        request_hook(&ctx).await;
+                        request_hook(ctx).await;
                     } else {
                         is_err = true;
-                        closed_hook(&ctx).await;
+                        closed_hook(ctx).await;
                     }
-                    if ctx.get_aborted().await {
+                    if ctx.get_aborted() {
                         continue;
                     }
-                    if ctx.get_closed().await {
+                    if ctx.get_closed() {
                         break;
                     }
-                    let body: ResponseBody = ctx.get_response_body().await;
+                    let body: ResponseBody = ctx.get_response().get_body().clone();
                     is_err = self.broadcast_map.try_send(&key, body).is_err() || is_err;
-                    sended_hook(&ctx).await;
-                    if is_err || ctx.get_closed().await{
+                    sended_hook(ctx).await;
+                    if is_err || ctx.get_closed() {
                         break;
                     }
                 },
@@ -3519,7 +3697,7 @@ impl WebSocket {
                 }
             }
         }
-        result_handle().await;
+        ctx.set_aborted(true).set_closed(true);
     }
 }
 ```
@@ -3530,9 +3708,8 @@ use crate::*;
 pub struct WebSocket {
     pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
 }
-#[derive(Clone)]
-pub struct WebSocketConfig<B: BroadcastTypeTrait> {
-    pub(super) context: Context,
+pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
+    pub(super) context: &'a mut Context,
     pub(super) capacity: Capacity,
     pub(super) broadcast_type: BroadcastType<B>,
     pub(super) connected_hook: ServerHookHandler,
@@ -3553,8 +3730,8 @@ struct TaskPanicHook {
     content_type: String,
 }
 impl ServerHook for TaskPanicHook {
-    async fn new(ctx: &Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().await.unwrap_or_default();
+    async fn new(ctx: &mut Context) -> Self {
+        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
         let response_body: String = error.to_string();
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
         Self {
@@ -3562,24 +3739,16 @@ impl ServerHook for TaskPanicHook {
             content_type,
         }
     }
-    async fn handle(self, ctx: &Context) {
-        let send_result: Result<(), ResponseError> = ctx
-            .set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(500)
-            .await
-            .clear_response_headers()
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONTENT_TYPE, &self.content_type)
-            .await
-            .set_response_body(&self.response_body)
-            .await
-            .try_send()
-            .await;
-        if send_result.is_err() {
-            ctx.aborted().await.closed().await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(500)
+            .clear_headers()
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONTENT_TYPE, &self.content_type)
+            .set_body(&self.response_body);
+        if ctx.try_send().await.is_err() {
+            ctx.set_aborted(true).set_closed(true);
         }
     }
 }
@@ -3588,26 +3757,20 @@ struct RequestErrorHook {
     response_body: String,
 }
 impl ServerHook for RequestErrorHook {
-    async fn new(ctx: &Context) -> Self {
-        let request_error: RequestError =
-            ctx.try_get_request_error_data().await.unwrap_or_default();
+    async fn new(ctx: &mut Context) -> Self {
+        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
         Self {
             response_status_code: request_error.get_http_status_code(),
             response_body: request_error.to_string(),
         }
     }
-    async fn handle(self, ctx: &Context) {
-        let send_result: Result<(), ResponseError> = ctx
-            .set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(self.response_status_code)
-            .await
-            .set_response_body(self.response_body)
-            .await
-            .try_send()
-            .await;
-        if send_result.is_err() {
-            ctx.aborted().await.closed().await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(self.response_status_code)
+            .set_body(self.response_body);
+        if ctx.try_send().await.is_err() {
+            ctx.set_aborted(true).set_closed(true);
         }
     }
 }
@@ -3615,55 +3778,41 @@ struct RequestMiddleware {
     socket_addr: String,
 }
 impl ServerHook for RequestMiddleware {
-    async fn new(ctx: &Context) -> Self {
+    async fn new(ctx: &mut Context) -> Self {
         let socket_addr: String = ctx.get_socket_addr_string().await;
         Self { socket_addr }
     }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_version(HttpVersion::Http1_1)
-            .await
-            .set_response_status_code(200)
-            .await
-            .set_response_header(SERVER, HYPERLANE)
-            .await
-            .set_response_header(CONNECTION, KEEP_ALIVE)
-            .await
-            .set_response_header(CONTENT_TYPE, TEXT_PLAIN)
-            .await
-            .set_response_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .await
-            .set_response_header("SocketAddr", &self.socket_addr)
-            .await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(200)
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONNECTION, KEEP_ALIVE)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .set_header("SocketAddr", &self.socket_addr);
     }
 }
 struct UpgradeHook;
 impl ServerHook for UpgradeHook {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &Context) {
-        if !ctx.get_request_is_ws_upgrade_type().await {
+    async fn handle(self, ctx: &mut Context) {
+        if !ctx.get_request().is_ws_upgrade_type() {
             return;
         }
-        if let Some(key) = &ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await {
+        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
             let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            let send_result: Result<(), ResponseError> = ctx
-                .set_response_version(HttpVersion::Http1_1)
-                .await
-                .set_response_status_code(101)
-                .await
-                .set_response_header(UPGRADE, WEBSOCKET)
-                .await
-                .set_response_header(CONNECTION, UPGRADE)
-                .await
-                .set_response_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .await
-                .set_response_body(&vec![])
-                .await
-                .try_send()
-                .await;
-            if send_result.is_err() {
-                ctx.aborted().await.closed().await;
+            ctx.get_mut_response()
+                .set_version(HttpVersion::Http1_1)
+                .set_status_code(101)
+                .set_header(UPGRADE, WEBSOCKET)
+                .set_header(CONNECTION, UPGRADE)
+                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .set_body(vec![]);
+            if ctx.try_send().await.is_err() {
+                ctx.set_aborted(true).set_closed(true);
             }
         }
     }
@@ -3675,19 +3824,13 @@ struct ConnectedHook {
     private_broadcast_type: BroadcastType<String>,
 }
 impl ServerHook for ConnectedHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx
-            .try_get_route_param("group_name")
-            .await
-            .unwrap_or_default();
+    async fn new(ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap_or_default();
         let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
         let receiver_count: ReceiverCount =
             get_broadcast_map().receiver_count(group_broadcast_type.clone());
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap_or_default();
-        let your_name: String = ctx
-            .try_get_route_param("your_name")
-            .await
-            .unwrap_or_default();
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap_or_default();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap_or_default();
         let private_broadcast_type: BroadcastType<String> =
             BroadcastType::PointToPoint(my_name, your_name);
         let data: String = format!("receiver_count => {receiver_count:?}");
@@ -3698,7 +3841,7 @@ impl ServerHook for ConnectedHook {
             private_broadcast_type,
         }
     }
-    async fn handle(self, _ctx: &Context) {
+    async fn handle(self, _ctx: &mut Context) {
         get_broadcast_map()
             .try_send(self.group_broadcast_type, self.data.clone())
             .unwrap_or_else(|err| {
@@ -3725,11 +3868,11 @@ struct SendedHook {
     msg: String,
 }
 impl ServerHook for SendedHook {
-    async fn new(ctx: &Context) -> Self {
-        let msg: String = ctx.get_response_body_string().await;
+    async fn new(ctx: &mut Context) -> Self {
+        let msg: String = ctx.get_response().get_body_string();
         Self { msg }
     }
-    async fn handle(self, _ctx: &Context) {
+    async fn handle(self, _ctx: &mut Context) {
         println!("[sended_hook] msg => {}", self.msg);
         Server::flush_stdout();
     }
@@ -3739,11 +3882,11 @@ struct GroupChatRequestHook {
     receiver_count: ReceiverCount,
 }
 impl ServerHook for GroupChatRequestHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+    async fn new(ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
         let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request_body().await;
+        let mut body: RequestBody = ctx.get_request().get_body().clone();
         if body.is_empty() {
             receiver_count = get_broadcast_map().receiver_count_after_closed(key);
             body = format!("receiver_count => {receiver_count:?}").into();
@@ -3753,8 +3896,8 @@ impl ServerHook for GroupChatRequestHook {
             receiver_count,
         }
     }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response().set_body(&self.body);
         println!("[group_chat] receiver_count => {:?}", self.receiver_count);
         Server::flush_stdout();
     }
@@ -3764,8 +3907,8 @@ struct GroupClosedHook {
     receiver_count: ReceiverCount,
 }
 impl ServerHook for GroupClosedHook {
-    async fn new(ctx: &Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+    async fn new(ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
         let receiver_count: ReceiverCount =
             get_broadcast_map().receiver_count_after_closed(key.clone());
@@ -3775,23 +3918,22 @@ impl ServerHook for GroupClosedHook {
             receiver_count,
         }
     }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response().set_body(&self.body);
         println!("[group_closed] receiver_count => {:?}", self.receiver_count);
         Server::flush_stdout();
     }
 }
 struct GroupChat;
 impl ServerHook for GroupChat {
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &Context) {
-        let group_name: String = ctx.try_get_route_param("group_name").await.unwrap();
+    async fn handle(self, ctx: &mut Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
+        let config: WebSocketConfig<String> = WebSocketConfig::new(ctx)
             .set_capacity(1024)
-            .set_context(ctx.clone())
             .set_broadcast_type(key)
             .set_connected_hook::<ConnectedHook>()
             .set_request_hook::<GroupChatRequestHook>()
@@ -3805,12 +3947,12 @@ struct PrivateChatRequestHook {
     receiver_count: ReceiverCount,
 }
 impl ServerHook for PrivateChatRequestHook {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+    async fn new(ctx: &mut Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
         let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request_body().await;
+        let mut body: RequestBody = ctx.get_request().get_body().clone();
         if body.is_empty() {
             receiver_count = get_broadcast_map().receiver_count_after_closed(key);
             body = format!("receiver_count => {receiver_count:?}").into();
@@ -3820,8 +3962,8 @@ impl ServerHook for PrivateChatRequestHook {
             receiver_count,
         }
     }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response().set_body(&self.body);
         println!("[private_chat] receiver_count => {:?}", self.receiver_count);
         Server::flush_stdout();
     }
@@ -3831,9 +3973,9 @@ struct PrivateClosedHook {
     receiver_count: ReceiverCount,
 }
 impl ServerHook for PrivateClosedHook {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+    async fn new(ctx: &mut Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
         let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
         let body: String = format!("receiver_count => {receiver_count:?}");
@@ -3842,8 +3984,8 @@ impl ServerHook for PrivateClosedHook {
             receiver_count,
         }
     }
-    async fn handle(self, ctx: &Context) {
-        ctx.set_response_body(&self.body).await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response().set_body(&self.body);
         println!(
             "[private_closed] receiver_count => {:?}",
             self.receiver_count
@@ -3851,37 +3993,34 @@ impl ServerHook for PrivateClosedHook {
         Server::flush_stdout();
     }
 }
-struct PrivateChat {
-    config: WebSocketConfig<String>,
-}
+struct PrivateChat;
 impl ServerHook for PrivateChat {
-    async fn new(ctx: &Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").await.unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").await.unwrap();
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new()
+        let config: WebSocketConfig<String> = WebSocketConfig::new(ctx)
             .set_capacity(1024)
-            .set_context(ctx.clone())
             .set_broadcast_type(key)
             .set_connected_hook::<ConnectedHook>()
             .set_request_hook::<PrivateChatRequestHook>()
             .set_sended_hook::<SendedHook>()
             .set_closed_hook::<PrivateClosedHook>();
-        Self { config }
-    }
-    async fn handle(self, _ctx: &Context) {
-        get_broadcast_map().run(self.config).await;
+        get_broadcast_map().run(config).await;
     }
 }
 #[tokio::test]
 async fn main() {
-    let server: Server = Server::new().await;
-    server.task_panic::<TaskPanicHook>().await;
-    server.request_error::<RequestErrorHook>().await;
-    server.request_middleware::<RequestMiddleware>().await;
-    server.request_middleware::<UpgradeHook>().await;
-    server.route::<GroupChat>("/{group_name}").await;
-    server.route::<PrivateChat>("/{my_name}/{your_name}").await;
+    let mut server: Server = Server::default();
+    server.task_panic::<TaskPanicHook>();
+    server.request_error::<RequestErrorHook>();
+    server.request_middleware::<RequestMiddleware>();
+    server.request_middleware::<UpgradeHook>();
+    server.route::<GroupChat>("/{group_name}");
+    server.route::<PrivateChat>("/{my_name}/{your_name}");
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     tokio::spawn(async move {
