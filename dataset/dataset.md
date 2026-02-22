@@ -1,4 +1,4 @@
-<!--2026-02-22 13:00:22-->
+<!--2026-02-22 18:43:07-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -1188,7 +1188,7 @@ pub struct ServerBootstrap;
 use super::*;
 impl ServerBootstrap {
     async fn print_route_matcher(server: &Server) {
-        let route_matcher: RouteMatcher = server.get_route_matcher().await;
+        let route_matcher: &RouteMatcher = server.get_route_matcher();
         for key in route_matcher.get_static_route().keys() {
             info!("Static route {key}");
         }
@@ -1209,10 +1209,8 @@ impl BootstrapAsyncInit for ServerBootstrap {
     async fn init() -> Self {
         let config: ConfigBootstrap = ConfigBootstrap::init().await;
         server
-            .request_config(config.get_request_config().clone())
-            .await
-            .server_config(config.get_server_config().clone())
-            .await;
+            .request_config(*config.get_request_config())
+            .server_config(config.get_server_config().clone());
         match server.run().await {
             Ok(server_hook) => {
                 let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
@@ -1283,16 +1281,13 @@ use super::*;
 impl BootstrapAsyncInit for ConfigBootstrap {
     #[hyperlane(server_config: ServerConfig)]
     async fn init() -> Self {
-        let request_config: RequestConfig = RequestConfig::default();
+        let mut request_config: RequestConfig = RequestConfig::default();
         request_config
-            .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
-            .await
-            .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)
-            .await;
-        server_config.host(SERVER_HOST).await;
-        server_config.port(SERVER_PORT).await;
-        server_config.ttl(SERVER_TTI).await;
-        server_config.nodelay(SERVER_NODELAY).await;
+            .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
+            .set_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);
+        server_config.set_address(Server::format_bind_address(SERVER_HOST, SERVER_PORT));
+        server_config.set_ttl(SERVER_TTI);
+        server_config.set_nodelay(SERVER_NODELAY);
         debug!("Server config {server_config:?}");
         info!("Server initialization successful");
         Self {
@@ -1708,14 +1703,14 @@ use super::*;
 ```rust
 use super::*;
 #[instrument_trace]
-pub async fn get_request_json(ctx: &Context) -> String {
-    let mut request: Request = ctx.get_request().await;
+pub async fn get_request_json(ctx: &mut Context) -> String {
+    let mut request: Request = ctx.get_request().clone();
     request.set_body(request.get_body().len().to_string().into_bytes());
     serde_json::to_string(&request).unwrap_or(request.to_string())
 }
 #[instrument_trace]
-pub async fn get_response_json(ctx: &Context) -> String {
-    let mut response: Response = ctx.get_response().await;
+pub async fn get_response_json(ctx: &mut Context) -> String {
+    let mut response: Response = ctx.get_response().clone();
     response.set_body(response.get_body().len().to_string().into_bytes());
     serde_json::to_string(&response).unwrap_or(response.to_string())
 }
@@ -1730,16 +1725,16 @@ use super::*;
 ```rust
 use super::*;
 #[instrument_trace]
-pub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {
-    let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {
-        let body: ResponseBody = ctx.get_response_body().await;
-        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+pub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {
+    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {
+        let body: &ResponseBody = ctx.get_response().get_body();
+        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
         ctx.try_send_body_list_with_data(&frame_list).await
     } else {
         ctx.try_send_body().await
     };
     if send_result.is_err() {
-        ctx.aborted().await.closed().await;
+        ctx.set_aborted(true).set_closed(true);
     }
     send_result
 }
@@ -1772,23 +1767,23 @@ pub struct LogMiddleware;
 use super::*;
 impl ServerHook for SendMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
-        reject(ctx.get_request_is_ws_upgrade_type().await),
+        reject(ctx.get_request().is_ws_upgrade_type()),
         try_send
     )]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {}
+    async fn handle(self, ctx: &mut Context) {}
 }
 impl ServerHook for LogMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {
+    async fn handle(self, ctx: &mut Context) {
         let request_json: String = get_request_json(ctx).await;
         let response_json: String = get_response_json(ctx).await;
         info!("{request_json}");
@@ -1834,21 +1829,21 @@ pub struct UpgradeMiddleware;
 use super::*;
 impl ServerHook for HttpRequestMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
-        reject(ctx.get_request_is_http_version().await),
+        reject(ctx.get_request().get_version().is_http()),
         send,
     )]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {
-        ctx.closed().await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.set_closed(true);
     }
 }
 impl ServerHook for CrossMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[response_version(HttpVersion::Http1_1)]
@@ -1856,11 +1851,11 @@ impl ServerHook for CrossMiddleware {
     #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
     #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {}
+    async fn handle(self, ctx: &mut Context) {}
 }
 impl ServerHook for ResponseHeaderMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[response_header(DATE => gmt())]
@@ -1872,46 +1867,46 @@ impl ServerHook for ResponseHeaderMiddleware {
         response_header("SocketAddr" => socket_addr_string)
     )]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {
+    async fn handle(self, ctx: &mut Context) {
         let socket_addr_string: String = ctx.get_socket_addr_string().await;
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
     }
 }
 impl ServerHook for ResponseStatusCodeMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[response_status_code(200)]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {}
+    async fn handle(self, ctx: &mut Context) {}
 }
 impl ServerHook for ResponseBodyMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace("{{ time }}", &time())))]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {}
+    async fn handle(self, ctx: &mut Context) {}
 }
 impl ServerHook for OptionMethodMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
-        filter(ctx.get_request_is_options_method().await),
+        filter(ctx.get_request().get_method().is_options()),
         send
     )]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {
-        ctx.aborted().await;
+    async fn handle(self, ctx: &mut Context) {
+        ctx.set_aborted(true);
     }
 }
 impl ServerHook for UpgradeMiddleware {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -1921,11 +1916,11 @@ impl ServerHook for UpgradeMiddleware {
         response_body(&vec![]),
         response_header(UPGRADE => WEBSOCKET),
         response_header(CONNECTION => UPGRADE),
-        response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.try_get_request_header_back(SEC_WEBSOCKET_KEY).await.unwrap())),
+        response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.get_request().get_header_back(SEC_WEBSOCKET_KEY))),
         send
     )]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {}
+    async fn handle(self, ctx: &mut Context) {}
 }
 ```
 # Path: hyperlane-quick-start/application/exception/mod.rs
@@ -1963,7 +1958,7 @@ use super::*;
 impl ServerHook for TaskPanicHook {
     #[task_panic_data(task_panic_data)]
     #[instrument_trace]
-    async fn new(ctx: &Context) -> Self {
+    async fn new(ctx: &mut Context) -> Self {
         Self {
             content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
             response_body: task_panic_data.to_string(),
@@ -1978,8 +1973,8 @@ impl ServerHook for TaskPanicHook {
     )]
     #[epilogue_macros(response_body(&response_body), try_send)]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {
-        debug!("TaskPanicHook request => {}", ctx.get_request().await);
+    async fn handle(self, ctx: &mut Context) {
+        debug!("TaskPanicHook request => {}", ctx.get_request());
         error!("TaskPanicHook => {}", self.get_response_body());
         let api_response: ApiResponse<()> =
             ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
@@ -1989,7 +1984,7 @@ impl ServerHook for TaskPanicHook {
 impl ServerHook for RequestErrorHook {
     #[request_error_data(request_error_data)]
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self {
             response_status_code: request_error_data.get_http_status_code(),
             content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
@@ -2006,14 +2001,14 @@ impl ServerHook for RequestErrorHook {
     )]
     #[epilogue_macros(response_body(&response_body), try_send)]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {
+    async fn handle(self, ctx: &mut Context) {
         if self.get_response_status_code() == HttpStatus::BadRequest.code() {
-            ctx.aborted().await;
+            ctx.set_aborted(true);
             debug!("Context aborted");
             return;
         }
         if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {
-            debug!("RequestErrorHook request => {}", ctx.get_request().await);
+            debug!("RequestErrorHook request => {}", ctx.get_request());
             error!("RequestErrorHook => {}", self.get_response_body());
         }
         let api_response: ApiResponse<()> =
@@ -2047,7 +2042,7 @@ pub struct FaviconRoute;
 use super::*;
 impl ServerHook for FaviconRoute {
     #[instrument_trace]
-    async fn new(_ctx: &Context) -> Self {
+    async fn new(_ctx: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -2056,7 +2051,7 @@ impl ServerHook for FaviconRoute {
         response_header(LOCATION => LOGO_IMG_URL)
     )]
     #[instrument_trace]
-    async fn handle(self, ctx: &Context) {}
+    async fn handle(self, ctx: &mut Context) {}
 }
 ```
 # Path: hyperlane-quick-start/config/lib.rs
@@ -2082,8 +2077,8 @@ pub const SERVER_LOG_SIZE: usize = 100_024_000;
 pub const SERVER_LOG_DIR: &str = "./tmp/logs";
 pub const SERVER_INNER_PRINT: bool = true;
 pub const SERVER_INNER_LOG: bool = true;
-pub const SERVER_NODELAY: bool = false;
-pub const SERVER_TTI: u32 = 128;
+pub const SERVER_NODELAY: Option<bool> = Some(false);
+pub const SERVER_TTI: Option<u32> = Some(128);
 pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
 pub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;
 pub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;
@@ -5132,14 +5127,14 @@ pub struct ShutdownPlugin;
 ```rust
 use super::*;
 impl GetOrInit for ShutdownPlugin {
-    type Instance = SharedAsyncTaskFactory<()>;
+    type Instance = ServerControlHookHandler<()>;
     fn get_or_init() -> &'static Self::Instance {
         SHUTDOWN.get_or_init(Self::get_init)
     }
 }
 impl ShutdownPlugin {
     #[instrument_trace]
-    pub fn get_init() -> SharedAsyncTaskFactory<()> {
+    pub fn get_init() -> ServerControlHookHandler<()> {
         Arc::new(|| {
             Box::pin(async {
                 warn!("Not set shutdown, using default");
@@ -5147,7 +5142,7 @@ impl ShutdownPlugin {
         })
     }
     #[instrument_trace]
-    pub fn set(shutdown: &SharedAsyncTaskFactory<()>) {
+    pub fn set(shutdown: &ServerControlHookHandler<()>) {
         drop(SHUTDOWN.set(shutdown.clone()));
     }
 }
@@ -5155,7 +5150,7 @@ impl ShutdownPlugin {
 # Path: hyperlane-quick-start/plugin/shutdown/static.rs
 ```rust
 use super::*;
-pub(super) static SHUTDOWN: OnceLock> = OnceLock::new();
+pub(super) static SHUTDOWN: OnceLock<ServerControlHookHandler<()>> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/src/main.rs
 ```rust

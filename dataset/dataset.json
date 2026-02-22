@@ -2522,37 +2522,37 @@
   {
     "instruction": "ServerBootstrap::print_route_matcher方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerBootstrap::print_route_matcher方法的源码实现如下：\n\n```rust\nasync fn print_route_matcher(server: &Server) {\n        let route_matcher: RouteMatcher = server.get_route_matcher().await;\n        for key in route_matcher.get_static_route().keys() {\n            info!(\"Static route {key}\");\n        }\n        for value in route_matcher.get_dynamic_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Dynamic route {route_pattern}\");\n            }\n        }\n        for value in route_matcher.get_regex_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Regex route {route_pattern}\");\n            }\n        }\n    }\n```",
+    "output": "ServerBootstrap::print_route_matcher方法的源码实现如下：\n\n```rust\nasync fn print_route_matcher(server: &Server) {\n        let route_matcher: &RouteMatcher = server.get_route_matcher();\n        for key in route_matcher.get_static_route().keys() {\n            info!(\"Static route {key}\");\n        }\n        for value in route_matcher.get_dynamic_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Dynamic route {route_pattern}\");\n            }\n        }\n        for value in route_matcher.get_regex_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Regex route {route_pattern}\");\n            }\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerBootstrap::print_route_matcher方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerBootstrap::print_route_matcher方法的异步实现机制如下：\n\n```rust\nasync fn print_route_matcher(server: &Server) {\n        let route_matcher: RouteMatcher = server.get_route_matcher().await;\n        for key in route_matcher.get_static_route().keys() {\n            info!(\"Static route {key}\");\n        }\n        for value in route_matcher.get_dynamic_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Dynamic route {route_pattern}\");\n            }\n        }\n        for value in route_matcher.get_regex_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Regex route {route_pattern}\");\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerBootstrap::print_route_matcher方法的异步实现机制如下：\n\n```rust\nasync fn print_route_matcher(server: &Server) {\n        let route_matcher: &RouteMatcher = server.get_route_matcher();\n        for key in route_matcher.get_static_route().keys() {\n            info!(\"Static route {key}\");\n        }\n        for value in route_matcher.get_dynamic_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Dynamic route {route_pattern}\");\n            }\n        }\n        for value in route_matcher.get_regex_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Regex route {route_pattern}\");\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerBootstrap::print_route_matcher方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerBootstrap::print_route_matcher方法的参数设计如下：\n\n```rust\nasync fn print_route_matcher(server: &Server) {\n        let route_matcher: RouteMatcher = server.get_route_matcher().await;\n        for key in route_matcher.get_static_route().keys() {\n            info!(\"Static route {key}\");\n        }\n        for value in route_matcher.get_dynamic_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Dynamic route {route_pattern}\");\n            }\n        }\n        for value in route_matcher.get_regex_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Regex route {route_pattern}\");\n            }\n        }\n    }\n```\n\n参数列表：\n- server: &Server\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerBootstrap::print_route_matcher方法的参数设计如下：\n\n```rust\nasync fn print_route_matcher(server: &Server) {\n        let route_matcher: &RouteMatcher = server.get_route_matcher();\n        for key in route_matcher.get_static_route().keys() {\n            info!(\"Static route {key}\");\n        }\n        for value in route_matcher.get_dynamic_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Dynamic route {route_pattern}\");\n            }\n        }\n        for value in route_matcher.get_regex_route().values() {\n            for (route_pattern, _) in value {\n                info!(\"Regex route {route_pattern}\");\n            }\n        }\n    }\n```\n\n参数列表：\n- server: &Server\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "BootstrapAsyncInit::init方法的源码是怎么实现的？",
     "input": "",
-    "output": "BootstrapAsyncInit::init方法的源码实现如下：\n\n```rust\n#[hyperlane(server: Server)]\n    async fn init() -> Self {\n        let config: ConfigBootstrap = ConfigBootstrap::init().await;\n        server\n            .request_config(config.get_request_config().clone())\n            .await\n            .server_config(config.get_server_config().clone())\n            .await;\n        match server.run().await {\n            Ok(server_hook) => {\n                let host_port: String = format!(\"{SERVER_HOST}{COLON}{SERVER_PORT}\");\n                Self::print_route_matcher(&server).await;\n                info!(\"Server listen in {host_port}\");\n                ShutdownPlugin::set(server_hook.get_shutdown_hook());\n                server_hook.wait().await;\n            }\n            Err(server_error) => error!(\"Server run error {server_error}\"),\n        }\n        Self\n    }\n```",
+    "output": "BootstrapAsyncInit::init方法的源码实现如下：\n\n```rust\n#[hyperlane(server: Server)]\n    async fn init() -> Self {\n        let config: ConfigBootstrap = ConfigBootstrap::init().await;\n        server\n            .request_config(*config.get_request_config())\n            .server_config(config.get_server_config().clone());\n        match server.run().await {\n            Ok(server_hook) => {\n                let host_port: String = format!(\"{SERVER_HOST}{COLON}{SERVER_PORT}\");\n                Self::print_route_matcher(&server).await;\n                info!(\"Server listen in {host_port}\");\n                ShutdownPlugin::set(server_hook.get_shutdown_hook());\n                server_hook.wait().await;\n            }\n            Err(server_error) => error!(\"Server run error {server_error}\"),\n        }\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "BootstrapAsyncInit::init方法的异步实现是如何工作的？",
     "input": "",
-    "output": "BootstrapAsyncInit::init方法的异步实现机制如下：\n\n```rust\n#[hyperlane(server: Server)]\n    async fn init() -> Self {\n        let config: ConfigBootstrap = ConfigBootstrap::init().await;\n        server\n            .request_config(config.get_request_config().clone())\n            .await\n            .server_config(config.get_server_config().clone())\n            .await;\n        match server.run().await {\n            Ok(server_hook) => {\n                let host_port: String = format!(\"{SERVER_HOST}{COLON}{SERVER_PORT}\");\n                Self::print_route_matcher(&server).await;\n                info!(\"Server listen in {host_port}\");\n                ShutdownPlugin::set(server_hook.get_shutdown_hook());\n                server_hook.wait().await;\n            }\n            Err(server_error) => error!(\"Server run error {server_error}\"),\n        }\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "BootstrapAsyncInit::init方法的异步实现机制如下：\n\n```rust\n#[hyperlane(server: Server)]\n    async fn init() -> Self {\n        let config: ConfigBootstrap = ConfigBootstrap::init().await;\n        server\n            .request_config(*config.get_request_config())\n            .server_config(config.get_server_config().clone());\n        match server.run().await {\n            Ok(server_hook) => {\n                let host_port: String = format!(\"{SERVER_HOST}{COLON}{SERVER_PORT}\");\n                Self::print_route_matcher(&server).await;\n                info!(\"Server listen in {host_port}\");\n                ShutdownPlugin::set(server_hook.get_shutdown_hook());\n                server_hook.wait().await;\n            }\n            Err(server_error) => error!(\"Server run error {server_error}\"),\n        }\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "BootstrapAsyncInit::init方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "BootstrapAsyncInit::init方法的返回值类型设计如下：\n\n```rust\n#[hyperlane(server: Server)]\n    async fn init() -> Self {\n        let config: ConfigBootstrap = ConfigBootstrap::init().await;\n        server\n            .request_config(config.get_request_config().clone())\n            .await\n            .server_config(config.get_server_config().clone())\n            .await;\n        match server.run().await {\n            Ok(server_hook) => {\n                let host_port: String = format!(\"{SERVER_HOST}{COLON}{SERVER_PORT}\");\n                Self::print_route_matcher(&server).await;\n                info!(\"Server listen in {host_port}\");\n                ShutdownPlugin::set(server_hook.get_shutdown_hook());\n                server_hook.wait().await;\n            }\n            Err(server_error) => error!(\"Server run error {server_error}\"),\n        }\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "BootstrapAsyncInit::init方法的返回值类型设计如下：\n\n```rust\n#[hyperlane(server: Server)]\n    async fn init() -> Self {\n        let config: ConfigBootstrap = ConfigBootstrap::init().await;\n        server\n            .request_config(*config.get_request_config())\n            .server_config(config.get_server_config().clone());\n        match server.run().await {\n            Ok(server_hook) => {\n                let host_port: String = format!(\"{SERVER_HOST}{COLON}{SERVER_PORT}\");\n                Self::print_route_matcher(&server).await;\n                info!(\"Server listen in {host_port}\");\n                ShutdownPlugin::set(server_hook.get_shutdown_hook());\n                server_hook.wait().await;\n            }\n            Err(server_error) => error!(\"Server run error {server_error}\"),\n        }\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -2588,19 +2588,19 @@
   {
     "instruction": "BootstrapAsyncInit::init方法的源码是怎么实现的？",
     "input": "",
-    "output": "BootstrapAsyncInit::init方法的源码实现如下：\n\n```rust\n#[hyperlane(server_config: ServerConfig)]\n    async fn init() -> Self {\n        let request_config: RequestConfig = RequestConfig::default();\n        request_config\n            .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)\n            .await\n            .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)\n            .await;\n        server_config.host(SERVER_HOST).await;\n        server_config.port(SERVER_PORT).await;\n        server_config.ttl(SERVER_TTI).await;\n        server_config.nodelay(SERVER_NODELAY).await;\n        debug!(\"Server config {server_config:?}\");\n        info!(\"Server initialization successful\");\n        Self {\n            server_config,\n            request_config,\n        }\n    }\n```",
+    "output": "BootstrapAsyncInit::init方法的源码实现如下：\n\n```rust\n#[hyperlane(server_config: ServerConfig)]\n    async fn init() -> Self {\n        let mut request_config: RequestConfig = RequestConfig::default();\n        request_config\n            .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)\n            .set_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);\n        server_config.set_address(Server::format_bind_address(SERVER_HOST, SERVER_PORT));\n        server_config.set_ttl(SERVER_TTI);\n        server_config.set_nodelay(SERVER_NODELAY);\n        debug!(\"Server config {server_config:?}\");\n        info!(\"Server initialization successful\");\n        Self {\n            server_config,\n            request_config,\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "BootstrapAsyncInit::init方法的异步实现是如何工作的？",
     "input": "",
-    "output": "BootstrapAsyncInit::init方法的异步实现机制如下：\n\n```rust\n#[hyperlane(server_config: ServerConfig)]\n    async fn init() -> Self {\n        let request_config: RequestConfig = RequestConfig::default();\n        request_config\n            .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)\n            .await\n            .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)\n            .await;\n        server_config.host(SERVER_HOST).await;\n        server_config.port(SERVER_PORT).await;\n        server_config.ttl(SERVER_TTI).await;\n        server_config.nodelay(SERVER_NODELAY).await;\n        debug!(\"Server config {server_config:?}\");\n        info!(\"Server initialization successful\");\n        Self {\n            server_config,\n            request_config,\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "BootstrapAsyncInit::init方法的异步实现机制如下：\n\n```rust\n#[hyperlane(server_config: ServerConfig)]\n    async fn init() -> Self {\n        let mut request_config: RequestConfig = RequestConfig::default();\n        request_config\n            .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)\n            .set_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);\n        server_config.set_address(Server::format_bind_address(SERVER_HOST, SERVER_PORT));\n        server_config.set_ttl(SERVER_TTI);\n        server_config.set_nodelay(SERVER_NODELAY);\n        debug!(\"Server config {server_config:?}\");\n        info!(\"Server initialization successful\");\n        Self {\n            server_config,\n            request_config,\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "BootstrapAsyncInit::init方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "BootstrapAsyncInit::init方法的返回值类型设计如下：\n\n```rust\n#[hyperlane(server_config: ServerConfig)]\n    async fn init() -> Self {\n        let request_config: RequestConfig = RequestConfig::default();\n        request_config\n            .max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)\n            .await\n            .http_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS)\n            .await;\n        server_config.host(SERVER_HOST).await;\n        server_config.port(SERVER_PORT).await;\n        server_config.ttl(SERVER_TTI).await;\n        server_config.nodelay(SERVER_NODELAY).await;\n        debug!(\"Server config {server_config:?}\");\n        info!(\"Server initialization successful\");\n        Self {\n            server_config,\n            request_config,\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "BootstrapAsyncInit::init方法的返回值类型设计如下：\n\n```rust\n#[hyperlane(server_config: ServerConfig)]\n    async fn init() -> Self {\n        let mut request_config: RequestConfig = RequestConfig::default();\n        request_config\n            .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)\n            .set_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);\n        server_config.set_address(Server::format_bind_address(SERVER_HOST, SERVER_PORT));\n        server_config.set_ttl(SERVER_TTI);\n        server_config.set_nodelay(SERVER_NODELAY);\n        debug!(\"Server config {server_config:?}\");\n        info!(\"Server initialization successful\");\n        Self {\n            server_config,\n            request_config,\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -2870,85 +2870,103 @@
   {
     "instruction": "get_request_json函数的源码是怎么实现的？",
     "input": "",
-    "output": "get_request_json函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &Context) -> String {\n    let mut request: Request = ctx.get_request().await;\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```",
+    "output": "get_request_json函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```",
     "system": ""
   },
   {
     "instruction": "get_request_json函数的异步实现是如何工作的？",
     "input": "",
-    "output": "get_request_json函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &Context) -> String {\n    let mut request: Request = ctx.get_request().await;\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "get_request_json函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "get_request_json函数的参数设计有什么考虑？",
     "input": "",
-    "output": "get_request_json函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &Context) -> String {\n    let mut request: Request = ctx.get_request().await;\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "get_request_json函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "get_request_json函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "get_request_json函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &Context) -> String {\n    let mut request: Request = ctx.get_request().await;\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "get_request_json函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "get_request_json函数为什么需要修改状态？",
+    "input": "",
+    "output": "get_request_json函数的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "get_response_json函数的源码是怎么实现的？",
     "input": "",
-    "output": "get_response_json函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &Context) -> String {\n    let mut response: Response = ctx.get_response().await;\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```",
+    "output": "get_response_json函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```",
     "system": ""
   },
   {
     "instruction": "get_response_json函数的异步实现是如何工作的？",
     "input": "",
-    "output": "get_response_json函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &Context) -> String {\n    let mut response: Response = ctx.get_response().await;\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "get_response_json函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "get_response_json函数的参数设计有什么考虑？",
     "input": "",
-    "output": "get_response_json函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &Context) -> String {\n    let mut response: Response = ctx.get_response().await;\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "get_response_json函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "get_response_json函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "get_response_json函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &Context) -> String {\n    let mut response: Response = ctx.get_response().await;\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "get_response_json函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "get_response_json函数为什么需要修改状态？",
+    "input": "",
+    "output": "get_response_json函数的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "try_send_body_hook函数的源码是怎么实现的？",
     "input": "",
-    "output": "try_send_body_hook函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {\n        let body: ResponseBody = ctx.get_response_body().await;\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.aborted().await.closed().await;\n    }\n    send_result\n}\n```",
+    "output": "try_send_body_hook函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {\n        let body: &ResponseBody = ctx.get_response().get_body();\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.set_aborted(true).set_closed(true);\n    }\n    send_result\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释try_send_body_hook这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "try_send_body_hook函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {\n        let body: ResponseBody = ctx.get_response_body().await;\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.aborted().await.closed().await;\n    }\n    send_result\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：14\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "output": "try_send_body_hook函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {\n        let body: &ResponseBody = ctx.get_response().get_body();\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.set_aborted(true).set_closed(true);\n    }\n    send_result\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：14\n- 包含高级特性：泛型编程、异步编程、错误处理",
     "system": ""
   },
   {
     "instruction": "try_send_body_hook函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "try_send_body_hook函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {\n        let body: ResponseBody = ctx.get_response_body().await;\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.aborted().await.closed().await;\n    }\n    send_result\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "try_send_body_hook函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {\n        let body: &ResponseBody = ctx.get_response().get_body();\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.set_aborted(true).set_closed(true);\n    }\n    send_result\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "try_send_body_hook函数的异步实现是如何工作的？",
     "input": "",
-    "output": "try_send_body_hook函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {\n        let body: ResponseBody = ctx.get_response_body().await;\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.aborted().await.closed().await;\n    }\n    send_result\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "try_send_body_hook函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {\n        let body: &ResponseBody = ctx.get_response().get_body();\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.set_aborted(true).set_closed(true);\n    }\n    send_result\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "try_send_body_hook函数的参数设计有什么考虑？",
     "input": "",
-    "output": "try_send_body_hook函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {\n        let body: ResponseBody = ctx.get_response_body().await;\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.aborted().await.closed().await;\n    }\n    send_result\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "try_send_body_hook函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {\n        let body: &ResponseBody = ctx.get_response().get_body();\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.set_aborted(true).set_closed(true);\n    }\n    send_result\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "try_send_body_hook函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "try_send_body_hook函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request_is_ws_upgrade_type().await {\n        let body: ResponseBody = ctx.get_response_body().await;\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.aborted().await.closed().await;\n    }\n    send_result\n}\n```\n\n返回类型：Result<(), ResponseError>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "try_send_body_hook函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {\n        let body: &ResponseBody = ctx.get_response().get_body();\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.set_aborted(true).set_closed(true);\n    }\n    send_result\n}\n```\n\n返回类型：Result<(), ResponseError>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "try_send_body_hook函数为什么需要修改状态？",
+    "input": "",
+    "output": "try_send_body_hook函数的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {\n    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {\n        let body: &ResponseBody = ctx.get_response().get_body();\n        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);\n        ctx.try_send_body_list_with_data(&frame_list).await\n    } else {\n        ctx.try_send_body().await\n    };\n    if send_result.is_err() {\n        ctx.set_aborted(true).set_closed(true);\n    }\n    send_result\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -2966,85 +2984,109 @@
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for LogMiddleware {\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        let request_json: String = get_request_json(ctx).await;\n        let response_json: String = get_response_json(ctx).await;\n        info!(\"{request_json}\");\n        info!(\"{response_json}\");\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let request_json: String = get_request_json(ctx).await;\n        let response_json: String = get_response_json(ctx).await;\n        info!(\"{request_json}\");\n        info!(\"{response_json}\");\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        let request_json: String = get_request_json(ctx).await;\n        let response_json: String = get_response_json(ctx).await;\n        info!(\"{request_json}\");\n        info!(\"{response_json}\");\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let request_json: String = get_request_json(ctx).await;\n        let response_json: String = get_response_json(ctx).await;\n        info!(\"{request_json}\");\n        info!(\"{response_json}\");\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        let request_json: String = get_request_json(ctx).await;\n        let response_json: String = get_response_json(ctx).await;\n        info!(\"{request_json}\");\n        info!(\"{response_json}\");\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let request_json: String = get_request_json(ctx).await;\n        let response_json: String = get_response_json(ctx).await;\n        info!(\"{request_json}\");\n        info!(\"{response_json}\");\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let request_json: String = get_request_json(ctx).await;\n        let response_json: String = get_response_json(ctx).await;\n        info!(\"{request_json}\");\n        info!(\"{response_json}\");\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -3092,295 +3134,379 @@
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        ctx.closed().await;\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        ctx.set_closed(true);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        ctx.closed().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        ctx.set_closed(true);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        ctx.closed().await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        ctx.set_closed(true);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        ctx.set_closed(true);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[response_version(HttpVersion::Http1_1)]\n    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]\n    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]\n    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseHeaderMiddleware {\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        ctx.aborted().await;\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        ctx.set_aborted(true);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        ctx.aborted().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        ctx.set_aborted(true);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        ctx.aborted().await;\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        ctx.set_aborted(true);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        ctx.set_aborted(true);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -3398,109 +3524,133 @@
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &mut Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &mut Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &mut Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &mut Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[task_panic_data(task_panic_data)]\n    #[instrument_trace]\n    async fn new(ctx: &mut Context) -> Self {\n        Self {\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: task_panic_data.to_string(),\n        }\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request().await);\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request().await);\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：9\n- 包含高级特性：泛型编程、异步编程",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：9\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request().await);\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request().await);\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request().await);\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[request_error_data(request_error_data)]\n    #[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self {\n            response_status_code: request_error_data.get_http_status_code(),\n            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),\n            response_body: request_error_data.to_string(),\n        }\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request().await);\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request().await);\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：16\n- 包含高级特性：泛型编程、异步编程",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：16\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request().await);\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request().await);\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.aborted().await;\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request().await);\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -3512,49 +3662,67 @@
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &Context) {}\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "SERVER_PORT常量的源码是怎么实现的？",
     "input": "",
-    "output": "SERVER_PORT常量的源码实现如下：\n\n```rust\n#[cfg(debug_assertions)]\npub const SERVER_PORT: u16 = DEFAULT_WEB_PORT;\n#[cfg(not(debug_assertions))]\npub const SERVER_PORT: u16 = 65002;\npub const SERVER_HOST: &str = DEFAULT_HOST;\npub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;\npub const SERVER_LOG_SIZE: usize = 100_024_000;\npub const SERVER_LOG_DIR: &str = \"./tmp/logs\";\npub const SERVER_INNER_PRINT: bool = true;\npub const SERVER_INNER_LOG: bool = true;\npub const SERVER_NODELAY: bool = false;\npub const SERVER_TTI: u32 = 128;\npub const SERVER_PID_FILE_PATH: &str = \"./tmp/process/hyperlane.pid\";\npub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;\npub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;\n```",
+    "output": "SERVER_PORT常量的源码实现如下：\n\n```rust\n#[cfg(debug_assertions)]\npub const SERVER_PORT: u16 = DEFAULT_WEB_PORT;\n#[cfg(not(debug_assertions))]\npub const SERVER_PORT: u16 = 65002;\npub const SERVER_HOST: &str = DEFAULT_HOST;\npub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;\npub const SERVER_LOG_SIZE: usize = 100_024_000;\npub const SERVER_LOG_DIR: &str = \"./tmp/logs\";\npub const SERVER_INNER_PRINT: bool = true;\npub const SERVER_INNER_LOG: bool = true;\npub const SERVER_NODELAY: Option<bool> = Some(false);\npub const SERVER_TTI: Option<u32> = Some(128);\npub const SERVER_PID_FILE_PATH: &str = \"./tmp/process/hyperlane.pid\";\npub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;\npub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "SERVER_PORT常量中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "SERVER_PORT常量的泛型设计和使用如下：\n\n```rust\n#[cfg(debug_assertions)]\npub const SERVER_PORT: u16 = DEFAULT_WEB_PORT;\n#[cfg(not(debug_assertions))]\npub const SERVER_PORT: u16 = 65002;\npub const SERVER_HOST: &str = DEFAULT_HOST;\npub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;\npub const SERVER_LOG_SIZE: usize = 100_024_000;\npub const SERVER_LOG_DIR: &str = \"./tmp/logs\";\npub const SERVER_INNER_PRINT: bool = true;\npub const SERVER_INNER_LOG: bool = true;\npub const SERVER_NODELAY: Option<bool> = Some(false);\npub const SERVER_TTI: Option<u32> = Some(128);\npub const SERVER_PID_FILE_PATH: &str = \"./tmp/process/hyperlane.pid\";\npub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;\npub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
@@ -6518,79 +6686,79 @@
   {
     "instruction": "Instance类型别名的源码是怎么实现的？",
     "input": "",
-    "output": "Instance类型别名的源码实现如下：\n\n```rust\ntype Instance = SharedAsyncTaskFactory<()>;\n```",
+    "output": "Instance类型别名的源码实现如下：\n\n```rust\ntype Instance = ServerControlHookHandler<()>;\n```",
     "system": ""
   },
   {
     "instruction": "Instance类型别名中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Instance类型别名的泛型设计和使用如下：\n\n```rust\ntype Instance = SharedAsyncTaskFactory<()>;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Instance类型别名的泛型设计和使用如下：\n\n```rust\ntype Instance = ServerControlHookHandler<()>;\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "GetOrInit::get_or_init方法的源码是怎么实现的？",
     "input": "",
-    "output": "GetOrInit::get_or_init方法的源码实现如下：\n\n```rust\nfn get_or_init() -> &'static Self::Instance {\n        SHUTDOWN.get_or_init(Self::get_init)\n    }\n}\n\nimpl ShutdownPlugin {\n    #[instrument_trace]\n    pub fn get_init() -> SharedAsyncTaskFactory<()> {\n```",
+    "output": "GetOrInit::get_or_init方法的源码实现如下：\n\n```rust\nfn get_or_init() -> &'static Self::Instance {\n        SHUTDOWN.get_or_init(Self::get_init)\n    }\n}\n\nimpl ShutdownPlugin {\n    #[instrument_trace]\n    pub fn get_init() -> ServerControlHookHandler<()> {\n```",
     "system": ""
   },
   {
     "instruction": "GetOrInit::get_or_init方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "GetOrInit::get_or_init方法的泛型设计和使用如下：\n\n```rust\nfn get_or_init() -> &'static Self::Instance {\n        SHUTDOWN.get_or_init(Self::get_init)\n    }\n}\n\nimpl ShutdownPlugin {\n    #[instrument_trace]\n    pub fn get_init() -> SharedAsyncTaskFactory<()> {\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "GetOrInit::get_or_init方法的泛型设计和使用如下：\n\n```rust\nfn get_or_init() -> &'static Self::Instance {\n        SHUTDOWN.get_or_init(Self::get_init)\n    }\n}\n\nimpl ShutdownPlugin {\n    #[instrument_trace]\n    pub fn get_init() -> ServerControlHookHandler<()> {\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "GetOrInit::get_or_init方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "GetOrInit::get_or_init方法的返回值类型设计如下：\n\n```rust\nfn get_or_init() -> &'static Self::Instance {\n        SHUTDOWN.get_or_init(Self::get_init)\n    }\n}\n\nimpl ShutdownPlugin {\n    #[instrument_trace]\n    pub fn get_init() -> SharedAsyncTaskFactory<()> {\n```\n\n返回类型：&'static Self::Instance\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "GetOrInit::get_or_init方法的返回值类型设计如下：\n\n```rust\nfn get_or_init() -> &'static Self::Instance {\n        SHUTDOWN.get_or_init(Self::get_init)\n    }\n}\n\nimpl ShutdownPlugin {\n    #[instrument_trace]\n    pub fn get_init() -> ServerControlHookHandler<()> {\n```\n\n返回类型：&'static Self::Instance\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "ShutdownPlugin::get_init方法的源码是怎么实现的？",
     "input": "",
-    "output": "ShutdownPlugin::get_init方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> SharedAsyncTaskFactory<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```",
+    "output": "ShutdownPlugin::get_init方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> ServerControlHookHandler<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ShutdownPlugin::get_init这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ShutdownPlugin::get_init方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> SharedAsyncTaskFactory<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：8\n- 包含高级特性：泛型编程、异步编程、闭包",
+    "output": "ShutdownPlugin::get_init方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> ServerControlHookHandler<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：8\n- 包含高级特性：泛型编程、异步编程、闭包",
     "system": ""
   },
   {
     "instruction": "ShutdownPlugin::get_init方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ShutdownPlugin::get_init方法的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> SharedAsyncTaskFactory<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ShutdownPlugin::get_init方法的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> ServerControlHookHandler<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ShutdownPlugin::get_init方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ShutdownPlugin::get_init方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> SharedAsyncTaskFactory<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ShutdownPlugin::get_init方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> ServerControlHookHandler<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ShutdownPlugin::get_init方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ShutdownPlugin::get_init方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> SharedAsyncTaskFactory<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```\n\n返回类型：SharedAsyncTaskFactory<()>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ShutdownPlugin::get_init方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn get_init() -> ServerControlHookHandler<()> {\n        Arc::new(|| {\n            Box::pin(async {\n                warn!(\"Not set shutdown, using default\");\n            })\n        })\n    }\n```\n\n返回类型：ServerControlHookHandler<()>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "ShutdownPlugin::set方法的源码是怎么实现的？",
     "input": "",
-    "output": "ShutdownPlugin::set方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn set(shutdown: &SharedAsyncTaskFactory<()>) {\n        drop(SHUTDOWN.set(shutdown.clone()));\n    }\n```",
+    "output": "ShutdownPlugin::set方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn set(shutdown: &ServerControlHookHandler<()>) {\n        drop(SHUTDOWN.set(shutdown.clone()));\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ShutdownPlugin::set方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ShutdownPlugin::set方法的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn set(shutdown: &SharedAsyncTaskFactory<()>) {\n        drop(SHUTDOWN.set(shutdown.clone()));\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ShutdownPlugin::set方法的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn set(shutdown: &ServerControlHookHandler<()>) {\n        drop(SHUTDOWN.set(shutdown.clone()));\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ShutdownPlugin::set方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ShutdownPlugin::set方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn set(shutdown: &SharedAsyncTaskFactory<()>) {\n        drop(SHUTDOWN.set(shutdown.clone()));\n    }\n```\n\n参数列表：\n- shutdown: &SharedAsyncTaskFactory<(\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ShutdownPlugin::set方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn set(shutdown: &ServerControlHookHandler<()>) {\n        drop(SHUTDOWN.set(shutdown.clone()));\n    }\n```\n\n参数列表：\n- shutdown: &ServerControlHookHandler<(\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
