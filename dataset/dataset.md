@@ -1,5745 +1,4 @@
-<!--2026-02-25 13:17:07-->
-# Path: hyperlane-utils/README.md
-## hyperlane-utils
-[Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
-[Api Docs](https://docs.rs/hyperlane-utils/latest/)
-> A library providing utils for hyperlane.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-utils
-```
-## Contact
-# Path: hyperlane-utils/src/lib.rs
-```rust
-pub use {
-    ahash, base64, bin_encode_decode::*, bytemuck_derive, chrono, chunkify::*, clonelicious::*,
-    color_output::*, compare_version::*, dotenvy, file_operation::*, future_fn::*, futures, hex,
-    hot_restart::*, http_request::*, hyperlane_broadcast::*, hyperlane_log::*, hyperlane_macros::*,
-    hyperlane_plugin_websocket::*, instrument_level::*, jsonwebtoken, jwt_service::*, log,
-    lombok_macros::*, num_cpus, once_cell, recoverable_spawn::*, recoverable_thread_pool::*, redis,
-    regex, rust_decimal, sea_orm, serde_urlencoded, serde_with, serde_xml_rs, serde_yaml,
-    server_manager::*, sha2, simd_json, snafu, sqlx, std_macro_extensions::*, sysinfo, tracing_log,
-    tracing_subscriber, twox_hash, url, urlencoding, utoipa, utoipa_rapidoc, utoipa_swagger_ui,
-    uuid,
-};
-```
-# Path: hyperlane-broadcast/README.md
-## hyperlane-broadcast
-[Official Documentation](https://docs.ltpp.vip/hyperlane-broadcast/)
-[Api Docs](https://docs.rs/hyperlane-broadcast/latest/)
-> hyperlane-broadcast is a lightweight and ergonomic wrapper over Tokio’s broadcast channel designed for easy-to-use publish-subscribe messaging in async Rust applications. It simplifies the native Tokio broadcast API by providing a straightforward interface for broadcasting messages to multiple subscribers with minimal boilerplate.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-broadcast
-```
-## Contact
-# Path: hyperlane-broadcast/src/lib.rs
-```rust
-mod broadcast;
-mod broadcast_map;
-pub use {broadcast::*, broadcast_map::*};
-#[cfg(test)]
-use std::time::Duration;
-use std::{fmt::Debug, hash::BuildHasherDefault};
-#[cfg(test)]
-use tokio::{
-    sync::broadcast::error::RecvError,
-    time::{error::Elapsed, timeout},
-};
-use {
-    dashmap::{mapref::one::Ref, *},
-    tokio::sync::broadcast::{
-        error::SendError,
-        {Receiver, Sender},
-    },
-    twox_hash::XxHash3_64,
-};
-```
-# Path: hyperlane-broadcast/src/broadcast/trait.rs
-```rust
-use crate::*;
-pub trait BroadcastTrait: Clone + Debug {}
-```
-# Path: hyperlane-broadcast/src/broadcast/const.rs
-```rust
-pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
-```
-# Path: hyperlane-broadcast/src/broadcast/mod.rs
-```rust
-mod r#const;
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-mod r#trait;
-mod r#type;
-pub use {r#const::*, r#struct::*, r#trait::*, r#type::*};
-```
-# Path: hyperlane-broadcast/src/broadcast/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, Debug)]
-pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
-```
-# Path: hyperlane-broadcast/src/broadcast/impl.rs
-```rust
-use crate::*;
-impl<T: Clone + Debug> BroadcastTrait for T {}
-impl<T: BroadcastTrait> Default for Broadcast<T> {
-    #[inline(always)]
-    fn default() -> Self {
-        let sender: BroadcastSender<T> = BroadcastSender::new(DEFAULT_BROADCAST_SENDER_CAPACITY);
-        Self(sender)
-    }
-}
-impl<T: BroadcastTrait> Broadcast<T> {
-    #[inline(always)]
-    pub fn new(capacity: Capacity) -> Self {
-        let sender: BroadcastSender<T> = BroadcastSender::new(capacity);
-        Self(sender)
-    }
-    #[inline(always)]
-    pub fn receiver_count(&self) -> ReceiverCount {
-        self.0.receiver_count()
-    }
-    #[inline(always)]
-    pub fn subscribe(&self) -> BroadcastReceiver<T> {
-        self.0.subscribe()
-    }
-    #[inline(always)]
-    pub fn send(&self, data: T) -> BroadcastSendResult<T> {
-        self.0.send(data)
-    }
-}
-```
-# Path: hyperlane-broadcast/src/broadcast/type.rs
-```rust
-use crate::*;
-pub type ReceiverCount = usize;
-pub type BroadcastSendError<T> = SendError<T>;
-pub type BroadcastSendResult<T> = Result<ReceiverCount, BroadcastSendError<T>>;
-pub type BroadcastReceiver<T> = Receiver<T>;
-pub type BroadcastSender<T> = Sender<T>;
-pub type Capacity = usize;
-```
-# Path: hyperlane-broadcast/src/broadcast/test.rs
-```rust
-use crate::*;
-#[tokio::test]
-pub async fn test_broadcast() {
-    let broadcast: Broadcast<usize> = Broadcast::new(10);
-    let mut rec1: BroadcastReceiver<usize> = broadcast.subscribe();
-    let mut rec2: BroadcastReceiver<usize> = broadcast.subscribe();
-    broadcast.send(20).unwrap();
-    assert_eq!(rec1.recv().await, Ok(20));
-    assert_eq!(rec2.recv().await, Ok(20));
-}
-```
-# Path: hyperlane-broadcast/src/broadcast_map/trait.rs
-```rust
-use crate::*;
-pub trait BroadcastMapTrait: Clone + Debug {}
-```
-# Path: hyperlane-broadcast/src/broadcast_map/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-mod r#trait;
-mod r#type;
-pub use {r#struct::*, r#trait::*, r#type::*};
-```
-# Path: hyperlane-broadcast/src/broadcast_map/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, Debug)]
-pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>);
-```
-# Path: hyperlane-broadcast/src/broadcast_map/impl.rs
-```rust
-use crate::*;
-impl<T: Clone + Debug> BroadcastMapTrait for T {}
-impl<T: BroadcastMapTrait> Default for BroadcastMap<T> {
-    #[inline(always)]
-    fn default() -> Self {
-        Self(DashMap::with_hasher(BuildHasherDefault::default()))
-    }
-}
-impl<T: BroadcastMapTrait> BroadcastMap<T> {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-    #[inline(always)]
-    fn get(&self) -> &DashMapStringBroadcast<T> {
-        &self.0
-    }
-    #[inline(always)]
-    pub fn insert<K>(&self, key: K, capacity: Capacity) -> Option<Broadcast<T>>
-    where
-        K: AsRef<str>,
-    {
-        let broadcast: Broadcast<T> = Broadcast::new(capacity);
-        self.get().insert(key.as_ref().to_owned(), broadcast)
-    }
-    #[inline(always)]
-    pub fn receiver_count<K>(&self, key: K) -> Option<ReceiverCount>
-    where
-        K: AsRef<str>,
-    {
-        self.get()
-            .get(key.as_ref())
-            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.receiver_count())
-    }
-    #[inline(always)]
-    pub fn subscribe<K>(&self, key: K) -> Option<BroadcastMapReceiver<T>>
-    where
-        K: AsRef<str>,
-    {
-        self.get()
-            .get(key.as_ref())
-            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.subscribe())
-    }
-    #[inline(always)]
-    pub fn subscribe_or_insert<K>(&self, key: K, capacity: Capacity) -> BroadcastMapReceiver<T>
-    where
-        K: AsRef<str>,
-    {
-        let key_ref: &str = key.as_ref();
-        match self.get().get(key_ref) {
-            Some(sender) => sender.subscribe(),
-            None => {
-                self.insert(key_ref, capacity);
-                self.subscribe_or_insert(key_ref, capacity)
-            }
-        }
-    }
-    #[inline(always)]
-    pub fn try_send<K>(&self, key: K, data: T) -> Result<Option<ReceiverCount>, SendError<T>>
-    where
-        K: AsRef<str>,
-    {
-        match self.get().get(key.as_ref()) {
-            Some(sender) => sender.send(data).map(Some),
-            None => Ok(None),
-        }
-    }
-    #[inline(always)]
-    pub fn send<K>(&self, key: K, data: T) -> Option<ReceiverCount>
-    where
-        K: AsRef<str>,
-    {
-        self.try_send(key, data).unwrap()
-    }
-    #[inline(always)]
-    pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>
-    where
-        K: AsRef<str>,
-    {
-        self.get()
-            .remove(key.as_ref())
-            .map(|(_, broadcast): (String, Broadcast<T>)| broadcast)
-    }
-}
-```
-# Path: hyperlane-broadcast/src/broadcast_map/type.rs
-```rust
-use crate::*;
-pub type BroadcastMapSendError<T> = SendError<T>;
-pub type BroadcastMapReceiver<T> = Receiver<T>;
-pub type BroadcastMapSender<T> = Sender<T>;
-pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDefault<XxHash3_64>>;
-```
-# Path: hyperlane-broadcast/src/broadcast_map/test.rs
-```rust
-use crate::*;
-#[tokio::test]
-pub async fn test_broadcast_map() {
-    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
-    broadcast_map.insert("test_key", 10);
-    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
-    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
-    let mut rec3: BroadcastMapReceiver<u128> =
-        broadcast_map.subscribe_or_insert("another_key", DEFAULT_BROADCAST_SENDER_CAPACITY);
-    broadcast_map.send("test_key", 20).unwrap();
-    broadcast_map.send("another_key", 10).unwrap();
-    assert_eq!(rec1.recv().await, Ok(20));
-    assert_eq!(rec2.recv().await, Ok(20));
-    assert_eq!(rec3.recv().await, Ok(10));
-}
-#[tokio::test]
-pub async fn test_broadcast_map_unsubscribe() {
-    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
-    broadcast_map.insert("test_key", 10);
-    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
-    let removed: Option<Broadcast<u128>> = broadcast_map.unsubscribe("test_key");
-    assert!(removed.is_some());
-    drop(removed);
-    let not_exist: Option<Broadcast<u128>> = broadcast_map.unsubscribe("nonexistent_key");
-    assert!(not_exist.is_none());
-    assert!(broadcast_map.subscribe("test_key").is_none());
-    let send_result: Result<Option<ReceiverCount>, SendError<u128>> =
-        broadcast_map.try_send("test_key", 30);
-    assert!(send_result.unwrap().is_none());
-    let result: Result<Result<u128, RecvError>, Elapsed> =
-        timeout(Duration::from_millis(100), rec1.recv()).await;
-    assert!(result.is_ok(), "recv should not timeout after unsubscribe");
-    assert_eq!(result.unwrap(), Err(RecvError::Closed));
-}
-#[tokio::test]
-pub async fn test_broadcast_map_unsubscribe_and_reinsert() {
-    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
-    broadcast_map.insert("test_key", 10);
-    broadcast_map.subscribe("test_key").unwrap();
-    let removed: Option<Broadcast<u128>> = broadcast_map.unsubscribe("test_key");
-    assert!(removed.is_some());
-    broadcast_map.insert("test_key", 10);
-    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
-    broadcast_map.send("test_key", 100).unwrap();
-    assert_eq!(rec2.recv().await, Ok(100));
-}
-#[tokio::test]
-pub async fn test_broadcast_map_unsubscribe_receiver_count() {
-    let broadcast_map: BroadcastMap<String> = BroadcastMap::new();
-    broadcast_map.insert("test_key", 10);
-    let _rec1: BroadcastMapReceiver<String> = broadcast_map.subscribe("test_key").unwrap();
-    let _rec2: BroadcastMapReceiver<String> = broadcast_map.subscribe("test_key").unwrap();
-    assert_eq!(broadcast_map.receiver_count("test_key"), Some(2));
-    let removed: Option<Broadcast<String>> = broadcast_map.unsubscribe("test_key");
-    assert!(removed.is_some());
-    assert_eq!(broadcast_map.receiver_count("test_key"), None);
-}
-#[tokio::test]
-pub async fn test_broadcast_map_send() {
-    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
-    broadcast_map.insert("test_key", 10);
-    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
-    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
-    let count: Option<ReceiverCount> = broadcast_map.send("test_key", 42);
-    assert_eq!(count, Some(2));
-    assert_eq!(rec1.recv().await, Ok(42));
-    assert_eq!(rec2.recv().await, Ok(42));
-    let non_existent: Option<ReceiverCount> = broadcast_map.send("non_existent_key", 100);
-    assert_eq!(non_existent, None);
-}
-```
-# Path: hyperlane-plugin-websocket/README.md
-## hyperlane-plugin-websocket
-[Official Documentation](https://docs.ltpp.vip/hyperlane-plugin-websocket/)
-[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
-> A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with hyperlane-broadcast for efficient message dissemination.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-plugin-websocket
-```
-## Contact
-# Path: hyperlane-plugin-websocket/src/trait.rs
-```rust
-pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
-```
-# Path: hyperlane-plugin-websocket/src/lib.rs
-```rust
-mod r#const;
-mod r#enum;
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-mod r#trait;
-pub use {r#enum::*, r#struct::*};
-use {r#const::*, r#trait::*};
-#[cfg(test)]
-use std::sync::OnceLock;
-use std::{
-    convert::Infallible,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    num::{
-        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
-        NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
-    },
-};
-use {
-    hyperlane::{
-        tokio::sync::broadcast::{Receiver, error::SendError},
-        *,
-    },
-    hyperlane_broadcast::*,
-};
-```
-# Path: hyperlane-plugin-websocket/src/const.rs
-```rust
-pub(crate) const POINT_TO_POINT_KEY: &str = "ptp-";
-pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
-```
-# Path: hyperlane-plugin-websocket/src/enum.rs
-```rust
-use crate::*;
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum BroadcastType<T: BroadcastTypeTrait> {
-    PointToPoint(T, T),
-    PointToGroup(T),
-    Unknown,
-}
-```
-# Path: hyperlane-plugin-websocket/src/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, Debug, Default)]
-pub struct WebSocket {
-    pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
-}
-pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
-    pub(super) context: &'a mut Context,
-    pub(super) capacity: Capacity,
-    pub(super) broadcast_type: BroadcastType<B>,
-    pub(super) connected_hook: ServerHookHandler,
-    pub(super) request_hook: ServerHookHandler,
-    pub(super) sended_hook: ServerHookHandler,
-    pub(super) closed_hook: ServerHookHandler,
-}
-```
-# Path: hyperlane-plugin-websocket/src/impl.rs
-```rust
-use crate::*;
-impl BroadcastTypeTrait for String {}
-impl BroadcastTypeTrait for &str {}
-impl BroadcastTypeTrait for char {}
-impl BroadcastTypeTrait for bool {}
-impl BroadcastTypeTrait for i8 {}
-impl BroadcastTypeTrait for i16 {}
-impl BroadcastTypeTrait for i32 {}
-impl BroadcastTypeTrait for i64 {}
-impl BroadcastTypeTrait for i128 {}
-impl BroadcastTypeTrait for isize {}
-impl BroadcastTypeTrait for u8 {}
-impl BroadcastTypeTrait for u16 {}
-impl BroadcastTypeTrait for u32 {}
-impl BroadcastTypeTrait for u64 {}
-impl BroadcastTypeTrait for u128 {}
-impl BroadcastTypeTrait for usize {}
-impl BroadcastTypeTrait for f32 {}
-impl BroadcastTypeTrait for f64 {}
-impl BroadcastTypeTrait for IpAddr {}
-impl BroadcastTypeTrait for Ipv4Addr {}
-impl BroadcastTypeTrait for Ipv6Addr {}
-impl BroadcastTypeTrait for SocketAddr {}
-impl BroadcastTypeTrait for NonZeroU8 {}
-impl BroadcastTypeTrait for NonZeroU16 {}
-impl BroadcastTypeTrait for NonZeroU32 {}
-impl BroadcastTypeTrait for NonZeroU64 {}
-impl BroadcastTypeTrait for NonZeroU128 {}
-impl BroadcastTypeTrait for NonZeroUsize {}
-impl BroadcastTypeTrait for NonZeroI8 {}
-impl BroadcastTypeTrait for NonZeroI16 {}
-impl BroadcastTypeTrait for NonZeroI32 {}
-impl BroadcastTypeTrait for NonZeroI64 {}
-impl BroadcastTypeTrait for NonZeroI128 {}
-impl BroadcastTypeTrait for NonZeroIsize {}
-impl BroadcastTypeTrait for Infallible {}
-impl BroadcastTypeTrait for &String {}
-impl BroadcastTypeTrait for &&str {}
-impl BroadcastTypeTrait for &char {}
-impl BroadcastTypeTrait for &bool {}
-impl BroadcastTypeTrait for &i8 {}
-impl BroadcastTypeTrait for &i16 {}
-impl BroadcastTypeTrait for &i32 {}
-impl BroadcastTypeTrait for &i64 {}
-impl BroadcastTypeTrait for &i128 {}
-impl BroadcastTypeTrait for &isize {}
-impl BroadcastTypeTrait for &u8 {}
-impl BroadcastTypeTrait for &u16 {}
-impl BroadcastTypeTrait for &u32 {}
-impl BroadcastTypeTrait for &u128 {}
-impl BroadcastTypeTrait for &usize {}
-impl BroadcastTypeTrait for &f32 {}
-impl BroadcastTypeTrait for &f64 {}
-impl BroadcastTypeTrait for &IpAddr {}
-impl BroadcastTypeTrait for &Ipv4Addr {}
-impl BroadcastTypeTrait for &Ipv6Addr {}
-impl BroadcastTypeTrait for &SocketAddr {}
-impl BroadcastTypeTrait for &NonZeroU8 {}
-impl BroadcastTypeTrait for &NonZeroU16 {}
-impl BroadcastTypeTrait for &NonZeroU32 {}
-impl BroadcastTypeTrait for &NonZeroU64 {}
-impl BroadcastTypeTrait for &NonZeroU128 {}
-impl BroadcastTypeTrait for &NonZeroUsize {}
-impl BroadcastTypeTrait for &NonZeroI8 {}
-impl BroadcastTypeTrait for &NonZeroI16 {}
-impl BroadcastTypeTrait for &NonZeroI32 {}
-impl BroadcastTypeTrait for &NonZeroI64 {}
-impl BroadcastTypeTrait for &NonZeroI128 {}
-impl BroadcastTypeTrait for &NonZeroIsize {}
-impl BroadcastTypeTrait for &Infallible {}
-impl<B> Default for BroadcastType<B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    fn default() -> Self {
-        BroadcastType::Unknown
-    }
-}
-impl<B> BroadcastType<B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    pub fn get_key(broadcast_type: BroadcastType<B>) -> String {
-        match broadcast_type {
-            BroadcastType::PointToPoint(key1, key2) => {
-                let (first_key, second_key) = if key1 <= key2 {
-                    (key1, key2)
-                } else {
-                    (key2, key1)
-                };
-                format!(
-                    "{}-{}-{}",
-                    POINT_TO_POINT_KEY,
-                    first_key.to_string(),
-                    second_key.to_string()
-                )
-            }
-            BroadcastType::PointToGroup(key) => {
-                format!("{}-{}", POINT_TO_GROUP_KEY, key.to_string())
-            }
-            BroadcastType::Unknown => String::new(),
-        }
-    }
-}
-impl<'a, B> WebSocketConfig<'a, B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    pub fn new(context: &'a mut Context) -> Self {
-        Self {
-            context,
-            capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
-            broadcast_type: BroadcastType::default(),
-            connected_hook: default_server_hook_handler(),
-            request_hook: default_server_hook_handler(),
-            sended_hook: default_server_hook_handler(),
-            closed_hook: default_server_hook_handler(),
-        }
-    }
-}
-impl<'a, B> WebSocketConfig<'a, B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    pub fn set_capacity(mut self, capacity: Capacity) -> Self {
-        self.capacity = capacity;
-        self
-    }
-    #[inline(always)]
-    pub fn set_context(mut self, context: &'a mut Context) -> Self {
-        self.context = context;
-        self
-    }
-    #[inline(always)]
-    pub fn set_broadcast_type(mut self, broadcast_type: BroadcastType<B>) -> Self {
-        self.broadcast_type = broadcast_type;
-        self
-    }
-    #[inline(always)]
-    pub fn get_context(&mut self) -> &mut Context {
-        self.context
-    }
-    #[inline(always)]
-    pub fn get_capacity(&self) -> Capacity {
-        self.capacity
-    }
-    #[inline(always)]
-    pub fn get_broadcast_type(&self) -> &BroadcastType<B> {
-        &self.broadcast_type
-    }
-    #[inline(always)]
-    pub fn set_connected_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.connected_hook = server_hook_factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_request_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.request_hook = server_hook_factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_sended_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.sended_hook = server_hook_factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_closed_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.closed_hook = server_hook_factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn get_connected_hook(&self) -> &ServerHookHandler {
-        &self.connected_hook
-    }
-    #[inline(always)]
-    pub fn get_request_hook(&self) -> &ServerHookHandler {
-        &self.request_hook
-    }
-    #[inline(always)]
-    pub fn get_sended_hook(&self) -> &ServerHookHandler {
-        &self.sended_hook
-    }
-    #[inline(always)]
-    pub fn get_closed_hook(&self) -> &ServerHookHandler {
-        &self.closed_hook
-    }
-}
-impl WebSocket {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-    #[inline(always)]
-    fn subscribe_unwrap_or_insert<B>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-        capacity: Capacity,
-    ) -> BroadcastMapReceiver<Vec<u8>>
-    where
-        B: BroadcastTypeTrait,
-    {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.subscribe_or_insert(&key, capacity)
-    }
-    #[inline(always)]
-    fn point_to_point<B>(
-        &self,
-        key1: &B,
-        key2: &B,
-        capacity: Capacity,
-    ) -> BroadcastMapReceiver<Vec<u8>>
-    where
-        B: BroadcastTypeTrait,
-    {
-        self.subscribe_unwrap_or_insert(
-            BroadcastType::PointToPoint(key1.clone(), key2.clone()),
-            capacity,
-        )
-    }
-    #[inline(always)]
-    fn point_to_group<B>(&self, key: &B, capacity: Capacity) -> BroadcastMapReceiver<Vec<u8>>
-    where
-        B: BroadcastTypeTrait,
-    {
-        self.subscribe_unwrap_or_insert(BroadcastType::PointToGroup(key.clone()), capacity)
-    }
-    #[inline(always)]
-    pub fn receiver_count<B>(&self, broadcast_type: BroadcastType<B>) -> ReceiverCount
-    where
-        B: BroadcastTypeTrait,
-    {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.receiver_count(&key).unwrap_or(0)
-    }
-    #[inline(always)]
-    pub fn receiver_count_before_connected<B>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-    ) -> ReceiverCount
-    where
-        B: BroadcastTypeTrait,
-    {
-        let count: ReceiverCount = self.receiver_count(broadcast_type);
-        count.clamp(0, ReceiverCount::MAX - 1) + 1
-    }
-    #[inline(always)]
-    pub fn receiver_count_after_closed<B>(&self, broadcast_type: BroadcastType<B>) -> ReceiverCount
-    where
-        B: BroadcastTypeTrait,
-    {
-        let count: ReceiverCount = self.receiver_count(broadcast_type);
-        count.clamp(1, ReceiverCount::MAX) - 1
-    }
-    #[inline(always)]
-    pub fn try_send<T, B>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-        data: T,
-    ) -> Result<Option<ReceiverCount>, SendError<Vec<u8>>>
-    where
-        T: Into<Vec<u8>>,
-        B: BroadcastTypeTrait,
-    {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.try_send(&key, data.into())
-    }
-    #[inline(always)]
-    pub fn send<T, B>(&self, broadcast_type: BroadcastType<B>, data: T) -> Option<ReceiverCount>
-    where
-        T: Into<Vec<u8>>,
-        B: BroadcastTypeTrait,
-    {
-        self.try_send(broadcast_type, data).unwrap()
-    }
-    pub async fn run<B>(&self, mut websocket_config: WebSocketConfig<'_, B>)
-    where
-        B: BroadcastTypeTrait,
-    {
-        let capacity: Capacity = websocket_config.get_capacity();
-        let broadcast_type: BroadcastType<B> = websocket_config.get_broadcast_type().clone();
-        let connected_hook: ServerHookHandler = websocket_config.get_connected_hook().clone();
-        let sended_hook: ServerHookHandler = websocket_config.get_sended_hook().clone();
-        let request_hook: ServerHookHandler = websocket_config.get_request_hook().clone();
-        let closed_hook: ServerHookHandler = websocket_config.get_closed_hook().clone();
-        let ctx: &mut Context = websocket_config.get_context();
-        let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
-            BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
-            BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
-            BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
-        };
-        let key: String = BroadcastType::get_key(broadcast_type);
-        connected_hook(ctx).await;
-        loop {
-            tokio::select! {
-                request_res = ctx.ws_from_stream() => {
-                    let mut is_err: bool = false;
-                    if request_res.is_ok() {
-                        request_hook(ctx).await;
-                    } else {
-                        is_err = true;
-                        closed_hook(ctx).await;
-                    }
-                    if ctx.get_aborted() {
-                        continue;
-                    }
-                    if ctx.get_closed() {
-                        break;
-                    }
-                    let body: ResponseBody = ctx.get_response().get_body().clone();
-                    is_err = self.broadcast_map.try_send(&key, body).is_err() || is_err;
-                    sended_hook(ctx).await;
-                    if is_err || ctx.get_closed() {
-                        break;
-                    }
-                },
-                msg_res = receiver.recv() => {
-                    if let Ok(msg) = &msg_res {
-                        if ctx.try_send_body_list_with_data(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
-                            continue;
-                        } else {
-                            break;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-        ctx.set_aborted(true).set_closed(true);
-    }
-}
-```
-# Path: hyperlane-plugin-websocket/src/test.rs
-```rust
-use crate::*;
-static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
-fn get_broadcast_map() -> &'static WebSocket {
-    BROADCAST_MAP.get_or_init(WebSocket::new)
-}
-struct TaskPanicHook {
-    response_body: String,
-    content_type: String,
-}
-impl ServerHook for TaskPanicHook {
-    async fn new(ctx: &mut Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, ctx: &mut Context) {
-        ctx.get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(500)
-            .clear_headers()
-            .set_header(SERVER, HYPERLANE)
-            .set_header(CONTENT_TYPE, &self.content_type)
-            .set_body(&self.response_body);
-        if ctx.try_send().await.is_err() {
-            ctx.set_aborted(true).set_closed(true);
-        }
-    }
-}
-struct RequestErrorHook {
-    response_status_code: ResponseStatusCode,
-    response_body: String,
-}
-impl ServerHook for RequestErrorHook {
-    async fn new(ctx: &mut Context) -> Self {
-        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
-        Self {
-            response_status_code: request_error.get_http_status_code(),
-            response_body: request_error.to_string(),
-        }
-    }
-    async fn handle(self, ctx: &mut Context) {
-        ctx.get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(self.response_status_code)
-            .set_body(self.response_body);
-        if ctx.try_send().await.is_err() {
-            ctx.set_aborted(true).set_closed(true);
-        }
-    }
-}
-struct RequestMiddleware {
-    socket_addr: String,
-}
-impl ServerHook for RequestMiddleware {
-    async fn new(ctx: &mut Context) -> Self {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
-        Self { socket_addr }
-    }
-    async fn handle(self, ctx: &mut Context) {
-        ctx.get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(200)
-            .set_header(SERVER, HYPERLANE)
-            .set_header(CONNECTION, KEEP_ALIVE)
-            .set_header(CONTENT_TYPE, TEXT_PLAIN)
-            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .set_header("SocketAddr", &self.socket_addr);
-    }
-}
-struct UpgradeHook;
-impl ServerHook for UpgradeHook {
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &mut Context) {
-        if !ctx.get_request().is_ws_upgrade_type() {
-            return;
-        }
-        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            ctx.get_mut_response()
-                .set_version(HttpVersion::Http1_1)
-                .set_status_code(101)
-                .set_header(UPGRADE, WEBSOCKET)
-                .set_header(CONNECTION, UPGRADE)
-                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .set_body(vec![]);
-            if ctx.try_send().await.is_err() {
-                ctx.set_aborted(true).set_closed(true);
-            }
-        }
-    }
-}
-struct ConnectedHook {
-    receiver_count: ReceiverCount,
-    data: String,
-    group_broadcast_type: BroadcastType<String>,
-    private_broadcast_type: BroadcastType<String>,
-}
-impl ServerHook for ConnectedHook {
-    async fn new(ctx: &mut Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").unwrap_or_default();
-        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count(group_broadcast_type.clone());
-        let my_name: String = ctx.try_get_route_param("my_name").unwrap_or_default();
-        let your_name: String = ctx.try_get_route_param("your_name").unwrap_or_default();
-        let private_broadcast_type: BroadcastType<String> =
-            BroadcastType::PointToPoint(my_name, your_name);
-        let data: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            receiver_count,
-            data,
-            group_broadcast_type,
-            private_broadcast_type,
-        }
-    }
-    async fn handle(self, _ctx: &mut Context) {
-        get_broadcast_map()
-            .try_send(self.group_broadcast_type, self.data.clone())
-            .unwrap_or_else(|err| {
-                println!("[connected_hook] send group error => {:?}", err.to_string());
-                None
-            });
-        get_broadcast_map()
-            .try_send(self.private_broadcast_type, self.data)
-            .unwrap_or_else(|err| {
-                println!(
-                    "[connected_hook] send private error => {:?}",
-                    err.to_string()
-                );
-                None
-            });
-        println!(
-            "[connected_hook] receiver_count => {:?}",
-            self.receiver_count
-        );
-        Server::flush_stdout();
-    }
-}
-struct SendedHook {
-    msg: String,
-}
-impl ServerHook for SendedHook {
-    async fn new(ctx: &mut Context) -> Self {
-        let msg: String = ctx.get_response().get_body_string();
-        Self { msg }
-    }
-    async fn handle(self, _ctx: &mut Context) {
-        println!("[sended_hook] msg => {}", self.msg);
-        Server::flush_stdout();
-    }
-}
-struct GroupChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for GroupChatRequestHook {
-    async fn new(ctx: &mut Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request().get_body().clone();
-        if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-            body = format!("receiver_count => {receiver_count:?}").into();
-        }
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &mut Context) {
-        ctx.get_mut_response().set_body(&self.body);
-        println!("[group_chat] receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct GroupClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for GroupClosedHook {
-    async fn new(ctx: &mut Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count_after_closed(key.clone());
-        let body: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &mut Context) {
-        ctx.get_mut_response().set_body(&self.body);
-        println!("[group_closed] receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct GroupChat;
-impl ServerHook for GroupChat {
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &mut Context) {
-        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new(ctx)
-            .set_capacity(1024)
-            .set_broadcast_type(key)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<GroupChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<GroupClosedHook>();
-        get_broadcast_map().run(config).await;
-    }
-}
-struct PrivateChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for PrivateChatRequestHook {
-    async fn new(ctx: &mut Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request().get_body().clone();
-        if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
-            body = format!("receiver_count => {receiver_count:?}").into();
-        }
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &mut Context) {
-        ctx.get_mut_response().set_body(&self.body);
-        println!("[private_chat] receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-    }
-}
-struct PrivateClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
-impl ServerHook for PrivateClosedHook {
-    async fn new(ctx: &mut Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
-        let body: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, ctx: &mut Context) {
-        ctx.get_mut_response().set_body(&self.body);
-        println!(
-            "[private_closed] receiver_count => {:?}",
-            self.receiver_count
-        );
-        Server::flush_stdout();
-    }
-}
-struct PrivateChat;
-impl ServerHook for PrivateChat {
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, ctx: &mut Context) {
-        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new(ctx)
-            .set_capacity(1024)
-            .set_broadcast_type(key)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<PrivateChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<PrivateClosedHook>();
-        get_broadcast_map().run(config).await;
-    }
-}
-#[tokio::test]
-async fn main() {
-    let mut server: Server = Server::default();
-    server.task_panic::<TaskPanicHook>();
-    server.request_error::<RequestErrorHook>();
-    server.request_middleware::<RequestMiddleware>();
-    server.request_middleware::<UpgradeHook>();
-    server.route::<GroupChat>("/{group_name}");
-    server.route::<PrivateChat>("/{my_name}/{your_name}");
-    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
-    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-        server_control_hook_2.shutdown().await;
-    });
-    server_control_hook_1.wait().await;
-}
-```
-# Path: hyperlane-quick-start/README.md
-## hyperlane-quick-start
-> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
-## Official Documentation
-- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
-## Api Docs
-- [Api Docs](https://docs.rs/hyperlane/latest/)
-## Directory Structure
-```txt
-├── application              # Application service
-│   ├── controller           # Interface control layer
-│   ├── domain               # Business domain layer
-│   ├── exception            # Exception handling layer
-│   ├── mapper               # Data mapping layer
-│   ├── middleware           # Middleware layer
-│   ├── model                # Data model layer
-│      ├── request           # Request parameter objects
-│      ├── response          # Response parameter objects
-│   ├── repository           # Data access layer
-│   ├── service              # Business logic layer
-│   ├── utils                # Utility layer
-│   ├── view                 # View layer
-├── bootstrap                # Service initialization
-│   ├── application          # Application initialization
-│   ├── framework            # Framework initialization
-├── config                   # Service configuration
-│   ├── application          # Application configuration
-│   ├── framework            # Framework configuration
-├── plugin                   # Service plugins
-│   ├── database             # Database plugin
-│   ├── env                  # Environment variable plugin
-│   ├── logger               # Logging plugin
-│   ├── mysql                # MySQL plugin
-│   ├── postgresql           # PostgreSQL plugin
-│   ├── process              # Process management plugin
-│   ├── redis                # Redis plugin
-├── resources                # Service resources
-│   ├── sql                  # SQL files
-│   ├── static               # Static resource files
-│   ├── templates            # Template files
-```
-## Run
-### start
-```sh
-cargo run
-```
-### started in background
-```sh
-cargo run -- -d
-```
-### stop
-```sh
-cargo run stop
-```
-### restart
-```sh
-cargo run restart
-```
-### restarted in background
-```sh
-cargo run restart -d
-```
-## Cli
-```sh
-cargo install hyperlane-cli
-```
-### help
-```sh
-hyperlane-cli -h
-```
-## Performance
-- [Performance](https://docs.ltpp.vip/hyperlane/speed)
-## Appreciate
-> If you feel that `hyperlane` is helpful to you, feel free to donate
-### WeChat Pay
-### Alipay
-### Virtual Currency Pay
-| Virtual Currency | Virtual Currency Address                   |
-| ---------------- | ------------------------------------------ |
-| BTC              | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
-| ETH              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-| BSC              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-## Contact
-# Path: hyperlane-quick-start/bootstrap/lib.rs
-```rust
-pub mod application;
-pub mod common;
-pub mod framework;
-use common::*;
-use {
-    hyperlane::*,
-    hyperlane_utils::{log::*, *},
-};
-```
-# Path: hyperlane-quick-start/bootstrap/README.md
-## hyperlane-bootstrap
-> Hyperlane bootstrap crate providing application initialization and framework lifecycle management.
-## Contact
-# Path: hyperlane-quick-start/bootstrap/framework/mod.rs
-```rust
-pub mod config;
-pub mod runtime;
-pub mod server;
-use super::*;
-```
-# Path: hyperlane-quick-start/bootstrap/framework/server/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use {super::*, config::*};
-#[allow(unused_imports)]
-use {hyperlane_application::*, hyperlane_config::framework::*, hyperlane_plugin::shutdown::*};
-```
-# Path: hyperlane-quick-start/bootstrap/framework/server/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct ServerBootstrap;
-```
-# Path: hyperlane-quick-start/bootstrap/framework/server/impl.rs
-```rust
-use super::*;
-impl ServerBootstrap {
-    async fn print_route_matcher(server: &Server) {
-        let route_matcher: &RouteMatcher = server.get_route_matcher();
-        for key in route_matcher.get_static_route().keys() {
-            info!("Static route {key}");
-        }
-        for value in route_matcher.get_dynamic_route().values() {
-            for (route_pattern, _) in value {
-                info!("Dynamic route {route_pattern}");
-            }
-        }
-        for value in route_matcher.get_regex_route().values() {
-            for (route_pattern, _) in value {
-                info!("Regex route {route_pattern}");
-            }
-        }
-    }
-}
-impl BootstrapAsyncInit for ServerBootstrap {
-    #[hyperlane(server: Server)]
-    async fn init() -> Self {
-        let config: ConfigBootstrap = ConfigBootstrap::init().await;
-        server
-            .request_config(*config.get_request_config())
-            .server_config(config.get_server_config().clone());
-        match server.run().await {
-            Ok(server_hook) => {
-                let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
-                Self::print_route_matcher(&server).await;
-                info!("Server listen in {host_port}");
-                ShutdownPlugin::set(server_hook.get_shutdown_hook());
-                server_hook.wait().await;
-            }
-            Err(server_error) => error!("Server run error {server_error}"),
-        }
-        Self
-    }
-}
-```
-# Path: hyperlane-quick-start/bootstrap/framework/runtime/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use tokio::runtime::{Builder, Runtime};
-```
-# Path: hyperlane-quick-start/bootstrap/framework/runtime/struct.rs
-```rust
-use super::*;
-#[derive(Data, Debug)]
-pub struct RuntimeBootstrap {
-    pub(super) runtime: Runtime,
-}
-```
-# Path: hyperlane-quick-start/bootstrap/framework/runtime/impl.rs
-```rust
-use super::*;
-impl BootstrapSyncInit for RuntimeBootstrap {
-    fn init() -> Self {
-        let runtime: Runtime = Builder::new_multi_thread()
-            .worker_threads(num_cpus::get_physical() << 1)
-            .thread_stack_size(1_048_576)
-            .max_blocking_threads(2_048)
-            .max_io_events_per_tick(1_024)
-            .enable_all()
-            .build()
-            .unwrap();
-        Self { runtime }
-    }
-}
-```
-# Path: hyperlane-quick-start/bootstrap/framework/config/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use hyperlane_config::framework::*;
-```
-# Path: hyperlane-quick-start/bootstrap/framework/config/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Data, Debug, Default)]
-pub struct ConfigBootstrap {
-    pub(super) server_config: ServerConfig,
-    pub(super) request_config: RequestConfig,
-}
-```
-# Path: hyperlane-quick-start/bootstrap/framework/config/impl.rs
-```rust
-use super::*;
-impl BootstrapAsyncInit for ConfigBootstrap {
-    #[hyperlane(server_config: ServerConfig)]
-    async fn init() -> Self {
-        let mut request_config: RequestConfig = RequestConfig::default();
-        request_config
-            .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
-            .set_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);
-        server_config.set_address(Server::format_bind_address(SERVER_HOST, SERVER_PORT));
-        server_config.set_ttl(SERVER_TTI);
-        server_config.set_nodelay(SERVER_NODELAY);
-        debug!("Server config {server_config:?}");
-        info!("Server initialization successful");
-        Self {
-            server_config,
-            request_config,
-        }
-    }
-}
-```
-# Path: hyperlane-quick-start/bootstrap/application/mod.rs
-```rust
-pub mod db;
-pub mod env;
-pub mod logger;
-use super::*;
-```
-# Path: hyperlane-quick-start/bootstrap/application/db/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use hyperlane_plugin::{common::*, database::*, mysql::*, postgresql::*, redis::*};
-use {redis::Connection, sea_orm::DatabaseConnection};
-```
-# Path: hyperlane-quick-start/bootstrap/application/db/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct DbBootstrap;
-```
-# Path: hyperlane-quick-start/bootstrap/application/db/impl.rs
-```rust
-use super::*;
-impl BootstrapAsyncInit for DbBootstrap {
-    async fn init() -> Self {
-        let _: Result<DatabaseConnection, String> =
-            MySqlPlugin::connection_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
-        let _: Result<DatabaseConnection, String> =
-            PostgreSqlPlugin::connection_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
-        let _: Result<ArcRwLock<Connection>, String> =
-            RedisPlugin::connection_db(DEFAULT_REDIS_INSTANCE_NAME, None).await;
-        match DatabasePlugin::initialize_auto_creation().await {
-            Ok(_) => {
-                info!("Auto-creation initialization successful");
-            }
-            Err(error) => {
-                error!("Auto-creation initialization failed {error}");
-            }
-        };
-        Self
-    }
-}
-```
-# Path: hyperlane-quick-start/bootstrap/application/env/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use hyperlane_plugin::env::*;
-```
-# Path: hyperlane-quick-start/bootstrap/application/env/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct EnvBootstrap;
-```
-# Path: hyperlane-quick-start/bootstrap/application/env/impl.rs
-```rust
-use super::*;
-impl BootstrapSyncInit for EnvBootstrap {
-    fn init() -> Self {
-        if let Err(error) = EnvPlugin::try_get_config() {
-            error!("{error}");
-        }
-        Self
-    }
-}
-```
-# Path: hyperlane-quick-start/bootstrap/application/logger/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use {
-    hyperlane_config::{application::logger::*, framework::*},
-    hyperlane_plugin::logger::*,
-};
-```
-# Path: hyperlane-quick-start/bootstrap/application/logger/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct LoggerBootstrap;
-```
-# Path: hyperlane-quick-start/bootstrap/application/logger/impl.rs
-```rust
-use super::*;
-impl BootstrapSyncInit for LoggerBootstrap {
-    fn init() -> Self {
-        let mut file_logger: FileLogger = FileLogger::default();
-        file_logger.set_path(SERVER_LOG_DIR);
-        file_logger.set_limit_file_size(SERVER_LOG_SIZE);
-        Logger::init(LOG_LEVEL_FILTER, file_logger);
-        Self
-    }
-}
-```
-# Path: hyperlane-quick-start/bootstrap/common/trait.rs
-```rust
-pub trait BootstrapSyncInit {
-    fn init() -> Self;
-}
-pub trait BootstrapAsyncInit {
-    fn init() -> impl Future<Output = Self> + Send;
-}
-```
-# Path: hyperlane-quick-start/bootstrap/common/mod.rs
-```rust
-mod r#trait;
-pub use r#trait::*;
-```
-# Path: hyperlane-quick-start/resources/lib.rs
-```rust
-pub mod sql;
-pub mod r#static;
-pub mod templates;
-```
-# Path: hyperlane-quick-start/resources/README.md
-## hyperlane-resources
-> Hyperlane resources module containing various resources and utilities used by the framework.
-## Contact
-# Path: hyperlane-quick-start/resources/static/not_found/index.html
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>404 Not Found</title>
-    <style>
-      .center-text {
-        text-align: center;
-      }
-      a {
-        color: #1e90ff;
-        text-decoration: none;
-        transition:
-          color 0.3s,
-          border-bottom-color 0.3s;
-      }
-      a:hover,
-      a:focus {
-        color: pink;
-        border-bottom-color: pink;
-        outline: none;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <h1 class="center-text">404 Not Found</h1>
-    <hr />
-    <p class="center-text">
-      Server:
-      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
-        >Hyperlane</a
-    </p>
-  </body>
-</html>
-```
-# Path: hyperlane-quick-start/resources/templates/const.rs
-```rust
-pub const TEMPLATES_INDEX_HTML: &str = include_str!("./index/index.html");
-```
-# Path: hyperlane-quick-start/resources/templates/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/resources/templates/index/index.html
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hyperlane</title>
-    <style>
-      .center-text {
-        text-align: center;
-      }
-      a {
-        color: #1e90ff;
-        text-decoration: none;
-        transition:
-          color 0.3s,
-          border-bottom-color 0.3s;
-      }
-      a:hover,
-      a:focus {
-        color: pink;
-        border-bottom-color: pink;
-        outline: none;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <h1 class="center-text">Hello hyperlane: {{ time }}</h1>
-    <hr />
-    <p class="center-text">
-      Server:
-      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
-        >Hyperlane</a
-    </p>
-  </body>
-</html>
-```
-# Path: hyperlane-quick-start/application/lib.rs
-```rust
-pub mod controller;
-pub mod domain;
-pub mod exception;
-pub mod mapper;
-pub mod middleware;
-pub mod model;
-pub mod repository;
-pub mod service;
-pub mod utils;
-pub mod view;
-use {
-    hyperlane::*,
-    hyperlane_utils::{log::*, *},
-    serde::{Deserialize, Serialize},
-    serde_with::skip_serializing_none,
-    utoipa::ToSchema,
-};
-```
-# Path: hyperlane-quick-start/application/README.md
-## hyperlane-application
-> Hyperlane application module containing core application logic, controllers, services, and middleware components.
-## Contact
-# Path: hyperlane-quick-start/application/model/mod.rs
-```rust
-pub mod request;
-pub mod response;
-use super::*;
-```
-# Path: hyperlane-quick-start/application/model/response/mod.rs
-```rust
-pub mod common;
-use super::*;
-```
-# Path: hyperlane-quick-start/application/model/response/common/mod.rs
-```rust
-mod r#enum;
-mod r#impl;
-mod r#struct;
-pub use {r#enum::*, r#struct::*};
-use super::*;
-```
-# Path: hyperlane-quick-start/application/model/response/common/enum.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
-#[repr(i32)]
-pub enum ResponseCode {
-    Success = 200,
-    BadRequest = 400,
-    Unauthorized = 401,
-    Forbidden = 403,
-    NotFound = 404,
-    InternalError = 500,
-    DatabaseError = 501,
-    BusinessError = 502,
-}
-```
-# Path: hyperlane-quick-start/application/model/response/common/struct.rs
-```rust
-use super::*;
-#[skip_serializing_none]
-#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]
-pub struct ApiResponse<T>
-where
-    T: Clone + Default + Serialize,
-{
-    #[get(type(copy), pub(crate))]
-    pub(super) code: i32,
-    #[get(pub(crate))]
-    pub(super) message: String,
-    #[get(pub(crate))]
-    pub(super) data: Option<T>,
-    #[get(pub(crate))]
-    pub(super) timestamp: Option<String>,
-}
-```
-# Path: hyperlane-quick-start/application/model/response/common/impl.rs
-```rust
-use super::*;
-impl ResponseCode {
-    #[instrument_trace]
-    pub fn default_message(&self) -> &'static str {
-        match self {
-            Self::Success => "Operation successful",
-            Self::BadRequest => "Invalid request parameters",
-            Self::Unauthorized => "Unauthorized access",
-            Self::Forbidden => "Access forbidden",
-            Self::NotFound => "Resource not found",
-            Self::InternalError => "Internal server error",
-            Self::DatabaseError => "Database operation failed",
-            Self::BusinessError => "Business logic error",
-        }
-    }
-}
-impl<T> ApiResponse<T>
-where
-    T: Clone + Default + Serialize,
-{
-    #[instrument_trace]
-    pub fn default_success() -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message("Success".to_string())
-            .set_data(None)
-            .set_timestamp(Some(date()));
-        instance
-    }
-    #[instrument_trace]
-    pub fn success(data: T) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message("Success".to_string())
-            .set_data(Some(data))
-            .set_timestamp(Some(date()));
-        instance
-    }
-    #[instrument_trace]
-    pub fn success_with_message(data: T, message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message(message.into())
-            .set_data(Some(data))
-            .set_timestamp(Some(date()));
-        instance
-    }
-    #[instrument_trace]
-    pub fn default_error() -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::InternalError as i32)
-            .set_message("Internal server error".to_string())
-            .set_data(None)
-            .set_timestamp(Some(date()));
-        instance
-    }
-    #[instrument_trace]
-    pub fn error(message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::InternalError as i32)
-            .set_message(message.into())
-            .set_data(None)
-            .set_timestamp(Some(date()));
-        instance
-    }
-    #[instrument_trace]
-    pub fn error_with_code(code: ResponseCode, message: impl ToString) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(code as i32)
-            .set_message(message.to_string())
-            .set_data(None)
-            .set_timestamp(Some(date()));
-        instance
-    }
-    #[instrument_trace]
-    pub fn to_json_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).unwrap_or_default()
-    }
-}
-impl ApiResponse<()> {
-    #[instrument_trace]
-    pub fn success_without_data(message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<()> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message(message.into())
-            .set_data(None)
-            .set_timestamp(Some(date()));
-        instance
-    }
-}
-```
-# Path: hyperlane-quick-start/application/utils/mod.rs
-```rust
-pub mod json;
-pub mod send;
-use super::*;
-```
-# Path: hyperlane-quick-start/application/utils/json/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/application/utils/json/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub async fn get_request_json(ctx: &mut Context) -> String {
-    let mut request: Request = ctx.get_request().clone();
-    request.set_body(request.get_body().len().to_string().into_bytes());
-    serde_json::to_string(&request).unwrap_or(request.to_string())
-}
-#[instrument_trace]
-pub async fn get_response_json(ctx: &mut Context) -> String {
-    let mut response: Response = ctx.get_response().clone();
-    response.set_body(response.get_body().len().to_string().into_bytes());
-    serde_json::to_string(&response).unwrap_or(response.to_string())
-}
-```
-# Path: hyperlane-quick-start/application/utils/send/mod.rs
-```rust
-mod r#fn;
-pub use r#fn::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/application/utils/send/fn.rs
-```rust
-use super::*;
-#[instrument_trace]
-pub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {
-    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {
-        let body: &ResponseBody = ctx.get_response().get_body();
-        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.try_send_body_list_with_data(&frame_list).await
-    } else {
-        ctx.try_send_body().await
-    };
-    if send_result.is_err() {
-        ctx.set_aborted(true).set_closed(true);
-    }
-    send_result
-}
-```
-# Path: hyperlane-quick-start/application/middleware/mod.rs
-```rust
-pub mod request;
-pub mod response;
-use {super::*, utils::json::*};
-```
-# Path: hyperlane-quick-start/application/middleware/response/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/application/middleware/response/struct.rs
-```rust
-use super::*;
-#[response_middleware(1)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct SendMiddleware;
-#[response_middleware(2)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct LogMiddleware;
-```
-# Path: hyperlane-quick-start/application/middleware/response/impl.rs
-```rust
-use super::*;
-impl ServerHook for SendMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        reject(ctx.get_request().is_ws_upgrade_type()),
-        try_send
-    )]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {}
-}
-impl ServerHook for LogMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {
-        let request_json: String = get_request_json(ctx).await;
-        let response_json: String = get_response_json(ctx).await;
-        info!("{request_json}");
-        info!("{response_json}");
-    }
-}
-```
-# Path: hyperlane-quick-start/application/middleware/request/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use hyperlane_resources::templates::*;
-```
-# Path: hyperlane-quick-start/application/middleware/request/struct.rs
-```rust
-use super::*;
-#[request_middleware(1)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct HttpRequestMiddleware;
-#[request_middleware(2)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct CrossMiddleware;
-#[request_middleware(3)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct ResponseHeaderMiddleware;
-#[request_middleware(4)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct ResponseStatusCodeMiddleware;
-#[request_middleware(5)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct ResponseBodyMiddleware;
-#[request_middleware(6)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct OptionMethodMiddleware;
-#[request_middleware(7)]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct UpgradeMiddleware;
-```
-# Path: hyperlane-quick-start/application/middleware/request/impl.rs
-```rust
-use super::*;
-impl ServerHook for HttpRequestMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        reject(ctx.get_request().get_version().is_http()),
-        send,
-    )]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {
-        ctx.set_closed(true);
-    }
-}
-impl ServerHook for CrossMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[response_version(HttpVersion::Http1_1)]
-    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
-    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
-    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {}
-}
-impl ServerHook for ResponseHeaderMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[response_header(DATE => gmt())]
-    #[response_header(SERVER => HYPERLANE)]
-    #[response_header(CONNECTION => KEEP_ALIVE)]
-    #[response_header(TRACE => uuid::Uuid::new_v4().to_string())]
-    #[epilogue_macros(
-        response_header(CONTENT_TYPE => content_type),
-        response_header("SocketAddr" => socket_addr_string)
-    )]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {
-        let socket_addr_string: String = ctx.get_socket_addr_string().await;
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
-    }
-}
-impl ServerHook for ResponseStatusCodeMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[response_status_code(200)]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {}
-}
-impl ServerHook for ResponseBodyMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace("{{ time }}", &time())))]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {}
-}
-impl ServerHook for OptionMethodMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        filter(ctx.get_request().get_method().is_options()),
-        send
-    )]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {
-        ctx.set_aborted(true);
-    }
-}
-impl ServerHook for UpgradeMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        ws_upgrade_type,
-        response_version(HttpVersion::Http1_1),
-        response_status_code(101),
-        response_body(&vec![]),
-        response_header(UPGRADE => WEBSOCKET),
-        response_header(CONNECTION => UPGRADE),
-        response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.get_request().get_header_back(SEC_WEBSOCKET_KEY))),
-        send
-    )]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {}
-}
-```
-# Path: hyperlane-quick-start/application/exception/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use {super::*, model::response::common::*};
-```
-# Path: hyperlane-quick-start/application/exception/struct.rs
-```rust
-use super::*;
-#[task_panic]
-#[derive(Clone, Data, Debug, Default)]
-pub struct TaskPanicHook {
-    #[get(pub(crate))]
-    pub(super) content_type: String,
-    #[get(pub(crate))]
-    pub(super) response_body: String,
-}
-#[request_error]
-#[derive(Clone, Data, Debug, Default)]
-pub struct RequestErrorHook {
-    #[get(type(copy), pub(crate))]
-    pub(super) response_status_code: ResponseStatusCode,
-    #[get(pub(crate))]
-    pub(super) content_type: String,
-    #[get(pub(crate))]
-    pub(super) response_body: String,
-}
-```
-# Path: hyperlane-quick-start/application/exception/impl.rs
-```rust
-use super::*;
-impl ServerHook for TaskPanicHook {
-    #[task_panic_data(task_panic_data)]
-    #[instrument_trace]
-    async fn new(ctx: &mut Context) -> Self {
-        Self {
-            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
-            response_body: task_panic_data.to_string(),
-        }
-    }
-    #[prologue_macros(
-        response_version(HttpVersion::Http1_1),
-        response_status_code(500),
-        clear_response_headers,
-        response_header(SERVER => HYPERLANE),
-        response_header(CONTENT_TYPE, &self.content_type),
-    )]
-    #[epilogue_macros(response_body(&response_body), try_send)]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {
-        debug!("TaskPanicHook request => {}", ctx.get_request());
-        error!("TaskPanicHook => {}", self.get_response_body());
-        let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
-        let response_body: Vec<u8> = api_response.to_json_bytes();
-    }
-}
-impl ServerHook for RequestErrorHook {
-    #[request_error_data(request_error_data)]
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self {
-            response_status_code: request_error_data.get_http_status_code(),
-            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
-            response_body: request_error_data.to_string(),
-        }
-    }
-    #[prologue_macros(
-        response_version(HttpVersion::Http1_1),
-        response_status_code(self.get_response_status_code()),
-        clear_response_headers,
-        response_header(SERVER => HYPERLANE),
-        response_header(CONTENT_TYPE, &self.content_type),
-        response_header(TRACE => uuid::Uuid::new_v4().to_string()),
-    )]
-    #[epilogue_macros(response_body(&response_body), try_send)]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {
-        if self.get_response_status_code() == HttpStatus::BadRequest.code() {
-            ctx.set_aborted(true);
-            debug!("Context aborted");
-            return;
-        }
-        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {
-            debug!("RequestErrorHook request => {}", ctx.get_request());
-            error!("RequestErrorHook => {}", self.get_response_body());
-        }
-        let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
-        let response_body: Vec<u8> = api_response.to_json_bytes();
-    }
-}
-```
-# Path: hyperlane-quick-start/application/view/mod.rs
-```rust
-mod favicon;
-use super::*;
-```
-# Path: hyperlane-quick-start/application/view/favicon/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-use hyperlane_config::application::logo_img::*;
-```
-# Path: hyperlane-quick-start/application/view/favicon/struct.rs
-```rust
-use super::*;
-#[route("/favicon.ico")]
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct FaviconRoute;
-```
-# Path: hyperlane-quick-start/application/view/favicon/impl.rs
-```rust
-use super::*;
-impl ServerHook for FaviconRoute {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        get_method,
-        response_status_code(301),
-        response_header(LOCATION => LOGO_IMG_URL)
-    )]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {}
-}
-```
-# Path: hyperlane-quick-start/config/lib.rs
-```rust
-pub mod application;
-pub mod framework;
-use {hyperlane::*, hyperlane_utils::log::*};
-```
-# Path: hyperlane-quick-start/config/README.md
-## hyperlane-config
-> Hyperlane configuration module providing comprehensive configuration management capabilities for the framework.
-## Contact
-# Path: hyperlane-quick-start/config/framework/const.rs
-```rust
-use super::*;
-#[cfg(debug_assertions)]
-pub const SERVER_PORT: u16 = DEFAULT_WEB_PORT;
-#[cfg(not(debug_assertions))]
-pub const SERVER_PORT: u16 = 65002;
-pub const SERVER_HOST: &str = DEFAULT_HOST;
-pub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;
-pub const SERVER_LOG_SIZE: usize = 100_024_000;
-pub const SERVER_LOG_DIR: &str = "./tmp/logs";
-pub const SERVER_INNER_PRINT: bool = true;
-pub const SERVER_INNER_LOG: bool = true;
-pub const SERVER_NODELAY: Option<bool> = Some(false);
-pub const SERVER_TTI: Option<u32> = Some(128);
-pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
-pub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;
-pub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;
-```
-# Path: hyperlane-quick-start/config/framework/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/config/application/mod.rs
-```rust
-pub mod logger;
-pub mod logo_img;
-use super::*;
-```
-# Path: hyperlane-quick-start/config/application/logo_img/const.rs
-```rust
-pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
-```
-# Path: hyperlane-quick-start/config/application/logo_img/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/config/application/logger/const.rs
-```rust
-use super::*;
-#[cfg(debug_assertions)]
-pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Trace;
-#[cfg(not(debug_assertions))]
-pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Info;
-```
-# Path: hyperlane-quick-start/config/application/logger/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-use super::*;
-```
-# Path: hyperlane-quick-start/plugin/lib.rs
-```rust
-pub mod common;
-pub mod database;
-pub mod env;
-pub mod logger;
-pub mod mysql;
-pub mod postgresql;
-pub mod process;
-pub mod redis;
-pub mod shutdown;
-use common::*;
-use {
-    hyperlane::*,
-    hyperlane_utils::{log::*, *},
-    sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
-};
-```
-# Path: hyperlane-quick-start/plugin/README.md
-## hyperlane-plugin
-> A powerful and extensible plugin system for the hyperlane framework, providing modularity and customization capabilities.
-## Contact
-# Path: hyperlane-quick-start/plugin/process/const.rs
-```rust
-pub const CMD_STOP: &str = "stop";
-pub const CMD_RESTART: &str = "restart";
-pub const DAEMON_FLAG: &str = "-d";
-```
-# Path: hyperlane-quick-start/plugin/process/mod.rs
-```rust
-mod r#const;
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use {super::*, r#const::*};
-use std::{env::args, future::Future};
-```
-# Path: hyperlane-quick-start/plugin/process/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct ProcessPlugin;
-```
-# Path: hyperlane-quick-start/plugin/process/impl.rs
-```rust
-use super::*;
-impl ProcessPlugin {
-    #[instrument_trace]
-    pub async fn create<P, F, Fut>(pid_path: P, server_hook: F)
-    where
-        P: AsRef<str>,
-        F: Fn() -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static,
-    {
-        let args: Vec<String> = args().collect();
-        debug!("Process create args {args:?}");
-        let mut manager: ServerManager = ServerManager::new();
-        manager
-            .set_pid_file(pid_path.as_ref())
-            .set_server_hook(server_hook);
-        let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
-        let start_server = || async {
-            if is_daemon {
-                match manager.start_daemon().await {
-                    Ok(_) => info!("Server started in background successfully"),
-                    Err(error) => {
-                        error!("Error starting server in background {error}")
-                    }
-                };
-            } else {
-                info!("Server started successfully");
-                manager.start().await;
-            }
-        };
-        let stop_server = || async {
-            match manager.stop().await {
-                Ok(_) => info!("Server stopped successfully"),
-                Err(error) => error!("Error stopping server {error}"),
-            };
-        };
-        let restart_server = || async {
-            stop_server().await;
-            start_server().await;
-        };
-        if args.len() < 2 {
-            warn!("No additional command-line parameters, default startup");
-            start_server().await;
-            return;
-        }
-        let command: String = args[1].to_lowercase();
-        match command.as_str() {
-            CMD_STOP => stop_server().await,
-            CMD_RESTART => restart_server().await,
-            _ => {
-                error!("Invalid command {command}");
-            }
-        }
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/env/const.rs
-```rust
-pub const ENV_FILE_PATH: &str = "./.env";
-pub const DOCKER_COMPOSE_FILE_PATH: &str = "./docker-compose.yml";
-pub const ENV_KEY_GPT_API_URL: &str = "GPT_API_URL";
-pub const ENV_KEY_GPT_MODEL: &str = "GPT_MODEL";
-pub const ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS: &str = "DB_CONNECTION_TIMEOUT_MILLIS";
-pub const DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS: u64 = 3000;
-pub const ENV_KEY_DB_RETRY_INTERVAL_MILLIS: &str = "DB_RETRY_INTERVAL_MILLIS";
-pub const DEFAULT_DB_RETRY_INTERVAL_MILLIS: u64 = 30000;
-pub const ENV_KEY_MYSQL_HOST: &str = "MYSQL_HOST";
-pub const ENV_KEY_MYSQL_PORT: &str = "MYSQL_PORT";
-pub const ENV_KEY_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
-pub const ENV_KEY_MYSQL_USERNAME: &str = "MYSQL_USERNAME";
-pub const ENV_KEY_MYSQL_PASSWORD: &str = "MYSQL_PASSWORD";
-pub const ENV_KEY_POSTGRES_HOST: &str = "POSTGRES_HOST";
-pub const ENV_KEY_POSTGRES_PORT: &str = "POSTGRES_PORT";
-pub const ENV_KEY_POSTGRES_DATABASE: &str = "POSTGRES_DATABASE";
-pub const ENV_KEY_POSTGRES_USERNAME: &str = "POSTGRES_USERNAME";
-pub const ENV_KEY_POSTGRES_PASSWORD: &str = "POSTGRES_PASSWORD";
-pub const ENV_KEY_REDIS_HOST: &str = "REDIS_HOST";
-pub const ENV_KEY_REDIS_PORT: &str = "REDIS_PORT";
-pub const ENV_KEY_REDIS_USERNAME: &str = "REDIS_USERNAME";
-pub const ENV_KEY_REDIS_PASSWORD: &str = "REDIS_PASSWORD";
-pub const DEFAULT_MYSQL_PORT: usize = 3306;
-pub const DEFAULT_REDIS_PORT: usize = 6379;
-pub const DEFAULT_POSTGRESQL_PORT: usize = 5432;
-pub const DEFAULT_DB_HOST: &str = "127.0.0.1";
-pub const DOCKER_YAML_SERVICES: &str = "services";
-pub const DOCKER_YAML_ENVIRONMENT: &str = "environment";
-pub const DOCKER_YAML_PORTS: &str = "ports";
-pub const DOCKER_YAML_COMMAND: &str = "command";
-pub const DOCKER_SERVICE_MYSQL: &str = "mysql";
-pub const DOCKER_SERVICE_POSTGRESQL: &str = "postgresql";
-pub const DOCKER_SERVICE_REDIS: &str = "redis";
-pub const DOCKER_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
-pub const DOCKER_MYSQL_USER: &str = "MYSQL_USER";
-pub const DOCKER_MYSQL_PASSWORD: &str = "MYSQL_PASSWORD";
-pub const DOCKER_POSTGRES_DB: &str = "POSTGRES_DB";
-pub const DOCKER_POSTGRES_USER: &str = "POSTGRES_USER";
-pub const DOCKER_POSTGRES_PASSWORD: &str = "POSTGRES_PASSWORD";
-pub const DOCKER_REDIS_PASSWORD_FLAG: &str = "--requirepass";
-```
-# Path: hyperlane-quick-start/plugin/env/mod.rs
-```rust
-mod r#const;
-mod r#impl;
-mod r#static;
-mod r#struct;
-pub use {r#const::*, r#struct::*};
-use {super::*, mysql::*, postgresql::*, redis::*, r#static::*};
-use std::sync::OnceLock;
-```
-# Path: hyperlane-quick-start/plugin/env/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct EnvPlugin;
-#[derive(Clone, Data, Debug, Default)]
-pub struct DockerComposeConfig {
-    #[get(pub(crate))]
-    pub(super) mysql_database: Option<String>,
-    #[get(pub(crate))]
-    pub(super) mysql_password: Option<String>,
-    #[get(type(copy), pub(crate))]
-    pub(super) mysql_port: Option<usize>,
-    #[get(pub(crate))]
-    pub(super) mysql_username: Option<String>,
-    #[get(pub(crate))]
-    pub(super) postgresql_database: Option<String>,
-    #[get(pub(crate))]
-    pub(super) postgresql_password: Option<String>,
-    #[get(type(copy), pub(crate))]
-    pub(super) postgresql_port: Option<usize>,
-    #[get(pub(crate))]
-    pub(super) postgresql_username: Option<String>,
-    #[get(pub(crate))]
-    pub(super) redis_password: Option<String>,
-    #[get(type(copy), pub(crate))]
-    pub(super) redis_port: Option<usize>,
-    #[get(pub(crate))]
-    pub(super) redis_username: Option<String>,
-}
-#[derive(Clone, Data, Debug, Default)]
-pub struct EnvConfig {
-    #[get(pub)]
-    pub(super) gpt_api_url: String,
-    #[get(pub)]
-    pub(super) gpt_model: String,
-    #[get(pub(crate))]
-    pub(super) mysql_instances: Vec<MySqlInstanceConfig>,
-    #[get(pub(crate))]
-    pub(super) postgresql_instances: Vec<PostgreSqlInstanceConfig>,
-    #[get(pub(crate))]
-    pub(super) redis_instances: Vec<RedisInstanceConfig>,
-}
-#[derive(Clone, Data, Debug, Default)]
-pub struct MySqlInstanceConfig {
-    #[get(pub(crate))]
-    pub(super) database: String,
-    #[get(pub(crate))]
-    pub(super) host: String,
-    #[get(pub(crate))]
-    pub(super) name: String,
-    #[get(pub(crate))]
-    pub(super) password: String,
-    #[get(type(copy), pub(crate))]
-    pub(super) port: usize,
-    #[get(pub(crate))]
-    pub(super) username: String,
-}
-#[derive(Clone, Data, Debug, Default)]
-pub struct PostgreSqlInstanceConfig {
-    #[get(pub(crate))]
-    pub(super) database: String,
-    #[get(pub(crate))]
-    pub(super) host: String,
-    #[get(pub(crate))]
-    pub(super) name: String,
-    #[get(pub(crate))]
-    pub(super) password: String,
-    #[get(type(copy), pub(crate))]
-    pub(super) port: usize,
-    #[get(pub(crate))]
-    pub(super) username: String,
-}
-#[derive(Clone, Data, Debug, Default)]
-pub struct RedisInstanceConfig {
-    #[get(pub(crate))]
-    pub(super) host: String,
-    #[get(pub(crate))]
-    pub(super) name: String,
-    #[get(pub(crate))]
-    pub(super) password: String,
-    #[get(type(copy), pub(crate))]
-    pub(super) port: usize,
-    #[get(pub(crate))]
-    pub(super) username: String,
-}
-```
-# Path: hyperlane-quick-start/plugin/env/impl.rs
-```rust
-use super::*;
-impl GetOrInit for EnvPlugin {
-    type Instance = EnvConfig;
-    #[instrument_trace]
-    fn get_or_init() -> &'static Self::Instance {
-        GLOBAL_ENV_CONFIG.get_or_init(EnvConfig::default)
-    }
-}
-impl EnvPlugin {
-    #[instrument_trace]
-    pub fn try_get_config() -> Result<(), String> {
-        let config: EnvConfig = EnvConfig::load()?;
-        GLOBAL_ENV_CONFIG
-            .set(config.clone())
-            .map_err(|_| "Failed to initialize global environment configuration".to_string())?;
-        info!("Environment Configuration Loaded Successfully");
-        info!(
-            "GPT API URL {}",
-            if config.get_gpt_api_url().is_empty() {
-                "(not set)"
-            } else {
-                config.get_gpt_api_url()
-            }
-        );
-        info!(
-            "GPT Model {}",
-            if config.get_gpt_model().is_empty() {
-                "(not set)"
-            } else {
-                config.get_gpt_model()
-            }
-        );
-        info!("MySQL Configuration:");
-        if config.get_mysql_instances().is_empty() {
-            info!("  (no MySQL instances configured)");
-        } else {
-            for instance in config.get_mysql_instances() {
-                info!(
-    #[instrument_trace]
-    pub(crate) fn load() -> Result<Self, String> {
-        let docker_config: DockerComposeConfig =
-            Self::load_from_docker_compose().unwrap_or_default();
-        if read_from_file::<Vec<u8>>(ENV_FILE_PATH).is_err() {
-            let mut data: String = String::new();
-            data.push_str(&format!("{ENV_KEY_GPT_API_URL}={BR}"));
-            data.push_str(&format!("{ENV_KEY_GPT_MODEL}={BR}"));
-            data.push_str(&format!(
-                "{ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS}={DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS}{BR}"
-            ));
-            write_to_file(ENV_FILE_PATH, data.as_bytes())
-                .map_err(|error| format!("Failed to create example env file {error}"))?;
-        }
-        dotenvy::from_path(ENV_FILE_PATH)
-            .map_err(|error| format!("Failed to load env file {error}"))?;
-        let get_env = |key: &str| -> Option<String> { std::env::var(key).ok() };
-        let get_env_usize = |key: &str| -> Option<usize> {
-            std::env::var(key).ok().and_then(|value| value.parse().ok())
-        };
-        let mut config: EnvConfig = EnvConfig {
-            gpt_api_url: get_env(ENV_KEY_GPT_API_URL).unwrap_or_default(),
-            gpt_model: get_env(ENV_KEY_GPT_MODEL).unwrap_or_default(),
-            ..Default::default()
-        };
-        let default_mysql_host: String =
-            get_env(ENV_KEY_MYSQL_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
-        let default_mysql_port: usize = docker_config
-            .get_mysql_port()
-            .or_else(|| get_env_usize(ENV_KEY_MYSQL_PORT))
-            .unwrap_or(DEFAULT_MYSQL_PORT);
-        let default_mysql_database: String = docker_config
-            .try_get_mysql_database()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_MYSQL_DATABASE))
-            .unwrap_or_default();
-        let default_mysql_username: String = docker_config
-            .try_get_mysql_username()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_MYSQL_USERNAME))
-            .unwrap_or_default();
-        let default_mysql_password: String = docker_config
-            .try_get_mysql_password()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_MYSQL_PASSWORD))
-            .unwrap_or_default();
-        let instance: MySqlInstanceConfig = MySqlInstanceConfig {
-            name: DEFAULT_MYSQL_INSTANCE_NAME.to_string(),
-            host: default_mysql_host,
-            port: default_mysql_port,
-            database: default_mysql_database,
-            username: default_mysql_username,
-            password: default_mysql_password,
-        };
-        config.get_mut_mysql_instances().push(instance);
-        let mut instance_index: usize = 1;
-        loop {
-            let prefix: String = format!("MYSQL_{instance_index}_");
-            let host_key: String = format!("{prefix}HOST");
-            if let Some(host) = get_env(&host_key) {
-                let port_key: String = format!("{prefix}PORT");
-                let database_key: String = format!("{prefix}DATABASE");
-                let username_key: String = format!("{prefix}USERNAME");
-                let password_key: String = format!("{prefix}PASSWORD");
-                let instance_name: String = format!("mysql_{instance_index}");
-                let instance: MySqlInstanceConfig = MySqlInstanceConfig {
-                    name: instance_name,
-                    host,
-                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_MYSQL_PORT),
-                    database: get_env(&database_key).unwrap_or_default(),
-                    username: get_env(&username_key).unwrap_or_default(),
-                    password: get_env(&password_key).unwrap_or_default(),
-                };
-                config.get_mut_mysql_instances().push(instance);
-                instance_index += 1;
-            } else {
-                break;
-            }
-        }
-        let default_postgres_host: String =
-            get_env(ENV_KEY_POSTGRES_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
-        let default_postgres_port: usize = docker_config
-            .get_postgresql_port()
-            .or_else(|| get_env_usize(ENV_KEY_POSTGRES_PORT))
-            .unwrap_or(DEFAULT_POSTGRESQL_PORT);
-        let default_postgres_database: String = docker_config
-            .try_get_postgresql_database()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_POSTGRES_DATABASE))
-            .unwrap_or_default();
-        let default_postgres_username: String = docker_config
-            .try_get_postgresql_username()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_POSTGRES_USERNAME))
-            .unwrap_or_default();
-        let default_postgres_password: String = docker_config
-            .try_get_postgresql_password()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_POSTGRES_PASSWORD))
-            .unwrap_or_default();
-        let instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig {
-            name: DEFAULT_POSTGRESQL_INSTANCE_NAME.to_string(),
-            host: default_postgres_host,
-            port: default_postgres_port,
-            database: default_postgres_database,
-            username: default_postgres_username,
-            password: default_postgres_password,
-        };
-        config.get_mut_postgresql_instances().push(instance);
-        let mut instance_index: usize = 1;
-        loop {
-            let prefix: String = format!("POSTGRES_{instance_index}_");
-            let host_key: String = format!("{prefix}HOST");
-            if let Some(host) = get_env(&host_key) {
-                let port_key: String = format!("{prefix}PORT");
-                let database_key: String = format!("{prefix}DATABASE");
-                let username_key: String = format!("{prefix}USERNAME");
-                let password_key: String = format!("{prefix}PASSWORD");
-                let instance_name: String = format!("postgres_{instance_index}");
-                let instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig {
-                    name: instance_name,
-                    host,
-                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_POSTGRESQL_PORT),
-                    database: get_env(&database_key).unwrap_or_default(),
-                    username: get_env(&username_key).unwrap_or_default(),
-                    password: get_env(&password_key).unwrap_or_default(),
-                };
-                config.get_mut_postgresql_instances().push(instance);
-                instance_index += 1;
-            } else {
-                break;
-            }
-        }
-        let default_redis_host: String =
-            get_env(ENV_KEY_REDIS_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
-        let default_redis_port: usize = docker_config
-            .get_redis_port()
-            .or_else(|| get_env_usize(ENV_KEY_REDIS_PORT))
-            .unwrap_or(DEFAULT_REDIS_PORT);
-        let default_redis_username: String = docker_config
-            .try_get_redis_username()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_REDIS_USERNAME))
-            .unwrap_or_default();
-        let default_redis_password: String = docker_config
-            .try_get_redis_password()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_REDIS_PASSWORD))
-            .unwrap_or_default();
-        let instance: RedisInstanceConfig = RedisInstanceConfig {
-            name: DEFAULT_REDIS_INSTANCE_NAME.to_string(),
-            host: default_redis_host,
-            port: default_redis_port,
-            username: default_redis_username,
-            password: default_redis_password,
-        };
-        config.get_mut_redis_instances().push(instance);
-        let mut instance_index: usize = 1;
-        loop {
-            let prefix: String = format!("REDIS_{instance_index}_");
-            let host_key: String = format!("{prefix}HOST");
-            if let Some(host) = get_env(&host_key) {
-                let port_key: String = format!("{prefix}PORT");
-                let username_key: String = format!("{prefix}USERNAME");
-                let password_key: String = format!("{prefix}PASSWORD");
-                let instance_name: String = format!("redis_{instance_index}");
-                let instance: RedisInstanceConfig = RedisInstanceConfig {
-                    name: instance_name,
-                    host,
-                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_REDIS_PORT),
-                    username: get_env(&username_key).unwrap_or_default(),
-                    password: get_env(&password_key).unwrap_or_default(),
-                };
-                config.get_mut_redis_instances().push(instance);
-                instance_index += 1;
-            } else {
-                break;
-            }
-        }
-        Ok(config)
-    }
-    #[instrument_trace]
-    fn load_from_docker_compose() -> Result<DockerComposeConfig, String> {
-        let docker_compose_content: Vec<u8> = read_from_file(DOCKER_COMPOSE_FILE_PATH)
-            .map_err(|error| format!("Failed to read docker-compose.yml {error}"))?;
-        let yaml: serde_yaml::Value = serde_yaml::from_slice(&docker_compose_content)
-            .map_err(|error| format!("Failed to parse docker-compose.yml {error}"))?;
-        let mut config: DockerComposeConfig = DockerComposeConfig::default();
-        if let Some(mysql) = yaml
-            .get(DOCKER_YAML_SERVICES)
-            .and_then(|services| services.get(DOCKER_SERVICE_MYSQL))
-        {
-            if let Some(env) = mysql.get(DOCKER_YAML_ENVIRONMENT) {
-                if let Some(database) = env
-                    .get(DOCKER_MYSQL_DATABASE)
-                    .and_then(|value| value.as_str())
-                    .map(String::from)
-                {
-                    config.set_mysql_database(Some(database));
-                }
-                if let Some(username) = env
-                    .get(DOCKER_MYSQL_USER)
-                    .and_then(|value| value.as_str())
-                    .map(String::from)
-                {
-                    config.set_mysql_username(Some(username));
-                }
-                if let Some(password) = env
-                    .get(DOCKER_MYSQL_PASSWORD)
-                    .and_then(|value| value.as_str())
-                    .map(String::from)
-                {
-                    config.set_mysql_password(Some(password));
-                }
-            }
-            if let Some(ports) = mysql
-                .get(DOCKER_YAML_PORTS)
-                .and_then(|ports_value| ports_value.as_sequence())
-            {
-                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
-                    if let Some(host_port) = port_mapping.split(':').next() {
-                        if let Ok(port) = host_port.parse() {
-                            config.set_mysql_port(Some(port));
-                        }
-                    }
-                }
-            }
-        }
-        if let Some(postgresql) = yaml
-            .get(DOCKER_YAML_SERVICES)
-            .and_then(|services| services.get(DOCKER_SERVICE_POSTGRESQL))
-        {
-            if let Some(env) = postgresql.get(DOCKER_YAML_ENVIRONMENT) {
-                if let Some(database) = env
-                    .get(DOCKER_POSTGRES_DB)
-                    .and_then(|value| value.as_str())
-                    .map(String::from)
-                {
-                    config.set_postgresql_database(Some(database));
-                }
-                if let Some(username) = env
-                    .get(DOCKER_POSTGRES_USER)
-                    .and_then(|value| value.as_str())
-                    .map(String::from)
-                {
-                    config.set_postgresql_username(Some(username));
-                }
-                if let Some(password) = env
-                    .get(DOCKER_POSTGRES_PASSWORD)
-                    .and_then(|value| value.as_str())
-                    .map(String::from)
-                {
-                    config.set_postgresql_password(Some(password));
-                }
-            }
-            if let Some(ports) = postgresql
-                .get(DOCKER_YAML_PORTS)
-                .and_then(|ports_value| ports_value.as_sequence())
-            {
-                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
-                    if let Some(host_port) = port_mapping.split(':').next() {
-                        if let Ok(port) = host_port.parse() {
-                            config.set_postgresql_port(Some(port));
-                        }
-                    }
-                }
-            }
-        }
-        if let Some(redis) = yaml
-            .get(DOCKER_YAML_SERVICES)
-            .and_then(|services| services.get(DOCKER_SERVICE_REDIS))
-        {
-            if let Some(command) = redis
-                .get(DOCKER_YAML_COMMAND)
-                .and_then(|command_value| command_value.as_str())
-            {
-                if let Some(password_part) = command.split(DOCKER_REDIS_PASSWORD_FLAG).nth(1) {
-                    config.set_redis_password(Some(password_part.trim().to_string()));
-                }
-            }
-            if let Some(ports) = redis
-                .get(DOCKER_YAML_PORTS)
-                .and_then(|ports_value| ports_value.as_sequence())
-            {
-                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
-                    if let Some(host_port) = port_mapping.split(':').next() {
-                        if let Ok(port) = host_port.parse() {
-                            config.set_redis_port(Some(port));
-                        }
-                    }
-                }
-            }
-        }
-        Ok(config)
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/env/static.rs
-```rust
-use super::*;
-pub static GLOBAL_ENV_CONFIG: OnceLock<EnvConfig> = OnceLock::new();
-```
-# Path: hyperlane-quick-start/plugin/postgresql/const.rs
-```rust
-pub const DEFAULT_POSTGRESQL_INSTANCE_NAME: &str = "postgres_default";
-```
-# Path: hyperlane-quick-start/plugin/postgresql/mod.rs
-```rust
-mod r#const;
-mod r#impl;
-mod r#static;
-mod r#struct;
-pub use {r#const::*, r#struct::*};
-use {super::*, database::*, env::*, r#static::*};
-use std::{
-    collections::HashMap,
-    sync::OnceLock,
-    time::{Duration, Instant},
-};
-use {
-    sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
-    tokio::{
-        spawn,
-        sync::{RwLock, RwLockWriteGuard},
-        time::timeout,
-    },
-};
-```
-# Path: hyperlane-quick-start/plugin/postgresql/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct PostgreSqlPlugin;
-#[derive(Clone, Data, Debug, New)]
-pub struct PostgreSqlAutoCreation {
-    #[get(pub(crate))]
-    pub(super) instance: PostgreSqlInstanceConfig,
-    #[new(skip)]
-    #[get(pub(crate))]
-    pub(super) schema: DatabaseSchema,
-}
-```
-# Path: hyperlane-quick-start/plugin/postgresql/impl.rs
-```rust
-use super::*;
-impl GetOrInit for PostgreSqlPlugin {
-    type Instance = RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>;
-    #[instrument_trace]
-    fn get_or_init() -> &'static Self::Instance {
-        POSTGRESQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
-    }
-}
-impl DatabaseConnectionPlugin for PostgreSqlPlugin {
-    type InstanceConfig = PostgreSqlInstanceConfig;
-    type AutoCreation = PostgreSqlAutoCreation;
-    type Connection = DatabaseConnection;
-    type ConnectionCache = RwLock<HashMap<String, ConnectionCache<Self::Connection>>>;
-    #[instrument_trace]
-    fn plugin_type() -> PluginType {
-        PluginType::PostgreSQL
-    }
-    #[instrument_trace]
-    async fn connection_db<I>(
-        instance_name: I,
-        schema: Option<DatabaseSchema>,
-    ) -> Result<Self::Connection, String>
-    where
-        I: AsRef<str> + Send,
-    {
-        let instance_name_str: &str = instance_name.as_ref();
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        let instance: &PostgreSqlInstanceConfig = env
-            .get_postgresql_instance(instance_name_str)
-            .ok_or_else(|| format!("PostgreSQL instance '{instance_name_str}' not found"))?;
-        match Self::perform_auto_creation(instance, schema.clone()).await {
-            Ok(result) => {
-                if result.has_changes() {
-                    AutoCreationLogger::log_auto_creation_complete(PluginType::PostgreSQL, &result)
-                        .await;
-                }
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Auto-creation process",
-                    PluginType::PostgreSQL,
-                    Some(instance.get_database().as_str()),
-                )
-                .await;
-                if !error.should_continue() {
-                    return Err(error.to_string());
-                }
-            }
-        }
-        let db_url: String = instance.get_connection_url();
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> =
-            match timeout(timeout_duration, Database::connect(&db_url)).await {
-                Ok(result) => result,
-                Err(_) => Err(DbErr::Custom(format!(
-                    "PostgreSQL connection timeout after {timeout_seconds} seconds"
-                ))),
-            };
-        connection_result.map_err(|error: DbErr| {
-            let error_msg: String = error.to_string();
-            let database_name: String = instance.get_database().clone();
-            let error_msg_clone: String = error_msg.clone();
-            spawn(async move {
-                AutoCreationLogger::log_connection_verification(
-                    PluginType::PostgreSQL,
-                    &database_name,
-                    false,
-                    Some(&error_msg_clone),
-                )
-                .await;
-            });
-            error_msg
-        })
-    }
-    #[instrument_trace]
-    async fn get_connection<I>(
-        instance_name: I,
-        schema: Option<DatabaseSchema>,
-    ) -> Result<Self::Connection, String>
-    where
-        I: AsRef<str> + Send,
-    {
-        let instance_name_str: &str = instance_name.as_ref();
-        let duration: Duration = DatabasePlugin::get_retry_duration();
-        {
-            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
-                match cache.try_get_result() {
-                    Ok(conn) => return Ok(conn.clone()),
-                    Err(error) => {
-                        if !cache.is_expired(duration) {
-                            return Err(error.clone());
-                        }
-                    }
-                }
-            }
-        }
-        let mut connections: RwLockWriteGuard<
-            '_,
-            HashMap<String, ConnectionCache<DatabaseConnection>>,
-        > = Self::get_or_init().write().await;
-        if let Some(cache) = connections.get(instance_name_str) {
-            match cache.try_get_result() {
-                Ok(conn) => return Ok(conn.clone()),
-                Err(error) => {
-                    if !cache.is_expired(duration) {
-                        return Err(error.clone());
-                    }
-                }
-            }
-        }
-        connections.remove(instance_name_str);
-        drop(connections);
-        let new_connection: Result<DatabaseConnection, String> =
-            Self::connection_db(instance_name_str, schema).await;
-        let mut connections: RwLockWriteGuard<
-            '_,
-            HashMap<String, ConnectionCache<DatabaseConnection>>,
-        > = Self::get_or_init().write().await;
-        connections.insert(
-            instance_name_str.to_string(),
-            ConnectionCache::new(new_connection.clone()),
-        );
-        new_connection
-    }
-    #[instrument_trace]
-    async fn perform_auto_creation(
-        instance: &Self::InstanceConfig,
-        schema: Option<DatabaseSchema>,
-    ) -> Result<AutoCreationResult, AutoCreationError> {
-        let start_time: Instant = Instant::now();
-        let mut result: AutoCreationResult = AutoCreationResult::default();
-        AutoCreationLogger::log_auto_creation_start(
-            PluginType::PostgreSQL,
-            instance.get_database(),
-        )
-        .await;
-        let auto_creator: PostgreSqlAutoCreation = match schema {
-            Some(s) => PostgreSqlAutoCreation::with_schema(instance.clone(), s),
-            None => PostgreSqlAutoCreation::new(instance.clone()),
-        };
-        match auto_creator.create_database_if_not_exists().await {
-            Ok(created) => {
-                result.set_database_created(created);
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Database creation",
-                    PluginType::PostgreSQL,
-                    Some(instance.get_database().as_str()),
-                )
-                .await;
-                if !error.should_continue() {
-                    result.set_duration(start_time.elapsed());
-                    return Err(error);
-                }
-                result.get_mut_errors().push(error.to_string());
-            }
-        }
-        match auto_creator.create_tables_if_not_exist().await {
-            Ok(tables) => {
-                result.set_tables_created(tables);
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Table creation",
-                    PluginType::PostgreSQL,
-                    Some(instance.get_database().as_str()),
-                )
-                .await;
-                result.get_mut_errors().push(error.to_string());
-            }
-        }
-        if let Err(error) = auto_creator.verify_connection().await {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Connection verification",
-                PluginType::PostgreSQL,
-                Some(instance.get_database().as_str()),
-            )
-            .await;
-            if !error.should_continue() {
-                result.set_duration(start_time.elapsed());
-                return Err(error);
-            }
-            result.get_mut_errors().push(error.to_string());
-        }
-        result.set_duration(start_time.elapsed());
-        AutoCreationLogger::log_auto_creation_complete(PluginType::PostgreSQL, &result).await;
-        Ok(result)
-    }
-}
-impl Default for PostgreSqlAutoCreation {
-    #[instrument_trace]
-    fn default() -> Self {
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        if let Some(instance) = env.get_default_postgresql_instance() {
-            Self::new(instance.clone())
-        } else {
-            let default_instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig::default();
-            Self::new(default_instance)
-        }
-    }
-}
-impl PostgreSqlAutoCreation {
-    #[instrument_trace]
-    async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
-        let admin_url: String = self.instance.get_admin_url();
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> =
-            match timeout(timeout_duration, Database::connect(&admin_url)).await {
-                Ok(result) => result,
-                Err(_) => {
-                    return Err(AutoCreationError::Timeout(format!(
-                        "PostgreSQL admin connection timeout after {timeout_seconds} seconds"
-                    )));
-                }
-            };
-        connection_result.map_err(|error: DbErr| {
-            let error_msg: String = error.to_string();
-            if error_msg.contains("authentication failed") || error_msg.contains("permission") {
-                AutoCreationError::InsufficientPermissions(format!(
-                    "Cannot connect to PostgreSQL server for database creation {error_msg}"
-                ))
-            } else if error_msg.contains("timeout") || error_msg.contains("Connection refused") {
-                AutoCreationError::ConnectionFailed(format!(
-                    "Cannot connect to PostgreSQL server {error_msg}"
-                ))
-            } else {
-                AutoCreationError::DatabaseError(format!("PostgreSQL connection error {error_msg}"))
-            }
-        })
-    }
-    #[instrument_trace]
-    async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
-        let db_url: String = self.instance.get_connection_url();
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> =
-            match timeout(timeout_duration, Database::connect(&db_url)).await {
-                Ok(result) => result,
-                Err(_) => {
-                    return Err(AutoCreationError::Timeout(format!(
-                        "PostgreSQL database connection timeout after {timeout_seconds} seconds {}",
-                        self.instance.get_database().as_str()
-                    )));
-                }
-            };
-        connection_result.map_err(|error: DbErr| {
-            AutoCreationError::ConnectionFailed(format!(
-                "Cannot connect to PostgreSQL database '{}' {error}",
-                self.instance.get_database().as_str(),
-            ))
-        })
-    }
-    #[instrument_trace]
-    async fn database_exists(
-        &self,
-        connection: &DatabaseConnection,
-    ) -> Result<bool, AutoCreationError> {
-        let query: String = format!(
-            "SELECT 1 FROM pg_database WHERE datname = '{}'",
-            self.instance.get_database().as_str()
-        );
-        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, query);
-        match connection.query_all(statement).await {
-            Ok(results) => Ok(!results.is_empty()),
-            Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to check if database exists {error}"
-            ))),
-        }
-    }
-    #[instrument_trace]
-    async fn create_database(
-        &self,
-        connection: &DatabaseConnection,
-    ) -> Result<bool, AutoCreationError> {
-        if self.database_exists(connection).await? {
-            AutoCreationLogger::log_database_exists(
-                self.instance.get_database().as_str(),
-                PluginType::PostgreSQL,
-            )
-            .await;
-            return Ok(false);
-        }
-        let create_query: String = format!(
-            "CREATE DATABASE \"{}\" WITH ENCODING='UTF8' LC_COLLATE='en_US.UTF-8' LC_CTYPE='en_US.UTF-8'",
-            self.instance.get_database().as_str()
-        );
-        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, create_query);
-        match connection.execute(statement).await {
-            Ok(_) => {
-                AutoCreationLogger::log_database_created(
-                    self.instance.get_database().as_str(),
-                    PluginType::PostgreSQL,
-                )
-                .await;
-                Ok(true)
-            }
-            Err(error) => {
-                let error_msg: String = error.to_string();
-                if error_msg.contains("permission denied") || error_msg.contains("must be owner") {
-                    Err(AutoCreationError::InsufficientPermissions(format!(
-                        "Cannot create PostgreSQL database '{}' {}",
-                        self.instance.get_database().as_str(),
-                        error_msg
-                    )))
-                } else if error_msg.contains("already exists") {
-                    AutoCreationLogger::log_database_exists(
-                        self.instance.get_database().as_str(),
-                        PluginType::PostgreSQL,
-                    )
-                    .await;
-                    Ok(false)
-                } else {
-                    Err(AutoCreationError::DatabaseError(format!(
-                        "Failed to create PostgreSQL database '{}' {}",
-                        self.instance.get_database().as_str(),
-                        error_msg
-                    )))
-                }
-            }
-        }
-    }
-    #[instrument_trace]
-    async fn table_exists<T>(
-        &self,
-        connection: &DatabaseConnection,
-        table_name: T,
-    ) -> Result<bool, AutoCreationError>
-    where
-        T: AsRef<str>,
-    {
-        let table_name_str: &str = table_name.as_ref();
-        let query: String = format!(
-            "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table_name_str}'"
-        );
-        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, query);
-        match connection.query_all(statement).await {
-            Ok(results) => Ok(!results.is_empty()),
-            Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to check if table '{table_name_str}' exists {error}"
-            ))),
-        }
-    }
-    #[instrument_trace]
-    async fn create_table(
-        &self,
-        connection: &DatabaseConnection,
-        table: &TableSchema,
-    ) -> Result<(), AutoCreationError> {
-        let statement: Statement =
-            Statement::from_string(DatabaseBackend::Postgres, table.get_sql().clone());
-        match connection.execute(statement).await {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                let error_msg: String = error.to_string();
-                if error_msg.contains("permission denied") {
-                    Err(AutoCreationError::InsufficientPermissions(format!(
-                        "Cannot create PostgreSQL table '{}' {}",
-                        table.get_name(),
-                        error_msg
-                    )))
-                } else {
-                    Err(AutoCreationError::SchemaError(format!(
-                        "Failed to create PostgreSQL table '{}' {}",
-                        table.get_name(),
-                        error_msg
-                    )))
-                }
-            }
-        }
-    }
-    #[instrument_trace]
-    async fn execute_sql<S>(
-        &self,
-        connection: &DatabaseConnection,
-        sql: S,
-    ) -> Result<(), AutoCreationError>
-    where
-        S: AsRef<str>,
-    {
-        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, sql.as_ref());
-        match connection.execute(statement).await {
-            Ok(_) => Ok(()),
-            Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to execute SQL {error}"
-            ))),
-        }
-    }
-    #[instrument_trace]
-    fn get_database_schema(&self) -> &DatabaseSchema {
-        &self.schema
-    }
-}
-impl DatabaseAutoCreation for PostgreSqlAutoCreation {
-    type InstanceConfig = PostgreSqlInstanceConfig;
-    #[instrument_trace]
-    fn new(instance: Self::InstanceConfig) -> Self {
-        Self {
-            instance,
-            schema: DatabaseSchema::default(),
-        }
-    }
-    #[instrument_trace]
-    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
-    where
-        Self: Sized,
-    {
-        Self { instance, schema }
-    }
-    #[instrument_trace]
-    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
-        let admin_connection: DatabaseConnection = self.create_admin_connection().await?;
-        let result: Result<bool, AutoCreationError> = self.create_database(&admin_connection).await;
-        let _: Result<(), DbErr> = admin_connection.close().await;
-        result
-    }
-    #[instrument_trace]
-    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
-        let connection: DatabaseConnection = self.create_target_connection().await?;
-        let schema: &DatabaseSchema = self.get_database_schema();
-        let mut created_tables: Vec<String> = Vec::new();
-        for table in schema.ordered_tables() {
-            if !self.table_exists(&connection, table.get_name()).await? {
-                self.create_table(&connection, table).await?;
-                created_tables.push(table.get_name().clone());
-                AutoCreationLogger::log_table_created(
-                    table.get_name(),
-                    self.instance.get_database().as_str(),
-                    PluginType::PostgreSQL,
-                )
-                .await;
-            } else {
-                AutoCreationLogger::log_table_exists(
-                    table.get_name(),
-                    self.instance.get_database().as_str(),
-                    PluginType::PostgreSQL,
-                )
-                .await;
-            }
-        }
-        for index_sql in schema.get_indexes() {
-            if let Err(error) = self.execute_sql(&connection, index_sql).await {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Index creation",
-                    PluginType::PostgreSQL,
-                    Some(self.instance.get_database().as_str()),
-                )
-                .await;
-            }
-        }
-        for constraint_sql in schema.get_constraints() {
-            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Constraint creation",
-                    PluginType::PostgreSQL,
-                    Some(self.instance.get_database().as_str()),
-                )
-                .await;
-            }
-        }
-        let _: Result<(), DbErr> = connection.close().await;
-        AutoCreationLogger::log_tables_created(
-            &created_tables,
-            self.instance.get_database().as_str(),
-            PluginType::PostgreSQL,
-        )
-        .await;
-        Ok(created_tables)
-    }
-    #[instrument_trace]
-    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
-        let connection: DatabaseConnection = self.create_target_connection().await?;
-        let statement: Statement =
-            Statement::from_string(DatabaseBackend::Postgres, "SELECT 1".to_string());
-        match connection.query_all(statement).await {
-            Ok(_) => {
-                let _: Result<(), DbErr> = connection.close().await;
-                AutoCreationLogger::log_connection_verification(
-                    PluginType::PostgreSQL,
-                    self.instance.get_database().as_str(),
-                    true,
-                    None,
-                )
-                .await;
-                Ok(())
-            }
-            Err(error) => {
-                let _: Result<(), DbErr> = connection.close().await;
-                let error_msg: String = error.to_string();
-                AutoCreationLogger::log_connection_verification(
-                    PluginType::PostgreSQL,
-                    self.instance.get_database().as_str(),
-                    false,
-                    Some(&error_msg),
-                )
-                .await;
-                Err(AutoCreationError::ConnectionFailed(format!(
-                    "PostgreSQL connection verification failed {error_msg}"
-                )))
-            }
-        }
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/postgresql/static.rs
-```rust
-use super::*;
-pub static POSTGRESQL_CONNECTIONS: OnceLock<
-    RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
-> = OnceLock::new();
-```
-# Path: hyperlane-quick-start/plugin/mysql/const.rs
-```rust
-pub const DEFAULT_MYSQL_INSTANCE_NAME: &str = "mysql_default";
-```
-# Path: hyperlane-quick-start/plugin/mysql/mod.rs
-```rust
-mod r#const;
-mod r#impl;
-mod r#static;
-mod r#struct;
-pub use {r#const::*, r#struct::*};
-use {super::*, database::*, env::*, r#static::*};
-use std::{
-    collections::HashMap,
-    sync::OnceLock,
-    time::{Duration, Instant},
-};
-use tokio::{
-    spawn,
-    sync::{RwLock, RwLockWriteGuard},
-    time::timeout,
-};
-```
-# Path: hyperlane-quick-start/plugin/mysql/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct MySqlPlugin;
-#[derive(Clone, Data, Debug, New)]
-pub struct MySqlAutoCreation {
-    #[get(pub(crate))]
-    pub(super) instance: MySqlInstanceConfig,
-    #[new(skip)]
-    #[get(pub(crate))]
-    pub(super) schema: DatabaseSchema,
-}
-```
-# Path: hyperlane-quick-start/plugin/mysql/impl.rs
-```rust
-use super::*;
-impl GetOrInit for MySqlPlugin {
-    type Instance = RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>;
-    #[instrument_trace]
-    fn get_or_init() -> &'static Self::Instance {
-        MYSQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
-    }
-}
-impl DatabaseConnectionPlugin for MySqlPlugin {
-    type InstanceConfig = MySqlInstanceConfig;
-    type AutoCreation = MySqlAutoCreation;
-    type Connection = DatabaseConnection;
-    type ConnectionCache = RwLock<HashMap<String, ConnectionCache<Self::Connection>>>;
-    #[instrument_trace]
-    fn plugin_type() -> PluginType {
-        PluginType::MySQL
-    }
-    #[instrument_trace]
-    async fn connection_db<I>(
-        instance_name: I,
-        schema: Option<DatabaseSchema>,
-    ) -> Result<Self::Connection, String>
-    where
-        I: AsRef<str> + Send,
-    {
-        let instance_name_str: &str = instance_name.as_ref();
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        let instance: &MySqlInstanceConfig = env
-            .get_mysql_instance(instance_name_str)
-            .ok_or_else(|| format!("MySQL instance '{instance_name_str}' not found"))?;
-        match Self::perform_auto_creation(instance, schema.clone()).await {
-            Ok(result) => {
-                if result.has_changes() {
-                    AutoCreationLogger::log_auto_creation_complete(PluginType::MySQL, &result)
-                        .await;
-                }
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Auto-creation process",
-                    PluginType::MySQL,
-                    Some(instance.get_database().as_str()),
-                )
-                .await;
-                if !error.should_continue() {
-                    return Err(error.to_string());
-                }
-            }
-        }
-        let db_url: String = instance.get_connection_url();
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> =
-            match timeout(timeout_duration, Database::connect(&db_url)).await {
-                Ok(result) => result,
-                Err(_) => Err(DbErr::Custom(format!(
-                    "MySQL connection timeout after {timeout_seconds} seconds"
-                ))),
-            };
-        connection_result.map_err(|error: DbErr| {
-            let error_msg: String = error.to_string();
-            let database_name: String = instance.get_database().clone();
-            let error_msg_clone: String = error_msg.clone();
-            spawn(async move {
-                AutoCreationLogger::log_connection_verification(
-                    PluginType::MySQL,
-                    &database_name,
-                    false,
-                    Some(&error_msg_clone),
-                )
-                .await;
-            });
-            error_msg
-        })
-    }
-    #[instrument_trace]
-    async fn get_connection<I>(
-        instance_name: I,
-        schema: Option<DatabaseSchema>,
-    ) -> Result<Self::Connection, String>
-    where
-        I: AsRef<str> + Send,
-    {
-        let instance_name_str: &str = instance_name.as_ref();
-        let duration: Duration = DatabasePlugin::get_retry_duration();
-        {
-            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
-                match cache.try_get_result() {
-                    Ok(conn) => return Ok(conn.clone()),
-                    Err(error) => {
-                        if !cache.is_expired(duration) {
-                            return Err(error.clone());
-                        }
-                    }
-                }
-            }
-        }
-        let mut connections: RwLockWriteGuard<
-            '_,
-            HashMap<String, ConnectionCache<DatabaseConnection>>,
-        > = Self::get_or_init().write().await;
-        if let Some(cache) = connections.get(instance_name_str) {
-            match cache.try_get_result() {
-                Ok(conn) => return Ok(conn.clone()),
-                Err(error) => {
-                    if !cache.is_expired(duration) {
-                        return Err(error.clone());
-                    }
-                }
-            }
-        }
-        connections.remove(instance_name_str);
-        drop(connections);
-        let new_connection: Result<DatabaseConnection, String> =
-            Self::connection_db(instance_name_str, schema).await;
-        let mut connections: RwLockWriteGuard<
-            '_,
-            HashMap<String, ConnectionCache<DatabaseConnection>>,
-        > = Self::get_or_init().write().await;
-        connections.insert(
-            instance_name_str.to_string(),
-            ConnectionCache::new(new_connection.clone()),
-        );
-        new_connection
-    }
-    #[instrument_trace]
-    async fn perform_auto_creation(
-        instance: &Self::InstanceConfig,
-        schema: Option<DatabaseSchema>,
-    ) -> Result<AutoCreationResult, AutoCreationError> {
-        let start_time: Instant = Instant::now();
-        let mut result: AutoCreationResult = AutoCreationResult::default();
-        AutoCreationLogger::log_auto_creation_start(PluginType::MySQL, instance.get_database())
-            .await;
-        let auto_creator: MySqlAutoCreation = match schema {
-            Some(s) => MySqlAutoCreation::with_schema(instance.clone(), s),
-            None => MySqlAutoCreation::new(instance.clone()),
-        };
-        match auto_creator.create_database_if_not_exists().await {
-            Ok(created) => {
-                result.set_database_created(created);
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Database creation",
-                    PluginType::MySQL,
-                    Some(instance.get_database()),
-                )
-                .await;
-                if !error.should_continue() {
-                    result.set_duration(start_time.elapsed());
-                    return Err(error);
-                }
-                result.get_mut_errors().push(error.to_string());
-            }
-        }
-        match auto_creator.create_tables_if_not_exist().await {
-            Ok(tables) => {
-                result.set_tables_created(tables);
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Table creation",
-                    PluginType::MySQL,
-                    Some(instance.get_database().as_str()),
-                )
-                .await;
-                result.get_mut_errors().push(error.to_string());
-            }
-        }
-        if let Err(error) = auto_creator.verify_connection().await {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Connection verification",
-                PluginType::MySQL,
-                Some(instance.get_database().as_str()),
-            )
-            .await;
-            if !error.should_continue() {
-                result.set_duration(start_time.elapsed());
-                return Err(error);
-            }
-            result.get_mut_errors().push(error.to_string());
-        }
-        result.set_duration(start_time.elapsed());
-        AutoCreationLogger::log_auto_creation_complete(PluginType::MySQL, &result).await;
-        Ok(result)
-    }
-}
-impl Default for MySqlAutoCreation {
-    #[instrument_trace]
-    fn default() -> Self {
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        if let Some(instance) = env.get_default_mysql_instance() {
-            Self::new(instance.clone())
-        } else {
-            let default_instance: MySqlInstanceConfig = MySqlInstanceConfig::default();
-            Self::new(default_instance)
-        }
-    }
-}
-impl MySqlAutoCreation {
-    #[instrument_trace]
-    async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
-        let admin_url: String = self.instance.get_admin_url();
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> =
-            match timeout(timeout_duration, Database::connect(&admin_url)).await {
-                Ok(result) => result,
-                Err(_) => {
-                    return Err(AutoCreationError::Timeout(format!(
-                        "MySQL admin connection timeout after {timeout_seconds} seconds"
-                    )));
-                }
-            };
-        connection_result.map_err(|error: DbErr| {
-            let error_msg: String = error.to_string();
-            if error_msg.contains("Access denied") || error_msg.contains("permission") {
-                AutoCreationError::InsufficientPermissions(format!(
-                    "Cannot connect to MySQL server for database creation {error_msg}"
-                ))
-            } else if error_msg.contains("timeout") || error_msg.contains("Connection refused") {
-                AutoCreationError::ConnectionFailed(format!(
-                    "Cannot connect to MySQL server {error_msg}"
-                ))
-            } else {
-                AutoCreationError::DatabaseError(format!("MySQL connection error {error_msg}"))
-            }
-        })
-    }
-    #[instrument_trace]
-    async fn database_exists(
-        &self,
-        connection: &DatabaseConnection,
-    ) -> Result<bool, AutoCreationError> {
-        let query: String = format!(
-            "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{}'",
-            self.instance.get_database()
-        );
-        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, query);
-        match connection.query_all(statement).await {
-            Ok(results) => Ok(!results.is_empty()),
-            Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to check if database exists {error}"
-            ))),
-        }
-    }
-    #[instrument_trace]
-    async fn create_database(
-        &self,
-        connection: &DatabaseConnection,
-    ) -> Result<bool, AutoCreationError> {
-        if self.database_exists(connection).await? {
-            AutoCreationLogger::log_database_exists(
-                self.instance.get_database().as_str(),
-                PluginType::MySQL,
-            )
-            .await;
-            return Ok(false);
-        }
-        let create_query: String = format!(
-            "CREATE DATABASE IF NOT EXISTS `{}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
-            self.instance.get_database()
-        );
-        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, create_query);
-        match connection.execute(statement).await {
-            Ok(_) => {
-                AutoCreationLogger::log_database_created(
-                    self.instance.get_database().as_str(),
-                    PluginType::MySQL,
-                )
-                .await;
-                Ok(true)
-            }
-            Err(error) => {
-                let error_msg: String = error.to_string();
-                if error_msg.contains("Access denied") || error_msg.contains("permission") {
-                    Err(AutoCreationError::InsufficientPermissions(format!(
-                        "Cannot create MySQL database '{}' {}",
-                        self.instance.get_database().as_str(),
-                        error_msg
-                    )))
-                } else {
-                    Err(AutoCreationError::DatabaseError(format!(
-                        "Failed to create MySQL database '{}' {}",
-                        self.instance.get_database().as_str(),
-                        error_msg
-                    )))
-                }
-            }
-        }
-    }
-    #[instrument_trace]
-    async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
-        let db_url: String = self.instance.get_connection_url();
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> =
-            match timeout(timeout_duration, Database::connect(&db_url)).await {
-                Ok(result) => result,
-                Err(_) => {
-                    return Err(AutoCreationError::Timeout(format!(
-                        "MySQL database connection timeout after {timeout_seconds} seconds {}",
-                        self.instance.get_database()
-                    )));
-                }
-            };
-        connection_result.map_err(|error: DbErr| {
-            AutoCreationError::ConnectionFailed(format!(
-                "Cannot connect to MySQL database '{}' {}",
-                self.instance.get_database().as_str(),
-                error
-            ))
-        })
-    }
-    #[instrument_trace]
-    async fn table_exists<T>(
-        &self,
-        connection: &DatabaseConnection,
-        table_name: T,
-    ) -> Result<bool, AutoCreationError>
-    where
-        T: AsRef<str>,
-    {
-        let table_name_str: &str = table_name.as_ref();
-        let query: String = format!(
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{}' AND TABLE_NAME = '{table_name_str}'",
-            self.instance.get_database()
-        );
-        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, query);
-        match connection.query_all(statement).await {
-            Ok(results) => Ok(!results.is_empty()),
-            Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to check if table '{table_name_str}' exists {error}"
-            ))),
-        }
-    }
-    #[instrument_trace]
-    async fn create_table(
-        &self,
-        connection: &DatabaseConnection,
-        table: &TableSchema,
-    ) -> Result<(), AutoCreationError> {
-        let statement: Statement =
-            Statement::from_string(DatabaseBackend::MySql, table.get_sql().clone());
-        match connection.execute(statement).await {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                let error_msg: String = error.to_string();
-                if error_msg.contains("Access denied") || error_msg.contains("permission") {
-                    Err(AutoCreationError::InsufficientPermissions(format!(
-                        "Cannot create MySQL table '{}' {}",
-                        table.get_name(),
-                        error_msg
-                    )))
-                } else {
-                    Err(AutoCreationError::SchemaError(format!(
-                        "Failed to create MySQL table '{}' {}",
-                        table.get_name(),
-                        error_msg
-                    )))
-                }
-            }
-        }
-    }
-    #[instrument_trace]
-    async fn execute_sql<S>(
-        &self,
-        connection: &DatabaseConnection,
-        sql: S,
-    ) -> Result<(), AutoCreationError>
-    where
-        S: AsRef<str>,
-    {
-        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, sql.as_ref());
-        match connection.execute(statement).await {
-            Ok(_) => Ok(()),
-            Err(error) => Err(AutoCreationError::DatabaseError(format!(
-                "Failed to execute SQL {error}"
-            ))),
-        }
-    }
-    #[instrument_trace]
-    fn get_database_schema(&self) -> &DatabaseSchema {
-        &self.schema
-    }
-}
-impl DatabaseAutoCreation for MySqlAutoCreation {
-    type InstanceConfig = MySqlInstanceConfig;
-    #[instrument_trace]
-    fn new(instance: Self::InstanceConfig) -> Self {
-        Self {
-            instance,
-            schema: DatabaseSchema::default(),
-        }
-    }
-    #[instrument_trace]
-    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
-    where
-        Self: Sized,
-    {
-        Self { instance, schema }
-    }
-    #[instrument_trace]
-    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
-        let admin_connection: DatabaseConnection = self.create_admin_connection().await?;
-        let result: Result<bool, AutoCreationError> = self.create_database(&admin_connection).await;
-        let _: Result<(), DbErr> = admin_connection.close().await;
-        result
-    }
-    #[instrument_trace]
-    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
-        let connection: DatabaseConnection = self.create_target_connection().await?;
-        let schema: &DatabaseSchema = self.get_database_schema();
-        let mut created_tables: Vec<String> = Vec::new();
-        for table in schema.ordered_tables() {
-            if !self.table_exists(&connection, table.get_name()).await? {
-                self.create_table(&connection, table).await?;
-                created_tables.push(table.get_name().clone());
-                AutoCreationLogger::log_table_created(
-                    table.get_name(),
-                    self.instance.get_database().as_str(),
-                    PluginType::MySQL,
-                )
-                .await;
-            } else {
-                AutoCreationLogger::log_table_exists(
-                    table.get_name(),
-                    self.instance.get_database().as_str(),
-                    PluginType::MySQL,
-                )
-                .await;
-            }
-        }
-        for index_sql in schema.get_indexes() {
-            if let Err(error) = self.execute_sql(&connection, index_sql).await {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Index creation",
-                    PluginType::MySQL,
-                    Some(self.instance.get_database().as_str()),
-                )
-                .await;
-            }
-        }
-        for constraint_sql in schema.get_constraints() {
-            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Constraint creation",
-                    PluginType::MySQL,
-                    Some(self.instance.get_database().as_str()),
-                )
-                .await;
-            }
-        }
-        let _: Result<(), DbErr> = connection.close().await;
-        AutoCreationLogger::log_tables_created(
-            &created_tables,
-            self.instance.get_database().as_str(),
-            PluginType::MySQL,
-        )
-        .await;
-        Ok(created_tables)
-    }
-    #[instrument_trace]
-    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
-        let db_url: String = self.instance.get_connection_url();
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_result: Result<DatabaseConnection, DbErr> =
-            match timeout(timeout_duration, Database::connect(&db_url)).await {
-                Ok(result) => result,
-                Err(_) => {
-                    return Err(AutoCreationError::Timeout(format!(
-                        "Failed to verify MySQL connection within {timeout_seconds} seconds"
-                    )));
-                }
-            };
-        let connection: DatabaseConnection = connection_result.map_err(|error: DbErr| {
-            AutoCreationError::ConnectionFailed(format!(
-                "Failed to verify MySQL connection {error}"
-            ))
-        })?;
-        let statement: Statement =
-            Statement::from_string(DatabaseBackend::MySql, "SELECT 1".to_string());
-        match connection.query_all(statement).await {
-            Ok(_) => {
-                let _: Result<(), DbErr> = connection.close().await;
-                AutoCreationLogger::log_connection_verification(
-                    PluginType::MySQL,
-                    self.instance.get_database().as_str(),
-                    true,
-                    None,
-                )
-                .await;
-                Ok(())
-            }
-            Err(error) => {
-                let _: Result<(), DbErr> = connection.close().await;
-                let error_msg: String = error.to_string();
-                AutoCreationLogger::log_connection_verification(
-                    PluginType::MySQL,
-                    self.instance.get_database().as_str(),
-                    false,
-                    Some(&error_msg),
-                )
-                .await;
-                Err(AutoCreationError::ConnectionFailed(format!(
-                    "MySQL connection verification failed {error_msg}"
-                )))
-            }
-        }
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/mysql/static.rs
-```rust
-use super::*;
-pub static MYSQL_CONNECTIONS: OnceLock<
-    RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
-> = OnceLock::new();
-```
-# Path: hyperlane-quick-start/plugin/logger/mod.rs
-```rust
-mod r#impl;
-mod r#static;
-mod r#struct;
-pub use r#struct::*;
-use {super::*, r#static::*};
-use std::{fmt::Arguments, sync::OnceLock};
-use hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-```
-# Path: hyperlane-quick-start/plugin/logger/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct LoggerPlugin;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct Logger;
-```
-# Path: hyperlane-quick-start/plugin/logger/impl.rs
-```rust
-use super::*;
-impl GetOrInit for LoggerPlugin {
-    type Instance = RwLock<FileLogger>;
-    fn get_or_init() -> &'static Self::Instance {
-        FILE_LOGGER.get_or_init(|| RwLock::new(FileLogger::default()))
-    }
-}
-impl Log for Logger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= max_level()
-    }
-    fn log(&self, record: &Record) {
-        if !self.enabled(record.metadata()) {
-            return;
-        }
-        let now_time: String = time();
-        let level: Level = record.level();
-        let args: &Arguments<'_> = record.args();
-        let file: Option<&str> = record.file();
-        let module_path: Option<&str> = record.module_path();
-        let target: &str = record.target();
-        let line: u32 = record.line().unwrap_or_default();
-        let location: &str = file.unwrap_or(module_path.unwrap_or(target));
-        let time_text: String = format!("{SPACE}{now_time}{SPACE}");
-        let level_text: String = format!("{SPACE}{level}{SPACE}");
-        let args_text: String = format!("{args}{SPACE}");
-        let location_text: String = format!("{SPACE}{location}{COLON}{line}{SPACE}");
-        let write_file_data: String = format!("{level}{location_text}{args}");
-        let color: ColorType = match record.level() {
-            Level::Trace => ColorType::Use(Color::Magenta),
-            Level::Debug => ColorType::Use(Color::Cyan),
-            Level::Info => ColorType::Use(Color::Green),
-            Level::Warn => ColorType::Use(Color::Yellow),
-            Level::Error => ColorType::Use(Color::Red),
-        };
-        let mut time_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
-        let mut level_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
-        let mut location_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
-        let mut args_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
-        let time_output: ColorOutput<'_> = time_output_builder
-            .text(&time_text)
-            .bold(true)
-            .color(ColorType::Use(Color::White))
-            .bg_color(ColorType::Use(Color::Black))
-            .build();
-        let level_output: ColorOutput<'_> = level_output_builder
-            .text(&level_text)
-            .bold(true)
-            .color(ColorType::Use(Color::White))
-            .bg_color(color)
-            .build();
-        let location_output: ColorOutput<'_> = location_output_builder
-            .text(&location_text)
-            .bold(true)
-            .color(color)
-            .build();
-        let args_output: ColorOutput<'_> = args_output_builder
-            .text(&args_text)
-            .bold(true)
-            .color(color)
-            .endl(true)
-            .build();
-        ColorOutputListBuilder::new()
-            .add(time_output)
-            .add(level_output)
-            .add(location_output)
-            .add(args_output)
-            .run();
-        match record.metadata().level() {
-            Level::Trace => Self::log_trace(&write_file_data),
-            Level::Debug => Self::log_debug(&write_file_data),
-            Level::Info => Self::log_info(&write_file_data),
-            Level::Warn => Self::log_warn(&write_file_data),
-            Level::Error => Self::log_error(&write_file_data),
-        }
-    }
-    fn flush(&self) {
-        Server::flush_stdout_and_stderr();
-    }
-}
-impl Logger {
-    fn read() -> RwLockReadGuard<'static, FileLogger> {
-        LoggerPlugin::get_or_init().try_read().unwrap()
-    }
-    fn write() -> RwLockWriteGuard<'static, FileLogger> {
-        LoggerPlugin::get_or_init().try_write().unwrap()
-    }
-    pub fn init(level: LevelFilter, file_logger: FileLogger) {
-        set_logger(&LOGGER).unwrap();
-        set_max_level(level);
-        *Self::write() = file_logger;
-    }
-    pub fn log_trace<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        Self::read().trace(data, log_handler);
-    }
-    #[instrument_trace]
-    pub fn log_debug<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        Self::read().debug(data, log_handler);
-    }
-    #[instrument_trace]
-    pub fn log_info<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        Self::read().info(data, log_handler);
-    }
-    #[instrument_trace]
-    pub fn log_warn<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        Self::read().warn(data, log_handler);
-    }
-    #[instrument_trace]
-    pub fn log_error<T>(data: T)
-    where
-        T: AsRef<str>,
-    {
-        Self::read().error(data, log_handler);
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/logger/static.rs
-```rust
-use super::*;
-pub(super) static LOGGER: Logger = Logger;
-pub(super) static FILE_LOGGER: OnceLock<RwLock<FileLogger>> = OnceLock::new();
-```
-# Path: hyperlane-quick-start/plugin/common/trait.rs
-```rust
-use super::*;
-pub trait GetOrInit: Clone + Copy + Default + Send + Sync + 'static {
-    type Instance: Send + Sync + 'static;
-    fn get_or_init() -> &'static Self::Instance;
-}
-pub trait DatabaseConnectionPlugin: Clone + Copy + Default + Send + Sync + 'static {
-    type InstanceConfig: Clone + Send + Sync + 'static;
-    type AutoCreation: DatabaseAutoCreation<InstanceConfig = Self::InstanceConfig>;
-    type Connection: Clone + Send + Sync + 'static;
-    type ConnectionCache: Send + Sync + 'static;
-    fn plugin_type() -> PluginType;
-    fn connection_db<I>(
-        instance_name: I,
-        schema: Option<DatabaseSchema>,
-    ) -> impl Future<Output = Result<Self::Connection, String>> + Send
-    where
-        I: AsRef<str> + Send;
-    fn get_connection<I>(
-        instance_name: I,
-        schema: Option<DatabaseSchema>,
-    ) -> impl Future<Output = Result<Self::Connection, String>> + Send
-    where
-        I: AsRef<str> + Send;
-    fn perform_auto_creation(
-        instance: &Self::InstanceConfig,
-        schema: Option<DatabaseSchema>,
-    ) -> impl Future<Output = Result<AutoCreationResult, AutoCreationError>> + Send;
-}
-pub trait DatabaseAutoCreation: Clone + Send + Sync + 'static {
-    type InstanceConfig;
-    fn new(instance: Self::InstanceConfig) -> Self;
-    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
-    where
-        Self: Sized;
-    fn create_database_if_not_exists(
-        &self,
-    ) -> impl Future<Output = Result<bool, AutoCreationError>> + Send;
-    fn create_tables_if_not_exist(
-        &self,
-    ) -> impl Future<Output = Result<Vec<String>, AutoCreationError>> + Send;
-    fn verify_connection(&self) -> impl Future<Output = Result<(), AutoCreationError>> + Send;
-}
-```
-# Path: hyperlane-quick-start/plugin/common/mod.rs
-```rust
-mod r#trait;
-pub use r#trait::*;
-use crate::database::{AutoCreationError, AutoCreationResult, DatabaseSchema, PluginType};
-use std::future::Future;
-```
-# Path: hyperlane-quick-start/plugin/database/mod.rs
-```rust
-mod r#enum;
-mod r#impl;
-mod r#struct;
-pub use {r#enum::*, r#struct::*};
-use {super::*, env::*, mysql::*, postgresql::*, redis::*};
-use std::{
-    str::FromStr,
-    time::{Duration, Instant},
-};
-```
-# Path: hyperlane-quick-start/plugin/database/enum.rs
-```rust
-#[derive(Clone, Debug)]
-pub enum AutoCreationError {
-    InsufficientPermissions(String),
-    ConnectionFailed(String),
-    SchemaError(String),
-    Timeout(String),
-    DatabaseError(String),
-}
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PluginType {
-    MySQL,
-    PostgreSQL,
-    Redis,
-}
-```
-# Path: hyperlane-quick-start/plugin/database/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct DatabasePlugin;
-#[derive(Clone, Data, Debug)]
-pub struct ConnectionCache<T: Clone> {
-    #[get(type(copy), pub(crate))]
-    pub(super) last_attempt: Instant,
-    #[get(pub(crate))]
-    pub(super) result: Result<T, String>,
-}
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct AutoCreationErrorHandler;
-#[derive(Clone, Data, Debug)]
-pub struct ErrorContext {
-    #[get(pub(crate))]
-    pub(super) database_name: Option<String>,
-    #[get(pub(crate))]
-    pub(super) error_message: String,
-    #[get(pub(crate))]
-    pub(super) error_type: String,
-    #[get(pub(crate))]
-    pub(super) log_level: String,
-    #[get(pub(crate))]
-    pub(super) operation: String,
-    #[get(pub(crate))]
-    pub(super) plugin_name: String,
-    #[get(pub(crate))]
-    pub(super) recovery_suggestion: String,
-    #[get(type(copy), pub(crate))]
-    pub(super) should_continue: bool,
-    #[get(pub(crate))]
-    pub(super) timestamp: std::time::SystemTime,
-}
-#[derive(Clone, Data, Debug)]
-pub struct AutoCreationResult {
-    #[get(type(copy), pub(crate))]
-    pub(super) database_created: bool,
-    #[get(pub(crate))]
-    pub(super) duration: Duration,
-    #[get(pub(crate))]
-    pub(super) errors: Vec<String>,
-    #[get(pub(crate))]
-    pub(super) tables_created: Vec<String>,
-}
-#[derive(Clone, Data, Debug, New)]
-pub struct TableSchema {
-    #[get(pub(crate))]
-    pub(super) dependencies: Vec<String>,
-    #[get(pub(crate))]
-    pub(super) name: String,
-    #[get(pub(crate))]
-    pub(super) sql: String,
-}
-#[derive(Clone, Data, Debug, Default)]
-pub struct DatabaseSchema {
-    #[get(pub(crate))]
-    pub(super) constraints: Vec<String>,
-    #[get(pub(crate))]
-    pub(super) indexes: Vec<String>,
-    #[get(pub(crate))]
-    pub(super) tables: Vec<TableSchema>,
-}
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct AutoCreationConfig;
-#[derive(Clone, Data, Debug, Default)]
-pub struct PluginAutoCreationConfig {
-    #[get(pub(crate))]
-    pub(super) plugin_name: String,
-}
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct AutoCreationLogger;
-```
-# Path: hyperlane-quick-start/plugin/database/impl.rs
-```rust
-use super::*;
-impl DatabasePlugin {
-    #[instrument_trace]
-    pub fn get_connection_timeout_duration() -> Duration {
-        let timeout_seconds: u64 = std::env::var(ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS)
-            .ok()
-            .and_then(|value: String| value.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS);
-        Duration::from_millis(timeout_seconds)
-    }
-    #[instrument_trace]
-    pub fn get_retry_duration() -> Duration {
-        let millis: u64 = std::env::var(ENV_KEY_DB_RETRY_INTERVAL_MILLIS)
-            .ok()
-            .and_then(|value: String| value.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_DB_RETRY_INTERVAL_MILLIS);
-        Duration::from_millis(millis)
-    }
-    #[instrument_trace]
-    pub async fn initialize_auto_creation() -> Result<(), String> {
-        Self::initialize_auto_creation_with_schema(None, None, None).await
-    }
-    #[instrument_trace]
-    pub async fn initialize_auto_creation_with_schema(
-        mysql_schema: Option<DatabaseSchema>,
-        postgresql_schema: Option<DatabaseSchema>,
-        _redis_schema: Option<()>,
-    ) -> Result<(), String> {
-        if let Err(error) = AutoCreationConfig::validate() {
-            return Err(format!(
-                "Auto-creation configuration validation failed {error}"
-            ));
-        }
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        let mut initialization_results: Vec<String> = Vec::new();
-        for instance in env.get_mysql_instances() {
-            match MySqlPlugin::perform_auto_creation(instance, mysql_schema.clone()).await {
-                Ok(result) => {
-                    initialization_results.push(format!(
-                        "MySQL ({})  {}",
-                        instance.get_name(),
-                        if result.has_changes() {
-                            "initialized with changes"
-                        } else {
-                            "verified"
-                        }
-                    ));
-                }
-                Err(error) => {
-                    if !error.should_continue() {
-                        return Err(format!(
-                            "MySQL ({}) auto-creation failed {error}",
-                            instance.get_name()
-                        ));
-                    }
-                    initialization_results.push(format!(
-                        "MySQL ({}) : failed but continuing ({error})",
-                        instance.get_name()
-                    ));
-                }
-            }
-        }
-        for instance in env.get_postgresql_instances() {
-            match PostgreSqlPlugin::perform_auto_creation(instance, postgresql_schema.clone()).await
-            {
-                Ok(result) => {
-                    initialization_results.push(format!(
-                        "PostgreSQL ({})  {}",
-                        instance.get_name(),
-                        if result.has_changes() {
-                            "initialized with changes"
-                        } else {
-                            "verified"
-                        }
-                    ));
-                }
-                Err(error) => {
-                    if !error.should_continue() {
-                        return Err(format!(
-                            "PostgreSQL ({}) auto-creation failed {error}",
-                            instance.get_name()
-                        ));
-                    }
-                    initialization_results.push(format!(
-                        "PostgreSQL ({}) : failed but continuing ({error})",
-                        instance.get_name()
-                    ));
-                }
-            }
-        }
-        for instance in env.get_redis_instances() {
-            match RedisPlugin::perform_auto_creation(instance, None).await {
-                Ok(result) => {
-                    initialization_results.push(format!(
-                        "Redis ({})  {}",
-                        instance.get_name(),
-                        if result.has_changes() {
-                            "initialized with changes"
-                        } else {
-                            "verified"
-                        }
-                    ));
-                }
-                Err(error) => {
-                    if !error.should_continue() {
-                        return Err(format!(
-                            "Redis ({}) auto-creation failed {error}",
-                            instance.get_name()
-                        ));
-                    }
-                    initialization_results.push(format!(
-                        "Redis ({}) : failed but continuing ({error})",
-                        instance.get_name()
-                    ));
-                }
-            }
-        }
-        if initialization_results.is_empty() {
-            info!("[AUTO-CREATION] No plugins enabled for auto-creation");
-        } else {
-            let results_summary: String = initialization_results.join(", ");
-            info!("[AUTO-CREATION] Initialization complete {results_summary}");
-        }
-        Ok(())
-    }
-}
-impl<T: Clone> ConnectionCache<T> {
-    #[instrument_trace]
-    pub fn new(result: Result<T, String>) -> Self {
-        Self {
-            result,
-            last_attempt: Instant::now(),
-        }
-    }
-    #[instrument_trace]
-    pub fn is_expired(&self, duration: Duration) -> bool {
-        self.get_last_attempt().elapsed() >= duration
-    }
-    #[instrument_trace]
-    pub fn should_retry(&self, duration: Duration) -> bool {
-        self.try_get_result().is_err() && self.is_expired(duration)
-    }
-}
-impl PluginType {
-    #[instrument_trace]
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::MySQL => "MySQL",
-            Self::PostgreSQL => "PostgreSQL",
-            Self::Redis => "Redis",
-        }
-    }
-}
-impl FromStr for PluginType {
-    type Err = ();
-    #[instrument_trace]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "MySQL" => Ok(Self::MySQL),
-            "PostgreSQL" => Ok(Self::PostgreSQL),
-            "Redis" => Ok(Self::Redis),
-            _ => Err(()),
-        }
-    }
-}
-impl std::fmt::Display for PluginType {
-    #[instrument_trace]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-impl AutoCreationError {
-    #[instrument_trace]
-    pub fn should_continue(&self) -> bool {
-        match self {
-            Self::InsufficientPermissions(_) => true,
-            Self::ConnectionFailed(_) => false,
-            Self::SchemaError(_) => true,
-            Self::Timeout(_) => true,
-            Self::DatabaseError(_) => true,
-        }
-    }
-    #[instrument_trace]
-    pub fn user_message(&self) -> &str {
-        match self {
-            Self::InsufficientPermissions(msg) => msg,
-            Self::ConnectionFailed(msg) => msg,
-            Self::SchemaError(msg) => msg,
-            Self::Timeout(msg) => msg,
-            Self::DatabaseError(msg) => msg,
-        }
-    }
-}
-impl std::fmt::Display for AutoCreationError {
-    #[instrument_trace]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InsufficientPermissions(msg) => {
-                write!(f, "Insufficient permissions {msg}")
-            }
-            Self::ConnectionFailed(msg) => write!(f, "Connection failed {msg}"),
-            Self::SchemaError(msg) => write!(f, "Schema error {msg}"),
-            Self::Timeout(msg) => write!(f, "Timeout {msg}"),
-            Self::DatabaseError(msg) => write!(f, "Database error {msg}"),
-        }
-    }
-}
-impl std::error::Error for AutoCreationError {}
-impl AutoCreationResult {
-    #[instrument_trace]
-    pub fn has_changes(&self) -> bool {
-        self.get_database_created() || !self.get_tables_created().is_empty()
-    }
-    #[instrument_trace]
-    pub fn has_errors(&self) -> bool {
-        !self.get_errors().is_empty()
-    }
-}
-impl Default for AutoCreationResult {
-    #[instrument_trace]
-    fn default() -> Self {
-        Self {
-            database_created: false,
-            tables_created: Vec::new(),
-            errors: Vec::new(),
-            duration: Duration::from_secs(0),
-        }
-    }
-}
-impl TableSchema {
-    #[instrument_trace]
-    pub fn with_dependency(mut self, dependency: String) -> Self {
-        self.get_mut_dependencies().push(dependency);
-        self
-    }
-}
-impl DatabaseSchema {
-    #[instrument_trace]
-    pub fn add_table(mut self, table: TableSchema) -> Self {
-        self.get_mut_tables().push(table);
-        self
-    }
-    #[instrument_trace]
-    pub fn add_index(mut self, index: String) -> Self {
-        self.get_mut_indexes().push(index);
-        self
-    }
-    #[instrument_trace]
-    pub fn add_constraint(mut self, constraint: String) -> Self {
-        self.get_mut_constraints().push(constraint);
-        self
-    }
-    #[instrument_trace]
-    pub fn ordered_tables(&self) -> Vec<&TableSchema> {
-        let mut ordered: Vec<&TableSchema> = Vec::new();
-        let mut remaining: Vec<&TableSchema> = self.get_tables().iter().collect();
-        while !remaining.is_empty() {
-            let mut added_any: bool = false;
-            remaining.retain(|table: &&TableSchema| {
-                let dependencies_satisfied: bool =
-                    table.get_dependencies().iter().all(|dep: &String| {
-                        ordered.iter().any(|ordered_table: &&TableSchema| {
-                            ordered_table.get_name().as_str() == dep.as_str()
-                        })
-                    });
-                if dependencies_satisfied {
-                    ordered.push(table);
-                    added_any = true;
-                    false
-                } else {
-                    true
-                }
-            });
-            if !added_any && !remaining.is_empty() {
-                for table in remaining {
-                    ordered.push(table);
-                }
-                break;
-            }
-        }
-        ordered
-    }
-}
-impl AutoCreationConfig {
-    #[instrument_trace]
-    pub fn validate() -> Result<(), String> {
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        if env.get_mysql_instances().is_empty() {
-            return Err("At least one MySQL instance is required".to_string());
-        }
-        if env.get_postgresql_instances().is_empty() {
-            return Err("At least one PostgreSQL instance is required".to_string());
-        }
-        if env.get_redis_instances().is_empty() {
-            return Err("At least one Redis instance is required".to_string());
-        }
-        Ok(())
-    }
-    #[instrument_trace]
-    pub fn for_plugin(plugin_name: &str) -> PluginAutoCreationConfig {
-        PluginAutoCreationConfig {
-            plugin_name: plugin_name.to_string(),
-        }
-    }
-}
-impl PluginAutoCreationConfig {
-    #[instrument_trace]
-    pub fn is_plugin_enabled(&self) -> bool {
-        PluginType::from_str(self.get_plugin_name()).is_ok()
-    }
-    #[instrument_trace]
-    pub fn get_database_name(&self) -> String {
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        if let Ok(plugin_type) = PluginType::from_str(self.get_plugin_name()) {
-            match plugin_type {
-                PluginType::MySQL => {
-                    if let Some(instance) = env.get_default_mysql_instance() {
-                        instance.get_database().clone()
-                    } else {
-                        "unknown".to_string()
-                    }
-                }
-                PluginType::PostgreSQL => {
-                    if let Some(instance) = env.get_default_postgresql_instance() {
-                        instance.get_database().clone()
-                    } else {
-                        "unknown".to_string()
-                    }
-                }
-                PluginType::Redis => "default".to_string(),
-            }
-        } else {
-            "unknown".to_string()
-        }
-    }
-    #[instrument_trace]
-    pub fn get_connection_info(&self) -> String {
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        if let Ok(plugin_type) = PluginType::from_str(self.get_plugin_name()) {
-            match plugin_type {
-                PluginType::MySQL => {
-                    if let Some(instance) = env.get_default_mysql_instance() {
-                        format!(
-                            "{}:{}:{}",
-                            instance.get_host(),
-                            instance.get_port(),
-                            instance.get_database()
-                        )
-                    } else {
-                        "unknown".to_string()
-                    }
-                }
-                PluginType::PostgreSQL => {
-                    if let Some(instance) = env.get_default_postgresql_instance() {
-                        format!(
-                            "{}:{}:{}",
-                            instance.get_host(),
-                            instance.get_port(),
-                            instance.get_database()
-                        )
-                    } else {
-                        "unknown".to_string()
-                    }
-                }
-                PluginType::Redis => {
-                    if let Some(instance) = env.get_default_redis_instance() {
-                        format!("{}:{}", instance.get_host(), instance.get_port())
-                    } else {
-                        "unknown".to_string()
-                    }
-                }
-            }
-        } else {
-            "unknown".to_string()
-        }
-    }
-}
-impl AutoCreationLogger {
-    #[instrument_trace]
-    pub async fn log_auto_creation_start(plugin_type: PluginType, database_name: &str) {
-        info!(
-            "[AUTO-CREATION] Starting auto-creation for {plugin_type} database '{database_name}'"
-        );
-    }
-    #[instrument_trace]
-    pub async fn log_auto_creation_complete(plugin_type: PluginType, result: &AutoCreationResult) {
-        if result.has_errors() {
-            info!(
-                "[AUTO-CREATION] Auto-creation completed for {plugin_type} with warnings {}",
-                result.get_errors().join(", ")
-            );
-        } else {
-            info!("[AUTO-CREATION] Auto-creation completed successfully for {plugin_type}");
-        }
-    }
-    #[instrument_trace]
-    pub async fn log_auto_creation_error(
-        error: &AutoCreationError,
-        operation: &str,
-        plugin_type: PluginType,
-        database_name: Option<&str>,
-    ) {
-        error!(
-            "[AUTO-CREATION] {operation} failed for {plugin_type} database '{}' {error}",
-            database_name.unwrap_or("unknown")
-        );
-    }
-    #[instrument_trace]
-    pub async fn log_connection_verification(
-        plugin_type: PluginType,
-        database_name: &str,
-        success: bool,
-        error: Option<&str>,
-    ) {
-        if success {
-            info!(
-                "[AUTO-CREATION] Connection verification successful for {plugin_type} database '{database_name}'"
-            );
-        } else {
-            error!(
-                "[AUTO-CREATION] Connection verification failed for {plugin_type} database '{database_name}' {}",
-                error.unwrap_or("Unknown error")
-            );
-        };
-    }
-    #[instrument_trace]
-    pub async fn log_database_created(database_name: &str, plugin_type: PluginType) {
-        info!(
-            "[AUTO-CREATION] Successfully created database '{database_name}' for {plugin_type} plugin"
-        );
-    }
-    #[instrument_trace]
-    pub async fn log_database_exists(database_name: &str, plugin_type: PluginType) {
-        info!("[AUTO-CREATION] Database '{database_name}' already exists for {plugin_type} plugin");
-    }
-    #[instrument_trace]
-    pub async fn log_table_created(table_name: &str, database_name: &str, plugin_type: PluginType) {
-        info!(
-            "[AUTO-CREATION] Successfully created table '{table_name}' in database '{database_name}' for {plugin_type} plugin"
-        );
-    }
-    #[instrument_trace]
-    pub async fn log_table_exists(table_name: &str, database_name: &str, plugin_type: PluginType) {
-        info!(
-            "[AUTO-CREATION] Table '{table_name}' already exists in database '{database_name}' for {plugin_type} plugin"
-        );
-    }
-    #[instrument_trace]
-    pub async fn log_tables_created(
-        tables: &[String],
-        database_name: &str,
-        plugin_type: PluginType,
-    ) {
-        if tables.is_empty() {
-            info!(
-                "[AUTO-CREATION] No new tables created in database '{database_name}' for {plugin_type} plugin"
-            );
-        } else {
-            info!(
-                "[AUTO-CREATION] Created tables [{}] in database '{database_name}' for {plugin_type} plugin",
-                tables.join(", ")
-            );
-        }
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/redis/const.rs
-```rust
-pub const DEFAULT_REDIS_INSTANCE_NAME: &str = "redis_default";
-```
-# Path: hyperlane-quick-start/plugin/redis/mod.rs
-```rust
-mod r#const;
-mod r#impl;
-mod r#static;
-mod r#struct;
-mod r#type;
-pub use {r#const::*, r#struct::*, r#type::*};
-use {super::*, database::*, env::*, r#static::*};
-use hyperlane_utils::redis::*;
-use std::{
-    collections::HashMap,
-    sync::OnceLock,
-    time::{Duration, Instant},
-};
-use tokio::{
-    spawn,
-    sync::{RwLock, RwLockWriteGuard},
-    task::{JoinHandle, spawn_blocking},
-    time::timeout,
-};
-```
-# Path: hyperlane-quick-start/plugin/redis/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct RedisPlugin;
-#[derive(Clone, Data, Debug, New)]
-pub struct RedisAutoCreation {
-    #[get(pub(crate))]
-    pub(super) instance: RedisInstanceConfig,
-    #[new(skip)]
-    #[get(pub(crate))]
-    pub(super) schema: DatabaseSchema,
-}
-```
-# Path: hyperlane-quick-start/plugin/redis/impl.rs
-```rust
-use super::*;
-impl GetOrInit for RedisPlugin {
-    type Instance = RwLock<RedisConnectionMap>;
-    #[instrument_trace]
-    fn get_or_init() -> &'static Self::Instance {
-        REDIS_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
-    }
-}
-impl DatabaseConnectionPlugin for RedisPlugin {
-    type InstanceConfig = RedisInstanceConfig;
-    type AutoCreation = RedisAutoCreation;
-    type Connection = ArcRwLock<Connection>;
-    type ConnectionCache = RwLock<RedisConnectionMap>;
-    #[instrument_trace]
-    fn plugin_type() -> PluginType {
-        PluginType::Redis
-    }
-    #[instrument_trace]
-    async fn connection_db<I>(
-        instance_name: I,
-        _schema: Option<DatabaseSchema>,
-    ) -> Result<Self::Connection, String>
-    where
-        I: AsRef<str> + Send,
-    {
-        let instance_name_str: &str = instance_name.as_ref();
-        let env: &'static EnvConfig = EnvPlugin::get_or_init();
-        let instance: &RedisInstanceConfig = env
-            .get_redis_instance(instance_name_str)
-            .ok_or_else(|| format!("Redis instance '{instance_name_str}' not found"))?;
-        match Self::perform_auto_creation(instance, _schema).await {
-            Ok(result) => {
-                if result.has_changes() {
-                    AutoCreationLogger::log_auto_creation_complete(
-                        database::PluginType::Redis,
-                        &result,
-                    )
-                    .await;
-                }
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Auto-creation process",
-                    database::PluginType::Redis,
-                    Some(instance.get_name().as_str()),
-                )
-                .await;
-                if !error.should_continue() {
-                    return Err(error.to_string());
-                }
-            }
-        }
-        let db_url: String = instance.get_connection_url();
-        let client: Client = Client::open(db_url).map_err(|error: redis::RedisError| {
-            let error_msg: String = error.to_string();
-            let instance_name_clone: String = instance_name_str.to_string();
-            let error_msg_clone: String = error_msg.clone();
-            spawn(async move {
-                AutoCreationLogger::log_connection_verification(
-                    database::PluginType::Redis,
-                    &instance_name_clone,
-                    false,
-                    Some(&error_msg_clone),
-                )
-                .await;
-            });
-            error_msg
-        })?;
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_task: JoinHandle<Result<Connection, RedisError>> =
-            spawn_blocking(move || client.get_connection());
-        let connection: Connection = match timeout(timeout_duration, connection_task).await {
-            Ok(join_result) => match join_result {
-                Ok(result) => result.map_err(|error: redis::RedisError| {
-                    let error_msg: String = error.to_string();
-                    let instance_name_clone: String = instance_name_str.to_string();
-                    let error_msg_clone: String = error_msg.clone();
-                    spawn(async move {
-                        AutoCreationLogger::log_connection_verification(
-                            database::PluginType::Redis,
-                            &instance_name_clone,
-                            false,
-                            Some(&error_msg_clone),
-                        )
-                        .await;
-                    });
-                    error_msg
-                })?,
-                Err(_) => {
-                    let error_msg: String = "Redis connection task failed".to_string();
-                    let instance_name_clone: String = instance_name_str.to_string();
-                    let error_msg_clone: String = error_msg.clone();
-                    spawn(async move {
-                        AutoCreationLogger::log_connection_verification(
-                            database::PluginType::Redis,
-                            &instance_name_clone,
-                            false,
-                            Some(&error_msg_clone),
-                        )
-                        .await;
-                    });
-                    return Err(error_msg);
-                }
-            },
-            Err(_) => {
-                let error_msg: String =
-                    format!("Redis connection timeout after {timeout_seconds} seconds");
-                let instance_name_clone: String = instance_name_str.to_string();
-                let error_msg_clone: String = error_msg.clone();
-                spawn(async move {
-                    AutoCreationLogger::log_connection_verification(
-                        database::PluginType::Redis,
-                        &instance_name_clone,
-                        false,
-                        Some(&error_msg_clone),
-                    )
-                    .await;
-                });
-                return Err(error_msg);
-            }
-        };
-        Ok(arc_rwlock(connection))
-    }
-    #[instrument_trace]
-    async fn get_connection<I>(
-        instance_name: I,
-        schema: Option<DatabaseSchema>,
-    ) -> Result<Self::Connection, String>
-    where
-        I: AsRef<str> + Send,
-    {
-        let instance_name_str: &str = instance_name.as_ref();
-        let duration: Duration = DatabasePlugin::get_retry_duration();
-        {
-            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
-                match cache.try_get_result() {
-                    Ok(conn) => return Ok(conn.clone()),
-                    Err(error) => {
-                        if !cache.is_expired(duration) {
-                            return Err(error.clone());
-                        }
-                    }
-                }
-            }
-        }
-        let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
-            Self::get_or_init().write().await;
-        if let Some(cache) = connections.get(instance_name_str) {
-            match cache.try_get_result() {
-                Ok(conn) => return Ok(conn.clone()),
-                Err(error) => {
-                    if !cache.is_expired(duration) {
-                        return Err(error.clone());
-                    }
-                }
-            }
-        }
-        connections.remove(instance_name_str);
-        drop(connections);
-        let new_connection: Result<ArcRwLock<Connection>, String> =
-            Self::connection_db(instance_name_str, schema).await;
-        let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
-            Self::get_or_init().write().await;
-        connections.insert(
-            instance_name_str.to_string(),
-            ConnectionCache::new(new_connection.clone()),
-        );
-        new_connection
-    }
-    #[instrument_trace]
-    async fn perform_auto_creation(
-        instance: &Self::InstanceConfig,
-        schema: Option<DatabaseSchema>,
-    ) -> Result<AutoCreationResult, AutoCreationError> {
-        let start_time: Instant = Instant::now();
-        let mut result: AutoCreationResult = AutoCreationResult::default();
-        AutoCreationLogger::log_auto_creation_start(
-            database::PluginType::Redis,
-            instance.get_name(),
-        )
-        .await;
-        let auto_creator: RedisAutoCreation = match schema {
-            Some(s) => RedisAutoCreation::with_schema(instance.clone(), s),
-            None => RedisAutoCreation::new(instance.clone()),
-        };
-        match auto_creator.create_database_if_not_exists().await {
-            Ok(created) => {
-                result.set_database_created(created);
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Database validation",
-                    database::PluginType::Redis,
-                    Some(instance.get_name().as_str()),
-                )
-                .await;
-                if !error.should_continue() {
-                    result.set_duration(start_time.elapsed());
-                    return Err(error);
-                }
-                result.get_mut_errors().push(error.to_string());
-            }
-        }
-        match auto_creator.create_tables_if_not_exist().await {
-            Ok(operations) => {
-                result.set_tables_created(operations);
-            }
-            Err(error) => {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Namespace setup",
-                    database::PluginType::Redis,
-                    Some(instance.get_name().as_str()),
-                )
-                .await;
-                result.get_mut_errors().push(error.to_string());
-            }
-        }
-        if let Err(error) = auto_creator.verify_connection().await {
-            AutoCreationLogger::log_auto_creation_error(
-                &error,
-                "Connection verification",
-                database::PluginType::Redis,
-                Some(instance.get_name().as_str()),
-            )
-            .await;
-            if !error.should_continue() {
-                result.set_duration(start_time.elapsed());
-                return Err(error);
-            }
-            result.get_mut_errors().push(error.to_string());
-        }
-        result.set_duration(start_time.elapsed());
-        AutoCreationLogger::log_auto_creation_complete(database::PluginType::Redis, &result).await;
-        Ok(result)
-    }
-}
-impl Default for RedisAutoCreation {
-    #[instrument_trace]
-    fn default() -> Self {
-        if let Some(instance) = EnvPlugin::get_or_init().get_default_redis_instance() {
-            Self::new(instance.clone())
-        } else {
-            let default_instance: RedisInstanceConfig = RedisInstanceConfig::default();
-            Self::new(default_instance)
-        }
-    }
-}
-impl RedisAutoCreation {
-    #[instrument_trace]
-    async fn create_mutable_connection(&self) -> Result<Connection, AutoCreationError> {
-        let db_url: String = self.instance.get_connection_url();
-        let client: Client = Client::open(db_url).map_err(|error: RedisError| {
-            let error_msg: String = error.to_string();
-            if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
-                AutoCreationError::InsufficientPermissions(format!(
-                    "Redis authentication failed {error_msg}"
-                ))
-            } else if error_msg.contains("Connection refused") || error_msg.contains("timeout") {
-                AutoCreationError::ConnectionFailed(format!(
-                    "Cannot connect to Redis server {error_msg}"
-                ))
-            } else {
-                AutoCreationError::DatabaseError(format!("Redis connection error {error_msg}"))
-            }
-        })?;
-        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
-        let timeout_seconds: u64 = timeout_duration.as_secs();
-        let connection_task: JoinHandle<Result<Connection, RedisError>> =
-            spawn_blocking(move || client.get_connection());
-        let connection: Connection = match timeout(timeout_duration, connection_task).await {
-            Ok(join_result) => match join_result {
-                Ok(result) => result.map_err(|error: RedisError| {
-                    let error_msg: String = error.to_string();
-                    if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
-                        AutoCreationError::InsufficientPermissions(format!(
-                            "Redis authentication failed {error_msg}"
-                        ))
-                    } else if error_msg.contains("Connection refused")
-                        || error_msg.contains("timeout")
-                    {
-                        AutoCreationError::ConnectionFailed(format!(
-                            "Cannot connect to Redis server {error_msg}"
-                        ))
-                    } else {
-                        AutoCreationError::DatabaseError(format!(
-                            "Redis connection error {error_msg}"
-                        ))
-                    }
-                })?,
-                Err(_) => {
-                    return Err(AutoCreationError::ConnectionFailed(
-                        "Redis connection task failed".to_string(),
-                    ));
-                }
-            },
-            Err(_) => {
-                return Err(AutoCreationError::Timeout(format!(
-                    "Redis connection timeout after {timeout_seconds} seconds"
-                )));
-            }
-        };
-        Ok(connection)
-    }
-    #[instrument_trace]
-    async fn validate_redis_server(&self) -> Result<(), AutoCreationError> {
-        let mut conn: Connection = self.create_mutable_connection().await?;
-        let pong: String = redis::cmd("PING")
-            .query(&mut conn)
-            .map_err(|error: RedisError| {
-                AutoCreationError::ConnectionFailed(format!("Redis PING failed {error}"))
-            })?;
-        if pong != "PONG" {
-            return Err(AutoCreationError::ConnectionFailed(
-                "Redis PING returned unexpected response".to_string(),
-            ));
-        }
-        let info: String =
-            redis::cmd("INFO")
-                .arg("server")
-                .query(&mut conn)
-                .map_err(|error: RedisError| {
-                    AutoCreationError::DatabaseError(format!(
-                        "Failed to get Redis server info {error}"
-                    ))
-                })?;
-        if info.contains("redis_version:") {
-            AutoCreationLogger::log_connection_verification(
-                database::PluginType::Redis,
-                self.instance.get_name().as_str(),
-                true,
-                None,
-            )
-            .await;
-        }
-        Ok(())
-    }
-    #[instrument_trace]
-    async fn setup_redis_namespace(&self) -> Result<Vec<String>, AutoCreationError> {
-        let mut setup_operations: Vec<String> = Vec::new();
-        let mut conn: Connection = self.create_mutable_connection().await?;
-        let app_key: String = format!("{}:initialized", self.instance.get_name());
-        let exists: i32 = redis::cmd("EXISTS")
-            .arg(&app_key)
-            .query(&mut conn)
-            .map_err(|error: RedisError| {
-                AutoCreationError::DatabaseError(format!(
-                    "Failed to check Redis key existence {error}"
-                ))
-            })?;
-        if exists == 0 {
-            let _: () = redis::cmd("SET")
-                .arg(&app_key)
-                .arg("true")
-                .query(&mut conn)
-                .map_err(|error: RedisError| {
-                    AutoCreationError::DatabaseError(format!(
-                        "Failed to set Redis initialization key {error}"
-                    ))
-                })?;
-            setup_operations.push(app_key.clone());
-            let config_key: String = format!("{}:config:version", self.instance.get_name());
-            let _: () = redis::cmd("SET")
-                .arg(&config_key)
-                .arg("1.0.0")
-                .query(&mut conn)
-                .map_err(|error: RedisError| {
-                    AutoCreationError::DatabaseError(format!(
-                        "Failed to set Redis config key {error}"
-                    ))
-                })?;
-            setup_operations.push(config_key);
-        }
-        Ok(setup_operations)
-    }
-}
-impl DatabaseAutoCreation for RedisAutoCreation {
-    type InstanceConfig = RedisInstanceConfig;
-    #[instrument_trace]
-    fn new(instance: Self::InstanceConfig) -> Self {
-        Self {
-            instance,
-            schema: DatabaseSchema::default(),
-        }
-    }
-    #[instrument_trace]
-    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
-    where
-        Self: Sized,
-    {
-        Self { instance, schema }
-    }
-    #[instrument_trace]
-    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
-        self.validate_redis_server().await?;
-        AutoCreationLogger::log_database_exists(
-            self.instance.get_name().as_str(),
-            database::PluginType::Redis,
-        )
-        .await;
-        Ok(false)
-    }
-    #[instrument_trace]
-    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
-        let setup_operations: Vec<String> = self.setup_redis_namespace().await?;
-        if !setup_operations.is_empty() {
-            AutoCreationLogger::log_tables_created(
-                &setup_operations,
-                self.instance.get_name().as_str(),
-                database::PluginType::Redis,
-            )
-            .await;
-        } else {
-            AutoCreationLogger::log_tables_created(
-                &[],
-                self.instance.get_name().as_str(),
-                database::PluginType::Redis,
-            )
-            .await;
-        }
-        Ok(setup_operations)
-    }
-    #[instrument_trace]
-    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
-        match self.validate_redis_server().await {
-            Ok(_) => {
-                AutoCreationLogger::log_connection_verification(
-                    database::PluginType::Redis,
-                    self.instance.get_name().as_str(),
-                    true,
-                    None,
-                )
-                .await;
-                Ok(())
-            }
-            Err(error) => {
-                AutoCreationLogger::log_connection_verification(
-                    database::PluginType::Redis,
-                    self.instance.get_name().as_str(),
-                    false,
-                    Some(&error.to_string()),
-                )
-                .await;
-                Err(error)
-            }
-        }
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/redis/type.rs
-```rust
-use super::*;
-pub type RedisConnectionMap = HashMap<String, ConnectionCache<ArcRwLock<Connection>>>;
-```
-# Path: hyperlane-quick-start/plugin/redis/static.rs
-```rust
-use super::*;
-pub static REDIS_CONNECTIONS: OnceLock<RwLock<RedisConnectionMap>> = OnceLock::new();
-```
-# Path: hyperlane-quick-start/plugin/shutdown/mod.rs
-```rust
-mod r#impl;
-mod r#static;
-mod r#struct;
-pub use r#struct::*;
-use {super::*, r#static::*};
-use std::sync::{Arc, OnceLock};
-```
-# Path: hyperlane-quick-start/plugin/shutdown/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Data, Debug, Default)]
-pub struct ShutdownPlugin;
-```
-# Path: hyperlane-quick-start/plugin/shutdown/impl.rs
-```rust
-use super::*;
-impl GetOrInit for ShutdownPlugin {
-    type Instance = ServerControlHookHandler<()>;
-    fn get_or_init() -> &'static Self::Instance {
-        SHUTDOWN.get_or_init(Self::get_init)
-    }
-}
-impl ShutdownPlugin {
-    #[instrument_trace]
-    pub fn get_init() -> ServerControlHookHandler<()> {
-        Arc::new(|| {
-            Box::pin(async {
-                warn!("Not set shutdown, using default");
-            })
-        })
-    }
-    #[instrument_trace]
-    pub fn set(shutdown: &ServerControlHookHandler<()>) {
-        drop(SHUTDOWN.set(shutdown.clone()));
-    }
-}
-```
-# Path: hyperlane-quick-start/plugin/shutdown/static.rs
-```rust
-use super::*;
-pub(super) static SHUTDOWN: OnceLock<ServerControlHookHandler<()>> = OnceLock::new();
-```
-# Path: hyperlane-quick-start/src/main.rs
-```rust
-use {
-    hyperlane_bootstrap::{
-        application::{db::*, env::*, logger::*},
-        common::*,
-        framework::{runtime::*, server::*},
-    },
-    hyperlane_config::framework::*,
-    hyperlane_plugin::process::*,
-};
-use hyperlane_utils::log::*;
-fn main() {
-    LoggerBootstrap::init();
-    EnvBootstrap::init();
-    info!("Environment configuration loaded successfully");
-    RuntimeBootstrap::init().get_runtime().block_on(async move {
-        DbBootstrap::init().await;
-        ProcessPlugin::create(SERVER_PID_FILE_PATH, || async {
-            ServerBootstrap::init().await;
-        })
-        .await;
-    });
-}
-```
-# Path: hyperlane-log/README.md
-## hyperlane-log
-[Official Documentation](https://docs.ltpp.vip/hyperlane-log/)
-[Api Docs](https://docs.rs/hyperlane-log/latest/)
-> A Rust logging library that supports both asynchronous and synchronous logging. It provides multiple log levels, such as error, info, and debug. Users can define custom log handling methods and configure log file paths. The library supports log rotation, automatically creating a new log file when the current file reaches the specified size limit. It allows flexible logging configurations, making it suitable for both high-performance asynchronous applications and traditional synchronous logging scenarios. The asynchronous mode utilizes Tokio's async channels for efficient log buffering, while the synchronous mode writes logs directly to the file system.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-log
-```
-## Log Storage Location Description
-> Three directories will be created under the user-specified directory: one for error logs, one for info logs, and one for debug logs. Each of these directories will contain a subdirectory named by the date, and the log files within these subdirectories will be named in the format `timestamp.index.log`.
-## Contact
-# Path: hyperlane-log/src/trait.rs
-```rust
-pub trait FileLoggerFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
-```
-# Path: hyperlane-log/src/lib.rs
-```rust
-mod r#const;
-mod r#fn;
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-mod r#trait;
-pub use {r#const::*, r#fn::*, r#struct::*, r#trait::*};
-use std::fs::read_dir;
-use {file_operation::*, hyperlane_time::*};
-```
-# Path: hyperlane-log/src/const.rs
-```rust
-pub const DEFAULT_LOG_DIR: &str = "./logs";
-pub const LOG_EXTENSION: &str = "log";
-pub const DEFAULT_LOG_FILE_START_IDX: usize = 1;
-pub const DEFAULT_LOG_FILE_SIZE: usize = 1_024_000_000;
-pub const DISABLE_LOG_FILE_SIZE: usize = 0;
-pub(crate) const ROOT_PATH: &str = "/";
-pub(crate) const POINT: &str = ".";
-pub(crate) const BR: &str = "\n";
-pub const TRACE_DIR: &str = "trace";
-pub const DEBUG_DIR: &str = "debug";
-pub const INFO_DIR: &str = "info";
-pub const WARN_DIR: &str = "warn";
-pub const ERROR_DIR: &str = "error";
-```
-# Path: hyperlane-log/src/struct.rs
-```rust
-#[derive(Clone)]
-pub struct FileLogger {
-    pub(super) path: String,
-    pub(super) limit_file_size: usize,
-    pub(super) trace_dir: String,
-    pub(super) debug_dir: String,
-    pub(super) info_dir: String,
-    pub(super) warn_dir: String,
-    pub(super) error_dir: String,
-}
-```
-# Path: hyperlane-log/src/fn.rs
-```rust
-use crate::*;
-pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
-    let mut res_idx: usize = DEFAULT_LOG_FILE_START_IDX;
-    if let Ok(entries) = read_dir(dir_path) {
-        for entry in entries.filter_map(Result::ok) {
-            let file_name: String = entry.file_name().to_string_lossy().to_string();
-            let parts: Vec<&str> = file_name.split(POINT).collect();
-            if parts.len() > 1
-                && let Ok(second_element) = parts[1].parse::<usize>()
-            {
-                res_idx = second_element.max(res_idx);
-            }
-        }
-    }
-    res_idx.max(DEFAULT_LOG_FILE_START_IDX)
-}
-#[inline(always)]
-pub(crate) fn get_file_name(idx: usize) -> String {
-    format!(
-        "{}{}{}{}{}{}",
-        ROOT_PATH,
-        date(),
-        POINT,
-        idx,
-        POINT,
-        LOG_EXTENSION
-    )
-}
-#[inline(always)]
-pub(crate) fn get_file_dir_name() -> String {
-    format!("{}{}", ROOT_PATH, date())
-}
-pub(crate) fn get_log_path(system_dir: &str, base_path: &str, limit_file_size: &usize) -> String {
-    let mut combined_path: String = base_path.trim_end_matches(ROOT_PATH).to_string();
-    if !system_dir.starts_with(ROOT_PATH) {
-        combined_path.push_str(ROOT_PATH);
-    }
-    combined_path.push_str(
-        system_dir
-            .trim_start_matches(ROOT_PATH)
-            .trim_end_matches(ROOT_PATH),
-    );
-    combined_path.push_str(&get_file_dir_name());
-    let idx: usize = get_second_element_from_filename(&combined_path);
-    let mut combined_path_clone: String = combined_path.clone();
-    combined_path.push_str(&get_file_name(idx));
-    let file_size: usize = get_file_size(&combined_path).unwrap_or_default() as usize;
-    if &file_size <= limit_file_size {
-        return combined_path;
-    }
-    combined_path_clone.push_str(&get_file_name(idx + 1));
-    combined_path_clone
-}
-#[inline(always)]
-pub fn common_log<T: AsRef<str>>(data: T) -> String {
-    let mut log_string: String = String::new();
-    for line in data.as_ref().lines() {
-        let line_string: String = format!("{} {}{}", time(), line, BR);
-        log_string.push_str(&line_string);
-    }
-    log_string
-}
-#[inline(always)]
-pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
-    common_log(log_data)
-}
-```
-# Path: hyperlane-log/src/impl.rs
-```rust
-use crate::*;
-impl<F, T> FileLoggerFuncTrait<T> for F
-where
-    F: Fn(T) -> String + Send + Sync,
-    T: AsRef<str>,
-{
-}
-impl Default for FileLogger {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            path: DEFAULT_LOG_DIR.to_owned(),
-            limit_file_size: DEFAULT_LOG_FILE_SIZE,
-            trace_dir: TRACE_DIR.to_owned(),
-            debug_dir: DEBUG_DIR.to_owned(),
-            info_dir: INFO_DIR.to_owned(),
-            warn_dir: WARN_DIR.to_owned(),
-            error_dir: ERROR_DIR.to_owned(),
-        }
-    }
-}
-impl FileLogger {
-    #[inline(always)]
-    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {
-        Self {
-            path: path.as_ref().to_owned(),
-            limit_file_size,
-            trace_dir: TRACE_DIR.to_owned(),
-            debug_dir: DEBUG_DIR.to_owned(),
-            info_dir: INFO_DIR.to_owned(),
-            warn_dir: WARN_DIR.to_owned(),
-            error_dir: ERROR_DIR.to_owned(),
-        }
-    }
-    #[inline(always)]
-    pub fn get_path(&self) -> &String {
-        &self.path
-    }
-    #[inline(always)]
-    pub fn get_limit_file_size(&self) -> &usize {
-        &self.limit_file_size
-    }
-    #[inline(always)]
-    pub fn get_trace_dir(&self) -> &String {
-        &self.trace_dir
-    }
-    #[inline(always)]
-    pub fn get_debug_dir(&self) -> &String {
-        &self.debug_dir
-    }
-    #[inline(always)]
-    pub fn get_info_dir(&self) -> &String {
-        &self.info_dir
-    }
-    #[inline(always)]
-    pub fn get_warn_dir(&self) -> &String {
-        &self.warn_dir
-    }
-    #[inline(always)]
-    pub fn get_error_dir(&self) -> &String {
-        &self.error_dir
-    }
-    #[inline(always)]
-    pub fn set_path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {
-        self.path = path.as_ref().to_owned();
-        self
-    }
-    #[inline(always)]
-    pub fn set_limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {
-        self.limit_file_size = limit_file_size;
-        self
-    }
-    #[inline(always)]
-    pub fn set_trace_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
-        self.trace_dir = dir.as_ref().to_owned();
-        self
-    }
-    #[inline(always)]
-    pub fn set_debug_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
-        self.debug_dir = dir.as_ref().to_owned();
-        self
-    }
-    #[inline(always)]
-    pub fn set_info_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
-        self.info_dir = dir.as_ref().to_owned();
-        self
-    }
-    #[inline(always)]
-    pub fn set_warn_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
-        self.warn_dir = dir.as_ref().to_owned();
-        self
-    }
-    #[inline(always)]
-    pub fn set_error_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
-        self.error_dir = dir.as_ref().to_owned();
-        self
-    }
-    #[inline(always)]
-    pub fn is_enable(&self) -> bool {
-        self.limit_file_size != DISABLE_LOG_FILE_SIZE
-    }
-    #[inline(always)]
-    pub fn is_disable(&self) -> bool {
-        !self.is_enable()
-    }
-    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        if self.is_disable() {
-            return self;
-        }
-        let out: String = func(data);
-        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
-        let _ = append_to_file(&path, out.as_bytes());
-        self
-    }
-    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        if self.is_disable() {
-            return self;
-        }
-        let out: String = func(data);
-        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
-        let _ = async_append_to_file(&path, out.as_bytes()).await;
-        self
-    }
-    pub fn trace<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, &self.trace_dir)
-    }
-    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, &self.trace_dir).await
-    }
-    pub fn debug<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, &self.debug_dir)
-    }
-    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, &self.debug_dir).await
-    }
-    pub fn info<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, &self.info_dir)
-    }
-    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, &self.info_dir).await
-    }
-    pub fn warn<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, &self.warn_dir)
-    }
-    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, &self.warn_dir).await
-    }
-    pub fn error<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_sync(data, func, &self.error_dir)
-    }
-    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self
-    where
-        T: AsRef<str>,
-        L: FileLoggerFuncTrait<T>,
-    {
-        self.write_async(data, func, &self.error_dir).await
-    }
-}
-```
-# Path: hyperlane-log/src/test.rs
-```rust
-use crate::*;
-#[tokio::test]
-async fn test() {
-    let log: FileLogger = FileLogger::new("./logs", 1_024_000);
-    let trace_str: String = String::from("custom trace message");
-    log.trace(trace_str, |trace| {
-        let write_data: String = format!("User trace func => {trace:#?}\n");
-        write_data
-    });
-    let debug_str: String = String::from("custom debug message");
-    log.debug(debug_str, |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
-        write_data
-    });
-    let info_str: String = String::from("custom info message");
-    log.info(info_str, |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
-        write_data
-    });
-    let warn_str: String = String::from("custom warn message");
-    log.warn(warn_str, |warn| {
-        let write_data: String = format!("User warn func => {warn:#?}\n");
-        write_data
-    });
-    let error_str: String = String::from("custom error message");
-    log.error(error_str, |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    });
-    let async_trace_str: String = String::from("custom async trace message");
-    log.async_trace(async_trace_str, |trace| {
-        let write_data: String = format!("User trace func => {trace:#?}\n");
-        write_data
-    })
-    .await;
-    let async_debug_str: String = String::from("custom async debug message");
-    log.async_debug(async_debug_str, |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
-        write_data
-    })
-    .await;
-    let async_info_str: String = String::from("custom async info message");
-    log.async_info(async_info_str, |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
-        write_data
-    })
-    .await;
-    let async_warn_str: String = String::from("custom async warn message");
-    log.async_warn(async_warn_str, |warn| {
-        let write_data: String = format!("User warn func => {warn:#?}\n");
-        write_data
-    })
-    .await;
-    let async_error_str: String = String::from("custom async error message");
-    log.async_error(async_error_str, |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    })
-    .await;
-}
-#[tokio::test]
-async fn test_more_log_first() {
-    let log: FileLogger = FileLogger::new("./logs", DISABLE_LOG_FILE_SIZE);
-    log.trace("trace data => ", |trace| {
-        let write_data: String = format!("User trace func => {trace:#?}\n");
-        write_data
-    });
-    log.debug("debug data => ", |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
-        write_data
-    });
-    log.info("info data => ", |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
-        write_data
-    });
-    log.warn("warn data => ", |warn| {
-        let write_data: String = format!("User warn func => {warn:#?}\n");
-        write_data
-    });
-    log.error("error data => ", |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    });
-    log.async_trace("async trace data => ", |trace| {
-        let write_data: String = format!("User trace func => {trace:#?}\n");
-        write_data
-    })
-    .await;
-    log.async_debug("async debug data => ", |debug| {
-        let write_data: String = format!("User debug func => {debug:#?}\n");
-        write_data
-    })
-    .await;
-    log.async_info("async info data => ", |info| {
-        let write_data: String = format!("User info func => {info:?}\n");
-        write_data
-    })
-    .await;
-    log.async_warn("async warn data => ", |warn| {
-        let write_data: String = format!("User warn func => {warn:#?}\n");
-        write_data
-    })
-    .await;
-    log.async_error("async error data => ", |error| {
-        let write_data: String = format!("User error func => {error:?}\n");
-        write_data
-    })
-    .await;
-}
-#[tokio::test]
-async fn test_more_log_second() {
-    for _ in 0..10 {
-        let log: FileLogger = FileLogger::new("./logs", 512_000);
-        log.trace("trace data!\n", common_log);
-        log.async_trace("async trace data!\n", common_log).await;
-        log.debug("debug data!\n", common_log);
-        log.async_debug("async debug data!\n", common_log).await;
-        log.info("info data!\n", common_log);
-        log.async_info("async info data!\n", common_log).await;
-        log.warn("warn data!\n", common_log);
-        log.async_warn("async warn data!\n", common_log).await;
-        log.error("error data!\n", common_log);
-        log.async_error("async error data!\n", common_log).await;
-    }
-}
-#[tokio::test]
-async fn test_set_log_level_dirs() {
-    let mut log: FileLogger = FileLogger::new("./test_logs", 1_024_000);
-    log.set_trace_dir("custom_trace")
-        .set_debug_dir("custom_debug")
-        .set_info_dir("custom_info")
-        .set_warn_dir("custom_warn")
-        .set_error_dir("custom_error");
-    assert_eq!(log.get_trace_dir(), "custom_trace");
-    assert_eq!(log.get_debug_dir(), "custom_debug");
-    assert_eq!(log.get_info_dir(), "custom_info");
-    assert_eq!(log.get_warn_dir(), "custom_warn");
-    assert_eq!(log.get_error_dir(), "custom_error");
-    log.trace("test trace message", common_log);
-    log.debug("test debug message", common_log);
-    log.info("test info message", common_log);
-    log.warn("test warn message", common_log);
-    log.error("test error message", common_log);
-    log.async_trace("async test trace message", common_log)
-        .await;
-    log.async_debug("async test debug message", common_log)
-        .await;
-    log.async_info("async test info message", common_log).await;
-    log.async_warn("async test warn message", common_log).await;
-    log.async_error("async test error message", common_log)
-        .await;
-}
-#[tokio::test]
-async fn test_log_level_dir_constants() {
-    let log: FileLogger = FileLogger::default();
-    assert_eq!(log.get_trace_dir(), TRACE_DIR);
-    assert_eq!(log.get_debug_dir(), DEBUG_DIR);
-    assert_eq!(log.get_info_dir(), INFO_DIR);
-    assert_eq!(log.get_warn_dir(), WARN_DIR);
-    assert_eq!(log.get_error_dir(), ERROR_DIR);
-}
-#[tokio::test]
-async fn test_log_level_dir_method_chaining() {
-    let mut log: FileLogger = FileLogger::new("./logs", 512_000);
-    let log_ref: &mut FileLogger = log
-        .set_trace_dir("chain_trace")
-        .set_debug_dir("chain_debug")
-        .set_info_dir("chain_info")
-        .set_warn_dir("chain_warn")
-        .set_error_dir("chain_error");
-    assert_eq!(log_ref.get_trace_dir(), "chain_trace");
-    assert_eq!(log_ref.get_debug_dir(), "chain_debug");
-    assert_eq!(log_ref.get_info_dir(), "chain_info");
-    assert_eq!(log_ref.get_warn_dir(), "chain_warn");
-    assert_eq!(log_ref.get_error_dir(), "chain_error");
-}
-#[tokio::test]
-async fn test_log_level_dirs_with_special_characters() {
-    let mut log: FileLogger = FileLogger::new("./logs/special", 1_024_000);
-    log.set_trace_dir("trace-2024")
-        .set_debug_dir("debug_test")
-        .set_info_dir("info.logs")
-        .set_warn_dir("warn/logs")
-        .set_error_dir("error_logs");
-    log.trace("special trace message", common_log);
-    log.async_trace("async special trace message", common_log)
-        .await;
-    log.debug("special debug message", common_log);
-    log.async_debug("async special debug message", common_log)
-        .await;
-    log.info("special info message", common_log);
-    log.async_info("async special info message", common_log)
-        .await;
-    log.warn("special warn message", common_log);
-    log.async_warn("async special warn message", common_log)
-        .await;
-    log.error("special error message", common_log);
-    log.async_error("async special error message", common_log)
-        .await;
-}
-#[tokio::test]
-async fn test_log_level_dirs_edge_cases() {
-    let mut log: FileLogger = FileLogger::new("./logs", 512_000);
-    log.set_trace_dir("")
-        .set_debug_dir("")
-        .set_info_dir("")
-        .set_warn_dir("")
-        .set_error_dir("");
-    assert_eq!(log.get_trace_dir(), "");
-    assert_eq!(log.get_debug_dir(), "");
-    assert_eq!(log.get_info_dir(), "");
-    assert_eq!(log.get_warn_dir(), "");
-    assert_eq!(log.get_error_dir(), "");
-    log.trace("empty dir trace", common_log);
-    log.debug("empty dir debug", common_log);
-    log.info("empty dir info", common_log);
-    log.warn("empty dir warn", common_log);
-    log.error("empty dir error", common_log);
-    log.set_trace_dir("valid_trace")
-        .set_debug_dir("valid_debug")
-        .set_info_dir("valid_info")
-        .set_warn_dir("valid_warn")
-        .set_error_dir("valid_error");
-    let long_dir_name: String = "a".repeat(200);
-    log.set_trace_dir(&long_dir_name);
-    assert_eq!(log.get_trace_dir().as_str(), long_dir_name.as_str());
-}
-```
+<!--2026-02-25 19:13:57-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -5795,6 +54,639 @@ use {
     },
 };
 ```
+# Path: hyperlane/src/context/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+#[cfg(test)]
+mod test;
+pub use r#struct::*;
+```
+# Path: hyperlane/src/context/impl.rs
+```rust
+use crate::*;
+impl Default for Context {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            aborted: false,
+            closed: false,
+            stream: None,
+            request: Request::default(),
+            response: Response::default(),
+            route_params: RouteParams::default(),
+            attributes: ThreadSafeAttributeStore::default(),
+            server: default_server(),
+        }
+    }
+}
+impl PartialEq for Context {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.get_aborted() == other.get_aborted()
+            && self.get_closed() == other.get_closed()
+            && self.get_request() == other.get_request()
+            && self.get_response() == other.get_response()
+            && self.get_route_params() == other.get_route_params()
+            && self.get_attributes().len() == other.get_attributes().len()
+            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
+            && self.get_server() == other.get_server()
+    }
+}
+impl Eq for Context {}
+impl From<&'static Server> for Context {
+    #[inline(always)]
+    fn from(server: &'static Server) -> Self {
+        let mut ctx: Context = Context::default();
+        ctx.set_server(server);
+        ctx
+    }
+}
+impl From<&ArcRwLockStream> for Context {
+    #[inline(always)]
+    fn from(stream: &ArcRwLockStream) -> Self {
+        let mut ctx: Context = Context::default();
+        ctx.set_stream(Some(stream.clone()));
+        ctx
+    }
+}
+impl From<ArcRwLockStream> for Context {
+    #[inline(always)]
+    fn from(stream: ArcRwLockStream) -> Self {
+        (&stream).into()
+    }
+}
+impl From<usize> for Context {
+    #[inline(always)]
+    fn from(addr: usize) -> Self {
+        let ctx: &Context = addr.into();
+        ctx.clone()
+    }
+}
+impl From<usize> for &'static Context {
+    #[inline(always)]
+    fn from(addr: usize) -> &'static Context {
+        unsafe { &*(addr as *const Context) }
+    }
+}
+impl From<usize> for &'static mut Context {
+    #[inline(always)]
+    fn from(addr: usize) -> &'static mut Context {
+        unsafe { &mut *(addr as *mut Context) }
+    }
+}
+impl From<&Context> for usize {
+    #[inline(always)]
+    fn from(ctx: &Context) -> Self {
+        ctx as *const Context as usize
+    }
+}
+impl From<&mut Context> for usize {
+    #[inline(always)]
+    fn from(ctx: &mut Context) -> Self {
+        ctx as *mut Context as usize
+    }
+}
+impl AsRef<Context> for Context {
+    #[inline(always)]
+    fn as_ref(&self) -> &Context {
+        let addr: usize = (self as &Context).into();
+        addr.into()
+    }
+}
+impl AsMut<Context> for Context {
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut Context {
+        let addr: usize = (self as &mut Context).into();
+        addr.into()
+    }
+}
+impl Context {
+    #[inline(always)]
+    pub(crate) fn new(
+        stream: &ArcRwLockStream,
+        request: &Request,
+        server: &'static Server,
+    ) -> Context {
+        let mut ctx: Context = Context::default();
+        ctx.set_stream(Some(stream.clone()))
+            .set_request(request.clone())
+            .set_server(server)
+            .get_mut_response()
+            .set_version(request.get_version().clone());
+        ctx
+    }
+    pub async fn http_from_stream(&mut self) -> Result<Request, RequestError> {
+        if self.get_aborted() {
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
+        }
+        if let Some(stream) = self.try_get_stream() {
+            let request_res: Result<Request, RequestError> =
+                Request::http_from_stream(stream, self.get_server().get_request_config()).await;
+            if let Ok(request) = request_res.as_ref() {
+                self.set_request(request.clone());
+            }
+            return request_res;
+        };
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+    }
+    pub async fn ws_from_stream(&mut self) -> Result<Request, RequestError> {
+        if self.get_aborted() {
+            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
+        }
+        if let Some(stream) = self.try_get_stream() {
+            let last_request: &Request = self.get_request();
+            let request_res: Result<Request, RequestError> = last_request
+                .ws_from_stream(stream, self.get_server().get_request_config())
+                .await;
+            match request_res.as_ref() {
+                Ok(request) => {
+                    self.set_request(request.clone());
+                }
+                Err(_) => {
+                    self.set_request(last_request.clone());
+                }
+            }
+            return request_res;
+        };
+        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
+    }
+    #[inline(always)]
+    pub fn is_terminated(&self) -> bool {
+        self.get_aborted() || self.get_closed()
+    }
+    #[inline(always)]
+    pub(crate) fn is_keep_alive(&self, keep_alive: bool) -> bool {
+        !self.get_closed() && keep_alive
+    }
+    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {
+        self.try_get_stream()
+            .as_ref()?
+            .read()
+            .await
+            .peer_addr()
+            .ok()
+    }
+    pub async fn get_socket_addr(&self) -> SocketAddr {
+        self.try_get_socket_addr().await.unwrap()
+    }
+    pub async fn try_get_socket_addr_string(&self) -> Option<String> {
+        self.try_get_socket_addr()
+            .await
+            .map(|data| data.to_string())
+    }
+    pub async fn get_socket_addr_string(&self) -> String {
+        self.get_socket_addr().await.to_string()
+    }
+    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {
+        self.try_get_socket_addr()
+            .await
+            .map(|socket_addr: SocketAddr| socket_addr.ip())
+    }
+    pub async fn get_socket_host(&self) -> SocketHost {
+        self.try_get_socket_host().await.unwrap()
+    }
+    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {
+        self.try_get_socket_addr()
+            .await
+            .map(|socket_addr: SocketAddr| socket_addr.port())
+    }
+    pub async fn get_socket_port(&self) -> SocketPort {
+        self.try_get_socket_port().await.unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_route_param<T>(&self, name: T) -> Option<String>
+    where
+        T: AsRef<str>,
+    {
+        self.get_route_params().get(name.as_ref()).cloned()
+    }
+    #[inline(always)]
+    pub fn get_route_param<T>(&self, name: T) -> String
+    where
+        T: AsRef<str>,
+    {
+        self.try_get_route_param(name).unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
+    where
+        V: AnySendSyncClone,
+    {
+        self.get_attributes()
+            .get(&Attribute::External(key.as_ref().to_owned()).to_string())
+            .and_then(|arc| arc.downcast_ref::<V>())
+            .cloned()
+    }
+    #[inline(always)]
+    pub fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
+    where
+        V: AnySendSyncClone,
+    {
+        self.try_get_attribute(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn set_attribute<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AnySendSyncClone,
+    {
+        self.get_mut_attributes().insert(
+            Attribute::External(key.as_ref().to_owned()).to_string(),
+            Arc::new(value),
+        );
+        self
+    }
+    #[inline(always)]
+    pub fn remove_attribute<K>(&mut self, key: K) -> &mut Self
+    where
+        K: AsRef<str>,
+    {
+        self.get_mut_attributes()
+            .remove(&Attribute::External(key.as_ref().to_owned()).to_string());
+        self
+    }
+    #[inline(always)]
+    pub fn clear_attribute(&mut self) -> &mut Self {
+        self.get_mut_attributes().clear();
+        self
+    }
+    #[inline(always)]
+    fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
+    where
+        V: AnySendSyncClone,
+    {
+        self.get_attributes()
+            .get(&Attribute::Internal(key).to_string())
+            .and_then(|arc| arc.downcast_ref::<V>())
+            .cloned()
+    }
+    #[inline(always)]
+    fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
+    where
+        V: AnySendSyncClone,
+    {
+        self.try_get_internal_attribute(key).unwrap()
+    }
+    #[inline(always)]
+    fn set_internal_attribute<V>(&mut self, key: InternalAttribute, value: V) -> &mut Self
+    where
+        V: AnySendSyncClone,
+    {
+        self.get_mut_attributes()
+            .insert(Attribute::Internal(key).to_string(), Arc::new(value));
+        self
+    }
+    #[inline(always)]
+    pub(crate) fn set_task_panic(&mut self, panic_data: PanicData) -> &mut Self {
+        self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
+    }
+    #[inline(always)]
+    pub fn try_get_task_panic_data(&self) -> Option<PanicData> {
+        self.try_get_internal_attribute(InternalAttribute::TaskPanicData)
+    }
+    #[inline(always)]
+    pub fn get_task_panic_data(&self) -> PanicData {
+        self.get_internal_attribute(InternalAttribute::TaskPanicData)
+    }
+    #[inline(always)]
+    pub(crate) fn set_request_error_data(&mut self, request_error: RequestError) -> &mut Self {
+        self.set_internal_attribute(InternalAttribute::RequestErrorData, request_error)
+    }
+    #[inline(always)]
+    pub fn try_get_request_error_data(&self) -> Option<RequestError> {
+        self.try_get_internal_attribute(InternalAttribute::RequestErrorData)
+    }
+    #[inline(always)]
+    pub fn get_request_error_data(&self) -> RequestError {
+        self.get_internal_attribute(InternalAttribute::RequestErrorData)
+    }
+    pub async fn try_send(&mut self) -> Result<(), ResponseError> {
+        if self.is_terminated() {
+            return Err(ResponseError::Terminated);
+        }
+        let response_data: ResponseData = self.get_mut_response().build();
+        if let Some(stream) = self.try_get_stream() {
+            return stream.try_send(response_data).await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+    pub async fn send(&mut self) {
+        self.try_send().await.unwrap();
+    }
+    pub async fn try_send_body(&self) -> Result<(), ResponseError> {
+        if self.is_terminated() {
+            return Err(ResponseError::Terminated);
+        }
+        self.try_send_body_with_data(self.get_response().get_body())
+            .await
+    }
+    pub async fn send_body(&self) {
+        self.try_send_body().await.unwrap();
+    }
+    pub async fn try_send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
+    where
+        D: AsRef<[u8]>,
+    {
+        if self.is_terminated() {
+            return Err(ResponseError::Terminated);
+        }
+        if let Some(stream) = self.try_get_stream() {
+            return stream.try_send_body(data).await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+    pub async fn send_body_with_data<D>(&self, data: D)
+    where
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_with_data(data).await.unwrap();
+    }
+    pub async fn try_send_body_list<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        if self.is_terminated() {
+            return Err(ResponseError::Terminated);
+        }
+        if let Some(stream) = self.try_get_stream() {
+            return stream.try_send_body_list(data_iter).await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+    pub async fn send_body_list<I, D>(&self, data_iter: I)
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_list(data_iter).await.unwrap();
+    }
+    pub async fn try_send_body_list_with_data<I, D>(
+        &self,
+        data_iter: I,
+    ) -> Result<(), ResponseError>
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        if self.is_terminated() {
+            return Err(ResponseError::Terminated);
+        }
+        if let Some(stream) = self.try_get_stream() {
+            return stream.try_send_body_list(data_iter).await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I)
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        self.try_send_body_list_with_data(data_iter).await.unwrap()
+    }
+    pub async fn try_flush(&self) -> Result<(), ResponseError> {
+        if self.is_terminated() {
+            return Err(ResponseError::Terminated);
+        }
+        if let Some(stream) = self.try_get_stream() {
+            return stream.try_flush().await;
+        }
+        Err(ResponseError::NotFoundStream)
+    }
+    pub async fn flush(&self) {
+        self.try_flush().await.unwrap();
+    }
+}
+```
+# Path: hyperlane/src/context/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, CustomDebug, Data, DisplayDebug)]
+pub struct Context {
+    #[get(type(copy))]
+    pub(super) aborted: bool,
+    #[get(type(copy))]
+    pub(super) closed: bool,
+    #[get(pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(super) stream: Option<ArcRwLockStream>,
+    #[get_mut(skip)]
+    #[set(pub(super))]
+    pub(super) request: Request,
+    pub(super) response: Response,
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(super) route_params: RouteParams,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) attributes: ThreadSafeAttributeStore,
+    #[get_mut(skip)]
+    #[set(pub(super))]
+    pub(super) server: &'static Server,
+}
+```
+# Path: hyperlane/src/context/test.rs
+```rust
+use crate::*;
+#[test]
+fn context_from_usize() {
+    let mut ctx: Context = Context::default();
+    ctx.set_aborted(true);
+    let ctx_address: usize = (&ctx).into();
+    let ctx_from_addr: Context = ctx_address.into();
+    assert_eq!(ctx.get_aborted(), ctx_from_addr.get_aborted());
+}
+#[test]
+fn context_ref_from_usize() {
+    let mut ctx: Context = Context::default();
+    ctx.set_closed(true);
+    let ctx_address: usize = (&ctx).into();
+    let ctx_ref: &Context = ctx_address.into();
+    assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
+}
+#[test]
+fn context_mut_from_usize() {
+    let mut ctx: Context = Context::default();
+    let ctx_address: usize = (&mut ctx).into();
+    let ctx_mut: &mut Context = ctx_address.into();
+    ctx_mut.set_aborted(true);
+    assert!(ctx_mut.get_aborted());
+}
+#[test]
+fn context_ref_into_usize() {
+    let ctx: Context = Context::default();
+    let ctx_address: usize = (&ctx).into();
+    assert!(ctx_address > 0);
+}
+#[test]
+fn context_mut_into_usize() {
+    let mut ctx: Context = Context::default();
+    let ctx_address: usize = (&mut ctx).into();
+    assert!(ctx_address > 0);
+}
+#[test]
+fn context_aborted_and_closed() {
+    let mut ctx: Context = Context::default();
+    assert!(!ctx.get_aborted());
+    ctx.set_aborted(true);
+    assert!(ctx.get_aborted());
+    ctx.set_aborted(false);
+    assert!(!ctx.get_aborted());
+    assert!(!ctx.get_closed());
+    ctx.set_closed(true);
+    assert!(ctx.get_closed());
+    ctx.set_closed(false);
+    assert!(!ctx.get_closed());
+    assert!(!ctx.is_terminated());
+    ctx.set_aborted(true);
+    assert!(ctx.is_terminated());
+    ctx.set_aborted(false);
+    ctx.set_closed(true);
+    assert!(ctx.is_terminated());
+}
+#[test]
+fn context_route_params() {
+    let mut ctx: Context = Context::default();
+    let mut params: RouteParams = RouteParams::default();
+    params.insert("id".to_string(), "123".to_string());
+    ctx.set_route_params(params);
+    let id: Option<String> = ctx.try_get_route_param("id");
+    assert_eq!(id, Some("123".to_string()));
+    let name: Option<String> = ctx.try_get_route_param("name");
+    assert_eq!(name, None);
+}
+#[test]
+fn context_request_and_response_string() {
+    let mut ctx: Context = Context::default();
+    let request: Request = Request::default();
+    ctx.set_request(request.clone());
+    let fetched_request: &Request = ctx.get_request();
+    assert_eq!(request.to_string(), fetched_request.to_string());
+    let response: Response = Response::default();
+    ctx.set_response(response.clone());
+    let fetched_response: &Response = ctx.get_response();
+    assert_eq!(response.to_string(), fetched_response.to_string());
+}
+#[test]
+fn context_as_ref() {
+    let ctx: Context = Context::default();
+    let ctx_ref: &Context = ctx.as_ref();
+    assert_eq!(ctx.get_aborted(), ctx_ref.get_aborted());
+    assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
+    assert_eq!(ctx.get_request(), ctx_ref.get_request());
+    assert_eq!(ctx.get_response(), ctx_ref.get_response());
+}
+#[test]
+fn context_as_mut() {
+    let mut ctx: Context = Context::default();
+    ctx.set_aborted(true);
+    let ctx_mut: &mut Context = ctx.as_mut();
+    assert!(ctx_mut.get_aborted());
+    ctx_mut.set_closed(true);
+    assert!(ctx.get_closed());
+}
+```
+# Path: hyperlane/src/panic/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+#[cfg(test)]
+mod test;
+pub use r#struct::*;
+```
+# Path: hyperlane/src/panic/impl.rs
+```rust
+use crate::*;
+impl PanicData {
+    #[inline(always)]
+    pub(crate) fn new(
+        message: Option<String>,
+        location: Option<String>,
+        payload: Option<String>,
+    ) -> Self {
+        Self {
+            message,
+            location,
+            payload,
+        }
+    }
+    #[inline(always)]
+    fn try_extract_panic_message(panic_payload: &dyn Any) -> Option<String> {
+        if let Some(s) = panic_payload.downcast_ref::<&str>() {
+            Some(s.to_string())
+        } else {
+            panic_payload.downcast_ref::<String>().cloned()
+        }
+    }
+    pub(crate) fn from_join_error(join_error: JoinError) -> Self {
+        let default_message: String = join_error.to_string();
+        let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
+        {
+            Self::try_extract_panic_message(&panic_join_error)
+        } else {
+            None
+        };
+        if (message.is_none() || message.clone().unwrap_or_default().is_empty())
+            && !default_message.is_empty()
+        {
+            message = Some(default_message);
+        }
+        let panic: PanicData = PanicData::new(message, None, None);
+        panic
+    }
+}
+```
+# Path: hyperlane/src/panic/struct.rs
+```rust
+use crate::*;
+#[derive(
+    Clone, CustomDebug, Default, Deserialize, DisplayDebug, Eq, Getter, PartialEq, Serialize, Setter,
+)]
+pub struct PanicData {
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) message: Option<String>,
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) location: Option<String>,
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) payload: Option<String>,
+}
+```
+# Path: hyperlane/src/panic/test.rs
+```rust
+use crate::*;
+#[test]
+fn panic_new() {
+    let panic: PanicData = PanicData::new(
+        Some("message".to_string()),
+        Some("location".to_string()),
+        Some("payload".to_string()),
+    );
+    assert_eq!(panic.try_get_message(), &Some("message".to_string()));
+    assert_eq!(panic.try_get_location(), &Some("location".to_string()));
+    assert_eq!(panic.try_get_payload(), &Some("payload".to_string()));
+}
+#[tokio::test]
+async fn from_join_error() {
+    let handle: JoinHandle<()> = tokio::spawn(async {
+        panic!("test panic");
+    });
+    let result: Result<(), JoinError> = handle.await;
+    assert!(result.is_err());
+    if let Err(join_error) = result {
+        let is_panic: bool = PanicData::from_join_error(join_error)
+            .try_get_message()
+            .clone()
+            .unwrap_or_default()
+            .contains("test panic");
+        assert!(is_panic);
+    }
+}
+```
 # Path: hyperlane/src/hook/trait.rs
 ```rust
 use crate::*;
@@ -5815,37 +707,6 @@ mod r#struct;
 mod r#trait;
 mod r#type;
 pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*, r#type::*};
-```
-# Path: hyperlane/src/hook/enum.rs
-```rust
-use crate::*;
-#[derive(Clone, Copy, Debug, DisplayDebug)]
-pub enum HookType {
-    TaskPanic(Option<isize>, ServerHookHandlerFactory),
-    RequestError(Option<isize>, ServerHookHandlerFactory),
-    RequestMiddleware(Option<isize>, ServerHookHandlerFactory),
-    Route(&'static str, ServerHookHandlerFactory),
-    ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
-}
-```
-# Path: hyperlane/src/hook/struct.rs
-```rust
-use crate::*;
-#[derive(
-    Clone, Copy, Debug, Deserialize, DisplayDebug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
-)]
-pub struct DefaultServerHook;
-#[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
-pub struct ServerControlHook {
-    #[debug(skip)]
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) wait_hook: ServerControlHookHandler<()>,
-    #[debug(skip)]
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) shutdown_hook: ServerControlHookHandler<()>,
-}
 ```
 # Path: hyperlane/src/hook/fn.rs
 ```rust
@@ -6002,6 +863,25 @@ impl ServerHook for DefaultServerHook {
     async fn handle(self, _: &mut Context) {}
 }
 ```
+# Path: hyperlane/src/hook/struct.rs
+```rust
+use crate::*;
+#[derive(
+    Clone, Copy, Debug, Deserialize, DisplayDebug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+)]
+pub struct DefaultServerHook;
+#[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
+pub struct ServerControlHook {
+    #[debug(skip)]
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) wait_hook: ServerControlHookHandler<()>,
+    #[debug(skip)]
+    #[get(pub)]
+    #[set(pub(crate))]
+    pub(super) shutdown_hook: ServerControlHookHandler<()>,
+}
+```
 # Path: hyperlane/src/hook/type.rs
 ```rust
 use crate::*;
@@ -6016,6 +896,80 @@ pub type ServerHookList = Vec<ServerHookHandler>;
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
 pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
 ```
+# Path: hyperlane/src/hook/enum.rs
+```rust
+use crate::*;
+#[derive(Clone, Copy, Debug, DisplayDebug)]
+pub enum HookType {
+    TaskPanic(Option<isize>, ServerHookHandlerFactory),
+    RequestError(Option<isize>, ServerHookHandlerFactory),
+    RequestMiddleware(Option<isize>, ServerHookHandlerFactory),
+    Route(&'static str, ServerHookHandlerFactory),
+    ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
+}
+```
+# Path: hyperlane/src/config/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+#[cfg(test)]
+mod test;
+pub use r#struct::*;
+```
+# Path: hyperlane/src/config/impl.rs
+```rust
+use crate::*;
+impl Default for ServerConfig {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            address: Server::format_bind_address(DEFAULT_HOST, DEFAULT_WEB_PORT),
+            nodelay: DEFAULT_NODELAY,
+            ttl: DEFAULT_TTI,
+        }
+    }
+}
+impl ServerConfig {
+    pub fn from_json<C>(json: C) -> Result<Self, serde_json::Error>
+    where
+        C: AsRef<str>,
+    {
+        serde_json::from_str(json.as_ref())
+    }
+}
+```
+# Path: hyperlane/src/config/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
+pub struct ServerConfig {
+    #[set(type(AsRef<str>))]
+    pub(super) address: String,
+    pub(super) nodelay: Option<bool>,
+    pub(super) ttl: Option<u32>,
+}
+```
+# Path: hyperlane/src/config/test.rs
+```rust
+use crate::*;
+#[test]
+fn server_config_from_json() {
+    let server_config_json: &'static str = r#"
+    {
+        "address": "0.0.0.0:80",
+        "nodelay": true,
+        "ttl": 64
+    }
+    "#;
+    let server_config: ServerConfig = ServerConfig::from_json(server_config_json).unwrap();
+    let mut new_server_config: ServerConfig = ServerConfig::default();
+    new_server_config
+        .set_address("0.0.0.0:80")
+        .set_nodelay(Some(true))
+        .set_ttl(Some(64));
+    assert_eq!(server_config, new_server_config);
+}
+```
 # Path: hyperlane/src/server/mod.rs
 ```rust
 mod r#fn;
@@ -6026,43 +980,6 @@ mod test;
 mod r#type;
 pub use {r#struct::*, r#type::*};
 pub(crate) use r#fn::*;
-```
-# Path: hyperlane/src/server/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, CustomDebug, DisplayDebug, Getter, New)]
-pub(crate) struct HandlerState {
-    pub(super) stream: ArcRwLockStream,
-    pub(super) server: &'static Server,
-}
-#[derive(Clone, CustomDebug, Data, DisplayDebug, New)]
-pub struct Server {
-    #[get_mut(skip)]
-    #[set(pub(super))]
-    pub(super) server_config: ServerConfig,
-    #[get_mut(skip)]
-    #[set(pub(super))]
-    pub(super) request_config: RequestConfig,
-    #[get_mut(pub(super))]
-    #[set(skip)]
-    pub(super) route_matcher: RouteMatcher,
-    #[debug(skip)]
-    #[get_mut(pub(super))]
-    #[set(skip)]
-    pub(super) request_error: ServerHookList,
-    #[debug(skip)]
-    #[get_mut(pub(super))]
-    #[set(skip)]
-    pub(super) task_panic: ServerHookList,
-    #[debug(skip)]
-    #[get_mut(pub(super))]
-    #[set(skip)]
-    pub(super) request_middleware: ServerHookList,
-    #[debug(skip)]
-    #[get_mut(pub(super))]
-    #[set(skip)]
-    pub(super) response_middleware: ServerHookList,
-}
 ```
 # Path: hyperlane/src/server/fn.rs
 ```rust
@@ -6480,6 +1397,43 @@ impl Server {
     }
 }
 ```
+# Path: hyperlane/src/server/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, CustomDebug, DisplayDebug, Getter, New)]
+pub(crate) struct HandlerState {
+    pub(super) stream: ArcRwLockStream,
+    pub(super) server: &'static Server,
+}
+#[derive(Clone, CustomDebug, Data, DisplayDebug, New)]
+pub struct Server {
+    #[get_mut(skip)]
+    #[set(pub(super))]
+    pub(super) server_config: ServerConfig,
+    #[get_mut(skip)]
+    #[set(pub(super))]
+    pub(super) request_config: RequestConfig,
+    #[get_mut(pub(super))]
+    #[set(skip)]
+    pub(super) route_matcher: RouteMatcher,
+    #[debug(skip)]
+    #[get_mut(pub(super))]
+    #[set(skip)]
+    pub(super) request_error: ServerHookList,
+    #[debug(skip)]
+    #[get_mut(pub(super))]
+    #[set(skip)]
+    pub(super) task_panic: ServerHookList,
+    #[debug(skip)]
+    #[get_mut(pub(super))]
+    #[set(skip)]
+    pub(super) request_middleware: ServerHookList,
+    #[debug(skip)]
+    #[get_mut(pub(super))]
+    #[set(skip)]
+    pub(super) response_middleware: ServerHookList,
+}
+```
 # Path: hyperlane/src/server/type.rs
 ```rust
 use crate::*;
@@ -6885,883 +1839,6 @@ async fn main() {
     server_control_hook_1.wait().await;
 }
 ```
-# Path: hyperlane/src/panic/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-pub use r#struct::*;
-```
-# Path: hyperlane/src/panic/struct.rs
-```rust
-use crate::*;
-#[derive(
-    Clone, CustomDebug, Default, Deserialize, DisplayDebug, Eq, Getter, PartialEq, Serialize, Setter,
-)]
-pub struct PanicData {
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) message: Option<String>,
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) location: Option<String>,
-    #[get(pub)]
-    #[set(pub(crate))]
-    pub(super) payload: Option<String>,
-}
-```
-# Path: hyperlane/src/panic/impl.rs
-```rust
-use crate::*;
-impl PanicData {
-    #[inline(always)]
-    pub(crate) fn new(
-        message: Option<String>,
-        location: Option<String>,
-        payload: Option<String>,
-    ) -> Self {
-        Self {
-            message,
-            location,
-            payload,
-        }
-    }
-    #[inline(always)]
-    fn try_extract_panic_message(panic_payload: &dyn Any) -> Option<String> {
-        if let Some(s) = panic_payload.downcast_ref::<&str>() {
-            Some(s.to_string())
-        } else {
-            panic_payload.downcast_ref::<String>().cloned()
-        }
-    }
-    pub(crate) fn from_join_error(join_error: JoinError) -> Self {
-        let default_message: String = join_error.to_string();
-        let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
-        {
-            Self::try_extract_panic_message(&panic_join_error)
-        } else {
-            None
-        };
-        if (message.is_none() || message.clone().unwrap_or_default().is_empty())
-            && !default_message.is_empty()
-        {
-            message = Some(default_message);
-        }
-        let panic: PanicData = PanicData::new(message, None, None);
-        panic
-    }
-}
-```
-# Path: hyperlane/src/panic/test.rs
-```rust
-use crate::*;
-#[test]
-fn panic_new() {
-    let panic: PanicData = PanicData::new(
-        Some("message".to_string()),
-        Some("location".to_string()),
-        Some("payload".to_string()),
-    );
-    assert_eq!(panic.try_get_message(), &Some("message".to_string()));
-    assert_eq!(panic.try_get_location(), &Some("location".to_string()));
-    assert_eq!(panic.try_get_payload(), &Some("payload".to_string()));
-}
-#[tokio::test]
-async fn from_join_error() {
-    let handle: JoinHandle<()> = tokio::spawn(async {
-        panic!("test panic");
-    });
-    let result: Result<(), JoinError> = handle.await;
-    assert!(result.is_err());
-    if let Err(join_error) = result {
-        let is_panic: bool = PanicData::from_join_error(join_error)
-            .try_get_message()
-            .clone()
-            .unwrap_or_default()
-            .contains("test panic");
-        assert!(is_panic);
-    }
-}
-```
-# Path: hyperlane/src/context/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-pub use r#struct::*;
-```
-# Path: hyperlane/src/context/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, CustomDebug, Data, DisplayDebug)]
-pub struct Context {
-    #[get(type(copy))]
-    pub(super) aborted: bool,
-    #[get(type(copy))]
-    pub(super) closed: bool,
-    #[get(pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
-    pub(super) stream: Option<ArcRwLockStream>,
-    #[get_mut(skip)]
-    #[set(pub(super))]
-    pub(super) request: Request,
-    pub(super) response: Response,
-    #[get_mut(skip)]
-    #[set(pub(crate))]
-    pub(super) route_params: RouteParams,
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) attributes: ThreadSafeAttributeStore,
-    #[get_mut(skip)]
-    #[set(pub(super))]
-    pub(super) server: &'static Server,
-}
-```
-# Path: hyperlane/src/context/impl.rs
-```rust
-use crate::*;
-impl Default for Context {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            aborted: false,
-            closed: false,
-            stream: None,
-            request: Request::default(),
-            response: Response::default(),
-            route_params: RouteParams::default(),
-            attributes: ThreadSafeAttributeStore::default(),
-            server: default_server(),
-        }
-    }
-}
-impl PartialEq for Context {
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        self.get_aborted() == other.get_aborted()
-            && self.get_closed() == other.get_closed()
-            && self.get_request() == other.get_request()
-            && self.get_response() == other.get_response()
-            && self.get_route_params() == other.get_route_params()
-            && self.get_attributes().len() == other.get_attributes().len()
-            && self.try_get_stream().is_some() == other.try_get_stream().is_some()
-            && self.get_server() == other.get_server()
-    }
-}
-impl Eq for Context {}
-impl From<&'static Server> for Context {
-    #[inline(always)]
-    fn from(server: &'static Server) -> Self {
-        let mut ctx: Context = Context::default();
-        ctx.set_server(server);
-        ctx
-    }
-}
-impl From<&ArcRwLockStream> for Context {
-    #[inline(always)]
-    fn from(stream: &ArcRwLockStream) -> Self {
-        let mut ctx: Context = Context::default();
-        ctx.set_stream(Some(stream.clone()));
-        ctx
-    }
-}
-impl From<ArcRwLockStream> for Context {
-    #[inline(always)]
-    fn from(stream: ArcRwLockStream) -> Self {
-        (&stream).into()
-    }
-}
-impl From<usize> for Context {
-    #[inline(always)]
-    fn from(addr: usize) -> Self {
-        let ctx: &Context = addr.into();
-        ctx.clone()
-    }
-}
-impl From<usize> for &'static Context {
-    #[inline(always)]
-    fn from(addr: usize) -> &'static Context {
-        unsafe { &*(addr as *const Context) }
-    }
-}
-impl From<usize> for &'static mut Context {
-    #[inline(always)]
-    fn from(addr: usize) -> &'static mut Context {
-        unsafe { &mut *(addr as *mut Context) }
-    }
-}
-impl From<&Context> for usize {
-    #[inline(always)]
-    fn from(ctx: &Context) -> Self {
-        ctx as *const Context as usize
-    }
-}
-impl From<&mut Context> for usize {
-    #[inline(always)]
-    fn from(ctx: &mut Context) -> Self {
-        ctx as *mut Context as usize
-    }
-}
-impl AsRef<Context> for Context {
-    #[inline(always)]
-    fn as_ref(&self) -> &Context {
-        let addr: usize = (self as &Context).into();
-        addr.into()
-    }
-}
-impl AsMut<Context> for Context {
-    #[inline(always)]
-    fn as_mut(&mut self) -> &mut Context {
-        let addr: usize = (self as &mut Context).into();
-        addr.into()
-    }
-}
-impl Context {
-    #[inline(always)]
-    pub(crate) fn new(
-        stream: &ArcRwLockStream,
-        request: &Request,
-        server: &'static Server,
-    ) -> Context {
-        let mut ctx: Context = Context::default();
-        ctx.set_stream(Some(stream.clone()))
-            .set_request(request.clone())
-            .set_server(server)
-            .get_mut_response()
-            .set_version(request.get_version().clone());
-        ctx
-    }
-    pub async fn http_from_stream(&mut self) -> Result<Request, RequestError> {
-        if self.get_aborted() {
-            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
-        }
-        if let Some(stream) = self.try_get_stream() {
-            let request_res: Result<Request, RequestError> =
-                Request::http_from_stream(stream, self.get_server().get_request_config()).await;
-            if let Ok(request) = request_res.as_ref() {
-                self.set_request(request.clone());
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
-    }
-    pub async fn ws_from_stream(&mut self) -> Result<Request, RequestError> {
-        if self.get_aborted() {
-            return Err(RequestError::RequestAborted(HttpStatus::BadRequest));
-        }
-        if let Some(stream) = self.try_get_stream() {
-            let last_request: &Request = self.get_request();
-            let request_res: Result<Request, RequestError> = last_request
-                .ws_from_stream(stream, self.get_server().get_request_config())
-                .await;
-            match request_res.as_ref() {
-                Ok(request) => {
-                    self.set_request(request.clone());
-                }
-                Err(_) => {
-                    self.set_request(last_request.clone());
-                }
-            }
-            return request_res;
-        };
-        Err(RequestError::GetTcpStream(HttpStatus::BadRequest))
-    }
-    #[inline(always)]
-    pub fn is_terminated(&self) -> bool {
-        self.get_aborted() || self.get_closed()
-    }
-    #[inline(always)]
-    pub(crate) fn is_keep_alive(&self, keep_alive: bool) -> bool {
-        !self.get_closed() && keep_alive
-    }
-    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {
-        self.try_get_stream()
-            .as_ref()?
-            .read()
-            .await
-            .peer_addr()
-            .ok()
-    }
-    pub async fn get_socket_addr(&self) -> SocketAddr {
-        self.try_get_socket_addr().await.unwrap()
-    }
-    pub async fn try_get_socket_addr_string(&self) -> Option<String> {
-        self.try_get_socket_addr()
-            .await
-            .map(|data| data.to_string())
-    }
-    pub async fn get_socket_addr_string(&self) -> String {
-        self.get_socket_addr().await.to_string()
-    }
-    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {
-        self.try_get_socket_addr()
-            .await
-            .map(|socket_addr: SocketAddr| socket_addr.ip())
-    }
-    pub async fn get_socket_host(&self) -> SocketHost {
-        self.try_get_socket_host().await.unwrap()
-    }
-    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {
-        self.try_get_socket_addr()
-            .await
-            .map(|socket_addr: SocketAddr| socket_addr.port())
-    }
-    pub async fn get_socket_port(&self) -> SocketPort {
-        self.try_get_socket_port().await.unwrap()
-    }
-    #[inline(always)]
-    pub fn try_get_route_param<T>(&self, name: T) -> Option<String>
-    where
-        T: AsRef<str>,
-    {
-        self.get_route_params().get(name.as_ref()).cloned()
-    }
-    #[inline(always)]
-    pub fn get_route_param<T>(&self, name: T) -> String
-    where
-        T: AsRef<str>,
-    {
-        self.try_get_route_param(name).unwrap()
-    }
-    #[inline(always)]
-    pub fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
-    where
-        V: AnySendSyncClone,
-    {
-        self.get_attributes()
-            .get(&Attribute::External(key.as_ref().to_owned()).to_string())
-            .and_then(|arc| arc.downcast_ref::<V>())
-            .cloned()
-    }
-    #[inline(always)]
-    pub fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
-    where
-        V: AnySendSyncClone,
-    {
-        self.try_get_attribute(key).unwrap()
-    }
-    #[inline(always)]
-    pub fn set_attribute<K, V>(&mut self, key: K, value: V) -> &mut Self
-    where
-        K: AsRef<str>,
-        V: AnySendSyncClone,
-    {
-        self.get_mut_attributes().insert(
-            Attribute::External(key.as_ref().to_owned()).to_string(),
-            Arc::new(value),
-        );
-        self
-    }
-    #[inline(always)]
-    pub fn remove_attribute<K>(&mut self, key: K) -> &mut Self
-    where
-        K: AsRef<str>,
-    {
-        self.get_mut_attributes()
-            .remove(&Attribute::External(key.as_ref().to_owned()).to_string());
-        self
-    }
-    #[inline(always)]
-    pub fn clear_attribute(&mut self) -> &mut Self {
-        self.get_mut_attributes().clear();
-        self
-    }
-    #[inline(always)]
-    fn try_get_internal_attribute<V>(&self, key: InternalAttribute) -> Option<V>
-    where
-        V: AnySendSyncClone,
-    {
-        self.get_attributes()
-            .get(&Attribute::Internal(key).to_string())
-            .and_then(|arc| arc.downcast_ref::<V>())
-            .cloned()
-    }
-    #[inline(always)]
-    fn get_internal_attribute<V>(&self, key: InternalAttribute) -> V
-    where
-        V: AnySendSyncClone,
-    {
-        self.try_get_internal_attribute(key).unwrap()
-    }
-    #[inline(always)]
-    fn set_internal_attribute<V>(&mut self, key: InternalAttribute, value: V) -> &mut Self
-    where
-        V: AnySendSyncClone,
-    {
-        self.get_mut_attributes()
-            .insert(Attribute::Internal(key).to_string(), Arc::new(value));
-        self
-    }
-    #[inline(always)]
-    pub(crate) fn set_task_panic(&mut self, panic_data: PanicData) -> &mut Self {
-        self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
-    }
-    #[inline(always)]
-    pub fn try_get_task_panic_data(&self) -> Option<PanicData> {
-        self.try_get_internal_attribute(InternalAttribute::TaskPanicData)
-    }
-    #[inline(always)]
-    pub fn get_task_panic_data(&self) -> PanicData {
-        self.get_internal_attribute(InternalAttribute::TaskPanicData)
-    }
-    #[inline(always)]
-    pub(crate) fn set_request_error_data(&mut self, request_error: RequestError) -> &mut Self {
-        self.set_internal_attribute(InternalAttribute::RequestErrorData, request_error)
-    }
-    #[inline(always)]
-    pub fn try_get_request_error_data(&self) -> Option<RequestError> {
-        self.try_get_internal_attribute(InternalAttribute::RequestErrorData)
-    }
-    #[inline(always)]
-    pub fn get_request_error_data(&self) -> RequestError {
-        self.get_internal_attribute(InternalAttribute::RequestErrorData)
-    }
-    pub async fn try_send(&mut self) -> Result<(), ResponseError> {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        let response_data: ResponseData = self.get_mut_response().build();
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_send(response_data).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-    pub async fn send(&mut self) {
-        self.try_send().await.unwrap();
-    }
-    pub async fn try_send_body(&self) -> Result<(), ResponseError> {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        self.try_send_body_with_data(self.get_response().get_body())
-            .await
-    }
-    pub async fn send_body(&self) {
-        self.try_send_body().await.unwrap();
-    }
-    pub async fn try_send_body_with_data<D>(&self, data: D) -> Result<(), ResponseError>
-    where
-        D: AsRef<[u8]>,
-    {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_send_body(data).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-    pub async fn send_body_with_data<D>(&self, data: D)
-    where
-        D: AsRef<[u8]>,
-    {
-        self.try_send_body_with_data(data).await.unwrap();
-    }
-    pub async fn try_send_body_list<I, D>(&self, data_iter: I) -> Result<(), ResponseError>
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_send_body_list(data_iter).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-    pub async fn send_body_list<I, D>(&self, data_iter: I)
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        self.try_send_body_list(data_iter).await.unwrap();
-    }
-    pub async fn try_send_body_list_with_data<I, D>(
-        &self,
-        data_iter: I,
-    ) -> Result<(), ResponseError>
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_send_body_list(data_iter).await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-    pub async fn send_body_list_with_data<I, D>(&self, data_iter: I)
-    where
-        I: IntoIterator<Item = D>,
-        D: AsRef<[u8]>,
-    {
-        self.try_send_body_list_with_data(data_iter).await.unwrap()
-    }
-    pub async fn try_flush(&self) -> Result<(), ResponseError> {
-        if self.is_terminated() {
-            return Err(ResponseError::Terminated);
-        }
-        if let Some(stream) = self.try_get_stream() {
-            return stream.try_flush().await;
-        }
-        Err(ResponseError::NotFoundStream)
-    }
-    pub async fn flush(&self) {
-        self.try_flush().await.unwrap();
-    }
-}
-```
-# Path: hyperlane/src/context/test.rs
-```rust
-use crate::*;
-#[test]
-fn context_from_usize() {
-    let mut ctx: Context = Context::default();
-    ctx.set_aborted(true);
-    let ctx_address: usize = (&ctx).into();
-    let ctx_from_addr: Context = ctx_address.into();
-    assert_eq!(ctx.get_aborted(), ctx_from_addr.get_aborted());
-}
-#[test]
-fn context_ref_from_usize() {
-    let mut ctx: Context = Context::default();
-    ctx.set_closed(true);
-    let ctx_address: usize = (&ctx).into();
-    let ctx_ref: &Context = ctx_address.into();
-    assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
-}
-#[test]
-fn context_mut_from_usize() {
-    let mut ctx: Context = Context::default();
-    let ctx_address: usize = (&mut ctx).into();
-    let ctx_mut: &mut Context = ctx_address.into();
-    ctx_mut.set_aborted(true);
-    assert!(ctx_mut.get_aborted());
-}
-#[test]
-fn context_ref_into_usize() {
-    let ctx: Context = Context::default();
-    let ctx_address: usize = (&ctx).into();
-    assert!(ctx_address > 0);
-}
-#[test]
-fn context_mut_into_usize() {
-    let mut ctx: Context = Context::default();
-    let ctx_address: usize = (&mut ctx).into();
-    assert!(ctx_address > 0);
-}
-#[test]
-fn context_aborted_and_closed() {
-    let mut ctx: Context = Context::default();
-    assert!(!ctx.get_aborted());
-    ctx.set_aborted(true);
-    assert!(ctx.get_aborted());
-    ctx.set_aborted(false);
-    assert!(!ctx.get_aborted());
-    assert!(!ctx.get_closed());
-    ctx.set_closed(true);
-    assert!(ctx.get_closed());
-    ctx.set_closed(false);
-    assert!(!ctx.get_closed());
-    assert!(!ctx.is_terminated());
-    ctx.set_aborted(true);
-    assert!(ctx.is_terminated());
-    ctx.set_aborted(false);
-    ctx.set_closed(true);
-    assert!(ctx.is_terminated());
-}
-#[test]
-fn context_route_params() {
-    let mut ctx: Context = Context::default();
-    let mut params: RouteParams = RouteParams::default();
-    params.insert("id".to_string(), "123".to_string());
-    ctx.set_route_params(params);
-    let id: Option<String> = ctx.try_get_route_param("id");
-    assert_eq!(id, Some("123".to_string()));
-    let name: Option<String> = ctx.try_get_route_param("name");
-    assert_eq!(name, None);
-}
-#[test]
-fn context_request_and_response_string() {
-    let mut ctx: Context = Context::default();
-    let request: Request = Request::default();
-    ctx.set_request(request.clone());
-    let fetched_request: &Request = ctx.get_request();
-    assert_eq!(request.to_string(), fetched_request.to_string());
-    let response: Response = Response::default();
-    ctx.set_response(response.clone());
-    let fetched_response: &Response = ctx.get_response();
-    assert_eq!(response.to_string(), fetched_response.to_string());
-}
-#[test]
-fn context_as_ref() {
-    let ctx: Context = Context::default();
-    let ctx_ref: &Context = ctx.as_ref();
-    assert_eq!(ctx.get_aborted(), ctx_ref.get_aborted());
-    assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
-    assert_eq!(ctx.get_request(), ctx_ref.get_request());
-    assert_eq!(ctx.get_response(), ctx_ref.get_response());
-}
-#[test]
-fn context_as_mut() {
-    let mut ctx: Context = Context::default();
-    ctx.set_aborted(true);
-    let ctx_mut: &mut Context = ctx.as_mut();
-    assert!(ctx_mut.get_aborted());
-    ctx_mut.set_closed(true);
-    assert!(ctx.get_closed());
-}
-```
-# Path: hyperlane/src/attribute/mod.rs
-```rust
-mod r#enum;
-mod r#impl;
-#[cfg(test)]
-mod test;
-mod r#type;
-pub use r#type::*;
-pub(crate) use r#enum::*;
-```
-# Path: hyperlane/src/attribute/enum.rs
-```rust
-use crate::*;
-#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum Attribute {
-    External(String),
-    Internal(InternalAttribute),
-}
-#[derive(Clone, Copy, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum InternalAttribute {
-    TaskPanicData,
-    RequestErrorData,
-}
-```
-# Path: hyperlane/src/attribute/impl.rs
-```rust
-use crate::*;
-impl From<&str> for Attribute {
-    #[inline(always)]
-    fn from(key: &str) -> Self {
-        Attribute::External(key.to_string())
-    }
-}
-impl From<String> for Attribute {
-    #[inline(always)]
-    fn from(key: String) -> Self {
-        Attribute::External(key)
-    }
-}
-impl From<InternalAttribute> for Attribute {
-    #[inline(always)]
-    fn from(key: InternalAttribute) -> Self {
-        Attribute::Internal(key)
-    }
-}
-```
-# Path: hyperlane/src/attribute/type.rs
-```rust
-use crate::*;
-pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
-```
-# Path: hyperlane/src/attribute/test.rs
-```rust
-use crate::*;
-#[test]
-fn get_panic_from_context() {
-    let mut ctx: Context = Context::default();
-    let set_panic: PanicData = PanicData::new(
-        Some("test".to_string()),
-        Some("test".to_string()),
-        Some("test".to_string()),
-    );
-    ctx.set_task_panic(set_panic.clone());
-    let get_panic: PanicData = ctx.try_get_task_panic_data().unwrap();
-    assert_eq!(set_panic, get_panic);
-}
-#[test]
-fn context_attributes() {
-    let mut ctx: Context = Context::default();
-    ctx.set_attribute("key1", "value1".to_string());
-    let value: Option<String> = ctx.try_get_attribute("key1");
-    assert_eq!(value, Some("value1".to_string()));
-    ctx.remove_attribute("key1");
-    let value: Option<String> = ctx.try_get_attribute("key1");
-    assert_eq!(value, None);
-    ctx.set_attribute("key2", 123);
-    ctx.clear_attribute();
-    let value: Option<i32> = ctx.try_get_attribute("key2");
-    assert_eq!(value, None);
-}
-#[tokio::test]
-async fn get_panic_from_join_error() {
-    let message: &'static str = "Test panic message";
-    let join_handle: JoinHandle<()> = spawn(async {
-        panic!("{}", message.to_string());
-    });
-    let join_error: JoinError = join_handle.await.unwrap_err();
-    let panic_struct: PanicData = PanicData::from_join_error(join_error);
-    assert!(!panic_struct.try_get_message().is_none());
-    assert!(
-        panic_struct
-            .try_get_message()
-            .clone()
-            .unwrap_or_default()
-            .contains(message)
-    );
-}
-#[test]
-fn run_set_func() {
-    let mut ctx: Context = Context::default();
-    const KEY: &str = "string";
-    const PARAM: &str = "test";
-    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
-    ctx.set_attribute(KEY, func);
-    let get_key: &(dyn Fn(&str) -> String + Send + Sync) = ctx.try_get_attribute(KEY).unwrap();
-    assert_eq!(get_key(PARAM), func(PARAM));
-    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {
-        assert_eq!(msg, PARAM);
-    };
-    ctx.set_attribute(KEY, func);
-    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY);
-    hyperlane(PARAM);
-}
-```
-# Path: hyperlane/src/config/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-pub use r#struct::*;
-```
-# Path: hyperlane/src/config/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
-pub struct ServerConfig {
-    #[set(type(AsRef<str>))]
-    pub(super) address: String,
-    pub(super) nodelay: Option<bool>,
-    pub(super) ttl: Option<u32>,
-}
-```
-# Path: hyperlane/src/config/impl.rs
-```rust
-use crate::*;
-impl Default for ServerConfig {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            address: Server::format_bind_address(DEFAULT_HOST, DEFAULT_WEB_PORT),
-            nodelay: DEFAULT_NODELAY,
-            ttl: DEFAULT_TTI,
-        }
-    }
-}
-impl ServerConfig {
-    pub fn from_json<C>(json: C) -> Result<Self, serde_json::Error>
-    where
-        C: AsRef<str>,
-    {
-        serde_json::from_str(json.as_ref())
-    }
-}
-```
-# Path: hyperlane/src/config/test.rs
-```rust
-use crate::*;
-#[test]
-fn server_config_from_json() {
-    let server_config_json: &'static str = r#"
-    {
-        "address": "0.0.0.0:80",
-        "nodelay": true,
-        "ttl": 64
-    }
-    "#;
-    let server_config: ServerConfig = ServerConfig::from_json(server_config_json).unwrap();
-    let mut new_server_config: ServerConfig = ServerConfig::default();
-    new_server_config
-        .set_address("0.0.0.0:80")
-        .set_nodelay(Some(true))
-        .set_ttl(Some(64));
-    assert_eq!(server_config, new_server_config);
-}
-```
-# Path: hyperlane/src/error/mod.rs
-```rust
-mod r#enum;
-mod r#impl;
-#[cfg(test)]
-mod test;
-pub use r#enum::*;
-```
-# Path: hyperlane/src/error/enum.rs
-```rust
-use crate::*;
-#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
-pub enum ServerError {
-    TcpBind(String),
-    Unknown(String),
-    HttpRead(String),
-    InvalidHttpRequest(Request),
-    Other(String),
-}
-#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
-pub enum RouteError {
-    EmptyPattern,
-    DuplicatePattern(String),
-    InvalidRegexPattern(String),
-}
-```
-# Path: hyperlane/src/error/impl.rs
-```rust
-use crate::*;
-impl From<std::io::Error> for ServerError {
-    #[inline(always)]
-    fn from(error: std::io::Error) -> Self {
-        ServerError::TcpBind(error.to_string())
-    }
-}
-```
-# Path: hyperlane/src/error/test.rs
-```rust
-use crate::*;
-#[test]
-fn server_error() {
-    let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
-    let new_tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
-    assert_eq!(tcp_bind_error, new_tcp_bind_error);
-    let unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
-    let new_unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
-    assert_eq!(unknown_error, new_unknown_error);
-    let request: Request = Request::default();
-    let invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request.clone());
-    let new_invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request);
-    assert_eq!(invalid_http_request_error, new_invalid_http_request_error);
-    let other_error: ServerError = ServerError::Other("other error".to_string());
-    let new_other_error: ServerError = ServerError::Other("other error".to_string());
-    assert_eq!(other_error, new_other_error);
-}
-#[test]
-fn route_error() {
-    let empty_pattern_error: RouteError = RouteError::EmptyPattern;
-    assert_eq!(empty_pattern_error, RouteError::EmptyPattern);
-    let duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
-    let new_duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
-    assert_eq!(duplicate_pattern_error, new_duplicate_pattern_error);
-    let invalid_regex_pattern_error: RouteError = RouteError::InvalidRegexPattern("[".to_string());
-    let new_invalid_regex_pattern_error: RouteError =
-        RouteError::InvalidRegexPattern("[".to_string());
-    assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
-}
-```
 # Path: hyperlane/src/route/mod.rs
 ```rust
 mod r#enum;
@@ -7771,43 +1848,6 @@ mod r#struct;
 mod test;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
-```
-# Path: hyperlane/src/route/enum.rs
-```rust
-use crate::*;
-#[derive(Clone, CustomDebug, DisplayDebug)]
-pub enum RouteSegment {
-    Static(String),
-    Dynamic(String),
-    Regex(String, Regex),
-}
-```
-# Path: hyperlane/src/route/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, Debug, DisplayDebug, Getter)]
-pub struct RoutePattern(
-    #[get]
-    pub(super) RouteSegmentList,
-);
-#[derive(Clone, CustomDebug, DisplayDebug, Getter, GetterMut, Setter)]
-pub struct RouteMatcher {
-    #[get]
-    #[set(skip)]
-    #[get_mut(pub(super))]
-    #[debug(skip)]
-    pub(super) static_route: ServerHookMap,
-    #[get]
-    #[set(skip)]
-    #[get_mut(pub(super))]
-    #[debug(skip)]
-    pub(super) dynamic_route: ServerHookPatternRoute,
-    #[get]
-    #[set(skip)]
-    #[get_mut(pub(super))]
-    #[debug(skip)]
-    pub(super) regex_route: ServerHookPatternRoute,
-}
 ```
 # Path: hyperlane/src/route/impl.rs
 ```rust
@@ -8157,6 +2197,33 @@ impl RouteMatcher {
     }
 }
 ```
+# Path: hyperlane/src/route/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, Debug, DisplayDebug, Getter)]
+pub struct RoutePattern(
+    #[get]
+    pub(super) RouteSegmentList,
+);
+#[derive(Clone, CustomDebug, DisplayDebug, Getter, GetterMut, Setter)]
+pub struct RouteMatcher {
+    #[get]
+    #[set(skip)]
+    #[get_mut(pub(super))]
+    #[debug(skip)]
+    pub(super) static_route: ServerHookMap,
+    #[get]
+    #[set(skip)]
+    #[get_mut(pub(super))]
+    #[debug(skip)]
+    pub(super) dynamic_route: ServerHookPatternRoute,
+    #[get]
+    #[set(skip)]
+    #[get_mut(pub(super))]
+    #[debug(skip)]
+    pub(super) regex_route: ServerHookPatternRoute,
+}
+```
 # Path: hyperlane/src/route/type.rs
 ```rust
 use crate::*;
@@ -8368,6 +2435,198 @@ fn large_tail_regex_routes() {
     );
 }
 ```
+# Path: hyperlane/src/route/enum.rs
+```rust
+use crate::*;
+#[derive(Clone, CustomDebug, DisplayDebug)]
+pub enum RouteSegment {
+    Static(String),
+    Dynamic(String),
+    Regex(String, Regex),
+}
+```
+# Path: hyperlane/src/attribute/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+#[cfg(test)]
+mod test;
+mod r#type;
+pub use r#type::*;
+pub(crate) use r#enum::*;
+```
+# Path: hyperlane/src/attribute/impl.rs
+```rust
+use crate::*;
+impl From<&str> for Attribute {
+    #[inline(always)]
+    fn from(key: &str) -> Self {
+        Attribute::External(key.to_string())
+    }
+}
+impl From<String> for Attribute {
+    #[inline(always)]
+    fn from(key: String) -> Self {
+        Attribute::External(key)
+    }
+}
+impl From<InternalAttribute> for Attribute {
+    #[inline(always)]
+    fn from(key: InternalAttribute) -> Self {
+        Attribute::Internal(key)
+    }
+}
+```
+# Path: hyperlane/src/attribute/type.rs
+```rust
+use crate::*;
+pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
+```
+# Path: hyperlane/src/attribute/test.rs
+```rust
+use crate::*;
+#[test]
+fn get_panic_from_context() {
+    let mut ctx: Context = Context::default();
+    let set_panic: PanicData = PanicData::new(
+        Some("test".to_string()),
+        Some("test".to_string()),
+        Some("test".to_string()),
+    );
+    ctx.set_task_panic(set_panic.clone());
+    let get_panic: PanicData = ctx.try_get_task_panic_data().unwrap();
+    assert_eq!(set_panic, get_panic);
+}
+#[test]
+fn context_attributes() {
+    let mut ctx: Context = Context::default();
+    ctx.set_attribute("key1", "value1".to_string());
+    let value: Option<String> = ctx.try_get_attribute("key1");
+    assert_eq!(value, Some("value1".to_string()));
+    ctx.remove_attribute("key1");
+    let value: Option<String> = ctx.try_get_attribute("key1");
+    assert_eq!(value, None);
+    ctx.set_attribute("key2", 123);
+    ctx.clear_attribute();
+    let value: Option<i32> = ctx.try_get_attribute("key2");
+    assert_eq!(value, None);
+}
+#[tokio::test]
+async fn get_panic_from_join_error() {
+    let message: &'static str = "Test panic message";
+    let join_handle: JoinHandle<()> = spawn(async {
+        panic!("{}", message.to_string());
+    });
+    let join_error: JoinError = join_handle.await.unwrap_err();
+    let panic_struct: PanicData = PanicData::from_join_error(join_error);
+    assert!(!panic_struct.try_get_message().is_none());
+    assert!(
+        panic_struct
+            .try_get_message()
+            .clone()
+            .unwrap_or_default()
+            .contains(message)
+    );
+}
+#[test]
+fn run_set_func() {
+    let mut ctx: Context = Context::default();
+    const KEY: &str = "string";
+    const PARAM: &str = "test";
+    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
+    ctx.set_attribute(KEY, func);
+    let get_key: &(dyn Fn(&str) -> String + Send + Sync) = ctx.try_get_attribute(KEY).unwrap();
+    assert_eq!(get_key(PARAM), func(PARAM));
+    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {
+        assert_eq!(msg, PARAM);
+    };
+    ctx.set_attribute(KEY, func);
+    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY);
+    hyperlane(PARAM);
+}
+```
+# Path: hyperlane/src/attribute/enum.rs
+```rust
+use crate::*;
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
+pub(crate) enum Attribute {
+    External(String),
+    Internal(InternalAttribute),
+}
+#[derive(Clone, Copy, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
+pub(crate) enum InternalAttribute {
+    TaskPanicData,
+    RequestErrorData,
+}
+```
+# Path: hyperlane/src/error/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+#[cfg(test)]
+mod test;
+pub use r#enum::*;
+```
+# Path: hyperlane/src/error/impl.rs
+```rust
+use crate::*;
+impl From<std::io::Error> for ServerError {
+    #[inline(always)]
+    fn from(error: std::io::Error) -> Self {
+        ServerError::TcpBind(error.to_string())
+    }
+}
+```
+# Path: hyperlane/src/error/test.rs
+```rust
+use crate::*;
+#[test]
+fn server_error() {
+    let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
+    let new_tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
+    assert_eq!(tcp_bind_error, new_tcp_bind_error);
+    let unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
+    let new_unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
+    assert_eq!(unknown_error, new_unknown_error);
+    let request: Request = Request::default();
+    let invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request.clone());
+    let new_invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request);
+    assert_eq!(invalid_http_request_error, new_invalid_http_request_error);
+    let other_error: ServerError = ServerError::Other("other error".to_string());
+    let new_other_error: ServerError = ServerError::Other("other error".to_string());
+    assert_eq!(other_error, new_other_error);
+}
+#[test]
+fn route_error() {
+    let empty_pattern_error: RouteError = RouteError::EmptyPattern;
+    assert_eq!(empty_pattern_error, RouteError::EmptyPattern);
+    let duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
+    let new_duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
+    assert_eq!(duplicate_pattern_error, new_duplicate_pattern_error);
+    let invalid_regex_pattern_error: RouteError = RouteError::InvalidRegexPattern("[".to_string());
+    let new_invalid_regex_pattern_error: RouteError =
+        RouteError::InvalidRegexPattern("[".to_string());
+    assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
+}
+```
+# Path: hyperlane/src/error/enum.rs
+```rust
+use crate::*;
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
+pub enum ServerError {
+    TcpBind(String),
+    Unknown(String),
+    HttpRead(String),
+    InvalidHttpRequest(Request),
+    Other(String),
+}
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
+pub enum RouteError {
+    EmptyPattern,
+    DuplicatePattern(String),
+    InvalidRegexPattern(String),
+}
+```
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
@@ -8394,30 +2653,6 @@ use std::{
     str::FromStr,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-```
-# Path: hyperlane-time/src/enum.rs
-```rust
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Lang {
-    EnUsUtf8,
-    #[default]
-    ZhCnUtf8,
-    FrFrUtf8,
-    DeDeUtf8,
-    EsEsUtf8,
-    ItItUtf8,
-    JaJpUtf8,
-    KoKrUtf8,
-    PtPtUtf8,
-    RuRuUtf8,
-    ArSaUtf8,
-    HiInUtf8,
-    ThThUtf8,
-    ViVnUtf8,
-    NlNlUtf8,
-    SvSeUtf8,
-    FiFiUtf8,
-}
 ```
 # Path: hyperlane-time/src/fn.rs
 ```rust
@@ -8715,6 +2950,1094 @@ fn test_methods() {
     println!("Compute Date (10000 days): {:?}", compute_date(10000));
     println!("Current Time with Millis: {}", time_millis());
     println!("Current Time with Micros: {}", time_micros());
+}
+```
+# Path: hyperlane-time/src/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Lang {
+    EnUsUtf8,
+    #[default]
+    ZhCnUtf8,
+    FrFrUtf8,
+    DeDeUtf8,
+    EsEsUtf8,
+    ItItUtf8,
+    JaJpUtf8,
+    KoKrUtf8,
+    PtPtUtf8,
+    RuRuUtf8,
+    ArSaUtf8,
+    HiInUtf8,
+    ThThUtf8,
+    ViVnUtf8,
+    NlNlUtf8,
+    SvSeUtf8,
+    FiFiUtf8,
+}
+```
+# Path: hyperlane-utils/README.md
+## hyperlane-utils
+[Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
+[Api Docs](https://docs.rs/hyperlane-utils/latest/)
+> A library providing utils for hyperlane.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-utils
+```
+## Contact
+# Path: hyperlane-utils/src/lib.rs
+```rust
+pub use {
+    ahash, base64, bin_encode_decode::*, bytemuck_derive, chrono, chunkify::*, clonelicious::*,
+    color_output::*, compare_version::*, dotenvy, file_operation::*, future_fn::*, futures, hex,
+    hot_restart::*, http_request::*, hyperlane_broadcast::*, hyperlane_log::*, hyperlane_macros::*,
+    hyperlane_plugin_websocket::*, instrument_level::*, jsonwebtoken, jwt_service::*, log,
+    lombok_macros::*, num_cpus, once_cell, recoverable_spawn::*, recoverable_thread_pool::*, redis,
+    regex, rust_decimal, sea_orm, serde_urlencoded, serde_with, serde_xml_rs, serde_yaml,
+    server_manager::*, sha2, simd_json, snafu, sqlx, std_macro_extensions::*, sysinfo, tracing_log,
+    tracing_subscriber, twox_hash, url, urlencoding, utoipa, utoipa_rapidoc, utoipa_swagger_ui,
+    uuid,
+};
+```
+# Path: hyperlane-broadcast/README.md
+## hyperlane-broadcast
+[Official Documentation](https://docs.ltpp.vip/hyperlane-broadcast/)
+[Api Docs](https://docs.rs/hyperlane-broadcast/latest/)
+> hyperlane-broadcast is a lightweight and ergonomic wrapper over Tokio’s broadcast channel designed for easy-to-use publish-subscribe messaging in async Rust applications. It simplifies the native Tokio broadcast API by providing a straightforward interface for broadcasting messages to multiple subscribers with minimal boilerplate.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-broadcast
+```
+## Contact
+# Path: hyperlane-broadcast/src/lib.rs
+```rust
+mod broadcast;
+mod broadcast_map;
+pub use {broadcast::*, broadcast_map::*};
+#[cfg(test)]
+use std::time::Duration;
+use std::{fmt::Debug, hash::BuildHasherDefault};
+#[cfg(test)]
+use tokio::{
+    sync::broadcast::error::RecvError,
+    time::{error::Elapsed, timeout},
+};
+use {
+    dashmap::{mapref::one::Ref, *},
+    tokio::sync::broadcast::{
+        error::SendError,
+        {Receiver, Sender},
+    },
+    twox_hash::XxHash3_64,
+};
+```
+# Path: hyperlane-broadcast/src/broadcast_map/trait.rs
+```rust
+use crate::*;
+pub trait BroadcastMapTrait: Clone + Debug {}
+```
+# Path: hyperlane-broadcast/src/broadcast_map/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+#[cfg(test)]
+mod test;
+mod r#trait;
+mod r#type;
+pub use {r#struct::*, r#trait::*, r#type::*};
+```
+# Path: hyperlane-broadcast/src/broadcast_map/impl.rs
+```rust
+use crate::*;
+impl<T: Clone + Debug> BroadcastMapTrait for T {}
+impl<T: BroadcastMapTrait> Default for BroadcastMap<T> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self(DashMap::with_hasher(BuildHasherDefault::default()))
+    }
+}
+impl<T: BroadcastMapTrait> BroadcastMap<T> {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    #[inline(always)]
+    fn get(&self) -> &DashMapStringBroadcast<T> {
+        &self.0
+    }
+    #[inline(always)]
+    pub fn insert<K>(&self, key: K, capacity: Capacity) -> Option<Broadcast<T>>
+    where
+        K: AsRef<str>,
+    {
+        let broadcast: Broadcast<T> = Broadcast::new(capacity);
+        self.get().insert(key.as_ref().to_owned(), broadcast)
+    }
+    #[inline(always)]
+    pub fn receiver_count<K>(&self, key: K) -> Option<ReceiverCount>
+    where
+        K: AsRef<str>,
+    {
+        self.get()
+            .get(key.as_ref())
+            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.receiver_count())
+    }
+    #[inline(always)]
+    pub fn subscribe<K>(&self, key: K) -> Option<BroadcastMapReceiver<T>>
+    where
+        K: AsRef<str>,
+    {
+        self.get()
+            .get(key.as_ref())
+            .map(|receiver: Ref<'_, String, Broadcast<T>>| receiver.subscribe())
+    }
+    #[inline(always)]
+    pub fn subscribe_or_insert<K>(&self, key: K, capacity: Capacity) -> BroadcastMapReceiver<T>
+    where
+        K: AsRef<str>,
+    {
+        let key_ref: &str = key.as_ref();
+        match self.get().get(key_ref) {
+            Some(sender) => sender.subscribe(),
+            None => {
+                self.insert(key_ref, capacity);
+                self.subscribe_or_insert(key_ref, capacity)
+            }
+        }
+    }
+    #[inline(always)]
+    pub fn try_send<K>(&self, key: K, data: T) -> Result<Option<ReceiverCount>, SendError<T>>
+    where
+        K: AsRef<str>,
+    {
+        match self.get().get(key.as_ref()) {
+            Some(sender) => sender.send(data).map(Some),
+            None => Ok(None),
+        }
+    }
+    #[inline(always)]
+    pub fn send<K>(&self, key: K, data: T) -> Option<ReceiverCount>
+    where
+        K: AsRef<str>,
+    {
+        self.try_send(key, data).unwrap()
+    }
+    #[inline(always)]
+    pub fn unsubscribe<K>(&self, key: K) -> Option<Broadcast<T>>
+    where
+        K: AsRef<str>,
+    {
+        self.get()
+            .remove(key.as_ref())
+            .map(|(_, broadcast): (String, Broadcast<T>)| broadcast)
+    }
+}
+```
+# Path: hyperlane-broadcast/src/broadcast_map/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, Debug)]
+pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>);
+```
+# Path: hyperlane-broadcast/src/broadcast_map/type.rs
+```rust
+use crate::*;
+pub type BroadcastMapSendError<T> = SendError<T>;
+pub type BroadcastMapReceiver<T> = Receiver<T>;
+pub type BroadcastMapSender<T> = Sender<T>;
+pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDefault<XxHash3_64>>;
+```
+# Path: hyperlane-broadcast/src/broadcast_map/test.rs
+```rust
+use crate::*;
+#[tokio::test]
+pub async fn test_broadcast_map() {
+    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let mut rec3: BroadcastMapReceiver<u128> =
+        broadcast_map.subscribe_or_insert("another_key", DEFAULT_BROADCAST_SENDER_CAPACITY);
+    broadcast_map.send("test_key", 20).unwrap();
+    broadcast_map.send("another_key", 10).unwrap();
+    assert_eq!(rec1.recv().await, Ok(20));
+    assert_eq!(rec2.recv().await, Ok(20));
+    assert_eq!(rec3.recv().await, Ok(10));
+}
+#[tokio::test]
+pub async fn test_broadcast_map_unsubscribe() {
+    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let removed: Option<Broadcast<u128>> = broadcast_map.unsubscribe("test_key");
+    assert!(removed.is_some());
+    drop(removed);
+    let not_exist: Option<Broadcast<u128>> = broadcast_map.unsubscribe("nonexistent_key");
+    assert!(not_exist.is_none());
+    assert!(broadcast_map.subscribe("test_key").is_none());
+    let send_result: Result<Option<ReceiverCount>, SendError<u128>> =
+        broadcast_map.try_send("test_key", 30);
+    assert!(send_result.unwrap().is_none());
+    let result: Result<Result<u128, RecvError>, Elapsed> =
+        timeout(Duration::from_millis(100), rec1.recv()).await;
+    assert!(result.is_ok(), "recv should not timeout after unsubscribe");
+    assert_eq!(result.unwrap(), Err(RecvError::Closed));
+}
+#[tokio::test]
+pub async fn test_broadcast_map_unsubscribe_and_reinsert() {
+    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    broadcast_map.subscribe("test_key").unwrap();
+    let removed: Option<Broadcast<u128>> = broadcast_map.unsubscribe("test_key");
+    assert!(removed.is_some());
+    broadcast_map.insert("test_key", 10);
+    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    broadcast_map.send("test_key", 100).unwrap();
+    assert_eq!(rec2.recv().await, Ok(100));
+}
+#[tokio::test]
+pub async fn test_broadcast_map_unsubscribe_receiver_count() {
+    let broadcast_map: BroadcastMap<String> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    let _rec1: BroadcastMapReceiver<String> = broadcast_map.subscribe("test_key").unwrap();
+    let _rec2: BroadcastMapReceiver<String> = broadcast_map.subscribe("test_key").unwrap();
+    assert_eq!(broadcast_map.receiver_count("test_key"), Some(2));
+    let removed: Option<Broadcast<String>> = broadcast_map.unsubscribe("test_key");
+    assert!(removed.is_some());
+    assert_eq!(broadcast_map.receiver_count("test_key"), None);
+}
+#[tokio::test]
+pub async fn test_broadcast_map_send() {
+    let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
+    broadcast_map.insert("test_key", 10);
+    let mut rec1: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let mut rec2: BroadcastMapReceiver<u128> = broadcast_map.subscribe("test_key").unwrap();
+    let count: Option<ReceiverCount> = broadcast_map.send("test_key", 42);
+    assert_eq!(count, Some(2));
+    assert_eq!(rec1.recv().await, Ok(42));
+    assert_eq!(rec2.recv().await, Ok(42));
+    let non_existent: Option<ReceiverCount> = broadcast_map.send("non_existent_key", 100);
+    assert_eq!(non_existent, None);
+}
+```
+# Path: hyperlane-broadcast/src/broadcast/const.rs
+```rust
+pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
+```
+# Path: hyperlane-broadcast/src/broadcast/trait.rs
+```rust
+use crate::*;
+pub trait BroadcastTrait: Clone + Debug {}
+```
+# Path: hyperlane-broadcast/src/broadcast/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#struct;
+#[cfg(test)]
+mod test;
+mod r#trait;
+mod r#type;
+pub use {r#const::*, r#struct::*, r#trait::*, r#type::*};
+```
+# Path: hyperlane-broadcast/src/broadcast/impl.rs
+```rust
+use crate::*;
+impl<T: Clone + Debug> BroadcastTrait for T {}
+impl<T: BroadcastTrait> Default for Broadcast<T> {
+    #[inline(always)]
+    fn default() -> Self {
+        let sender: BroadcastSender<T> = BroadcastSender::new(DEFAULT_BROADCAST_SENDER_CAPACITY);
+        Self(sender)
+    }
+}
+impl<T: BroadcastTrait> Broadcast<T> {
+    #[inline(always)]
+    pub fn new(capacity: Capacity) -> Self {
+        let sender: BroadcastSender<T> = BroadcastSender::new(capacity);
+        Self(sender)
+    }
+    #[inline(always)]
+    pub fn receiver_count(&self) -> ReceiverCount {
+        self.0.receiver_count()
+    }
+    #[inline(always)]
+    pub fn subscribe(&self) -> BroadcastReceiver<T> {
+        self.0.subscribe()
+    }
+    #[inline(always)]
+    pub fn send(&self, data: T) -> BroadcastSendResult<T> {
+        self.0.send(data)
+    }
+}
+```
+# Path: hyperlane-broadcast/src/broadcast/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, Debug)]
+pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
+```
+# Path: hyperlane-broadcast/src/broadcast/type.rs
+```rust
+use crate::*;
+pub type ReceiverCount = usize;
+pub type BroadcastSendError<T> = SendError<T>;
+pub type BroadcastSendResult<T> = Result<ReceiverCount, BroadcastSendError<T>>;
+pub type BroadcastReceiver<T> = Receiver<T>;
+pub type BroadcastSender<T> = Sender<T>;
+pub type Capacity = usize;
+```
+# Path: hyperlane-broadcast/src/broadcast/test.rs
+```rust
+use crate::*;
+#[tokio::test]
+pub async fn test_broadcast() {
+    let broadcast: Broadcast<usize> = Broadcast::new(10);
+    let mut rec1: BroadcastReceiver<usize> = broadcast.subscribe();
+    let mut rec2: BroadcastReceiver<usize> = broadcast.subscribe();
+    broadcast.send(20).unwrap();
+    assert_eq!(rec1.recv().await, Ok(20));
+    assert_eq!(rec2.recv().await, Ok(20));
+}
+```
+# Path: hyperlane-plugin-websocket/README.md
+## hyperlane-plugin-websocket
+[Official Documentation](https://docs.ltpp.vip/hyperlane-plugin-websocket/)
+[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
+> A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with hyperlane-broadcast for efficient message dissemination.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-plugin-websocket
+```
+## Contact
+# Path: hyperlane-plugin-websocket/src/const.rs
+```rust
+pub(crate) const POINT_TO_POINT_KEY: &str = "ptp-";
+pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
+```
+# Path: hyperlane-plugin-websocket/src/lib.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#impl;
+mod r#struct;
+#[cfg(test)]
+mod test;
+mod r#trait;
+pub use {r#enum::*, r#struct::*};
+use {r#const::*, r#trait::*};
+#[cfg(test)]
+use std::sync::OnceLock;
+use std::{
+    convert::Infallible,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    num::{
+        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
+        NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
+    },
+};
+use {
+    hyperlane::{
+        tokio::sync::broadcast::{Receiver, error::SendError},
+        *,
+    },
+    hyperlane_broadcast::*,
+};
+```
+# Path: hyperlane-plugin-websocket/src/trait.rs
+```rust
+pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
+```
+# Path: hyperlane-plugin-websocket/src/impl.rs
+```rust
+use crate::*;
+impl BroadcastTypeTrait for String {}
+impl BroadcastTypeTrait for &str {}
+impl BroadcastTypeTrait for char {}
+impl BroadcastTypeTrait for bool {}
+impl BroadcastTypeTrait for i8 {}
+impl BroadcastTypeTrait for i16 {}
+impl BroadcastTypeTrait for i32 {}
+impl BroadcastTypeTrait for i64 {}
+impl BroadcastTypeTrait for i128 {}
+impl BroadcastTypeTrait for isize {}
+impl BroadcastTypeTrait for u8 {}
+impl BroadcastTypeTrait for u16 {}
+impl BroadcastTypeTrait for u32 {}
+impl BroadcastTypeTrait for u64 {}
+impl BroadcastTypeTrait for u128 {}
+impl BroadcastTypeTrait for usize {}
+impl BroadcastTypeTrait for f32 {}
+impl BroadcastTypeTrait for f64 {}
+impl BroadcastTypeTrait for IpAddr {}
+impl BroadcastTypeTrait for Ipv4Addr {}
+impl BroadcastTypeTrait for Ipv6Addr {}
+impl BroadcastTypeTrait for SocketAddr {}
+impl BroadcastTypeTrait for NonZeroU8 {}
+impl BroadcastTypeTrait for NonZeroU16 {}
+impl BroadcastTypeTrait for NonZeroU32 {}
+impl BroadcastTypeTrait for NonZeroU64 {}
+impl BroadcastTypeTrait for NonZeroU128 {}
+impl BroadcastTypeTrait for NonZeroUsize {}
+impl BroadcastTypeTrait for NonZeroI8 {}
+impl BroadcastTypeTrait for NonZeroI16 {}
+impl BroadcastTypeTrait for NonZeroI32 {}
+impl BroadcastTypeTrait for NonZeroI64 {}
+impl BroadcastTypeTrait for NonZeroI128 {}
+impl BroadcastTypeTrait for NonZeroIsize {}
+impl BroadcastTypeTrait for Infallible {}
+impl BroadcastTypeTrait for &String {}
+impl BroadcastTypeTrait for &&str {}
+impl BroadcastTypeTrait for &char {}
+impl BroadcastTypeTrait for &bool {}
+impl BroadcastTypeTrait for &i8 {}
+impl BroadcastTypeTrait for &i16 {}
+impl BroadcastTypeTrait for &i32 {}
+impl BroadcastTypeTrait for &i64 {}
+impl BroadcastTypeTrait for &i128 {}
+impl BroadcastTypeTrait for &isize {}
+impl BroadcastTypeTrait for &u8 {}
+impl BroadcastTypeTrait for &u16 {}
+impl BroadcastTypeTrait for &u32 {}
+impl BroadcastTypeTrait for &u128 {}
+impl BroadcastTypeTrait for &usize {}
+impl BroadcastTypeTrait for &f32 {}
+impl BroadcastTypeTrait for &f64 {}
+impl BroadcastTypeTrait for &IpAddr {}
+impl BroadcastTypeTrait for &Ipv4Addr {}
+impl BroadcastTypeTrait for &Ipv6Addr {}
+impl BroadcastTypeTrait for &SocketAddr {}
+impl BroadcastTypeTrait for &NonZeroU8 {}
+impl BroadcastTypeTrait for &NonZeroU16 {}
+impl BroadcastTypeTrait for &NonZeroU32 {}
+impl BroadcastTypeTrait for &NonZeroU64 {}
+impl BroadcastTypeTrait for &NonZeroU128 {}
+impl BroadcastTypeTrait for &NonZeroUsize {}
+impl BroadcastTypeTrait for &NonZeroI8 {}
+impl BroadcastTypeTrait for &NonZeroI16 {}
+impl BroadcastTypeTrait for &NonZeroI32 {}
+impl BroadcastTypeTrait for &NonZeroI64 {}
+impl BroadcastTypeTrait for &NonZeroI128 {}
+impl BroadcastTypeTrait for &NonZeroIsize {}
+impl BroadcastTypeTrait for &Infallible {}
+impl<B> Default for BroadcastType<B>
+where
+    B: BroadcastTypeTrait,
+{
+    #[inline(always)]
+    fn default() -> Self {
+        BroadcastType::Unknown
+    }
+}
+impl<B> BroadcastType<B>
+where
+    B: BroadcastTypeTrait,
+{
+    #[inline(always)]
+    pub fn get_key(broadcast_type: BroadcastType<B>) -> String {
+        match broadcast_type {
+            BroadcastType::PointToPoint(key1, key2) => {
+                let (first_key, second_key) = if key1 <= key2 {
+                    (key1, key2)
+                } else {
+                    (key2, key1)
+                };
+                format!(
+                    "{}-{}-{}",
+                    POINT_TO_POINT_KEY,
+                    first_key.to_string(),
+                    second_key.to_string()
+                )
+            }
+            BroadcastType::PointToGroup(key) => {
+                format!("{}-{}", POINT_TO_GROUP_KEY, key.to_string())
+            }
+            BroadcastType::Unknown => String::new(),
+        }
+    }
+}
+impl<'a, B> WebSocketConfig<'a, B>
+where
+    B: BroadcastTypeTrait,
+{
+    #[inline(always)]
+    pub fn new(context: &'a mut Context) -> Self {
+        Self {
+            context,
+            capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
+            broadcast_type: BroadcastType::default(),
+            connected_hook: default_server_hook_handler(),
+            request_hook: default_server_hook_handler(),
+            sended_hook: default_server_hook_handler(),
+            closed_hook: default_server_hook_handler(),
+        }
+    }
+}
+impl<'a, B> WebSocketConfig<'a, B>
+where
+    B: BroadcastTypeTrait,
+{
+    #[inline(always)]
+    pub fn set_capacity(mut self, capacity: Capacity) -> Self {
+        self.capacity = capacity;
+        self
+    }
+    #[inline(always)]
+    pub fn set_context(mut self, context: &'a mut Context) -> Self {
+        self.context = context;
+        self
+    }
+    #[inline(always)]
+    pub fn set_broadcast_type(mut self, broadcast_type: BroadcastType<B>) -> Self {
+        self.broadcast_type = broadcast_type;
+        self
+    }
+    #[inline(always)]
+    pub fn get_context(&mut self) -> &mut Context {
+        self.context
+    }
+    #[inline(always)]
+    pub fn get_capacity(&self) -> Capacity {
+        self.capacity
+    }
+    #[inline(always)]
+    pub fn get_broadcast_type(&self) -> &BroadcastType<B> {
+        &self.broadcast_type
+    }
+    #[inline(always)]
+    pub fn set_connected_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.connected_hook = server_hook_factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_request_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.request_hook = server_hook_factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_sended_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.sended_hook = server_hook_factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_closed_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.closed_hook = server_hook_factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn get_connected_hook(&self) -> &ServerHookHandler {
+        &self.connected_hook
+    }
+    #[inline(always)]
+    pub fn get_request_hook(&self) -> &ServerHookHandler {
+        &self.request_hook
+    }
+    #[inline(always)]
+    pub fn get_sended_hook(&self) -> &ServerHookHandler {
+        &self.sended_hook
+    }
+    #[inline(always)]
+    pub fn get_closed_hook(&self) -> &ServerHookHandler {
+        &self.closed_hook
+    }
+}
+impl WebSocket {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    #[inline(always)]
+    fn subscribe_unwrap_or_insert<B>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+        capacity: Capacity,
+    ) -> BroadcastMapReceiver<Vec<u8>>
+    where
+        B: BroadcastTypeTrait,
+    {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.subscribe_or_insert(&key, capacity)
+    }
+    #[inline(always)]
+    fn point_to_point<B>(
+        &self,
+        key1: &B,
+        key2: &B,
+        capacity: Capacity,
+    ) -> BroadcastMapReceiver<Vec<u8>>
+    where
+        B: BroadcastTypeTrait,
+    {
+        self.subscribe_unwrap_or_insert(
+            BroadcastType::PointToPoint(key1.clone(), key2.clone()),
+            capacity,
+        )
+    }
+    #[inline(always)]
+    fn point_to_group<B>(&self, key: &B, capacity: Capacity) -> BroadcastMapReceiver<Vec<u8>>
+    where
+        B: BroadcastTypeTrait,
+    {
+        self.subscribe_unwrap_or_insert(BroadcastType::PointToGroup(key.clone()), capacity)
+    }
+    #[inline(always)]
+    pub fn receiver_count<B>(&self, broadcast_type: BroadcastType<B>) -> ReceiverCount
+    where
+        B: BroadcastTypeTrait,
+    {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.receiver_count(&key).unwrap_or(0)
+    }
+    #[inline(always)]
+    pub fn receiver_count_before_connected<B>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+    ) -> ReceiverCount
+    where
+        B: BroadcastTypeTrait,
+    {
+        let count: ReceiverCount = self.receiver_count(broadcast_type);
+        count.clamp(0, ReceiverCount::MAX - 1) + 1
+    }
+    #[inline(always)]
+    pub fn receiver_count_after_closed<B>(&self, broadcast_type: BroadcastType<B>) -> ReceiverCount
+    where
+        B: BroadcastTypeTrait,
+    {
+        let count: ReceiverCount = self.receiver_count(broadcast_type);
+        count.clamp(1, ReceiverCount::MAX) - 1
+    }
+    #[inline(always)]
+    pub fn try_send<T, B>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+        data: T,
+    ) -> Result<Option<ReceiverCount>, SendError<Vec<u8>>>
+    where
+        T: Into<Vec<u8>>,
+        B: BroadcastTypeTrait,
+    {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.try_send(&key, data.into())
+    }
+    #[inline(always)]
+    pub fn send<T, B>(&self, broadcast_type: BroadcastType<B>, data: T) -> Option<ReceiverCount>
+    where
+        T: Into<Vec<u8>>,
+        B: BroadcastTypeTrait,
+    {
+        self.try_send(broadcast_type, data).unwrap()
+    }
+    pub async fn run<B>(&self, mut websocket_config: WebSocketConfig<'_, B>)
+    where
+        B: BroadcastTypeTrait,
+    {
+        let capacity: Capacity = websocket_config.get_capacity();
+        let broadcast_type: BroadcastType<B> = websocket_config.get_broadcast_type().clone();
+        let connected_hook: ServerHookHandler = websocket_config.get_connected_hook().clone();
+        let sended_hook: ServerHookHandler = websocket_config.get_sended_hook().clone();
+        let request_hook: ServerHookHandler = websocket_config.get_request_hook().clone();
+        let closed_hook: ServerHookHandler = websocket_config.get_closed_hook().clone();
+        let ctx: &mut Context = websocket_config.get_context();
+        let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
+            BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
+            BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
+            BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
+        };
+        let key: String = BroadcastType::get_key(broadcast_type);
+        connected_hook(ctx).await;
+        loop {
+            tokio::select! {
+                request_res = ctx.ws_from_stream() => {
+                    let mut is_err: bool = false;
+                    if request_res.is_ok() {
+                        request_hook(ctx).await;
+                    } else {
+                        is_err = true;
+                        closed_hook(ctx).await;
+                    }
+                    if ctx.get_aborted() {
+                        continue;
+                    }
+                    if ctx.get_closed() {
+                        break;
+                    }
+                    let body: ResponseBody = ctx.get_response().get_body().clone();
+                    is_err = self.broadcast_map.try_send(&key, body).is_err() || is_err;
+                    sended_hook(ctx).await;
+                    if is_err || ctx.get_closed() {
+                        break;
+                    }
+                },
+                msg_res = receiver.recv() => {
+                    if let Ok(msg) = &msg_res {
+                        if ctx.try_send_body_list_with_data(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
+                            continue;
+                        } else {
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        ctx.set_aborted(true).set_closed(true);
+    }
+}
+```
+# Path: hyperlane-plugin-websocket/src/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, Debug, Default)]
+pub struct WebSocket {
+    pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
+}
+pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
+    pub(super) context: &'a mut Context,
+    pub(super) capacity: Capacity,
+    pub(super) broadcast_type: BroadcastType<B>,
+    pub(super) connected_hook: ServerHookHandler,
+    pub(super) request_hook: ServerHookHandler,
+    pub(super) sended_hook: ServerHookHandler,
+    pub(super) closed_hook: ServerHookHandler,
+}
+```
+# Path: hyperlane-plugin-websocket/src/test.rs
+```rust
+use crate::*;
+static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
+fn get_broadcast_map() -> &'static WebSocket {
+    BROADCAST_MAP.get_or_init(WebSocket::new)
+}
+struct TaskPanicHook {
+    response_body: String,
+    content_type: String,
+}
+impl ServerHook for TaskPanicHook {
+    async fn new(ctx: &mut Context) -> Self {
+        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(500)
+            .clear_headers()
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONTENT_TYPE, &self.content_type)
+            .set_body(&self.response_body);
+        if ctx.try_send().await.is_err() {
+            ctx.set_aborted(true).set_closed(true);
+        }
+    }
+}
+struct RequestErrorHook {
+    response_status_code: ResponseStatusCode,
+    response_body: String,
+}
+impl ServerHook for RequestErrorHook {
+    async fn new(ctx: &mut Context) -> Self {
+        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
+        Self {
+            response_status_code: request_error.get_http_status_code(),
+            response_body: request_error.to_string(),
+        }
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(self.response_status_code)
+            .set_body(self.response_body);
+        if ctx.try_send().await.is_err() {
+            ctx.set_aborted(true).set_closed(true);
+        }
+    }
+}
+struct RequestMiddleware {
+    socket_addr: String,
+}
+impl ServerHook for RequestMiddleware {
+    async fn new(ctx: &mut Context) -> Self {
+        let socket_addr: String = ctx.get_socket_addr_string().await;
+        Self { socket_addr }
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(200)
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONNECTION, KEEP_ALIVE)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .set_header("SocketAddr", &self.socket_addr);
+    }
+}
+struct UpgradeHook;
+impl ServerHook for UpgradeHook {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        if !ctx.get_request().is_ws_upgrade_type() {
+            return;
+        }
+        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            ctx.get_mut_response()
+                .set_version(HttpVersion::Http1_1)
+                .set_status_code(101)
+                .set_header(UPGRADE, WEBSOCKET)
+                .set_header(CONNECTION, UPGRADE)
+                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .set_body(vec![]);
+            if ctx.try_send().await.is_err() {
+                ctx.set_aborted(true).set_closed(true);
+            }
+        }
+    }
+}
+struct ConnectedHook {
+    receiver_count: ReceiverCount,
+    data: String,
+    group_broadcast_type: BroadcastType<String>,
+    private_broadcast_type: BroadcastType<String>,
+}
+impl ServerHook for ConnectedHook {
+    async fn new(ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap_or_default();
+        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count(group_broadcast_type.clone());
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap_or_default();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap_or_default();
+        let private_broadcast_type: BroadcastType<String> =
+            BroadcastType::PointToPoint(my_name, your_name);
+        let data: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            receiver_count,
+            data,
+            group_broadcast_type,
+            private_broadcast_type,
+        }
+    }
+    async fn handle(self, _ctx: &mut Context) {
+        get_broadcast_map()
+            .try_send(self.group_broadcast_type, self.data.clone())
+            .unwrap_or_else(|err| {
+                println!("[connected_hook] send group error => {:?}", err.to_string());
+                None
+            });
+        get_broadcast_map()
+            .try_send(self.private_broadcast_type, self.data)
+            .unwrap_or_else(|err| {
+                println!(
+                    "[connected_hook] send private error => {:?}",
+                    err.to_string()
+                );
+                None
+            });
+        println!(
+            "[connected_hook] receiver_count => {:?}",
+            self.receiver_count
+        );
+        Server::flush_stdout();
+    }
+}
+struct SendedHook {
+    msg: String,
+}
+impl ServerHook for SendedHook {
+    async fn new(ctx: &mut Context) -> Self {
+        let msg: String = ctx.get_response().get_body_string();
+        Self { msg }
+    }
+    async fn handle(self, _ctx: &mut Context) {
+        println!("[sended_hook] msg => {}", self.msg);
+        Server::flush_stdout();
+    }
+}
+struct GroupChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for GroupChatRequestHook {
+    async fn new(ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request().get_body().clone();
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response().set_body(&self.body);
+        println!("[group_chat] receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct GroupClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for GroupClosedHook {
+    async fn new(ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount =
+            get_broadcast_map().receiver_count_after_closed(key.clone());
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response().set_body(&self.body);
+        println!("[group_closed] receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct GroupChat;
+impl ServerHook for GroupChat {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new(ctx)
+            .set_capacity(1024)
+            .set_broadcast_type(key)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<GroupChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<GroupClosedHook>();
+        get_broadcast_map().run(config).await;
+    }
+}
+struct PrivateChatRequestHook {
+    body: RequestBody,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for PrivateChatRequestHook {
+    async fn new(ctx: &mut Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request().get_body().clone();
+        if body.is_empty() {
+            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response().set_body(&self.body);
+        println!("[private_chat] receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+    }
+}
+struct PrivateClosedHook {
+    body: String,
+    receiver_count: ReceiverCount,
+}
+impl ServerHook for PrivateClosedHook {
+    async fn new(ctx: &mut Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response().set_body(&self.body);
+        println!(
+            "[private_closed] receiver_count => {:?}",
+            self.receiver_count
+        );
+        Server::flush_stdout();
+    }
+}
+struct PrivateChat;
+impl ServerHook for PrivateChat {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new(ctx)
+            .set_capacity(1024)
+            .set_broadcast_type(key)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<PrivateChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<PrivateClosedHook>();
+        get_broadcast_map().run(config).await;
+    }
+}
+#[tokio::test]
+async fn main() {
+    let mut server: Server = Server::default();
+    server.task_panic::<TaskPanicHook>();
+    server.request_error::<RequestErrorHook>();
+    server.request_middleware::<RequestMiddleware>();
+    server.request_middleware::<UpgradeHook>();
+    server.route::<GroupChat>("/{group_name}");
+    server.route::<PrivateChat>("/{my_name}/{your_name}");
+    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
+    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        server_control_hook_2.shutdown().await;
+    });
+    server_control_hook_1.wait().await;
+}
+```
+# Path: hyperlane-plugin-websocket/src/enum.rs
+```rust
+use crate::*;
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum BroadcastType<T: BroadcastTypeTrait> {
+    PointToPoint(T, T),
+    PointToGroup(T),
+    Unknown,
 }
 ```
 # Path: hyperlane-macros/README.md
@@ -10650,25 +5973,341 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
     flush_macro(item, Position::Prologue)
 }
 ```
-# Path: hyperlane-macros/src/closed/mod.rs
+# Path: hyperlane-macros/src/common/const.rs
+```rust
+pub(crate) const SERVER_TYPE_KEY: &str = "Server";
+```
+# Path: hyperlane-macros/src/common/mod.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+mod r#type;
+pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#struct::*, r#type::*};
+```
+# Path: hyperlane-macros/src/common/fn.rs
+```rust
+use crate::*;
+fn inject_at_start(
+    input: TokenStream,
+    before_fn: impl FnOnce(&Ident) -> TokenStream2,
+) -> TokenStream {
+    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let before_code: TokenStream2 = before_fn(context);
+            let stmts: &Vec<Stmt> = &block.stmts;
+            let gen_code: TokenStream2 = quote! {
+                #(#attrs)*
+                #vis #sig {
+                    #before_code
+                    #(#stmts)*
+                }
+            };
+            gen_code.into()
+        }
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+fn inject_at_end(input: TokenStream, after_fn: impl FnOnce(&Ident) -> TokenStream2) -> TokenStream {
+    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let after_code: TokenStream2 = after_fn(context);
+            let stmts: &Vec<Stmt> = &block.stmts;
+            let gen_code: TokenStream2 = quote! {
+                #(#attrs)*
+                #vis #sig {
+                    #(#stmts)*
+                    #after_code
+                }
+            };
+            gen_code.into()
+        }
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+pub(crate) fn inject(
+    position: Position,
+    input: TokenStream,
+    hook: impl FnOnce(&Ident) -> TokenStream2,
+) -> TokenStream {
+    match position {
+        Position::Prologue => inject_at_start(input, hook),
+        Position::Epilogue => inject_at_end(input, hook),
+    }
+}
+#[allow(dead_code)]
+pub(crate) fn parse_context_from_fn(sig: &Signature) -> syn::Result<&Ident> {
+    match sig.inputs.first() {
+        Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
+            Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
+            Pat::Wild(wild) => Err(syn::Error::new_spanned(
+                wild,
+                "The argument cannot be anonymous `_`, please use a named identifier",
+            )),
+            _ => Err(syn::Error::new_spanned(
+                &pat_type.pat,
+                "expected identifier as first argument",
+            )),
+        },
+        _ => Err(syn::Error::new_spanned(
+            &sig.inputs,
+            "expected at least one argument",
+        )),
+    }
+}
+#[allow(dead_code)]
+pub(crate) fn parse_self_from_method(sig: &Signature) -> syn::Result<&Ident> {
+    match sig.inputs.first() {
+        Some(FnArg::Receiver(_)) => match sig.inputs.iter().nth(1) {
+            Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
+                Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
+                Pat::Wild(wild) => Err(syn::Error::new_spanned(
+                    wild,
+                    "The context argument cannot be anonymous `_`, please use a named identifier",
+                )),
+                _ => Err(syn::Error::new_spanned(
+                    &pat_type.pat,
+                    "expected identifier as second argument (context)",
+                )),
+            },
+            _ => Err(syn::Error::new_spanned(
+                &sig.inputs,
+                "expected context as second argument",
+            )),
+        },
+        _ => Err(syn::Error::new_spanned(
+            &sig.inputs,
+            "expected self as first argument for method",
+        )),
+    }
+}
+fn is_context_type(ty: &Type) -> bool {
+    if let Type::Reference(type_ref) = ty
+        && let Type::Path(type_path) = &*type_ref.elem
+    {
+        let path: &Path = &type_path.path;
+        if path.segments.len() >= 2 {
+            let segments: Vec<_> = path.segments.iter().collect();
+            if segments.len() >= 2 {
+                let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
+                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
+                    return true;
+                }
+            }
+        }
+        if path.segments.len() == 1 && path.segments[0].ident == "Context" {
+            return true;
+        }
+    }
+    false
+}
+pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<&Ident> {
+    for arg in sig.inputs.iter() {
+        if let FnArg::Typed(pat_type) = arg
+            && is_context_type(&pat_type.ty)
+        {
+            match &*pat_type.pat {
+                Pat::Ident(pat_ident) => return Ok(&pat_ident.ident),
+                Pat::Wild(wild) => {
+                    return Err(syn::Error::new_spanned(
+                        wild,
+                        "The context argument cannot be anonymous `_`, please use a named identifier",
+                    ));
+                }
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        &pat_type.pat,
+                        "expected identifier for context parameter",
+                    ));
+                }
+            }
+        }
+    }
+    Err(syn::Error::new_spanned(
+        &sig.inputs,
+        "expected at least one parameter of type &::hyperlane::Context",
+    ))
+}
+pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
+    match opt_expr {
+        Some(expr) => match expr {
+            Expr::Lit(ExprLit {
+                lit: Lit::Int(lit_int),
+                ..
+            }) => {
+                let value: isize = lit_int.base10_parse::<isize>().unwrap();
+                quote! { Some(#value) }
+            }
+            Expr::Lit(ExprLit {
+                lit: Lit::Str(lit_str),
+                ..
+            }) => {
+                let value: isize = lit_str.value().parse().expect("Cannot parse to isize");
+                quote! { Some(#value) }
+            }
+            _ => quote! { None },
+        },
+        None => quote! { None },
+    }
+}
+```
+# Path: hyperlane-macros/src/common/impl.rs
+```rust
+use crate::*;
+impl Parse for OrderAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.is_empty() {
+            return Ok(OrderAttr { order: None });
+        }
+        let expr: Expr = input.parse()?;
+        Ok(OrderAttr { order: Some(expr) })
+    }
+}
+```
+# Path: hyperlane-macros/src/common/struct.rs
+```rust
+use crate::*;
+#[derive(Clone)]
+pub(crate) struct OrderAttr {
+    pub(crate) order: Option<Expr>,
+}
+pub(crate) struct InjectableMacro {
+    pub(crate) name: &'static str,
+    pub(crate) handler: Handler,
+}
+```
+# Path: hyperlane-macros/src/common/type.rs
+```rust
+use crate::*;
+pub(crate) type MacroHandlerPosition = fn(TokenStream, Position) -> TokenStream;
+pub(crate) type MacroHandlerWithAttr = fn(TokenStream, TokenStream) -> TokenStream;
+pub(crate) type MacroHandlerWithAttrPosition =
+    fn(TokenStream, TokenStream, Position) -> TokenStream;
+```
+# Path: hyperlane-macros/src/common/enum.rs
+```rust
+use crate::*;
+pub(crate) enum Handler {
+    WithAttr(MacroHandlerWithAttr),
+    NoAttrPosition(MacroHandlerPosition),
+    WithAttrPosition(MacroHandlerWithAttrPosition),
+}
+pub(crate) enum Position {
+    Prologue,
+    Epilogue,
+}
+```
+# Path: hyperlane-macros/src/hyperlane/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+```
+# Path: hyperlane-macros/src/hyperlane/fn.rs
+```rust
+use crate::*;
+pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let multi_hyperlane: MultiHyperlaneAttr = parse_macro_input!(attr as MultiHyperlaneAttr);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    let stmts: &Vec<Stmt> = &block.stmts;
+    let mut init_statements: Vec<TokenStream2> = Vec::new();
+    for (var_name, type_name) in &multi_hyperlane.params {
+        init_statements.push(quote! {
+            let mut #var_name: #type_name = #type_name::default();
+        });
+        if type_name == SERVER_TYPE_KEY {
+            init_statements.push(quote! {
+                let mut hooks: Vec<::hyperlane::HookType> = inventory::iter().cloned().collect();
+                assert_hook_unique_order(hooks.clone());
+                hooks.sort_by_key(|hook| hook.try_get_order());
+                for hook in hooks {
+                    #var_name.handle_hook(hook.clone());
+                }
+            });
+        }
+    }
+    let gen_code: TokenStream2 = quote! {
+        #(#attrs)*
+        #vis #sig {
+            #(#init_statements)*
+            #(#stmts)*
+        }
+    };
+    gen_code.into()
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "hyperlane",
+        handler: Handler::WithAttr(hyperlane_macro),
+    }
+}
+```
+# Path: hyperlane-macros/src/hyperlane/impl.rs
+```rust
+use crate::*;
+impl Parse for MultiHyperlaneAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut params: Vec<(Ident, Ident)> = Vec::new();
+        loop {
+            let var_name: Ident = input.parse()?;
+            input.parse::<Token![:]>()?;
+            let type_name: Ident = input.parse()?;
+            params.push((var_name, type_name));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiHyperlaneAttr { params })
+    }
+}
+```
+# Path: hyperlane-macros/src/hyperlane/struct.rs
+```rust
+use crate::*;
+pub(crate) struct MultiHyperlaneAttr {
+    pub(crate) params: Vec<(Ident, Ident)>,
+}
+```
+# Path: hyperlane-macros/src/aborted/mod.rs
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/closed/fn.rs
+# Path: hyperlane-macros/src/aborted/fn.rs
 ```rust
 use crate::*;
-pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
+pub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
         quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_closed(true);
+            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_aborted(true);
         }
     })
 }
 inventory::submit! {
     InjectableMacro {
-        name: "closed",
-        handler: Handler::NoAttrPosition(closed_macro),
+        name: "aborted",
+        handler: Handler::NoAttrPosition(aborted_macro),
     }
 }
 ```
@@ -10767,260 +6406,49 @@ inventory::submit! {
     }
 }
 ```
-# Path: hyperlane-macros/src/response/mod.rs
+# Path: hyperlane-macros/src/from_stream/mod.rs
 ```rust
-mod r#enum;
-mod r#fn;
 mod r#impl;
 mod r#struct;
-pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+pub(crate) use r#struct::*;
 ```
-# Path: hyperlane-macros/src/response/enum.rs
-```rust
-pub(crate) enum HeaderOperation {
-    Set,
-    Add,
-}
-```
-# Path: hyperlane-macros/src/response/struct.rs
+# Path: hyperlane-macros/src/from_stream/impl.rs
 ```rust
 use crate::*;
-pub(crate) struct SendData {
-    pub(crate) data: Expr,
-}
-```
-# Path: hyperlane-macros/src/response/fn.rs
-```rust
-use crate::*;
-pub(crate) fn response_status_code_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let value: Expr = match parse(attr) {
-        Ok(v) => v,
-        Err(err) => return err.to_compile_error().into(),
-    };
-    inject(position, item, |context| {
-        quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_status_code",
-        handler: Handler::WithAttrPosition(response_status_code_macro),
-    }
-}
-pub(crate) fn response_reason_phrase_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let value: Expr = match parse(attr) {
-        Ok(v) => v,
-        Err(err) => return err.to_compile_error().into(),
-    };
-    inject(position, item, |context| {
-        quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_reason_phrase(&#value);
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_reason_phrase",
-        handler: Handler::WithAttrPosition(response_reason_phrase_macro),
-    }
-}
-pub(crate) fn response_header_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);
-    let key: Expr = header_data.key;
-    let value: Expr = header_data.value;
-    let operation: HeaderOperation = header_data.operation;
-    inject(position, item, |context| match operation {
-        HeaderOperation::Add => {
-            quote! {
-                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().add_header(&#key, &#value);
-            }
-        }
-        HeaderOperation::Set => {
-            quote! {
-                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_header(&#key, &#value);
-            }
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_header",
-        handler: Handler::WithAttrPosition(response_header_macro),
-    }
-}
-pub(crate) fn response_body_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
-    let body: Expr = body_data.body;
-    inject(position, item, |context| {
-        quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_body(&#body);
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_body",
-        handler: Handler::WithAttrPosition(response_body_macro),
-    }
-}
-pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().clear_headers();
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "clear_response_headers",
-        handler: Handler::NoAttrPosition(clear_response_headers_macro),
-    }
-}
-pub(crate) fn response_version_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let value: Expr = match parse(attr) {
-        Ok(v) => v,
-        Err(err) => return err.to_compile_error().into(),
-    };
-    inject(position, item, |context| {
-        quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_version(#value);
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_version",
-        handler: Handler::WithAttrPosition(response_version_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/response/impl.rs
-```rust
-use crate::*;
-impl Parse for ResponseHeaderData {
+impl Parse for FromStreamData {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let key: Expr = input.parse()?;
-        let operation: HeaderOperation = if input.peek(Token![=>]) {
-            input.parse::<Token![=>]>()?;
-            HeaderOperation::Set
-        } else if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-            HeaderOperation::Add
+        let variable_name: Option<Expr> = if input.is_empty() {
+            None
         } else {
-            return Err(syn::Error::new(
-                input.span(),
-                "Expected either ',' for add operation or '=>' for set operation",
-            ));
+            let expr: Expr = input.parse()?;
+            if !input.is_empty() {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "expected at most one parameter",
+                ));
+            }
+            Some(expr)
         };
-        let value: Expr = input.parse()?;
-        Ok(ResponseHeaderData {
-            key,
-            value,
-            operation,
-        })
-    }
-}
-impl Parse for ResponseBodyData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let body: Expr = input.parse()?;
-        Ok(ResponseBodyData { body })
+        Ok(FromStreamData { variable_name })
     }
 }
 ```
-# Path: hyperlane-macros/src/inject/mod.rs
+# Path: hyperlane-macros/src/from_stream/struct.rs
+```rust
+use crate::*;
+pub(crate) struct FromStreamData {
+    pub(crate) variable_name: Option<Expr>,
+}
+```
+# Path: hyperlane-macros/src/response_middleware/mod.rs
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/inject/fn.rs
+# Path: hyperlane-macros/src/response_middleware/fn.rs
 ```rust
 use crate::*;
-fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) -> TokenStream {
-    let (macro_name, macro_attr) = match macro_meta {
-        Meta::Path(path) => (
-            path.get_ident()
-                .expect("Macro path should have an identifier")
-                .to_string(),
-            TokenStream::new(),
-        ),
-        Meta::List(meta_list) => (
-            meta_list
-                .path
-                .get_ident()
-                .expect("Macro path should have an identifier")
-                .to_string(),
-            meta_list.tokens.clone().into(),
-        ),
-        _ => panic!("Unsupported macro format in inject macro"),
-    };
-    for injectable_macro in inventory::iter::<InjectableMacro>() {
-        if injectable_macro.name == macro_name {
-            return match injectable_macro.handler {
-                Handler::WithAttr(handler) => handler(macro_attr, item_stream),
-                Handler::NoAttrPosition(handler) => {
-                    if !macro_attr.is_empty() {
-                        panic!("Macro {macro_name} does not take attributes");
-                    }
-                    handler(item_stream, position)
-                }
-                Handler::WithAttrPosition(handler) => handler(macro_attr, item_stream, position),
-            };
-        }
-    }
-    panic!("Unsupported macro: {macro_name}");
-}
-pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse(attr)
-        .expect("Failed to parse macro attributes");
-    let mut current_stream: TokenStream = item;
-    for meta in metas.iter().rev() {
-        current_stream = apply_macro(meta, current_stream, Position::Prologue);
-    }
-    current_stream
-}
-pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse(attr)
-        .expect("Failed to parse macro attributes");
-    let mut current_stream: TokenStream = item;
-    for meta in metas.iter() {
-        current_stream = apply_macro(meta, current_stream, Position::Epilogue);
-    }
-    current_stream
-}
-```
-# Path: hyperlane-macros/src/request_middleware/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/request_middleware/fn.rs
-```rust
-use crate::*;
-pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
@@ -11028,17 +6456,100 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+            ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
         }
     };
     gen_code.into()
 }
 inventory::submit! {
     InjectableMacro {
-        name: "request_middleware",
-        handler: Handler::WithAttr(request_middleware_macro),
+        name: "response_middleware",
+        handler: Handler::WithAttr(response_middleware_macro),
     }
 }
+```
+# Path: hyperlane-macros/src/flush/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/flush/fn.rs
+```rust
+use crate::*;
+pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            let _ = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).try_flush().await;
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "try_flush",
+        handler: Handler::NoAttrPosition(try_flush_macro),
+    }
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "flush",
+        handler: Handler::NoAttrPosition(flush_macro),
+    }
+}
+pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {{
+            let new_context: &mut Context = (#context as *mut Context as usize).into();
+            new_context.flush().await;
+        }}
+    })
+}
+```
+# Path: hyperlane-macros/src/upgrade/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/upgrade/fn.rs
+```rust
+use crate::*;
+pub(crate) fn create_protocol_check(
+    upgrade_type: &proc_macro2::Ident,
+) -> impl FnOnce(&Ident) -> TokenStream2 {
+    let upgrade_type_str: String = upgrade_type.to_string();
+    move |context| {
+        let check_fn: proc_macro2::Ident =
+            Ident::new(&format!("is_{upgrade_type_str}"), context.span());
+        quote! {
+            if !#context.get_request().get_upgrade_type().#check_fn() {
+                return;
+            }
+        }
+    }
+}
+macro_rules! impl_protocol_check_macro {
+    ($name:ident, $submit_name:ident, $upgrade_type:ident) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_protocol_check(&proc_macro2::Ident::new(
+                    stringify!($upgrade_type),
+                    proc_macro2::Span::call_site(),
+                )),
+            )
+        }
+        inventory::submit! {
+            InjectableMacro {
+                name: stringify!($submit_name),
+                handler: Handler::NoAttrPosition($name),
+            }
+        }
+    };
+}
+impl_protocol_check_macro!(ws_upgrade_type_macro, ws_upgrade_type, ws);
+impl_protocol_check_macro!(h2c_upgrade_type_macro, h2c_upgrade_type, h2c);
+impl_protocol_check_macro!(tls_upgrade_type_macro, tls_upgrade_type, tls);
+impl_protocol_check_macro!(unknown_upgrade_type_macro, unknown_upgrade_type, unknown);
 ```
 # Path: hyperlane-macros/src/method/mod.rs
 ```rust
@@ -11128,217 +6639,26 @@ impl_http_method_macro!(connect_method_handler, connect_method, connect);
 impl_http_method_macro!(trace_method_handler, trace_method, trace);
 impl_http_method_macro!(unknown_method_handler, unknown_method, unknown);
 ```
-# Path: hyperlane-macros/src/hyperlane/mod.rs
-```rust
-mod r#fn;
-mod r#impl;
-mod r#struct;
-pub(crate) use {r#fn::*, r#struct::*};
-```
-# Path: hyperlane-macros/src/hyperlane/struct.rs
-```rust
-use crate::*;
-pub(crate) struct MultiHyperlaneAttr {
-    pub(crate) params: Vec<(Ident, Ident)>,
-}
-```
-# Path: hyperlane-macros/src/hyperlane/fn.rs
-```rust
-use crate::*;
-pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let multi_hyperlane: MultiHyperlaneAttr = parse_macro_input!(attr as MultiHyperlaneAttr);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
-    let block: &Block = &input_fn.block;
-    let attrs: &Vec<Attribute> = &input_fn.attrs;
-    let stmts: &Vec<Stmt> = &block.stmts;
-    let mut init_statements: Vec<TokenStream2> = Vec::new();
-    for (var_name, type_name) in &multi_hyperlane.params {
-        init_statements.push(quote! {
-            let mut #var_name: #type_name = #type_name::default();
-        });
-        if type_name == SERVER_TYPE_KEY {
-            init_statements.push(quote! {
-                let mut hooks: Vec<::hyperlane::HookType> = inventory::iter().cloned().collect();
-                assert_hook_unique_order(hooks.clone());
-                hooks.sort_by_key(|hook| hook.try_get_order());
-                for hook in hooks {
-                    #var_name.handle_hook(hook.clone());
-                }
-            });
-        }
-    }
-    let gen_code: TokenStream2 = quote! {
-        #(#attrs)*
-        #vis #sig {
-            #(#init_statements)*
-            #(#stmts)*
-        }
-    };
-    gen_code.into()
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "hyperlane",
-        handler: Handler::WithAttr(hyperlane_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/hyperlane/impl.rs
-```rust
-use crate::*;
-impl Parse for MultiHyperlaneAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let mut params: Vec<(Ident, Ident)> = Vec::new();
-        loop {
-            let var_name: Ident = input.parse()?;
-            input.parse::<Token![:]>()?;
-            let type_name: Ident = input.parse()?;
-            params.push((var_name, type_name));
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-            if input.is_empty() {
-                break;
-            }
-        }
-        Ok(MultiHyperlaneAttr { params })
-    }
-}
-```
-# Path: hyperlane-macros/src/referer/mod.rs
-```rust
-mod r#fn;
-mod r#impl;
-mod r#struct;
-pub(crate) use {r#fn::*, r#struct::*};
-```
-# Path: hyperlane-macros/src/referer/struct.rs
-```rust
-use crate::*;
-pub(crate) struct MultiRefererData {
-    pub(crate) referer_values: Vec<Expr>,
-}
-```
-# Path: hyperlane-macros/src/referer/fn.rs
-```rust
-use crate::*;
-pub(crate) fn referer_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
-    inject(position, item, |context| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value| {
-            quote! {
-                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(REFERER);
-                if let Some(referer_header) = referer {
-                    if referer_header != #referer_value {
-                        return;
-                    }
-                } else {
-                    return;
-                }
-            }
-        });
-        quote! {
-            #(#statements)*
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "referer",
-        handler: Handler::WithAttrPosition(referer_macro),
-    }
-}
-pub(crate) fn reject_referer_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
-    inject(position, item, |context| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value| {
-            quote! {
-                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(REFERER);
-                if let Some(referer_header) = referer {
-                    if referer_header == #referer_value {
-                        return;
-                    }
-                }
-            }
-        });
-        quote! {
-            #(#statements)*
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "reject_referer",
-        handler: Handler::WithAttrPosition(reject_referer_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/referer/impl.rs
-```rust
-use crate::*;
-impl Parse for MultiRefererData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut referer_values: Vec<Expr> = Vec::new();
-        loop {
-            let referer_value: Expr = input.parse()?;
-            referer_values.push(referer_value);
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-            if input.is_empty() {
-                break;
-            }
-        }
-        Ok(MultiRefererData { referer_values })
-    }
-}
-```
-# Path: hyperlane-macros/src/flush/mod.rs
+# Path: hyperlane-macros/src/closed/mod.rs
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/flush/fn.rs
+# Path: hyperlane-macros/src/closed/fn.rs
 ```rust
 use crate::*;
-pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
+pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
         quote! {
-            let _ = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).try_flush().await;
+            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_closed(true);
         }
     })
 }
 inventory::submit! {
     InjectableMacro {
-        name: "try_flush",
-        handler: Handler::NoAttrPosition(try_flush_macro),
+        name: "closed",
+        handler: Handler::NoAttrPosition(closed_macro),
     }
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "flush",
-        handler: Handler::NoAttrPosition(flush_macro),
-    }
-}
-pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {{
-            let new_context: &mut Context = (#context as *mut Context as usize).into();
-            new_context.flush().await;
-        }}
-    })
 }
 ```
 # Path: hyperlane-macros/src/request/mod.rs
@@ -11347,61 +6667,6 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
-```
-# Path: hyperlane-macros/src/request/struct.rs
-```rust
-use crate::*;
-pub(crate) struct RequestMethods {
-    pub(crate) methods: Punctuated<Ident, Token![,]>,
-}
-pub(crate) struct MultiRequestBodyData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRequestBodyJsonData {
-    pub(crate) params: Vec<(Ident, Type)>,
-}
-pub(crate) struct MultiAttributeData {
-    pub(crate) params: Vec<(Expr, Ident, Type)>,
-}
-pub(crate) struct MultiAttributesData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRouteParamData {
-    pub(crate) params: Vec<(Expr, Ident)>,
-}
-pub(crate) struct MultiRouteParamsData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiQueryData {
-    pub(crate) params: Vec<(Expr, Ident)>,
-}
-pub(crate) struct MultiQuerysData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiHeaderData {
-    pub(crate) params: Vec<(Expr, Ident)>,
-}
-pub(crate) struct MultiHeadersData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiCookieData {
-    pub(crate) params: Vec<(Expr, Ident)>,
-}
-pub(crate) struct MultiCookiesData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRequestVersionData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRequestPathData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiPanicData {
-    pub(crate) variables: Vec<Ident>,
-}
-pub(crate) struct MultiRequestErrorData {
-    pub(crate) variables: Vec<Ident>,
-}
 ```
 # Path: hyperlane-macros/src/request/fn.rs
 ```rust
@@ -12265,575 +7530,347 @@ impl Parse for MultiRequestErrorData {
     }
 }
 ```
-# Path: hyperlane-macros/src/version/mod.rs
+# Path: hyperlane-macros/src/request/struct.rs
+```rust
+use crate::*;
+pub(crate) struct RequestMethods {
+    pub(crate) methods: Punctuated<Ident, Token![,]>,
+}
+pub(crate) struct MultiRequestBodyData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestBodyJsonData {
+    pub(crate) params: Vec<(Ident, Type)>,
+}
+pub(crate) struct MultiAttributeData {
+    pub(crate) params: Vec<(Expr, Ident, Type)>,
+}
+pub(crate) struct MultiAttributesData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRouteParamData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiRouteParamsData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiQueryData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiQuerysData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiHeaderData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiHeadersData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiCookieData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiCookiesData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestVersionData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestPathData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiPanicData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestErrorData {
+    pub(crate) variables: Vec<Ident>,
+}
+```
+# Path: hyperlane-macros/src/reject/mod.rs
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/version/fn.rs
+# Path: hyperlane-macros/src/reject/fn.rs
 ```rust
 use crate::*;
-pub(crate) fn create_version_check(
-    version: &proc_macro2::Ident,
-) -> impl FnOnce(&Ident) -> TokenStream2 {
-    let version_str: String = version.to_string();
-    move |context| {
-        let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{version_str}"), context.span());
+pub(crate) fn reject_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let condition: Expr = parse_macro_input!(attr as Expr);
+    inject(position, item, |_| {
         quote! {
-            if !#context.get_request().get_version().#check_fn() {
+            if #condition {
                 return;
             }
-        }
-    }
-}
-macro_rules! impl_version_check_macro {
-    ($name:ident, $submit_name:ident, $version:ident) => {
-        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
-            inject(
-                position,
-                item,
-                create_version_check(&proc_macro2::Ident::new(
-                    stringify!($version),
-                    proc_macro2::Span::call_site(),
-                )),
-            )
-        }
-        inventory::submit! {
-            InjectableMacro {
-                name: stringify!($submit_name),
-                handler: Handler::NoAttrPosition($name),
-            }
-        }
-    };
-}
-impl_version_check_macro!(http0_9_version_macro, http0_9_version, http0_9);
-impl_version_check_macro!(http1_0_version_macro, http1_0_version, http1_0);
-impl_version_check_macro!(http1_1_version_macro, http1_1_version, http1_1);
-impl_version_check_macro!(http2_version_macro, http2_version, http2);
-impl_version_check_macro!(http3_version_macro, http3_version, http3);
-impl_version_check_macro!(
-    http1_1_or_higher_version_macro,
-    http1_1_or_higher_version,
-    http1_1_or_higher
-);
-impl_version_check_macro!(http_version_macro, http_version, http);
-impl_version_check_macro!(unknown_version_macro, unknown_version, unknown);
-```
-# Path: hyperlane-macros/src/aborted/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/aborted/fn.rs
-```rust
-use crate::*;
-pub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_aborted(true);
         }
     })
 }
 inventory::submit! {
     InjectableMacro {
-        name: "aborted",
-        handler: Handler::NoAttrPosition(aborted_macro),
+        name: "reject",
+        handler: Handler::WithAttrPosition(reject_macro),
     }
 }
 ```
-# Path: hyperlane-macros/src/stream/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/stream/fn.rs
-```rust
-use crate::*;
-use syn::Ident;
-pub(crate) fn generate_stream(
-    context: &Ident,
-    stream_method: &str,
-    data: &FromStreamData,
-    stmts: &[Stmt],
-) -> TokenStream2 {
-    let method_ident: Ident = Ident::new(stream_method, proc_macro2::Span::call_site());
-    match data.variable_name.clone() {
-        Some(variable_name) => {
-            quote! {
-                while let Ok(#variable_name) = #context.#method_ident().await {
-                    #(#stmts)*
-                }
-            }
-        }
-        None => {
-            quote! {
-                while #context.#method_ident().await.is_ok() {
-                    #(#stmts)*
-                }
-            }
-        }
-    }
-}
-pub(crate) fn http_from_stream_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
-    let block: &Block = &input_fn.block;
-    let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let loop_stream: TokenStream2 =
-                generate_stream(context, "http_from_stream", &data, stmts);
-            quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #loop_stream
-                }
-            }
-            .into()
-        }
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "http_from_stream",
-        handler: Handler::WithAttr(http_from_stream_macro),
-    }
-}
-pub(crate) fn ws_from_stream_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
-    let block: &Block = &input_fn.block;
-    let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let loop_stream: TokenStream2 =
-                generate_stream(context, "ws_from_stream", &data, stmts);
-            quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #loop_stream
-                }
-            }
-            .into()
-        }
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "ws_from_stream",
-        handler: Handler::WithAttr(ws_from_stream_macro),
-    }
-}
-```
-# Path: hyperlane-macros/src/from_stream/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub(crate) use r#struct::*;
-```
-# Path: hyperlane-macros/src/from_stream/struct.rs
-```rust
-use crate::*;
-pub(crate) struct FromStreamData {
-    pub(crate) variable_name: Option<Expr>,
-}
-```
-# Path: hyperlane-macros/src/from_stream/impl.rs
-```rust
-use crate::*;
-impl Parse for FromStreamData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let variable_name: Option<Expr> = if input.is_empty() {
-            None
-        } else {
-            let expr: Expr = input.parse()?;
-            if !input.is_empty() {
-                return Err(syn::Error::new(
-                    input.span(),
-                    "expected at most one parameter",
-                ));
-            }
-            Some(expr)
-        };
-        Ok(FromStreamData { variable_name })
-    }
-}
-```
-# Path: hyperlane-macros/src/upgrade/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/upgrade/fn.rs
-```rust
-use crate::*;
-pub(crate) fn create_protocol_check(
-    upgrade_type: &proc_macro2::Ident,
-) -> impl FnOnce(&Ident) -> TokenStream2 {
-    let upgrade_type_str: String = upgrade_type.to_string();
-    move |context| {
-        let check_fn: proc_macro2::Ident =
-            Ident::new(&format!("is_{upgrade_type_str}"), context.span());
-        quote! {
-            if !#context.get_request().get_upgrade_type().#check_fn() {
-                return;
-            }
-        }
-    }
-}
-macro_rules! impl_protocol_check_macro {
-    ($name:ident, $submit_name:ident, $upgrade_type:ident) => {
-        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
-            inject(
-                position,
-                item,
-                create_protocol_check(&proc_macro2::Ident::new(
-                    stringify!($upgrade_type),
-                    proc_macro2::Span::call_site(),
-                )),
-            )
-        }
-        inventory::submit! {
-            InjectableMacro {
-                name: stringify!($submit_name),
-                handler: Handler::NoAttrPosition($name),
-            }
-        }
-    };
-}
-impl_protocol_check_macro!(ws_upgrade_type_macro, ws_upgrade_type, ws);
-impl_protocol_check_macro!(h2c_upgrade_type_macro, h2c_upgrade_type, h2c);
-impl_protocol_check_macro!(tls_upgrade_type_macro, tls_upgrade_type, tls);
-impl_protocol_check_macro!(unknown_upgrade_type_macro, unknown_upgrade_type, unknown);
-```
-# Path: hyperlane-macros/src/host/mod.rs
+# Path: hyperlane-macros/src/route/mod.rs
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
-# Path: hyperlane-macros/src/host/struct.rs
+# Path: hyperlane-macros/src/route/fn.rs
 ```rust
 use crate::*;
-pub(crate) struct MultiHostData {
-    pub(crate) host_values: Vec<Expr>,
-}
-```
-# Path: hyperlane-macros/src/host/fn.rs
-```rust
-use crate::*;
-pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
-    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
-    inject(position, item, |context| {
-        let statements = multi_host.host_values.iter().map(|host_value| {
-            quote! {
-                if #context.get_request().get_host() != #host_value {
-                    return;
-                }
-            }
-        });
-        quote! {
-            #(#statements)*
+pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let route_attr: RouteAttr = parse_macro_input!(attr as RouteAttr);
+    let path: &Expr = &route_attr.path;
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: TokenStream2 = quote! {
+        #input_struct
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::Route(#path, || ::hyperlane::server_hook_factory::<#struct_name>())
         }
-    })
+    };
+    gen_code.into()
 }
 inventory::submit! {
     InjectableMacro {
-        name: "host",
-        handler: Handler::WithAttrPosition(host_macro),
-    }
-}
-pub(crate) fn reject_host_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
-    inject(position, item, |context| {
-        let statements = multi_host.host_values.iter().map(|host_value| {
-            quote! {
-                if #context.get_request().get_host() == #host_value {
-                    return;
-                }
-            }
-        });
-        quote! {
-            #(#statements)*
-        }
-    })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "reject_host",
-        handler: Handler::WithAttrPosition(reject_host_macro),
+        name: "route",
+        handler: Handler::WithAttr(route_macro),
     }
 }
 ```
-# Path: hyperlane-macros/src/host/impl.rs
+# Path: hyperlane-macros/src/route/impl.rs
 ```rust
 use crate::*;
-impl Parse for MultiHostData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut host_values: Vec<Expr> = Vec::new();
-        loop {
-            let host_value: Expr = input.parse()?;
-            host_values.push(host_value);
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-            if input.is_empty() {
-                break;
-            }
-        }
-        Ok(MultiHostData { host_values })
+impl Parse for RouteAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let first_expr: Expr = input.parse()?;
+        Ok(RouteAttr { path: first_expr })
     }
 }
 ```
-# Path: hyperlane-macros/src/common/const.rs
+# Path: hyperlane-macros/src/route/struct.rs
 ```rust
-pub(crate) const SERVER_TYPE_KEY: &str = "Server";
+use crate::*;
+pub(crate) struct RouteAttr {
+    pub(crate) path: Expr,
+}
 ```
-# Path: hyperlane-macros/src/common/mod.rs
+# Path: hyperlane-macros/src/response/mod.rs
 ```rust
-mod r#const;
 mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#struct;
-mod r#type;
-pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#struct::*, r#type::*};
+pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
 ```
-# Path: hyperlane-macros/src/common/enum.rs
+# Path: hyperlane-macros/src/response/fn.rs
 ```rust
 use crate::*;
-pub(crate) enum Handler {
-    WithAttr(MacroHandlerWithAttr),
-    NoAttrPosition(MacroHandlerPosition),
-    WithAttrPosition(MacroHandlerWithAttrPosition),
-}
-pub(crate) enum Position {
-    Prologue,
-    Epilogue,
-}
-```
-# Path: hyperlane-macros/src/common/struct.rs
-```rust
-use crate::*;
-#[derive(Clone)]
-pub(crate) struct OrderAttr {
-    pub(crate) order: Option<Expr>,
-}
-pub(crate) struct InjectableMacro {
-    pub(crate) name: &'static str,
-    pub(crate) handler: Handler,
-}
-```
-# Path: hyperlane-macros/src/common/fn.rs
-```rust
-use crate::*;
-fn inject_at_start(
-    input: TokenStream,
-    before_fn: impl FnOnce(&Ident) -> TokenStream2,
-) -> TokenStream {
-    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
-    let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
-    let block: &Block = &input_fn.block;
-    let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let before_code: TokenStream2 = before_fn(context);
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let gen_code: TokenStream2 = quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #before_code
-                    #(#stmts)*
-                }
-            };
-            gen_code.into()
-        }
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-fn inject_at_end(input: TokenStream, after_fn: impl FnOnce(&Ident) -> TokenStream2) -> TokenStream {
-    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
-    let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
-    let block: &Block = &input_fn.block;
-    let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let after_code: TokenStream2 = after_fn(context);
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let gen_code: TokenStream2 = quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #(#stmts)*
-                    #after_code
-                }
-            };
-            gen_code.into()
-        }
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-pub(crate) fn inject(
+pub(crate) fn response_status_code_macro(
+    attr: TokenStream,
+    item: TokenStream,
     position: Position,
-    input: TokenStream,
-    hook: impl FnOnce(&Ident) -> TokenStream2,
 ) -> TokenStream {
-    match position {
-        Position::Prologue => inject_at_start(input, hook),
-        Position::Epilogue => inject_at_end(input, hook),
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    inject(position, item, |context| {
+        quote! {
+            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_status_code",
+        handler: Handler::WithAttrPosition(response_status_code_macro),
     }
 }
-#[allow(dead_code)]
-pub(crate) fn parse_context_from_fn(sig: &Signature) -> syn::Result<&Ident> {
-    match sig.inputs.first() {
-        Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
-            Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
-            Pat::Wild(wild) => Err(syn::Error::new_spanned(
-                wild,
-                "The argument cannot be anonymous `_`, please use a named identifier",
-            )),
-            _ => Err(syn::Error::new_spanned(
-                &pat_type.pat,
-                "expected identifier as first argument",
-            )),
-        },
-        _ => Err(syn::Error::new_spanned(
-            &sig.inputs,
-            "expected at least one argument",
-        )),
+pub(crate) fn response_reason_phrase_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    inject(position, item, |context| {
+        quote! {
+            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_reason_phrase(&#value);
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_reason_phrase",
+        handler: Handler::WithAttrPosition(response_reason_phrase_macro),
     }
 }
-#[allow(dead_code)]
-pub(crate) fn parse_self_from_method(sig: &Signature) -> syn::Result<&Ident> {
-    match sig.inputs.first() {
-        Some(FnArg::Receiver(_)) => match sig.inputs.iter().nth(1) {
-            Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
-                Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
-                Pat::Wild(wild) => Err(syn::Error::new_spanned(
-                    wild,
-                    "The context argument cannot be anonymous `_`, please use a named identifier",
-                )),
-                _ => Err(syn::Error::new_spanned(
-                    &pat_type.pat,
-                    "expected identifier as second argument (context)",
-                )),
-            },
-            _ => Err(syn::Error::new_spanned(
-                &sig.inputs,
-                "expected context as second argument",
-            )),
-        },
-        _ => Err(syn::Error::new_spanned(
-            &sig.inputs,
-            "expected self as first argument for method",
-        )),
-    }
-}
-fn is_context_type(ty: &Type) -> bool {
-    if let Type::Reference(type_ref) = ty
-        && let Type::Path(type_path) = &*type_ref.elem
-    {
-        let path: &Path = &type_path.path;
-        if path.segments.len() >= 2 {
-            let segments: Vec<_> = path.segments.iter().collect();
-            if segments.len() >= 2 {
-                let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
-                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
-                    return true;
-                }
+pub(crate) fn response_header_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);
+    let key: Expr = header_data.key;
+    let value: Expr = header_data.value;
+    let operation: HeaderOperation = header_data.operation;
+    inject(position, item, |context| match operation {
+        HeaderOperation::Add => {
+            quote! {
+                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().add_header(&#key, &#value);
             }
         }
-        if path.segments.len() == 1 && path.segments[0].ident == "Context" {
-            return true;
-        }
-    }
-    false
-}
-pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<&Ident> {
-    for arg in sig.inputs.iter() {
-        if let FnArg::Typed(pat_type) = arg
-            && is_context_type(&pat_type.ty)
-        {
-            match &*pat_type.pat {
-                Pat::Ident(pat_ident) => return Ok(&pat_ident.ident),
-                Pat::Wild(wild) => {
-                    return Err(syn::Error::new_spanned(
-                        wild,
-                        "The context argument cannot be anonymous `_`, please use a named identifier",
-                    ));
-                }
-                _ => {
-                    return Err(syn::Error::new_spanned(
-                        &pat_type.pat,
-                        "expected identifier for context parameter",
-                    ));
-                }
+        HeaderOperation::Set => {
+            quote! {
+                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_header(&#key, &#value);
             }
         }
-    }
-    Err(syn::Error::new_spanned(
-        &sig.inputs,
-        "expected at least one parameter of type &::hyperlane::Context",
-    ))
+    })
 }
-pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
-    match opt_expr {
-        Some(expr) => match expr {
-            Expr::Lit(ExprLit {
-                lit: Lit::Int(lit_int),
-                ..
-            }) => {
-                let value: isize = lit_int.base10_parse::<isize>().unwrap();
-                quote! { Some(#value) }
-            }
-            Expr::Lit(ExprLit {
-                lit: Lit::Str(lit_str),
-                ..
-            }) => {
-                let value: isize = lit_str.value().parse().expect("Cannot parse to isize");
-                quote! { Some(#value) }
-            }
-            _ => quote! { None },
-        },
-        None => quote! { None },
+inventory::submit! {
+    InjectableMacro {
+        name: "response_header",
+        handler: Handler::WithAttrPosition(response_header_macro),
+    }
+}
+pub(crate) fn response_body_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
+    let body: Expr = body_data.body;
+    inject(position, item, |context| {
+        quote! {
+            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_body(&#body);
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_body",
+        handler: Handler::WithAttrPosition(response_body_macro),
+    }
+}
+pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context| {
+        quote! {
+            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().clear_headers();
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "clear_response_headers",
+        handler: Handler::NoAttrPosition(clear_response_headers_macro),
+    }
+}
+pub(crate) fn response_version_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    inject(position, item, |context| {
+        quote! {
+            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_version(#value);
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "response_version",
+        handler: Handler::WithAttrPosition(response_version_macro),
     }
 }
 ```
-# Path: hyperlane-macros/src/common/impl.rs
+# Path: hyperlane-macros/src/response/impl.rs
 ```rust
 use crate::*;
-impl Parse for OrderAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        if input.is_empty() {
-            return Ok(OrderAttr { order: None });
-        }
-        let expr: Expr = input.parse()?;
-        Ok(OrderAttr { order: Some(expr) })
+impl Parse for ResponseHeaderData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let key: Expr = input.parse()?;
+        let operation: HeaderOperation = if input.peek(Token![=>]) {
+            input.parse::<Token![=>]>()?;
+            HeaderOperation::Set
+        } else if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            HeaderOperation::Add
+        } else {
+            return Err(syn::Error::new(
+                input.span(),
+                "Expected either ',' for add operation or '=>' for set operation",
+            ));
+        };
+        let value: Expr = input.parse()?;
+        Ok(ResponseHeaderData {
+            key,
+            value,
+            operation,
+        })
+    }
+}
+impl Parse for ResponseBodyData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let body: Expr = input.parse()?;
+        Ok(ResponseBodyData { body })
     }
 }
 ```
-# Path: hyperlane-macros/src/common/type.rs
+# Path: hyperlane-macros/src/response/struct.rs
 ```rust
 use crate::*;
-pub(crate) type MacroHandlerPosition = fn(TokenStream, Position) -> TokenStream;
-pub(crate) type MacroHandlerWithAttr = fn(TokenStream, TokenStream) -> TokenStream;
-pub(crate) type MacroHandlerWithAttrPosition =
-    fn(TokenStream, TokenStream, Position) -> TokenStream;
+pub(crate) struct SendData {
+    pub(crate) data: Expr,
+}
+```
+# Path: hyperlane-macros/src/response/enum.rs
+```rust
+pub(crate) enum HeaderOperation {
+    Set,
+    Add,
+}
+```
+# Path: hyperlane-macros/src/filter/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/filter/fn.rs
+```rust
+use crate::*;
+pub(crate) fn filter_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let condition: Expr = parse_macro_input!(attr as Expr);
+    inject(position, item, |_| {
+        quote! {
+            if !(#condition) {
+                return;
+            }
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "filter",
+        handler: Handler::WithAttrPosition(filter_macro),
+    }
+}
 ```
 # Path: hyperlane-macros/src/send/mod.rs
 ```rust
@@ -12841,18 +7878,6 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
-```
-# Path: hyperlane-macros/src/send/struct.rs
-```rust
-use crate::*;
-pub(crate) struct ResponseHeaderData {
-    pub(crate) key: Expr,
-    pub(crate) value: Expr,
-    pub(crate) operation: HeaderOperation,
-}
-pub(crate) struct ResponseBodyData {
-    pub(crate) body: Expr,
-}
 ```
 # Path: hyperlane-macros/src/send/fn.rs
 ```rust
@@ -12958,73 +7983,204 @@ impl Parse for SendData {
     }
 }
 ```
-# Path: hyperlane-macros/src/filter/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/filter/fn.rs
+# Path: hyperlane-macros/src/send/struct.rs
 ```rust
 use crate::*;
-pub(crate) fn filter_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let condition: Expr = parse_macro_input!(attr as Expr);
-    inject(position, item, |_| {
-        quote! {
-            if !(#condition) {
-                return;
+pub(crate) struct ResponseHeaderData {
+    pub(crate) key: Expr,
+    pub(crate) value: Expr,
+    pub(crate) operation: HeaderOperation,
+}
+pub(crate) struct ResponseBodyData {
+    pub(crate) body: Expr,
+}
+```
+# Path: hyperlane-macros/src/host/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+```
+# Path: hyperlane-macros/src/host/fn.rs
+```rust
+use crate::*;
+pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
+    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
+    inject(position, item, |context| {
+        let statements = multi_host.host_values.iter().map(|host_value| {
+            quote! {
+                if #context.get_request().get_host() != #host_value {
+                    return;
+                }
             }
+        });
+        quote! {
+            #(#statements)*
         }
     })
 }
 inventory::submit! {
     InjectableMacro {
-        name: "filter",
-        handler: Handler::WithAttrPosition(filter_macro),
+        name: "host",
+        handler: Handler::WithAttrPosition(host_macro),
     }
 }
-```
-# Path: hyperlane-macros/src/reject/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/reject/fn.rs
-```rust
-use crate::*;
-pub(crate) fn reject_macro(
+pub(crate) fn reject_host_macro(
     attr: TokenStream,
     item: TokenStream,
     position: Position,
 ) -> TokenStream {
-    let condition: Expr = parse_macro_input!(attr as Expr);
-    inject(position, item, |_| {
-        quote! {
-            if #condition {
-                return;
+    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
+    inject(position, item, |context| {
+        let statements = multi_host.host_values.iter().map(|host_value| {
+            quote! {
+                if #context.get_request().get_host() == #host_value {
+                    return;
+                }
             }
+        });
+        quote! {
+            #(#statements)*
         }
     })
 }
 inventory::submit! {
     InjectableMacro {
-        name: "reject",
-        handler: Handler::WithAttrPosition(reject_macro),
+        name: "reject_host",
+        handler: Handler::WithAttrPosition(reject_host_macro),
     }
 }
 ```
-# Path: hyperlane-macros/src/response_middleware/mod.rs
+# Path: hyperlane-macros/src/host/impl.rs
+```rust
+use crate::*;
+impl Parse for MultiHostData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut host_values: Vec<Expr> = Vec::new();
+        loop {
+            let host_value: Expr = input.parse()?;
+            host_values.push(host_value);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiHostData { host_values })
+    }
+}
+```
+# Path: hyperlane-macros/src/host/struct.rs
+```rust
+use crate::*;
+pub(crate) struct MultiHostData {
+    pub(crate) host_values: Vec<Expr>,
+}
+```
+# Path: hyperlane-macros/src/stream/mod.rs
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
-# Path: hyperlane-macros/src/response_middleware/fn.rs
+# Path: hyperlane-macros/src/stream/fn.rs
 ```rust
 use crate::*;
-pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+use syn::Ident;
+pub(crate) fn generate_stream(
+    context: &Ident,
+    stream_method: &str,
+    data: &FromStreamData,
+    stmts: &[Stmt],
+) -> TokenStream2 {
+    let method_ident: Ident = Ident::new(stream_method, proc_macro2::Span::call_site());
+    match data.variable_name.clone() {
+        Some(variable_name) => {
+            quote! {
+                while let Ok(#variable_name) = #context.#method_ident().await {
+                    #(#stmts)*
+                }
+            }
+        }
+        None => {
+            quote! {
+                while #context.#method_ident().await.is_ok() {
+                    #(#stmts)*
+                }
+            }
+        }
+    }
+}
+pub(crate) fn http_from_stream_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let stmts: &Vec<Stmt> = &block.stmts;
+            let loop_stream: TokenStream2 =
+                generate_stream(context, "http_from_stream", &data, stmts);
+            quote! {
+                #(#attrs)*
+                #vis #sig {
+                    #loop_stream
+                }
+            }
+            .into()
+        }
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "http_from_stream",
+        handler: Handler::WithAttr(http_from_stream_macro),
+    }
+}
+pub(crate) fn ws_from_stream_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let stmts: &Vec<Stmt> = &block.stmts;
+            let loop_stream: TokenStream2 =
+                generate_stream(context, "ws_from_stream", &data, stmts);
+            quote! {
+                #(#attrs)*
+                #vis #sig {
+                    #loop_stream
+                }
+            }
+            .into()
+        }
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "ws_from_stream",
+        handler: Handler::WithAttr(ws_from_stream_macro),
+    }
+}
+```
+# Path: hyperlane-macros/src/request_middleware/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/request_middleware/fn.rs
+```rust
+use crate::*;
+pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
@@ -13032,64 +8188,4345 @@ pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) ->
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
         }
     };
     gen_code.into()
 }
 inventory::submit! {
     InjectableMacro {
-        name: "response_middleware",
-        handler: Handler::WithAttr(response_middleware_macro),
+        name: "request_middleware",
+        handler: Handler::WithAttr(request_middleware_macro),
     }
 }
 ```
-# Path: hyperlane-macros/src/route/mod.rs
+# Path: hyperlane-macros/src/referer/mod.rs
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
-# Path: hyperlane-macros/src/route/struct.rs
+# Path: hyperlane-macros/src/referer/fn.rs
 ```rust
 use crate::*;
-pub(crate) struct RouteAttr {
-    pub(crate) path: Expr,
-}
-```
-# Path: hyperlane-macros/src/route/fn.rs
-```rust
-use crate::*;
-pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let route_attr: RouteAttr = parse_macro_input!(attr as RouteAttr);
-    let path: &Expr = &route_attr.path;
-    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
-    let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
-        #input_struct
-        ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::Route(#path, || ::hyperlane::server_hook_factory::<#struct_name>())
+pub(crate) fn referer_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
+    inject(position, item, |context| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+            quote! {
+                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(REFERER);
+                if let Some(referer_header) = referer {
+                    if referer_header != #referer_value {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
         }
-    };
-    gen_code.into()
+    })
 }
 inventory::submit! {
     InjectableMacro {
-        name: "route",
-        handler: Handler::WithAttr(route_macro),
+        name: "referer",
+        handler: Handler::WithAttrPosition(referer_macro),
+    }
+}
+pub(crate) fn reject_referer_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
+    inject(position, item, |context| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+            quote! {
+                let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(REFERER);
+                if let Some(referer_header) = referer {
+                    if referer_header == #referer_value {
+                        return;
+                    }
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+inventory::submit! {
+    InjectableMacro {
+        name: "reject_referer",
+        handler: Handler::WithAttrPosition(reject_referer_macro),
     }
 }
 ```
-# Path: hyperlane-macros/src/route/impl.rs
+# Path: hyperlane-macros/src/referer/impl.rs
 ```rust
 use crate::*;
-impl Parse for RouteAttr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let first_expr: Expr = input.parse()?;
-        Ok(RouteAttr { path: first_expr })
+impl Parse for MultiRefererData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut referer_values: Vec<Expr> = Vec::new();
+        loop {
+            let referer_value: Expr = input.parse()?;
+            referer_values.push(referer_value);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRefererData { referer_values })
     }
 }
+```
+# Path: hyperlane-macros/src/referer/struct.rs
+```rust
+use crate::*;
+pub(crate) struct MultiRefererData {
+    pub(crate) referer_values: Vec<Expr>,
+}
+```
+# Path: hyperlane-macros/src/version/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/version/fn.rs
+```rust
+use crate::*;
+pub(crate) fn create_version_check(
+    version: &proc_macro2::Ident,
+) -> impl FnOnce(&Ident) -> TokenStream2 {
+    let version_str: String = version.to_string();
+    move |context| {
+        let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{version_str}"), context.span());
+        quote! {
+            if !#context.get_request().get_version().#check_fn() {
+                return;
+            }
+        }
+    }
+}
+macro_rules! impl_version_check_macro {
+    ($name:ident, $submit_name:ident, $version:ident) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_version_check(&proc_macro2::Ident::new(
+                    stringify!($version),
+                    proc_macro2::Span::call_site(),
+                )),
+            )
+        }
+        inventory::submit! {
+            InjectableMacro {
+                name: stringify!($submit_name),
+                handler: Handler::NoAttrPosition($name),
+            }
+        }
+    };
+}
+impl_version_check_macro!(http0_9_version_macro, http0_9_version, http0_9);
+impl_version_check_macro!(http1_0_version_macro, http1_0_version, http1_0);
+impl_version_check_macro!(http1_1_version_macro, http1_1_version, http1_1);
+impl_version_check_macro!(http2_version_macro, http2_version, http2);
+impl_version_check_macro!(http3_version_macro, http3_version, http3);
+impl_version_check_macro!(
+    http1_1_or_higher_version_macro,
+    http1_1_or_higher_version,
+    http1_1_or_higher
+);
+impl_version_check_macro!(http_version_macro, http_version, http);
+impl_version_check_macro!(unknown_version_macro, unknown_version, unknown);
+```
+# Path: hyperlane-macros/src/inject/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-macros/src/inject/fn.rs
+```rust
+use crate::*;
+fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) -> TokenStream {
+    let (macro_name, macro_attr) = match macro_meta {
+        Meta::Path(path) => (
+            path.get_ident()
+                .expect("Macro path should have an identifier")
+                .to_string(),
+            TokenStream::new(),
+        ),
+        Meta::List(meta_list) => (
+            meta_list
+                .path
+                .get_ident()
+                .expect("Macro path should have an identifier")
+                .to_string(),
+            meta_list.tokens.clone().into(),
+        ),
+        _ => panic!("Unsupported macro format in inject macro"),
+    };
+    for injectable_macro in inventory::iter::<InjectableMacro>() {
+        if injectable_macro.name == macro_name {
+            return match injectable_macro.handler {
+                Handler::WithAttr(handler) => handler(macro_attr, item_stream),
+                Handler::NoAttrPosition(handler) => {
+                    if !macro_attr.is_empty() {
+                        panic!("Macro {macro_name} does not take attributes");
+                    }
+                    handler(item_stream, position)
+                }
+                Handler::WithAttrPosition(handler) => handler(macro_attr, item_stream, position),
+            };
+        }
+    }
+    panic!("Unsupported macro: {macro_name}");
+}
+pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse(attr)
+        .expect("Failed to parse macro attributes");
+    let mut current_stream: TokenStream = item;
+    for meta in metas.iter().rev() {
+        current_stream = apply_macro(meta, current_stream, Position::Prologue);
+    }
+    current_stream
+}
+pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse(attr)
+        .expect("Failed to parse macro attributes");
+    let mut current_stream: TokenStream = item;
+    for meta in metas.iter() {
+        current_stream = apply_macro(meta, current_stream, Position::Epilogue);
+    }
+    current_stream
+}
+```
+# Path: hyperlane-quick-start/README.md
+## hyperlane-quick-start
+> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+## Official Documentation
+- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+## Api Docs
+- [Api Docs](https://docs.rs/hyperlane/latest/)
+## Directory Structure
+```txt
+├── application              # Application service
+│   ├── controller           # Interface control layer
+│   ├── domain               # Business domain layer
+│   ├── exception            # Exception handling layer
+│   ├── mapper               # Data mapping layer
+│   ├── middleware           # Middleware layer
+│   ├── model                # Data model layer
+│      ├── request           # Request parameter objects
+│      ├── response          # Response parameter objects
+│   ├── repository           # Data access layer
+│   ├── service              # Business logic layer
+│   ├── utils                # Utility layer
+│   ├── view                 # View layer
+├── bootstrap                # Service initialization
+│   ├── application          # Application initialization
+│   ├── framework            # Framework initialization
+├── config                   # Service configuration
+│   ├── application          # Application configuration
+│   ├── framework            # Framework configuration
+├── plugin                   # Service plugins
+│   ├── database             # Database plugin
+│   ├── env                  # Environment variable plugin
+│   ├── logger               # Logging plugin
+│   ├── mysql                # MySQL plugin
+│   ├── postgresql           # PostgreSQL plugin
+│   ├── process              # Process management plugin
+│   ├── redis                # Redis plugin
+├── resources                # Service resources
+│   ├── sql                  # SQL files
+│   ├── static               # Static resource files
+│   ├── templates            # Template files
+```
+## Run
+### start
+```sh
+cargo run
+```
+### started in background
+```sh
+cargo run -- -d
+```
+### stop
+```sh
+cargo run stop
+```
+### restart
+```sh
+cargo run restart
+```
+### restarted in background
+```sh
+cargo run restart -d
+```
+## Cli
+```sh
+cargo install hyperlane-cli
+```
+### help
+```sh
+hyperlane-cli -h
+```
+## Performance
+- [Performance](https://docs.ltpp.vip/hyperlane/speed)
+## Appreciate
+> If you feel that `hyperlane` is helpful to you, feel free to donate
+### WeChat Pay
+### Alipay
+### Virtual Currency Pay
+| Virtual Currency | Virtual Currency Address                   |
+| ---------------- | ------------------------------------------ |
+| BTC              | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
+| ETH              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
+| BSC              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
+## Contact
+# Path: hyperlane-quick-start/plugin/README.md
+## hyperlane-plugin
+> A powerful and extensible plugin system for the hyperlane framework, providing modularity and customization capabilities.
+## Contact
+# Path: hyperlane-quick-start/plugin/lib.rs
+```rust
+pub mod common;
+pub mod database;
+pub mod env;
+pub mod logger;
+pub mod mysql;
+pub mod postgresql;
+pub mod process;
+pub mod redis;
+pub mod shutdown;
+use common::*;
+use {
+    hyperlane::*,
+    hyperlane_utils::{log::*, *},
+    sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
+};
+```
+# Path: hyperlane-quick-start/plugin/common/trait.rs
+```rust
+use super::*;
+pub trait GetOrInit: Clone + Copy + Default + Send + Sync + 'static {
+    type Instance: Send + Sync + 'static;
+    fn get_or_init() -> &'static Self::Instance;
+}
+pub trait DatabaseConnectionPlugin: Clone + Copy + Default + Send + Sync + 'static {
+    type InstanceConfig: Clone + Send + Sync + 'static;
+    type AutoCreation: DatabaseAutoCreation<InstanceConfig = Self::InstanceConfig>;
+    type Connection: Clone + Send + Sync + 'static;
+    type ConnectionCache: Send + Sync + 'static;
+    fn plugin_type() -> PluginType;
+    fn connection_db<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> impl Future<Output = Result<Self::Connection, String>> + Send
+    where
+        I: AsRef<str> + Send;
+    fn get_connection<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> impl Future<Output = Result<Self::Connection, String>> + Send
+    where
+        I: AsRef<str> + Send;
+    fn perform_auto_creation(
+        instance: &Self::InstanceConfig,
+        schema: Option<DatabaseSchema>,
+    ) -> impl Future<Output = Result<AutoCreationResult, AutoCreationError>> + Send;
+}
+pub trait DatabaseAutoCreation: Clone + Send + Sync + 'static {
+    type InstanceConfig;
+    fn new(instance: Self::InstanceConfig) -> Self;
+    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
+    where
+        Self: Sized;
+    fn create_database_if_not_exists(
+        &self,
+    ) -> impl Future<Output = Result<bool, AutoCreationError>> + Send;
+    fn create_tables_if_not_exist(
+        &self,
+    ) -> impl Future<Output = Result<Vec<String>, AutoCreationError>> + Send;
+    fn verify_connection(&self) -> impl Future<Output = Result<(), AutoCreationError>> + Send;
+}
+```
+# Path: hyperlane-quick-start/plugin/common/mod.rs
+```rust
+mod r#trait;
+pub use r#trait::*;
+use crate::database::{AutoCreationError, AutoCreationResult, DatabaseSchema, PluginType};
+use std::future::Future;
+```
+# Path: hyperlane-quick-start/plugin/logger/mod.rs
+```rust
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use r#struct::*;
+use {super::*, r#static::*};
+use std::{fmt::Arguments, sync::OnceLock};
+use hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+```
+# Path: hyperlane-quick-start/plugin/logger/impl.rs
+```rust
+use super::*;
+impl GetOrInit for LoggerPlugin {
+    type Instance = RwLock<FileLogger>;
+    fn get_or_init() -> &'static Self::Instance {
+        FILE_LOGGER.get_or_init(|| RwLock::new(FileLogger::default()))
+    }
+}
+impl Log for Logger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= max_level()
+    }
+    fn log(&self, record: &Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let now_time: String = time();
+        let level: Level = record.level();
+        let args: &Arguments<'_> = record.args();
+        let file: Option<&str> = record.file();
+        let module_path: Option<&str> = record.module_path();
+        let target: &str = record.target();
+        let line: u32 = record.line().unwrap_or_default();
+        let location: &str = file.unwrap_or(module_path.unwrap_or(target));
+        let time_text: String = format!("{SPACE}{now_time}{SPACE}");
+        let level_text: String = format!("{SPACE}{level}{SPACE}");
+        let args_text: String = format!("{args}{SPACE}");
+        let location_text: String = format!("{SPACE}{location}{COLON}{line}{SPACE}");
+        let write_file_data: String = format!("{level}{location_text}{args}");
+        let color: ColorType = match record.level() {
+            Level::Trace => ColorType::Use(Color::Magenta),
+            Level::Debug => ColorType::Use(Color::Cyan),
+            Level::Info => ColorType::Use(Color::Green),
+            Level::Warn => ColorType::Use(Color::Yellow),
+            Level::Error => ColorType::Use(Color::Red),
+        };
+        let mut time_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut level_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut location_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut args_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let time_output: ColorOutput<'_> = time_output_builder
+            .text(&time_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(ColorType::Use(Color::Black))
+            .build();
+        let level_output: ColorOutput<'_> = level_output_builder
+            .text(&level_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(color)
+            .build();
+        let location_output: ColorOutput<'_> = location_output_builder
+            .text(&location_text)
+            .bold(true)
+            .color(color)
+            .build();
+        let args_output: ColorOutput<'_> = args_output_builder
+            .text(&args_text)
+            .bold(true)
+            .color(color)
+            .endl(true)
+            .build();
+        ColorOutputListBuilder::new()
+            .add(time_output)
+            .add(level_output)
+            .add(location_output)
+            .add(args_output)
+            .run();
+        match record.metadata().level() {
+            Level::Trace => Self::log_trace(&write_file_data),
+            Level::Debug => Self::log_debug(&write_file_data),
+            Level::Info => Self::log_info(&write_file_data),
+            Level::Warn => Self::log_warn(&write_file_data),
+            Level::Error => Self::log_error(&write_file_data),
+        }
+    }
+    fn flush(&self) {
+        Server::flush_stdout_and_stderr();
+    }
+}
+impl Logger {
+    fn read() -> RwLockReadGuard<'static, FileLogger> {
+        LoggerPlugin::get_or_init().try_read().unwrap()
+    }
+    fn write() -> RwLockWriteGuard<'static, FileLogger> {
+        LoggerPlugin::get_or_init().try_write().unwrap()
+    }
+    pub fn init(level: LevelFilter, file_logger: FileLogger) {
+        set_logger(&LOGGER).unwrap();
+        set_max_level(level);
+        *Self::write() = file_logger;
+    }
+    pub fn log_trace<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        Self::read().trace(data, log_handler);
+    }
+    #[instrument_trace]
+    pub fn log_debug<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        Self::read().debug(data, log_handler);
+    }
+    #[instrument_trace]
+    pub fn log_info<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        Self::read().info(data, log_handler);
+    }
+    #[instrument_trace]
+    pub fn log_warn<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        Self::read().warn(data, log_handler);
+    }
+    #[instrument_trace]
+    pub fn log_error<T>(data: T)
+    where
+        T: AsRef<str>,
+    {
+        Self::read().error(data, log_handler);
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/logger/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct LoggerPlugin;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct Logger;
+```
+# Path: hyperlane-quick-start/plugin/logger/static.rs
+```rust
+use super::*;
+pub(super) static LOGGER: Logger = Logger;
+pub(super) static FILE_LOGGER: OnceLock<RwLock<FileLogger>> = OnceLock::new();
+```
+# Path: hyperlane-quick-start/plugin/env/const.rs
+```rust
+pub const ENV_FILE_PATH: &str = "./.env";
+pub const DOCKER_COMPOSE_FILE_PATH: &str = "./docker-compose.yml";
+pub const ENV_KEY_GPT_API_URL: &str = "GPT_API_URL";
+pub const ENV_KEY_GPT_MODEL: &str = "GPT_MODEL";
+pub const ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS: &str = "DB_CONNECTION_TIMEOUT_MILLIS";
+pub const DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS: u64 = 3000;
+pub const ENV_KEY_DB_RETRY_INTERVAL_MILLIS: &str = "DB_RETRY_INTERVAL_MILLIS";
+pub const DEFAULT_DB_RETRY_INTERVAL_MILLIS: u64 = 30000;
+pub const ENV_KEY_MYSQL_HOST: &str = "MYSQL_HOST";
+pub const ENV_KEY_MYSQL_PORT: &str = "MYSQL_PORT";
+pub const ENV_KEY_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
+pub const ENV_KEY_MYSQL_USERNAME: &str = "MYSQL_USERNAME";
+pub const ENV_KEY_MYSQL_PASSWORD: &str = "MYSQL_PASSWORD";
+pub const ENV_KEY_POSTGRES_HOST: &str = "POSTGRES_HOST";
+pub const ENV_KEY_POSTGRES_PORT: &str = "POSTGRES_PORT";
+pub const ENV_KEY_POSTGRES_DATABASE: &str = "POSTGRES_DATABASE";
+pub const ENV_KEY_POSTGRES_USERNAME: &str = "POSTGRES_USERNAME";
+pub const ENV_KEY_POSTGRES_PASSWORD: &str = "POSTGRES_PASSWORD";
+pub const ENV_KEY_REDIS_HOST: &str = "REDIS_HOST";
+pub const ENV_KEY_REDIS_PORT: &str = "REDIS_PORT";
+pub const ENV_KEY_REDIS_USERNAME: &str = "REDIS_USERNAME";
+pub const ENV_KEY_REDIS_PASSWORD: &str = "REDIS_PASSWORD";
+pub const DEFAULT_MYSQL_PORT: usize = 3306;
+pub const DEFAULT_REDIS_PORT: usize = 6379;
+pub const DEFAULT_POSTGRESQL_PORT: usize = 5432;
+pub const DEFAULT_DB_HOST: &str = "127.0.0.1";
+pub const DOCKER_YAML_SERVICES: &str = "services";
+pub const DOCKER_YAML_ENVIRONMENT: &str = "environment";
+pub const DOCKER_YAML_PORTS: &str = "ports";
+pub const DOCKER_YAML_COMMAND: &str = "command";
+pub const DOCKER_SERVICE_MYSQL: &str = "mysql";
+pub const DOCKER_SERVICE_POSTGRESQL: &str = "postgresql";
+pub const DOCKER_SERVICE_REDIS: &str = "redis";
+pub const DOCKER_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
+pub const DOCKER_MYSQL_USER: &str = "MYSQL_USER";
+pub const DOCKER_MYSQL_PASSWORD: &str = "MYSQL_PASSWORD";
+pub const DOCKER_POSTGRES_DB: &str = "POSTGRES_DB";
+pub const DOCKER_POSTGRES_USER: &str = "POSTGRES_USER";
+pub const DOCKER_POSTGRES_PASSWORD: &str = "POSTGRES_PASSWORD";
+pub const DOCKER_REDIS_PASSWORD_FLAG: &str = "--requirepass";
+```
+# Path: hyperlane-quick-start/plugin/env/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use {r#const::*, r#struct::*};
+use {super::*, mysql::*, postgresql::*, redis::*, r#static::*};
+use std::sync::OnceLock;
+```
+# Path: hyperlane-quick-start/plugin/env/impl.rs
+```rust
+use super::*;
+impl GetOrInit for EnvPlugin {
+    type Instance = EnvConfig;
+    #[instrument_trace]
+    fn get_or_init() -> &'static Self::Instance {
+        GLOBAL_ENV_CONFIG.get_or_init(EnvConfig::default)
+    }
+}
+impl EnvPlugin {
+    #[instrument_trace]
+    pub fn try_get_config() -> Result<(), String> {
+        let config: EnvConfig = EnvConfig::load()?;
+        GLOBAL_ENV_CONFIG
+            .set(config.clone())
+            .map_err(|_| "Failed to initialize global environment configuration".to_string())?;
+        info!("Environment Configuration Loaded Successfully");
+        info!(
+            "GPT API URL {}",
+            if config.get_gpt_api_url().is_empty() {
+                "(not set)"
+            } else {
+                config.get_gpt_api_url()
+            }
+        );
+        info!(
+            "GPT Model {}",
+            if config.get_gpt_model().is_empty() {
+                "(not set)"
+            } else {
+                config.get_gpt_model()
+            }
+        );
+        info!("MySQL Configuration:");
+        if config.get_mysql_instances().is_empty() {
+            info!("  (no MySQL instances configured)");
+        } else {
+            for instance in config.get_mysql_instances() {
+                info!(
+    #[instrument_trace]
+    pub(crate) fn load() -> Result<Self, String> {
+        let docker_config: DockerComposeConfig =
+            Self::load_from_docker_compose().unwrap_or_default();
+        if read_from_file::<Vec<u8>>(ENV_FILE_PATH).is_err() {
+            let mut data: String = String::new();
+            data.push_str(&format!("{ENV_KEY_GPT_API_URL}={BR}"));
+            data.push_str(&format!("{ENV_KEY_GPT_MODEL}={BR}"));
+            data.push_str(&format!(
+                "{ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS}={DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS}{BR}"
+            ));
+            write_to_file(ENV_FILE_PATH, data.as_bytes())
+                .map_err(|error| format!("Failed to create example env file {error}"))?;
+        }
+        dotenvy::from_path(ENV_FILE_PATH)
+            .map_err(|error| format!("Failed to load env file {error}"))?;
+        let get_env = |key: &str| -> Option<String> { std::env::var(key).ok() };
+        let get_env_usize = |key: &str| -> Option<usize> {
+            std::env::var(key).ok().and_then(|value| value.parse().ok())
+        };
+        let mut config: EnvConfig = EnvConfig {
+            gpt_api_url: get_env(ENV_KEY_GPT_API_URL).unwrap_or_default(),
+            gpt_model: get_env(ENV_KEY_GPT_MODEL).unwrap_or_default(),
+            ..Default::default()
+        };
+        let default_mysql_host: String =
+            get_env(ENV_KEY_MYSQL_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
+        let default_mysql_port: usize = docker_config
+            .get_mysql_port()
+            .or_else(|| get_env_usize(ENV_KEY_MYSQL_PORT))
+            .unwrap_or(DEFAULT_MYSQL_PORT);
+        let default_mysql_database: String = docker_config
+            .try_get_mysql_database()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_MYSQL_DATABASE))
+            .unwrap_or_default();
+        let default_mysql_username: String = docker_config
+            .try_get_mysql_username()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_MYSQL_USERNAME))
+            .unwrap_or_default();
+        let default_mysql_password: String = docker_config
+            .try_get_mysql_password()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_MYSQL_PASSWORD))
+            .unwrap_or_default();
+        let instance: MySqlInstanceConfig = MySqlInstanceConfig {
+            name: DEFAULT_MYSQL_INSTANCE_NAME.to_string(),
+            host: default_mysql_host,
+            port: default_mysql_port,
+            database: default_mysql_database,
+            username: default_mysql_username,
+            password: default_mysql_password,
+        };
+        config.get_mut_mysql_instances().push(instance);
+        let mut instance_index: usize = 1;
+        loop {
+            let prefix: String = format!("MYSQL_{instance_index}_");
+            let host_key: String = format!("{prefix}HOST");
+            if let Some(host) = get_env(&host_key) {
+                let port_key: String = format!("{prefix}PORT");
+                let database_key: String = format!("{prefix}DATABASE");
+                let username_key: String = format!("{prefix}USERNAME");
+                let password_key: String = format!("{prefix}PASSWORD");
+                let instance_name: String = format!("mysql_{instance_index}");
+                let instance: MySqlInstanceConfig = MySqlInstanceConfig {
+                    name: instance_name,
+                    host,
+                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_MYSQL_PORT),
+                    database: get_env(&database_key).unwrap_or_default(),
+                    username: get_env(&username_key).unwrap_or_default(),
+                    password: get_env(&password_key).unwrap_or_default(),
+                };
+                config.get_mut_mysql_instances().push(instance);
+                instance_index += 1;
+            } else {
+                break;
+            }
+        }
+        let default_postgres_host: String =
+            get_env(ENV_KEY_POSTGRES_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
+        let default_postgres_port: usize = docker_config
+            .get_postgresql_port()
+            .or_else(|| get_env_usize(ENV_KEY_POSTGRES_PORT))
+            .unwrap_or(DEFAULT_POSTGRESQL_PORT);
+        let default_postgres_database: String = docker_config
+            .try_get_postgresql_database()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_POSTGRES_DATABASE))
+            .unwrap_or_default();
+        let default_postgres_username: String = docker_config
+            .try_get_postgresql_username()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_POSTGRES_USERNAME))
+            .unwrap_or_default();
+        let default_postgres_password: String = docker_config
+            .try_get_postgresql_password()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_POSTGRES_PASSWORD))
+            .unwrap_or_default();
+        let instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig {
+            name: DEFAULT_POSTGRESQL_INSTANCE_NAME.to_string(),
+            host: default_postgres_host,
+            port: default_postgres_port,
+            database: default_postgres_database,
+            username: default_postgres_username,
+            password: default_postgres_password,
+        };
+        config.get_mut_postgresql_instances().push(instance);
+        let mut instance_index: usize = 1;
+        loop {
+            let prefix: String = format!("POSTGRES_{instance_index}_");
+            let host_key: String = format!("{prefix}HOST");
+            if let Some(host) = get_env(&host_key) {
+                let port_key: String = format!("{prefix}PORT");
+                let database_key: String = format!("{prefix}DATABASE");
+                let username_key: String = format!("{prefix}USERNAME");
+                let password_key: String = format!("{prefix}PASSWORD");
+                let instance_name: String = format!("postgres_{instance_index}");
+                let instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig {
+                    name: instance_name,
+                    host,
+                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_POSTGRESQL_PORT),
+                    database: get_env(&database_key).unwrap_or_default(),
+                    username: get_env(&username_key).unwrap_or_default(),
+                    password: get_env(&password_key).unwrap_or_default(),
+                };
+                config.get_mut_postgresql_instances().push(instance);
+                instance_index += 1;
+            } else {
+                break;
+            }
+        }
+        let default_redis_host: String =
+            get_env(ENV_KEY_REDIS_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
+        let default_redis_port: usize = docker_config
+            .get_redis_port()
+            .or_else(|| get_env_usize(ENV_KEY_REDIS_PORT))
+            .unwrap_or(DEFAULT_REDIS_PORT);
+        let default_redis_username: String = docker_config
+            .try_get_redis_username()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_REDIS_USERNAME))
+            .unwrap_or_default();
+        let default_redis_password: String = docker_config
+            .try_get_redis_password()
+            .clone()
+            .or_else(|| get_env(ENV_KEY_REDIS_PASSWORD))
+            .unwrap_or_default();
+        let instance: RedisInstanceConfig = RedisInstanceConfig {
+            name: DEFAULT_REDIS_INSTANCE_NAME.to_string(),
+            host: default_redis_host,
+            port: default_redis_port,
+            username: default_redis_username,
+            password: default_redis_password,
+        };
+        config.get_mut_redis_instances().push(instance);
+        let mut instance_index: usize = 1;
+        loop {
+            let prefix: String = format!("REDIS_{instance_index}_");
+            let host_key: String = format!("{prefix}HOST");
+            if let Some(host) = get_env(&host_key) {
+                let port_key: String = format!("{prefix}PORT");
+                let username_key: String = format!("{prefix}USERNAME");
+                let password_key: String = format!("{prefix}PASSWORD");
+                let instance_name: String = format!("redis_{instance_index}");
+                let instance: RedisInstanceConfig = RedisInstanceConfig {
+                    name: instance_name,
+                    host,
+                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_REDIS_PORT),
+                    username: get_env(&username_key).unwrap_or_default(),
+                    password: get_env(&password_key).unwrap_or_default(),
+                };
+                config.get_mut_redis_instances().push(instance);
+                instance_index += 1;
+            } else {
+                break;
+            }
+        }
+        Ok(config)
+    }
+    #[instrument_trace]
+    fn load_from_docker_compose() -> Result<DockerComposeConfig, String> {
+        let docker_compose_content: Vec<u8> = read_from_file(DOCKER_COMPOSE_FILE_PATH)
+            .map_err(|error| format!("Failed to read docker-compose.yml {error}"))?;
+        let yaml: serde_yaml::Value = serde_yaml::from_slice(&docker_compose_content)
+            .map_err(|error| format!("Failed to parse docker-compose.yml {error}"))?;
+        let mut config: DockerComposeConfig = DockerComposeConfig::default();
+        if let Some(mysql) = yaml
+            .get(DOCKER_YAML_SERVICES)
+            .and_then(|services| services.get(DOCKER_SERVICE_MYSQL))
+        {
+            if let Some(env) = mysql.get(DOCKER_YAML_ENVIRONMENT) {
+                if let Some(database) = env
+                    .get(DOCKER_MYSQL_DATABASE)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_mysql_database(Some(database));
+                }
+                if let Some(username) = env
+                    .get(DOCKER_MYSQL_USER)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_mysql_username(Some(username));
+                }
+                if let Some(password) = env
+                    .get(DOCKER_MYSQL_PASSWORD)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_mysql_password(Some(password));
+                }
+            }
+            if let Some(ports) = mysql
+                .get(DOCKER_YAML_PORTS)
+                .and_then(|ports_value| ports_value.as_sequence())
+            {
+                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
+                    if let Some(host_port) = port_mapping.split(':').next() {
+                        if let Ok(port) = host_port.parse() {
+                            config.set_mysql_port(Some(port));
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(postgresql) = yaml
+            .get(DOCKER_YAML_SERVICES)
+            .and_then(|services| services.get(DOCKER_SERVICE_POSTGRESQL))
+        {
+            if let Some(env) = postgresql.get(DOCKER_YAML_ENVIRONMENT) {
+                if let Some(database) = env
+                    .get(DOCKER_POSTGRES_DB)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_postgresql_database(Some(database));
+                }
+                if let Some(username) = env
+                    .get(DOCKER_POSTGRES_USER)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_postgresql_username(Some(username));
+                }
+                if let Some(password) = env
+                    .get(DOCKER_POSTGRES_PASSWORD)
+                    .and_then(|value| value.as_str())
+                    .map(String::from)
+                {
+                    config.set_postgresql_password(Some(password));
+                }
+            }
+            if let Some(ports) = postgresql
+                .get(DOCKER_YAML_PORTS)
+                .and_then(|ports_value| ports_value.as_sequence())
+            {
+                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
+                    if let Some(host_port) = port_mapping.split(':').next() {
+                        if let Ok(port) = host_port.parse() {
+                            config.set_postgresql_port(Some(port));
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(redis) = yaml
+            .get(DOCKER_YAML_SERVICES)
+            .and_then(|services| services.get(DOCKER_SERVICE_REDIS))
+        {
+            if let Some(command) = redis
+                .get(DOCKER_YAML_COMMAND)
+                .and_then(|command_value| command_value.as_str())
+            {
+                if let Some(password_part) = command.split(DOCKER_REDIS_PASSWORD_FLAG).nth(1) {
+                    config.set_redis_password(Some(password_part.trim().to_string()));
+                }
+            }
+            if let Some(ports) = redis
+                .get(DOCKER_YAML_PORTS)
+                .and_then(|ports_value| ports_value.as_sequence())
+            {
+                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
+                    if let Some(host_port) = port_mapping.split(':').next() {
+                        if let Ok(port) = host_port.parse() {
+                            config.set_redis_port(Some(port));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(config)
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/env/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct EnvPlugin;
+#[derive(Clone, Data, Debug, Default)]
+pub struct DockerComposeConfig {
+    #[get(pub(crate))]
+    pub(super) mysql_database: Option<String>,
+    #[get(pub(crate))]
+    pub(super) mysql_password: Option<String>,
+    #[get(type(copy), pub(crate))]
+    pub(super) mysql_port: Option<usize>,
+    #[get(pub(crate))]
+    pub(super) mysql_username: Option<String>,
+    #[get(pub(crate))]
+    pub(super) postgresql_database: Option<String>,
+    #[get(pub(crate))]
+    pub(super) postgresql_password: Option<String>,
+    #[get(type(copy), pub(crate))]
+    pub(super) postgresql_port: Option<usize>,
+    #[get(pub(crate))]
+    pub(super) postgresql_username: Option<String>,
+    #[get(pub(crate))]
+    pub(super) redis_password: Option<String>,
+    #[get(type(copy), pub(crate))]
+    pub(super) redis_port: Option<usize>,
+    #[get(pub(crate))]
+    pub(super) redis_username: Option<String>,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct EnvConfig {
+    #[get(pub)]
+    pub(super) gpt_api_url: String,
+    #[get(pub)]
+    pub(super) gpt_model: String,
+    #[get(pub(crate))]
+    pub(super) mysql_instances: Vec<MySqlInstanceConfig>,
+    #[get(pub(crate))]
+    pub(super) postgresql_instances: Vec<PostgreSqlInstanceConfig>,
+    #[get(pub(crate))]
+    pub(super) redis_instances: Vec<RedisInstanceConfig>,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct MySqlInstanceConfig {
+    #[get(pub(crate))]
+    pub(super) database: String,
+    #[get(pub(crate))]
+    pub(super) host: String,
+    #[get(pub(crate))]
+    pub(super) name: String,
+    #[get(pub(crate))]
+    pub(super) password: String,
+    #[get(type(copy), pub(crate))]
+    pub(super) port: usize,
+    #[get(pub(crate))]
+    pub(super) username: String,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct PostgreSqlInstanceConfig {
+    #[get(pub(crate))]
+    pub(super) database: String,
+    #[get(pub(crate))]
+    pub(super) host: String,
+    #[get(pub(crate))]
+    pub(super) name: String,
+    #[get(pub(crate))]
+    pub(super) password: String,
+    #[get(type(copy), pub(crate))]
+    pub(super) port: usize,
+    #[get(pub(crate))]
+    pub(super) username: String,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct RedisInstanceConfig {
+    #[get(pub(crate))]
+    pub(super) host: String,
+    #[get(pub(crate))]
+    pub(super) name: String,
+    #[get(pub(crate))]
+    pub(super) password: String,
+    #[get(type(copy), pub(crate))]
+    pub(super) port: usize,
+    #[get(pub(crate))]
+    pub(super) username: String,
+}
+```
+# Path: hyperlane-quick-start/plugin/env/static.rs
+```rust
+use super::*;
+pub static GLOBAL_ENV_CONFIG: OnceLock<EnvConfig> = OnceLock::new();
+```
+# Path: hyperlane-quick-start/plugin/redis/const.rs
+```rust
+pub const DEFAULT_REDIS_INSTANCE_NAME: &str = "redis_default";
+```
+# Path: hyperlane-quick-start/plugin/redis/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#static;
+mod r#struct;
+mod r#type;
+pub use {r#const::*, r#struct::*, r#type::*};
+use {super::*, database::*, env::*, r#static::*};
+use hyperlane_utils::redis::*;
+use std::{
+    collections::HashMap,
+    sync::OnceLock,
+    time::{Duration, Instant},
+};
+use tokio::{
+    spawn,
+    sync::{RwLock, RwLockWriteGuard},
+    task::{JoinHandle, spawn_blocking},
+    time::timeout,
+};
+```
+# Path: hyperlane-quick-start/plugin/redis/impl.rs
+```rust
+use super::*;
+impl GetOrInit for RedisPlugin {
+    type Instance = RwLock<RedisConnectionMap>;
+    #[instrument_trace]
+    fn get_or_init() -> &'static Self::Instance {
+        REDIS_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
+    }
+}
+impl DatabaseConnectionPlugin for RedisPlugin {
+    type InstanceConfig = RedisInstanceConfig;
+    type AutoCreation = RedisAutoCreation;
+    type Connection = ArcRwLock<Connection>;
+    type ConnectionCache = RwLock<RedisConnectionMap>;
+    #[instrument_trace]
+    fn plugin_type() -> PluginType {
+        PluginType::Redis
+    }
+    #[instrument_trace]
+    async fn connection_db<I>(
+        instance_name: I,
+        _schema: Option<DatabaseSchema>,
+    ) -> Result<Self::Connection, String>
+    where
+        I: AsRef<str> + Send,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        let instance: &RedisInstanceConfig = env
+            .get_redis_instance(instance_name_str)
+            .ok_or_else(|| format!("Redis instance '{instance_name_str}' not found"))?;
+        match Self::perform_auto_creation(instance, _schema).await {
+            Ok(result) => {
+                if result.has_changes() {
+                    AutoCreationLogger::log_auto_creation_complete(
+                        database::PluginType::Redis,
+                        &result,
+                    )
+                    .await;
+                }
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Auto-creation process",
+                    database::PluginType::Redis,
+                    Some(instance.get_name().as_str()),
+                )
+                .await;
+                if !error.should_continue() {
+                    return Err(error.to_string());
+                }
+            }
+        }
+        let db_url: String = instance.get_connection_url();
+        let client: Client = Client::open(db_url).map_err(|error: redis::RedisError| {
+            let error_msg: String = error.to_string();
+            let instance_name_clone: String = instance_name_str.to_string();
+            let error_msg_clone: String = error_msg.clone();
+            spawn(async move {
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::Redis,
+                    &instance_name_clone,
+                    false,
+                    Some(&error_msg_clone),
+                )
+                .await;
+            });
+            error_msg
+        })?;
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_task: JoinHandle<Result<Connection, RedisError>> =
+            spawn_blocking(move || client.get_connection());
+        let connection: Connection = match timeout(timeout_duration, connection_task).await {
+            Ok(join_result) => match join_result {
+                Ok(result) => result.map_err(|error: redis::RedisError| {
+                    let error_msg: String = error.to_string();
+                    let instance_name_clone: String = instance_name_str.to_string();
+                    let error_msg_clone: String = error_msg.clone();
+                    spawn(async move {
+                        AutoCreationLogger::log_connection_verification(
+                            database::PluginType::Redis,
+                            &instance_name_clone,
+                            false,
+                            Some(&error_msg_clone),
+                        )
+                        .await;
+                    });
+                    error_msg
+                })?,
+                Err(_) => {
+                    let error_msg: String = "Redis connection task failed".to_string();
+                    let instance_name_clone: String = instance_name_str.to_string();
+                    let error_msg_clone: String = error_msg.clone();
+                    spawn(async move {
+                        AutoCreationLogger::log_connection_verification(
+                            database::PluginType::Redis,
+                            &instance_name_clone,
+                            false,
+                            Some(&error_msg_clone),
+                        )
+                        .await;
+                    });
+                    return Err(error_msg);
+                }
+            },
+            Err(_) => {
+                let error_msg: String =
+                    format!("Redis connection timeout after {timeout_seconds} seconds");
+                let instance_name_clone: String = instance_name_str.to_string();
+                let error_msg_clone: String = error_msg.clone();
+                spawn(async move {
+                    AutoCreationLogger::log_connection_verification(
+                        database::PluginType::Redis,
+                        &instance_name_clone,
+                        false,
+                        Some(&error_msg_clone),
+                    )
+                    .await;
+                });
+                return Err(error_msg);
+            }
+        };
+        Ok(arc_rwlock(connection))
+    }
+    #[instrument_trace]
+    async fn get_connection<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<Self::Connection, String>
+    where
+        I: AsRef<str> + Send,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let duration: Duration = DatabasePlugin::get_retry_duration();
+        {
+            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
+                match cache.try_get_result() {
+                    Ok(conn) => return Ok(conn.clone()),
+                    Err(error) => {
+                        if !cache.is_expired(duration) {
+                            return Err(error.clone());
+                        }
+                    }
+                }
+            }
+        }
+        let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
+            Self::get_or_init().write().await;
+        if let Some(cache) = connections.get(instance_name_str) {
+            match cache.try_get_result() {
+                Ok(conn) => return Ok(conn.clone()),
+                Err(error) => {
+                    if !cache.is_expired(duration) {
+                        return Err(error.clone());
+                    }
+                }
+            }
+        }
+        connections.remove(instance_name_str);
+        drop(connections);
+        let new_connection: Result<ArcRwLock<Connection>, String> =
+            Self::connection_db(instance_name_str, schema).await;
+        let mut connections: RwLockWriteGuard<'_, RedisConnectionMap> =
+            Self::get_or_init().write().await;
+        connections.insert(
+            instance_name_str.to_string(),
+            ConnectionCache::new(new_connection.clone()),
+        );
+        new_connection
+    }
+    #[instrument_trace]
+    async fn perform_auto_creation(
+        instance: &Self::InstanceConfig,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<AutoCreationResult, AutoCreationError> {
+        let start_time: Instant = Instant::now();
+        let mut result: AutoCreationResult = AutoCreationResult::default();
+        AutoCreationLogger::log_auto_creation_start(
+            database::PluginType::Redis,
+            instance.get_name(),
+        )
+        .await;
+        let auto_creator: RedisAutoCreation = match schema {
+            Some(s) => RedisAutoCreation::with_schema(instance.clone(), s),
+            None => RedisAutoCreation::new(instance.clone()),
+        };
+        match auto_creator.create_database_if_not_exists().await {
+            Ok(created) => {
+                result.set_database_created(created);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Database validation",
+                    database::PluginType::Redis,
+                    Some(instance.get_name().as_str()),
+                )
+                .await;
+                if !error.should_continue() {
+                    result.set_duration(start_time.elapsed());
+                    return Err(error);
+                }
+                result.get_mut_errors().push(error.to_string());
+            }
+        }
+        match auto_creator.create_tables_if_not_exist().await {
+            Ok(operations) => {
+                result.set_tables_created(operations);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Namespace setup",
+                    database::PluginType::Redis,
+                    Some(instance.get_name().as_str()),
+                )
+                .await;
+                result.get_mut_errors().push(error.to_string());
+            }
+        }
+        if let Err(error) = auto_creator.verify_connection().await {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Connection verification",
+                database::PluginType::Redis,
+                Some(instance.get_name().as_str()),
+            )
+            .await;
+            if !error.should_continue() {
+                result.set_duration(start_time.elapsed());
+                return Err(error);
+            }
+            result.get_mut_errors().push(error.to_string());
+        }
+        result.set_duration(start_time.elapsed());
+        AutoCreationLogger::log_auto_creation_complete(database::PluginType::Redis, &result).await;
+        Ok(result)
+    }
+}
+impl Default for RedisAutoCreation {
+    #[instrument_trace]
+    fn default() -> Self {
+        if let Some(instance) = EnvPlugin::get_or_init().get_default_redis_instance() {
+            Self::new(instance.clone())
+        } else {
+            let default_instance: RedisInstanceConfig = RedisInstanceConfig::default();
+            Self::new(default_instance)
+        }
+    }
+}
+impl RedisAutoCreation {
+    #[instrument_trace]
+    async fn create_mutable_connection(&self) -> Result<Connection, AutoCreationError> {
+        let db_url: String = self.instance.get_connection_url();
+        let client: Client = Client::open(db_url).map_err(|error: RedisError| {
+            let error_msg: String = error.to_string();
+            if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
+                AutoCreationError::InsufficientPermissions(format!(
+                    "Redis authentication failed {error_msg}"
+                ))
+            } else if error_msg.contains("Connection refused") || error_msg.contains("timeout") {
+                AutoCreationError::ConnectionFailed(format!(
+                    "Cannot connect to Redis server {error_msg}"
+                ))
+            } else {
+                AutoCreationError::DatabaseError(format!("Redis connection error {error_msg}"))
+            }
+        })?;
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_task: JoinHandle<Result<Connection, RedisError>> =
+            spawn_blocking(move || client.get_connection());
+        let connection: Connection = match timeout(timeout_duration, connection_task).await {
+            Ok(join_result) => match join_result {
+                Ok(result) => result.map_err(|error: RedisError| {
+                    let error_msg: String = error.to_string();
+                    if error_msg.contains("authentication failed") || error_msg.contains("NOAUTH") {
+                        AutoCreationError::InsufficientPermissions(format!(
+                            "Redis authentication failed {error_msg}"
+                        ))
+                    } else if error_msg.contains("Connection refused")
+                        || error_msg.contains("timeout")
+                    {
+                        AutoCreationError::ConnectionFailed(format!(
+                            "Cannot connect to Redis server {error_msg}"
+                        ))
+                    } else {
+                        AutoCreationError::DatabaseError(format!(
+                            "Redis connection error {error_msg}"
+                        ))
+                    }
+                })?,
+                Err(_) => {
+                    return Err(AutoCreationError::ConnectionFailed(
+                        "Redis connection task failed".to_string(),
+                    ));
+                }
+            },
+            Err(_) => {
+                return Err(AutoCreationError::Timeout(format!(
+                    "Redis connection timeout after {timeout_seconds} seconds"
+                )));
+            }
+        };
+        Ok(connection)
+    }
+    #[instrument_trace]
+    async fn validate_redis_server(&self) -> Result<(), AutoCreationError> {
+        let mut conn: Connection = self.create_mutable_connection().await?;
+        let pong: String = redis::cmd("PING")
+            .query(&mut conn)
+            .map_err(|error: RedisError| {
+                AutoCreationError::ConnectionFailed(format!("Redis PING failed {error}"))
+            })?;
+        if pong != "PONG" {
+            return Err(AutoCreationError::ConnectionFailed(
+                "Redis PING returned unexpected response".to_string(),
+            ));
+        }
+        let info: String =
+            redis::cmd("INFO")
+                .arg("server")
+                .query(&mut conn)
+                .map_err(|error: RedisError| {
+                    AutoCreationError::DatabaseError(format!(
+                        "Failed to get Redis server info {error}"
+                    ))
+                })?;
+        if info.contains("redis_version:") {
+            AutoCreationLogger::log_connection_verification(
+                database::PluginType::Redis,
+                self.instance.get_name().as_str(),
+                true,
+                None,
+            )
+            .await;
+        }
+        Ok(())
+    }
+    #[instrument_trace]
+    async fn setup_redis_namespace(&self) -> Result<Vec<String>, AutoCreationError> {
+        let mut setup_operations: Vec<String> = Vec::new();
+        let mut conn: Connection = self.create_mutable_connection().await?;
+        let app_key: String = format!("{}:initialized", self.instance.get_name());
+        let exists: i32 = redis::cmd("EXISTS")
+            .arg(&app_key)
+            .query(&mut conn)
+            .map_err(|error: RedisError| {
+                AutoCreationError::DatabaseError(format!(
+                    "Failed to check Redis key existence {error}"
+                ))
+            })?;
+        if exists == 0 {
+            let _: () = redis::cmd("SET")
+                .arg(&app_key)
+                .arg("true")
+                .query(&mut conn)
+                .map_err(|error: RedisError| {
+                    AutoCreationError::DatabaseError(format!(
+                        "Failed to set Redis initialization key {error}"
+                    ))
+                })?;
+            setup_operations.push(app_key.clone());
+            let config_key: String = format!("{}:config:version", self.instance.get_name());
+            let _: () = redis::cmd("SET")
+                .arg(&config_key)
+                .arg("1.0.0")
+                .query(&mut conn)
+                .map_err(|error: RedisError| {
+                    AutoCreationError::DatabaseError(format!(
+                        "Failed to set Redis config key {error}"
+                    ))
+                })?;
+            setup_operations.push(config_key);
+        }
+        Ok(setup_operations)
+    }
+}
+impl DatabaseAutoCreation for RedisAutoCreation {
+    type InstanceConfig = RedisInstanceConfig;
+    #[instrument_trace]
+    fn new(instance: Self::InstanceConfig) -> Self {
+        Self {
+            instance,
+            schema: DatabaseSchema::default(),
+        }
+    }
+    #[instrument_trace]
+    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
+    where
+        Self: Sized,
+    {
+        Self { instance, schema }
+    }
+    #[instrument_trace]
+    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
+        self.validate_redis_server().await?;
+        AutoCreationLogger::log_database_exists(
+            self.instance.get_name().as_str(),
+            database::PluginType::Redis,
+        )
+        .await;
+        Ok(false)
+    }
+    #[instrument_trace]
+    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
+        let setup_operations: Vec<String> = self.setup_redis_namespace().await?;
+        if !setup_operations.is_empty() {
+            AutoCreationLogger::log_tables_created(
+                &setup_operations,
+                self.instance.get_name().as_str(),
+                database::PluginType::Redis,
+            )
+            .await;
+        } else {
+            AutoCreationLogger::log_tables_created(
+                &[],
+                self.instance.get_name().as_str(),
+                database::PluginType::Redis,
+            )
+            .await;
+        }
+        Ok(setup_operations)
+    }
+    #[instrument_trace]
+    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
+        match self.validate_redis_server().await {
+            Ok(_) => {
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::Redis,
+                    self.instance.get_name().as_str(),
+                    true,
+                    None,
+                )
+                .await;
+                Ok(())
+            }
+            Err(error) => {
+                AutoCreationLogger::log_connection_verification(
+                    database::PluginType::Redis,
+                    self.instance.get_name().as_str(),
+                    false,
+                    Some(&error.to_string()),
+                )
+                .await;
+                Err(error)
+            }
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/redis/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct RedisPlugin;
+#[derive(Clone, Data, Debug, New)]
+pub struct RedisAutoCreation {
+    #[get(pub(crate))]
+    pub(super) instance: RedisInstanceConfig,
+    #[new(skip)]
+    #[get(pub(crate))]
+    pub(super) schema: DatabaseSchema,
+}
+```
+# Path: hyperlane-quick-start/plugin/redis/type.rs
+```rust
+use super::*;
+pub type RedisConnectionMap = HashMap<String, ConnectionCache<ArcRwLock<Connection>>>;
+```
+# Path: hyperlane-quick-start/plugin/redis/static.rs
+```rust
+use super::*;
+pub static REDIS_CONNECTIONS: OnceLock<RwLock<RedisConnectionMap>> = OnceLock::new();
+```
+# Path: hyperlane-quick-start/plugin/mysql/const.rs
+```rust
+pub const DEFAULT_MYSQL_INSTANCE_NAME: &str = "mysql_default";
+```
+# Path: hyperlane-quick-start/plugin/mysql/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use {r#const::*, r#struct::*};
+use {super::*, database::*, env::*, r#static::*};
+use std::{
+    collections::HashMap,
+    sync::OnceLock,
+    time::{Duration, Instant},
+};
+use tokio::{
+    spawn,
+    sync::{RwLock, RwLockWriteGuard},
+    time::timeout,
+};
+```
+# Path: hyperlane-quick-start/plugin/mysql/impl.rs
+```rust
+use super::*;
+impl GetOrInit for MySqlPlugin {
+    type Instance = RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>;
+    #[instrument_trace]
+    fn get_or_init() -> &'static Self::Instance {
+        MYSQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
+    }
+}
+impl DatabaseConnectionPlugin for MySqlPlugin {
+    type InstanceConfig = MySqlInstanceConfig;
+    type AutoCreation = MySqlAutoCreation;
+    type Connection = DatabaseConnection;
+    type ConnectionCache = RwLock<HashMap<String, ConnectionCache<Self::Connection>>>;
+    #[instrument_trace]
+    fn plugin_type() -> PluginType {
+        PluginType::MySQL
+    }
+    #[instrument_trace]
+    async fn connection_db<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<Self::Connection, String>
+    where
+        I: AsRef<str> + Send,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        let instance: &MySqlInstanceConfig = env
+            .get_mysql_instance(instance_name_str)
+            .ok_or_else(|| format!("MySQL instance '{instance_name_str}' not found"))?;
+        match Self::perform_auto_creation(instance, schema.clone()).await {
+            Ok(result) => {
+                if result.has_changes() {
+                    AutoCreationLogger::log_auto_creation_complete(PluginType::MySQL, &result)
+                        .await;
+                }
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Auto-creation process",
+                    PluginType::MySQL,
+                    Some(instance.get_database().as_str()),
+                )
+                .await;
+                if !error.should_continue() {
+                    return Err(error.to_string());
+                }
+            }
+        }
+        let db_url: String = instance.get_connection_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => Err(DbErr::Custom(format!(
+                    "MySQL connection timeout after {timeout_seconds} seconds"
+                ))),
+            };
+        connection_result.map_err(|error: DbErr| {
+            let error_msg: String = error.to_string();
+            let database_name: String = instance.get_database().clone();
+            let error_msg_clone: String = error_msg.clone();
+            spawn(async move {
+                AutoCreationLogger::log_connection_verification(
+                    PluginType::MySQL,
+                    &database_name,
+                    false,
+                    Some(&error_msg_clone),
+                )
+                .await;
+            });
+            error_msg
+        })
+    }
+    #[instrument_trace]
+    async fn get_connection<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<Self::Connection, String>
+    where
+        I: AsRef<str> + Send,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let duration: Duration = DatabasePlugin::get_retry_duration();
+        {
+            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
+                match cache.try_get_result() {
+                    Ok(conn) => return Ok(conn.clone()),
+                    Err(error) => {
+                        if !cache.is_expired(duration) {
+                            return Err(error.clone());
+                        }
+                    }
+                }
+            }
+        }
+        let mut connections: RwLockWriteGuard<
+            '_,
+            HashMap<String, ConnectionCache<DatabaseConnection>>,
+        > = Self::get_or_init().write().await;
+        if let Some(cache) = connections.get(instance_name_str) {
+            match cache.try_get_result() {
+                Ok(conn) => return Ok(conn.clone()),
+                Err(error) => {
+                    if !cache.is_expired(duration) {
+                        return Err(error.clone());
+                    }
+                }
+            }
+        }
+        connections.remove(instance_name_str);
+        drop(connections);
+        let new_connection: Result<DatabaseConnection, String> =
+            Self::connection_db(instance_name_str, schema).await;
+        let mut connections: RwLockWriteGuard<
+            '_,
+            HashMap<String, ConnectionCache<DatabaseConnection>>,
+        > = Self::get_or_init().write().await;
+        connections.insert(
+            instance_name_str.to_string(),
+            ConnectionCache::new(new_connection.clone()),
+        );
+        new_connection
+    }
+    #[instrument_trace]
+    async fn perform_auto_creation(
+        instance: &Self::InstanceConfig,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<AutoCreationResult, AutoCreationError> {
+        let start_time: Instant = Instant::now();
+        let mut result: AutoCreationResult = AutoCreationResult::default();
+        AutoCreationLogger::log_auto_creation_start(PluginType::MySQL, instance.get_database())
+            .await;
+        let auto_creator: MySqlAutoCreation = match schema {
+            Some(s) => MySqlAutoCreation::with_schema(instance.clone(), s),
+            None => MySqlAutoCreation::new(instance.clone()),
+        };
+        match auto_creator.create_database_if_not_exists().await {
+            Ok(created) => {
+                result.set_database_created(created);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Database creation",
+                    PluginType::MySQL,
+                    Some(instance.get_database()),
+                )
+                .await;
+                if !error.should_continue() {
+                    result.set_duration(start_time.elapsed());
+                    return Err(error);
+                }
+                result.get_mut_errors().push(error.to_string());
+            }
+        }
+        match auto_creator.create_tables_if_not_exist().await {
+            Ok(tables) => {
+                result.set_tables_created(tables);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Table creation",
+                    PluginType::MySQL,
+                    Some(instance.get_database().as_str()),
+                )
+                .await;
+                result.get_mut_errors().push(error.to_string());
+            }
+        }
+        if let Err(error) = auto_creator.verify_connection().await {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Connection verification",
+                PluginType::MySQL,
+                Some(instance.get_database().as_str()),
+            )
+            .await;
+            if !error.should_continue() {
+                result.set_duration(start_time.elapsed());
+                return Err(error);
+            }
+            result.get_mut_errors().push(error.to_string());
+        }
+        result.set_duration(start_time.elapsed());
+        AutoCreationLogger::log_auto_creation_complete(PluginType::MySQL, &result).await;
+        Ok(result)
+    }
+}
+impl Default for MySqlAutoCreation {
+    #[instrument_trace]
+    fn default() -> Self {
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        if let Some(instance) = env.get_default_mysql_instance() {
+            Self::new(instance.clone())
+        } else {
+            let default_instance: MySqlInstanceConfig = MySqlInstanceConfig::default();
+            Self::new(default_instance)
+        }
+    }
+}
+impl MySqlAutoCreation {
+    #[instrument_trace]
+    async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
+        let admin_url: String = self.instance.get_admin_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&admin_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "MySQL admin connection timeout after {timeout_seconds} seconds"
+                    )));
+                }
+            };
+        connection_result.map_err(|error: DbErr| {
+            let error_msg: String = error.to_string();
+            if error_msg.contains("Access denied") || error_msg.contains("permission") {
+                AutoCreationError::InsufficientPermissions(format!(
+                    "Cannot connect to MySQL server for database creation {error_msg}"
+                ))
+            } else if error_msg.contains("timeout") || error_msg.contains("Connection refused") {
+                AutoCreationError::ConnectionFailed(format!(
+                    "Cannot connect to MySQL server {error_msg}"
+                ))
+            } else {
+                AutoCreationError::DatabaseError(format!("MySQL connection error {error_msg}"))
+            }
+        })
+    }
+    #[instrument_trace]
+    async fn database_exists(
+        &self,
+        connection: &DatabaseConnection,
+    ) -> Result<bool, AutoCreationError> {
+        let query: String = format!(
+            "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '{}'",
+            self.instance.get_database()
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, query);
+        match connection.query_all(statement).await {
+            Ok(results) => Ok(!results.is_empty()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to check if database exists {error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    async fn create_database(
+        &self,
+        connection: &DatabaseConnection,
+    ) -> Result<bool, AutoCreationError> {
+        if self.database_exists(connection).await? {
+            AutoCreationLogger::log_database_exists(
+                self.instance.get_database().as_str(),
+                PluginType::MySQL,
+            )
+            .await;
+            return Ok(false);
+        }
+        let create_query: String = format!(
+            "CREATE DATABASE IF NOT EXISTS `{}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
+            self.instance.get_database()
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, create_query);
+        match connection.execute(statement).await {
+            Ok(_) => {
+                AutoCreationLogger::log_database_created(
+                    self.instance.get_database().as_str(),
+                    PluginType::MySQL,
+                )
+                .await;
+                Ok(true)
+            }
+            Err(error) => {
+                let error_msg: String = error.to_string();
+                if error_msg.contains("Access denied") || error_msg.contains("permission") {
+                    Err(AutoCreationError::InsufficientPermissions(format!(
+                        "Cannot create MySQL database '{}' {}",
+                        self.instance.get_database().as_str(),
+                        error_msg
+                    )))
+                } else {
+                    Err(AutoCreationError::DatabaseError(format!(
+                        "Failed to create MySQL database '{}' {}",
+                        self.instance.get_database().as_str(),
+                        error_msg
+                    )))
+                }
+            }
+        }
+    }
+    #[instrument_trace]
+    async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
+        let db_url: String = self.instance.get_connection_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "MySQL database connection timeout after {timeout_seconds} seconds {}",
+                        self.instance.get_database()
+                    )));
+                }
+            };
+        connection_result.map_err(|error: DbErr| {
+            AutoCreationError::ConnectionFailed(format!(
+                "Cannot connect to MySQL database '{}' {}",
+                self.instance.get_database().as_str(),
+                error
+            ))
+        })
+    }
+    #[instrument_trace]
+    async fn table_exists<T>(
+        &self,
+        connection: &DatabaseConnection,
+        table_name: T,
+    ) -> Result<bool, AutoCreationError>
+    where
+        T: AsRef<str>,
+    {
+        let table_name_str: &str = table_name.as_ref();
+        let query: String = format!(
+            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{}' AND TABLE_NAME = '{table_name_str}'",
+            self.instance.get_database()
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, query);
+        match connection.query_all(statement).await {
+            Ok(results) => Ok(!results.is_empty()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to check if table '{table_name_str}' exists {error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    async fn create_table(
+        &self,
+        connection: &DatabaseConnection,
+        table: &TableSchema,
+    ) -> Result<(), AutoCreationError> {
+        let statement: Statement =
+            Statement::from_string(DatabaseBackend::MySql, table.get_sql().clone());
+        match connection.execute(statement).await {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let error_msg: String = error.to_string();
+                if error_msg.contains("Access denied") || error_msg.contains("permission") {
+                    Err(AutoCreationError::InsufficientPermissions(format!(
+                        "Cannot create MySQL table '{}' {}",
+                        table.get_name(),
+                        error_msg
+                    )))
+                } else {
+                    Err(AutoCreationError::SchemaError(format!(
+                        "Failed to create MySQL table '{}' {}",
+                        table.get_name(),
+                        error_msg
+                    )))
+                }
+            }
+        }
+    }
+    #[instrument_trace]
+    async fn execute_sql<S>(
+        &self,
+        connection: &DatabaseConnection,
+        sql: S,
+    ) -> Result<(), AutoCreationError>
+    where
+        S: AsRef<str>,
+    {
+        let statement: Statement = Statement::from_string(DatabaseBackend::MySql, sql.as_ref());
+        match connection.execute(statement).await {
+            Ok(_) => Ok(()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to execute SQL {error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    fn get_database_schema(&self) -> &DatabaseSchema {
+        &self.schema
+    }
+}
+impl DatabaseAutoCreation for MySqlAutoCreation {
+    type InstanceConfig = MySqlInstanceConfig;
+    #[instrument_trace]
+    fn new(instance: Self::InstanceConfig) -> Self {
+        Self {
+            instance,
+            schema: DatabaseSchema::default(),
+        }
+    }
+    #[instrument_trace]
+    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
+    where
+        Self: Sized,
+    {
+        Self { instance, schema }
+    }
+    #[instrument_trace]
+    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
+        let admin_connection: DatabaseConnection = self.create_admin_connection().await?;
+        let result: Result<bool, AutoCreationError> = self.create_database(&admin_connection).await;
+        let _: Result<(), DbErr> = admin_connection.close().await;
+        result
+    }
+    #[instrument_trace]
+    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let schema: &DatabaseSchema = self.get_database_schema();
+        let mut created_tables: Vec<String> = Vec::new();
+        for table in schema.ordered_tables() {
+            if !self.table_exists(&connection, table.get_name()).await? {
+                self.create_table(&connection, table).await?;
+                created_tables.push(table.get_name().clone());
+                AutoCreationLogger::log_table_created(
+                    table.get_name(),
+                    self.instance.get_database().as_str(),
+                    PluginType::MySQL,
+                )
+                .await;
+            } else {
+                AutoCreationLogger::log_table_exists(
+                    table.get_name(),
+                    self.instance.get_database().as_str(),
+                    PluginType::MySQL,
+                )
+                .await;
+            }
+        }
+        for index_sql in schema.get_indexes() {
+            if let Err(error) = self.execute_sql(&connection, index_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Index creation",
+                    PluginType::MySQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        for constraint_sql in schema.get_constraints() {
+            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Constraint creation",
+                    PluginType::MySQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        let _: Result<(), DbErr> = connection.close().await;
+        AutoCreationLogger::log_tables_created(
+            &created_tables,
+            self.instance.get_database().as_str(),
+            PluginType::MySQL,
+        )
+        .await;
+        Ok(created_tables)
+    }
+    #[instrument_trace]
+    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
+        let db_url: String = self.instance.get_connection_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "Failed to verify MySQL connection within {timeout_seconds} seconds"
+                    )));
+                }
+            };
+        let connection: DatabaseConnection = connection_result.map_err(|error: DbErr| {
+            AutoCreationError::ConnectionFailed(format!(
+                "Failed to verify MySQL connection {error}"
+            ))
+        })?;
+        let statement: Statement =
+            Statement::from_string(DatabaseBackend::MySql, "SELECT 1".to_string());
+        match connection.query_all(statement).await {
+            Ok(_) => {
+                let _: Result<(), DbErr> = connection.close().await;
+                AutoCreationLogger::log_connection_verification(
+                    PluginType::MySQL,
+                    self.instance.get_database().as_str(),
+                    true,
+                    None,
+                )
+                .await;
+                Ok(())
+            }
+            Err(error) => {
+                let _: Result<(), DbErr> = connection.close().await;
+                let error_msg: String = error.to_string();
+                AutoCreationLogger::log_connection_verification(
+                    PluginType::MySQL,
+                    self.instance.get_database().as_str(),
+                    false,
+                    Some(&error_msg),
+                )
+                .await;
+                Err(AutoCreationError::ConnectionFailed(format!(
+                    "MySQL connection verification failed {error_msg}"
+                )))
+            }
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/mysql/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct MySqlPlugin;
+#[derive(Clone, Data, Debug, New)]
+pub struct MySqlAutoCreation {
+    #[get(pub(crate))]
+    pub(super) instance: MySqlInstanceConfig,
+    #[new(skip)]
+    #[get(pub(crate))]
+    pub(super) schema: DatabaseSchema,
+}
+```
+# Path: hyperlane-quick-start/plugin/mysql/static.rs
+```rust
+use super::*;
+pub static MYSQL_CONNECTIONS: OnceLock<
+    RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
+> = OnceLock::new();
+```
+# Path: hyperlane-quick-start/plugin/postgresql/const.rs
+```rust
+pub const DEFAULT_POSTGRESQL_INSTANCE_NAME: &str = "postgres_default";
+```
+# Path: hyperlane-quick-start/plugin/postgresql/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use {r#const::*, r#struct::*};
+use {super::*, database::*, env::*, r#static::*};
+use std::{
+    collections::HashMap,
+    sync::OnceLock,
+    time::{Duration, Instant},
+};
+use {
+    sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
+    tokio::{
+        spawn,
+        sync::{RwLock, RwLockWriteGuard},
+        time::timeout,
+    },
+};
+```
+# Path: hyperlane-quick-start/plugin/postgresql/impl.rs
+```rust
+use super::*;
+impl GetOrInit for PostgreSqlPlugin {
+    type Instance = RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>;
+    #[instrument_trace]
+    fn get_or_init() -> &'static Self::Instance {
+        POSTGRESQL_CONNECTIONS.get_or_init(|| RwLock::new(HashMap::new()))
+    }
+}
+impl DatabaseConnectionPlugin for PostgreSqlPlugin {
+    type InstanceConfig = PostgreSqlInstanceConfig;
+    type AutoCreation = PostgreSqlAutoCreation;
+    type Connection = DatabaseConnection;
+    type ConnectionCache = RwLock<HashMap<String, ConnectionCache<Self::Connection>>>;
+    #[instrument_trace]
+    fn plugin_type() -> PluginType {
+        PluginType::PostgreSQL
+    }
+    #[instrument_trace]
+    async fn connection_db<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<Self::Connection, String>
+    where
+        I: AsRef<str> + Send,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        let instance: &PostgreSqlInstanceConfig = env
+            .get_postgresql_instance(instance_name_str)
+            .ok_or_else(|| format!("PostgreSQL instance '{instance_name_str}' not found"))?;
+        match Self::perform_auto_creation(instance, schema.clone()).await {
+            Ok(result) => {
+                if result.has_changes() {
+                    AutoCreationLogger::log_auto_creation_complete(PluginType::PostgreSQL, &result)
+                        .await;
+                }
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Auto-creation process",
+                    PluginType::PostgreSQL,
+                    Some(instance.get_database().as_str()),
+                )
+                .await;
+                if !error.should_continue() {
+                    return Err(error.to_string());
+                }
+            }
+        }
+        let db_url: String = instance.get_connection_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => Err(DbErr::Custom(format!(
+                    "PostgreSQL connection timeout after {timeout_seconds} seconds"
+                ))),
+            };
+        connection_result.map_err(|error: DbErr| {
+            let error_msg: String = error.to_string();
+            let database_name: String = instance.get_database().clone();
+            let error_msg_clone: String = error_msg.clone();
+            spawn(async move {
+                AutoCreationLogger::log_connection_verification(
+                    PluginType::PostgreSQL,
+                    &database_name,
+                    false,
+                    Some(&error_msg_clone),
+                )
+                .await;
+            });
+            error_msg
+        })
+    }
+    #[instrument_trace]
+    async fn get_connection<I>(
+        instance_name: I,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<Self::Connection, String>
+    where
+        I: AsRef<str> + Send,
+    {
+        let instance_name_str: &str = instance_name.as_ref();
+        let duration: Duration = DatabasePlugin::get_retry_duration();
+        {
+            if let Some(cache) = Self::get_or_init().read().await.get(instance_name_str) {
+                match cache.try_get_result() {
+                    Ok(conn) => return Ok(conn.clone()),
+                    Err(error) => {
+                        if !cache.is_expired(duration) {
+                            return Err(error.clone());
+                        }
+                    }
+                }
+            }
+        }
+        let mut connections: RwLockWriteGuard<
+            '_,
+            HashMap<String, ConnectionCache<DatabaseConnection>>,
+        > = Self::get_or_init().write().await;
+        if let Some(cache) = connections.get(instance_name_str) {
+            match cache.try_get_result() {
+                Ok(conn) => return Ok(conn.clone()),
+                Err(error) => {
+                    if !cache.is_expired(duration) {
+                        return Err(error.clone());
+                    }
+                }
+            }
+        }
+        connections.remove(instance_name_str);
+        drop(connections);
+        let new_connection: Result<DatabaseConnection, String> =
+            Self::connection_db(instance_name_str, schema).await;
+        let mut connections: RwLockWriteGuard<
+            '_,
+            HashMap<String, ConnectionCache<DatabaseConnection>>,
+        > = Self::get_or_init().write().await;
+        connections.insert(
+            instance_name_str.to_string(),
+            ConnectionCache::new(new_connection.clone()),
+        );
+        new_connection
+    }
+    #[instrument_trace]
+    async fn perform_auto_creation(
+        instance: &Self::InstanceConfig,
+        schema: Option<DatabaseSchema>,
+    ) -> Result<AutoCreationResult, AutoCreationError> {
+        let start_time: Instant = Instant::now();
+        let mut result: AutoCreationResult = AutoCreationResult::default();
+        AutoCreationLogger::log_auto_creation_start(
+            PluginType::PostgreSQL,
+            instance.get_database(),
+        )
+        .await;
+        let auto_creator: PostgreSqlAutoCreation = match schema {
+            Some(s) => PostgreSqlAutoCreation::with_schema(instance.clone(), s),
+            None => PostgreSqlAutoCreation::new(instance.clone()),
+        };
+        match auto_creator.create_database_if_not_exists().await {
+            Ok(created) => {
+                result.set_database_created(created);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Database creation",
+                    PluginType::PostgreSQL,
+                    Some(instance.get_database().as_str()),
+                )
+                .await;
+                if !error.should_continue() {
+                    result.set_duration(start_time.elapsed());
+                    return Err(error);
+                }
+                result.get_mut_errors().push(error.to_string());
+            }
+        }
+        match auto_creator.create_tables_if_not_exist().await {
+            Ok(tables) => {
+                result.set_tables_created(tables);
+            }
+            Err(error) => {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Table creation",
+                    PluginType::PostgreSQL,
+                    Some(instance.get_database().as_str()),
+                )
+                .await;
+                result.get_mut_errors().push(error.to_string());
+            }
+        }
+        if let Err(error) = auto_creator.verify_connection().await {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Connection verification",
+                PluginType::PostgreSQL,
+                Some(instance.get_database().as_str()),
+            )
+            .await;
+            if !error.should_continue() {
+                result.set_duration(start_time.elapsed());
+                return Err(error);
+            }
+            result.get_mut_errors().push(error.to_string());
+        }
+        result.set_duration(start_time.elapsed());
+        AutoCreationLogger::log_auto_creation_complete(PluginType::PostgreSQL, &result).await;
+        Ok(result)
+    }
+}
+impl Default for PostgreSqlAutoCreation {
+    #[instrument_trace]
+    fn default() -> Self {
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        if let Some(instance) = env.get_default_postgresql_instance() {
+            Self::new(instance.clone())
+        } else {
+            let default_instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig::default();
+            Self::new(default_instance)
+        }
+    }
+}
+impl PostgreSqlAutoCreation {
+    #[instrument_trace]
+    async fn create_admin_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
+        let admin_url: String = self.instance.get_admin_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&admin_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "PostgreSQL admin connection timeout after {timeout_seconds} seconds"
+                    )));
+                }
+            };
+        connection_result.map_err(|error: DbErr| {
+            let error_msg: String = error.to_string();
+            if error_msg.contains("authentication failed") || error_msg.contains("permission") {
+                AutoCreationError::InsufficientPermissions(format!(
+                    "Cannot connect to PostgreSQL server for database creation {error_msg}"
+                ))
+            } else if error_msg.contains("timeout") || error_msg.contains("Connection refused") {
+                AutoCreationError::ConnectionFailed(format!(
+                    "Cannot connect to PostgreSQL server {error_msg}"
+                ))
+            } else {
+                AutoCreationError::DatabaseError(format!("PostgreSQL connection error {error_msg}"))
+            }
+        })
+    }
+    #[instrument_trace]
+    async fn create_target_connection(&self) -> Result<DatabaseConnection, AutoCreationError> {
+        let db_url: String = self.instance.get_connection_url();
+        let timeout_duration: Duration = DatabasePlugin::get_connection_timeout_duration();
+        let timeout_seconds: u64 = timeout_duration.as_secs();
+        let connection_result: Result<DatabaseConnection, DbErr> =
+            match timeout(timeout_duration, Database::connect(&db_url)).await {
+                Ok(result) => result,
+                Err(_) => {
+                    return Err(AutoCreationError::Timeout(format!(
+                        "PostgreSQL database connection timeout after {timeout_seconds} seconds {}",
+                        self.instance.get_database().as_str()
+                    )));
+                }
+            };
+        connection_result.map_err(|error: DbErr| {
+            AutoCreationError::ConnectionFailed(format!(
+                "Cannot connect to PostgreSQL database '{}' {error}",
+                self.instance.get_database().as_str(),
+            ))
+        })
+    }
+    #[instrument_trace]
+    async fn database_exists(
+        &self,
+        connection: &DatabaseConnection,
+    ) -> Result<bool, AutoCreationError> {
+        let query: String = format!(
+            "SELECT 1 FROM pg_database WHERE datname = '{}'",
+            self.instance.get_database().as_str()
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, query);
+        match connection.query_all(statement).await {
+            Ok(results) => Ok(!results.is_empty()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to check if database exists {error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    async fn create_database(
+        &self,
+        connection: &DatabaseConnection,
+    ) -> Result<bool, AutoCreationError> {
+        if self.database_exists(connection).await? {
+            AutoCreationLogger::log_database_exists(
+                self.instance.get_database().as_str(),
+                PluginType::PostgreSQL,
+            )
+            .await;
+            return Ok(false);
+        }
+        let create_query: String = format!(
+            "CREATE DATABASE \"{}\" WITH ENCODING='UTF8' LC_COLLATE='en_US.UTF-8' LC_CTYPE='en_US.UTF-8'",
+            self.instance.get_database().as_str()
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, create_query);
+        match connection.execute(statement).await {
+            Ok(_) => {
+                AutoCreationLogger::log_database_created(
+                    self.instance.get_database().as_str(),
+                    PluginType::PostgreSQL,
+                )
+                .await;
+                Ok(true)
+            }
+            Err(error) => {
+                let error_msg: String = error.to_string();
+                if error_msg.contains("permission denied") || error_msg.contains("must be owner") {
+                    Err(AutoCreationError::InsufficientPermissions(format!(
+                        "Cannot create PostgreSQL database '{}' {}",
+                        self.instance.get_database().as_str(),
+                        error_msg
+                    )))
+                } else if error_msg.contains("already exists") {
+                    AutoCreationLogger::log_database_exists(
+                        self.instance.get_database().as_str(),
+                        PluginType::PostgreSQL,
+                    )
+                    .await;
+                    Ok(false)
+                } else {
+                    Err(AutoCreationError::DatabaseError(format!(
+                        "Failed to create PostgreSQL database '{}' {}",
+                        self.instance.get_database().as_str(),
+                        error_msg
+                    )))
+                }
+            }
+        }
+    }
+    #[instrument_trace]
+    async fn table_exists<T>(
+        &self,
+        connection: &DatabaseConnection,
+        table_name: T,
+    ) -> Result<bool, AutoCreationError>
+    where
+        T: AsRef<str>,
+    {
+        let table_name_str: &str = table_name.as_ref();
+        let query: String = format!(
+            "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table_name_str}'"
+        );
+        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, query);
+        match connection.query_all(statement).await {
+            Ok(results) => Ok(!results.is_empty()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to check if table '{table_name_str}' exists {error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    async fn create_table(
+        &self,
+        connection: &DatabaseConnection,
+        table: &TableSchema,
+    ) -> Result<(), AutoCreationError> {
+        let statement: Statement =
+            Statement::from_string(DatabaseBackend::Postgres, table.get_sql().clone());
+        match connection.execute(statement).await {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let error_msg: String = error.to_string();
+                if error_msg.contains("permission denied") {
+                    Err(AutoCreationError::InsufficientPermissions(format!(
+                        "Cannot create PostgreSQL table '{}' {}",
+                        table.get_name(),
+                        error_msg
+                    )))
+                } else {
+                    Err(AutoCreationError::SchemaError(format!(
+                        "Failed to create PostgreSQL table '{}' {}",
+                        table.get_name(),
+                        error_msg
+                    )))
+                }
+            }
+        }
+    }
+    #[instrument_trace]
+    async fn execute_sql<S>(
+        &self,
+        connection: &DatabaseConnection,
+        sql: S,
+    ) -> Result<(), AutoCreationError>
+    where
+        S: AsRef<str>,
+    {
+        let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, sql.as_ref());
+        match connection.execute(statement).await {
+            Ok(_) => Ok(()),
+            Err(error) => Err(AutoCreationError::DatabaseError(format!(
+                "Failed to execute SQL {error}"
+            ))),
+        }
+    }
+    #[instrument_trace]
+    fn get_database_schema(&self) -> &DatabaseSchema {
+        &self.schema
+    }
+}
+impl DatabaseAutoCreation for PostgreSqlAutoCreation {
+    type InstanceConfig = PostgreSqlInstanceConfig;
+    #[instrument_trace]
+    fn new(instance: Self::InstanceConfig) -> Self {
+        Self {
+            instance,
+            schema: DatabaseSchema::default(),
+        }
+    }
+    #[instrument_trace]
+    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self
+    where
+        Self: Sized,
+    {
+        Self { instance, schema }
+    }
+    #[instrument_trace]
+    async fn create_database_if_not_exists(&self) -> Result<bool, AutoCreationError> {
+        let admin_connection: DatabaseConnection = self.create_admin_connection().await?;
+        let result: Result<bool, AutoCreationError> = self.create_database(&admin_connection).await;
+        let _: Result<(), DbErr> = admin_connection.close().await;
+        result
+    }
+    #[instrument_trace]
+    async fn create_tables_if_not_exist(&self) -> Result<Vec<String>, AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let schema: &DatabaseSchema = self.get_database_schema();
+        let mut created_tables: Vec<String> = Vec::new();
+        for table in schema.ordered_tables() {
+            if !self.table_exists(&connection, table.get_name()).await? {
+                self.create_table(&connection, table).await?;
+                created_tables.push(table.get_name().clone());
+                AutoCreationLogger::log_table_created(
+                    table.get_name(),
+                    self.instance.get_database().as_str(),
+                    PluginType::PostgreSQL,
+                )
+                .await;
+            } else {
+                AutoCreationLogger::log_table_exists(
+                    table.get_name(),
+                    self.instance.get_database().as_str(),
+                    PluginType::PostgreSQL,
+                )
+                .await;
+            }
+        }
+        for index_sql in schema.get_indexes() {
+            if let Err(error) = self.execute_sql(&connection, index_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Index creation",
+                    PluginType::PostgreSQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        for constraint_sql in schema.get_constraints() {
+            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Constraint creation",
+                    PluginType::PostgreSQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        let _: Result<(), DbErr> = connection.close().await;
+        AutoCreationLogger::log_tables_created(
+            &created_tables,
+            self.instance.get_database().as_str(),
+            PluginType::PostgreSQL,
+        )
+        .await;
+        Ok(created_tables)
+    }
+    #[instrument_trace]
+    async fn verify_connection(&self) -> Result<(), AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let statement: Statement =
+            Statement::from_string(DatabaseBackend::Postgres, "SELECT 1".to_string());
+        match connection.query_all(statement).await {
+            Ok(_) => {
+                let _: Result<(), DbErr> = connection.close().await;
+                AutoCreationLogger::log_connection_verification(
+                    PluginType::PostgreSQL,
+                    self.instance.get_database().as_str(),
+                    true,
+                    None,
+                )
+                .await;
+                Ok(())
+            }
+            Err(error) => {
+                let _: Result<(), DbErr> = connection.close().await;
+                let error_msg: String = error.to_string();
+                AutoCreationLogger::log_connection_verification(
+                    PluginType::PostgreSQL,
+                    self.instance.get_database().as_str(),
+                    false,
+                    Some(&error_msg),
+                )
+                .await;
+                Err(AutoCreationError::ConnectionFailed(format!(
+                    "PostgreSQL connection verification failed {error_msg}"
+                )))
+            }
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/postgresql/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct PostgreSqlPlugin;
+#[derive(Clone, Data, Debug, New)]
+pub struct PostgreSqlAutoCreation {
+    #[get(pub(crate))]
+    pub(super) instance: PostgreSqlInstanceConfig,
+    #[new(skip)]
+    #[get(pub(crate))]
+    pub(super) schema: DatabaseSchema,
+}
+```
+# Path: hyperlane-quick-start/plugin/postgresql/static.rs
+```rust
+use super::*;
+pub static POSTGRESQL_CONNECTIONS: OnceLock<
+    RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
+> = OnceLock::new();
+```
+# Path: hyperlane-quick-start/plugin/process/const.rs
+```rust
+pub const CMD_STOP: &str = "stop";
+pub const CMD_RESTART: &str = "restart";
+pub const DAEMON_FLAG: &str = "-d";
+```
+# Path: hyperlane-quick-start/plugin/process/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use {super::*, r#const::*};
+use std::{env::args, future::Future};
+```
+# Path: hyperlane-quick-start/plugin/process/impl.rs
+```rust
+use super::*;
+impl ProcessPlugin {
+    #[instrument_trace]
+    pub async fn create<P, F, Fut>(pid_path: P, server_hook: F)
+    where
+        P: AsRef<str>,
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let args: Vec<String> = args().collect();
+        debug!("Process create args {args:?}");
+        let mut manager: ServerManager = ServerManager::new();
+        manager
+            .set_pid_file(pid_path.as_ref())
+            .set_server_hook(server_hook);
+        let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
+        let start_server = || async {
+            if is_daemon {
+                match manager.start_daemon().await {
+                    Ok(_) => info!("Server started in background successfully"),
+                    Err(error) => {
+                        error!("Error starting server in background {error}")
+                    }
+                };
+            } else {
+                info!("Server started successfully");
+                manager.start().await;
+            }
+        };
+        let stop_server = || async {
+            match manager.stop().await {
+                Ok(_) => info!("Server stopped successfully"),
+                Err(error) => error!("Error stopping server {error}"),
+            };
+        };
+        let restart_server = || async {
+            stop_server().await;
+            start_server().await;
+        };
+        if args.len() < 2 {
+            warn!("No additional command-line parameters, default startup");
+            start_server().await;
+            return;
+        }
+        let command: String = args[1].to_lowercase();
+        match command.as_str() {
+            CMD_STOP => stop_server().await,
+            CMD_RESTART => restart_server().await,
+            _ => {
+                error!("Invalid command {command}");
+            }
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/process/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ProcessPlugin;
+```
+# Path: hyperlane-quick-start/plugin/shutdown/mod.rs
+```rust
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use r#struct::*;
+use {super::*, r#static::*};
+use std::sync::{Arc, OnceLock};
+```
+# Path: hyperlane-quick-start/plugin/shutdown/impl.rs
+```rust
+use super::*;
+impl GetOrInit for ShutdownPlugin {
+    type Instance = ServerControlHookHandler<()>;
+    fn get_or_init() -> &'static Self::Instance {
+        SHUTDOWN.get_or_init(Self::get_init)
+    }
+}
+impl ShutdownPlugin {
+    #[instrument_trace]
+    pub fn get_init() -> ServerControlHookHandler<()> {
+        Arc::new(|| {
+            Box::pin(async {
+                warn!("Not set shutdown, using default");
+            })
+        })
+    }
+    #[instrument_trace]
+    pub fn set(shutdown: &ServerControlHookHandler<()>) {
+        drop(SHUTDOWN.set(shutdown.clone()));
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/shutdown/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ShutdownPlugin;
+```
+# Path: hyperlane-quick-start/plugin/shutdown/static.rs
+```rust
+use super::*;
+pub(super) static SHUTDOWN: OnceLock<ServerControlHookHandler<()>> = OnceLock::new();
+```
+# Path: hyperlane-quick-start/plugin/database/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+mod r#struct;
+pub use {r#enum::*, r#struct::*};
+use {super::*, env::*, mysql::*, postgresql::*, redis::*};
+use std::{
+    str::FromStr,
+    time::{Duration, Instant},
+};
+```
+# Path: hyperlane-quick-start/plugin/database/impl.rs
+```rust
+use super::*;
+impl DatabasePlugin {
+    #[instrument_trace]
+    pub fn get_connection_timeout_duration() -> Duration {
+        let timeout_seconds: u64 = std::env::var(ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS)
+            .ok()
+            .and_then(|value: String| value.parse::<u64>().ok())
+            .unwrap_or(DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS);
+        Duration::from_millis(timeout_seconds)
+    }
+    #[instrument_trace]
+    pub fn get_retry_duration() -> Duration {
+        let millis: u64 = std::env::var(ENV_KEY_DB_RETRY_INTERVAL_MILLIS)
+            .ok()
+            .and_then(|value: String| value.parse::<u64>().ok())
+            .unwrap_or(DEFAULT_DB_RETRY_INTERVAL_MILLIS);
+        Duration::from_millis(millis)
+    }
+    #[instrument_trace]
+    pub async fn initialize_auto_creation() -> Result<(), String> {
+        Self::initialize_auto_creation_with_schema(None, None, None).await
+    }
+    #[instrument_trace]
+    pub async fn initialize_auto_creation_with_schema(
+        mysql_schema: Option<DatabaseSchema>,
+        postgresql_schema: Option<DatabaseSchema>,
+        _redis_schema: Option<()>,
+    ) -> Result<(), String> {
+        if let Err(error) = AutoCreationConfig::validate() {
+            return Err(format!(
+                "Auto-creation configuration validation failed {error}"
+            ));
+        }
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        let mut initialization_results: Vec<String> = Vec::new();
+        for instance in env.get_mysql_instances() {
+            match MySqlPlugin::perform_auto_creation(instance, mysql_schema.clone()).await {
+                Ok(result) => {
+                    initialization_results.push(format!(
+                        "MySQL ({})  {}",
+                        instance.get_name(),
+                        if result.has_changes() {
+                            "initialized with changes"
+                        } else {
+                            "verified"
+                        }
+                    ));
+                }
+                Err(error) => {
+                    if !error.should_continue() {
+                        return Err(format!(
+                            "MySQL ({}) auto-creation failed {error}",
+                            instance.get_name()
+                        ));
+                    }
+                    initialization_results.push(format!(
+                        "MySQL ({}) : failed but continuing ({error})",
+                        instance.get_name()
+                    ));
+                }
+            }
+        }
+        for instance in env.get_postgresql_instances() {
+            match PostgreSqlPlugin::perform_auto_creation(instance, postgresql_schema.clone()).await
+            {
+                Ok(result) => {
+                    initialization_results.push(format!(
+                        "PostgreSQL ({})  {}",
+                        instance.get_name(),
+                        if result.has_changes() {
+                            "initialized with changes"
+                        } else {
+                            "verified"
+                        }
+                    ));
+                }
+                Err(error) => {
+                    if !error.should_continue() {
+                        return Err(format!(
+                            "PostgreSQL ({}) auto-creation failed {error}",
+                            instance.get_name()
+                        ));
+                    }
+                    initialization_results.push(format!(
+                        "PostgreSQL ({}) : failed but continuing ({error})",
+                        instance.get_name()
+                    ));
+                }
+            }
+        }
+        for instance in env.get_redis_instances() {
+            match RedisPlugin::perform_auto_creation(instance, None).await {
+                Ok(result) => {
+                    initialization_results.push(format!(
+                        "Redis ({})  {}",
+                        instance.get_name(),
+                        if result.has_changes() {
+                            "initialized with changes"
+                        } else {
+                            "verified"
+                        }
+                    ));
+                }
+                Err(error) => {
+                    if !error.should_continue() {
+                        return Err(format!(
+                            "Redis ({}) auto-creation failed {error}",
+                            instance.get_name()
+                        ));
+                    }
+                    initialization_results.push(format!(
+                        "Redis ({}) : failed but continuing ({error})",
+                        instance.get_name()
+                    ));
+                }
+            }
+        }
+        if initialization_results.is_empty() {
+            info!("[AUTO-CREATION] No plugins enabled for auto-creation");
+        } else {
+            let results_summary: String = initialization_results.join(", ");
+            info!("[AUTO-CREATION] Initialization complete {results_summary}");
+        }
+        Ok(())
+    }
+}
+impl<T: Clone> ConnectionCache<T> {
+    #[instrument_trace]
+    pub fn new(result: Result<T, String>) -> Self {
+        Self {
+            result,
+            last_attempt: Instant::now(),
+        }
+    }
+    #[instrument_trace]
+    pub fn is_expired(&self, duration: Duration) -> bool {
+        self.get_last_attempt().elapsed() >= duration
+    }
+    #[instrument_trace]
+    pub fn should_retry(&self, duration: Duration) -> bool {
+        self.try_get_result().is_err() && self.is_expired(duration)
+    }
+}
+impl PluginType {
+    #[instrument_trace]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::MySQL => "MySQL",
+            Self::PostgreSQL => "PostgreSQL",
+            Self::Redis => "Redis",
+        }
+    }
+}
+impl FromStr for PluginType {
+    type Err = ();
+    #[instrument_trace]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "MySQL" => Ok(Self::MySQL),
+            "PostgreSQL" => Ok(Self::PostgreSQL),
+            "Redis" => Ok(Self::Redis),
+            _ => Err(()),
+        }
+    }
+}
+impl std::fmt::Display for PluginType {
+    #[instrument_trace]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+impl AutoCreationError {
+    #[instrument_trace]
+    pub fn should_continue(&self) -> bool {
+        match self {
+            Self::InsufficientPermissions(_) => true,
+            Self::ConnectionFailed(_) => false,
+            Self::SchemaError(_) => true,
+            Self::Timeout(_) => true,
+            Self::DatabaseError(_) => true,
+        }
+    }
+    #[instrument_trace]
+    pub fn user_message(&self) -> &str {
+        match self {
+            Self::InsufficientPermissions(msg) => msg,
+            Self::ConnectionFailed(msg) => msg,
+            Self::SchemaError(msg) => msg,
+            Self::Timeout(msg) => msg,
+            Self::DatabaseError(msg) => msg,
+        }
+    }
+}
+impl std::fmt::Display for AutoCreationError {
+    #[instrument_trace]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InsufficientPermissions(msg) => {
+                write!(f, "Insufficient permissions {msg}")
+            }
+            Self::ConnectionFailed(msg) => write!(f, "Connection failed {msg}"),
+            Self::SchemaError(msg) => write!(f, "Schema error {msg}"),
+            Self::Timeout(msg) => write!(f, "Timeout {msg}"),
+            Self::DatabaseError(msg) => write!(f, "Database error {msg}"),
+        }
+    }
+}
+impl std::error::Error for AutoCreationError {}
+impl AutoCreationResult {
+    #[instrument_trace]
+    pub fn has_changes(&self) -> bool {
+        self.get_database_created() || !self.get_tables_created().is_empty()
+    }
+    #[instrument_trace]
+    pub fn has_errors(&self) -> bool {
+        !self.get_errors().is_empty()
+    }
+}
+impl Default for AutoCreationResult {
+    #[instrument_trace]
+    fn default() -> Self {
+        Self {
+            database_created: false,
+            tables_created: Vec::new(),
+            errors: Vec::new(),
+            duration: Duration::from_secs(0),
+        }
+    }
+}
+impl TableSchema {
+    #[instrument_trace]
+    pub fn with_dependency(mut self, dependency: String) -> Self {
+        self.get_mut_dependencies().push(dependency);
+        self
+    }
+}
+impl DatabaseSchema {
+    #[instrument_trace]
+    pub fn add_table(mut self, table: TableSchema) -> Self {
+        self.get_mut_tables().push(table);
+        self
+    }
+    #[instrument_trace]
+    pub fn add_index(mut self, index: String) -> Self {
+        self.get_mut_indexes().push(index);
+        self
+    }
+    #[instrument_trace]
+    pub fn add_constraint(mut self, constraint: String) -> Self {
+        self.get_mut_constraints().push(constraint);
+        self
+    }
+    #[instrument_trace]
+    pub fn ordered_tables(&self) -> Vec<&TableSchema> {
+        let mut ordered: Vec<&TableSchema> = Vec::new();
+        let mut remaining: Vec<&TableSchema> = self.get_tables().iter().collect();
+        while !remaining.is_empty() {
+            let mut added_any: bool = false;
+            remaining.retain(|table: &&TableSchema| {
+                let dependencies_satisfied: bool =
+                    table.get_dependencies().iter().all(|dep: &String| {
+                        ordered.iter().any(|ordered_table: &&TableSchema| {
+                            ordered_table.get_name().as_str() == dep.as_str()
+                        })
+                    });
+                if dependencies_satisfied {
+                    ordered.push(table);
+                    added_any = true;
+                    false
+                } else {
+                    true
+                }
+            });
+            if !added_any && !remaining.is_empty() {
+                for table in remaining {
+                    ordered.push(table);
+                }
+                break;
+            }
+        }
+        ordered
+    }
+}
+impl AutoCreationConfig {
+    #[instrument_trace]
+    pub fn validate() -> Result<(), String> {
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        if env.get_mysql_instances().is_empty() {
+            return Err("At least one MySQL instance is required".to_string());
+        }
+        if env.get_postgresql_instances().is_empty() {
+            return Err("At least one PostgreSQL instance is required".to_string());
+        }
+        if env.get_redis_instances().is_empty() {
+            return Err("At least one Redis instance is required".to_string());
+        }
+        Ok(())
+    }
+    #[instrument_trace]
+    pub fn for_plugin(plugin_name: &str) -> PluginAutoCreationConfig {
+        PluginAutoCreationConfig {
+            plugin_name: plugin_name.to_string(),
+        }
+    }
+}
+impl PluginAutoCreationConfig {
+    #[instrument_trace]
+    pub fn is_plugin_enabled(&self) -> bool {
+        PluginType::from_str(self.get_plugin_name()).is_ok()
+    }
+    #[instrument_trace]
+    pub fn get_database_name(&self) -> String {
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        if let Ok(plugin_type) = PluginType::from_str(self.get_plugin_name()) {
+            match plugin_type {
+                PluginType::MySQL => {
+                    if let Some(instance) = env.get_default_mysql_instance() {
+                        instance.get_database().clone()
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+                PluginType::PostgreSQL => {
+                    if let Some(instance) = env.get_default_postgresql_instance() {
+                        instance.get_database().clone()
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+                PluginType::Redis => "default".to_string(),
+            }
+        } else {
+            "unknown".to_string()
+        }
+    }
+    #[instrument_trace]
+    pub fn get_connection_info(&self) -> String {
+        let env: &'static EnvConfig = EnvPlugin::get_or_init();
+        if let Ok(plugin_type) = PluginType::from_str(self.get_plugin_name()) {
+            match plugin_type {
+                PluginType::MySQL => {
+                    if let Some(instance) = env.get_default_mysql_instance() {
+                        format!(
+                            "{}:{}:{}",
+                            instance.get_host(),
+                            instance.get_port(),
+                            instance.get_database()
+                        )
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+                PluginType::PostgreSQL => {
+                    if let Some(instance) = env.get_default_postgresql_instance() {
+                        format!(
+                            "{}:{}:{}",
+                            instance.get_host(),
+                            instance.get_port(),
+                            instance.get_database()
+                        )
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+                PluginType::Redis => {
+                    if let Some(instance) = env.get_default_redis_instance() {
+                        format!("{}:{}", instance.get_host(), instance.get_port())
+                    } else {
+                        "unknown".to_string()
+                    }
+                }
+            }
+        } else {
+            "unknown".to_string()
+        }
+    }
+}
+impl AutoCreationLogger {
+    #[instrument_trace]
+    pub async fn log_auto_creation_start(plugin_type: PluginType, database_name: &str) {
+        info!(
+            "[AUTO-CREATION] Starting auto-creation for {plugin_type} database '{database_name}'"
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_auto_creation_complete(plugin_type: PluginType, result: &AutoCreationResult) {
+        if result.has_errors() {
+            info!(
+                "[AUTO-CREATION] Auto-creation completed for {plugin_type} with warnings {}",
+                result.get_errors().join(", ")
+            );
+        } else {
+            info!("[AUTO-CREATION] Auto-creation completed successfully for {plugin_type}");
+        }
+    }
+    #[instrument_trace]
+    pub async fn log_auto_creation_error(
+        error: &AutoCreationError,
+        operation: &str,
+        plugin_type: PluginType,
+        database_name: Option<&str>,
+    ) {
+        error!(
+            "[AUTO-CREATION] {operation} failed for {plugin_type} database '{}' {error}",
+            database_name.unwrap_or("unknown")
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_connection_verification(
+        plugin_type: PluginType,
+        database_name: &str,
+        success: bool,
+        error: Option<&str>,
+    ) {
+        if success {
+            info!(
+                "[AUTO-CREATION] Connection verification successful for {plugin_type} database '{database_name}'"
+            );
+        } else {
+            error!(
+                "[AUTO-CREATION] Connection verification failed for {plugin_type} database '{database_name}' {}",
+                error.unwrap_or("Unknown error")
+            );
+        };
+    }
+    #[instrument_trace]
+    pub async fn log_database_created(database_name: &str, plugin_type: PluginType) {
+        info!(
+            "[AUTO-CREATION] Successfully created database '{database_name}' for {plugin_type} plugin"
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_database_exists(database_name: &str, plugin_type: PluginType) {
+        info!("[AUTO-CREATION] Database '{database_name}' already exists for {plugin_type} plugin");
+    }
+    #[instrument_trace]
+    pub async fn log_table_created(table_name: &str, database_name: &str, plugin_type: PluginType) {
+        info!(
+            "[AUTO-CREATION] Successfully created table '{table_name}' in database '{database_name}' for {plugin_type} plugin"
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_table_exists(table_name: &str, database_name: &str, plugin_type: PluginType) {
+        info!(
+            "[AUTO-CREATION] Table '{table_name}' already exists in database '{database_name}' for {plugin_type} plugin"
+        );
+    }
+    #[instrument_trace]
+    pub async fn log_tables_created(
+        tables: &[String],
+        database_name: &str,
+        plugin_type: PluginType,
+    ) {
+        if tables.is_empty() {
+            info!(
+                "[AUTO-CREATION] No new tables created in database '{database_name}' for {plugin_type} plugin"
+            );
+        } else {
+            info!(
+                "[AUTO-CREATION] Created tables [{}] in database '{database_name}' for {plugin_type} plugin",
+                tables.join(", ")
+            );
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/database/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct DatabasePlugin;
+#[derive(Clone, Data, Debug)]
+pub struct ConnectionCache<T: Clone> {
+    #[get(type(copy), pub(crate))]
+    pub(super) last_attempt: Instant,
+    #[get(pub(crate))]
+    pub(super) result: Result<T, String>,
+}
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct AutoCreationErrorHandler;
+#[derive(Clone, Data, Debug)]
+pub struct ErrorContext {
+    #[get(pub(crate))]
+    pub(super) database_name: Option<String>,
+    #[get(pub(crate))]
+    pub(super) error_message: String,
+    #[get(pub(crate))]
+    pub(super) error_type: String,
+    #[get(pub(crate))]
+    pub(super) log_level: String,
+    #[get(pub(crate))]
+    pub(super) operation: String,
+    #[get(pub(crate))]
+    pub(super) plugin_name: String,
+    #[get(pub(crate))]
+    pub(super) recovery_suggestion: String,
+    #[get(type(copy), pub(crate))]
+    pub(super) should_continue: bool,
+    #[get(pub(crate))]
+    pub(super) timestamp: std::time::SystemTime,
+}
+#[derive(Clone, Data, Debug)]
+pub struct AutoCreationResult {
+    #[get(type(copy), pub(crate))]
+    pub(super) database_created: bool,
+    #[get(pub(crate))]
+    pub(super) duration: Duration,
+    #[get(pub(crate))]
+    pub(super) errors: Vec<String>,
+    #[get(pub(crate))]
+    pub(super) tables_created: Vec<String>,
+}
+#[derive(Clone, Data, Debug, New)]
+pub struct TableSchema {
+    #[get(pub(crate))]
+    pub(super) dependencies: Vec<String>,
+    #[get(pub(crate))]
+    pub(super) name: String,
+    #[get(pub(crate))]
+    pub(super) sql: String,
+}
+#[derive(Clone, Data, Debug, Default)]
+pub struct DatabaseSchema {
+    #[get(pub(crate))]
+    pub(super) constraints: Vec<String>,
+    #[get(pub(crate))]
+    pub(super) indexes: Vec<String>,
+    #[get(pub(crate))]
+    pub(super) tables: Vec<TableSchema>,
+}
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct AutoCreationConfig;
+#[derive(Clone, Data, Debug, Default)]
+pub struct PluginAutoCreationConfig {
+    #[get(pub(crate))]
+    pub(super) plugin_name: String,
+}
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct AutoCreationLogger;
+```
+# Path: hyperlane-quick-start/plugin/database/enum.rs
+```rust
+#[derive(Clone, Debug)]
+pub enum AutoCreationError {
+    InsufficientPermissions(String),
+    ConnectionFailed(String),
+    SchemaError(String),
+    Timeout(String),
+    DatabaseError(String),
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PluginType {
+    MySQL,
+    PostgreSQL,
+    Redis,
+}
+```
+# Path: hyperlane-quick-start/config/README.md
+## hyperlane-config
+> Hyperlane configuration module providing comprehensive configuration management capabilities for the framework.
+## Contact
+# Path: hyperlane-quick-start/config/lib.rs
+```rust
+pub mod application;
+pub mod framework;
+use {hyperlane::*, hyperlane_utils::log::*};
+```
+# Path: hyperlane-quick-start/config/application/mod.rs
+```rust
+pub mod logger;
+pub mod logo_img;
+use super::*;
+```
+# Path: hyperlane-quick-start/config/application/logger/const.rs
+```rust
+use super::*;
+#[cfg(debug_assertions)]
+pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Trace;
+#[cfg(not(debug_assertions))]
+pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Info;
+```
+# Path: hyperlane-quick-start/config/application/logger/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+use super::*;
+```
+# Path: hyperlane-quick-start/config/application/logo_img/const.rs
+```rust
+pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
+```
+# Path: hyperlane-quick-start/config/application/logo_img/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start/config/framework/const.rs
+```rust
+use super::*;
+#[cfg(debug_assertions)]
+pub const SERVER_PORT: u16 = DEFAULT_WEB_PORT;
+#[cfg(not(debug_assertions))]
+pub const SERVER_PORT: u16 = 65002;
+pub const SERVER_HOST: &str = DEFAULT_HOST;
+pub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;
+pub const SERVER_LOG_SIZE: usize = 100_024_000;
+pub const SERVER_LOG_DIR: &str = "./tmp/logs";
+pub const SERVER_INNER_PRINT: bool = true;
+pub const SERVER_INNER_LOG: bool = true;
+pub const SERVER_NODELAY: Option<bool> = Some(false);
+pub const SERVER_TTI: Option<u32> = Some(128);
+pub const SERVER_PID_FILE_PATH: &str = "./tmp/process/hyperlane.pid";
+pub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;
+pub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;
+```
+# Path: hyperlane-quick-start/config/framework/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+use super::*;
+```
+# Path: hyperlane-quick-start/application/README.md
+## hyperlane-application
+> Hyperlane application module containing core application logic, controllers, services, and middleware components.
+## Contact
+# Path: hyperlane-quick-start/application/lib.rs
+```rust
+pub mod controller;
+pub mod domain;
+pub mod exception;
+pub mod mapper;
+pub mod middleware;
+pub mod model;
+pub mod repository;
+pub mod service;
+pub mod utils;
+pub mod view;
+use {
+    hyperlane::*,
+    hyperlane_utils::{log::*, *},
+    serde::{Deserialize, Serialize},
+    serde_with::skip_serializing_none,
+    utoipa::ToSchema,
+};
+```
+# Path: hyperlane-quick-start/application/exception/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use {super::*, model::response::common::*};
+```
+# Path: hyperlane-quick-start/application/exception/impl.rs
+```rust
+use super::*;
+impl ServerHook for TaskPanicHook {
+    #[task_panic_data(task_panic_data)]
+    #[instrument_trace]
+    async fn new(ctx: &mut Context) -> Self {
+        Self {
+            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
+            response_body: task_panic_data.to_string(),
+        }
+    }
+    #[prologue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(500),
+        clear_response_headers,
+        response_header(SERVER => HYPERLANE),
+        response_header(CONTENT_TYPE, &self.content_type),
+    )]
+    #[epilogue_macros(response_body(&response_body), try_send)]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {
+        debug!("TaskPanicHook request => {}", ctx.get_request());
+        error!("TaskPanicHook => {}", self.get_response_body());
+        let api_response: ApiResponse<()> =
+            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
+        let response_body: Vec<u8> = api_response.to_json_bytes();
+    }
+}
+impl ServerHook for RequestErrorHook {
+    #[request_error_data(request_error_data)]
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self {
+            response_status_code: request_error_data.get_http_status_code(),
+            content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
+            response_body: request_error_data.to_string(),
+        }
+    }
+    #[prologue_macros(
+        response_version(HttpVersion::Http1_1),
+        response_status_code(self.get_response_status_code()),
+        clear_response_headers,
+        response_header(SERVER => HYPERLANE),
+        response_header(CONTENT_TYPE, &self.content_type),
+        response_header(TRACE => uuid::Uuid::new_v4().to_string()),
+    )]
+    #[epilogue_macros(response_body(&response_body), try_send)]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {
+        if self.get_response_status_code() == HttpStatus::BadRequest.code() {
+            ctx.set_aborted(true);
+            debug!("Context aborted");
+            return;
+        }
+        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {
+            debug!("RequestErrorHook request => {}", ctx.get_request());
+            error!("RequestErrorHook => {}", self.get_response_body());
+        }
+        let api_response: ApiResponse<()> =
+            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
+        let response_body: Vec<u8> = api_response.to_json_bytes();
+    }
+}
+```
+# Path: hyperlane-quick-start/application/exception/struct.rs
+```rust
+use super::*;
+#[task_panic]
+#[derive(Clone, Data, Debug, Default)]
+pub struct TaskPanicHook {
+    #[get(pub(crate))]
+    pub(super) content_type: String,
+    #[get(pub(crate))]
+    pub(super) response_body: String,
+}
+#[request_error]
+#[derive(Clone, Data, Debug, Default)]
+pub struct RequestErrorHook {
+    #[get(type(copy), pub(crate))]
+    pub(super) response_status_code: ResponseStatusCode,
+    #[get(pub(crate))]
+    pub(super) content_type: String,
+    #[get(pub(crate))]
+    pub(super) response_body: String,
+}
+```
+# Path: hyperlane-quick-start/application/middleware/mod.rs
+```rust
+pub mod request;
+pub mod response;
+use {super::*, utils::json::*};
+```
+# Path: hyperlane-quick-start/application/middleware/request/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use hyperlane_resources::templates::*;
+```
+# Path: hyperlane-quick-start/application/middleware/request/impl.rs
+```rust
+use super::*;
+impl ServerHook for HttpRequestMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        reject(ctx.get_request().get_version().is_http()),
+        send,
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {
+        ctx.set_closed(true);
+    }
+}
+impl ServerHook for CrossMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[response_version(HttpVersion::Http1_1)]
+    #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
+    #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
+    #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {}
+}
+impl ServerHook for ResponseHeaderMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[response_header(DATE => gmt())]
+    #[response_header(SERVER => HYPERLANE)]
+    #[response_header(CONNECTION => KEEP_ALIVE)]
+    #[response_header(TRACE => uuid::Uuid::new_v4().to_string())]
+    #[epilogue_macros(
+        response_header(CONTENT_TYPE => content_type),
+        response_header("SocketAddr" => socket_addr_string)
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {
+        let socket_addr_string: String = ctx.get_socket_addr_string().await;
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
+    }
+}
+impl ServerHook for ResponseStatusCodeMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[response_status_code(200)]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {}
+}
+impl ServerHook for ResponseBodyMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace("{{ time }}", &time())))]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {}
+}
+impl ServerHook for OptionMethodMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        filter(ctx.get_request().get_method().is_options()),
+        send
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {
+        ctx.set_aborted(true);
+    }
+}
+impl ServerHook for UpgradeMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        ws_upgrade_type,
+        response_version(HttpVersion::Http1_1),
+        response_status_code(101),
+        response_body(&vec![]),
+        response_header(UPGRADE => WEBSOCKET),
+        response_header(CONNECTION => UPGRADE),
+        response_header(SEC_WEBSOCKET_ACCEPT => WebSocketFrame::generate_accept_key(ctx.get_request().get_header_back(SEC_WEBSOCKET_KEY))),
+        send
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {}
+}
+```
+# Path: hyperlane-quick-start/application/middleware/request/struct.rs
+```rust
+use super::*;
+#[request_middleware(1)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct HttpRequestMiddleware;
+#[request_middleware(2)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct CrossMiddleware;
+#[request_middleware(3)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ResponseHeaderMiddleware;
+#[request_middleware(4)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ResponseStatusCodeMiddleware;
+#[request_middleware(5)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ResponseBodyMiddleware;
+#[request_middleware(6)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct OptionMethodMiddleware;
+#[request_middleware(7)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct UpgradeMiddleware;
+```
+# Path: hyperlane-quick-start/application/middleware/response/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane-quick-start/application/middleware/response/impl.rs
+```rust
+use super::*;
+impl ServerHook for SendMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        reject(ctx.get_request().is_ws_upgrade_type()),
+        try_send
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {}
+}
+impl ServerHook for LogMiddleware {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {
+        let request_json: String = get_request_json(ctx).await;
+        let response_json: String = get_response_json(ctx).await;
+        info!("{request_json}");
+        info!("{response_json}");
+    }
+}
+```
+# Path: hyperlane-quick-start/application/middleware/response/struct.rs
+```rust
+use super::*;
+#[response_middleware(1)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct SendMiddleware;
+#[response_middleware(2)]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct LogMiddleware;
+```
+# Path: hyperlane-quick-start/application/utils/mod.rs
+```rust
+pub mod json;
+pub mod send;
+use super::*;
+```
+# Path: hyperlane-quick-start/application/utils/send/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+```
+# Path: hyperlane-quick-start/application/utils/send/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> {
+    let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {
+        let body: &ResponseBody = ctx.get_response().get_body();
+        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        ctx.try_send_body_list_with_data(&frame_list).await
+    } else {
+        ctx.try_send_body().await
+    };
+    if send_result.is_err() {
+        ctx.set_aborted(true).set_closed(true);
+    }
+    send_result
+}
+```
+# Path: hyperlane-quick-start/application/utils/json/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+```
+# Path: hyperlane-quick-start/application/utils/json/fn.rs
+```rust
+use super::*;
+#[instrument_trace]
+pub async fn get_request_json(ctx: &mut Context) -> String {
+    let mut request: Request = ctx.get_request().clone();
+    request.set_body(request.get_body().len().to_string().into_bytes());
+    serde_json::to_string(&request).unwrap_or(request.to_string())
+}
+#[instrument_trace]
+pub async fn get_response_json(ctx: &mut Context) -> String {
+    let mut response: Response = ctx.get_response().clone();
+    response.set_body(response.get_body().len().to_string().into_bytes());
+    serde_json::to_string(&response).unwrap_or(response.to_string())
+}
+```
+# Path: hyperlane-quick-start/application/view/mod.rs
+```rust
+mod favicon;
+use super::*;
+```
+# Path: hyperlane-quick-start/application/view/favicon/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use hyperlane_config::application::logo_img::*;
+```
+# Path: hyperlane-quick-start/application/view/favicon/impl.rs
+```rust
+use super::*;
+impl ServerHook for FaviconRoute {
+    #[instrument_trace]
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    #[prologue_macros(
+        get_method,
+        response_status_code(301),
+        response_header(LOCATION => LOGO_IMG_URL)
+    )]
+    #[instrument_trace]
+    async fn handle(self, ctx: &mut Context) {}
+}
+```
+# Path: hyperlane-quick-start/application/view/favicon/struct.rs
+```rust
+use super::*;
+#[route("/favicon.ico")]
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct FaviconRoute;
+```
+# Path: hyperlane-quick-start/application/model/mod.rs
+```rust
+pub mod request;
+pub mod response;
+use super::*;
+```
+# Path: hyperlane-quick-start/application/model/response/mod.rs
+```rust
+pub mod common;
+use super::*;
+```
+# Path: hyperlane-quick-start/application/model/response/common/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+mod r#struct;
+pub use {r#enum::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane-quick-start/application/model/response/common/impl.rs
+```rust
+use super::*;
+impl ResponseCode {
+    #[instrument_trace]
+    pub fn default_message(&self) -> &'static str {
+        match self {
+            Self::Success => "Operation successful",
+            Self::BadRequest => "Invalid request parameters",
+            Self::Unauthorized => "Unauthorized access",
+            Self::Forbidden => "Access forbidden",
+            Self::NotFound => "Resource not found",
+            Self::InternalError => "Internal server error",
+            Self::DatabaseError => "Database operation failed",
+            Self::BusinessError => "Business logic error",
+        }
+    }
+}
+impl<T> ApiResponse<T>
+where
+    T: Clone + Default + Serialize,
+{
+    #[instrument_trace]
+    pub fn default_success() -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::Success as i32)
+            .set_message("Success".to_string())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+    #[instrument_trace]
+    pub fn success(data: T) -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::Success as i32)
+            .set_message("Success".to_string())
+            .set_data(Some(data))
+            .set_timestamp(Some(date()));
+        instance
+    }
+    #[instrument_trace]
+    pub fn success_with_message(data: T, message: impl Into<String>) -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::Success as i32)
+            .set_message(message.into())
+            .set_data(Some(data))
+            .set_timestamp(Some(date()));
+        instance
+    }
+    #[instrument_trace]
+    pub fn default_error() -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::InternalError as i32)
+            .set_message("Internal server error".to_string())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+    #[instrument_trace]
+    pub fn error(message: impl Into<String>) -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(ResponseCode::InternalError as i32)
+            .set_message(message.into())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+    #[instrument_trace]
+    pub fn error_with_code(code: ResponseCode, message: impl ToString) -> Self {
+        let mut instance: ApiResponse<T> = Self::default();
+        instance
+            .set_code(code as i32)
+            .set_message(message.to_string())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+    #[instrument_trace]
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap_or_default()
+    }
+}
+impl ApiResponse<()> {
+    #[instrument_trace]
+    pub fn success_without_data(message: impl Into<String>) -> Self {
+        let mut instance: ApiResponse<()> = Self::default();
+        instance
+            .set_code(ResponseCode::Success as i32)
+            .set_message(message.into())
+            .set_data(None)
+            .set_timestamp(Some(date()));
+        instance
+    }
+}
+```
+# Path: hyperlane-quick-start/application/model/response/common/struct.rs
+```rust
+use super::*;
+#[skip_serializing_none]
+#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct ApiResponse<T>
+where
+    T: Clone + Default + Serialize,
+{
+    #[get(type(copy), pub(crate))]
+    pub(super) code: i32,
+    #[get(pub(crate))]
+    pub(super) message: String,
+    #[get(pub(crate))]
+    pub(super) data: Option<T>,
+    #[get(pub(crate))]
+    pub(super) timestamp: Option<String>,
+}
+```
+# Path: hyperlane-quick-start/application/model/response/common/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[repr(i32)]
+pub enum ResponseCode {
+    Success = 200,
+    BadRequest = 400,
+    Unauthorized = 401,
+    Forbidden = 403,
+    NotFound = 404,
+    InternalError = 500,
+    DatabaseError = 501,
+    BusinessError = 502,
+}
+```
+# Path: hyperlane-quick-start/src/main.rs
+```rust
+use {
+    hyperlane_bootstrap::{
+        application::{db::*, env::*, logger::*},
+        common::*,
+        framework::{runtime::*, server::*},
+    },
+    hyperlane_config::framework::*,
+    hyperlane_plugin::process::*,
+};
+use hyperlane_utils::log::*;
+fn main() {
+    LoggerBootstrap::init();
+    EnvBootstrap::init();
+    info!("Environment configuration loaded successfully");
+    RuntimeBootstrap::init().get_runtime().block_on(async move {
+        DbBootstrap::init().await;
+        ProcessPlugin::create(SERVER_PID_FILE_PATH, || async {
+            ServerBootstrap::init().await;
+        })
+        .await;
+    });
+}
+```
+# Path: hyperlane-quick-start/bootstrap/README.md
+## hyperlane-bootstrap
+> Hyperlane bootstrap crate providing application initialization and framework lifecycle management.
+## Contact
+# Path: hyperlane-quick-start/bootstrap/lib.rs
+```rust
+pub mod application;
+pub mod common;
+pub mod framework;
+use common::*;
+use {
+    hyperlane::*,
+    hyperlane_utils::{log::*, *},
+};
+```
+# Path: hyperlane-quick-start/bootstrap/common/trait.rs
+```rust
+pub trait BootstrapSyncInit {
+    fn init() -> Self;
+}
+pub trait BootstrapAsyncInit {
+    fn init() -> impl Future<Output = Self> + Send;
+}
+```
+# Path: hyperlane-quick-start/bootstrap/common/mod.rs
+```rust
+mod r#trait;
+pub use r#trait::*;
+```
+# Path: hyperlane-quick-start/bootstrap/application/mod.rs
+```rust
+pub mod db;
+pub mod env;
+pub mod logger;
+use super::*;
+```
+# Path: hyperlane-quick-start/bootstrap/application/logger/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use {
+    hyperlane_config::{application::logger::*, framework::*},
+    hyperlane_plugin::logger::*,
+};
+```
+# Path: hyperlane-quick-start/bootstrap/application/logger/impl.rs
+```rust
+use super::*;
+impl BootstrapSyncInit for LoggerBootstrap {
+    fn init() -> Self {
+        let mut file_logger: FileLogger = FileLogger::default();
+        file_logger.set_path(SERVER_LOG_DIR);
+        file_logger.set_limit_file_size(SERVER_LOG_SIZE);
+        Logger::init(LOG_LEVEL_FILTER, file_logger);
+        Self
+    }
+}
+```
+# Path: hyperlane-quick-start/bootstrap/application/logger/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct LoggerBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/application/env/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use hyperlane_plugin::env::*;
+```
+# Path: hyperlane-quick-start/bootstrap/application/env/impl.rs
+```rust
+use super::*;
+impl BootstrapSyncInit for EnvBootstrap {
+    fn init() -> Self {
+        if let Err(error) = EnvPlugin::try_get_config() {
+            error!("{error}");
+        }
+        Self
+    }
+}
+```
+# Path: hyperlane-quick-start/bootstrap/application/env/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct EnvBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/application/db/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use hyperlane_plugin::{common::*, database::*, mysql::*, postgresql::*, redis::*};
+use {redis::Connection, sea_orm::DatabaseConnection};
+```
+# Path: hyperlane-quick-start/bootstrap/application/db/impl.rs
+```rust
+use super::*;
+impl BootstrapAsyncInit for DbBootstrap {
+    async fn init() -> Self {
+        let _: Result<DatabaseConnection, String> =
+            MySqlPlugin::connection_db(DEFAULT_MYSQL_INSTANCE_NAME, None).await;
+        let _: Result<DatabaseConnection, String> =
+            PostgreSqlPlugin::connection_db(DEFAULT_POSTGRESQL_INSTANCE_NAME, None).await;
+        let _: Result<ArcRwLock<Connection>, String> =
+            RedisPlugin::connection_db(DEFAULT_REDIS_INSTANCE_NAME, None).await;
+        match DatabasePlugin::initialize_auto_creation().await {
+            Ok(_) => {
+                info!("Auto-creation initialization successful");
+            }
+            Err(error) => {
+                error!("Auto-creation initialization failed {error}");
+            }
+        };
+        Self
+    }
+}
+```
+# Path: hyperlane-quick-start/bootstrap/application/db/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct DbBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/mod.rs
+```rust
+pub mod config;
+pub mod runtime;
+pub mod server;
+use super::*;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/config/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use hyperlane_config::framework::*;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/config/impl.rs
+```rust
+use super::*;
+impl BootstrapAsyncInit for ConfigBootstrap {
+    #[hyperlane(server_config: ServerConfig)]
+    async fn init() -> Self {
+        let mut request_config: RequestConfig = RequestConfig::default();
+        request_config
+            .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
+            .set_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);
+        server_config.set_address(Server::format_bind_address(SERVER_HOST, SERVER_PORT));
+        server_config.set_ttl(SERVER_TTI);
+        server_config.set_nodelay(SERVER_NODELAY);
+        debug!("Server config {server_config:?}");
+        info!("Server initialization successful");
+        Self {
+            server_config,
+            request_config,
+        }
+    }
+}
+```
+# Path: hyperlane-quick-start/bootstrap/framework/config/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Default)]
+pub struct ConfigBootstrap {
+    pub(super) server_config: ServerConfig,
+    pub(super) request_config: RequestConfig,
+}
+```
+# Path: hyperlane-quick-start/bootstrap/framework/server/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use {super::*, config::*};
+#[allow(unused_imports)]
+use {hyperlane_application::*, hyperlane_config::framework::*, hyperlane_plugin::shutdown::*};
+```
+# Path: hyperlane-quick-start/bootstrap/framework/server/impl.rs
+```rust
+use super::*;
+impl ServerBootstrap {
+    async fn print_route_matcher(server: &Server) {
+        let route_matcher: &RouteMatcher = server.get_route_matcher();
+        for key in route_matcher.get_static_route().keys() {
+            info!("Static route {key}");
+        }
+        for value in route_matcher.get_dynamic_route().values() {
+            for (route_pattern, _) in value {
+                info!("Dynamic route {route_pattern}");
+            }
+        }
+        for value in route_matcher.get_regex_route().values() {
+            for (route_pattern, _) in value {
+                info!("Regex route {route_pattern}");
+            }
+        }
+    }
+}
+impl BootstrapAsyncInit for ServerBootstrap {
+    #[hyperlane(server: Server)]
+    async fn init() -> Self {
+        let config: ConfigBootstrap = ConfigBootstrap::init().await;
+        server
+            .request_config(*config.get_request_config())
+            .server_config(config.get_server_config().clone());
+        match server.run().await {
+            Ok(server_hook) => {
+                let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
+                Self::print_route_matcher(&server).await;
+                info!("Server listen in {host_port}");
+                ShutdownPlugin::set(server_hook.get_shutdown_hook());
+                server_hook.wait().await;
+            }
+            Err(server_error) => error!("Server run error {server_error}"),
+        }
+        Self
+    }
+}
+```
+# Path: hyperlane-quick-start/bootstrap/framework/server/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Default)]
+pub struct ServerBootstrap;
+```
+# Path: hyperlane-quick-start/bootstrap/framework/runtime/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+use tokio::runtime::{Builder, Runtime};
+```
+# Path: hyperlane-quick-start/bootstrap/framework/runtime/impl.rs
+```rust
+use super::*;
+impl BootstrapSyncInit for RuntimeBootstrap {
+    fn init() -> Self {
+        let runtime: Runtime = Builder::new_multi_thread()
+            .worker_threads(num_cpus::get_physical() << 1)
+            .thread_stack_size(1_048_576)
+            .max_blocking_threads(2_048)
+            .max_io_events_per_tick(1_024)
+            .enable_all()
+            .build()
+            .unwrap();
+        Self { runtime }
+    }
+}
+```
+# Path: hyperlane-quick-start/bootstrap/framework/runtime/struct.rs
+```rust
+use super::*;
+#[derive(Data, Debug)]
+pub struct RuntimeBootstrap {
+    pub(super) runtime: Runtime,
+}
+```
+# Path: hyperlane-quick-start/resources/README.md
+## hyperlane-resources
+> Hyperlane resources module containing various resources and utilities used by the framework.
+## Contact
+# Path: hyperlane-quick-start/resources/lib.rs
+```rust
+pub mod sql;
+pub mod r#static;
+pub mod templates;
+```
+# Path: hyperlane-quick-start/resources/templates/const.rs
+```rust
+pub const TEMPLATES_INDEX_HTML: &str = include_str!("./index/index.html");
+```
+# Path: hyperlane-quick-start/resources/templates/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start/resources/templates/index/index.html
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hyperlane</title>
+    <style>
+      .center-text {
+        text-align: center;
+      }
+      a {
+        color: #1e90ff;
+        text-decoration: none;
+        transition:
+          color 0.3s,
+          border-bottom-color 0.3s;
+      }
+      a:hover,
+      a:focus {
+        color: pink;
+        border-bottom-color: pink;
+        outline: none;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="center-text">Hello hyperlane: {{ time }}</h1>
+    <hr />
+    <p class="center-text">
+      Server:
+      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
+        >Hyperlane</a
+    </p>
+  </body>
+</html>
+```
+# Path: hyperlane-quick-start/resources/static/not_found/index.html
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 Not Found</title>
+    <style>
+      .center-text {
+        text-align: center;
+      }
+      a {
+        color: #1e90ff;
+        text-decoration: none;
+        transition:
+          color 0.3s,
+          border-bottom-color 0.3s;
+      }
+      a:hover,
+      a:focus {
+        color: pink;
+        border-bottom-color: pink;
+        outline: none;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="center-text">404 Not Found</h1>
+    <hr />
+    <p class="center-text">
+      Server:
+      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
+        >Hyperlane</a
+    </p>
+  </body>
+</html>
 ```
 # Path: hyperlane-cli/README.md
 # hyperlane-cli
@@ -13235,16 +12672,132 @@ async fn main() {
     }
 }
 ```
-# Path: hyperlane-cli/src/watch/mod.rs
+# Path: hyperlane-cli/src/fmt/mod.rs
 ```rust
 mod r#fn;
-pub(crate) use r#fn::*;
+mod r#static;
+#[cfg(test)]
+mod test;
+pub(crate) use {r#fn::*, r#static::*};
 ```
-# Path: hyperlane-cli/src/watch/fn.rs
+# Path: hyperlane-cli/src/fmt/fn.rs
 ```rust
 use crate::*;
-async fn is_cargo_watch_installed() -> bool {
-    Command::new("cargo-watch")
+fn sort_derive_in_line(line: &str) -> Option<String> {
+    let captures: Captures<'_> = DERIVE_REGEX.captures(line)?;
+    let derive_content: &str = captures.get(1)?.as_str();
+    let mut traits: Vec<String> = derive_content
+        .split(',')
+        .map(|s: &str| s.trim().to_string())
+        .filter(|s: &String| !s.is_empty())
+        .collect();
+    traits.sort_by_key(|a| a.to_lowercase());
+    let sorted_traits: String = traits.join(", ");
+    let result: String = line.replace(derive_content, &sorted_traits);
+    Some(result)
+}
+async fn format_derive_in_file(file_path: &Path) -> Result<bool, std::io::Error> {
+    let content: String = read_to_string(file_path)?;
+    let lines: std::str::Lines<'_> = content.lines();
+    let mut modified: bool = false;
+    let mut new_content: String = String::new();
+    for line in lines {
+        let trimmed: &str = line.trim();
+        let new_line: String = if trimmed.starts_with("#[derive(") {
+            if let Some(sorted) = sort_derive_in_line(line) {
+                if sorted != line {
+                    modified = true;
+                }
+                sorted
+            } else {
+                line.to_string()
+            }
+        } else {
+            line.to_string()
+        };
+        new_content.push_str(&new_line);
+        new_content.push('\n');
+    }
+    if modified {
+        write(file_path, new_content)?;
+    }
+    Ok(modified)
+}
+async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
+    let mut files: Vec<PathBuf> = Vec::new();
+    let workspace_root: &Path = manifest_path.parent().unwrap_or(Path::new("."));
+    let src_dir: PathBuf = workspace_root.join("src");
+    if src_dir.exists() {
+        find_rust_files_in_dir(&src_dir, &mut files).await?;
+    }
+    let content: String = read_to_string(manifest_path)?;
+    if let Ok(doc) = toml::from_str::<toml::Value>(&content) {
+        if let Some(workspace) = doc.get("workspace") {
+            if let Some(members) = workspace
+                .get("members")
+                .and_then(|m: &toml::Value| m.as_array())
+            {
+                for member in members {
+                    if let Some(pattern) = member.as_str() {
+                        let member_src: PathBuf = workspace_root.join(pattern).join("src");
+                        if member_src.exists() {
+                            find_rust_files_in_dir(&member_src, &mut files).await?;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(files)
+}
+async fn find_rust_files_in_dir(
+    dir: &Path,
+    files: &mut Vec<PathBuf>,
+) -> Result<(), std::io::Error> {
+    let mut entries = tokio::fs::read_dir(dir).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let path: PathBuf = entry.path();
+        if path.is_file()
+            && path
+                .extension()
+                .is_some_and(|ext: &std::ffi::OsStr| ext == "rs")
+        {
+            files.push(path);
+        } else if path.is_dir() {
+            Box::pin(find_rust_files_in_dir(&path, files)).await?;
+        }
+    }
+    Ok(())
+}
+async fn format_derive_attributes(manifest_path: &str) -> Result<(), std::io::Error> {
+    let path: &Path = Path::new(manifest_path);
+    let files: Vec<PathBuf> = find_rust_files(path).await?;
+    let modified_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
+    let mut handles: Vec<tokio::task::JoinHandle<Result<(), std::io::Error>>> = Vec::new();
+    for file in files {
+        let counter: Arc<Mutex<usize>> = Arc::clone(&modified_count);
+        let handle: tokio::task::JoinHandle<Result<(), std::io::Error>> =
+            tokio::spawn(async move {
+                if format_derive_in_file(&file).await? {
+                    let mut count: tokio::sync::MutexGuard<'_, usize> = counter.lock().await;
+                    *count += 1;
+                }
+                Ok(())
+            });
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.await??;
+    }
+    let count: usize = *modified_count.lock().await;
+    if count > 0 {
+        println!("Sorted derive attributes in {count} files");
+    }
+    Ok(())
+}
+async fn is_cargo_clippy_installed() -> bool {
+    Command::new("cargo")
+        .arg("clippy")
         .arg("--version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -13252,33 +12805,91 @@ async fn is_cargo_watch_installed() -> bool {
         .await
         .is_ok_and(|status: ExitStatus| status.success())
 }
-async fn install_cargo_watch() -> Result<(), std::io::Error> {
-    println!("cargo-watch not found, installing...");
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("install").arg("cargo-watch");
+async fn install_cargo_clippy() -> Result<(), std::io::Error> {
+    println!("cargo-clippy not found, installing...");
+    let mut cmd: Command = Command::new("rustup");
+    cmd.arg("component").arg("add").arg("clippy");
     cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
     let status: ExitStatus = cmd.status().await?;
     if !status.success() {
-        return Err(std::io::Error::other("failed to install cargo-watch"));
+        return Err(std::io::Error::other("failed to install cargo-clippy"));
     }
     Ok(())
 }
-pub(crate) async fn execute_watch() -> Result<(), std::io::Error> {
-    if !is_cargo_watch_installed().await {
-        install_cargo_watch().await?;
+async fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {
+    if !is_cargo_clippy_installed().await {
+        install_cargo_clippy().await?;
     }
-    let mut cmd: Command = Command::new("cargo-watch");
-    cmd.arg("--clear")
-        .arg("--skip-local-deps")
-        .arg("-q")
-        .arg("-x")
-        .arg("run");
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("clippy")
+        .arg("--fix")
+        .arg("--workspace")
+        .arg("--all-targets")
+        .arg("--allow-dirty");
+    if let Some(ref manifest_path) = args.manifest_path {
+        cmd.arg("--manifest-path").arg(manifest_path);
+    }
     cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
     let status: ExitStatus = cmd.status().await?;
     if !status.success() {
-        return Err(std::io::Error::other("cargo-watch failed"));
+        return Err(std::io::Error::other("cargo clippy --fix failed"));
     }
     Ok(())
+}
+pub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
+    let manifest_path: String = args
+        .manifest_path
+        .clone()
+        .unwrap_or_else(|| "Cargo.toml".to_string());
+    if !args.check {
+        format_derive_attributes(&manifest_path).await?;
+    }
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("fmt");
+    if args.check {
+        cmd.arg("--check");
+    }
+    if let Some(ref manifest_path) = args.manifest_path {
+        cmd.arg("--manifest-path").arg(manifest_path);
+    }
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("cargo fmt failed"));
+    }
+    if !args.check {
+        execute_clippy_fix(args).await?;
+    }
+    Ok(())
+}
+pub(crate) async fn format_path(path: &std::path::Path) -> Result<(), std::io::Error> {
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("fmt").arg("--").arg(path);
+    cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    cmd.status().await?;
+    Ok(())
+}
+```
+# Path: hyperlane-cli/src/fmt/static.rs
+```rust
+use crate::*;
+pub(crate) static DERIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"#\[derive\s*\(([^)]+)\)\]").expect("Invalid regex pattern")
+});
+```
+# Path: hyperlane-cli/src/fmt/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_format_path_integration() {
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_fmt");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let test_file: PathBuf = tmp_dir.join("test.rs");
+    std::fs::write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
+    let rt: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
+    let result: Result<(), std::io::Error> = rt.block_on(format_path(&tmp_dir));
+    assert!(result.is_ok());
 }
 ```
 # Path: hyperlane-cli/src/template/mod.rs
@@ -13290,49 +12901,6 @@ mod r#struct;
 #[cfg(test)]
 mod test;
 pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
-```
-# Path: hyperlane-cli/src/template/enum.rs
-```rust
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum TemplateType {
-    Controller,
-    Domain,
-    Exception,
-    Mapper,
-    Model,
-    Repository,
-    Service,
-    Utils,
-    View,
-}
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ModelSubType {
-    Application,
-    Request,
-    Response,
-}
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum TemplateError {
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error("Invalid template type: {0}")]
-    InvalidTemplateType(String),
-    #[error("Invalid model subtype: {0}")]
-    InvalidModelSubType(String),
-    #[error("Directory '{0}' already exists")]
-    DirectoryExists(String),
-}
-```
-# Path: hyperlane-cli/src/template/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, Debug)]
-pub(crate) struct TemplateConfig {
-    pub template_type: TemplateType,
-    pub component_name: String,
-    pub model_sub_type: Option<ModelSubType>,
-    pub base_directory: String,
-}
 ```
 # Path: hyperlane-cli/src/template/fn.rs
 ```rust
@@ -13613,6 +13181,17 @@ impl FromStr for ModelSubType {
     }
 }
 ```
+# Path: hyperlane-cli/src/template/struct.rs
+```rust
+use crate::*;
+#[derive(Clone, Debug)]
+pub(crate) struct TemplateConfig {
+    pub template_type: TemplateType,
+    pub component_name: String,
+    pub model_sub_type: Option<ModelSubType>,
+    pub base_directory: String,
+}
+```
 # Path: hyperlane-cli/src/template/test.rs
 ```rust
 use std::str::FromStr;
@@ -13796,6 +13375,38 @@ fn test_parse_model_sub_type_invalid() {
     assert_eq!(ModelSubType::from_str("unknown").ok(), None);
 }
 ```
+# Path: hyperlane-cli/src/template/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TemplateType {
+    Controller,
+    Domain,
+    Exception,
+    Mapper,
+    Model,
+    Repository,
+    Service,
+    Utils,
+    View,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ModelSubType {
+    Application,
+    Request,
+    Response,
+}
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum TemplateError {
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Invalid template type: {0}")]
+    InvalidTemplateType(String),
+    #[error("Invalid model subtype: {0}")]
+    InvalidModelSubType(String),
+    #[error("Directory '{0}' already exists")]
+    DirectoryExists(String),
+}
+```
 # Path: hyperlane-cli/src/new/mod.rs
 ```rust
 mod r#enum;
@@ -13805,30 +13416,6 @@ mod r#struct;
 #[cfg(test)]
 mod test;
 pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
-```
-# Path: hyperlane-cli/src/new/enum.rs
-```rust
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum NewError {
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error("Git is not installed or not found in PATH")]
-    GitNotFound,
-    #[error("Project directory '{0}' already exists")]
-    ProjectExists(String),
-    #[error("Git clone failed: {0}")]
-    CloneFailed(String),
-    #[error("Invalid project name: {0}")]
-    InvalidName(String),
-}
-```
-# Path: hyperlane-cli/src/new/struct.rs
-```rust
-#[derive(Clone, Debug)]
-pub(crate) struct NewProjectConfig {
-    pub project_name: String,
-    pub template_url: String,
-}
 ```
 # Path: hyperlane-cli/src/new/fn.rs
 ```rust
@@ -13913,6 +13500,14 @@ impl NewProjectConfig {
     }
 }
 ```
+# Path: hyperlane-cli/src/new/struct.rs
+```rust
+#[derive(Clone, Debug)]
+pub(crate) struct NewProjectConfig {
+    pub project_name: String,
+    pub template_url: String,
+}
+```
 # Path: hyperlane-cli/src/new/test.rs
 ```rust
 use crate::*;
@@ -13962,264 +13557,662 @@ fn test_new_project_config_debug() {
     assert!(debug_str.contains("test"));
 }
 ```
-# Path: hyperlane-cli/src/fmt/mod.rs
+# Path: hyperlane-cli/src/new/enum.rs
+```rust
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum NewError {
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Git is not installed or not found in PATH")]
+    GitNotFound,
+    #[error("Project directory '{0}' already exists")]
+    ProjectExists(String),
+    #[error("Git clone failed: {0}")]
+    CloneFailed(String),
+    #[error("Invalid project name: {0}")]
+    InvalidName(String),
+}
+```
+# Path: hyperlane-cli/src/config/mod.rs
 ```rust
 mod r#fn;
-mod r#static;
+mod r#struct;
 #[cfg(test)]
 mod test;
-pub(crate) use {r#fn::*, r#static::*};
+pub(crate) use {r#fn::*, r#struct::*};
 ```
-# Path: hyperlane-cli/src/fmt/fn.rs
+# Path: hyperlane-cli/src/config/fn.rs
 ```rust
+use std::str::FromStr;
 use crate::*;
-fn sort_derive_in_line(line: &str) -> Option<String> {
-    let captures: Captures<'_> = DERIVE_REGEX.captures(line)?;
-    let derive_content: &str = captures.get(1)?.as_str();
-    let mut traits: Vec<String> = derive_content
-        .split(',')
-        .map(|s: &str| s.trim().to_string())
-        .filter(|s: &String| !s.is_empty())
-        .collect();
-    traits.sort_by_key(|a| a.to_lowercase());
-    let sorted_traits: String = traits.join(", ");
-    let result: String = line.replace(derive_content, &sorted_traits);
-    Some(result)
-}
-async fn format_derive_in_file(file_path: &Path) -> Result<bool, std::io::Error> {
-    let content: String = read_to_string(file_path)?;
-    let lines: std::str::Lines<'_> = content.lines();
-    let mut modified: bool = false;
-    let mut new_content: String = String::new();
-    for line in lines {
-        let trimmed: &str = line.trim();
-        let new_line: String = if trimmed.starts_with("#[derive(") {
-            if let Some(sorted) = sort_derive_in_line(line) {
-                if sorted != line {
-                    modified = true;
-                }
-                sorted
-            } else {
-                line.to_string()
+pub(crate) fn parse_args() -> Args {
+    let raw_args: Vec<String> = args().collect();
+    let mut command: CommandType = CommandType::Help;
+    let mut check: bool = false;
+    let mut manifest_path: Option<String> = None;
+    let mut bump_type: Option<BumpVersionType> = None;
+    let mut max_retries: u32 = 3;
+    let mut project_name: Option<String> = None;
+    let mut template_type: Option<TemplateType> = None;
+    let mut model_sub_type: Option<ModelSubType> = None;
+    let mut component_name: Option<String> = None;
+    let mut i: usize = 1;
+    while i < raw_args.len() {
+        let arg: &str = raw_args[i].as_str();
+        match arg {
+            "-h" | "--help" => {
+                command = CommandType::Help;
             }
-        } else {
-            line.to_string()
-        };
-        new_content.push_str(&new_line);
-        new_content.push('\n');
-    }
-    if modified {
-        write(file_path, new_content)?;
-    }
-    Ok(modified)
-}
-async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
-    let mut files: Vec<PathBuf> = Vec::new();
-    let workspace_root: &Path = manifest_path.parent().unwrap_or(Path::new("."));
-    let src_dir: PathBuf = workspace_root.join("src");
-    if src_dir.exists() {
-        find_rust_files_in_dir(&src_dir, &mut files).await?;
-    }
-    let content: String = read_to_string(manifest_path)?;
-    if let Ok(doc) = toml::from_str::<toml::Value>(&content) {
-        if let Some(workspace) = doc.get("workspace") {
-            if let Some(members) = workspace
-                .get("members")
-                .and_then(|m: &toml::Value| m.as_array())
-            {
-                for member in members {
-                    if let Some(pattern) = member.as_str() {
-                        let member_src: PathBuf = workspace_root.join(pattern).join("src");
-                        if member_src.exists() {
-                            find_rust_files_in_dir(&member_src, &mut files).await?;
-                        }
+            "-v" | "--version" => {
+                command = CommandType::Version;
+            }
+            "fmt" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Fmt;
+                }
+            }
+            "watch" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Watch;
+                }
+            }
+            "bump" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Bump;
+                }
+            }
+            "publish" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Publish;
+                }
+            }
+            "new" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::New;
+                    i += 1;
+                    if i < raw_args.len()
+                        && !raw_args[i].starts_with("--")
+                        && !raw_args[i].starts_with("-")
+                    {
+                        project_name = Some(raw_args[i].clone());
+                    } else {
+                        i -= 1;
                     }
                 }
             }
-        }
-    }
-    Ok(files)
-}
-async fn find_rust_files_in_dir(
-    dir: &Path,
-    files: &mut Vec<PathBuf>,
-) -> Result<(), std::io::Error> {
-    let mut entries = tokio::fs::read_dir(dir).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        let path: PathBuf = entry.path();
-        if path.is_file()
-            && path
-                .extension()
-                .is_some_and(|ext: &std::ffi::OsStr| ext == "rs")
-        {
-            files.push(path);
-        } else if path.is_dir() {
-            Box::pin(find_rust_files_in_dir(&path, files)).await?;
-        }
-    }
-    Ok(())
-}
-async fn format_derive_attributes(manifest_path: &str) -> Result<(), std::io::Error> {
-    let path: &Path = Path::new(manifest_path);
-    let files: Vec<PathBuf> = find_rust_files(path).await?;
-    let modified_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
-    let mut handles: Vec<tokio::task::JoinHandle<Result<(), std::io::Error>>> = Vec::new();
-    for file in files {
-        let counter: Arc<Mutex<usize>> = Arc::clone(&modified_count);
-        let handle: tokio::task::JoinHandle<Result<(), std::io::Error>> =
-            tokio::spawn(async move {
-                if format_derive_in_file(&file).await? {
-                    let mut count: tokio::sync::MutexGuard<'_, usize> = counter.lock().await;
-                    *count += 1;
+            "template" => {
+                if command == CommandType::Help || command == CommandType::Version {
+                    command = CommandType::Template;
+                    i += 1;
+                    if i < raw_args.len()
+                        && !raw_args[i].starts_with("--")
+                        && !raw_args[i].starts_with("-")
+                    {
+                        let type_str: &str = &raw_args[i];
+                        template_type = TemplateType::from_str(type_str).ok();
+                        i += 1;
+                        if template_type == Some(TemplateType::Model)
+                            && i < raw_args.len()
+                            && !raw_args[i].starts_with("--")
+                            && !raw_args[i].starts_with("-")
+                        {
+                            let sub_type_str: &str = &raw_args[i];
+                            model_sub_type = ModelSubType::from_str(sub_type_str).ok();
+                            i += 1;
+                        }
+                        if i < raw_args.len()
+                            && !raw_args[i].starts_with("--")
+                            && !raw_args[i].starts_with("-")
+                        {
+                            component_name = Some(raw_args[i].clone());
+                            i += 1;
+                        }
+                        i -= 1;
+                    }
                 }
-                Ok(())
-            });
-        handles.push(handle);
+            }
+            "--patch" => {
+                bump_type = Some(BumpVersionType::Patch);
+            }
+            "--minor" => {
+                bump_type = Some(BumpVersionType::Minor);
+            }
+            "--major" => {
+                bump_type = Some(BumpVersionType::Major);
+            }
+            "--release" => {
+                bump_type = Some(BumpVersionType::Release);
+            }
+            "--alpha" => {
+                bump_type = Some(BumpVersionType::Alpha);
+            }
+            "--beta" => {
+                bump_type = Some(BumpVersionType::Beta);
+            }
+            "--rc" => {
+                bump_type = Some(BumpVersionType::Rc);
+            }
+            "--check" => {
+                check = true;
+            }
+            "--manifest-path" => {
+                i += 1;
+                if i < raw_args.len() {
+                    manifest_path = Some(raw_args[i].clone());
+                }
+            }
+            "--max-retries" => {
+                i += 1;
+                if i < raw_args.len() {
+                    if let Ok(n) = raw_args[i].parse::<u32>() {
+                        max_retries = n;
+                    }
+                }
+            }
+            _ => {}
+        }
+        i += 1;
     }
-    for handle in handles {
-        handle.await??;
+    Args {
+        command,
+        check,
+        manifest_path,
+        bump_type,
+        max_retries,
+        project_name,
+        template_type,
+        model_sub_type,
+        component_name,
     }
-    let count: usize = *modified_count.lock().await;
-    if count > 0 {
-        println!("Sorted derive attributes in {count} files");
-    }
-    Ok(())
-}
-async fn is_cargo_clippy_installed() -> bool {
-    Command::new("cargo")
-        .arg("clippy")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .is_ok_and(|status: ExitStatus| status.success())
-}
-async fn install_cargo_clippy() -> Result<(), std::io::Error> {
-    println!("cargo-clippy not found, installing...");
-    let mut cmd: Command = Command::new("rustup");
-    cmd.arg("component").arg("add").arg("clippy");
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("failed to install cargo-clippy"));
-    }
-    Ok(())
-}
-async fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {
-    if !is_cargo_clippy_installed().await {
-        install_cargo_clippy().await?;
-    }
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("clippy")
-        .arg("--fix")
-        .arg("--workspace")
-        .arg("--all-targets")
-        .arg("--allow-dirty");
-    if let Some(ref manifest_path) = args.manifest_path {
-        cmd.arg("--manifest-path").arg(manifest_path);
-    }
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("cargo clippy --fix failed"));
-    }
-    Ok(())
-}
-pub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
-    let manifest_path: String = args
-        .manifest_path
-        .clone()
-        .unwrap_or_else(|| "Cargo.toml".to_string());
-    if !args.check {
-        format_derive_attributes(&manifest_path).await?;
-    }
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("fmt");
-    if args.check {
-        cmd.arg("--check");
-    }
-    if let Some(ref manifest_path) = args.manifest_path {
-        cmd.arg("--manifest-path").arg(manifest_path);
-    }
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("cargo fmt failed"));
-    }
-    if !args.check {
-        execute_clippy_fix(args).await?;
-    }
-    Ok(())
-}
-pub(crate) async fn format_path(path: &std::path::Path) -> Result<(), std::io::Error> {
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("fmt").arg("--").arg(path);
-    cmd.stdout(Stdio::null()).stderr(Stdio::null());
-    cmd.status().await?;
-    Ok(())
 }
 ```
-# Path: hyperlane-cli/src/fmt/static.rs
+# Path: hyperlane-cli/src/config/struct.rs
 ```rust
 use crate::*;
-pub(crate) static DERIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    regex::Regex::new(r"#\[derive\s*\(([^)]+)\)\]").expect("Invalid regex pattern")
-});
+#[derive(Clone, Debug)]
+pub struct Args {
+    pub command: CommandType,
+    pub check: bool,
+    pub manifest_path: Option<String>,
+    pub bump_type: Option<BumpVersionType>,
+    pub max_retries: u32,
+    pub project_name: Option<String>,
+    pub template_type: Option<TemplateType>,
+    pub model_sub_type: Option<ModelSubType>,
+    pub component_name: Option<String>,
+}
 ```
-# Path: hyperlane-cli/src/fmt/test.rs
+# Path: hyperlane-cli/src/config/test.rs
 ```rust
 use crate::*;
 #[test]
-fn test_format_path_integration() {
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_fmt");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let test_file: PathBuf = tmp_dir.join("test.rs");
-    std::fs::write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
-    let rt: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
-    let result: Result<(), std::io::Error> = rt.block_on(format_path(&tmp_dir));
-    assert!(result.is_ok());
+fn test_args_default_values() {
+    let args: Args = Args {
+        command: CommandType::Help,
+        check: false,
+        manifest_path: None,
+        bump_type: None,
+        max_retries: 3,
+        project_name: None,
+        template_type: None,
+        model_sub_type: None,
+        component_name: None,
+    };
+    assert!(!args.check);
+    assert_eq!(args.max_retries, 3);
+    assert!(args.manifest_path.is_none());
+    assert!(args.bump_type.is_none());
+    assert!(args.project_name.is_none());
+    assert!(args.template_type.is_none());
+    assert!(args.model_sub_type.is_none());
+    assert!(args.component_name.is_none());
 }
-```
-# Path: hyperlane-cli/src/version/mod.rs
-```rust
-mod r#fn;
-#[cfg(test)]
-mod test;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-cli/src/version/fn.rs
-```rust
-pub(crate) fn print_version() {
-    println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
-}
-```
-# Path: hyperlane-cli/src/version/test.rs
-```rust
-use crate::*;
 #[test]
-fn test_print_version_runs() {
-    print_version();
+fn test_args_with_values() {
+    let args: Args = Args {
+        command: CommandType::Bump,
+        check: true,
+        manifest_path: Some("./test/Cargo.toml".to_string()),
+        bump_type: Some(BumpVersionType::Minor),
+        max_retries: 5,
+        project_name: Some("test-project".to_string()),
+        template_type: Some(TemplateType::Controller),
+        model_sub_type: None,
+        component_name: Some("test".to_string()),
+    };
+    assert!(args.check);
+    assert_eq!(args.max_retries, 5);
+    assert_eq!(args.manifest_path, Some("./test/Cargo.toml".to_string()));
+    assert_eq!(args.bump_type, Some(BumpVersionType::Minor));
+    assert_eq!(args.project_name, Some("test-project".to_string()));
+    assert_eq!(args.template_type, Some(TemplateType::Controller));
+    assert_eq!(args.component_name, Some("test".to_string()));
+}
+#[test]
+fn test_args_with_model_subtype() {
+    let args: Args = Args {
+        command: CommandType::Template,
+        check: false,
+        manifest_path: None,
+        bump_type: None,
+        max_retries: 3,
+        project_name: None,
+        template_type: Some(TemplateType::Model),
+        model_sub_type: Some(ModelSubType::Request),
+        component_name: Some("user".to_string()),
+    };
+    assert_eq!(args.template_type, Some(TemplateType::Model));
+    assert_eq!(args.model_sub_type, Some(ModelSubType::Request));
+    assert_eq!(args.component_name, Some("user".to_string()));
+}
+#[test]
+fn test_command_type_enum_values() {
+    let _: CommandType = CommandType::Fmt;
+    let _: CommandType = CommandType::Watch;
+    let _: CommandType = CommandType::Bump;
+    let _: CommandType = CommandType::Publish;
+    let _: CommandType = CommandType::New;
+    let _: CommandType = CommandType::Template;
+    let _: CommandType = CommandType::Help;
+    let _: CommandType = CommandType::Version;
+}
+#[test]
+fn test_args_clone() {
+    let args: Args = Args {
+        command: CommandType::Bump,
+        check: true,
+        manifest_path: Some("./test/Cargo.toml".to_string()),
+        bump_type: Some(BumpVersionType::Minor),
+        max_retries: 5,
+        project_name: Some("test-project".to_string()),
+        template_type: Some(TemplateType::Controller),
+        model_sub_type: None,
+        component_name: Some("test".to_string()),
+    };
+    let cloned: Args = args.clone();
+    assert_eq!(cloned.check, args.check);
+    assert_eq!(cloned.max_retries, args.max_retries);
+    assert_eq!(cloned.manifest_path, args.manifest_path);
+    assert_eq!(cloned.bump_type, args.bump_type);
+    assert_eq!(cloned.project_name, args.project_name);
+    assert_eq!(cloned.template_type, args.template_type);
+    assert_eq!(cloned.component_name, args.component_name);
 }
 ```
-# Path: hyperlane-cli/src/command/mod.rs
+# Path: hyperlane-cli/src/bump/mod.rs
 ```rust
 mod r#enum;
-pub(crate) use r#enum::*;
+mod r#fn;
+mod r#struct;
+#[cfg(test)]
+mod test;
+pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
 ```
-# Path: hyperlane-cli/src/command/enum.rs
+# Path: hyperlane-cli/src/bump/fn.rs
+```rust
+use crate::*;
+fn parse_version(version_str: &str) -> Option<Version> {
+    let parts: Vec<&str> = version_str.split('-').collect();
+    let version_part: &str = parts.first()?;
+    let prerelease: Option<String> = parts.get(1).map(|s: &&str| s.to_string());
+    let nums: Vec<&str> = version_part.split('.').collect();
+    if nums.len() != 3 {
+        return None;
+    }
+    let major: u64 = nums.first()?.parse().ok()?;
+    let minor: u64 = nums.get(1)?.parse().ok()?;
+    let patch: u64 = nums.get(2)?.parse().ok()?;
+    Some(Version {
+        major,
+        minor,
+        patch,
+        prerelease,
+    })
+}
+fn parse_prerelease(prerelease: &str) -> Option<(&str, u64)> {
+    let parts: Vec<&str> = prerelease.split('.').collect();
+    let pre_type: &str = parts.first()?;
+    let number: u64 = parts
+        .get(1)
+        .and_then(|s: &&str| s.parse().ok())
+        .unwrap_or(0);
+    Some((pre_type, number))
+}
+fn get_next_prerelease(current: Option<&String>, target_type: &str) -> String {
+    match current {
+        Some(pre) => {
+            if let Some((pre_type, number)) = parse_prerelease(pre) {
+                if pre_type == target_type && number > 0 {
+                    return format!("{}.{}", target_type, number + 1);
+                }
+            }
+            format!("{target_type}.1")
+        }
+        None => target_type.to_string(),
+    }
+}
+fn version_to_string(version: &Version) -> String {
+    let base: String = format!("{}.{}.{}", version.major, version.minor, version.patch);
+    match &version.prerelease {
+        Some(pre) => format!("{base}-{pre}"),
+        None => base,
+    }
+}
+fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
+    match bump_type {
+        BumpVersionType::Patch => Version {
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch + 1,
+            prerelease: None,
+        },
+        BumpVersionType::Minor => Version {
+            major: version.major,
+            minor: version.minor + 1,
+            patch: 0,
+            prerelease: None,
+        },
+        BumpVersionType::Major => Version {
+            major: version.major + 1,
+            minor: 0,
+            patch: 0,
+            prerelease: None,
+        },
+        BumpVersionType::Release => Version {
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+            prerelease: None,
+        },
+        BumpVersionType::Alpha => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "alpha");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+        BumpVersionType::Beta => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "beta");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+        BumpVersionType::Rc => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "rc");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+    }
+}
+fn find_version_position(line: &str) -> Option<(usize, usize)> {
+    let trimmed: &str = line.trim();
+    if !trimmed.starts_with("version") || !trimmed.contains('=') {
+        return None;
+    }
+    let eq_pos: usize = line.find('=')?;
+    let after_eq: &str = &line[eq_pos + 1..];
+    let quote_start: usize = after_eq.find('"')?;
+    let after_first_quote: &str = &after_eq[quote_start + 1..];
+    let quote_end: usize = after_first_quote.find('"')?;
+    let version_start: usize = eq_pos + 1 + quote_start + 1;
+    let version_end: usize = version_start + quote_end;
+    Some((version_start, version_end))
+}
+pub(crate) fn execute_bump(
+    manifest_path: &str,
+    bump_type: &BumpVersionType,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let path: &Path = Path::new(manifest_path);
+    let content: String = read_to_string(path)?;
+    let mut new_version: Option<String> = None;
+    let mut found_version: bool = false;
+    let mut updated_content: String = content.clone();
+    for line in content.lines() {
+        if found_version {
+            break;
+        }
+        if let Some((version_start, version_end)) = find_version_position(line) {
+            let version_str: &str = &line[version_start..version_end];
+            if let Some(version) = parse_version(version_str) {
+                let bumped: Version = bump_version(&version, bump_type);
+                let version_string: String = version_to_string(&bumped);
+                new_version = Some(version_string.clone());
+                let new_line: String = format!(
+                    "{}{}{}",
+                    &line[..version_start],
+                    version_string,
+                    &line[version_end..]
+                );
+                updated_content = updated_content.replacen(line, &new_line, 1);
+                found_version = true;
+            }
+        }
+    }
+    if !found_version {
+        return Err("version field not found in Cargo.toml".into());
+    }
+    write(path, updated_content)?;
+    match new_version {
+        Some(v) => Ok(v),
+        None => Err("failed to bump version".into()),
+    }
+}
+```
+# Path: hyperlane-cli/src/bump/struct.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Version {
+    pub major: u64,
+    pub minor: u64,
+    pub patch: u64,
+    pub prerelease: Option<String>,
+}
+```
+# Path: hyperlane-cli/src/bump/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_bump_version_type_enum() {
+    assert_eq!(BumpVersionType::Patch, BumpVersionType::Patch);
+    assert_eq!(BumpVersionType::Minor, BumpVersionType::Minor);
+    assert_eq!(BumpVersionType::Major, BumpVersionType::Major);
+    assert_eq!(BumpVersionType::Release, BumpVersionType::Release);
+    assert_eq!(BumpVersionType::Alpha, BumpVersionType::Alpha);
+    assert_eq!(BumpVersionType::Beta, BumpVersionType::Beta);
+    assert_eq!(BumpVersionType::Rc, BumpVersionType::Rc);
+}
+#[test]
+fn test_version_struct_creation() {
+    let version: Version = Version {
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: Some("alpha.1".to_string()),
+    };
+    assert_eq!(version.major, 1);
+    assert_eq!(version.minor, 2);
+    assert_eq!(version.patch, 3);
+    assert_eq!(version.prerelease, Some("alpha.1".to_string()));
+}
+#[test]
+fn test_version_clone() {
+    let version: Version = Version {
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: Some("beta".to_string()),
+    };
+    let cloned: Version = version.clone();
+    assert_eq!(cloned.major, version.major);
+    assert_eq!(cloned.minor, version.minor);
+    assert_eq!(cloned.patch, version.patch);
+    assert_eq!(cloned.prerelease, version.prerelease);
+}
+#[test]
+fn test_execute_bump_integration() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.1");
+    let updated_content: String = std::fs::read_to_string(&manifest_path).unwrap();
+    assert!(updated_content.contains("version = \"0.1.1\""));
+}
+#[test]
+fn test_execute_bump_minor() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_minor");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Minor);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.2.0");
+}
+#[test]
+fn test_execute_bump_major() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_major");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Major);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "1.0.0");
+}
+#[test]
+fn test_execute_bump_alpha() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_alpha");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Alpha);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-alpha");
+}
+#[test]
+fn test_execute_bump_beta() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_beta");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-alpha.2"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Beta);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-beta.1");
+}
+#[test]
+fn test_execute_bump_rc() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_rc");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-beta.1"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Rc);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-rc.1");
+}
+#[test]
+fn test_execute_bump_release() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_release");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-alpha"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Release);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0");
+}
+#[test]
+fn test_execute_bump_no_version_field() {
+    use std::fs::write;
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_no_version");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+edition = "2024"
+"#;
+    write(&manifest_path, content).unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
+    assert!(result.is_err());
+}
+```
+# Path: hyperlane-cli/src/bump/enum.rs
 ```rust
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommandType {
-    Fmt,
-    Watch,
-    Bump,
-    Publish,
-    New,
-    Template,
-    Help,
-    Version,
+pub(crate) enum BumpVersionType {
+    Patch,
+    Minor,
+    Major,
+    Release,
+    Alpha,
+    Beta,
+    Rc,
 }
 ```
 # Path: hyperlane-cli/src/publish/mod.rs
@@ -14230,35 +14223,6 @@ mod r#struct;
 #[cfg(test)]
 mod test;
 pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
-```
-# Path: hyperlane-cli/src/publish/enum.rs
-```rust
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum PublishError {
-    #[error("Failed to parse Cargo.toml")]
-    ManifestParseError,
-    #[error("Circular dependency detected")]
-    CircularDependency,
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-}
-```
-# Path: hyperlane-cli/src/publish/struct.rs
-```rust
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Package {
-    pub name: String,
-    pub version: String,
-    pub path: std::path::PathBuf,
-    pub local_dependencies: Vec<String>,
-}
-#[derive(Clone, Debug)]
-pub(crate) struct PublishResult {
-    pub package_name: String,
-    pub success: bool,
-    pub error: Option<String>,
-    pub retries: u32,
-}
 ```
 # Path: hyperlane-cli/src/publish/fn.rs
 ```rust
@@ -14494,6 +14458,23 @@ pub(crate) async fn execute_publish(
     Ok(results)
 }
 ```
+# Path: hyperlane-cli/src/publish/struct.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Package {
+    pub name: String,
+    pub version: String,
+    pub path: std::path::PathBuf,
+    pub local_dependencies: Vec<String>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct PublishResult {
+    pub package_name: String,
+    pub success: bool,
+    pub error: Option<String>,
+    pub retries: u32,
+}
+```
 # Path: hyperlane-cli/src/publish/test.rs
 ```rust
 use crate::*;
@@ -14591,270 +14572,16 @@ fn test_publish_error_from_io() {
     assert!(publish_error.to_string().contains("IO error"));
 }
 ```
-# Path: hyperlane-cli/src/config/mod.rs
+# Path: hyperlane-cli/src/publish/enum.rs
 ```rust
-mod r#fn;
-mod r#struct;
-#[cfg(test)]
-mod test;
-pub(crate) use {r#fn::*, r#struct::*};
-```
-# Path: hyperlane-cli/src/config/struct.rs
-```rust
-use crate::*;
-#[derive(Clone, Debug)]
-pub struct Args {
-    pub command: CommandType,
-    pub check: bool,
-    pub manifest_path: Option<String>,
-    pub bump_type: Option<BumpVersionType>,
-    pub max_retries: u32,
-    pub project_name: Option<String>,
-    pub template_type: Option<TemplateType>,
-    pub model_sub_type: Option<ModelSubType>,
-    pub component_name: Option<String>,
-}
-```
-# Path: hyperlane-cli/src/config/fn.rs
-```rust
-use std::str::FromStr;
-use crate::*;
-pub(crate) fn parse_args() -> Args {
-    let raw_args: Vec<String> = args().collect();
-    let mut command: CommandType = CommandType::Help;
-    let mut check: bool = false;
-    let mut manifest_path: Option<String> = None;
-    let mut bump_type: Option<BumpVersionType> = None;
-    let mut max_retries: u32 = 3;
-    let mut project_name: Option<String> = None;
-    let mut template_type: Option<TemplateType> = None;
-    let mut model_sub_type: Option<ModelSubType> = None;
-    let mut component_name: Option<String> = None;
-    let mut i: usize = 1;
-    while i < raw_args.len() {
-        let arg: &str = raw_args[i].as_str();
-        match arg {
-            "-h" | "--help" => {
-                command = CommandType::Help;
-            }
-            "-v" | "--version" => {
-                command = CommandType::Version;
-            }
-            "fmt" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Fmt;
-                }
-            }
-            "watch" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Watch;
-                }
-            }
-            "bump" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Bump;
-                }
-            }
-            "publish" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Publish;
-                }
-            }
-            "new" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::New;
-                    i += 1;
-                    if i < raw_args.len()
-                        && !raw_args[i].starts_with("--")
-                        && !raw_args[i].starts_with("-")
-                    {
-                        project_name = Some(raw_args[i].clone());
-                    } else {
-                        i -= 1;
-                    }
-                }
-            }
-            "template" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Template;
-                    i += 1;
-                    if i < raw_args.len()
-                        && !raw_args[i].starts_with("--")
-                        && !raw_args[i].starts_with("-")
-                    {
-                        let type_str: &str = &raw_args[i];
-                        template_type = TemplateType::from_str(type_str).ok();
-                        i += 1;
-                        if template_type == Some(TemplateType::Model)
-                            && i < raw_args.len()
-                            && !raw_args[i].starts_with("--")
-                            && !raw_args[i].starts_with("-")
-                        {
-                            let sub_type_str: &str = &raw_args[i];
-                            model_sub_type = ModelSubType::from_str(sub_type_str).ok();
-                            i += 1;
-                        }
-                        if i < raw_args.len()
-                            && !raw_args[i].starts_with("--")
-                            && !raw_args[i].starts_with("-")
-                        {
-                            component_name = Some(raw_args[i].clone());
-                            i += 1;
-                        }
-                        i -= 1;
-                    }
-                }
-            }
-            "--patch" => {
-                bump_type = Some(BumpVersionType::Patch);
-            }
-            "--minor" => {
-                bump_type = Some(BumpVersionType::Minor);
-            }
-            "--major" => {
-                bump_type = Some(BumpVersionType::Major);
-            }
-            "--release" => {
-                bump_type = Some(BumpVersionType::Release);
-            }
-            "--alpha" => {
-                bump_type = Some(BumpVersionType::Alpha);
-            }
-            "--beta" => {
-                bump_type = Some(BumpVersionType::Beta);
-            }
-            "--rc" => {
-                bump_type = Some(BumpVersionType::Rc);
-            }
-            "--check" => {
-                check = true;
-            }
-            "--manifest-path" => {
-                i += 1;
-                if i < raw_args.len() {
-                    manifest_path = Some(raw_args[i].clone());
-                }
-            }
-            "--max-retries" => {
-                i += 1;
-                if i < raw_args.len() {
-                    if let Ok(n) = raw_args[i].parse::<u32>() {
-                        max_retries = n;
-                    }
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    Args {
-        command,
-        check,
-        manifest_path,
-        bump_type,
-        max_retries,
-        project_name,
-        template_type,
-        model_sub_type,
-        component_name,
-    }
-}
-```
-# Path: hyperlane-cli/src/config/test.rs
-```rust
-use crate::*;
-#[test]
-fn test_args_default_values() {
-    let args: Args = Args {
-        command: CommandType::Help,
-        check: false,
-        manifest_path: None,
-        bump_type: None,
-        max_retries: 3,
-        project_name: None,
-        template_type: None,
-        model_sub_type: None,
-        component_name: None,
-    };
-    assert!(!args.check);
-    assert_eq!(args.max_retries, 3);
-    assert!(args.manifest_path.is_none());
-    assert!(args.bump_type.is_none());
-    assert!(args.project_name.is_none());
-    assert!(args.template_type.is_none());
-    assert!(args.model_sub_type.is_none());
-    assert!(args.component_name.is_none());
-}
-#[test]
-fn test_args_with_values() {
-    let args: Args = Args {
-        command: CommandType::Bump,
-        check: true,
-        manifest_path: Some("./test/Cargo.toml".to_string()),
-        bump_type: Some(BumpVersionType::Minor),
-        max_retries: 5,
-        project_name: Some("test-project".to_string()),
-        template_type: Some(TemplateType::Controller),
-        model_sub_type: None,
-        component_name: Some("test".to_string()),
-    };
-    assert!(args.check);
-    assert_eq!(args.max_retries, 5);
-    assert_eq!(args.manifest_path, Some("./test/Cargo.toml".to_string()));
-    assert_eq!(args.bump_type, Some(BumpVersionType::Minor));
-    assert_eq!(args.project_name, Some("test-project".to_string()));
-    assert_eq!(args.template_type, Some(TemplateType::Controller));
-    assert_eq!(args.component_name, Some("test".to_string()));
-}
-#[test]
-fn test_args_with_model_subtype() {
-    let args: Args = Args {
-        command: CommandType::Template,
-        check: false,
-        manifest_path: None,
-        bump_type: None,
-        max_retries: 3,
-        project_name: None,
-        template_type: Some(TemplateType::Model),
-        model_sub_type: Some(ModelSubType::Request),
-        component_name: Some("user".to_string()),
-    };
-    assert_eq!(args.template_type, Some(TemplateType::Model));
-    assert_eq!(args.model_sub_type, Some(ModelSubType::Request));
-    assert_eq!(args.component_name, Some("user".to_string()));
-}
-#[test]
-fn test_command_type_enum_values() {
-    let _: CommandType = CommandType::Fmt;
-    let _: CommandType = CommandType::Watch;
-    let _: CommandType = CommandType::Bump;
-    let _: CommandType = CommandType::Publish;
-    let _: CommandType = CommandType::New;
-    let _: CommandType = CommandType::Template;
-    let _: CommandType = CommandType::Help;
-    let _: CommandType = CommandType::Version;
-}
-#[test]
-fn test_args_clone() {
-    let args: Args = Args {
-        command: CommandType::Bump,
-        check: true,
-        manifest_path: Some("./test/Cargo.toml".to_string()),
-        bump_type: Some(BumpVersionType::Minor),
-        max_retries: 5,
-        project_name: Some("test-project".to_string()),
-        template_type: Some(TemplateType::Controller),
-        model_sub_type: None,
-        component_name: Some("test".to_string()),
-    };
-    let cloned: Args = args.clone();
-    assert_eq!(cloned.check, args.check);
-    assert_eq!(cloned.max_retries, args.max_retries);
-    assert_eq!(cloned.manifest_path, args.manifest_path);
-    assert_eq!(cloned.bump_type, args.bump_type);
-    assert_eq!(cloned.project_name, args.project_name);
-    assert_eq!(cloned.template_type, args.template_type);
-    assert_eq!(cloned.component_name, args.component_name);
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum PublishError {
+    #[error("Failed to parse Cargo.toml")]
+    ManifestParseError,
+    #[error("Circular dependency detected")]
+    CircularDependency,
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 ```
 # Path: hyperlane-cli/src/help/mod.rs
@@ -14907,379 +14634,652 @@ pub(crate) fn print_help() {
     println!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
 }
 ```
-# Path: hyperlane-cli/src/bump/mod.rs
+# Path: hyperlane-cli/src/watch/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-cli/src/watch/fn.rs
+```rust
+use crate::*;
+async fn is_cargo_watch_installed() -> bool {
+    Command::new("cargo-watch")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .is_ok_and(|status: ExitStatus| status.success())
+}
+async fn install_cargo_watch() -> Result<(), std::io::Error> {
+    println!("cargo-watch not found, installing...");
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("install").arg("cargo-watch");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("failed to install cargo-watch"));
+    }
+    Ok(())
+}
+pub(crate) async fn execute_watch() -> Result<(), std::io::Error> {
+    if !is_cargo_watch_installed().await {
+        install_cargo_watch().await?;
+    }
+    let mut cmd: Command = Command::new("cargo-watch");
+    cmd.arg("--clear")
+        .arg("--skip-local-deps")
+        .arg("-q")
+        .arg("-x")
+        .arg("run");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("cargo-watch failed"));
+    }
+    Ok(())
+}
+```
+# Path: hyperlane-cli/src/command/mod.rs
 ```rust
 mod r#enum;
+pub(crate) use r#enum::*;
+```
+# Path: hyperlane-cli/src/command/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CommandType {
+    Fmt,
+    Watch,
+    Bump,
+    Publish,
+    New,
+    Template,
+    Help,
+    Version,
+}
+```
+# Path: hyperlane-cli/src/version/mod.rs
+```rust
 mod r#fn;
+#[cfg(test)]
+mod test;
+pub(crate) use r#fn::*;
+```
+# Path: hyperlane-cli/src/version/fn.rs
+```rust
+pub(crate) fn print_version() {
+    println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
+}
+```
+# Path: hyperlane-cli/src/version/test.rs
+```rust
+use crate::*;
+#[test]
+fn test_print_version_runs() {
+    print_version();
+}
+```
+# Path: hyperlane-log/README.md
+## hyperlane-log
+[Official Documentation](https://docs.ltpp.vip/hyperlane-log/)
+[Api Docs](https://docs.rs/hyperlane-log/latest/)
+> A Rust logging library that supports both asynchronous and synchronous logging. It provides multiple log levels, such as error, info, and debug. Users can define custom log handling methods and configure log file paths. The library supports log rotation, automatically creating a new log file when the current file reaches the specified size limit. It allows flexible logging configurations, making it suitable for both high-performance asynchronous applications and traditional synchronous logging scenarios. The asynchronous mode utilizes Tokio's async channels for efficient log buffering, while the synchronous mode writes logs directly to the file system.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-log
+```
+## Log Storage Location Description
+> Three directories will be created under the user-specified directory: one for error logs, one for info logs, and one for debug logs. Each of these directories will contain a subdirectory named by the date, and the log files within these subdirectories will be named in the format `timestamp.index.log`.
+## Contact
+# Path: hyperlane-log/src/const.rs
+```rust
+pub const DEFAULT_LOG_DIR: &str = "./logs";
+pub const LOG_EXTENSION: &str = "log";
+pub const DEFAULT_LOG_FILE_START_IDX: usize = 1;
+pub const DEFAULT_LOG_FILE_SIZE: usize = 1_024_000_000;
+pub const DISABLE_LOG_FILE_SIZE: usize = 0;
+pub(crate) const ROOT_PATH: &str = "/";
+pub(crate) const POINT: &str = ".";
+pub(crate) const BR: &str = "\n";
+pub const TRACE_DIR: &str = "trace";
+pub const DEBUG_DIR: &str = "debug";
+pub const INFO_DIR: &str = "info";
+pub const WARN_DIR: &str = "warn";
+pub const ERROR_DIR: &str = "error";
+```
+# Path: hyperlane-log/src/lib.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
 mod r#struct;
 #[cfg(test)]
 mod test;
-pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+mod r#trait;
+pub use {r#const::*, r#fn::*, r#struct::*, r#trait::*};
+use std::fs::read_dir;
+use {file_operation::*, hyperlane_time::*};
 ```
-# Path: hyperlane-cli/src/bump/enum.rs
+# Path: hyperlane-log/src/trait.rs
 ```rust
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum BumpVersionType {
-    Patch,
-    Minor,
-    Major,
-    Release,
-    Alpha,
-    Beta,
-    Rc,
-}
+pub trait FileLoggerFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
 ```
-# Path: hyperlane-cli/src/bump/struct.rs
-```rust
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Version {
-    pub major: u64,
-    pub minor: u64,
-    pub patch: u64,
-    pub prerelease: Option<String>,
-}
-```
-# Path: hyperlane-cli/src/bump/fn.rs
+# Path: hyperlane-log/src/fn.rs
 ```rust
 use crate::*;
-fn parse_version(version_str: &str) -> Option<Version> {
-    let parts: Vec<&str> = version_str.split('-').collect();
-    let version_part: &str = parts.first()?;
-    let prerelease: Option<String> = parts.get(1).map(|s: &&str| s.to_string());
-    let nums: Vec<&str> = version_part.split('.').collect();
-    if nums.len() != 3 {
-        return None;
+pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
+    let mut res_idx: usize = DEFAULT_LOG_FILE_START_IDX;
+    if let Ok(entries) = read_dir(dir_path) {
+        for entry in entries.filter_map(Result::ok) {
+            let file_name: String = entry.file_name().to_string_lossy().to_string();
+            let parts: Vec<&str> = file_name.split(POINT).collect();
+            if parts.len() > 1
+                && let Ok(second_element) = parts[1].parse::<usize>()
+            {
+                res_idx = second_element.max(res_idx);
+            }
+        }
     }
-    let major: u64 = nums.first()?.parse().ok()?;
-    let minor: u64 = nums.get(1)?.parse().ok()?;
-    let patch: u64 = nums.get(2)?.parse().ok()?;
-    Some(Version {
-        major,
-        minor,
-        patch,
-        prerelease,
+    res_idx.max(DEFAULT_LOG_FILE_START_IDX)
+}
+#[inline(always)]
+pub(crate) fn get_file_name(idx: usize) -> String {
+    format!(
+        "{}{}{}{}{}{}",
+        ROOT_PATH,
+        date(),
+        POINT,
+        idx,
+        POINT,
+        LOG_EXTENSION
+    )
+}
+#[inline(always)]
+pub(crate) fn get_file_dir_name() -> String {
+    format!("{}{}", ROOT_PATH, date())
+}
+pub(crate) fn get_log_path(system_dir: &str, base_path: &str, limit_file_size: &usize) -> String {
+    let mut combined_path: String = base_path.trim_end_matches(ROOT_PATH).to_string();
+    if !system_dir.starts_with(ROOT_PATH) {
+        combined_path.push_str(ROOT_PATH);
+    }
+    combined_path.push_str(
+        system_dir
+            .trim_start_matches(ROOT_PATH)
+            .trim_end_matches(ROOT_PATH),
+    );
+    combined_path.push_str(&get_file_dir_name());
+    let idx: usize = get_second_element_from_filename(&combined_path);
+    let mut combined_path_clone: String = combined_path.clone();
+    combined_path.push_str(&get_file_name(idx));
+    let file_size: usize = get_file_size(&combined_path).unwrap_or_default() as usize;
+    if &file_size <= limit_file_size {
+        return combined_path;
+    }
+    combined_path_clone.push_str(&get_file_name(idx + 1));
+    combined_path_clone
+}
+#[inline(always)]
+pub fn common_log<T: AsRef<str>>(data: T) -> String {
+    let mut log_string: String = String::new();
+    for line in data.as_ref().lines() {
+        let line_string: String = format!("{} {}{}", time(), line, BR);
+        log_string.push_str(&line_string);
+    }
+    log_string
+}
+#[inline(always)]
+pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
+    common_log(log_data)
+}
+```
+# Path: hyperlane-log/src/impl.rs
+```rust
+use crate::*;
+impl<F, T> FileLoggerFuncTrait<T> for F
+where
+    F: Fn(T) -> String + Send + Sync,
+    T: AsRef<str>,
+{
+}
+impl Default for FileLogger {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            path: DEFAULT_LOG_DIR.to_owned(),
+            limit_file_size: DEFAULT_LOG_FILE_SIZE,
+            trace_dir: TRACE_DIR.to_owned(),
+            debug_dir: DEBUG_DIR.to_owned(),
+            info_dir: INFO_DIR.to_owned(),
+            warn_dir: WARN_DIR.to_owned(),
+            error_dir: ERROR_DIR.to_owned(),
+        }
+    }
+}
+impl FileLogger {
+    #[inline(always)]
+    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {
+        Self {
+            path: path.as_ref().to_owned(),
+            limit_file_size,
+            trace_dir: TRACE_DIR.to_owned(),
+            debug_dir: DEBUG_DIR.to_owned(),
+            info_dir: INFO_DIR.to_owned(),
+            warn_dir: WARN_DIR.to_owned(),
+            error_dir: ERROR_DIR.to_owned(),
+        }
+    }
+    #[inline(always)]
+    pub fn get_path(&self) -> &String {
+        &self.path
+    }
+    #[inline(always)]
+    pub fn get_limit_file_size(&self) -> &usize {
+        &self.limit_file_size
+    }
+    #[inline(always)]
+    pub fn get_trace_dir(&self) -> &String {
+        &self.trace_dir
+    }
+    #[inline(always)]
+    pub fn get_debug_dir(&self) -> &String {
+        &self.debug_dir
+    }
+    #[inline(always)]
+    pub fn get_info_dir(&self) -> &String {
+        &self.info_dir
+    }
+    #[inline(always)]
+    pub fn get_warn_dir(&self) -> &String {
+        &self.warn_dir
+    }
+    #[inline(always)]
+    pub fn get_error_dir(&self) -> &String {
+        &self.error_dir
+    }
+    #[inline(always)]
+    pub fn set_path<P: AsRef<str>>(&mut self, path: P) -> &mut Self {
+        self.path = path.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_limit_file_size(&mut self, limit_file_size: usize) -> &mut Self {
+        self.limit_file_size = limit_file_size;
+        self
+    }
+    #[inline(always)]
+    pub fn set_trace_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.trace_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_debug_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.debug_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_info_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.info_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_warn_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.warn_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn set_error_dir<P: AsRef<str>>(&mut self, dir: P) -> &mut Self {
+        self.error_dir = dir.as_ref().to_owned();
+        self
+    }
+    #[inline(always)]
+    pub fn is_enable(&self) -> bool {
+        self.limit_file_size != DISABLE_LOG_FILE_SIZE
+    }
+    #[inline(always)]
+    pub fn is_disable(&self) -> bool {
+        !self.is_enable()
+    }
+    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        if self.is_disable() {
+            return self;
+        }
+        let out: String = func(data);
+        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
+        let _ = append_to_file(&path, out.as_bytes());
+        self
+    }
+    async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        if self.is_disable() {
+            return self;
+        }
+        let out: String = func(data);
+        let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
+        let _ = async_append_to_file(&path, out.as_bytes()).await;
+        self
+    }
+    pub fn trace<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, &self.trace_dir)
+    }
+    pub async fn async_trace<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, &self.trace_dir).await
+    }
+    pub fn debug<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, &self.debug_dir)
+    }
+    pub async fn async_debug<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, &self.debug_dir).await
+    }
+    pub fn info<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, &self.info_dir)
+    }
+    pub async fn async_info<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, &self.info_dir).await
+    }
+    pub fn warn<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, &self.warn_dir)
+    }
+    pub async fn async_warn<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, &self.warn_dir).await
+    }
+    pub fn error<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_sync(data, func, &self.error_dir)
+    }
+    pub async fn async_error<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: FileLoggerFuncTrait<T>,
+    {
+        self.write_async(data, func, &self.error_dir).await
+    }
+}
+```
+# Path: hyperlane-log/src/struct.rs
+```rust
+#[derive(Clone)]
+pub struct FileLogger {
+    pub(super) path: String,
+    pub(super) limit_file_size: usize,
+    pub(super) trace_dir: String,
+    pub(super) debug_dir: String,
+    pub(super) info_dir: String,
+    pub(super) warn_dir: String,
+    pub(super) error_dir: String,
+}
+```
+# Path: hyperlane-log/src/test.rs
+```rust
+use crate::*;
+#[tokio::test]
+async fn test() {
+    let log: FileLogger = FileLogger::new("./logs", 1_024_000);
+    let trace_str: String = String::from("custom trace message");
+    log.trace(trace_str, |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
+    });
+    let debug_str: String = String::from("custom debug message");
+    log.debug(debug_str, |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
+        write_data
+    });
+    let info_str: String = String::from("custom info message");
+    log.info(info_str, |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    });
+    let warn_str: String = String::from("custom warn message");
+    log.warn(warn_str, |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    });
+    let error_str: String = String::from("custom error message");
+    log.error(error_str, |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    });
+    let async_trace_str: String = String::from("custom async trace message");
+    log.async_trace(async_trace_str, |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
     })
+    .await;
+    let async_debug_str: String = String::from("custom async debug message");
+    log.async_debug(async_debug_str, |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
+        write_data
+    })
+    .await;
+    let async_info_str: String = String::from("custom async info message");
+    log.async_info(async_info_str, |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    })
+    .await;
+    let async_warn_str: String = String::from("custom async warn message");
+    log.async_warn(async_warn_str, |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    })
+    .await;
+    let async_error_str: String = String::from("custom async error message");
+    log.async_error(async_error_str, |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    })
+    .await;
 }
-fn parse_prerelease(prerelease: &str) -> Option<(&str, u64)> {
-    let parts: Vec<&str> = prerelease.split('.').collect();
-    let pre_type: &str = parts.first()?;
-    let number: u64 = parts
-        .get(1)
-        .and_then(|s: &&str| s.parse().ok())
-        .unwrap_or(0);
-    Some((pre_type, number))
+#[tokio::test]
+async fn test_more_log_first() {
+    let log: FileLogger = FileLogger::new("./logs", DISABLE_LOG_FILE_SIZE);
+    log.trace("trace data => ", |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
+    });
+    log.debug("debug data => ", |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
+        write_data
+    });
+    log.info("info data => ", |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    });
+    log.warn("warn data => ", |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    });
+    log.error("error data => ", |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    });
+    log.async_trace("async trace data => ", |trace| {
+        let write_data: String = format!("User trace func => {trace:#?}\n");
+        write_data
+    })
+    .await;
+    log.async_debug("async debug data => ", |debug| {
+        let write_data: String = format!("User debug func => {debug:#?}\n");
+        write_data
+    })
+    .await;
+    log.async_info("async info data => ", |info| {
+        let write_data: String = format!("User info func => {info:?}\n");
+        write_data
+    })
+    .await;
+    log.async_warn("async warn data => ", |warn| {
+        let write_data: String = format!("User warn func => {warn:#?}\n");
+        write_data
+    })
+    .await;
+    log.async_error("async error data => ", |error| {
+        let write_data: String = format!("User error func => {error:?}\n");
+        write_data
+    })
+    .await;
 }
-fn get_next_prerelease(current: Option<&String>, target_type: &str) -> String {
-    match current {
-        Some(pre) => {
-            if let Some((pre_type, number)) = parse_prerelease(pre) {
-                if pre_type == target_type && number > 0 {
-                    return format!("{}.{}", target_type, number + 1);
-                }
-            }
-            format!("{target_type}.1")
-        }
-        None => target_type.to_string(),
+#[tokio::test]
+async fn test_more_log_second() {
+    for _ in 0..10 {
+        let log: FileLogger = FileLogger::new("./logs", 512_000);
+        log.trace("trace data!\n", common_log);
+        log.async_trace("async trace data!\n", common_log).await;
+        log.debug("debug data!\n", common_log);
+        log.async_debug("async debug data!\n", common_log).await;
+        log.info("info data!\n", common_log);
+        log.async_info("async info data!\n", common_log).await;
+        log.warn("warn data!\n", common_log);
+        log.async_warn("async warn data!\n", common_log).await;
+        log.error("error data!\n", common_log);
+        log.async_error("async error data!\n", common_log).await;
     }
 }
-fn version_to_string(version: &Version) -> String {
-    let base: String = format!("{}.{}.{}", version.major, version.minor, version.patch);
-    match &version.prerelease {
-        Some(pre) => format!("{base}-{pre}"),
-        None => base,
-    }
+#[tokio::test]
+async fn test_set_log_level_dirs() {
+    let mut log: FileLogger = FileLogger::new("./test_logs", 1_024_000);
+    log.set_trace_dir("custom_trace")
+        .set_debug_dir("custom_debug")
+        .set_info_dir("custom_info")
+        .set_warn_dir("custom_warn")
+        .set_error_dir("custom_error");
+    assert_eq!(log.get_trace_dir(), "custom_trace");
+    assert_eq!(log.get_debug_dir(), "custom_debug");
+    assert_eq!(log.get_info_dir(), "custom_info");
+    assert_eq!(log.get_warn_dir(), "custom_warn");
+    assert_eq!(log.get_error_dir(), "custom_error");
+    log.trace("test trace message", common_log);
+    log.debug("test debug message", common_log);
+    log.info("test info message", common_log);
+    log.warn("test warn message", common_log);
+    log.error("test error message", common_log);
+    log.async_trace("async test trace message", common_log)
+        .await;
+    log.async_debug("async test debug message", common_log)
+        .await;
+    log.async_info("async test info message", common_log).await;
+    log.async_warn("async test warn message", common_log).await;
+    log.async_error("async test error message", common_log)
+        .await;
 }
-fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
-    match bump_type {
-        BumpVersionType::Patch => Version {
-            major: version.major,
-            minor: version.minor,
-            patch: version.patch + 1,
-            prerelease: None,
-        },
-        BumpVersionType::Minor => Version {
-            major: version.major,
-            minor: version.minor + 1,
-            patch: 0,
-            prerelease: None,
-        },
-        BumpVersionType::Major => Version {
-            major: version.major + 1,
-            minor: 0,
-            patch: 0,
-            prerelease: None,
-        },
-        BumpVersionType::Release => Version {
-            major: version.major,
-            minor: version.minor,
-            patch: version.patch,
-            prerelease: None,
-        },
-        BumpVersionType::Alpha => {
-            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "alpha");
-            Version {
-                major: version.major,
-                minor: version.minor,
-                patch: version.patch,
-                prerelease: Some(prerelease),
-            }
-        }
-        BumpVersionType::Beta => {
-            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "beta");
-            Version {
-                major: version.major,
-                minor: version.minor,
-                patch: version.patch,
-                prerelease: Some(prerelease),
-            }
-        }
-        BumpVersionType::Rc => {
-            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "rc");
-            Version {
-                major: version.major,
-                minor: version.minor,
-                patch: version.patch,
-                prerelease: Some(prerelease),
-            }
-        }
-    }
+#[tokio::test]
+async fn test_log_level_dir_constants() {
+    let log: FileLogger = FileLogger::default();
+    assert_eq!(log.get_trace_dir(), TRACE_DIR);
+    assert_eq!(log.get_debug_dir(), DEBUG_DIR);
+    assert_eq!(log.get_info_dir(), INFO_DIR);
+    assert_eq!(log.get_warn_dir(), WARN_DIR);
+    assert_eq!(log.get_error_dir(), ERROR_DIR);
 }
-fn find_version_position(line: &str) -> Option<(usize, usize)> {
-    let trimmed: &str = line.trim();
-    if !trimmed.starts_with("version") || !trimmed.contains('=') {
-        return None;
-    }
-    let eq_pos: usize = line.find('=')?;
-    let after_eq: &str = &line[eq_pos + 1..];
-    let quote_start: usize = after_eq.find('"')?;
-    let after_first_quote: &str = &after_eq[quote_start + 1..];
-    let quote_end: usize = after_first_quote.find('"')?;
-    let version_start: usize = eq_pos + 1 + quote_start + 1;
-    let version_end: usize = version_start + quote_end;
-    Some((version_start, version_end))
+#[tokio::test]
+async fn test_log_level_dir_method_chaining() {
+    let mut log: FileLogger = FileLogger::new("./logs", 512_000);
+    let log_ref: &mut FileLogger = log
+        .set_trace_dir("chain_trace")
+        .set_debug_dir("chain_debug")
+        .set_info_dir("chain_info")
+        .set_warn_dir("chain_warn")
+        .set_error_dir("chain_error");
+    assert_eq!(log_ref.get_trace_dir(), "chain_trace");
+    assert_eq!(log_ref.get_debug_dir(), "chain_debug");
+    assert_eq!(log_ref.get_info_dir(), "chain_info");
+    assert_eq!(log_ref.get_warn_dir(), "chain_warn");
+    assert_eq!(log_ref.get_error_dir(), "chain_error");
 }
-pub(crate) fn execute_bump(
-    manifest_path: &str,
-    bump_type: &BumpVersionType,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let path: &Path = Path::new(manifest_path);
-    let content: String = read_to_string(path)?;
-    let mut new_version: Option<String> = None;
-    let mut found_version: bool = false;
-    let mut updated_content: String = content.clone();
-    for line in content.lines() {
-        if found_version {
-            break;
-        }
-        if let Some((version_start, version_end)) = find_version_position(line) {
-            let version_str: &str = &line[version_start..version_end];
-            if let Some(version) = parse_version(version_str) {
-                let bumped: Version = bump_version(&version, bump_type);
-                let version_string: String = version_to_string(&bumped);
-                new_version = Some(version_string.clone());
-                let new_line: String = format!(
-                    "{}{}{}",
-                    &line[..version_start],
-                    version_string,
-                    &line[version_end..]
-                );
-                updated_content = updated_content.replacen(line, &new_line, 1);
-                found_version = true;
-            }
-        }
-    }
-    if !found_version {
-        return Err("version field not found in Cargo.toml".into());
-    }
-    write(path, updated_content)?;
-    match new_version {
-        Some(v) => Ok(v),
-        None => Err("failed to bump version".into()),
-    }
+#[tokio::test]
+async fn test_log_level_dirs_with_special_characters() {
+    let mut log: FileLogger = FileLogger::new("./logs/special", 1_024_000);
+    log.set_trace_dir("trace-2024")
+        .set_debug_dir("debug_test")
+        .set_info_dir("info.logs")
+        .set_warn_dir("warn/logs")
+        .set_error_dir("error_logs");
+    log.trace("special trace message", common_log);
+    log.async_trace("async special trace message", common_log)
+        .await;
+    log.debug("special debug message", common_log);
+    log.async_debug("async special debug message", common_log)
+        .await;
+    log.info("special info message", common_log);
+    log.async_info("async special info message", common_log)
+        .await;
+    log.warn("special warn message", common_log);
+    log.async_warn("async special warn message", common_log)
+        .await;
+    log.error("special error message", common_log);
+    log.async_error("async special error message", common_log)
+        .await;
 }
-```
-# Path: hyperlane-cli/src/bump/test.rs
-```rust
-use crate::*;
-#[test]
-fn test_bump_version_type_enum() {
-    assert_eq!(BumpVersionType::Patch, BumpVersionType::Patch);
-    assert_eq!(BumpVersionType::Minor, BumpVersionType::Minor);
-    assert_eq!(BumpVersionType::Major, BumpVersionType::Major);
-    assert_eq!(BumpVersionType::Release, BumpVersionType::Release);
-    assert_eq!(BumpVersionType::Alpha, BumpVersionType::Alpha);
-    assert_eq!(BumpVersionType::Beta, BumpVersionType::Beta);
-    assert_eq!(BumpVersionType::Rc, BumpVersionType::Rc);
-}
-#[test]
-fn test_version_struct_creation() {
-    let version: Version = Version {
-        major: 1,
-        minor: 2,
-        patch: 3,
-        prerelease: Some("alpha.1".to_string()),
-    };
-    assert_eq!(version.major, 1);
-    assert_eq!(version.minor, 2);
-    assert_eq!(version.patch, 3);
-    assert_eq!(version.prerelease, Some("alpha.1".to_string()));
-}
-#[test]
-fn test_version_clone() {
-    let version: Version = Version {
-        major: 1,
-        minor: 2,
-        patch: 3,
-        prerelease: Some("beta".to_string()),
-    };
-    let cloned: Version = version.clone();
-    assert_eq!(cloned.major, version.major);
-    assert_eq!(cloned.minor, version.minor);
-    assert_eq!(cloned.patch, version.patch);
-    assert_eq!(cloned.prerelease, version.prerelease);
-}
-#[test]
-fn test_execute_bump_integration() {
-    use std::fs::write;
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
-    let content: &str = r#"[package]
-name = "test-package"
-version = "0.1.0"
-edition = "2024"
-"#;
-    write(&manifest_path, content).unwrap();
-    let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "0.1.1");
-    let updated_content: String = std::fs::read_to_string(&manifest_path).unwrap();
-    assert!(updated_content.contains("version = \"0.1.1\""));
-}
-#[test]
-fn test_execute_bump_minor() {
-    use std::fs::write;
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_minor");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
-    let content: &str = r#"[package]
-name = "test-package"
-version = "0.1.0"
-edition = "2024"
-"#;
-    write(&manifest_path, content).unwrap();
-    let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Minor);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "0.2.0");
-}
-#[test]
-fn test_execute_bump_major() {
-    use std::fs::write;
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_major");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
-    let content: &str = r#"[package]
-name = "test-package"
-version = "0.1.0"
-edition = "2024"
-"#;
-    write(&manifest_path, content).unwrap();
-    let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Major);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "1.0.0");
-}
-#[test]
-fn test_execute_bump_alpha() {
-    use std::fs::write;
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_alpha");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
-    let content: &str = r#"[package]
-name = "test-package"
-version = "0.1.0"
-edition = "2024"
-"#;
-    write(&manifest_path, content).unwrap();
-    let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Alpha);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "0.1.0-alpha");
-}
-#[test]
-fn test_execute_bump_beta() {
-    use std::fs::write;
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_beta");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
-    let content: &str = r#"[package]
-name = "test-package"
-version = "0.1.0-alpha.2"
-edition = "2024"
-"#;
-    write(&manifest_path, content).unwrap();
-    let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Beta);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "0.1.0-beta.1");
-}
-#[test]
-fn test_execute_bump_rc() {
-    use std::fs::write;
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_rc");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
-    let content: &str = r#"[package]
-name = "test-package"
-version = "0.1.0-beta.1"
-edition = "2024"
-"#;
-    write(&manifest_path, content).unwrap();
-    let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Rc);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "0.1.0-rc.1");
-}
-#[test]
-fn test_execute_bump_release() {
-    use std::fs::write;
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_release");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
-    let content: &str = r#"[package]
-name = "test-package"
-version = "0.1.0-alpha"
-edition = "2024"
-"#;
-    write(&manifest_path, content).unwrap();
-    let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Release);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "0.1.0");
-}
-#[test]
-fn test_execute_bump_no_version_field() {
-    use std::fs::write;
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_no_version");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
-    let content: &str = r#"[package]
-name = "test-package"
-edition = "2024"
-"#;
-    write(&manifest_path, content).unwrap();
-    let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
-    assert!(result.is_err());
+#[tokio::test]
+async fn test_log_level_dirs_edge_cases() {
+    let mut log: FileLogger = FileLogger::new("./logs", 512_000);
+    log.set_trace_dir("")
+        .set_debug_dir("")
+        .set_info_dir("")
+        .set_warn_dir("")
+        .set_error_dir("");
+    assert_eq!(log.get_trace_dir(), "");
+    assert_eq!(log.get_debug_dir(), "");
+    assert_eq!(log.get_info_dir(), "");
+    assert_eq!(log.get_warn_dir(), "");
+    assert_eq!(log.get_error_dir(), "");
+    log.trace("empty dir trace", common_log);
+    log.debug("empty dir debug", common_log);
+    log.info("empty dir info", common_log);
+    log.warn("empty dir warn", common_log);
+    log.error("empty dir error", common_log);
+    log.set_trace_dir("valid_trace")
+        .set_debug_dir("valid_debug")
+        .set_info_dir("valid_info")
+        .set_warn_dir("valid_warn")
+        .set_error_dir("valid_error");
+    let long_dir_name: String = "a".repeat(200);
+    log.set_trace_dir(&long_dir_name);
+    assert_eq!(log.get_trace_dir().as_str(), long_dir_name.as_str());
 }
 ```
