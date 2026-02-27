@@ -1,4 +1,4 @@
-<!--2026-02-27 07:02:11-->
+<!--2026-02-27 13:09:46-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -41,6 +41,8 @@ use std::{
     pin::Pin,
     sync::{Arc, OnceLock},
 };
+#[cfg(test)]
+use tokio::time::sleep;
 use {
     inventory::collect,
     lombok_macros::*,
@@ -129,9 +131,9 @@ impl From<usize> for &'static Context {
         unsafe { &*(addr as *const Context) }
     }
 }
-impl From<usize> for &'static mut Context {
+impl<'a> From<usize> for &'a mut Context {
     #[inline(always)]
-    fn from(addr: usize) -> &'static mut Context {
+    fn from(addr: usize) -> &'a mut Context {
         unsafe { &mut *(addr as *mut Context) }
     }
 }
@@ -1832,8 +1834,8 @@ async fn main() {
     server.route::<DynamicRoute>("/regex/{file:^.*$}");
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    spawn(async move {
+        sleep(Duration::from_secs(60)).await;
         server_control_hook_2.shutdown().await;
     });
     server_control_hook_1.wait().await;
@@ -3330,8 +3332,6 @@ mod test;
 mod r#trait;
 pub use {r#enum::*, r#struct::*};
 use {r#const::*, r#trait::*};
-#[cfg(test)]
-use std::sync::OnceLock;
 use std::{
     convert::Infallible,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
@@ -3340,6 +3340,10 @@ use std::{
         NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
     },
 };
+#[cfg(test)]
+use std::{sync::OnceLock, time::Duration};
+#[cfg(test)]
+use tokio::{spawn, time::sleep};
 use {
     hyperlane::{
         tokio::sync::broadcast::{Receiver, error::SendError},
@@ -4023,8 +4027,8 @@ async fn main() {
     server.route::<PrivateChat>("/{my_name}/{your_name}");
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    spawn(async move {
+        sleep(Duration::from_secs(60)).await;
         server_control_hook_2.shutdown().await;
     });
     server_control_hook_1.wait().await;
