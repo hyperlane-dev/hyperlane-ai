@@ -1,4 +1,4 @@
-<!--2026-02-27 13:09:46-->
+<!--2026-02-27 18:53:23-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -1140,8 +1140,8 @@ impl Server {
         self
     }
     #[inline(always)]
-    pub fn request_config(&mut self, request_config: RequestConfig) -> &mut Self {
-        self.set_request_config(request_config);
+    pub fn request_config(&mut self, config: RequestConfig) -> &mut Self {
+        self.set_request_config(config);
         self
     }
     #[inline(always)]
@@ -1253,17 +1253,6 @@ impl Server {
             let _ = Self::try_flush_stdout_and_stderr();
         };
     }
-    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)
-    }
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
-        while let Ok((stream, _)) = tcp_listener.accept().await {
-            self.configure_stream(&stream).await;
-            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            self.spawn_connection_handler(stream).await;
-        }
-        Ok(())
-    }
     async fn configure_stream(&self, stream: &TcpStream) {
         let config: ServerConfig = self.get_server_config().clone();
         if let Some(nodelay) = config.try_get_nodelay() {
@@ -1272,6 +1261,33 @@ impl Server {
         if let Some(ttl) = config.try_get_ttl() {
             let _ = stream.set_ttl(*ttl);
         }
+    }
+    pub(super) async fn handle_request_middleware(&self, ctx: &mut Context) -> bool {
+        for hook in self.get_request_middleware().iter() {
+            self.task_handler(ctx, hook, true).await;
+            if ctx.get_aborted() {
+                return true;
+            }
+        }
+        false
+    }
+    pub(super) async fn handle_route_matcher(&self, ctx: &mut Context, path: &str) -> bool {
+        if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path) {
+            self.task_handler(ctx, &hook, true).await;
+            if ctx.get_aborted() {
+                return true;
+            }
+        }
+        false
+    }
+    pub(super) async fn handle_response_middleware(&self, ctx: &mut Context) -> bool {
+        for hook in self.get_response_middleware().iter() {
+            self.task_handler(ctx, hook, true).await;
+            if ctx.get_aborted() {
+                return true;
+            }
+        }
+        false
     }
     async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
         let server_address: usize = self.into();
@@ -1291,18 +1307,6 @@ impl Server {
             }
         }
         ctx.set_aborted(true).set_closed(true);
-    }
-    async fn handle_connection(&self, stream: ArcRwLockStream) {
-        match Request::http_from_stream(&stream, self.get_request_config()).await {
-            Ok(request) => {
-                let server_address: usize = self.into();
-                let hook: HandlerState = HandlerState::new(stream, server_address.into());
-                self.handle_http_requests(&hook, &request).await;
-            }
-            Err(error) => {
-                self.handle_request_error(&mut stream.into(), &error).await;
-            }
-        }
     }
     async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
@@ -1340,32 +1344,28 @@ impl Server {
             }
         }
     }
-    pub(super) async fn handle_request_middleware(&self, ctx: &mut Context) -> bool {
-        for hook in self.get_request_middleware().iter() {
-            self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted() {
-                return true;
+    async fn handle_connection(&self, stream: ArcRwLockStream) {
+        match Request::http_from_stream(&stream, self.get_request_config()).await {
+            Ok(request) => {
+                let server_address: usize = self.into();
+                let hook: HandlerState = HandlerState::new(stream, server_address.into());
+                self.handle_http_requests(&hook, &request).await;
+            }
+            Err(error) => {
+                self.handle_request_error(&mut stream.into(), &error).await;
             }
         }
-        false
     }
-    pub(super) async fn handle_route_matcher(&self, ctx: &mut Context, path: &str) -> bool {
-        if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path) {
-            self.task_handler(ctx, &hook, true).await;
-            if ctx.get_aborted() {
-                return true;
-            }
+    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
+        while let Ok((stream, _)) = tcp_listener.accept().await {
+            self.configure_stream(&stream).await;
+            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
+            self.spawn_connection_handler(stream).await;
         }
-        false
+        Ok(())
     }
-    pub(super) async fn handle_response_middleware(&self, ctx: &mut Context) -> bool {
-        for hook in self.get_response_middleware().iter() {
-            self.task_handler(ctx, hook, true).await;
-            if ctx.get_aborted() {
-                return true;
-            }
-        }
-        false
+    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
+        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)
     }
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
         let tcp_listener: TcpListener = self.create_tcp_listener().await?;
@@ -1821,6 +1821,11 @@ impl ServerHook for GetAllRoutes {
 #[tokio::test]
 async fn main() {
     let mut server: Server = Server::default();
+    let mut server_config: ServerConfig = ServerConfig::default();
+    server_config
+        .set_address(Server::format_bind_address(DEFAULT_HOST, 80))
+        .set_nodelay(Some(false));
+    server.server_config(server_config);
     server.task_panic::<TaskPanicHook>();
     server.request_error::<RequestErrorHook>();
     server.request_middleware::<RequestMiddleware>();
@@ -5614,6 +5619,7 @@ async fn main() {
 mod aborted;
 mod closed;
 mod common;
+mod context;
 mod filter;
 mod flush;
 mod from_stream;
@@ -5634,9 +5640,10 @@ mod stream;
 mod upgrade;
 mod version;
 use {
-    aborted::*, closed::*, common::*, filter::*, flush::*, from_stream::*, hook::*, host::*,
-    hyperlane::*, inject::*, method::*, referer::*, reject::*, request::*, request_middleware::*,
-    response::*, response_middleware::*, route::*, send::*, stream::*, upgrade::*, version::*,
+    aborted::*, closed::*, common::*, context::*, filter::*, flush::*, from_stream::*, hook::*,
+    host::*, hyperlane::*, inject::*, method::*, referer::*, reject::*, request::*,
+    request_middleware::*, response::*, response_middleware::*, route::*, send::*, stream::*,
+    upgrade::*, version::*,
 };
 use {
     ::hyperlane::inventory,
@@ -5976,6 +5983,10 @@ pub fn try_flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
     flush_macro(item, Position::Prologue)
 }
+#[proc_macro]
+pub fn context(input: TokenStream) -> TokenStream {
+    context_macro(input)
+}
 ```
 # Path: hyperlane-macros/src/common/const.rs
 ```rust
@@ -6166,6 +6177,11 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
         None => quote! { None },
     }
 }
+pub(crate) fn into_new_context(context: &Ident) -> TokenStream2 {
+    quote! {
+        std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize)
+    }
+}
 ```
 # Path: hyperlane-macros/src/common/impl.rs
 ```rust
@@ -6211,6 +6227,42 @@ pub(crate) enum Handler {
 pub(crate) enum Position {
     Prologue,
     Epilogue,
+}
+```
+# Path: hyperlane-macros/src/context/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+```
+# Path: hyperlane-macros/src/context/fn.rs
+```rust
+use crate::*;
+pub(crate) fn context_macro(input: TokenStream) -> TokenStream {
+    let context_input: ContextInput = match parse(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    let source_ctx: Ident = context_input.source_ctx;
+    into_new_context(&source_ctx).into()
+}
+```
+# Path: hyperlane-macros/src/context/impl.rs
+```rust
+use crate::*;
+impl Parse for ContextInput {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let source_ctx: Ident = input.parse()?;
+        Ok(ContextInput { source_ctx })
+    }
+}
+```
+# Path: hyperlane-macros/src/context/struct.rs
+```rust
+use crate::*;
+pub(crate) struct ContextInput {
+    pub(crate) source_ctx: Ident,
 }
 ```
 # Path: hyperlane-macros/src/hyperlane/mod.rs
@@ -6303,8 +6355,9 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_aborted(true);
+            #new_context.set_aborted(true);
         }
     })
 }
@@ -6482,8 +6535,9 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         quote! {
-            let _ = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).try_flush().await;
+            let _ = #new_context.try_flush().await;
         }
     })
 }
@@ -6653,8 +6707,9 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_closed(true);
+            #new_context.set_closed(true);
         }
     })
 }
@@ -6682,9 +6737,10 @@ pub(crate) fn request_body_macro(
 ) -> TokenStream {
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         let statements = multi_body.variables.iter().map(|variable| {
             quote! {
-                let #variable: &::hyperlane::RequestBody = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_body();
+                let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
             }
         });
         quote! {
@@ -6805,9 +6861,10 @@ pub(crate) fn attributes_macro(
 ) -> TokenStream {
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         let statements = multi_attrs.variables.iter().map(|variable| {
             quote! {
-                let #variable: &::hyperlane::ThreadSafeAttributeStore = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_attributes();
+                let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
             }
         });
         quote! {
@@ -6966,9 +7023,10 @@ pub(crate) fn route_params_macro(
 ) -> TokenStream {
     let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         let statements = multi_route_params.variables.iter().map(|variable| {
             quote! {
-                let #variable: &::hyperlane::RouteParams = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_route_params();
+                let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
             }
         });
         quote! {
@@ -7035,9 +7093,10 @@ pub(crate) fn request_querys_macro(
 ) -> TokenStream {
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         let statements = multi_querys.variables.iter().map(|variable| {
             quote! {
-                let #variable: &::hyperlane::RequestQuerys = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_querys();
+                let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
             }
         });
         quote! {
@@ -7104,9 +7163,10 @@ pub(crate) fn request_headers_macro(
 ) -> TokenStream {
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         let statements = multi_headers.variables.iter().map(|variable| {
             quote! {
-                let #variable: &::hyperlane::RequestHeaders = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_headers();
+                let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
             }
         });
         quote! {
@@ -7197,9 +7257,10 @@ pub(crate) fn request_version_macro(
     let multi_version: MultiRequestVersionData =
         parse_macro_input!(attr as MultiRequestVersionData);
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         let statements = multi_version.variables.iter().map(|variable| {
             quote! {
-                let #variable: &::hyperlane::RequestVersion = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_version();
+                let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
             }
         });
         quote! {
@@ -7220,9 +7281,10 @@ pub(crate) fn request_path_macro(
 ) -> TokenStream {
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         let statements = multi_path.variables.iter().map(|variable| {
             quote! {
-                let #variable: &::hyperlane::RequestPath = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_path();
+                let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
             }
         });
         quote! {
@@ -7686,8 +7748,9 @@ pub(crate) fn response_status_code_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
+            #new_context.get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
         }
     })
 }
@@ -7707,8 +7770,9 @@ pub(crate) fn response_reason_phrase_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_reason_phrase(&#value);
+            #new_context.get_mut_response().set_reason_phrase(&#value);
         }
     })
 }
@@ -7727,15 +7791,18 @@ pub(crate) fn response_header_macro(
     let key: Expr = header_data.key;
     let value: Expr = header_data.value;
     let operation: HeaderOperation = header_data.operation;
-    inject(position, item, |context| match operation {
-        HeaderOperation::Add => {
-            quote! {
-                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().add_header(&#key, &#value);
+    inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
+        match operation {
+            HeaderOperation::Add => {
+                quote! {
+                    #new_context.get_mut_response().add_header(&#key, &#value);
+                }
             }
-        }
-        HeaderOperation::Set => {
-            quote! {
-                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_header(&#key, &#value);
+            HeaderOperation::Set => {
+                quote! {
+                    #new_context.get_mut_response().set_header(&#key, &#value);
+                }
             }
         }
     })
@@ -7754,8 +7821,9 @@ pub(crate) fn response_body_macro(
     let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
     let body: Expr = body_data.body;
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_body(&#body);
+            #new_context.get_mut_response().set_body(&#body);
         }
     })
 }
@@ -7767,8 +7835,9 @@ inventory::submit! {
 }
 pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().clear_headers();
+            #new_context.get_mut_response().clear_headers();
         }
     })
 }
@@ -7788,8 +7857,9 @@ pub(crate) fn response_version_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context| {
+        let new_context: TokenStream2 = into_new_context(context);
         quote! {
-            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_version(#value);
+            #new_context.get_mut_response().set_version(#value);
         }
     })
 }

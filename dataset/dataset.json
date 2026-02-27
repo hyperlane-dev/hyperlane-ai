@@ -2348,25 +2348,25 @@
   {
     "instruction": "request_config函数的源码是怎么实现的？",
     "input": "",
-    "output": "request_config函数的源码实现如下：\n\n```rust\n/// Sets the HTTP request config.\n    ///\n    /// # Arguments\n    ///\n    /// - `RequestConfig`- The HTTP request config to set.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Reference to self for method chaining.\n    #[inline(always)]\n    pub fn request_config(&mut self, request_config: RequestConfig) -> &mut Self {\n        self.set_request_config(request_config);\n        self\n    }\n```",
+    "output": "request_config函数的源码实现如下：\n\n```rust\n/// Sets the HTTP request config.\n    ///\n    /// # Arguments\n    ///\n    /// - `RequestConfig`- The HTTP request config to set.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Reference to self for method chaining.\n    #[inline(always)]\n    pub fn request_config(&mut self, config: RequestConfig) -> &mut Self {\n        self.set_request_config(config);\n        self\n    }\n```",
     "system": ""
   },
   {
     "instruction": "request_config函数的参数设计有什么考虑？",
     "input": "",
-    "output": "request_config函数的参数设计如下：\n\n```rust\n/// Sets the HTTP request config.\n    ///\n    /// # Arguments\n    ///\n    /// - `RequestConfig`- The HTTP request config to set.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Reference to self for method chaining.\n    #[inline(always)]\n    pub fn request_config(&mut self, request_config: RequestConfig) -> &mut Self {\n        self.set_request_config(request_config);\n        self\n    }\n```\n\n参数列表：\n- request_config: RequestConfig\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "request_config函数的参数设计如下：\n\n```rust\n/// Sets the HTTP request config.\n    ///\n    /// # Arguments\n    ///\n    /// - `RequestConfig`- The HTTP request config to set.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Reference to self for method chaining.\n    #[inline(always)]\n    pub fn request_config(&mut self, config: RequestConfig) -> &mut Self {\n        self.set_request_config(config);\n        self\n    }\n```\n\n参数列表：\n- config: RequestConfig\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "request_config函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "request_config函数的返回值类型设计如下：\n\n```rust\n/// Sets the HTTP request config.\n    ///\n    /// # Arguments\n    ///\n    /// - `RequestConfig`- The HTTP request config to set.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Reference to self for method chaining.\n    #[inline(always)]\n    pub fn request_config(&mut self, request_config: RequestConfig) -> &mut Self {\n        self.set_request_config(request_config);\n        self\n    }\n```\n\n返回类型：&mut Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "request_config函数的返回值类型设计如下：\n\n```rust\n/// Sets the HTTP request config.\n    ///\n    /// # Arguments\n    ///\n    /// - `RequestConfig`- The HTTP request config to set.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Reference to self for method chaining.\n    #[inline(always)]\n    pub fn request_config(&mut self, config: RequestConfig) -> &mut Self {\n        self.set_request_config(config);\n        self\n    }\n```\n\n返回类型：&mut Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "request_config函数为什么需要修改状态？",
     "input": "",
-    "output": "request_config函数的状态修改逻辑如下：\n\n```rust\n/// Sets the HTTP request config.\n    ///\n    /// # Arguments\n    ///\n    /// - `RequestConfig`- The HTTP request config to set.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Reference to self for method chaining.\n    #[inline(always)]\n    pub fn request_config(&mut self, request_config: RequestConfig) -> &mut Self {\n        self.set_request_config(request_config);\n        self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "request_config函数的状态修改逻辑如下：\n\n```rust\n/// Sets the HTTP request config.\n    ///\n    /// # Arguments\n    ///\n    /// - `RequestConfig`- The HTTP request config to set.\n    ///\n    /// # Returns\n    ///\n    /// - `&mut Self` - Reference to self for method chaining.\n    #[inline(always)]\n    pub fn request_config(&mut self, config: RequestConfig) -> &mut Self {\n        self.set_request_config(config);\n        self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -2492,31 +2492,31 @@
   {
     "instruction": "format_bind_address函数的源码是怎么实现的？",
     "input": "",
-    "output": "format_bind_address函数的源码实现如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `H: AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```",
+    "output": "format_bind_address函数的源码实现如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释format_bind_address这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "format_bind_address函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `H: AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "format_bind_address函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：17\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "format_bind_address函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "format_bind_address函数的泛型设计和使用如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `H: AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "format_bind_address函数的泛型设计和使用如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "format_bind_address函数的参数设计有什么考虑？",
     "input": "",
-    "output": "format_bind_address函数的参数设计如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `H: AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```\n\n参数列表：\n- host: H\n- port: u16\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "format_bind_address函数的参数设计如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```\n\n参数列表：\n- host: H\n- port: u16\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "format_bind_address函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "format_bind_address函数的返回值类型设计如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `H: AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "format_bind_address函数的返回值类型设计如下：\n\n```rust\n/// Format the host and port into a bindable address string.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The host address.\n    /// - `u16` - The port number.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The formatted address string in the form \"host:port\".\n    #[inline(always)]\n    pub fn format_bind_address<H>(host: H, port: u16) -> String\n    where\n        H: AsRef<str>,\n    {\n        format!(\"{}{COLON}{port}\", host.as_ref())\n    }\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -2670,72 +2670,6 @@
     "system": ""
   },
   {
-    "instruction": "create_tcp_listener函数的源码是怎么实现的？",
-    "input": "",
-    "output": "create_tcp_listener函数的源码实现如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释create_tcp_listener这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "create_tcp_listener函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：9\n- 包含高级特性：泛型编程、生命周期管理、异步编程、错误处理",
-    "system": ""
-  },
-  {
-    "instruction": "create_tcp_listener函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "create_tcp_listener函数的泛型设计和使用如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "create_tcp_listener函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "create_tcp_listener函数的异步实现机制如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "create_tcp_listener函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "create_tcp_listener函数的返回值类型设计如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```\n\n返回类型：Result<TcpListener, ServerError>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "accept_connections函数的源码是怎么实现的？",
-    "input": "",
-    "output": "accept_connections函数的源码实现如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释accept_connections这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "accept_connections函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：18\n- 包含高级特性：泛型编程、异步编程、错误处理",
-    "system": ""
-  },
-  {
-    "instruction": "accept_connections函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "accept_connections函数的泛型设计和使用如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "accept_connections函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "accept_connections函数的异步实现机制如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "accept_connections函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "accept_connections函数的参数设计如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n参数列表：\n- tcp_listener: &TcpListener\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "accept_connections函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "accept_connections函数的返回值类型设计如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n返回类型：Result<(), ServerError>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
     "instruction": "configure_stream函数的源码是怎么实现的？",
     "input": "",
     "output": "configure_stream函数的源码实现如下：\n\n```rust\n/// Configures socket options for a newly accepted `TcpStream`.\n    ///\n    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpStream` - A reference to the `TcpStream` to configure.\n    async fn configure_stream(&self, stream: &TcpStream) {\n        let config: ServerConfig = self.get_server_config().clone();\n        if let Some(nodelay) = config.try_get_nodelay() {\n            let _ = stream.set_nodelay(*nodelay);\n        }\n        if let Some(ttl) = config.try_get_ttl() {\n            let _ = stream.set_ttl(*ttl);\n        }\n    }\n```",
@@ -2751,108 +2685,6 @@
     "instruction": "configure_stream函数的参数设计有什么考虑？",
     "input": "",
     "output": "configure_stream函数的参数设计如下：\n\n```rust\n/// Configures socket options for a newly accepted `TcpStream`.\n    ///\n    /// This applies settings like `TCP_NODELAY`, and `IP_TTL` from the server's configuration.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpStream` - A reference to the `TcpStream` to configure.\n    async fn configure_stream(&self, stream: &TcpStream) {\n        let config: ServerConfig = self.get_server_config().clone();\n        if let Some(nodelay) = config.try_get_nodelay() {\n            let _ = stream.set_nodelay(*nodelay);\n        }\n        if let Some(ttl) = config.try_get_ttl() {\n            let _ = stream.set_ttl(*ttl);\n        }\n    }\n```\n\n参数列表：\n- stream: &TcpStream\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "spawn_connection_handler函数的源码是怎么实现的？",
-    "input": "",
-    "output": "spawn_connection_handler函数的源码实现如下：\n\n```rust\n/// Spawns a new asynchronous task to handle a single client connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.\n    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {\n        let server_address: usize = self.into();\n        spawn(async move {\n            let server: &'static Server = server_address.into();\n            server.handle_connection(stream).await;\n        });\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "spawn_connection_handler函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "spawn_connection_handler函数的异步实现机制如下：\n\n```rust\n/// Spawns a new asynchronous task to handle a single client connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.\n    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {\n        let server_address: usize = self.into();\n        spawn(async move {\n            let server: &'static Server = server_address.into();\n            server.handle_connection(stream).await;\n        });\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "spawn_connection_handler函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "spawn_connection_handler函数的参数设计如下：\n\n```rust\n/// Spawns a new asynchronous task to handle a single client connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.\n    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {\n        let server_address: usize = self.into();\n        spawn(async move {\n            let server: &'static Server = server_address.into();\n            server.handle_connection(stream).await;\n        });\n    }\n```\n\n参数列表：\n- stream: ArcRwLockStream\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "handle_request_error函数的源码是怎么实现的？",
-    "input": "",
-    "output": "handle_request_error函数的源码实现如下：\n\n```rust\n/// Handles errors that occur while processing HTTP requests.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    /// - `&RequestError` - The error that occurred.\n    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {\n        ctx.set_aborted(false)\n            .set_closed(false)\n            .set_request_error_data(error.clone());\n        for hook in self.get_request_error().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return;\n            }\n        }\n        ctx.set_aborted(true).set_closed(true);\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "handle_request_error函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "handle_request_error函数的异步实现机制如下：\n\n```rust\n/// Handles errors that occur while processing HTTP requests.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    /// - `&RequestError` - The error that occurred.\n    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {\n        ctx.set_aborted(false)\n            .set_closed(false)\n            .set_request_error_data(error.clone());\n        for hook in self.get_request_error().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return;\n            }\n        }\n        ctx.set_aborted(true).set_closed(true);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "handle_request_error函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "handle_request_error函数的参数设计如下：\n\n```rust\n/// Handles errors that occur while processing HTTP requests.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    /// - `&RequestError` - The error that occurred.\n    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {\n        ctx.set_aborted(false)\n            .set_closed(false)\n            .set_request_error_data(error.clone());\n        for hook in self.get_request_error().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return;\n            }\n        }\n        ctx.set_aborted(true).set_closed(true);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n- error: &RequestError\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "handle_request_error函数为什么需要修改状态？",
-    "input": "",
-    "output": "handle_request_error函数的状态修改逻辑如下：\n\n```rust\n/// Handles errors that occur while processing HTTP requests.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    /// - `&RequestError` - The error that occurred.\n    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {\n        ctx.set_aborted(false)\n            .set_closed(false)\n            .set_request_error_data(error.clone());\n        for hook in self.get_request_error().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return;\n            }\n        }\n        ctx.set_aborted(true).set_closed(true);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
-    "system": ""
-  },
-  {
-    "instruction": "handle_connection函数的源码是怎么实现的？",
-    "input": "",
-    "output": "handle_connection函数的源码实现如下：\n\n```rust\n/// Handles a single client connection, determining whether it's an HTTP or WebSocket request.\n    ///\n    /// It reads the initial request from the stream and dispatches it to the appropriate hook.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The stream for the client connection.\n    async fn handle_connection(&self, stream: ArcRwLockStream) {\n        match Request::http_from_stream(&stream, self.get_request_config()).await {\n            Ok(request) => {\n                let server_address: usize = self.into();\n                let hook: HandlerState = HandlerState::new(stream, server_address.into());\n                self.handle_http_requests(&hook, &request).await;\n            }\n            Err(error) => {\n                self.handle_request_error(&mut stream.into(), &error).await;\n            }\n        }\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "handle_connection函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "handle_connection函数的异步实现机制如下：\n\n```rust\n/// Handles a single client connection, determining whether it's an HTTP or WebSocket request.\n    ///\n    /// It reads the initial request from the stream and dispatches it to the appropriate hook.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The stream for the client connection.\n    async fn handle_connection(&self, stream: ArcRwLockStream) {\n        match Request::http_from_stream(&stream, self.get_request_config()).await {\n            Ok(request) => {\n                let server_address: usize = self.into();\n                let hook: HandlerState = HandlerState::new(stream, server_address.into());\n                self.handle_http_requests(&hook, &request).await;\n            }\n            Err(error) => {\n                self.handle_request_error(&mut stream.into(), &error).await;\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "handle_connection函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "handle_connection函数的参数设计如下：\n\n```rust\n/// Handles a single client connection, determining whether it's an HTTP or WebSocket request.\n    ///\n    /// It reads the initial request from the stream and dispatches it to the appropriate hook.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The stream for the client connection.\n    async fn handle_connection(&self, stream: ArcRwLockStream) {\n        match Request::http_from_stream(&stream, self.get_request_config()).await {\n            Ok(request) => {\n                let server_address: usize = self.into();\n                let hook: HandlerState = HandlerState::new(stream, server_address.into());\n                self.handle_http_requests(&hook, &request).await;\n            }\n            Err(error) => {\n                self.handle_request_error(&mut stream.into(), &error).await;\n            }\n        }\n    }\n```\n\n参数列表：\n- stream: ArcRwLockStream\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "request_hook函数的源码是怎么实现的？",
-    "input": "",
-    "output": "request_hook函数的源码实现如下：\n\n```rust\n/// The core request handling pipeline.\n    ///\n    /// This function orchestrates the execution of request middleware, the route hook,\n    /// and response middleware. It supports both function-based and trait-based handlers.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The incoming request to be processed.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - A boolean indicating whether the connection should be kept alive.\n    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {\n        let route: &str = request.get_path();\n        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());\n        let keep_alive: bool = request.is_enable_keep_alive();\n        if self.handle_request_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_route_matcher(ctx, route).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_response_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        ctx.is_keep_alive(keep_alive)\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "request_hook函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "request_hook函数的异步实现机制如下：\n\n```rust\n/// The core request handling pipeline.\n    ///\n    /// This function orchestrates the execution of request middleware, the route hook,\n    /// and response middleware. It supports both function-based and trait-based handlers.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The incoming request to be processed.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - A boolean indicating whether the connection should be kept alive.\n    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {\n        let route: &str = request.get_path();\n        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());\n        let keep_alive: bool = request.is_enable_keep_alive();\n        if self.handle_request_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_route_matcher(ctx, route).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_response_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        ctx.is_keep_alive(keep_alive)\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "request_hook函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "request_hook函数的参数设计如下：\n\n```rust\n/// The core request handling pipeline.\n    ///\n    /// This function orchestrates the execution of request middleware, the route hook,\n    /// and response middleware. It supports both function-based and trait-based handlers.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The incoming request to be processed.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - A boolean indicating whether the connection should be kept alive.\n    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {\n        let route: &str = request.get_path();\n        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());\n        let keep_alive: bool = request.is_enable_keep_alive();\n        if self.handle_request_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_route_matcher(ctx, route).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_response_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        ctx.is_keep_alive(keep_alive)\n    }\n```\n\n参数列表：\n- state: &HandlerState\n- request: &Request\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "request_hook函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "request_hook函数的返回值类型设计如下：\n\n```rust\n/// The core request handling pipeline.\n    ///\n    /// This function orchestrates the execution of request middleware, the route hook,\n    /// and response middleware. It supports both function-based and trait-based handlers.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The incoming request to be processed.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - A boolean indicating whether the connection should be kept alive.\n    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {\n        let route: &str = request.get_path();\n        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());\n        let keep_alive: bool = request.is_enable_keep_alive();\n        if self.handle_request_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_route_matcher(ctx, route).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_response_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        ctx.is_keep_alive(keep_alive)\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "handle_http_requests函数的源码是怎么实现的？",
-    "input": "",
-    "output": "handle_http_requests函数的源码实现如下：\n\n```rust\n/// Handles subsequent HTTP requests on a persistent (keep-alive) connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The initial request that established the keep-alive connection.\n    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {\n        if !self.request_hook(state, request).await {\n            return;\n        }\n        let stream: &ArcRwLockStream = state.get_stream();\n        let request_config: &RequestConfig = state.get_server().get_request_config();\n        loop {\n            match Request::http_from_stream(stream, request_config).await {\n                Ok(new_request) => {\n                    if !self.request_hook(state, &new_request).await {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    self.handle_request_error(&mut state.get_stream().into(), &error)\n                        .await;\n                    return;\n                }\n            }\n        }\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "handle_http_requests函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "handle_http_requests函数的异步实现机制如下：\n\n```rust\n/// Handles subsequent HTTP requests on a persistent (keep-alive) connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The initial request that established the keep-alive connection.\n    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {\n        if !self.request_hook(state, request).await {\n            return;\n        }\n        let stream: &ArcRwLockStream = state.get_stream();\n        let request_config: &RequestConfig = state.get_server().get_request_config();\n        loop {\n            match Request::http_from_stream(stream, request_config).await {\n                Ok(new_request) => {\n                    if !self.request_hook(state, &new_request).await {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    self.handle_request_error(&mut state.get_stream().into(), &error)\n                        .await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "handle_http_requests函数的参数设计有什么考虑？",
-    "input": "",
-    "output": "handle_http_requests函数的参数设计如下：\n\n```rust\n/// Handles subsequent HTTP requests on a persistent (keep-alive) connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The initial request that established the keep-alive connection.\n    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {\n        if !self.request_hook(state, request).await {\n            return;\n        }\n        let stream: &ArcRwLockStream = state.get_stream();\n        let request_config: &RequestConfig = state.get_server().get_request_config();\n        loop {\n            match Request::http_from_stream(stream, request_config).await {\n                Ok(new_request) => {\n                    if !self.request_hook(state, &new_request).await {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    self.handle_request_error(&mut state.get_stream().into(), &error)\n                        .await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n参数列表：\n- state: &HandlerState\n- request: &Request\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
@@ -2925,6 +2757,174 @@
     "instruction": "handle_response_middleware函数为什么需要修改状态？",
     "input": "",
     "output": "handle_response_middleware函数的状态修改逻辑如下：\n\n```rust\n/// Executes trait-based response middleware in sequence.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - `true` if the lifecycle was aborted, `false` otherwise.\n    pub(super) async fn handle_response_middleware(&self, ctx: &mut Context) -> bool {\n        for hook in self.get_response_middleware().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return true;\n            }\n        }\n        false\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "spawn_connection_handler函数的源码是怎么实现的？",
+    "input": "",
+    "output": "spawn_connection_handler函数的源码实现如下：\n\n```rust\n/// Spawns a new asynchronous task to handle a single client connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.\n    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {\n        let server_address: usize = self.into();\n        spawn(async move {\n            let server: &'static Server = server_address.into();\n            server.handle_connection(stream).await;\n        });\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "spawn_connection_handler函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "spawn_connection_handler函数的异步实现机制如下：\n\n```rust\n/// Spawns a new asynchronous task to handle a single client connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.\n    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {\n        let server_address: usize = self.into();\n        spawn(async move {\n            let server: &'static Server = server_address.into();\n            server.handle_connection(stream).await;\n        });\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "spawn_connection_handler函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "spawn_connection_handler函数的参数设计如下：\n\n```rust\n/// Spawns a new asynchronous task to handle a single client connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The thread-safe stream representing the client connection.\n    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {\n        let server_address: usize = self.into();\n        spawn(async move {\n            let server: &'static Server = server_address.into();\n            server.handle_connection(stream).await;\n        });\n    }\n```\n\n参数列表：\n- stream: ArcRwLockStream\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "handle_request_error函数的源码是怎么实现的？",
+    "input": "",
+    "output": "handle_request_error函数的源码实现如下：\n\n```rust\n/// Handles errors that occur while processing HTTP requests.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    /// - `&RequestError` - The error that occurred.\n    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {\n        ctx.set_aborted(false)\n            .set_closed(false)\n            .set_request_error_data(error.clone());\n        for hook in self.get_request_error().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return;\n            }\n        }\n        ctx.set_aborted(true).set_closed(true);\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "handle_request_error函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "handle_request_error函数的异步实现机制如下：\n\n```rust\n/// Handles errors that occur while processing HTTP requests.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    /// - `&RequestError` - The error that occurred.\n    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {\n        ctx.set_aborted(false)\n            .set_closed(false)\n            .set_request_error_data(error.clone());\n        for hook in self.get_request_error().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return;\n            }\n        }\n        ctx.set_aborted(true).set_closed(true);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "handle_request_error函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "handle_request_error函数的参数设计如下：\n\n```rust\n/// Handles errors that occur while processing HTTP requests.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    /// - `&RequestError` - The error that occurred.\n    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {\n        ctx.set_aborted(false)\n            .set_closed(false)\n            .set_request_error_data(error.clone());\n        for hook in self.get_request_error().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return;\n            }\n        }\n        ctx.set_aborted(true).set_closed(true);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n- error: &RequestError\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "handle_request_error函数为什么需要修改状态？",
+    "input": "",
+    "output": "handle_request_error函数的状态修改逻辑如下：\n\n```rust\n/// Handles errors that occur while processing HTTP requests.\n    ///\n    /// # Arguments\n    ///\n    /// - `&mut Context` - The request context.\n    /// - `&RequestError` - The error that occurred.\n    pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {\n        ctx.set_aborted(false)\n            .set_closed(false)\n            .set_request_error_data(error.clone());\n        for hook in self.get_request_error().iter() {\n            self.task_handler(ctx, hook, true).await;\n            if ctx.get_aborted() {\n                return;\n            }\n        }\n        ctx.set_aborted(true).set_closed(true);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "request_hook函数的源码是怎么实现的？",
+    "input": "",
+    "output": "request_hook函数的源码实现如下：\n\n```rust\n/// The core request handling pipeline.\n    ///\n    /// This function orchestrates the execution of request middleware, the route hook,\n    /// and response middleware. It supports both function-based and trait-based handlers.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The incoming request to be processed.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - A boolean indicating whether the connection should be kept alive.\n    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {\n        let route: &str = request.get_path();\n        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());\n        let keep_alive: bool = request.is_enable_keep_alive();\n        if self.handle_request_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_route_matcher(ctx, route).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_response_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        ctx.is_keep_alive(keep_alive)\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "request_hook函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "request_hook函数的异步实现机制如下：\n\n```rust\n/// The core request handling pipeline.\n    ///\n    /// This function orchestrates the execution of request middleware, the route hook,\n    /// and response middleware. It supports both function-based and trait-based handlers.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The incoming request to be processed.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - A boolean indicating whether the connection should be kept alive.\n    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {\n        let route: &str = request.get_path();\n        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());\n        let keep_alive: bool = request.is_enable_keep_alive();\n        if self.handle_request_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_route_matcher(ctx, route).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_response_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        ctx.is_keep_alive(keep_alive)\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "request_hook函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "request_hook函数的参数设计如下：\n\n```rust\n/// The core request handling pipeline.\n    ///\n    /// This function orchestrates the execution of request middleware, the route hook,\n    /// and response middleware. It supports both function-based and trait-based handlers.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The incoming request to be processed.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - A boolean indicating whether the connection should be kept alive.\n    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {\n        let route: &str = request.get_path();\n        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());\n        let keep_alive: bool = request.is_enable_keep_alive();\n        if self.handle_request_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_route_matcher(ctx, route).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_response_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        ctx.is_keep_alive(keep_alive)\n    }\n```\n\n参数列表：\n- state: &HandlerState\n- request: &Request\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "request_hook函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "request_hook函数的返回值类型设计如下：\n\n```rust\n/// The core request handling pipeline.\n    ///\n    /// This function orchestrates the execution of request middleware, the route hook,\n    /// and response middleware. It supports both function-based and trait-based handlers.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The incoming request to be processed.\n    ///\n    /// # Returns\n    ///\n    /// - `bool` - A boolean indicating whether the connection should be kept alive.\n    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {\n        let route: &str = request.get_path();\n        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());\n        let keep_alive: bool = request.is_enable_keep_alive();\n        if self.handle_request_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_route_matcher(ctx, route).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        if self.handle_response_middleware(ctx).await {\n            return ctx.is_keep_alive(keep_alive);\n        }\n        ctx.is_keep_alive(keep_alive)\n    }\n```\n\n返回类型：bool\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "handle_http_requests函数的源码是怎么实现的？",
+    "input": "",
+    "output": "handle_http_requests函数的源码实现如下：\n\n```rust\n/// Handles subsequent HTTP requests on a persistent (keep-alive) connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The initial request that established the keep-alive connection.\n    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {\n        if !self.request_hook(state, request).await {\n            return;\n        }\n        let stream: &ArcRwLockStream = state.get_stream();\n        let request_config: &RequestConfig = state.get_server().get_request_config();\n        loop {\n            match Request::http_from_stream(stream, request_config).await {\n                Ok(new_request) => {\n                    if !self.request_hook(state, &new_request).await {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    self.handle_request_error(&mut state.get_stream().into(), &error)\n                        .await;\n                    return;\n                }\n            }\n        }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "handle_http_requests函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "handle_http_requests函数的异步实现机制如下：\n\n```rust\n/// Handles subsequent HTTP requests on a persistent (keep-alive) connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The initial request that established the keep-alive connection.\n    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {\n        if !self.request_hook(state, request).await {\n            return;\n        }\n        let stream: &ArcRwLockStream = state.get_stream();\n        let request_config: &RequestConfig = state.get_server().get_request_config();\n        loop {\n            match Request::http_from_stream(stream, request_config).await {\n                Ok(new_request) => {\n                    if !self.request_hook(state, &new_request).await {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    self.handle_request_error(&mut state.get_stream().into(), &error)\n                        .await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "handle_http_requests函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "handle_http_requests函数的参数设计如下：\n\n```rust\n/// Handles subsequent HTTP requests on a persistent (keep-alive) connection.\n    ///\n    /// # Arguments\n    ///\n    /// - `&HandlerState` - The `HandlerState` for the current connection.\n    /// - `&Request` - The initial request that established the keep-alive connection.\n    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {\n        if !self.request_hook(state, request).await {\n            return;\n        }\n        let stream: &ArcRwLockStream = state.get_stream();\n        let request_config: &RequestConfig = state.get_server().get_request_config();\n        loop {\n            match Request::http_from_stream(stream, request_config).await {\n                Ok(new_request) => {\n                    if !self.request_hook(state, &new_request).await {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    self.handle_request_error(&mut state.get_stream().into(), &error)\n                        .await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n参数列表：\n- state: &HandlerState\n- request: &Request\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "handle_connection函数的源码是怎么实现的？",
+    "input": "",
+    "output": "handle_connection函数的源码实现如下：\n\n```rust\n/// Handles a single client connection, determining whether it's an HTTP or WebSocket request.\n    ///\n    /// It reads the initial request from the stream and dispatches it to the appropriate hook.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The stream for the client connection.\n    async fn handle_connection(&self, stream: ArcRwLockStream) {\n        match Request::http_from_stream(&stream, self.get_request_config()).await {\n            Ok(request) => {\n                let server_address: usize = self.into();\n                let hook: HandlerState = HandlerState::new(stream, server_address.into());\n                self.handle_http_requests(&hook, &request).await;\n            }\n            Err(error) => {\n                self.handle_request_error(&mut stream.into(), &error).await;\n            }\n        }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "handle_connection函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "handle_connection函数的异步实现机制如下：\n\n```rust\n/// Handles a single client connection, determining whether it's an HTTP or WebSocket request.\n    ///\n    /// It reads the initial request from the stream and dispatches it to the appropriate hook.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The stream for the client connection.\n    async fn handle_connection(&self, stream: ArcRwLockStream) {\n        match Request::http_from_stream(&stream, self.get_request_config()).await {\n            Ok(request) => {\n                let server_address: usize = self.into();\n                let hook: HandlerState = HandlerState::new(stream, server_address.into());\n                self.handle_http_requests(&hook, &request).await;\n            }\n            Err(error) => {\n                self.handle_request_error(&mut stream.into(), &error).await;\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "handle_connection函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "handle_connection函数的参数设计如下：\n\n```rust\n/// Handles a single client connection, determining whether it's an HTTP or WebSocket request.\n    ///\n    /// It reads the initial request from the stream and dispatches it to the appropriate hook.\n    ///\n    /// # Arguments\n    ///\n    /// - `ArcRwLockStream` - The stream for the client connection.\n    async fn handle_connection(&self, stream: ArcRwLockStream) {\n        match Request::http_from_stream(&stream, self.get_request_config()).await {\n            Ok(request) => {\n                let server_address: usize = self.into();\n                let hook: HandlerState = HandlerState::new(stream, server_address.into());\n                self.handle_http_requests(&hook, &request).await;\n            }\n            Err(error) => {\n                self.handle_request_error(&mut stream.into(), &error).await;\n            }\n        }\n    }\n```\n\n参数列表：\n- stream: ArcRwLockStream\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "accept_connections函数的源码是怎么实现的？",
+    "input": "",
+    "output": "accept_connections函数的源码实现如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释accept_connections这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "accept_connections函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：18\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "accept_connections函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "accept_connections函数的泛型设计和使用如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "accept_connections函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "accept_connections函数的异步实现机制如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "accept_connections函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "accept_connections函数的参数设计如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n参数列表：\n- tcp_listener: &TcpListener\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "accept_connections函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "accept_connections函数的返回值类型设计如下：\n\n```rust\n/// Enters a loop to accept incoming TCP connections and spawn handlers for them.\n    ///\n    /// # Arguments\n    ///\n    /// - `&TcpListener` - A reference to the `TcpListener` to accept connections from.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<(), ServerError>` - A `Result` which is typically `Ok(())` unless an unrecoverable\n    ///   error occurs.\n    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {\n        while let Ok((stream, _)) = tcp_listener.accept().await {\n            self.configure_stream(&stream).await;\n            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);\n            self.spawn_connection_handler(stream).await;\n        }\n        Ok(())\n    }\n```\n\n返回类型：Result<(), ServerError>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "create_tcp_listener函数的源码是怎么实现的？",
+    "input": "",
+    "output": "create_tcp_listener函数的源码实现如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释create_tcp_listener这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "create_tcp_listener函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：9\n- 包含高级特性：泛型编程、生命周期管理、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "create_tcp_listener函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "create_tcp_listener函数的泛型设计和使用如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "create_tcp_listener函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "create_tcp_listener函数的异步实现机制如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "create_tcp_listener函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "create_tcp_listener函数的返回值类型设计如下：\n\n```rust\n/// Creates and binds a `TcpListener` based on the server's configuration.\n    ///\n    /// # Returns\n    ///\n    /// - `Result<TcpListener, ServerError>` - A `Result` containing the bound `TcpListener` on success,\n    ///   or a `ServerError` on failure.\n    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {\n        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)\n    }\n```\n\n返回类型：Result<TcpListener, ServerError>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -3854,25 +3854,25 @@
   {
     "instruction": "main函数的源码是怎么实现的？",
     "input": "",
-    "output": "main函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let mut server: Server = Server::default();\n    server.task_panic::<TaskPanicHook>();\n    server.request_error::<RequestErrorHook>();\n    server.request_middleware::<RequestMiddleware>();\n    server.request_middleware::<UpgradeMiddleware>();\n    server.response_middleware::<ResponseMiddleware>();\n    server.route::<RootRoute>(\"/\");\n    server.route::<SseRoute>(\"/sse\");\n    server.route::<WebsocketRoute>(\"/websocket\");\n    server.route::<GetAllRoutes>(\"/get/all/routes\");\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\");\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\");\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    spawn(async move {\n        sleep(Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```",
+    "output": "main函数的源码实现如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let mut server: Server = Server::default();\n    let mut server_config: ServerConfig = ServerConfig::default();\n    server_config\n        .set_address(Server::format_bind_address(DEFAULT_HOST, 80))\n        .set_nodelay(Some(false));\n    server.server_config(server_config);\n    server.task_panic::<TaskPanicHook>();\n    server.request_error::<RequestErrorHook>();\n    server.request_middleware::<RequestMiddleware>();\n    server.request_middleware::<UpgradeMiddleware>();\n    server.response_middleware::<ResponseMiddleware>();\n    server.route::<RootRoute>(\"/\");\n    server.route::<SseRoute>(\"/sse\");\n    server.route::<WebsocketRoute>(\"/websocket\");\n    server.route::<GetAllRoutes>(\"/get/all/routes\");\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\");\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\");\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    spawn(async move {\n        sleep(Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释main这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "main函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let mut server: Server = Server::default();\n    server.task_panic::<TaskPanicHook>();\n    server.request_error::<RequestErrorHook>();\n    server.request_middleware::<RequestMiddleware>();\n    server.request_middleware::<UpgradeMiddleware>();\n    server.response_middleware::<ResponseMiddleware>();\n    server.route::<RootRoute>(\"/\");\n    server.route::<SseRoute>(\"/sse\");\n    server.route::<WebsocketRoute>(\"/websocket\");\n    server.route::<GetAllRoutes>(\"/get/all/routes\");\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\");\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\");\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    spawn(async move {\n        sleep(Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：22\n- 包含高级特性：泛型编程、异步编程",
+    "output": "main函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let mut server: Server = Server::default();\n    let mut server_config: ServerConfig = ServerConfig::default();\n    server_config\n        .set_address(Server::format_bind_address(DEFAULT_HOST, 80))\n        .set_nodelay(Some(false));\n    server.server_config(server_config);\n    server.task_panic::<TaskPanicHook>();\n    server.request_error::<RequestErrorHook>();\n    server.request_middleware::<RequestMiddleware>();\n    server.request_middleware::<UpgradeMiddleware>();\n    server.response_middleware::<ResponseMiddleware>();\n    server.route::<RootRoute>(\"/\");\n    server.route::<SseRoute>(\"/sse\");\n    server.route::<WebsocketRoute>(\"/websocket\");\n    server.route::<GetAllRoutes>(\"/get/all/routes\");\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\");\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\");\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    spawn(async move {\n        sleep(Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：27\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "main函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "main函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let mut server: Server = Server::default();\n    server.task_panic::<TaskPanicHook>();\n    server.request_error::<RequestErrorHook>();\n    server.request_middleware::<RequestMiddleware>();\n    server.request_middleware::<UpgradeMiddleware>();\n    server.response_middleware::<ResponseMiddleware>();\n    server.route::<RootRoute>(\"/\");\n    server.route::<SseRoute>(\"/sse\");\n    server.route::<WebsocketRoute>(\"/websocket\");\n    server.route::<GetAllRoutes>(\"/get/all/routes\");\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\");\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\");\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    spawn(async move {\n        sleep(Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "main函数的泛型设计和使用如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let mut server: Server = Server::default();\n    let mut server_config: ServerConfig = ServerConfig::default();\n    server_config\n        .set_address(Server::format_bind_address(DEFAULT_HOST, 80))\n        .set_nodelay(Some(false));\n    server.server_config(server_config);\n    server.task_panic::<TaskPanicHook>();\n    server.request_error::<RequestErrorHook>();\n    server.request_middleware::<RequestMiddleware>();\n    server.request_middleware::<UpgradeMiddleware>();\n    server.response_middleware::<ResponseMiddleware>();\n    server.route::<RootRoute>(\"/\");\n    server.route::<SseRoute>(\"/sse\");\n    server.route::<WebsocketRoute>(\"/websocket\");\n    server.route::<GetAllRoutes>(\"/get/all/routes\");\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\");\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\");\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    spawn(async move {\n        sleep(Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "main函数的异步实现是如何工作的？",
     "input": "",
-    "output": "main函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let mut server: Server = Server::default();\n    server.task_panic::<TaskPanicHook>();\n    server.request_error::<RequestErrorHook>();\n    server.request_middleware::<RequestMiddleware>();\n    server.request_middleware::<UpgradeMiddleware>();\n    server.response_middleware::<ResponseMiddleware>();\n    server.route::<RootRoute>(\"/\");\n    server.route::<SseRoute>(\"/sse\");\n    server.route::<WebsocketRoute>(\"/websocket\");\n    server.route::<GetAllRoutes>(\"/get/all/routes\");\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\");\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\");\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    spawn(async move {\n        sleep(Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "main函数的异步实现机制如下：\n\n```rust\n#[tokio::test]\nasync fn main() {\n    let mut server: Server = Server::default();\n    let mut server_config: ServerConfig = ServerConfig::default();\n    server_config\n        .set_address(Server::format_bind_address(DEFAULT_HOST, 80))\n        .set_nodelay(Some(false));\n    server.server_config(server_config);\n    server.task_panic::<TaskPanicHook>();\n    server.request_error::<RequestErrorHook>();\n    server.request_middleware::<RequestMiddleware>();\n    server.request_middleware::<UpgradeMiddleware>();\n    server.response_middleware::<ResponseMiddleware>();\n    server.route::<RootRoute>(\"/\");\n    server.route::<SseRoute>(\"/sse\");\n    server.route::<WebsocketRoute>(\"/websocket\");\n    server.route::<GetAllRoutes>(\"/get/all/routes\");\n    server.route::<DynamicRoute>(\"/dynamic/{routing}\");\n    server.route::<DynamicRoute>(\"/regex/{file:^.*$}\");\n    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();\n    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();\n    spawn(async move {\n        sleep(Duration::from_secs(60)).await;\n        server_control_hook_2.shutdown().await;\n    });\n    server_control_hook_1.wait().await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
@@ -25716,6 +25716,54 @@
     "system": ""
   },
   {
+    "instruction": "example函数的源码是怎么实现的？",
+    "input": "",
+    "output": "example函数的源码实现如下：\n\n```rust\n/// Generates a context reference binding statement.\n///\n/// This function-like procedural macro generates a let statement that converts\n/// a context pointer into a mutable reference to `::hyperlane::Context`.\n/// The conversion is performed through the `Into` trait with an intermediate\n/// conversion to usize.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing a single identifier\n///   that will be used as the variable name in the generated let statement.\n///\n/// # Returns\n///\n/// - `TokenStream` - A let statement binding the specified variable name\n///   to a `&mut ::hyperlane::Context` obtained through pointer conversion.\n///\n/// # Example\n///\n/// ```rust\n/// use hyperlane::*;\n/// use hyperlane_macros::*;\n///\n/// async fn example(ctx: &mut Context) {\n///     let new_ctx: &mut Context = context!(ctx);\n///     let _ = ctx.try_send().await;\n///     let _ = new_ctx.try_send().await;\n/// }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "example函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "example函数的异步实现机制如下：\n\n```rust\n/// Generates a context reference binding statement.\n///\n/// This function-like procedural macro generates a let statement that converts\n/// a context pointer into a mutable reference to `::hyperlane::Context`.\n/// The conversion is performed through the `Into` trait with an intermediate\n/// conversion to usize.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing a single identifier\n///   that will be used as the variable name in the generated let statement.\n///\n/// # Returns\n///\n/// - `TokenStream` - A let statement binding the specified variable name\n///   to a `&mut ::hyperlane::Context` obtained through pointer conversion.\n///\n/// # Example\n///\n/// ```rust\n/// use hyperlane::*;\n/// use hyperlane_macros::*;\n///\n/// async fn example(ctx: &mut Context) {\n///     let new_ctx: &mut Context = context!(ctx);\n///     let _ = ctx.try_send().await;\n///     let _ = new_ctx.try_send().await;\n/// }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "example函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "example函数的参数设计如下：\n\n```rust\n/// Generates a context reference binding statement.\n///\n/// This function-like procedural macro generates a let statement that converts\n/// a context pointer into a mutable reference to `::hyperlane::Context`.\n/// The conversion is performed through the `Into` trait with an intermediate\n/// conversion to usize.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing a single identifier\n///   that will be used as the variable name in the generated let statement.\n///\n/// # Returns\n///\n/// - `TokenStream` - A let statement binding the specified variable name\n///   to a `&mut ::hyperlane::Context` obtained through pointer conversion.\n///\n/// # Example\n///\n/// ```rust\n/// use hyperlane::*;\n/// use hyperlane_macros::*;\n///\n/// async fn example(ctx: &mut Context) {\n///     let new_ctx: &mut Context = context!(ctx);\n///     let _ = ctx.try_send().await;\n///     let _ = new_ctx.try_send().await;\n/// }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "example函数为什么需要修改状态？",
+    "input": "",
+    "output": "example函数的状态修改逻辑如下：\n\n```rust\n/// Generates a context reference binding statement.\n///\n/// This function-like procedural macro generates a let statement that converts\n/// a context pointer into a mutable reference to `::hyperlane::Context`.\n/// The conversion is performed through the `Into` trait with an intermediate\n/// conversion to usize.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing a single identifier\n///   that will be used as the variable name in the generated let statement.\n///\n/// # Returns\n///\n/// - `TokenStream` - A let statement binding the specified variable name\n///   to a `&mut ::hyperlane::Context` obtained through pointer conversion.\n///\n/// # Example\n///\n/// ```rust\n/// use hyperlane::*;\n/// use hyperlane_macros::*;\n///\n/// async fn example(ctx: &mut Context) {\n///     let new_ctx: &mut Context = context!(ctx);\n///     let _ = ctx.try_send().await;\n///     let _ = new_ctx.try_send().await;\n/// }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "context函数的源码是怎么实现的？",
+    "input": "",
+    "output": "context函数的源码实现如下：\n\n```rust\n/// Generates a context reference binding statement.\n///\n/// This function-like procedural macro generates a let statement that converts\n/// a context pointer into a mutable reference to `::hyperlane::Context`.\n/// The conversion is performed through the `Into` trait with an intermediate\n/// conversion to usize.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing a single identifier\n///   that will be used as the variable name in the generated let statement.\n///\n/// # Returns\n///\n/// - `TokenStream` - A let statement binding the specified variable name\n///   to a `&mut ::hyperlane::Context` obtained through pointer conversion.\n///\n/// # Example\n///\n/// ```rust\n/// use hyperlane::*;\n/// use hyperlane_macros::*;\n///\n/// async fn example(ctx: &mut Context) {\n///     let new_ctx: &mut Context = context!(ctx);\n///     let _ = ctx.try_send().await;\n///     let _ = new_ctx.try_send().await;\n/// }\n/// ```\n#[proc_macro]\npub fn context(input: TokenStream) -> TokenStream {\n    context_macro(input)\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "context函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "context函数的异步实现机制如下：\n\n```rust\n/// Generates a context reference binding statement.\n///\n/// This function-like procedural macro generates a let statement that converts\n/// a context pointer into a mutable reference to `::hyperlane::Context`.\n/// The conversion is performed through the `Into` trait with an intermediate\n/// conversion to usize.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing a single identifier\n///   that will be used as the variable name in the generated let statement.\n///\n/// # Returns\n///\n/// - `TokenStream` - A let statement binding the specified variable name\n///   to a `&mut ::hyperlane::Context` obtained through pointer conversion.\n///\n/// # Example\n///\n/// ```rust\n/// use hyperlane::*;\n/// use hyperlane_macros::*;\n///\n/// async fn example(ctx: &mut Context) {\n///     let new_ctx: &mut Context = context!(ctx);\n///     let _ = ctx.try_send().await;\n///     let _ = new_ctx.try_send().await;\n/// }\n/// ```\n#[proc_macro]\npub fn context(input: TokenStream) -> TokenStream {\n    context_macro(input)\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "context函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "context函数的参数设计如下：\n\n```rust\n/// Generates a context reference binding statement.\n///\n/// This function-like procedural macro generates a let statement that converts\n/// a context pointer into a mutable reference to `::hyperlane::Context`.\n/// The conversion is performed through the `Into` trait with an intermediate\n/// conversion to usize.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing a single identifier\n///   that will be used as the variable name in the generated let statement.\n///\n/// # Returns\n///\n/// - `TokenStream` - A let statement binding the specified variable name\n///   to a `&mut ::hyperlane::Context` obtained through pointer conversion.\n///\n/// # Example\n///\n/// ```rust\n/// use hyperlane::*;\n/// use hyperlane_macros::*;\n///\n/// async fn example(ctx: &mut Context) {\n///     let new_ctx: &mut Context = context!(ctx);\n///     let _ = ctx.try_send().await;\n///     let _ = new_ctx.try_send().await;\n/// }\n/// ```\n#[proc_macro]\npub fn context(input: TokenStream) -> TokenStream {\n    context_macro(input)\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "context函数为什么需要修改状态？",
+    "input": "",
+    "output": "context函数的状态修改逻辑如下：\n\n```rust\n/// Generates a context reference binding statement.\n///\n/// This function-like procedural macro generates a let statement that converts\n/// a context pointer into a mutable reference to `::hyperlane::Context`.\n/// The conversion is performed through the `Into` trait with an intermediate\n/// conversion to usize.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing a single identifier\n///   that will be used as the variable name in the generated let statement.\n///\n/// # Returns\n///\n/// - `TokenStream` - A let statement binding the specified variable name\n///   to a `&mut ::hyperlane::Context` obtained through pointer conversion.\n///\n/// # Example\n///\n/// ```rust\n/// use hyperlane::*;\n/// use hyperlane_macros::*;\n///\n/// async fn example(ctx: &mut Context) {\n///     let new_ctx: &mut Context = context!(ctx);\n///     let _ = ctx.try_send().await;\n///     let _ = new_ctx.try_send().await;\n/// }\n/// ```\n#[proc_macro]\npub fn context(input: TokenStream) -> TokenStream {\n    context_macro(input)\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
     "instruction": "SERVER_TYPE_KEY常量的源码是怎么实现的？",
     "input": "",
     "output": "SERVER_TYPE_KEY常量的源码实现如下：\n\n```rust\npub(crate) const SERVER_TYPE_KEY: &str = \"Server\";\n```",
@@ -25866,6 +25914,24 @@
     "system": ""
   },
   {
+    "instruction": "into_new_context函数的源码是怎么实现的？",
+    "input": "",
+    "output": "into_new_context函数的源码实现如下：\n\n```rust\n/// Generates a token stream that converts a context identifier into `&mut ::hyperlane::Context`.\n///\n/// # Arguments\n///\n/// - `&Ident` - The context variable identifier.\n///\n/// # Returns\n///\n/// - `TokenStream2` - The token stream performing the conversion.\npub(crate) fn into_new_context(context: &Ident) -> TokenStream2 {\n    quote! {\n        std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize)\n    }\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "into_new_context函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "into_new_context函数的泛型设计和使用如下：\n\n```rust\n/// Generates a token stream that converts a context identifier into `&mut ::hyperlane::Context`.\n///\n/// # Arguments\n///\n/// - `&Ident` - The context variable identifier.\n///\n/// # Returns\n///\n/// - `TokenStream2` - The token stream performing the conversion.\npub(crate) fn into_new_context(context: &Ident) -> TokenStream2 {\n    quote! {\n        std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize)\n    }\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "into_new_context函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "into_new_context函数的返回值类型设计如下：\n\n```rust\n/// Generates a token stream that converts a context identifier into `&mut ::hyperlane::Context`.\n///\n/// # Arguments\n///\n/// - `&Ident` - The context variable identifier.\n///\n/// # Returns\n///\n/// - `TokenStream2` - The token stream performing the conversion.\npub(crate) fn into_new_context(context: &Ident) -> TokenStream2 {\n    quote! {\n        std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize)\n    }\n}\n```\n\n返回类型：TokenStream2\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
     "instruction": "Parse::parse方法的源码是怎么实现的？",
     "input": "",
     "output": "Parse::parse方法的源码实现如下：\n\n```rust\n/// Parses the input stream into an `OrderAttr` struct.\n    ///\n    /// # Arguments\n    ///\n    /// - `input` - The token stream to parse.\n    ///\n    /// # Returns\n    ///\n    /// A `Result` containing the parsed `OrderAttr` or an error.\n    fn parse(input: ParseStream) -> Result<Self> {\n        if input.is_empty() {\n            return Ok(OrderAttr { order: None });\n        }\n        let expr: Expr = input.parse()?;\n        Ok(OrderAttr { order: Some(expr) })\n    }\n```",
@@ -25938,6 +26004,60 @@
     "system": ""
   },
   {
+    "instruction": "context_macro函数的源码是怎么实现的？",
+    "input": "",
+    "output": "context_macro函数的源码实现如下：\n\n```rust\n/// Implements the context! procedural macro.\n///\n/// This macro generates a let statement that converts a context pointer into a mutable reference.\n/// The generated code performs an unsafe conversion from a raw pointer to a mutable reference\n/// through the `Into` trait.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing the variable name identifier.\n///\n/// # Returns\n///\n/// - `TokenStream` - The generated let statement binding the variable to the converted context reference.\npub(crate) fn context_macro(input: TokenStream) -> TokenStream {\n    let context_input: ContextInput = match parse(input) {\n        Ok(input) => input,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    let source_ctx: Ident = context_input.source_ctx;\n    into_new_context(&source_ctx).into()\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释context_macro这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "context_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Implements the context! procedural macro.\n///\n/// This macro generates a let statement that converts a context pointer into a mutable reference.\n/// The generated code performs an unsafe conversion from a raw pointer to a mutable reference\n/// through the `Into` trait.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing the variable name identifier.\n///\n/// # Returns\n///\n/// - `TokenStream` - The generated let statement binding the variable to the converted context reference.\npub(crate) fn context_macro(input: TokenStream) -> TokenStream {\n    let context_input: ContextInput = match parse(input) {\n        Ok(input) => input,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    let source_ctx: Ident = context_input.source_ctx;\n    into_new_context(&source_ctx).into()\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：21\n- 包含高级特性：unsafe代码",
+    "system": ""
+  },
+  {
+    "instruction": "context_macro函数中为什么需要使用unsafe代码？有哪些安全考虑？",
+    "input": "",
+    "output": "context_macro函数中使用unsafe代码的原因和安全考虑如下：\n\n```rust\n/// Implements the context! procedural macro.\n///\n/// This macro generates a let statement that converts a context pointer into a mutable reference.\n/// The generated code performs an unsafe conversion from a raw pointer to a mutable reference\n/// through the `Into` trait.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing the variable name identifier.\n///\n/// # Returns\n///\n/// - `TokenStream` - The generated let statement binding the variable to the converted context reference.\npub(crate) fn context_macro(input: TokenStream) -> TokenStream {\n    let context_input: ContextInput = match parse(input) {\n        Ok(input) => input,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    let source_ctx: Ident = context_input.source_ctx;\n    into_new_context(&source_ctx).into()\n}\n```\n\nunsafe代码通常用于以下场景：\n- 底层系统编程\n- 性能优化\n- 与硬件交互\n- FFI（外部函数接口）调用\n\n在使用时需要特别注意内存安全和数据竞争问题。",
+    "system": ""
+  },
+  {
+    "instruction": "context_macro函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "context_macro函数的返回值类型设计如下：\n\n```rust\n/// Implements the context! procedural macro.\n///\n/// This macro generates a let statement that converts a context pointer into a mutable reference.\n/// The generated code performs an unsafe conversion from a raw pointer to a mutable reference\n/// through the `Into` trait.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream containing the variable name identifier.\n///\n/// # Returns\n///\n/// - `TokenStream` - The generated let statement binding the variable to the converted context reference.\npub(crate) fn context_macro(input: TokenStream) -> TokenStream {\n    let context_input: ContextInput = match parse(input) {\n        Ok(input) => input,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    let source_ctx: Ident = context_input.source_ctx;\n    into_new_context(&source_ctx).into()\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "Parse::parse方法的源码是怎么实现的？",
+    "input": "",
+    "output": "Parse::parse方法的源码实现如下：\n\n```rust\nfn parse(input: ParseStream) -> Result<Self> {\n        let source_ctx: Ident = input.parse()?;\n        Ok(ContextInput { source_ctx })\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "Parse::parse方法中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "Parse::parse方法的泛型设计和使用如下：\n\n```rust\nfn parse(input: ParseStream) -> Result<Self> {\n        let source_ctx: Ident = input.parse()?;\n        Ok(ContextInput { source_ctx })\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "Parse::parse方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "Parse::parse方法的参数设计如下：\n\n```rust\nfn parse(input: ParseStream) -> Result<Self> {\n        let source_ctx: Ident = input.parse()?;\n        Ok(ContextInput { source_ctx })\n    }\n```\n\n参数列表：\n- input: ParseStream\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "Parse::parse方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "Parse::parse方法的返回值类型设计如下：\n\n```rust\nfn parse(input: ParseStream) -> Result<Self> {\n        let source_ctx: Ident = input.parse()?;\n        Ok(ContextInput { source_ctx })\n    }\n```\n\n返回类型：Result<Self>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ContextInput结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "ContextInput结构体的源码实现如下：\n\n```rust\n/// Parses the input for context macro.\n///\n/// This struct represents the source context identifier parsed from the macro input.\npub(crate) struct ContextInput {\n    /// The source context variable identifier.\n    pub(crate) source_ctx: Ident,\n}\n```",
+    "system": ""
+  },
+  {
     "instruction": "hyperlane_macro函数的源码是怎么实现的？",
     "input": "",
     "output": "hyperlane_macro函数的源码实现如下：\n\n```rust\n/// Main macro for creating and configuring a Hyperlane server instance.\n/// Supports both single and multiple variable-type pair initialization.\n///\n/// This macro expects an attribute in the format `#[hyperlane(variable_name: TypeName)]`\n/// or `#[hyperlane(var1: Type1, var2: Type2, ...)]`.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream, containing the variable and type name.\n/// - `TokenStream` - The input token stream to process, typically an `async fn`.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with server initialization.\npub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStream {\n    let multi_hyperlane: MultiHyperlaneAttr = parse_macro_input!(attr as MultiHyperlaneAttr);\n    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);\n    let vis: &Visibility = &input_fn.vis;\n    let sig: &Signature = &input_fn.sig;\n    let block: &Block = &input_fn.block;\n    let attrs: &Vec<Attribute> = &input_fn.attrs;\n    let stmts: &Vec<Stmt> = &block.stmts;\n    let mut init_statements: Vec<TokenStream2> = Vec::new();\n    for (var_name, type_name) in &multi_hyperlane.params {\n        init_statements.push(quote! {\n            let mut #var_name: #type_name = #type_name::default();\n        });\n        if type_name == SERVER_TYPE_KEY {\n            init_statements.push(quote! {\n                let mut hooks: Vec<::hyperlane::HookType> = inventory::iter().cloned().collect();\n                assert_hook_unique_order(hooks.clone());\n                hooks.sort_by_key(|hook| hook.try_get_order());\n                for hook in hooks {\n                    #var_name.handle_hook(hook.clone());\n                }\n            });\n        }\n    }\n    let gen_code: TokenStream2 = quote! {\n        #(#attrs)*\n        #vis #sig {\n            #(#init_statements)*\n            #(#stmts)*\n        }\n    };\n    gen_code.into()\n}\n```",
@@ -26006,31 +26126,25 @@
   {
     "instruction": "aborted_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "aborted_macro函数的源码实现如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_aborted(true);\n        }\n    })\n}\n```",
+    "output": "aborted_macro函数的源码实现如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.set_aborted(true);\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释aborted_macro这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "aborted_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_aborted(true);\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：7\n- 代码行数：22\n- 包含高级特性：泛型编程、异步编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "aborted_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "aborted_macro函数的泛型设计和使用如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_aborted(true);\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "aborted_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.set_aborted(true);\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：23\n- 包含高级特性：异步编程、闭包",
     "system": ""
   },
   {
     "instruction": "aborted_macro函数的异步实现是如何工作的？",
     "input": "",
-    "output": "aborted_macro函数的异步实现机制如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_aborted(true);\n        }\n    })\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "aborted_macro函数的异步实现机制如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.set_aborted(true);\n        }\n    })\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "aborted_macro函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "aborted_macro函数的返回值类型设计如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_aborted(true);\n        }\n    })\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "aborted_macro函数的返回值类型设计如下：\n\n```rust\n/// Expands the macro to generate an asynchronous aborted call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_aborted(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being aborted.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the aborted call inserted.\npub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.set_aborted(true);\n        }\n    })\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -26186,31 +26300,25 @@
   {
     "instruction": "try_flush_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "try_flush_macro函数的源码实现如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            let _ = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).try_flush().await;\n        }\n    })\n}\n```",
+    "output": "try_flush_macro函数的源码实现如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            let _ = #new_context.try_flush().await;\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释try_flush_macro这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "try_flush_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            let _ = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).try_flush().await;\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：17\n- 包含高级特性：泛型编程、异步编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "try_flush_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "try_flush_macro函数的泛型设计和使用如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            let _ = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).try_flush().await;\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "try_flush_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            let _ = #new_context.try_flush().await;\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：18\n- 包含高级特性：异步编程、闭包",
     "system": ""
   },
   {
     "instruction": "try_flush_macro函数的异步实现是如何工作的？",
     "input": "",
-    "output": "try_flush_macro函数的异步实现机制如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            let _ = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).try_flush().await;\n        }\n    })\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "try_flush_macro函数的异步实现机制如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            let _ = #new_context.try_flush().await;\n        }\n    })\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "try_flush_macro函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "try_flush_macro函数的返回值类型设计如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            let _ = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).try_flush().await;\n        }\n    })\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "try_flush_macro函数的返回值类型设计如下：\n\n```rust\n/// Expands macro to generate async try_flush call.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with try_flush call.\npub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            let _ = #new_context.try_flush().await;\n        }\n    })\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
@@ -26294,49 +26402,31 @@
   {
     "instruction": "closed_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "closed_macro函数的源码实现如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_closed(true);\n        }\n    })\n}\n```",
+    "output": "closed_macro函数的源码实现如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.set_closed(true);\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释closed_macro这个函数的实现逻辑和设计思路。",
     "input": "",
-    "output": "closed_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_closed(true);\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：7\n- 代码行数：22\n- 包含高级特性：泛型编程、异步编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "closed_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "closed_macro函数的泛型设计和使用如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_closed(true);\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "closed_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.set_closed(true);\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：23\n- 包含高级特性：异步编程、闭包",
     "system": ""
   },
   {
     "instruction": "closed_macro函数的异步实现是如何工作的？",
     "input": "",
-    "output": "closed_macro函数的异步实现机制如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_closed(true);\n        }\n    })\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "closed_macro函数的异步实现机制如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.set_closed(true);\n        }\n    })\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "closed_macro函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "closed_macro函数的返回值类型设计如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).set_closed(true);\n        }\n    })\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "closed_macro函数的返回值类型设计如下：\n\n```rust\n/// Expands the macro to generate an asynchronous closed call.\n///\n/// This macro takes a `TokenStream` as input, which typically represents\n/// the context of a function or block, and inserts a call to `.set_closed(true)`\n/// on that context. This is useful for ensuring that a component gracefully\n/// handles being closed.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The input `TokenStream` to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// Returns the expanded `TokenStream` with the closed call inserted.\npub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.set_closed(true);\n        }\n    })\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "request_body_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "request_body_macro函数的源码实现如下：\n\n```rust\n/// Gets raw request body and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with body extraction.\npub(crate) fn request_body_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);\n    inject(position, item, |context| {\n        let statements = multi_body.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestBody = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_body();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释request_body_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "request_body_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Gets raw request body and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with body extraction.\npub(crate) fn request_body_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);\n    inject(position, item, |context| {\n        let statements = multi_body.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestBody = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_body();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：29\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "request_body_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "request_body_macro函数的泛型设计和使用如下：\n\n```rust\n/// Gets raw request body and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with body extraction.\npub(crate) fn request_body_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);\n    inject(position, item, |context| {\n        let statements = multi_body.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestBody = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_body();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "request_body_macro函数的源码实现如下：\n\n```rust\n/// Gets raw request body and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with body extraction.\npub(crate) fn request_body_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        let statements = multi_body.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
     "system": ""
   },
   {
@@ -26402,19 +26492,7 @@
   {
     "instruction": "attributes_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "attributes_macro函数的源码实现如下：\n\n```rust\n/// Gets all request attributes and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with attributes extraction.\npub(crate) fn attributes_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);\n    inject(position, item, |context| {\n        let statements = multi_attrs.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::ThreadSafeAttributeStore = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_attributes();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释attributes_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "attributes_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Gets all request attributes and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with attributes extraction.\npub(crate) fn attributes_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);\n    inject(position, item, |context| {\n        let statements = multi_attrs.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::ThreadSafeAttributeStore = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_attributes();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：29\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "attributes_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "attributes_macro函数的泛型设计和使用如下：\n\n```rust\n/// Gets all request attributes and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with attributes extraction.\npub(crate) fn attributes_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);\n    inject(position, item, |context| {\n        let statements = multi_attrs.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::ThreadSafeAttributeStore = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_attributes();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "attributes_macro函数的源码实现如下：\n\n```rust\n/// Gets all request attributes and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with attributes extraction.\npub(crate) fn attributes_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        let statements = multi_attrs.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
     "system": ""
   },
   {
@@ -26492,19 +26570,7 @@
   {
     "instruction": "route_params_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "route_params_macro函数的源码实现如下：\n\n```rust\n/// Gets all route parameters and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with route params extraction.\npub(crate) fn route_params_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);\n    inject(position, item, |context| {\n        let statements = multi_route_params.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RouteParams = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_route_params();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释route_params_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "route_params_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Gets all route parameters and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with route params extraction.\npub(crate) fn route_params_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);\n    inject(position, item, |context| {\n        let statements = multi_route_params.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RouteParams = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_route_params();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：29\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "route_params_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "route_params_macro函数的泛型设计和使用如下：\n\n```rust\n/// Gets all route parameters and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with route params extraction.\npub(crate) fn route_params_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);\n    inject(position, item, |context| {\n        let statements = multi_route_params.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RouteParams = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_route_params();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "route_params_macro函数的源码实现如下：\n\n```rust\n/// Gets all route parameters and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with route params extraction.\npub(crate) fn route_params_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        let statements = multi_route_params.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
     "system": ""
   },
   {
@@ -26534,19 +26600,7 @@
   {
     "instruction": "request_querys_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "request_querys_macro函数的源码实现如下：\n\n```rust\n/// Gets all request query parameters and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with query params extraction.\npub(crate) fn request_querys_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);\n    inject(position, item, |context| {\n        let statements = multi_querys.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestQuerys = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_querys();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释request_querys_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "request_querys_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Gets all request query parameters and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with query params extraction.\npub(crate) fn request_querys_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);\n    inject(position, item, |context| {\n        let statements = multi_querys.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestQuerys = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_querys();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：29\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "request_querys_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "request_querys_macro函数的泛型设计和使用如下：\n\n```rust\n/// Gets all request query parameters and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with query params extraction.\npub(crate) fn request_querys_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);\n    inject(position, item, |context| {\n        let statements = multi_querys.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestQuerys = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_querys();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "request_querys_macro函数的源码实现如下：\n\n```rust\n/// Gets all request query parameters and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with query params extraction.\npub(crate) fn request_querys_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        let statements = multi_querys.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
     "system": ""
   },
   {
@@ -26576,19 +26630,7 @@
   {
     "instruction": "request_headers_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "request_headers_macro函数的源码实现如下：\n\n```rust\n/// Gets all request headers and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with headers extraction.\npub(crate) fn request_headers_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);\n    inject(position, item, |context| {\n        let statements = multi_headers.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestHeaders = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_headers();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释request_headers_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "request_headers_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Gets all request headers and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with headers extraction.\npub(crate) fn request_headers_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);\n    inject(position, item, |context| {\n        let statements = multi_headers.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestHeaders = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_headers();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：29\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "request_headers_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "request_headers_macro函数的泛型设计和使用如下：\n\n```rust\n/// Gets all request headers and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with headers extraction.\npub(crate) fn request_headers_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);\n    inject(position, item, |context| {\n        let statements = multi_headers.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestHeaders = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_headers();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "request_headers_macro函数的源码实现如下：\n\n```rust\n/// Gets all request headers and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with headers extraction.\npub(crate) fn request_headers_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        let statements = multi_headers.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
     "system": ""
   },
   {
@@ -26624,37 +26666,13 @@
   {
     "instruction": "request_version_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "request_version_macro函数的源码实现如下：\n\n```rust\n/// Gets request version and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with version extraction.\npub(crate) fn request_version_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_version: MultiRequestVersionData =\n        parse_macro_input!(attr as MultiRequestVersionData);\n    inject(position, item, |context| {\n        let statements = multi_version.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestVersion = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_version();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释request_version_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "request_version_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Gets request version and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with version extraction.\npub(crate) fn request_version_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_version: MultiRequestVersionData =\n        parse_macro_input!(attr as MultiRequestVersionData);\n    inject(position, item, |context| {\n        let statements = multi_version.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestVersion = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_version();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：30\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "request_version_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "request_version_macro函数的泛型设计和使用如下：\n\n```rust\n/// Gets request version and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with version extraction.\npub(crate) fn request_version_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_version: MultiRequestVersionData =\n        parse_macro_input!(attr as MultiRequestVersionData);\n    inject(position, item, |context| {\n        let statements = multi_version.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestVersion = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_version();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "request_version_macro函数的源码实现如下：\n\n```rust\n/// Gets request version and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with version extraction.\npub(crate) fn request_version_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_version: MultiRequestVersionData =\n        parse_macro_input!(attr as MultiRequestVersionData);\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        let statements = multi_version.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "request_path_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "request_path_macro函数的源码实现如下：\n\n```rust\n/// Gets request path and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with path extraction.\npub(crate) fn request_path_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);\n    inject(position, item, |context| {\n        let statements = multi_path.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestPath = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_path();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释request_path_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "request_path_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Gets request path and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with path extraction.\npub(crate) fn request_path_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);\n    inject(position, item, |context| {\n        let statements = multi_path.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestPath = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_path();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：29\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "request_path_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "request_path_macro函数的泛型设计和使用如下：\n\n```rust\n/// Gets request path and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with path extraction.\npub(crate) fn request_path_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);\n    inject(position, item, |context| {\n        let statements = multi_path.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestPath = std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_request().get_path();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "request_path_macro函数的源码实现如下：\n\n```rust\n/// Gets request path and assigns to specified variable.\n/// Supports both single and multiple variable extraction.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with path extraction.\npub(crate) fn request_path_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        let statements = multi_path.variables.iter().map(|variable| {\n            quote! {\n                let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();\n            }\n        });\n        quote! {\n            #(#statements)*\n        }\n    })\n}\n```",
     "system": ""
   },
   {
@@ -27332,115 +27350,43 @@
   {
     "instruction": "response_status_code_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "response_status_code_macro函数的源码实现如下：\n\n```rust\n/// Sets response status code from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with status code setting.\npub(crate) fn response_status_code_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释response_status_code_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "response_status_code_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sets response status code from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with status code setting.\npub(crate) fn response_status_code_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：26\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "response_status_code_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "response_status_code_macro函数的泛型设计和使用如下：\n\n```rust\n/// Sets response status code from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with status code setting.\npub(crate) fn response_status_code_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "response_status_code_macro函数的源码实现如下：\n\n```rust\n/// Sets response status code from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with status code setting.\npub(crate) fn response_status_code_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "response_reason_phrase_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "response_reason_phrase_macro函数的源码实现如下：\n\n```rust\n/// Sets response reason phrase from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with reason phrase setting.\npub(crate) fn response_reason_phrase_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_reason_phrase(&#value);\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释response_reason_phrase_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "response_reason_phrase_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sets response reason phrase from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with reason phrase setting.\npub(crate) fn response_reason_phrase_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_reason_phrase(&#value);\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：26\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "response_reason_phrase_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "response_reason_phrase_macro函数的泛型设计和使用如下：\n\n```rust\n/// Sets response reason phrase from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with reason phrase setting.\npub(crate) fn response_reason_phrase_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_reason_phrase(&#value);\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "response_reason_phrase_macro函数的源码实现如下：\n\n```rust\n/// Sets response reason phrase from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with reason phrase setting.\npub(crate) fn response_reason_phrase_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.get_mut_response().set_reason_phrase(&#value);\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "response_header_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "response_header_macro函数的源码实现如下：\n\n```rust\n/// Sets or replaces response header from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn response_header_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);\n    let key: Expr = header_data.key;\n    let value: Expr = header_data.value;\n    let operation: HeaderOperation = header_data.operation;\n    inject(position, item, |context| match operation {\n        HeaderOperation::Add => {\n            quote! {\n                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().add_header(&#key, &#value);\n            }\n        }\n        HeaderOperation::Set => {\n            quote! {\n                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_header(&#key, &#value);\n            }\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释response_header_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "response_header_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sets or replaces response header from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn response_header_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);\n    let key: Expr = header_data.key;\n    let value: Expr = header_data.value;\n    let operation: HeaderOperation = header_data.operation;\n    inject(position, item, |context| match operation {\n        HeaderOperation::Add => {\n            quote! {\n                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().add_header(&#key, &#value);\n            }\n        }\n        HeaderOperation::Set => {\n            quote! {\n                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_header(&#key, &#value);\n            }\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：33\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "response_header_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "response_header_macro函数的泛型设计和使用如下：\n\n```rust\n/// Sets or replaces response header from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn response_header_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);\n    let key: Expr = header_data.key;\n    let value: Expr = header_data.value;\n    let operation: HeaderOperation = header_data.operation;\n    inject(position, item, |context| match operation {\n        HeaderOperation::Add => {\n            quote! {\n                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().add_header(&#key, &#value);\n            }\n        }\n        HeaderOperation::Set => {\n            quote! {\n                std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_header(&#key, &#value);\n            }\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "response_header_macro函数的源码实现如下：\n\n```rust\n/// Sets or replaces response header from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn response_header_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);\n    let key: Expr = header_data.key;\n    let value: Expr = header_data.value;\n    let operation: HeaderOperation = header_data.operation;\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        match operation {\n            HeaderOperation::Add => {\n                quote! {\n                    #new_context.get_mut_response().add_header(&#key, &#value);\n                }\n            }\n            HeaderOperation::Set => {\n                quote! {\n                    #new_context.get_mut_response().set_header(&#key, &#value);\n                }\n            }\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "response_body_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "response_body_macro函数的源码实现如下：\n\n```rust\n/// Sets response body from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with body setting.\npub(crate) fn response_body_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);\n    let body: Expr = body_data.body;\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_body(&#body);\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释response_body_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "response_body_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sets response body from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with body setting.\npub(crate) fn response_body_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);\n    let body: Expr = body_data.body;\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_body(&#body);\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：24\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "response_body_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "response_body_macro函数的泛型设计和使用如下：\n\n```rust\n/// Sets response body from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with body setting.\npub(crate) fn response_body_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);\n    let body: Expr = body_data.body;\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_body(&#body);\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "response_body_macro函数的源码实现如下：\n\n```rust\n/// Sets response body from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with body setting.\npub(crate) fn response_body_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);\n    let body: Expr = body_data.body;\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.get_mut_response().set_body(&#body);\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "clear_response_headers_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "clear_response_headers_macro函数的源码实现如下：\n\n```rust\n/// Clears all response headers from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().clear_headers();\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释clear_response_headers_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "clear_response_headers_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Clears all response headers from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().clear_headers();\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：18\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "clear_response_headers_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "clear_response_headers_macro函数的泛型设计和使用如下：\n\n```rust\n/// Clears all response headers from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().clear_headers();\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "clear_response_headers_macro函数的源码实现如下：\n\n```rust\n/// Clears all response headers from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.get_mut_response().clear_headers();\n        }\n    })\n}\n```",
     "system": ""
   },
   {
     "instruction": "clear_response_headers_macro函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "clear_response_headers_macro函数的返回值类型设计如下：\n\n```rust\n/// Clears all response headers from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().clear_headers();\n        }\n    })\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "clear_response_headers_macro函数的返回值类型设计如下：\n\n```rust\n/// Clears all response headers from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with header operation.\npub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.get_mut_response().clear_headers();\n        }\n    })\n}\n```\n\n返回类型：TokenStream\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "response_version_macro函数的源码是怎么实现的？",
     "input": "",
-    "output": "response_version_macro函数的源码实现如下：\n\n```rust\n/// Sets response version from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with version setting.\npub(crate) fn response_version_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_version(#value);\n        }\n    })\n}\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释response_version_macro这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "response_version_macro函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Sets response version from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with version setting.\npub(crate) fn response_version_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_version(#value);\n        }\n    })\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：5\n- 代码行数：26\n- 包含高级特性：泛型编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "response_version_macro函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "response_version_macro函数的泛型设计和使用如下：\n\n```rust\n/// Sets response version from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with version setting.\npub(crate) fn response_version_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        quote! {\n            std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize).get_mut_response().set_version(#value);\n        }\n    })\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "response_version_macro函数的源码实现如下：\n\n```rust\n/// Sets response version from macro input.\n///\n/// # Arguments\n///\n/// - `TokenStream` - The attribute token stream.\n/// - `TokenStream` - The input token stream to process.\n/// - `Position` - The position to inject the code.\n///\n/// # Returns\n///\n/// - `TokenStream` - The expanded token stream with version setting.\npub(crate) fn response_version_macro(\n    attr: TokenStream,\n    item: TokenStream,\n    position: Position,\n) -> TokenStream {\n    let value: Expr = match parse(attr) {\n        Ok(v) => v,\n        Err(err) => return err.to_compile_error().into(),\n    };\n    inject(position, item, |context| {\n        let new_context: TokenStream2 = into_new_context(context);\n        quote! {\n            #new_context.get_mut_response().set_version(#value);\n        }\n    })\n}\n```",
     "system": ""
   },
   {
