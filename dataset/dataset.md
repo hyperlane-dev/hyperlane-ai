@@ -1,4 +1,4 @@
-<!--2026-02-27 18:53:23-->
+<!--2026-02-28 02:13:15-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -37,7 +37,6 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
-    net::SocketAddr,
     pin::Pin,
     sync::{Arc, OnceLock},
 };
@@ -220,41 +219,6 @@ impl Context {
     #[inline(always)]
     pub(crate) fn is_keep_alive(&self, keep_alive: bool) -> bool {
         !self.get_closed() && keep_alive
-    }
-    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {
-        self.try_get_stream()
-            .as_ref()?
-            .read()
-            .await
-            .peer_addr()
-            .ok()
-    }
-    pub async fn get_socket_addr(&self) -> SocketAddr {
-        self.try_get_socket_addr().await.unwrap()
-    }
-    pub async fn try_get_socket_addr_string(&self) -> Option<String> {
-        self.try_get_socket_addr()
-            .await
-            .map(|data| data.to_string())
-    }
-    pub async fn get_socket_addr_string(&self) -> String {
-        self.get_socket_addr().await.to_string()
-    }
-    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {
-        self.try_get_socket_addr()
-            .await
-            .map(|socket_addr: SocketAddr| socket_addr.ip())
-    }
-    pub async fn get_socket_host(&self) -> SocketHost {
-        self.try_get_socket_host().await.unwrap()
-    }
-    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {
-        self.try_get_socket_addr()
-            .await
-            .map(|socket_addr: SocketAddr| socket_addr.port())
-    }
-    pub async fn get_socket_port(&self) -> SocketPort {
-        self.try_get_socket_port().await.unwrap()
     }
     #[inline(always)]
     pub fn try_get_route_param<T>(&self, name: T) -> Option<String>
@@ -470,9 +434,8 @@ pub struct Context {
     pub(super) aborted: bool,
     #[get(type(copy))]
     pub(super) closed: bool,
-    #[get(pub(crate))]
     #[get_mut(skip)]
-    #[set(pub(crate))]
+    #[set(pub(super))]
     pub(super) stream: Option<ArcRwLockStream>,
     #[get_mut(skip)]
     #[set(pub(super))]
@@ -1642,7 +1605,15 @@ struct RequestMiddleware {
 }
 impl ServerHook for RequestMiddleware {
     async fn new(ctx: &mut Context) -> Self {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
+        let mut socket_addr: String = String::new();
+        if let Some(stream) = ctx.try_get_stream().as_ref() {
+            socket_addr = stream
+                .read()
+                .await
+                .peer_addr()
+                .map(|data| data.to_string())
+                .unwrap_or_default();
+        }
         Self { socket_addr }
     }
     async fn handle(self, ctx: &mut Context) {
@@ -3788,7 +3759,15 @@ struct RequestMiddleware {
 }
 impl ServerHook for RequestMiddleware {
     async fn new(ctx: &mut Context) -> Self {
-        let socket_addr: String = ctx.get_socket_addr_string().await;
+        let mut socket_addr: String = String::new();
+        if let Some(stream) = ctx.try_get_stream().as_ref() {
+            socket_addr = stream
+                .read()
+                .await
+                .peer_addr()
+                .map(|data| data.to_string())
+                .unwrap_or_default();
+        }
         Self { socket_addr }
     }
     async fn handle(self, ctx: &mut Context) {
@@ -11841,11 +11820,19 @@ impl ServerHook for ResponseHeaderMiddleware {
     #[response_header(TRACE => uuid::Uuid::new_v4().to_string())]
     #[epilogue_macros(
         response_header(CONTENT_TYPE => content_type),
-        response_header("SocketAddr" => socket_addr_string)
+        response_header("SocketAddr" => socket_addr)
     )]
     #[instrument_trace]
     async fn handle(self, ctx: &mut Context) {
-        let socket_addr_string: String = ctx.get_socket_addr_string().await;
+        let mut socket_addr: String = String::new();
+        if let Some(stream) = ctx.try_get_stream().as_ref() {
+            socket_addr = stream
+                .read()
+                .await
+                .peer_addr()
+                .map(|data| data.to_string())
+                .unwrap_or_default();
+        }
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
     }
 }

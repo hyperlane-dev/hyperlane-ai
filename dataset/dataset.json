@@ -354,198 +354,6 @@
     "system": ""
   },
   {
-    "instruction": "try_get_socket_addr函数的源码是怎么实现的？",
-    "input": "",
-    "output": "try_get_socket_addr函数的源码实现如下：\n\n```rust\n/// Retrieves the remote socket address of the connection.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketAddr>` - The socket address of the remote peer if available.\n    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {\n        self.try_get_stream()\n            .as_ref()?\n            .read()\n            .await\n            .peer_addr()\n            .ok()\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释try_get_socket_addr这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "try_get_socket_addr函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves the remote socket address of the connection.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketAddr>` - The socket address of the remote peer if available.\n    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {\n        self.try_get_stream()\n            .as_ref()?\n            .read()\n            .await\n            .peer_addr()\n            .ok()\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：13\n- 包含高级特性：泛型编程、异步编程",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_addr函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "try_get_socket_addr函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves the remote socket address of the connection.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketAddr>` - The socket address of the remote peer if available.\n    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {\n        self.try_get_stream()\n            .as_ref()?\n            .read()\n            .await\n            .peer_addr()\n            .ok()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_addr函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "try_get_socket_addr函数的异步实现机制如下：\n\n```rust\n/// Retrieves the remote socket address of the connection.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketAddr>` - The socket address of the remote peer if available.\n    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {\n        self.try_get_stream()\n            .as_ref()?\n            .read()\n            .await\n            .peer_addr()\n            .ok()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_addr函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "try_get_socket_addr函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the remote socket address of the connection.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketAddr>` - The socket address of the remote peer if available.\n    pub async fn try_get_socket_addr(&self) -> Option<SocketAddr> {\n        self.try_get_stream()\n            .as_ref()?\n            .read()\n            .await\n            .peer_addr()\n            .ok()\n    }\n```\n\n返回类型：Option<SocketAddr>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_addr函数的源码是怎么实现的？",
-    "input": "",
-    "output": "get_socket_addr函数的源码实现如下：\n\n```rust\n/// Retrieves the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketAddr` - The socket address of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_addr(&self) -> SocketAddr {\n        self.try_get_socket_addr().await.unwrap()\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_addr函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "get_socket_addr函数的异步实现机制如下：\n\n```rust\n/// Retrieves the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketAddr` - The socket address of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_addr(&self) -> SocketAddr {\n        self.try_get_socket_addr().await.unwrap()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_addr函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "get_socket_addr函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketAddr` - The socket address of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_addr(&self) -> SocketAddr {\n        self.try_get_socket_addr().await.unwrap()\n    }\n```\n\n返回类型：SocketAddr\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_addr_string函数的源码是怎么实现的？",
-    "input": "",
-    "output": "try_get_socket_addr_string函数的源码实现如下：\n\n```rust\n/// Retrieves the remote socket address as a string.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<String>` - The string representation of the socket address if available.\n    pub async fn try_get_socket_addr_string(&self) -> Option<String> {\n        self.try_get_socket_addr()\n            .await\n            .map(|data| data.to_string())\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释try_get_socket_addr_string这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "try_get_socket_addr_string函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves the remote socket address as a string.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<String>` - The string representation of the socket address if available.\n    pub async fn try_get_socket_addr_string(&self) -> Option<String> {\n        self.try_get_socket_addr()\n            .await\n            .map(|data| data.to_string())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：10\n- 包含高级特性：泛型编程、异步编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_addr_string函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "try_get_socket_addr_string函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves the remote socket address as a string.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<String>` - The string representation of the socket address if available.\n    pub async fn try_get_socket_addr_string(&self) -> Option<String> {\n        self.try_get_socket_addr()\n            .await\n            .map(|data| data.to_string())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_addr_string函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "try_get_socket_addr_string函数的异步实现机制如下：\n\n```rust\n/// Retrieves the remote socket address as a string.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<String>` - The string representation of the socket address if available.\n    pub async fn try_get_socket_addr_string(&self) -> Option<String> {\n        self.try_get_socket_addr()\n            .await\n            .map(|data| data.to_string())\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_addr_string函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "try_get_socket_addr_string函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the remote socket address as a string.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<String>` - The string representation of the socket address if available.\n    pub async fn try_get_socket_addr_string(&self) -> Option<String> {\n        self.try_get_socket_addr()\n            .await\n            .map(|data| data.to_string())\n    }\n```\n\n返回类型：Option<String>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_addr_string函数的源码是怎么实现的？",
-    "input": "",
-    "output": "get_socket_addr_string函数的源码实现如下：\n\n```rust\n/// Retrieves the remote socket address as a string.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The string representation of the socket address.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_addr_string(&self) -> String {\n        self.get_socket_addr().await.to_string()\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_addr_string函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "get_socket_addr_string函数的异步实现机制如下：\n\n```rust\n/// Retrieves the remote socket address as a string.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The string representation of the socket address.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_addr_string(&self) -> String {\n        self.get_socket_addr().await.to_string()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_addr_string函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "get_socket_addr_string函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the remote socket address as a string.\n    ///\n    /// # Returns\n    ///\n    /// - `String` - The string representation of the socket address.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_addr_string(&self) -> String {\n        self.get_socket_addr().await.to_string()\n    }\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_host函数的源码是怎么实现的？",
-    "input": "",
-    "output": "try_get_socket_host函数的源码实现如下：\n\n```rust\n/// Retrieves the IP address part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketHost>` - The IP address of the remote peer.\n    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.ip())\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释try_get_socket_host这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "try_get_socket_host函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves the IP address part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketHost>` - The IP address of the remote peer.\n    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.ip())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：10\n- 包含高级特性：泛型编程、异步编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_host函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "try_get_socket_host函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves the IP address part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketHost>` - The IP address of the remote peer.\n    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.ip())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_host函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "try_get_socket_host函数的异步实现机制如下：\n\n```rust\n/// Retrieves the IP address part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketHost>` - The IP address of the remote peer.\n    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.ip())\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_host函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "try_get_socket_host函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the IP address part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketHost>` - The IP address of the remote peer.\n    pub async fn try_get_socket_host(&self) -> Option<SocketHost> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.ip())\n    }\n```\n\n返回类型：Option<SocketHost>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_host函数的源码是怎么实现的？",
-    "input": "",
-    "output": "get_socket_host函数的源码实现如下：\n\n```rust\n/// Retrieves the IP address part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketHost` - The IP address of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_host(&self) -> SocketHost {\n        self.try_get_socket_host().await.unwrap()\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_host函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "get_socket_host函数的异步实现机制如下：\n\n```rust\n/// Retrieves the IP address part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketHost` - The IP address of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_host(&self) -> SocketHost {\n        self.try_get_socket_host().await.unwrap()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_host函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "get_socket_host函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the IP address part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketHost` - The IP address of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_host(&self) -> SocketHost {\n        self.try_get_socket_host().await.unwrap()\n    }\n```\n\n返回类型：SocketHost\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_port函数的源码是怎么实现的？",
-    "input": "",
-    "output": "try_get_socket_port函数的源码实现如下：\n\n```rust\n/// Retrieves the port number part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketPort>` - The port number of the remote peer if available.\n    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.port())\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "请解释try_get_socket_port这个函数的实现逻辑和设计思路。",
-    "input": "",
-    "output": "try_get_socket_port函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Retrieves the port number part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketPort>` - The port number of the remote peer if available.\n    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.port())\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：10\n- 包含高级特性：泛型编程、异步编程、闭包",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_port函数中的泛型是如何设计和使用的？",
-    "input": "",
-    "output": "try_get_socket_port函数的泛型设计和使用如下：\n\n```rust\n/// Retrieves the port number part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketPort>` - The port number of the remote peer if available.\n    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.port())\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_port函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "try_get_socket_port函数的异步实现机制如下：\n\n```rust\n/// Retrieves the port number part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketPort>` - The port number of the remote peer if available.\n    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.port())\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "try_get_socket_port函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "try_get_socket_port函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the port number part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<SocketPort>` - The port number of the remote peer if available.\n    pub async fn try_get_socket_port(&self) -> Option<SocketPort> {\n        self.try_get_socket_addr()\n            .await\n            .map(|socket_addr: SocketAddr| socket_addr.port())\n    }\n```\n\n返回类型：Option<SocketPort>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_port函数的源码是怎么实现的？",
-    "input": "",
-    "output": "get_socket_port函数的源码实现如下：\n\n```rust\n/// Retrieves the port number part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketPort` - The port number of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_port(&self) -> SocketPort {\n        self.try_get_socket_port().await.unwrap()\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_port函数的异步实现是如何工作的？",
-    "input": "",
-    "output": "get_socket_port函数的异步实现机制如下：\n\n```rust\n/// Retrieves the port number part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketPort` - The port number of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_port(&self) -> SocketPort {\n        self.try_get_socket_port().await.unwrap()\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "get_socket_port函数的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "get_socket_port函数的返回值类型设计如下：\n\n```rust\n/// Retrieves the port number part of the remote socket address.\n    ///\n    /// # Returns\n    ///\n    /// - `SocketPort` - The port number of the remote peer.\n    ///\n    /// # Panics\n    ///\n    /// - If the socket address is not found.\n    pub async fn get_socket_port(&self) -> SocketPort {\n        self.try_get_socket_port().await.unwrap()\n    }\n```\n\n返回类型：SocketPort\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
     "instruction": "try_get_route_param函数的源码是怎么实现的？",
     "input": "",
     "output": "try_get_route_param函数的源码实现如下：\n\n```rust\n/// Attempts to retrieve a specific route parameter by its name.\n    ///\n    /// # Arguments\n    ///\n    /// - `AsRef<str>` - The name of the route parameter to retrieve.\n    ///\n    /// # Returns\n    ///\n    /// - `Option<String>` - The value of the route parameter if it exists.\n    #[inline(always)]\n    pub fn try_get_route_param<T>(&self, name: T) -> Option<String>\n    where\n        T: AsRef<str>,\n    {\n        self.get_route_params().get(name.as_ref()).cloned()\n    }\n```",
@@ -1214,19 +1022,19 @@
   {
     "instruction": "Context结构体的源码是怎么实现的？",
     "input": "",
-    "output": "Context结构体的源码实现如下：\n\n```rust\n/// Represents the internal state of the application context.\n///\n/// This structure holds all the data associated with a single request-response cycle,\n/// including the stream, request, response, and any custom attributes.\n#[derive(Clone, CustomDebug, Data, DisplayDebug)]\npub struct Context {\n    /// A flag indicating whether the request handling has been aborted.\n    #[get(type(copy))]\n    pub(super) aborted: bool,\n    /// A flag indicating whether the connection has been closed.\n    #[get(type(copy))]\n    pub(super) closed: bool,\n    /// The underlying network stream for the connection.\n    #[get(pub(crate))]\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) stream: Option<ArcRwLockStream>,\n    /// The incoming HTTP request.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) request: Request,\n    /// The outgoing HTTP response.\n    pub(super) response: Response,\n    /// Parameters extracted from the route path.\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) route_params: RouteParams,\n    /// A collection of custom attributes for sharing data within the request lifecycle.\n    #[get_mut(pub(super))]\n    #[set(pub(super))]\n    pub(super) attributes: ThreadSafeAttributeStore,\n    /// The server for accessing server-wide configuration and state.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) server: &'static Server,\n}\n```",
+    "output": "Context结构体的源码实现如下：\n\n```rust\n/// Represents the internal state of the application context.\n///\n/// This structure holds all the data associated with a single request-response cycle,\n/// including the stream, request, response, and any custom attributes.\n#[derive(Clone, CustomDebug, Data, DisplayDebug)]\npub struct Context {\n    /// A flag indicating whether the request handling has been aborted.\n    #[get(type(copy))]\n    pub(super) aborted: bool,\n    /// A flag indicating whether the connection has been closed.\n    #[get(type(copy))]\n    pub(super) closed: bool,\n    /// The underlying network stream for the connection.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) stream: Option<ArcRwLockStream>,\n    /// The incoming HTTP request.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) request: Request,\n    /// The outgoing HTTP response.\n    pub(super) response: Response,\n    /// Parameters extracted from the route path.\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) route_params: RouteParams,\n    /// A collection of custom attributes for sharing data within the request lifecycle.\n    #[get_mut(pub(super))]\n    #[set(pub(super))]\n    pub(super) attributes: ThreadSafeAttributeStore,\n    /// The server for accessing server-wide configuration and state.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) server: &'static Server,\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释Context这个结构体的实现逻辑和设计思路。",
     "input": "",
-    "output": "Context结构体的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Represents the internal state of the application context.\n///\n/// This structure holds all the data associated with a single request-response cycle,\n/// including the stream, request, response, and any custom attributes.\n#[derive(Clone, CustomDebug, Data, DisplayDebug)]\npub struct Context {\n    /// A flag indicating whether the request handling has been aborted.\n    #[get(type(copy))]\n    pub(super) aborted: bool,\n    /// A flag indicating whether the connection has been closed.\n    #[get(type(copy))]\n    pub(super) closed: bool,\n    /// The underlying network stream for the connection.\n    #[get(pub(crate))]\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) stream: Option<ArcRwLockStream>,\n    /// The incoming HTTP request.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) request: Request,\n    /// The outgoing HTTP response.\n    pub(super) response: Response,\n    /// Parameters extracted from the route path.\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) route_params: RouteParams,\n    /// A collection of custom attributes for sharing data within the request lifecycle.\n    #[get_mut(pub(super))]\n    #[set(pub(super))]\n    pub(super) attributes: ThreadSafeAttributeStore,\n    /// The server for accessing server-wide configuration and state.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) server: &'static Server,\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：36\n- 包含高级特性：泛型编程、生命周期管理",
+    "output": "Context结构体的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n/// Represents the internal state of the application context.\n///\n/// This structure holds all the data associated with a single request-response cycle,\n/// including the stream, request, response, and any custom attributes.\n#[derive(Clone, CustomDebug, Data, DisplayDebug)]\npub struct Context {\n    /// A flag indicating whether the request handling has been aborted.\n    #[get(type(copy))]\n    pub(super) aborted: bool,\n    /// A flag indicating whether the connection has been closed.\n    #[get(type(copy))]\n    pub(super) closed: bool,\n    /// The underlying network stream for the connection.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) stream: Option<ArcRwLockStream>,\n    /// The incoming HTTP request.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) request: Request,\n    /// The outgoing HTTP response.\n    pub(super) response: Response,\n    /// Parameters extracted from the route path.\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) route_params: RouteParams,\n    /// A collection of custom attributes for sharing data within the request lifecycle.\n    #[get_mut(pub(super))]\n    #[set(pub(super))]\n    pub(super) attributes: ThreadSafeAttributeStore,\n    /// The server for accessing server-wide configuration and state.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) server: &'static Server,\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：35\n- 包含高级特性：泛型编程、生命周期管理",
     "system": ""
   },
   {
     "instruction": "Context结构体中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "Context结构体的泛型设计和使用如下：\n\n```rust\n/// Represents the internal state of the application context.\n///\n/// This structure holds all the data associated with a single request-response cycle,\n/// including the stream, request, response, and any custom attributes.\n#[derive(Clone, CustomDebug, Data, DisplayDebug)]\npub struct Context {\n    /// A flag indicating whether the request handling has been aborted.\n    #[get(type(copy))]\n    pub(super) aborted: bool,\n    /// A flag indicating whether the connection has been closed.\n    #[get(type(copy))]\n    pub(super) closed: bool,\n    /// The underlying network stream for the connection.\n    #[get(pub(crate))]\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) stream: Option<ArcRwLockStream>,\n    /// The incoming HTTP request.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) request: Request,\n    /// The outgoing HTTP response.\n    pub(super) response: Response,\n    /// Parameters extracted from the route path.\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) route_params: RouteParams,\n    /// A collection of custom attributes for sharing data within the request lifecycle.\n    #[get_mut(pub(super))]\n    #[set(pub(super))]\n    pub(super) attributes: ThreadSafeAttributeStore,\n    /// The server for accessing server-wide configuration and state.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) server: &'static Server,\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Context结构体的泛型设计和使用如下：\n\n```rust\n/// Represents the internal state of the application context.\n///\n/// This structure holds all the data associated with a single request-response cycle,\n/// including the stream, request, response, and any custom attributes.\n#[derive(Clone, CustomDebug, Data, DisplayDebug)]\npub struct Context {\n    /// A flag indicating whether the request handling has been aborted.\n    #[get(type(copy))]\n    pub(super) aborted: bool,\n    /// A flag indicating whether the connection has been closed.\n    #[get(type(copy))]\n    pub(super) closed: bool,\n    /// The underlying network stream for the connection.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) stream: Option<ArcRwLockStream>,\n    /// The incoming HTTP request.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) request: Request,\n    /// The outgoing HTTP response.\n    pub(super) response: Response,\n    /// Parameters extracted from the route path.\n    #[get_mut(skip)]\n    #[set(pub(crate))]\n    pub(super) route_params: RouteParams,\n    /// A collection of custom attributes for sharing data within the request lifecycle.\n    #[get_mut(pub(super))]\n    #[set(pub(super))]\n    pub(super) attributes: ThreadSafeAttributeStore,\n    /// The server for accessing server-wide configuration and state.\n    #[get_mut(skip)]\n    #[set(pub(super))]\n    pub(super) server: &'static Server,\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
@@ -3242,31 +3050,37 @@
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释ServerHook::new这个方法的实现逻辑和设计思路。",
+    "input": "",
+    "output": "ServerHook::new方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：12\n- 包含高级特性：异步编程、闭包",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -6944,31 +6758,37 @@
   {
     "instruction": "ServerHook::new方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释ServerHook::new这个方法的实现逻辑和设计思路。",
+    "input": "",
+    "output": "ServerHook::new方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：12\n- 包含高级特性：异步编程、闭包",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "ServerHook::new方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let socket_addr: String = ctx.get_socket_addr_string().await;\n        Self { socket_addr }\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(ctx: &mut Context) -> Self {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        Self { socket_addr }\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -31172,25 +30992,25 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let socket_addr_string: String = ctx.get_socket_addr_string().await;\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
