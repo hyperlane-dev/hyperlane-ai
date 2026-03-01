@@ -1,4 +1,4 @@
-<!--2026-03-01 06:55:10-->
+<!--2026-03-01 12:58:55-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -12119,7 +12119,7 @@ impl ServerHook for FaviconRoute {
     }
     #[prologue_macros(
         get_method,
-        response_status_code(301),
+        response_status_code(302),
         response_header(LOCATION => LOGO_IMG_URL)
     )]
     #[instrument_trace]
