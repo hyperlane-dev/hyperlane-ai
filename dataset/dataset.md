@@ -1,4 +1,4 @@
-<!--2026-03-01 02:44:36-->
+<!--2026-03-01 06:55:10-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -8614,6 +8614,7 @@ pub trait DatabaseAutoCreation: Clone + Send + Sync + 'static {
     fn create_tables_if_not_exist(
         &self,
     ) -> impl Future<Output = Result<Vec<String>, AutoCreationError>> + Send;
+    fn init_data(&self) -> impl Future<Output = Result<(), AutoCreationError>> + Send;
     fn verify_connection(&self) -> impl Future<Output = Result<(), AutoCreationError>> + Send;
 }
 ```
@@ -9714,6 +9715,10 @@ impl DatabaseAutoCreation for RedisAutoCreation {
         Ok(setup_operations)
     }
     #[instrument_trace]
+    async fn init_data(&self) -> Result<(), AutoCreationError> {
+        Ok(())
+    }
+    #[instrument_trace]
     async fn verify_connection(&self) -> Result<(), AutoCreationError> {
         match self.validate_redis_server().await {
             Ok(_) => {
@@ -9962,6 +9967,26 @@ impl DatabaseConnectionPlugin for MySqlPlugin {
                 result.get_mut_errors().push(error.to_string());
             }
         }
+        if let Err(error) = auto_creator.create_indexes().await {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Index creation",
+                PluginType::MySQL,
+                Some(instance.get_database().as_str()),
+            )
+            .await;
+            result.get_mut_errors().push(error.to_string());
+        }
+        if let Err(error) = auto_creator.init_data().await {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Init data",
+                PluginType::MySQL,
+                Some(instance.get_database().as_str()),
+            )
+            .await;
+            result.get_mut_errors().push(error.to_string());
+        }
         if let Err(error) = auto_creator.verify_connection().await {
             AutoCreationLogger::log_auto_creation_error(
                 &error,
@@ -10179,6 +10204,35 @@ impl MySqlAutoCreation {
     fn get_database_schema(&self) -> &DatabaseSchema {
         &self.schema
     }
+    #[instrument_trace]
+    async fn create_indexes(&self) -> Result<(), AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let schema: &DatabaseSchema = self.get_database_schema();
+        for index_sql in schema.get_indexes() {
+            if let Err(error) = self.execute_sql(&connection, index_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Index creation",
+                    PluginType::MySQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        for constraint_sql in schema.get_constraints() {
+            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Constraint creation",
+                    PluginType::MySQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        let _: Result<(), DbErr> = connection.close().await;
+        Ok(())
+    }
 }
 impl DatabaseAutoCreation for MySqlAutoCreation {
     type InstanceConfig = MySqlInstanceConfig;
@@ -10227,28 +10281,6 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
                 .await;
             }
         }
-        for index_sql in schema.get_indexes() {
-            if let Err(error) = self.execute_sql(&connection, index_sql).await {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Index creation",
-                    PluginType::MySQL,
-                    Some(self.instance.get_database().as_str()),
-                )
-                .await;
-            }
-        }
-        for constraint_sql in schema.get_constraints() {
-            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Constraint creation",
-                    PluginType::MySQL,
-                    Some(self.instance.get_database().as_str()),
-                )
-                .await;
-            }
-        }
         let _: Result<(), DbErr> = connection.close().await;
         AutoCreationLogger::log_tables_created(
             &created_tables,
@@ -10257,6 +10289,24 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
         )
         .await;
         Ok(created_tables)
+    }
+    #[instrument_trace]
+    async fn init_data(&self) -> Result<(), AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let schema: &DatabaseSchema = self.get_database_schema();
+        for init_data_sql in schema.get_init_data() {
+            if let Err(error) = self.execute_sql(&connection, init_data_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Init data insertion",
+                    PluginType::MySQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        let _: Result<(), DbErr> = connection.close().await;
+        Ok(())
     }
     #[instrument_trace]
     async fn verify_connection(&self) -> Result<(), AutoCreationError> {
@@ -10534,6 +10584,26 @@ impl DatabaseConnectionPlugin for PostgreSqlPlugin {
                 result.get_mut_errors().push(error.to_string());
             }
         }
+        if let Err(error) = auto_creator.create_indexes().await {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Index creation",
+                PluginType::PostgreSQL,
+                Some(instance.get_database().as_str()),
+            )
+            .await;
+            result.get_mut_errors().push(error.to_string());
+        }
+        if let Err(error) = auto_creator.init_data().await {
+            AutoCreationLogger::log_auto_creation_error(
+                &error,
+                "Init data",
+                PluginType::PostgreSQL,
+                Some(instance.get_database().as_str()),
+            )
+            .await;
+            result.get_mut_errors().push(error.to_string());
+        }
         if let Err(error) = auto_creator.verify_connection().await {
             AutoCreationLogger::log_auto_creation_error(
                 &error,
@@ -10756,6 +10826,35 @@ impl PostgreSqlAutoCreation {
     fn get_database_schema(&self) -> &DatabaseSchema {
         &self.schema
     }
+    #[instrument_trace]
+    async fn create_indexes(&self) -> Result<(), AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let schema: &DatabaseSchema = self.get_database_schema();
+        for index_sql in schema.get_indexes() {
+            if let Err(error) = self.execute_sql(&connection, index_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Index creation",
+                    PluginType::PostgreSQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        for constraint_sql in schema.get_constraints() {
+            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Constraint creation",
+                    PluginType::PostgreSQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        let _: Result<(), DbErr> = connection.close().await;
+        Ok(())
+    }
 }
 impl DatabaseAutoCreation for PostgreSqlAutoCreation {
     type InstanceConfig = PostgreSqlInstanceConfig;
@@ -10804,28 +10903,6 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
                 .await;
             }
         }
-        for index_sql in schema.get_indexes() {
-            if let Err(error) = self.execute_sql(&connection, index_sql).await {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Index creation",
-                    PluginType::PostgreSQL,
-                    Some(self.instance.get_database().as_str()),
-                )
-                .await;
-            }
-        }
-        for constraint_sql in schema.get_constraints() {
-            if let Err(error) = self.execute_sql(&connection, constraint_sql).await {
-                AutoCreationLogger::log_auto_creation_error(
-                    &error,
-                    "Constraint creation",
-                    PluginType::PostgreSQL,
-                    Some(self.instance.get_database().as_str()),
-                )
-                .await;
-            }
-        }
         let _: Result<(), DbErr> = connection.close().await;
         AutoCreationLogger::log_tables_created(
             &created_tables,
@@ -10834,6 +10911,24 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
         )
         .await;
         Ok(created_tables)
+    }
+    #[instrument_trace]
+    async fn init_data(&self) -> Result<(), AutoCreationError> {
+        let connection: DatabaseConnection = self.create_target_connection().await?;
+        let schema: &DatabaseSchema = self.get_database_schema();
+        for init_data_sql in schema.get_init_data() {
+            if let Err(error) = self.execute_sql(&connection, init_data_sql).await {
+                AutoCreationLogger::log_auto_creation_error(
+                    &error,
+                    "Init data insertion",
+                    PluginType::PostgreSQL,
+                    Some(self.instance.get_database().as_str()),
+                )
+                .await;
+            }
+        }
+        let _: Result<(), DbErr> = connection.close().await;
+        Ok(())
     }
     #[instrument_trace]
     async fn verify_connection(&self) -> Result<(), AutoCreationError> {
@@ -11021,6 +11116,7 @@ mod r#struct;
 pub use {r#enum::*, r#struct::*};
 use {super::*, env::*, mysql::*, postgresql::*, redis::*};
 use std::{
+    fmt,
     str::FromStr,
     time::{Duration, Instant},
 };
@@ -11028,6 +11124,72 @@ use std::{
 # Path: hyperlane-quick-start/plugin/database/impl.rs
 ```rust
 use super::*;
+impl fmt::Display for PluginType {
+    #[instrument_trace]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MySQL => write!(f, "MySQL"),
+            Self::PostgreSQL => write!(f, "PostgreSQL"),
+            Self::Redis => write!(f, "Redis"),
+        }
+    }
+}
+impl FromStr for PluginType {
+    type Err = ();
+    #[instrument_trace]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "MySQL" => Ok(Self::MySQL),
+            "PostgreSQL" => Ok(Self::PostgreSQL),
+            "Redis" => Ok(Self::Redis),
+            _ => Err(()),
+        }
+    }
+}
+impl std::fmt::Display for AutoCreationError {
+    #[instrument_trace]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InsufficientPermissions(msg) => {
+                write!(f, "Insufficient permissions {msg}")
+            }
+            Self::ConnectionFailed(msg) => write!(f, "Connection failed {msg}"),
+            Self::SchemaError(msg) => write!(f, "Schema error {msg}"),
+            Self::Timeout(msg) => write!(f, "Timeout {msg}"),
+            Self::DatabaseError(msg) => write!(f, "Database error {msg}"),
+        }
+    }
+}
+impl std::error::Error for AutoCreationError {}
+impl AutoCreationError {
+    #[instrument_trace]
+    pub fn should_continue(&self) -> bool {
+        match self {
+            Self::InsufficientPermissions(_) => true,
+            Self::ConnectionFailed(_) => false,
+            Self::SchemaError(_) => true,
+            Self::Timeout(_) => true,
+            Self::DatabaseError(_) => true,
+        }
+    }
+    #[instrument_trace]
+    pub fn user_message(&self) -> &str {
+        match self {
+            Self::InsufficientPermissions(msg) => msg,
+            Self::ConnectionFailed(msg) => msg,
+            Self::SchemaError(msg) => msg,
+            Self::Timeout(msg) => msg,
+            Self::DatabaseError(msg) => msg,
+        }
+    }
+}
+impl TableSchema {
+    #[instrument_trace]
+    pub fn with_dependency(mut self, dependency: String) -> Self {
+        self.get_mut_dependencies().push(dependency);
+        self
+    }
+}
 impl DatabasePlugin {
     #[instrument_trace]
     pub fn get_connection_timeout_duration() -> Duration {
@@ -11170,71 +11332,6 @@ impl<T: Clone> ConnectionCache<T> {
         self.try_get_result().is_err() && self.is_expired(duration)
     }
 }
-impl PluginType {
-    #[instrument_trace]
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::MySQL => "MySQL",
-            Self::PostgreSQL => "PostgreSQL",
-            Self::Redis => "Redis",
-        }
-    }
-}
-impl FromStr for PluginType {
-    type Err = ();
-    #[instrument_trace]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "MySQL" => Ok(Self::MySQL),
-            "PostgreSQL" => Ok(Self::PostgreSQL),
-            "Redis" => Ok(Self::Redis),
-            _ => Err(()),
-        }
-    }
-}
-impl std::fmt::Display for PluginType {
-    #[instrument_trace]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-impl AutoCreationError {
-    #[instrument_trace]
-    pub fn should_continue(&self) -> bool {
-        match self {
-            Self::InsufficientPermissions(_) => true,
-            Self::ConnectionFailed(_) => false,
-            Self::SchemaError(_) => true,
-            Self::Timeout(_) => true,
-            Self::DatabaseError(_) => true,
-        }
-    }
-    #[instrument_trace]
-    pub fn user_message(&self) -> &str {
-        match self {
-            Self::InsufficientPermissions(msg) => msg,
-            Self::ConnectionFailed(msg) => msg,
-            Self::SchemaError(msg) => msg,
-            Self::Timeout(msg) => msg,
-            Self::DatabaseError(msg) => msg,
-        }
-    }
-}
-impl std::fmt::Display for AutoCreationError {
-    #[instrument_trace]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InsufficientPermissions(msg) => {
-                write!(f, "Insufficient permissions {msg}")
-            }
-            Self::ConnectionFailed(msg) => write!(f, "Connection failed {msg}"),
-            Self::SchemaError(msg) => write!(f, "Schema error {msg}"),
-            Self::Timeout(msg) => write!(f, "Timeout {msg}"),
-            Self::DatabaseError(msg) => write!(f, "Database error {msg}"),
-        }
-    }
-}
-impl std::error::Error for AutoCreationError {}
 impl AutoCreationResult {
     #[instrument_trace]
     pub fn has_changes(&self) -> bool {
@@ -11243,24 +11340,6 @@ impl AutoCreationResult {
     #[instrument_trace]
     pub fn has_errors(&self) -> bool {
         !self.get_errors().is_empty()
-    }
-}
-impl Default for AutoCreationResult {
-    #[instrument_trace]
-    fn default() -> Self {
-        Self {
-            database_created: false,
-            tables_created: Vec::new(),
-            errors: Vec::new(),
-            duration: Duration::from_secs(0),
-        }
-    }
-}
-impl TableSchema {
-    #[instrument_trace]
-    pub fn with_dependency(mut self, dependency: String) -> Self {
-        self.get_mut_dependencies().push(dependency);
-        self
     }
 }
 impl DatabaseSchema {
@@ -11277,6 +11356,11 @@ impl DatabaseSchema {
     #[instrument_trace]
     pub fn add_constraint(mut self, constraint: String) -> Self {
         self.get_mut_constraints().push(constraint);
+        self
+    }
+    #[instrument_trace]
+    pub fn add_init_data(mut self, init_data: String) -> Self {
+        self.get_mut_init_data().push(init_data);
         self
     }
     #[instrument_trace]
@@ -11528,7 +11612,7 @@ pub struct ErrorContext {
     #[get(pub(crate))]
     pub(super) timestamp: std::time::SystemTime,
 }
-#[derive(Clone, Data, Debug)]
+#[derive(Clone, Data, Debug, Default)]
 pub struct AutoCreationResult {
     #[get(type(copy), pub(crate))]
     pub(super) database_created: bool,
@@ -11554,6 +11638,8 @@ pub struct DatabaseSchema {
     pub(super) constraints: Vec<String>,
     #[get(pub(crate))]
     pub(super) indexes: Vec<String>,
+    #[get(pub(crate))]
+    pub(super) init_data: Vec<String>,
     #[get(pub(crate))]
     pub(super) tables: Vec<TableSchema>,
 }
