@@ -1,4 +1,4 @@
-<!--2026-03-02 13:10:14-->
+<!--2026-03-02 18:57:30-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -5625,7 +5625,6 @@ use {
     upgrade::*, version::*,
 };
 use {
-    ::hyperlane::inventory,
     proc_macro::TokenStream,
     proc_macro2::TokenStream as TokenStream2,
     quote::quote,
@@ -5637,7 +5636,6 @@ use {
         *,
     },
 };
-inventory::collect!(InjectableMacro);
 #[proc_macro_attribute]
 pub fn ws_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
     ws_from_stream_macro(attr, item)
@@ -5977,9 +5975,10 @@ mod r#const;
 mod r#enum;
 mod r#fn;
 mod r#impl;
+mod r#static;
 mod r#struct;
 mod r#type;
-pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#struct::*, r#type::*};
+pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#static::*, r#struct::*, r#type::*};
 ```
 # Path: hyperlane-macros/src/common/fn.rs
 ```rust
@@ -6195,6 +6194,328 @@ pub(crate) type MacroHandlerWithAttr = fn(TokenStream, TokenStream) -> TokenStre
 pub(crate) type MacroHandlerWithAttrPosition =
     fn(TokenStream, TokenStream, Position) -> TokenStream;
 ```
+# Path: hyperlane-macros/src/common/static.rs
+```rust
+use crate::*;
+pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
+    InjectableMacro {
+        name: "aborted",
+        handler: Handler::NoAttrPosition(aborted_macro),
+    },
+    InjectableMacro {
+        name: "closed",
+        handler: Handler::NoAttrPosition(closed_macro),
+    },
+    InjectableMacro {
+        name: "filter",
+        handler: Handler::WithAttrPosition(filter_macro),
+    },
+    InjectableMacro {
+        name: "try_flush",
+        handler: Handler::NoAttrPosition(try_flush_macro),
+    },
+    InjectableMacro {
+        name: "flush",
+        handler: Handler::NoAttrPosition(flush_macro),
+    },
+    InjectableMacro {
+        name: "task_panic",
+        handler: Handler::WithAttr(task_panic_macro),
+    },
+    InjectableMacro {
+        name: "request_error",
+        handler: Handler::WithAttr(request_error_macro),
+    },
+    InjectableMacro {
+        name: "prologue_hooks",
+        handler: Handler::WithAttrPosition(prologue_hooks_macro),
+    },
+    InjectableMacro {
+        name: "epilogue_hooks",
+        handler: Handler::WithAttrPosition(epilogue_hooks_macro),
+    },
+    InjectableMacro {
+        name: "host",
+        handler: Handler::WithAttrPosition(host_macro),
+    },
+    InjectableMacro {
+        name: "reject_host",
+        handler: Handler::WithAttrPosition(reject_host_macro),
+    },
+    InjectableMacro {
+        name: "hyperlane",
+        handler: Handler::WithAttr(hyperlane_macro),
+    },
+    InjectableMacro {
+        name: "methods",
+        handler: Handler::WithAttrPosition(methods_macro),
+    },
+    InjectableMacro {
+        name: "get_method",
+        handler: Handler::NoAttrPosition(get_method_handler),
+    },
+    InjectableMacro {
+        name: "post_method",
+        handler: Handler::NoAttrPosition(post_method_handler),
+    },
+    InjectableMacro {
+        name: "put_method",
+        handler: Handler::NoAttrPosition(put_method_handler),
+    },
+    InjectableMacro {
+        name: "delete_method",
+        handler: Handler::NoAttrPosition(delete_method_handler),
+    },
+    InjectableMacro {
+        name: "patch_method",
+        handler: Handler::NoAttrPosition(patch_method_handler),
+    },
+    InjectableMacro {
+        name: "head_method",
+        handler: Handler::NoAttrPosition(head_method_handler),
+    },
+    InjectableMacro {
+        name: "options_method",
+        handler: Handler::NoAttrPosition(options_method_handler),
+    },
+    InjectableMacro {
+        name: "connect_method",
+        handler: Handler::NoAttrPosition(connect_method_handler),
+    },
+    InjectableMacro {
+        name: "trace_method",
+        handler: Handler::NoAttrPosition(trace_method_handler),
+    },
+    InjectableMacro {
+        name: "unknown_method",
+        handler: Handler::NoAttrPosition(unknown_method_handler),
+    },
+    InjectableMacro {
+        name: "referer",
+        handler: Handler::WithAttrPosition(referer_macro),
+    },
+    InjectableMacro {
+        name: "reject_referer",
+        handler: Handler::WithAttrPosition(reject_referer_macro),
+    },
+    InjectableMacro {
+        name: "reject",
+        handler: Handler::WithAttrPosition(reject_macro),
+    },
+    InjectableMacro {
+        name: "request_body",
+        handler: Handler::WithAttrPosition(request_body_macro),
+    },
+    InjectableMacro {
+        name: "request_body_json_result",
+        handler: Handler::WithAttrPosition(request_body_json_result_macro),
+    },
+    InjectableMacro {
+        name: "request_body_json",
+        handler: Handler::WithAttrPosition(request_body_json_macro),
+    },
+    InjectableMacro {
+        name: "attribute_option",
+        handler: Handler::WithAttrPosition(attribute_option_macro),
+    },
+    InjectableMacro {
+        name: "attribute",
+        handler: Handler::WithAttrPosition(attribute_macro),
+    },
+    InjectableMacro {
+        name: "attributes",
+        handler: Handler::WithAttrPosition(attributes_macro),
+    },
+    InjectableMacro {
+        name: "task_panic_data_option",
+        handler: Handler::WithAttrPosition(task_panic_data_option_macro),
+    },
+    InjectableMacro {
+        name: "task_panic_data",
+        handler: Handler::WithAttrPosition(task_panic_data_macro),
+    },
+    InjectableMacro {
+        name: "request_error_data_option",
+        handler: Handler::WithAttrPosition(request_error_data_option_macro),
+    },
+    InjectableMacro {
+        name: "request_error_data",
+        handler: Handler::WithAttrPosition(request_error_data_macro),
+    },
+    InjectableMacro {
+        name: "route_param_option",
+        handler: Handler::WithAttrPosition(route_param_option_macro),
+    },
+    InjectableMacro {
+        name: "route_param",
+        handler: Handler::WithAttrPosition(route_param_macro),
+    },
+    InjectableMacro {
+        name: "route_params",
+        handler: Handler::WithAttrPosition(route_params_macro),
+    },
+    InjectableMacro {
+        name: "request_query_option",
+        handler: Handler::WithAttrPosition(request_query_option_macro),
+    },
+    InjectableMacro {
+        name: "request_query",
+        handler: Handler::WithAttrPosition(request_query_macro),
+    },
+    InjectableMacro {
+        name: "request_querys",
+        handler: Handler::WithAttrPosition(request_querys_macro),
+    },
+    InjectableMacro {
+        name: "request_header_option",
+        handler: Handler::WithAttrPosition(request_header_option_macro),
+    },
+    InjectableMacro {
+        name: "request_header",
+        handler: Handler::WithAttrPosition(request_header_macro),
+    },
+    InjectableMacro {
+        name: "request_headers",
+        handler: Handler::WithAttrPosition(request_headers_macro),
+    },
+    InjectableMacro {
+        name: "request_cookie_option",
+        handler: Handler::WithAttrPosition(request_cookie_option_macro),
+    },
+    InjectableMacro {
+        name: "request_cookie",
+        handler: Handler::WithAttrPosition(request_cookie_macro),
+    },
+    InjectableMacro {
+        name: "request_cookies",
+        handler: Handler::WithAttrPosition(request_cookies_macro),
+    },
+    InjectableMacro {
+        name: "request_version",
+        handler: Handler::WithAttrPosition(request_version_macro),
+    },
+    InjectableMacro {
+        name: "request_path",
+        handler: Handler::WithAttrPosition(request_path_macro),
+    },
+    InjectableMacro {
+        name: "request_middleware",
+        handler: Handler::WithAttr(request_middleware_macro),
+    },
+    InjectableMacro {
+        name: "response_status_code",
+        handler: Handler::WithAttrPosition(response_status_code_macro),
+    },
+    InjectableMacro {
+        name: "response_reason_phrase",
+        handler: Handler::WithAttrPosition(response_reason_phrase_macro),
+    },
+    InjectableMacro {
+        name: "response_header",
+        handler: Handler::WithAttrPosition(response_header_macro),
+    },
+    InjectableMacro {
+        name: "response_body",
+        handler: Handler::WithAttrPosition(response_body_macro),
+    },
+    InjectableMacro {
+        name: "clear_response_headers",
+        handler: Handler::NoAttrPosition(clear_response_headers_macro),
+    },
+    InjectableMacro {
+        name: "response_version",
+        handler: Handler::WithAttrPosition(response_version_macro),
+    },
+    InjectableMacro {
+        name: "response_middleware",
+        handler: Handler::WithAttr(response_middleware_macro),
+    },
+    InjectableMacro {
+        name: "route",
+        handler: Handler::WithAttr(route_macro),
+    },
+    InjectableMacro {
+        name: "try_send",
+        handler: Handler::NoAttrPosition(try_send_macro),
+    },
+    InjectableMacro {
+        name: "send",
+        handler: Handler::NoAttrPosition(send_macro),
+    },
+    InjectableMacro {
+        name: "try_send_body",
+        handler: Handler::NoAttrPosition(try_send_body_macro),
+    },
+    InjectableMacro {
+        name: "send_body",
+        handler: Handler::NoAttrPosition(send_body_macro),
+    },
+    InjectableMacro {
+        name: "try_send_body_with_data",
+        handler: Handler::WithAttrPosition(try_send_body_with_data_macro),
+    },
+    InjectableMacro {
+        name: "send_body_with_data",
+        handler: Handler::WithAttrPosition(send_body_with_data_macro),
+    },
+    InjectableMacro {
+        name: "http_from_stream",
+        handler: Handler::WithAttr(http_from_stream_macro),
+    },
+    InjectableMacro {
+        name: "ws_from_stream",
+        handler: Handler::WithAttr(ws_from_stream_macro),
+    },
+    InjectableMacro {
+        name: "ws_upgrade_type",
+        handler: Handler::NoAttrPosition(ws_upgrade_type_macro),
+    },
+    InjectableMacro {
+        name: "h2c_upgrade_type",
+        handler: Handler::NoAttrPosition(h2c_upgrade_type_macro),
+    },
+    InjectableMacro {
+        name: "tls_upgrade_type",
+        handler: Handler::NoAttrPosition(tls_upgrade_type_macro),
+    },
+    InjectableMacro {
+        name: "unknown_upgrade_type",
+        handler: Handler::NoAttrPosition(unknown_upgrade_type_macro),
+    },
+    InjectableMacro {
+        name: "http0_9_version",
+        handler: Handler::NoAttrPosition(http0_9_version_macro),
+    },
+    InjectableMacro {
+        name: "http1_0_version",
+        handler: Handler::NoAttrPosition(http1_0_version_macro),
+    },
+    InjectableMacro {
+        name: "http1_1_version",
+        handler: Handler::NoAttrPosition(http1_1_version_macro),
+    },
+    InjectableMacro {
+        name: "http2_version",
+        handler: Handler::NoAttrPosition(http2_version_macro),
+    },
+    InjectableMacro {
+        name: "http3_version",
+        handler: Handler::NoAttrPosition(http3_version_macro),
+    },
+    InjectableMacro {
+        name: "http1_1_or_higher_version",
+        handler: Handler::NoAttrPosition(http1_1_or_higher_version_macro),
+    },
+    InjectableMacro {
+        name: "http_version",
+        handler: Handler::NoAttrPosition(http_version_macro),
+    },
+    InjectableMacro {
+        name: "unknown_version",
+        handler: Handler::NoAttrPosition(unknown_version_macro),
+    },
+];
+```
 # Path: hyperlane-macros/src/common/enum.rs
 ```rust
 use crate::*;
@@ -6287,12 +6608,6 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
     };
     gen_code.into()
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "hyperlane",
-        handler: Handler::WithAttr(hyperlane_macro),
-    }
-}
 ```
 # Path: hyperlane-macros/src/hyperlane/impl.rs
 ```rust
@@ -6340,12 +6655,6 @@ pub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStrea
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "aborted",
-        handler: Handler::NoAttrPosition(aborted_macro),
-    }
-}
 ```
 # Path: hyperlane-macros/src/hook/mod.rs
 ```rust
@@ -6368,12 +6677,6 @@ pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStr
     };
     gen_code.into()
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "task_panic",
-        handler: Handler::WithAttr(task_panic_macro),
-    }
-}
 pub(crate) fn request_error_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
@@ -6386,12 +6689,6 @@ pub(crate) fn request_error_macro(attr: TokenStream, item: TokenStream) -> Token
         }
     };
     gen_code.into()
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_error",
-        handler: Handler::WithAttr(request_error_macro),
-    }
 }
 pub(crate) fn prologue_hooks_macro(
     attr: TokenStream,
@@ -6411,12 +6708,6 @@ pub(crate) fn prologue_hooks_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "prologue_hooks",
-        handler: Handler::WithAttrPosition(prologue_hooks_macro),
-    }
-}
 pub(crate) fn epilogue_hooks_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6434,12 +6725,6 @@ pub(crate) fn epilogue_hooks_macro(
             #(#hook_calls)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "epilogue_hooks",
-        handler: Handler::WithAttrPosition(epilogue_hooks_macro),
-    }
 }
 ```
 # Path: hyperlane-macros/src/from_stream/mod.rs
@@ -6497,12 +6782,6 @@ pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) ->
     };
     gen_code.into()
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "response_middleware",
-        handler: Handler::WithAttr(response_middleware_macro),
-    }
-}
 ```
 # Path: hyperlane-macros/src/flush/mod.rs
 ```rust
@@ -6519,18 +6798,6 @@ pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStr
             let _ = #new_context.try_flush().await;
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "try_flush",
-        handler: Handler::NoAttrPosition(try_flush_macro),
-    }
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "flush",
-        handler: Handler::NoAttrPosition(flush_macro),
-    }
 }
 pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
@@ -6574,12 +6841,6 @@ macro_rules! impl_protocol_check_macro {
                     proc_macro2::Span::call_site(),
                 )),
             )
-        }
-        inventory::submit! {
-            InjectableMacro {
-                name: stringify!($submit_name),
-                handler: Handler::NoAttrPosition($name),
-            }
         }
     };
 }
@@ -6639,12 +6900,6 @@ pub(crate) fn methods_macro(
         Err(err) => err.to_compile_error().into(),
     }
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "methods",
-        handler: Handler::WithAttrPosition(methods_macro),
-    }
-}
 macro_rules! impl_http_method_macro {
     ($name:ident, $submit_name:ident, $method:ident) => {
         pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
@@ -6656,12 +6911,6 @@ macro_rules! impl_http_method_macro {
                     proc_macro2::Span::call_site(),
                 )),
             )
-        }
-        inventory::submit! {
-            InjectableMacro {
-                name: stringify!($submit_name),
-                handler: Handler::NoAttrPosition($name),
-            }
         }
     };
 }
@@ -6692,12 +6941,6 @@ pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "closed",
-        handler: Handler::NoAttrPosition(closed_macro),
-    }
-}
 ```
 # Path: hyperlane-macros/src/request/mod.rs
 ```rust
@@ -6727,12 +6970,6 @@ pub(crate) fn request_body_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_body",
-        handler: Handler::WithAttrPosition(request_body_macro),
-    }
-}
 pub(crate) fn request_body_json_result_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6751,12 +6988,6 @@ pub(crate) fn request_body_json_result_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_body_json_result",
-        handler: Handler::WithAttrPosition(request_body_json_result_macro),
-    }
-}
 pub(crate) fn request_body_json_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6774,12 +7005,6 @@ pub(crate) fn request_body_json_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_body_json",
-        handler: Handler::WithAttrPosition(request_body_json_macro),
-    }
 }
 pub(crate) fn attribute_option_macro(
     attr: TokenStream,
@@ -6801,12 +7026,6 @@ pub(crate) fn attribute_option_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "attribute_option",
-        handler: Handler::WithAttrPosition(attribute_option_macro),
-    }
-}
 pub(crate) fn attribute_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6827,12 +7046,6 @@ pub(crate) fn attribute_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "attribute",
-        handler: Handler::WithAttrPosition(attribute_macro),
-    }
-}
 pub(crate) fn attributes_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6851,12 +7064,6 @@ pub(crate) fn attributes_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "attributes",
-        handler: Handler::WithAttrPosition(attributes_macro),
-    }
-}
 pub(crate) fn task_panic_data_option_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6873,12 +7080,6 @@ pub(crate) fn task_panic_data_option_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "task_panic_data_option",
-        handler: Handler::WithAttrPosition(task_panic_data_option_macro),
-    }
 }
 pub(crate) fn task_panic_data_macro(
     attr: TokenStream,
@@ -6897,12 +7098,6 @@ pub(crate) fn task_panic_data_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "task_panic_data",
-        handler: Handler::WithAttrPosition(task_panic_data_macro),
-    }
-}
 pub(crate) fn request_error_data_option_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6919,12 +7114,6 @@ pub(crate) fn request_error_data_option_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_error_data_option",
-        handler: Handler::WithAttrPosition(request_error_data_option_macro),
-    }
 }
 pub(crate) fn request_error_data_macro(
     attr: TokenStream,
@@ -6943,12 +7132,6 @@ pub(crate) fn request_error_data_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_error_data",
-        handler: Handler::WithAttrPosition(request_error_data_macro),
-    }
-}
 pub(crate) fn route_param_option_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6966,12 +7149,6 @@ pub(crate) fn route_param_option_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "route_param_option",
-        handler: Handler::WithAttrPosition(route_param_option_macro),
-    }
-}
 pub(crate) fn route_param_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6988,12 +7165,6 @@ pub(crate) fn route_param_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "route_param",
-        handler: Handler::WithAttrPosition(route_param_macro),
-    }
 }
 pub(crate) fn route_params_macro(
     attr: TokenStream,
@@ -7013,12 +7184,6 @@ pub(crate) fn route_params_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "route_params",
-        handler: Handler::WithAttrPosition(route_params_macro),
-    }
-}
 pub(crate) fn request_query_option_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7036,12 +7201,6 @@ pub(crate) fn request_query_option_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_query_option",
-        handler: Handler::WithAttrPosition(request_query_option_macro),
-    }
-}
 pub(crate) fn request_query_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7058,12 +7217,6 @@ pub(crate) fn request_query_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_query",
-        handler: Handler::WithAttrPosition(request_query_macro),
-    }
 }
 pub(crate) fn request_querys_macro(
     attr: TokenStream,
@@ -7083,12 +7236,6 @@ pub(crate) fn request_querys_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_querys",
-        handler: Handler::WithAttrPosition(request_querys_macro),
-    }
-}
 pub(crate) fn request_header_option_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7106,12 +7253,6 @@ pub(crate) fn request_header_option_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_header_option",
-        handler: Handler::WithAttrPosition(request_header_option_macro),
-    }
-}
 pub(crate) fn request_header_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7128,12 +7269,6 @@ pub(crate) fn request_header_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_header",
-        handler: Handler::WithAttrPosition(request_header_macro),
-    }
 }
 pub(crate) fn request_headers_macro(
     attr: TokenStream,
@@ -7153,12 +7288,6 @@ pub(crate) fn request_headers_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_headers",
-        handler: Handler::WithAttrPosition(request_headers_macro),
-    }
-}
 pub(crate) fn request_cookie_option_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7175,12 +7304,6 @@ pub(crate) fn request_cookie_option_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_cookie_option",
-        handler: Handler::WithAttrPosition(request_cookie_option_macro),
-    }
 }
 pub(crate) fn request_cookie_macro(
     attr: TokenStream,
@@ -7199,12 +7322,6 @@ pub(crate) fn request_cookie_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_cookie",
-        handler: Handler::WithAttrPosition(request_cookie_macro),
-    }
-}
 pub(crate) fn request_cookies_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7221,12 +7338,6 @@ pub(crate) fn request_cookies_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_cookies",
-        handler: Handler::WithAttrPosition(request_cookies_macro),
-    }
 }
 pub(crate) fn request_version_macro(
     attr: TokenStream,
@@ -7247,12 +7358,6 @@ pub(crate) fn request_version_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "request_version",
-        handler: Handler::WithAttrPosition(request_version_macro),
-    }
-}
 pub(crate) fn request_path_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7270,12 +7375,6 @@ pub(crate) fn request_path_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_path",
-        handler: Handler::WithAttrPosition(request_path_macro),
-    }
 }
 ```
 # Path: hyperlane-macros/src/request/impl.rs
@@ -7652,12 +7751,6 @@ pub(crate) fn reject_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "reject",
-        handler: Handler::WithAttrPosition(reject_macro),
-    }
-}
 ```
 # Path: hyperlane-macros/src/route/mod.rs
 ```rust
@@ -7681,12 +7774,6 @@ pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
     gen_code.into()
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "route",
-        handler: Handler::WithAttr(route_macro),
-    }
 }
 ```
 # Path: hyperlane-macros/src/route/impl.rs
@@ -7733,12 +7820,6 @@ pub(crate) fn response_status_code_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "response_status_code",
-        handler: Handler::WithAttrPosition(response_status_code_macro),
-    }
-}
 pub(crate) fn response_reason_phrase_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7754,12 +7835,6 @@ pub(crate) fn response_reason_phrase_macro(
             #new_context.get_mut_response().set_reason_phrase(&#value);
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_reason_phrase",
-        handler: Handler::WithAttrPosition(response_reason_phrase_macro),
-    }
 }
 pub(crate) fn response_header_macro(
     attr: TokenStream,
@@ -7786,12 +7861,6 @@ pub(crate) fn response_header_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "response_header",
-        handler: Handler::WithAttrPosition(response_header_macro),
-    }
-}
 pub(crate) fn response_body_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -7806,12 +7875,6 @@ pub(crate) fn response_body_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "response_body",
-        handler: Handler::WithAttrPosition(response_body_macro),
-    }
-}
 pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
         let new_context: TokenStream2 = into_new_context(context);
@@ -7819,12 +7882,6 @@ pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position
             #new_context.get_mut_response().clear_headers();
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "clear_response_headers",
-        handler: Handler::NoAttrPosition(clear_response_headers_macro),
-    }
 }
 pub(crate) fn response_version_macro(
     attr: TokenStream,
@@ -7841,12 +7898,6 @@ pub(crate) fn response_version_macro(
             #new_context.get_mut_response().set_version(#value);
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "response_version",
-        handler: Handler::WithAttrPosition(response_version_macro),
-    }
 }
 ```
 # Path: hyperlane-macros/src/response/impl.rs
@@ -7918,12 +7969,6 @@ pub(crate) fn filter_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "filter",
-        handler: Handler::WithAttrPosition(filter_macro),
-    }
-}
 ```
 # Path: hyperlane-macros/src/send/mod.rs
 ```rust
@@ -7942,24 +7987,12 @@ pub(crate) fn try_send_macro(item: TokenStream, position: Position) -> TokenStre
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "try_send",
-        handler: Handler::NoAttrPosition(try_send_macro),
-    }
-}
 pub(crate) fn send_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
         quote! {
             #context.send().await;
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "send",
-        handler: Handler::NoAttrPosition(send_macro),
-    }
 }
 pub(crate) fn try_send_body_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
@@ -7968,24 +8001,12 @@ pub(crate) fn try_send_body_macro(item: TokenStream, position: Position) -> Toke
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "try_send_body",
-        handler: Handler::NoAttrPosition(try_send_body_macro),
-    }
-}
 pub(crate) fn send_body_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
         quote! {
             #context.send_body().await;
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "send_body",
-        handler: Handler::NoAttrPosition(send_body_macro),
-    }
 }
 pub(crate) fn try_send_body_with_data_macro(
     attr: TokenStream,
@@ -8000,12 +8021,6 @@ pub(crate) fn try_send_body_with_data_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "try_send_body_with_data",
-        handler: Handler::WithAttrPosition(try_send_body_with_data_macro),
-    }
-}
 pub(crate) fn send_body_with_data_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -8018,12 +8033,6 @@ pub(crate) fn send_body_with_data_macro(
             #context.send_body_with_data(#data).await;
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "send_body_with_data",
-        handler: Handler::WithAttrPosition(send_body_with_data_macro),
-    }
 }
 ```
 # Path: hyperlane-macros/src/send/impl.rs
@@ -8073,12 +8082,6 @@ pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Positio
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "host",
-        handler: Handler::WithAttrPosition(host_macro),
-    }
-}
 pub(crate) fn reject_host_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -8097,12 +8100,6 @@ pub(crate) fn reject_host_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "reject_host",
-        handler: Handler::WithAttrPosition(reject_host_macro),
-    }
 }
 ```
 # Path: hyperlane-macros/src/host/impl.rs
@@ -8189,12 +8186,6 @@ pub(crate) fn http_from_stream_macro(attr: TokenStream, item: TokenStream) -> To
         Err(err) => err.to_compile_error().into(),
     }
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "http_from_stream",
-        handler: Handler::WithAttr(http_from_stream_macro),
-    }
-}
 pub(crate) fn ws_from_stream_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
     let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
@@ -8218,12 +8209,6 @@ pub(crate) fn ws_from_stream_macro(attr: TokenStream, item: TokenStream) -> Toke
         Err(err) => err.to_compile_error().into(),
     }
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "ws_from_stream",
-        handler: Handler::WithAttr(ws_from_stream_macro),
-    }
-}
 ```
 # Path: hyperlane-macros/src/request_middleware/mod.rs
 ```rust
@@ -8245,12 +8230,6 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
         }
     };
     gen_code.into()
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "request_middleware",
-        handler: Handler::WithAttr(request_middleware_macro),
-    }
 }
 ```
 # Path: hyperlane-macros/src/referer/mod.rs
@@ -8287,12 +8266,6 @@ pub(crate) fn referer_macro(
         }
     })
 }
-inventory::submit! {
-    InjectableMacro {
-        name: "referer",
-        handler: Handler::WithAttrPosition(referer_macro),
-    }
-}
 pub(crate) fn reject_referer_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -8314,12 +8287,6 @@ pub(crate) fn reject_referer_macro(
             #(#statements)*
         }
     })
-}
-inventory::submit! {
-    InjectableMacro {
-        name: "reject_referer",
-        handler: Handler::WithAttrPosition(reject_referer_macro),
-    }
 }
 ```
 # Path: hyperlane-macros/src/referer/impl.rs
@@ -8383,12 +8350,6 @@ macro_rules! impl_version_check_macro {
                 )),
             )
         }
-        inventory::submit! {
-            InjectableMacro {
-                name: stringify!($submit_name),
-                handler: Handler::NoAttrPosition($name),
-            }
-        }
     };
 }
 impl_version_check_macro!(http0_9_version_macro, http0_9_version, http0_9);
@@ -8430,7 +8391,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
         ),
         _ => panic!("Unsupported macro format in inject macro"),
     };
-    for injectable_macro in inventory::iter::<InjectableMacro>() {
+    for injectable_macro in INJECTABLE_MACROS {
         if injectable_macro.name == macro_name {
             return match injectable_macro.handler {
                 Handler::WithAttr(handler) => handler(macro_attr, item_stream),
@@ -9090,14 +9051,11 @@ impl EnvPlugin {
             if let Some(ports) = mysql
                 .get(DOCKER_YAML_PORTS)
                 .and_then(|ports_value| ports_value.as_sequence())
+                && let Some(port_mapping) = ports.first().and_then(|port| port.as_str())
+                && let Some(host_port) = port_mapping.split(':').next()
+                && let Ok(port) = host_port.parse()
             {
-                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
-                    if let Some(host_port) = port_mapping.split(':').next() {
-                        if let Ok(port) = host_port.parse() {
-                            config.set_mysql_port(Some(port));
-                        }
-                    }
-                }
+                config.set_mysql_port(Some(port));
             }
         }
         if let Some(postgresql) = yaml
@@ -9130,14 +9088,11 @@ impl EnvPlugin {
             if let Some(ports) = postgresql
                 .get(DOCKER_YAML_PORTS)
                 .and_then(|ports_value| ports_value.as_sequence())
+                && let Some(port_mapping) = ports.first().and_then(|port| port.as_str())
+                && let Some(host_port) = port_mapping.split(':').next()
+                && let Ok(port) = host_port.parse()
             {
-                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
-                    if let Some(host_port) = port_mapping.split(':').next() {
-                        if let Ok(port) = host_port.parse() {
-                            config.set_postgresql_port(Some(port));
-                        }
-                    }
-                }
+                config.set_postgresql_port(Some(port));
             }
         }
         if let Some(redis) = yaml
@@ -9147,22 +9102,18 @@ impl EnvPlugin {
             if let Some(command) = redis
                 .get(DOCKER_YAML_COMMAND)
                 .and_then(|command_value| command_value.as_str())
+                && let Some(password_part) = command.split(DOCKER_REDIS_PASSWORD_FLAG).nth(1)
             {
-                if let Some(password_part) = command.split(DOCKER_REDIS_PASSWORD_FLAG).nth(1) {
-                    config.set_redis_password(Some(password_part.trim().to_string()));
-                }
+                config.set_redis_password(Some(password_part.trim().to_string()));
             }
             if let Some(ports) = redis
                 .get(DOCKER_YAML_PORTS)
                 .and_then(|ports_value| ports_value.as_sequence())
+                && let Some(port_mapping) = ports.first().and_then(|port| port.as_str())
+                && let Some(host_port) = port_mapping.split(':').next()
+                && let Ok(port) = host_port.parse()
             {
-                if let Some(port_mapping) = ports.first().and_then(|port| port.as_str()) {
-                    if let Some(host_port) = port_mapping.split(':').next() {
-                        if let Ok(port) = host_port.parse() {
-                            config.set_redis_port(Some(port));
-                        }
-                    }
-                }
+                config.set_redis_port(Some(port));
             }
         }
         Ok(config)
