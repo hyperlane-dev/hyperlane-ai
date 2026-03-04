@@ -1,4 +1,4 @@
-<!--2026-03-03 13:08:57-->
+<!--2026-03-04 02:28:31-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -12829,9 +12829,9 @@ async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, std::io::
         find_rust_files_in_dir(&src_dir, &mut files).await?;
     }
     let content: String = read_to_string(manifest_path)?;
-    if let Ok(doc) = toml::from_str::<toml::Value>(&content) {
-        if let Some(workspace) = doc.get("workspace") {
-            if let Some(members) = workspace
+    if let Ok(doc) = toml::from_str::<toml::Value>(&content)
+        && let Some(workspace) = doc.get("workspace")
+            && let Some(members) = workspace
                 .get("members")
                 .and_then(|m: &toml::Value| m.as_array())
             {
@@ -12844,8 +12844,6 @@ async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, std::io::
                     }
                 }
             }
-        }
-    }
     Ok(files)
 }
 async fn find_rust_files_in_dir(
@@ -13801,11 +13799,10 @@ pub(crate) fn parse_args() -> Args {
             }
             "--max-retries" => {
                 i += 1;
-                if i < raw_args.len() {
-                    if let Ok(n) = raw_args[i].parse::<u32>() {
+                if i < raw_args.len()
+                    && let Ok(n) = raw_args[i].parse::<u32>() {
                         max_retries = n;
                     }
-                }
             }
             _ => {}
         }
@@ -13979,11 +13976,10 @@ fn parse_prerelease(prerelease: &str) -> Option<(&str, u64)> {
 fn get_next_prerelease(current: Option<&String>, target_type: &str) -> String {
     match current {
         Some(pre) => {
-            if let Some((pre_type, number)) = parse_prerelease(pre) {
-                if pre_type == target_type && number > 0 {
+            if let Some((pre_type, number)) = parse_prerelease(pre)
+                && pre_type == target_type && number > 0 {
                     return format!("{}.{}", target_type, number + 1);
                 }
-            }
             format!("{target_type}.1")
         }
         None => target_type.to_string(),
@@ -14330,8 +14326,8 @@ fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError
     let doc: toml::Value =
         toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
     let mut packages: Vec<Package> = Vec::new();
-    if let Some(workspace) = doc.get("workspace") {
-        if let Some(members) = workspace.get("members").and_then(|m| m.as_array()) {
+    if let Some(workspace) = doc.get("workspace")
+        && let Some(members) = workspace.get("members").and_then(|m| m.as_array()) {
             for member in members {
                 if let Some(pattern) = member.as_str() {
                     let base_path: &Path = workspace_root.parent().unwrap_or(workspace_root);
@@ -14339,7 +14335,6 @@ fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError
                 }
             }
         }
-    }
     if packages.is_empty() {
         let package: Package = read_single_package(workspace_root)?;
         packages.push(package);
