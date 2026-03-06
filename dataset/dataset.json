@@ -30752,13 +30752,13 @@
   {
     "instruction": "ErrorContext结构体的源码是怎么实现的？",
     "input": "",
-    "output": "ErrorContext结构体的源码实现如下：\n\n```rust\n#[derive(Clone, Data, Debug)]\npub struct ErrorContext {\n    #[get(pub(crate))]\n    pub(super) database_name: Option<String>,\n    #[get(pub(crate))]\n    pub(super) error_message: String,\n    #[get(pub(crate))]\n    pub(super) error_type: String,\n    #[get(pub(crate))]\n    pub(super) log_level: String,\n    #[get(pub(crate))]\n    pub(super) operation: String,\n    #[get(pub(crate))]\n    pub(super) plugin_name: String,\n    #[get(pub(crate))]\n    pub(super) recovery_suggestion: String,\n    #[get(type(copy), pub(crate))]\n    pub(super) should_continue: bool,\n    #[get(pub(crate))]\n    pub(super) timestamp: std::time::SystemTime,\n}\n```",
+    "output": "ErrorContext结构体的源码实现如下：\n\n```rust\n#[derive(Clone, Data, Debug)]\npub struct ErrorContext {\n    #[get(pub(crate))]\n    pub(super) database_name: Option<String>,\n    #[get(pub(crate))]\n    pub(super) error_message: String,\n    #[get(pub(crate))]\n    pub(super) error_type: String,\n    #[get(pub(crate))]\n    pub(super) log_level: String,\n    #[get(pub(crate))]\n    pub(super) operation: String,\n    #[get(pub(crate))]\n    pub(super) plugin_name: String,\n    #[get(pub(crate))]\n    pub(super) recovery_suggestion: String,\n    #[get(type(copy), pub(crate))]\n    pub(super) should_continue: bool,\n    #[get(pub(crate))]\n    pub(super) timestamp: SystemTime,\n}\n```",
     "system": ""
   },
   {
     "instruction": "ErrorContext结构体中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ErrorContext结构体的泛型设计和使用如下：\n\n```rust\n#[derive(Clone, Data, Debug)]\npub struct ErrorContext {\n    #[get(pub(crate))]\n    pub(super) database_name: Option<String>,\n    #[get(pub(crate))]\n    pub(super) error_message: String,\n    #[get(pub(crate))]\n    pub(super) error_type: String,\n    #[get(pub(crate))]\n    pub(super) log_level: String,\n    #[get(pub(crate))]\n    pub(super) operation: String,\n    #[get(pub(crate))]\n    pub(super) plugin_name: String,\n    #[get(pub(crate))]\n    pub(super) recovery_suggestion: String,\n    #[get(type(copy), pub(crate))]\n    pub(super) should_continue: bool,\n    #[get(pub(crate))]\n    pub(super) timestamp: std::time::SystemTime,\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ErrorContext结构体的泛型设计和使用如下：\n\n```rust\n#[derive(Clone, Data, Debug)]\npub struct ErrorContext {\n    #[get(pub(crate))]\n    pub(super) database_name: Option<String>,\n    #[get(pub(crate))]\n    pub(super) error_message: String,\n    #[get(pub(crate))]\n    pub(super) error_type: String,\n    #[get(pub(crate))]\n    pub(super) log_level: String,\n    #[get(pub(crate))]\n    pub(super) operation: String,\n    #[get(pub(crate))]\n    pub(super) plugin_name: String,\n    #[get(pub(crate))]\n    pub(super) recovery_suggestion: String,\n    #[get(type(copy), pub(crate))]\n    pub(super) should_continue: bool,\n    #[get(pub(crate))]\n    pub(super) timestamp: SystemTime,\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
