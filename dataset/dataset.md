@@ -1,4 +1,4 @@
-<!--2026-03-11 13:12:11-->
+<!--2026-03-11 19:03:55-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -8435,85 +8435,14 @@ pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
-## Directory Structure
-```txt
-├── application              # Application service
-│   ├── controller           # Interface control layer
-│   ├── domain               # Business domain layer
-│   ├── exception            # Exception handling layer
-│   ├── mapper               # Data mapping layer
-│   ├── middleware           # Middleware layer
-│   ├── model                # Data model layer
-│      ├── request           # Request parameter objects
-│      ├── response          # Response parameter objects
-│   ├── repository           # Data access layer
-│   ├── service              # Business logic layer
-│   ├── utils                # Utility layer
-│   ├── view                 # View layer
-├── bootstrap                # Service initialization
-│   ├── application          # Application initialization
-│   ├── framework            # Framework initialization
-├── config                   # Service configuration
-│   ├── application          # Application configuration
-│   ├── framework            # Framework configuration
-├── plugin                   # Service plugins
-│   ├── database             # Database plugin
-│   ├── env                  # Environment variable plugin
-│   ├── logger               # Logging plugin
-│   ├── mysql                # MySQL plugin
-│   ├── postgresql           # PostgreSQL plugin
-│   ├── process              # Process management plugin
-│   ├── redis                # Redis plugin
-├── resources                # Service resources
-│   ├── sql                  # SQL files
-│   ├── static               # Static resource files
-│   ├── templates            # Template files
-```
-## Run
-### start
-```sh
-cargo run
-```
-### started in background
-```sh
-cargo run -- -d
-```
-### stop
-```sh
-cargo run stop
-```
-### restart
-```sh
-cargo run restart
-```
-### restarted in background
-```sh
-cargo run restart -d
-```
-## Cli
-```sh
-cargo install hyperlane-cli
-```
-### help
-```sh
-hyperlane-cli -h
-```
-## Performance
-- [Performance](https://docs.ltpp.vip/hyperlane/speed)
-## Appreciate
-> If you feel that `hyperlane` is helpful to you, feel free to donate
-### WeChat Pay
-### Alipay
-### Virtual Currency Pay
-| Virtual Currency | Virtual Currency Address                   |
-| ---------------- | ------------------------------------------ |
-| BTC              | 3QndxCJTf3mEniTgyRRQ1jcNTJajm9qSCy         |
-| ETH              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
-| BSC              | 0x8EB3794f67897ED397584d3a1248a79e0B8e97A6 |
 ## Contact
 # Path: hyperlane-quick-start/plugin/README.md
 ## hyperlane-plugin
 > A powerful and extensible plugin system for the hyperlane framework, providing modularity and customization capabilities.
+## Official Documentation
+- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+## Api Docs
+- [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
 # Path: hyperlane-quick-start/plugin/lib.rs
 ```rust
@@ -11613,6 +11542,10 @@ pub enum PluginType {
 # Path: hyperlane-quick-start/config/README.md
 ## hyperlane-config
 > Hyperlane configuration module providing comprehensive configuration management capabilities for the framework.
+## Official Documentation
+- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+## Api Docs
+- [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
 # Path: hyperlane-quick-start/config/lib.rs
 ```rust
@@ -11680,6 +11613,10 @@ use super::*;
 # Path: hyperlane-quick-start/application/README.md
 ## hyperlane-application
 > Hyperlane application module containing core application logic, controllers, services, and middleware components.
+## Official Documentation
+- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+## Api Docs
+- [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
 # Path: hyperlane-quick-start/application/lib.rs
 ```rust
@@ -12016,6 +11953,10 @@ pub async fn try_send_body_hook(ctx: &mut Context) -> Result<(), ResponseError> 
     }
     send_result
 }
+#[instrument_trace]
+pub async fn send_body_hook(ctx: &mut Context) {
+    try_send_body_hook(ctx).await.unwrap()
+}
 ```
 # Path: hyperlane-quick-start/application/utils/json/mod.rs
 ```rust
@@ -12027,13 +11968,13 @@ use super::*;
 ```rust
 use super::*;
 #[instrument_trace]
-pub async fn get_request_json(ctx: &mut Context) -> String {
+pub async fn get_request_json(ctx: &Context) -> String {
     let mut request: Request = ctx.get_request().clone();
     request.set_body(request.get_body().len().to_string().into_bytes());
     serde_json::to_string(&request).unwrap_or(request.to_string())
 }
 #[instrument_trace]
-pub async fn get_response_json(ctx: &mut Context) -> String {
+pub async fn get_response_json(ctx: &Context) -> String {
     let mut response: Response = ctx.get_response().clone();
     response.set_body(response.get_body().len().to_string().into_bytes());
     serde_json::to_string(&response).unwrap_or(response.to_string())
@@ -12258,6 +12199,10 @@ fn main() {
 # Path: hyperlane-quick-start/bootstrap/README.md
 ## hyperlane-bootstrap
 > Hyperlane bootstrap crate providing application initialization and framework lifecycle management.
+## Official Documentation
+- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+## Api Docs
+- [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
 # Path: hyperlane-quick-start/bootstrap/lib.rs
 ```rust
@@ -12524,6 +12469,10 @@ pub struct RuntimeBootstrap {
 # Path: hyperlane-quick-start/resources/README.md
 ## hyperlane-resources
 > Hyperlane resources module containing various resources and utilities used by the framework.
+## Official Documentation
+- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+## Api Docs
+- [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
 # Path: hyperlane-quick-start/resources/lib.rs
 ```rust

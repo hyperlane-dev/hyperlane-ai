@@ -31578,63 +31578,75 @@
     "system": ""
   },
   {
+    "instruction": "send_body_hook函数的源码是怎么实现的？",
+    "input": "",
+    "output": "send_body_hook函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn send_body_hook(ctx: &mut Context) {\n    try_send_body_hook(ctx).await.unwrap()\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "send_body_hook函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "send_body_hook函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn send_body_hook(ctx: &mut Context) {\n    try_send_body_hook(ctx).await.unwrap()\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "send_body_hook函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "send_body_hook函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn send_body_hook(ctx: &mut Context) {\n    try_send_body_hook(ctx).await.unwrap()\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "send_body_hook函数为什么需要修改状态？",
+    "input": "",
+    "output": "send_body_hook函数的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn send_body_hook(ctx: &mut Context) {\n    try_send_body_hook(ctx).await.unwrap()\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
     "instruction": "get_request_json函数的源码是怎么实现的？",
     "input": "",
-    "output": "get_request_json函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```",
+    "output": "get_request_json函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```",
     "system": ""
   },
   {
     "instruction": "get_request_json函数的异步实现是如何工作的？",
     "input": "",
-    "output": "get_request_json函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "get_request_json函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "get_request_json函数的参数设计有什么考虑？",
     "input": "",
-    "output": "get_request_json函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "get_request_json函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "get_request_json函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "get_request_json函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "get_request_json函数为什么需要修改状态？",
-    "input": "",
-    "output": "get_request_json函数的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &mut Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "get_request_json函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_request_json(ctx: &Context) -> String {\n    let mut request: Request = ctx.get_request().clone();\n    request.set_body(request.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&request).unwrap_or(request.to_string())\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "get_response_json函数的源码是怎么实现的？",
     "input": "",
-    "output": "get_response_json函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```",
+    "output": "get_response_json函数的源码实现如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```",
     "system": ""
   },
   {
     "instruction": "get_response_json函数的异步实现是如何工作的？",
     "input": "",
-    "output": "get_response_json函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "get_response_json函数的异步实现机制如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "get_response_json函数的参数设计有什么考虑？",
     "input": "",
-    "output": "get_response_json函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "get_response_json函数的参数设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n参数列表：\n- ctx: &Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "get_response_json函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "get_response_json函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "get_response_json函数为什么需要修改状态？",
-    "input": "",
-    "output": "get_response_json函数的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &mut Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "get_response_json函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\npub async fn get_response_json(ctx: &Context) -> String {\n    let mut response: Response = ctx.get_response().clone();\n    response.set_body(response.get_body().len().to_string().into_bytes());\n    serde_json::to_string(&response).unwrap_or(response.to_string())\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
