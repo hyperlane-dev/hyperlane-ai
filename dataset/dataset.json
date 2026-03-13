@@ -31136,25 +31136,25 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_header(DATE => gmt())]\n    #[response_header(SERVER => HYPERLANE)]\n    #[response_header(CONNECTION => KEEP_ALIVE)]\n    #[response_header(TRACE => uuid::Uuid::new_v4().to_string())]\n    #[epilogue_macros(response_header(CONTENT_TYPE => content_type))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_header(DATE => gmt())]\n    #[response_header(SERVER => HYPERLANE)]\n    #[response_header(CONNECTION => KEEP_ALIVE)]\n    #[response_header(TRACE => uuid::Uuid::new_v4().to_string())]\n    #[epilogue_macros(response_header(CONTENT_TYPE => content_type))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_header(DATE => gmt())]\n    #[response_header(SERVER => HYPERLANE)]\n    #[response_header(CONNECTION => KEEP_ALIVE)]\n    #[response_header(TRACE => uuid::Uuid::new_v4().to_string())]\n    #[epilogue_macros(response_header(CONTENT_TYPE => content_type))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let mut socket_addr: String = String::new();\n        if let Some(stream) = ctx.try_get_stream().as_ref() {\n            socket_addr = stream\n                .read()\n                .await\n                .peer_addr()\n                .map(|data| data.to_string())\n                .unwrap_or_default();\n        }\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[response_header(DATE => gmt())]\n    #[response_header(SERVER => HYPERLANE)]\n    #[response_header(CONNECTION => KEEP_ALIVE)]\n    #[response_header(TRACE => uuid::Uuid::new_v4().to_string())]\n    #[epilogue_macros(response_header(CONTENT_TYPE => content_type))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
