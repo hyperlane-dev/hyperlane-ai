@@ -27654,6 +27654,360 @@
     "system": ""
   },
   {
+    "instruction": "ProcessGuardRoute;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "ProcessGuardRoute;结构体的源码实现如下：\n\n```rust\nstruct ProcessGuardRoute;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "RequestMiddleware;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "RequestMiddleware;结构体的源码实现如下：\n\n```rust\nstruct RequestMiddleware;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ResponseMiddleware;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "ResponseMiddleware;结构体的源码实现如下：\n\n```rust\nstruct ResponseMiddleware;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "TaskPanicHook;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "TaskPanicHook;结构体的源码实现如下：\n\n```rust\nstruct TaskPanicHook;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "RequestErrorHook;结构体的源码是怎么实现的？",
+    "input": "",
+    "output": "RequestErrorHook;结构体的源码实现如下：\n\n```rust\nstruct RequestErrorHook;\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let body: RequestBody = ctx.get_request().get_body().clone();\n        let script: String = String::from_utf8_lossy(&body).to_string();\n        let output: Result<std::process::Output, std::io::Error> = if cfg!(target_os = \"windows\") {\n            Command::new(\"cmd\").args([\"/C\", &script]).output()\n        } else {\n            Command::new(\"sh\").arg(\"-c\").arg(&script).output()\n        };\n        let response_body: String = match output {\n            Ok(result) => {\n                let stdout: String = decode_output(&result.stdout);\n                let stderr: String = decode_output(&result.stderr);\n                let exit_code: i32 = result.status.code().unwrap_or(-1);\n                format!(\n                    \"{{\\\"exit_code\\\": {}, \\\"stdout\\\": {:?}, \\\"stderr\\\": {:?}}}\",\n                    exit_code, stdout, stderr\n                )\n            }\n            Err(error) => {\n                format!(\"{{\\\"error\\\": \\\"Failed to execute script: {}\\\"}}\", error)\n            }\n        };\n        ctx.get_mut_response()\n            .set_status_code(200)\n            .set_header(CONTENT_TYPE, APPLICATION_JSON)\n            .set_body(&response_body);\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
+    "input": "",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let body: RequestBody = ctx.get_request().get_body().clone();\n        let script: String = String::from_utf8_lossy(&body).to_string();\n        let output: Result<std::process::Output, std::io::Error> = if cfg!(target_os = \"windows\") {\n            Command::new(\"cmd\").args([\"/C\", &script]).output()\n        } else {\n            Command::new(\"sh\").arg(\"-c\").arg(&script).output()\n        };\n        let response_body: String = match output {\n            Ok(result) => {\n                let stdout: String = decode_output(&result.stdout);\n                let stderr: String = decode_output(&result.stderr);\n                let exit_code: i32 = result.status.code().unwrap_or(-1);\n                format!(\n                    \"{{\\\"exit_code\\\": {}, \\\"stdout\\\": {:?}, \\\"stderr\\\": {:?}}}\",\n                    exit_code, stdout, stderr\n                )\n            }\n            Err(error) => {\n                format!(\"{{\\\"error\\\": \\\"Failed to execute script: {}\\\"}}\", error)\n            }\n        };\n        ctx.get_mut_response()\n            .set_status_code(200)\n            .set_header(CONTENT_TYPE, APPLICATION_JSON)\n            .set_body(&response_body);\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：6\n- 代码行数：27\n- 包含高级特性：泛型编程、异步编程、错误处理",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let body: RequestBody = ctx.get_request().get_body().clone();\n        let script: String = String::from_utf8_lossy(&body).to_string();\n        let output: Result<std::process::Output, std::io::Error> = if cfg!(target_os = \"windows\") {\n            Command::new(\"cmd\").args([\"/C\", &script]).output()\n        } else {\n            Command::new(\"sh\").arg(\"-c\").arg(&script).output()\n        };\n        let response_body: String = match output {\n            Ok(result) => {\n                let stdout: String = decode_output(&result.stdout);\n                let stderr: String = decode_output(&result.stderr);\n                let exit_code: i32 = result.status.code().unwrap_or(-1);\n                format!(\n                    \"{{\\\"exit_code\\\": {}, \\\"stdout\\\": {:?}, \\\"stderr\\\": {:?}}}\",\n                    exit_code, stdout, stderr\n                )\n            }\n            Err(error) => {\n                format!(\"{{\\\"error\\\": \\\"Failed to execute script: {}\\\"}}\", error)\n            }\n        };\n        ctx.get_mut_response()\n            .set_status_code(200)\n            .set_header(CONTENT_TYPE, APPLICATION_JSON)\n            .set_body(&response_body);\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let body: RequestBody = ctx.get_request().get_body().clone();\n        let script: String = String::from_utf8_lossy(&body).to_string();\n        let output: Result<std::process::Output, std::io::Error> = if cfg!(target_os = \"windows\") {\n            Command::new(\"cmd\").args([\"/C\", &script]).output()\n        } else {\n            Command::new(\"sh\").arg(\"-c\").arg(&script).output()\n        };\n        let response_body: String = match output {\n            Ok(result) => {\n                let stdout: String = decode_output(&result.stdout);\n                let stderr: String = decode_output(&result.stderr);\n                let exit_code: i32 = result.status.code().unwrap_or(-1);\n                format!(\n                    \"{{\\\"exit_code\\\": {}, \\\"stdout\\\": {:?}, \\\"stderr\\\": {:?}}}\",\n                    exit_code, stdout, stderr\n                )\n            }\n            Err(error) => {\n                format!(\"{{\\\"error\\\": \\\"Failed to execute script: {}\\\"}}\", error)\n            }\n        };\n        ctx.get_mut_response()\n            .set_status_code(200)\n            .set_header(CONTENT_TYPE, APPLICATION_JSON)\n            .set_body(&response_body);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let body: RequestBody = ctx.get_request().get_body().clone();\n        let script: String = String::from_utf8_lossy(&body).to_string();\n        let output: Result<std::process::Output, std::io::Error> = if cfg!(target_os = \"windows\") {\n            Command::new(\"cmd\").args([\"/C\", &script]).output()\n        } else {\n            Command::new(\"sh\").arg(\"-c\").arg(&script).output()\n        };\n        let response_body: String = match output {\n            Ok(result) => {\n                let stdout: String = decode_output(&result.stdout);\n                let stderr: String = decode_output(&result.stderr);\n                let exit_code: i32 = result.status.code().unwrap_or(-1);\n                format!(\n                    \"{{\\\"exit_code\\\": {}, \\\"stdout\\\": {:?}, \\\"stderr\\\": {:?}}}\",\n                    exit_code, stdout, stderr\n                )\n            }\n            Err(error) => {\n                format!(\"{{\\\"error\\\": \\\"Failed to execute script: {}\\\"}}\", error)\n            }\n        };\n        ctx.get_mut_response()\n            .set_status_code(200)\n            .set_header(CONTENT_TYPE, APPLICATION_JSON)\n            .set_body(&response_body);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let body: RequestBody = ctx.get_request().get_body().clone();\n        let script: String = String::from_utf8_lossy(&body).to_string();\n        let output: Result<std::process::Output, std::io::Error> = if cfg!(target_os = \"windows\") {\n            Command::new(\"cmd\").args([\"/C\", &script]).output()\n        } else {\n            Command::new(\"sh\").arg(\"-c\").arg(&script).output()\n        };\n        let response_body: String = match output {\n            Ok(result) => {\n                let stdout: String = decode_output(&result.stdout);\n                let stderr: String = decode_output(&result.stderr);\n                let exit_code: i32 = result.status.code().unwrap_or(-1);\n                format!(\n                    \"{{\\\"exit_code\\\": {}, \\\"stdout\\\": {:?}, \\\"stderr\\\": {:?}}}\",\n                    exit_code, stdout, stderr\n                )\n            }\n            Err(error) => {\n                format!(\"{{\\\"error\\\": \\\"Failed to execute script: {}\\\"}}\", error)\n            }\n        };\n        ctx.get_mut_response()\n            .set_status_code(200)\n            .set_header(CONTENT_TYPE, APPLICATION_JSON)\n            .set_body(&response_body);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(200)\n            .set_header(SERVER, HYPERLANE)\n            .set_header(CONNECTION, KEEP_ALIVE);\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(200)\n            .set_header(SERVER, HYPERLANE)\n            .set_header(CONNECTION, KEEP_ALIVE);\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(200)\n            .set_header(SERVER, HYPERLANE)\n            .set_header(CONNECTION, KEEP_ALIVE);\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(200)\n            .set_header(SERVER, HYPERLANE)\n            .set_header(CONNECTION, KEEP_ALIVE);\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let _ = ctx.try_send().await;\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let _ = ctx.try_send().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let _ = ctx.try_send().await;\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let _ = ctx.try_send().await;\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(500)\n            .set_header(CONTENT_TYPE, TEXT_PLAIN)\n            .set_body(INTERNAL_SERVER_ERROR);\n        let _ = ctx.try_send().await;\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(500)\n            .set_header(CONTENT_TYPE, TEXT_PLAIN)\n            .set_body(INTERNAL_SERVER_ERROR);\n        let _ = ctx.try_send().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(500)\n            .set_header(CONTENT_TYPE, TEXT_PLAIN)\n            .set_body(INTERNAL_SERVER_ERROR);\n        let _ = ctx.try_send().await;\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(500)\n            .set_header(CONTENT_TYPE, TEXT_PLAIN)\n            .set_body(INTERNAL_SERVER_ERROR);\n        let _ = ctx.try_send().await;\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::new方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\nasync fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的源码是怎么实现的？",
+    "input": "",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(400)\n            .set_header(CONTENT_TYPE, TEXT_PLAIN)\n            .set_body(BAD_REQUEST);\n        let _ = ctx.try_send().await;\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
+    "input": "",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(400)\n            .set_header(CONTENT_TYPE, TEXT_PLAIN)\n            .set_body(BAD_REQUEST);\n        let _ = ctx.try_send().await;\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
+    "input": "",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(400)\n            .set_header(CONTENT_TYPE, TEXT_PLAIN)\n            .set_body(BAD_REQUEST);\n        let _ = ctx.try_send().await;\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "ServerHook::handle方法为什么需要修改状态？",
+    "input": "",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        ctx.get_mut_response()\n            .set_version(HttpVersion::Http1_1)\n            .set_status_code(400)\n            .set_header(CONTENT_TYPE, TEXT_PLAIN)\n            .set_body(BAD_REQUEST);\n        let _ = ctx.try_send().await;\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "system": ""
+  },
+  {
+    "instruction": "decode_output函数的源码是怎么实现的？",
+    "input": "",
+    "output": "decode_output函数的源码实现如下：\n\n```rust\nfn decode_output(bytes: &[u8]) -> String {\n    if bytes.is_empty() {\n        return String::new();\n    }\n    use encoding::{DecoderTrap, Encoding};\n    if cfg!(target_os = \"windows\") {\n        encoding::all::GB18030\n            .decode(bytes, DecoderTrap::Replace)\n            .unwrap_or_else(|_| String::from_utf8_lossy(bytes).to_string())\n    } else {\n        String::from_utf8_lossy(bytes).to_string()\n    }\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "decode_output函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "decode_output函数的参数设计如下：\n\n```rust\nfn decode_output(bytes: &[u8]) -> String {\n    if bytes.is_empty() {\n        return String::new();\n    }\n    use encoding::{DecoderTrap, Encoding};\n    if cfg!(target_os = \"windows\") {\n        encoding::all::GB18030\n            .decode(bytes, DecoderTrap::Replace)\n            .unwrap_or_else(|_| String::from_utf8_lossy(bytes).to_string())\n    } else {\n        String::from_utf8_lossy(bytes).to_string()\n    }\n}\n```\n\n参数列表：\n- bytes: &[u8]\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "decode_output函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "decode_output函数的返回值类型设计如下：\n\n```rust\nfn decode_output(bytes: &[u8]) -> String {\n    if bytes.is_empty() {\n        return String::new();\n    }\n    use encoding::{DecoderTrap, Encoding};\n    if cfg!(target_os = \"windows\") {\n        encoding::all::GB18030\n            .decode(bytes, DecoderTrap::Replace)\n            .unwrap_or_else(|_| String::from_utf8_lossy(bytes).to_string())\n    } else {\n        String::from_utf8_lossy(bytes).to_string()\n    }\n}\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "main函数的源码是怎么实现的？",
+    "input": "",
+    "output": "main函数的源码实现如下：\n\n```rust\n#[tokio::main]\nasync fn main() {\n    let mut server: Server = Server::default();\n    let mut server_config: ServerConfig = ServerConfig::default();\n    if let Ok(address) = env::var(\"HYPERLANE_PROCESS_GUARD_ADDRESS\") {\n        server_config.set_address(address);\n    } else {\n        panic!(\"HYPERLANE_PROCESS_GUARD_ADDRESS is not set\");\n    }\n    server\n        .server_config(server_config)\n        .task_panic::<TaskPanicHook>()\n        .request_error::<RequestErrorHook>()\n        .request_middleware::<RequestMiddleware>()\n        .response_middleware::<ResponseMiddleware>()\n        .route::<ProcessGuardRoute>(\"/execute\");\n    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();\n    server_control_hook.wait().await;\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释main这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "main函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[tokio::main]\nasync fn main() {\n    let mut server: Server = Server::default();\n    let mut server_config: ServerConfig = ServerConfig::default();\n    if let Ok(address) = env::var(\"HYPERLANE_PROCESS_GUARD_ADDRESS\") {\n        server_config.set_address(address);\n    } else {\n        panic!(\"HYPERLANE_PROCESS_GUARD_ADDRESS is not set\");\n    }\n    server\n        .server_config(server_config)\n        .task_panic::<TaskPanicHook>()\n        .request_error::<RequestErrorHook>()\n        .request_middleware::<RequestMiddleware>()\n        .response_middleware::<ResponseMiddleware>()\n        .route::<ProcessGuardRoute>(\"/execute\");\n    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();\n    server_control_hook.wait().await;\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：19\n- 包含高级特性：泛型编程、异步编程",
+    "system": ""
+  },
+  {
+    "instruction": "main函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "main函数的泛型设计和使用如下：\n\n```rust\n#[tokio::main]\nasync fn main() {\n    let mut server: Server = Server::default();\n    let mut server_config: ServerConfig = ServerConfig::default();\n    if let Ok(address) = env::var(\"HYPERLANE_PROCESS_GUARD_ADDRESS\") {\n        server_config.set_address(address);\n    } else {\n        panic!(\"HYPERLANE_PROCESS_GUARD_ADDRESS is not set\");\n    }\n    server\n        .server_config(server_config)\n        .task_panic::<TaskPanicHook>()\n        .request_error::<RequestErrorHook>()\n        .request_middleware::<RequestMiddleware>()\n        .response_middleware::<ResponseMiddleware>()\n        .route::<ProcessGuardRoute>(\"/execute\");\n    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();\n    server_control_hook.wait().await;\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "main函数的异步实现是如何工作的？",
+    "input": "",
+    "output": "main函数的异步实现机制如下：\n\n```rust\n#[tokio::main]\nasync fn main() {\n    let mut server: Server = Server::default();\n    let mut server_config: ServerConfig = ServerConfig::default();\n    if let Ok(address) = env::var(\"HYPERLANE_PROCESS_GUARD_ADDRESS\") {\n        server_config.set_address(address);\n    } else {\n        panic!(\"HYPERLANE_PROCESS_GUARD_ADDRESS is not set\");\n    }\n    server\n        .server_config(server_config)\n        .task_panic::<TaskPanicHook>()\n        .request_error::<RequestErrorHook>()\n        .request_middleware::<RequestMiddleware>()\n        .response_middleware::<ResponseMiddleware>()\n        .route::<ProcessGuardRoute>(\"/execute\");\n    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();\n    server_control_hook.wait().await;\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "system": ""
+  },
+  {
     "instruction": "GetOrInittrait的源码是怎么实现的？",
     "input": "",
     "output": "GetOrInittrait的源码实现如下：\n\n```rust\npub trait GetOrInit: Clone + Copy + Default + Send + Sync + 'static {\n    type Instance: Send + Sync + 'static;\n\n    fn get_or_init() -> &'static Self::Instance;\n}\n\npub trait DatabaseConnectionPlugin: Clone + Copy + Default + Send + Sync + 'static {\n    type InstanceConfig: Clone + Send + Sync + 'static;\n\n    type AutoCreation: DatabaseAutoCreation<InstanceConfig = Self::InstanceConfig>;\n\n    type Connection: Clone + Send + Sync + 'static;\n\n    type ConnectionCache: Send + Sync + 'static;\n\n    fn plugin_type() -> PluginType;\n\n    fn connection_db<I>(\n        instance_name: I,\n        schema: Option<DatabaseSchema>,\n    ) -> impl Future<Output = Result<Self::Connection, String>> + Send\n    where\n        I: AsRef<str> + Send;\n\n    fn get_connection<I>(\n        instance_name: I,\n        schema: Option<DatabaseSchema>,\n    ) -> impl Future<Output = Result<Self::Connection, String>> + Send\n    where\n        I: AsRef<str> + Send;\n\n    fn perform_auto_creation(\n        instance: &Self::InstanceConfig,\n        schema: Option<DatabaseSchema>,\n    ) -> impl Future<Output = Result<AutoCreationResult, AutoCreationError>> + Send;\n}\n\npub trait DatabaseAutoCreation: Clone + Send + Sync + 'static {\n    type InstanceConfig;\n\n    fn new(instance: Self::InstanceConfig) -> Self;\n\n    fn with_schema(instance: Self::InstanceConfig, schema: DatabaseSchema) -> Self\n    where\n        Self: Sized;\n\n    fn create_database_if_not_exists(\n        &self,\n    ) -> impl Future<Output = Result<bool, AutoCreationError>> + Send;\n\n    fn create_tables_if_not_exist(\n        &self,\n    ) -> impl Future<Output = Result<Vec<String>, AutoCreationError>> + Send;\n\n    fn init_data(&self) -> impl Future<Output = Result<(), AutoCreationError>> + Send;\n\n    fn verify_connection(&self) -> impl Future<Output = Result<(), AutoCreationError>> + Send;\n}\n```",

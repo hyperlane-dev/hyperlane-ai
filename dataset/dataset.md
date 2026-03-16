@@ -1,4 +1,4 @@
-<!--2026-03-16 13:24:01-->
+<!--2026-03-16 19:10:33-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -8426,6 +8426,136 @@ pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
         current_stream = apply_macro(meta, current_stream, Position::Epilogue);
     }
     current_stream
+}
+```
+# Path: hyperlane-process-guard/README.md
+## hyperlane-process-guard
+> A process guard service based on Hyperlane web framework for remote script execution and process management.
+## Installation
+Install `hyperlane-process-guard` via `cargo`:
+```bash
+cargo install hyperlane-process-guard
+```
+## Contribution
+## Contact
+# Path: hyperlane-process-guard/src/main.rs
+```rust
+use hyperlane::*;
+use std::{env, process::Command};
+fn decode_output(bytes: &[u8]) -> String {
+    if bytes.is_empty() {
+        return String::new();
+    }
+    use encoding::{DecoderTrap, Encoding};
+    if cfg!(target_os = "windows") {
+        encoding::all::GB18030
+            .decode(bytes, DecoderTrap::Replace)
+            .unwrap_or_else(|_| String::from_utf8_lossy(bytes).to_string())
+    } else {
+        String::from_utf8_lossy(bytes).to_string()
+    }
+}
+struct ProcessGuardRoute;
+impl ServerHook for ProcessGuardRoute {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        let body: RequestBody = ctx.get_request().get_body().clone();
+        let script: String = String::from_utf8_lossy(&body).to_string();
+        let output: Result<std::process::Output, std::io::Error> = if cfg!(target_os = "windows") {
+            Command::new("cmd").args(["/C", &script]).output()
+        } else {
+            Command::new("sh").arg("-c").arg(&script).output()
+        };
+        let response_body: String = match output {
+            Ok(result) => {
+                let stdout: String = decode_output(&result.stdout);
+                let stderr: String = decode_output(&result.stderr);
+                let exit_code: i32 = result.status.code().unwrap_or(-1);
+                format!(
+                    "{{\"exit_code\": {}, \"stdout\": {:?}, \"stderr\": {:?}}}",
+                    exit_code, stdout, stderr
+                )
+            }
+            Err(error) => {
+                format!("{{\"error\": \"Failed to execute script: {}\"}}", error)
+            }
+        };
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, APPLICATION_JSON)
+            .set_body(&response_body);
+    }
+}
+struct RequestMiddleware;
+impl ServerHook for RequestMiddleware {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(200)
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONNECTION, KEEP_ALIVE);
+    }
+}
+struct ResponseMiddleware;
+impl ServerHook for ResponseMiddleware {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        let _ = ctx.try_send().await;
+    }
+}
+struct TaskPanicHook;
+impl ServerHook for TaskPanicHook {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(500)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_body(INTERNAL_SERVER_ERROR);
+        let _ = ctx.try_send().await;
+    }
+}
+struct RequestErrorHook;
+impl ServerHook for RequestErrorHook {
+    async fn new(_ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(400)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_body(BAD_REQUEST);
+        let _ = ctx.try_send().await;
+    }
+}
+#[tokio::main]
+async fn main() {
+    let mut server: Server = Server::default();
+    let mut server_config: ServerConfig = ServerConfig::default();
+    if let Ok(address) = env::var("HYPERLANE_PROCESS_GUARD_ADDRESS") {
+        server_config.set_address(address);
+    } else {
+        panic!("HYPERLANE_PROCESS_GUARD_ADDRESS is not set");
+    }
+    server
+        .server_config(server_config)
+        .task_panic::<TaskPanicHook>()
+        .request_error::<RequestErrorHook>()
+        .request_middleware::<RequestMiddleware>()
+        .response_middleware::<ResponseMiddleware>()
+        .route::<ProcessGuardRoute>("/execute");
+    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
+    server_control_hook.wait().await;
 }
 ```
 # Path: hyperlane-quick-start/README.md
