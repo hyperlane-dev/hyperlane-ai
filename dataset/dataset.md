@@ -1,4 +1,4 @@
-<!--2026-03-21 02:26:12-->
+<!--2026-03-21 06:53:27-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -8589,7 +8589,7 @@ use common::*;
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 use {
     hyperlane::*,
@@ -8647,7 +8647,7 @@ pub trait DatabaseAutoCreation: Clone + Send + Sync + 'static {
 ```rust
 mod r#trait;
 pub use r#trait::*;
-use crate::database::{AutoCreationError, AutoCreationResult, DatabaseSchema, PluginType};
+use crate::database::*;
 use std::future::Future;
 ```
 # Path: hyperlane-quick-start/plugin/logger/mod.rs
@@ -8806,32 +8806,25 @@ pub(super) static FILE_LOGGER: OnceLock<RwLock<FileLogger>> = OnceLock::new();
 ```
 # Path: hyperlane-quick-start/plugin/env/const.rs
 ```rust
-pub const ENV_FILE_PATH: &str = "./.env";
-pub const DOCKER_COMPOSE_FILE_PATH: &str = "./docker-compose.yml";
+pub const ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS: &str = "DB_CONNECTION_TIMEOUT_MILLIS";
+pub const ENV_KEY_DB_RETRY_INTERVAL_MILLIS: &str = "DB_RETRY_INTERVAL_MILLIS";
+pub const ENV_KEY_MYSQL: &str = "MYSQL";
+pub const ENV_KEY_POSTGRESQL: &str = "POSTGRESQL";
+pub const ENV_KEY_REDIS: &str = "REDIS";
 pub const ENV_KEY_GPT_API_URL: &str = "GPT_API_URL";
 pub const ENV_KEY_GPT_MODEL: &str = "GPT_MODEL";
-pub const ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS: &str = "DB_CONNECTION_TIMEOUT_MILLIS";
-pub const DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS: u64 = 3000;
-pub const ENV_KEY_DB_RETRY_INTERVAL_MILLIS: &str = "DB_RETRY_INTERVAL_MILLIS";
-pub const DEFAULT_DB_RETRY_INTERVAL_MILLIS: u64 = 30000;
-pub const ENV_KEY_MYSQL_HOST: &str = "MYSQL_HOST";
-pub const ENV_KEY_MYSQL_PORT: &str = "MYSQL_PORT";
-pub const ENV_KEY_MYSQL_DATABASE: &str = "MYSQL_DATABASE";
-pub const ENV_KEY_MYSQL_USERNAME: &str = "MYSQL_USERNAME";
-pub const ENV_KEY_MYSQL_PASSWORD: &str = "MYSQL_PASSWORD";
-pub const ENV_KEY_POSTGRES_HOST: &str = "POSTGRES_HOST";
-pub const ENV_KEY_POSTGRES_PORT: &str = "POSTGRES_PORT";
-pub const ENV_KEY_POSTGRES_DATABASE: &str = "POSTGRES_DATABASE";
-pub const ENV_KEY_POSTGRES_USERNAME: &str = "POSTGRES_USERNAME";
-pub const ENV_KEY_POSTGRES_PASSWORD: &str = "POSTGRES_PASSWORD";
-pub const ENV_KEY_REDIS_HOST: &str = "REDIS_HOST";
-pub const ENV_KEY_REDIS_PORT: &str = "REDIS_PORT";
-pub const ENV_KEY_REDIS_USERNAME: &str = "REDIS_USERNAME";
-pub const ENV_KEY_REDIS_PASSWORD: &str = "REDIS_PASSWORD";
-pub const DEFAULT_MYSQL_PORT: usize = 3306;
-pub const DEFAULT_REDIS_PORT: usize = 6379;
-pub const DEFAULT_POSTGRESQL_PORT: usize = 5432;
-pub const DEFAULT_DB_HOST: &str = "127.0.0.1";
+pub const ENV_KEY_SERVER_PORT: &str = "SERVER_PORT";
+pub const ENV_KEY_SERVER_HOST: &str = "SERVER_HOST";
+pub const ENV_KEY_SERVER_BUFFER: &str = "SERVER_BUFFER";
+pub const ENV_KEY_SERVER_LOG_SIZE: &str = "SERVER_LOG_SIZE";
+pub const ENV_KEY_SERVER_LOG_DIR: &str = "SERVER_LOG_DIR";
+pub const ENV_KEY_SERVER_INNER_PRINT: &str = "SERVER_INNER_PRINT";
+pub const ENV_KEY_SERVER_INNER_LOG: &str = "SERVER_INNER_LOG";
+pub const ENV_KEY_SERVER_NODELAY: &str = "SERVER_NODELAY";
+pub const ENV_KEY_SERVER_TTI: &str = "SERVER_TTI";
+pub const ENV_KEY_SERVER_PID_FILE_PATH: &str = "SERVER_PID_FILE_PATH";
+pub const ENV_KEY_SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: &str = "SERVER_REQUEST_HTTP_READ_TIMEOUT_MS";
+pub const ENV_KEY_SERVER_REQUEST_MAX_BODY_SIZE: &str = "SERVER_REQUEST_MAX_BODY_SIZE";
 pub const DOCKER_YAML_SERVICES: &str = "services";
 pub const DOCKER_YAML_ENVIRONMENT: &str = "environment";
 pub const DOCKER_YAML_PORTS: &str = "ports";
@@ -8854,8 +8847,9 @@ mod r#impl;
 mod r#static;
 mod r#struct;
 pub use {r#const::*, r#struct::*};
-use {super::*, mysql::*, postgresql::*, redis::*, r#static::*};
-use std::sync::OnceLock;
+use {super::*, r#static::*};
+use hyperlane_resources::{docker::*, env::*};
+use std::{env::var, sync::OnceLock};
 ```
 # Path: hyperlane-quick-start/plugin/env/impl.rs
 ```rust
@@ -8869,221 +8863,153 @@ impl GetOrInit for EnvPlugin {
 }
 impl EnvPlugin {
     #[instrument_trace]
-    pub fn try_get_config() -> Result<(), String> {
+    pub fn try_load_config() -> Result<(), String> {
         let config: EnvConfig = EnvConfig::load()?;
         GLOBAL_ENV_CONFIG
             .set(config.clone())
             .map_err(|_| "Failed to initialize global environment configuration".to_string())?;
-        info!("Environment Configuration Loaded Successfully");
-        info!(
-            "GPT API URL {}",
-            if config.get_gpt_api_url().is_empty() {
-                "(not set)"
-            } else {
-                config.get_gpt_api_url()
-            }
-        );
-        info!(
-            "GPT Model {}",
-            if config.get_gpt_model().is_empty() {
-                "(not set)"
-            } else {
-                config.get_gpt_model()
-            }
-        );
-        info!("MySQL Configuration:");
-        if config.get_mysql_instances().is_empty() {
-            info!("  (no MySQL instances configured)");
-        } else {
-            for instance in config.get_mysql_instances() {
-                info!(
+        Ok(())
+    }
+}
+impl MySqlInstanceConfig {
+    pub(crate) fn get_connection_url(&self) -> String {
+        format!(
     #[instrument_trace]
     pub(crate) fn load() -> Result<Self, String> {
+        dotenvy::from_path(SERVER_ENV_FILE_PATH)
+            .map_err(|error: dotenvy::Error| format!("Failed to load env file {error}"))?;
+        let get_env_required = |key: &str| -> Result<String, String> {
+            var(key).map_err(|_| format!("Environment variable {} is not set", key))
+        };
+        let get_env_u16 = |key: &str| -> Result<u16, String> {
+            var(key)
+                .map_err(|_| format!("Environment variable {} is not set", key))?
+                .parse()
+                .map_err(|_| format!("Environment variable {} must be a valid u16", key))
+        };
+        let get_env_u32 = |key: &str| -> Result<u32, String> {
+            var(key)
+                .map_err(|_| format!("Environment variable {} is not set", key))?
+                .parse()
+                .map_err(|_| format!("Environment variable {} must be a valid u32", key))
+        };
+        let get_env_u64 = |key: &str| -> Result<u64, String> {
+            var(key)
+                .map_err(|_| format!("Environment variable {} is not set", key))?
+                .parse()
+                .map_err(|_| format!("Environment variable {} must be a valid u64", key))
+        };
+        let get_env_usize = |key: &str| -> Result<usize, String> {
+            var(key)
+                .map_err(|_| format!("Environment variable {} is not set", key))?
+                .parse()
+                .map_err(|_| format!("Environment variable {} must be a valid usize", key))
+        };
+        let get_env_bool = |key: &str| -> Result<bool, String> {
+            let value = var(key).map_err(|_| format!("Environment variable {} is not set", key))?;
+            if value.eq_ignore_ascii_case("true") || value.eq_ignore_ascii_case("1") {
+                Ok(true)
+            } else if value.eq_ignore_ascii_case("false") || value.eq_ignore_ascii_case("0") {
+                Ok(false)
+            } else {
+                Err(format!(
+                    "Environment variable {} must be true/false or 1/0",
+                    key
+                ))
+            }
+        };
         let docker_config: DockerComposeConfig =
-            Self::load_from_docker_compose().unwrap_or_default();
-        if read_from_file::<Vec<u8>>(ENV_FILE_PATH).is_err() {
-            let mut data: String = String::new();
-            data.push_str(&format!("{ENV_KEY_GPT_API_URL}={BR}"));
-            data.push_str(&format!("{ENV_KEY_GPT_MODEL}={BR}"));
-            data.push_str(&format!(
-                "{ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS}={DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS}{BR}"
-            ));
-            write_to_file(ENV_FILE_PATH, data.as_bytes())
-                .map_err(|error| format!("Failed to create example env file {error}"))?;
-        }
-        dotenvy::from_path(ENV_FILE_PATH)
-            .map_err(|error| format!("Failed to load env file {error}"))?;
-        let get_env = |key: &str| -> Option<String> { std::env::var(key).ok() };
-        let get_env_usize = |key: &str| -> Option<usize> {
-            std::env::var(key).ok().and_then(|value| value.parse().ok())
+            Self::load_from_docker_compose(SERVER_DOCKER_COMPOSE_FILE_PATH).unwrap_or_default();
+        let mysql_instances: Vec<MySqlInstanceConfig> =
+            Self::parse_mysql_instances(&docker_config)?;
+        let postgresql_instances: Vec<PostgreSqlInstanceConfig> =
+            Self::parse_postgresql_instances(&docker_config)?;
+        let redis_instances: Vec<RedisInstanceConfig> =
+            Self::parse_redis_instances(&docker_config)?;
+        let config: EnvConfig = EnvConfig {
+            db_connection_timeout_millis: get_env_u64(ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS)?,
+            db_retry_interval_millis: get_env_u64(ENV_KEY_DB_RETRY_INTERVAL_MILLIS)?,
+            gpt_api_url: var(ENV_KEY_GPT_API_URL).unwrap_or_default(),
+            gpt_model: var(ENV_KEY_GPT_MODEL).unwrap_or_default(),
+            mysql_instances,
+            postgresql_instances,
+            redis_instances,
+            server_port: get_env_u16(ENV_KEY_SERVER_PORT)?,
+            server_host: get_env_required(ENV_KEY_SERVER_HOST)?,
+            server_buffer: get_env_usize(ENV_KEY_SERVER_BUFFER)?,
+            server_log_size: get_env_usize(ENV_KEY_SERVER_LOG_SIZE)?,
+            server_log_dir: get_env_required(ENV_KEY_SERVER_LOG_DIR)?,
+            server_inner_print: get_env_bool(ENV_KEY_SERVER_INNER_PRINT)?,
+            server_inner_log: get_env_bool(ENV_KEY_SERVER_INNER_LOG)?,
+            server_nodelay: Some(get_env_bool(ENV_KEY_SERVER_NODELAY)?),
+            server_tti: Some(get_env_u32(ENV_KEY_SERVER_TTI)?),
+            server_pid_file_path: get_env_required(ENV_KEY_SERVER_PID_FILE_PATH)?,
+            server_request_http_read_timeout_ms: get_env_u64(
+                ENV_KEY_SERVER_REQUEST_HTTP_READ_TIMEOUT_MS,
+            )?,
+            server_request_max_body_size: get_env_usize(ENV_KEY_SERVER_REQUEST_MAX_BODY_SIZE)?,
         };
-        let mut config: EnvConfig = EnvConfig {
-            gpt_api_url: get_env(ENV_KEY_GPT_API_URL).unwrap_or_default(),
-            gpt_model: get_env(ENV_KEY_GPT_MODEL).unwrap_or_default(),
-            ..Default::default()
-        };
-        let default_mysql_host: String =
-            get_env(ENV_KEY_MYSQL_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
-        let default_mysql_port: usize = docker_config
-            .get_mysql_port()
-            .or_else(|| get_env_usize(ENV_KEY_MYSQL_PORT))
-            .unwrap_or(DEFAULT_MYSQL_PORT);
-        let default_mysql_database: String = docker_config
-            .try_get_mysql_database()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_MYSQL_DATABASE))
-            .unwrap_or_default();
-        let default_mysql_username: String = docker_config
-            .try_get_mysql_username()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_MYSQL_USERNAME))
-            .unwrap_or_default();
-        let default_mysql_password: String = docker_config
-            .try_get_mysql_password()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_MYSQL_PASSWORD))
-            .unwrap_or_default();
-        let instance: MySqlInstanceConfig = MySqlInstanceConfig {
-            name: DEFAULT_MYSQL_INSTANCE_NAME.to_string(),
-            host: default_mysql_host,
-            port: default_mysql_port,
-            database: default_mysql_database,
-            username: default_mysql_username,
-            password: default_mysql_password,
-        };
-        config.get_mut_mysql_instances().push(instance);
-        let mut instance_index: usize = 1;
-        loop {
-            let prefix: String = format!("MYSQL_{instance_index}_");
-            let host_key: String = format!("{prefix}HOST");
-            if let Some(host) = get_env(&host_key) {
-                let port_key: String = format!("{prefix}PORT");
-                let database_key: String = format!("{prefix}DATABASE");
-                let username_key: String = format!("{prefix}USERNAME");
-                let password_key: String = format!("{prefix}PASSWORD");
-                let instance_name: String = format!("mysql_{instance_index}");
-                let instance: MySqlInstanceConfig = MySqlInstanceConfig {
-                    name: instance_name,
-                    host,
-                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_MYSQL_PORT),
-                    database: get_env(&database_key).unwrap_or_default(),
-                    username: get_env(&username_key).unwrap_or_default(),
-                    password: get_env(&password_key).unwrap_or_default(),
-                };
-                config.get_mut_mysql_instances().push(instance);
-                instance_index += 1;
-            } else {
-                break;
-            }
-        }
-        let default_postgres_host: String =
-            get_env(ENV_KEY_POSTGRES_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
-        let default_postgres_port: usize = docker_config
-            .get_postgresql_port()
-            .or_else(|| get_env_usize(ENV_KEY_POSTGRES_PORT))
-            .unwrap_or(DEFAULT_POSTGRESQL_PORT);
-        let default_postgres_database: String = docker_config
-            .try_get_postgresql_database()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_POSTGRES_DATABASE))
-            .unwrap_or_default();
-        let default_postgres_username: String = docker_config
-            .try_get_postgresql_username()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_POSTGRES_USERNAME))
-            .unwrap_or_default();
-        let default_postgres_password: String = docker_config
-            .try_get_postgresql_password()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_POSTGRES_PASSWORD))
-            .unwrap_or_default();
-        let instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig {
-            name: DEFAULT_POSTGRESQL_INSTANCE_NAME.to_string(),
-            host: default_postgres_host,
-            port: default_postgres_port,
-            database: default_postgres_database,
-            username: default_postgres_username,
-            password: default_postgres_password,
-        };
-        config.get_mut_postgresql_instances().push(instance);
-        let mut instance_index: usize = 1;
-        loop {
-            let prefix: String = format!("POSTGRES_{instance_index}_");
-            let host_key: String = format!("{prefix}HOST");
-            if let Some(host) = get_env(&host_key) {
-                let port_key: String = format!("{prefix}PORT");
-                let database_key: String = format!("{prefix}DATABASE");
-                let username_key: String = format!("{prefix}USERNAME");
-                let password_key: String = format!("{prefix}PASSWORD");
-                let instance_name: String = format!("postgres_{instance_index}");
-                let instance: PostgreSqlInstanceConfig = PostgreSqlInstanceConfig {
-                    name: instance_name,
-                    host,
-                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_POSTGRESQL_PORT),
-                    database: get_env(&database_key).unwrap_or_default(),
-                    username: get_env(&username_key).unwrap_or_default(),
-                    password: get_env(&password_key).unwrap_or_default(),
-                };
-                config.get_mut_postgresql_instances().push(instance);
-                instance_index += 1;
-            } else {
-                break;
-            }
-        }
-        let default_redis_host: String =
-            get_env(ENV_KEY_REDIS_HOST).unwrap_or_else(|| DEFAULT_DB_HOST.to_string());
-        let default_redis_port: usize = docker_config
-            .get_redis_port()
-            .or_else(|| get_env_usize(ENV_KEY_REDIS_PORT))
-            .unwrap_or(DEFAULT_REDIS_PORT);
-        let default_redis_username: String = docker_config
-            .try_get_redis_username()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_REDIS_USERNAME))
-            .unwrap_or_default();
-        let default_redis_password: String = docker_config
-            .try_get_redis_password()
-            .clone()
-            .or_else(|| get_env(ENV_KEY_REDIS_PASSWORD))
-            .unwrap_or_default();
-        let instance: RedisInstanceConfig = RedisInstanceConfig {
-            name: DEFAULT_REDIS_INSTANCE_NAME.to_string(),
-            host: default_redis_host,
-            port: default_redis_port,
-            username: default_redis_username,
-            password: default_redis_password,
-        };
-        config.get_mut_redis_instances().push(instance);
-        let mut instance_index: usize = 1;
-        loop {
-            let prefix: String = format!("REDIS_{instance_index}_");
-            let host_key: String = format!("{prefix}HOST");
-            if let Some(host) = get_env(&host_key) {
-                let port_key: String = format!("{prefix}PORT");
-                let username_key: String = format!("{prefix}USERNAME");
-                let password_key: String = format!("{prefix}PASSWORD");
-                let instance_name: String = format!("redis_{instance_index}");
-                let instance: RedisInstanceConfig = RedisInstanceConfig {
-                    name: instance_name,
-                    host,
-                    port: get_env_usize(&port_key).unwrap_or(DEFAULT_REDIS_PORT),
-                    username: get_env(&username_key).unwrap_or_default(),
-                    password: get_env(&password_key).unwrap_or_default(),
-                };
-                config.get_mut_redis_instances().push(instance);
-                instance_index += 1;
-            } else {
-                break;
-            }
-        }
         Ok(config)
     }
+    fn parse_mysql_instances(
+        docker_config: &DockerComposeConfig,
+    ) -> Result<Vec<MySqlInstanceConfig>, String> {
+        let mysql_json: String = var(ENV_KEY_MYSQL)
+            .map_err(|_| format!("Environment variable {} is not set", ENV_KEY_MYSQL))?
+            .trim_matches('\'')
+            .to_string();
+        let mut instances: Vec<MySqlInstanceConfig> = serde_json::from_str(&mysql_json)
+            .map_err(|error: Error| format!("Failed to parse {}: {}", ENV_KEY_MYSQL, error))?;
+        for instance in instances.iter_mut() {
+            if instance.get_port() == 0 {
+                instance.set_port(docker_config.get_mysql_port().unwrap_or(3306));
+            }
+        }
+        Ok(instances)
+    }
+    fn parse_postgresql_instances(
+        docker_config: &DockerComposeConfig,
+    ) -> Result<Vec<PostgreSqlInstanceConfig>, String> {
+        let postgresql_json: String = var(ENV_KEY_POSTGRESQL)
+            .map_err(|_| format!("Environment variable {} is not set", ENV_KEY_POSTGRESQL))?
+            .trim_matches('\'')
+            .to_string();
+        let mut instances: Vec<PostgreSqlInstanceConfig> = serde_json::from_str(&postgresql_json)
+            .map_err(|error: Error| {
+            format!("Failed to parse {}: {}", ENV_KEY_POSTGRESQL, error)
+        })?;
+        for instance in instances.iter_mut() {
+            if instance.get_port() == 0 {
+                instance.set_port(docker_config.get_postgresql_port().unwrap_or(5432));
+            }
+        }
+        Ok(instances)
+    }
+    fn parse_redis_instances(
+        docker_config: &DockerComposeConfig,
+    ) -> Result<Vec<RedisInstanceConfig>, String> {
+        let redis_json: String = var(ENV_KEY_REDIS)
+            .map_err(|_| format!("Environment variable {} is not set", ENV_KEY_REDIS))?
+            .trim_matches('\'')
+            .to_string();
+        let mut instances: Vec<RedisInstanceConfig> = serde_json::from_str(&redis_json)
+            .map_err(|error: Error| format!("Failed to parse {}: {}", ENV_KEY_REDIS, error))?;
+        for instance in instances.iter_mut() {
+            if instance.get_port() == 0 {
+                instance.set_port(docker_config.get_redis_port().unwrap_or(6379));
+            }
+        }
+        Ok(instances)
+    }
     #[instrument_trace]
-    fn load_from_docker_compose() -> Result<DockerComposeConfig, String> {
-        let docker_compose_content: Vec<u8> = read_from_file(DOCKER_COMPOSE_FILE_PATH)
-            .map_err(|error| format!("Failed to read docker-compose.yml {error}"))?;
-        let yaml: serde_yaml::Value = serde_yaml::from_slice(&docker_compose_content)
-            .map_err(|error| format!("Failed to parse docker-compose.yml {error}"))?;
+    fn load_from_docker_compose(file_path: &str) -> Result<DockerComposeConfig, String> {
+        let docker_compose_content: Vec<u8> =
+            read_from_file(file_path).map_err(|error: Box<dyn std::error::Error>| {
+                format!("Failed to read docker-compose.yml {error}")
+            })?;
+        let yaml: serde_yaml::Value = serde_yaml::from_slice(&docker_compose_content).map_err(
+            |error: serde_yaml::Error| format!("Failed to parse docker-compose.yml {error}"),
+        )?;
         let mut config: DockerComposeConfig = DockerComposeConfig::default();
         if let Some(mysql) = yaml
             .get(DOCKER_YAML_SERVICES)
@@ -9182,7 +9108,131 @@ impl EnvPlugin {
         }
         Ok(config)
     }
-}
+    #[instrument_trace]
+    pub fn log_config() {
+        #[cfg(debug_assertions)]
+        let is_dev: bool = true;
+        #[cfg(not(debug_assertions))]
+        let is_dev: bool = false;
+        let config: &EnvConfig = EnvPlugin::get_or_init();
+        if is_dev {
+            info!("Environment Configuration Loaded Successfully");
+            info!("Database Configuration:");
+            info!(
+                "  DB_CONNECTION_TIMEOUT_MILLIS: {}",
+                config.get_db_connection_timeout_millis()
+            );
+            info!(
+                "  DB_RETRY_INTERVAL_MILLIS: {}",
+                config.get_db_retry_interval_millis()
+            );
+            info!("GPT Configuration:");
+            info!(
+                "  GPT_API_URL: {}",
+                if config.get_gpt_api_url().is_empty() {
+                    "(not set)"
+                } else {
+                    config.get_gpt_api_url()
+                }
+            );
+            info!(
+                "  GPT_MODEL: {}",
+                if config.get_gpt_model().is_empty() {
+                    "(not set)"
+                } else {
+                    config.get_gpt_model()
+                }
+            );
+            info!("MySQL Configuration:");
+            if config.get_mysql_instances().is_empty() {
+                info!("  (no MySQL instances configured)");
+            } else {
+                for instance in config.get_mysql_instances() {
+                    info!("  Instance '{}'", instance.get_name());
+                    info!("    Host: {}", instance.get_host());
+                    info!("    Port: {}", instance.get_port());
+                    info!("    Database: {}", instance.get_database());
+                    info!("    Username: {}", instance.get_username());
+                    info!("    Password: {}", instance.get_password());
+                }
+            }
+            info!("PostgreSQL Configuration:");
+            if config.get_postgresql_instances().is_empty() {
+                info!("  (no PostgreSQL instances configured)");
+            } else {
+                for instance in config.get_postgresql_instances() {
+                    info!("  Instance '{}'", instance.get_name());
+                    info!("    Host: {}", instance.get_host());
+                    info!("    Port: {}", instance.get_port());
+                    info!("    Database: {}", instance.get_database());
+                    info!("    Username: {}", instance.get_username());
+                    info!("    Password: {}", instance.get_password());
+                }
+            }
+            info!("Redis Configuration:");
+            if config.get_redis_instances().is_empty() {
+                info!("  (no Redis instances configured)");
+            } else {
+                for instance in config.get_redis_instances() {
+                    info!("  Instance '{}'", instance.get_name());
+                    info!("    Host: {}", instance.get_host());
+                    info!("    Port: {}", instance.get_port());
+                    info!(
+                        "    Username: {}",
+                        if instance.get_username().is_empty() {
+                            "(none)"
+                        } else {
+                            instance.get_username()
+                        }
+                    );
+                    info!("    Password: {}", instance.get_password());
+                }
+            }
+            info!("Server Configuration:");
+            info!("  SERVER_PORT: {}", config.get_server_port());
+            info!("  SERVER_HOST: {}", config.get_server_host());
+            info!("  SERVER_BUFFER: {}", config.get_server_buffer());
+            info!("  SERVER_LOG_SIZE: {}", config.get_server_log_size());
+            info!("  SERVER_LOG_DIR: {}", config.get_server_log_dir());
+            info!("  SERVER_INNER_PRINT: {}", config.get_server_inner_print());
+            info!("  SERVER_INNER_LOG: {}", config.get_server_inner_log());
+            info!("  SERVER_NODELAY: {:?}", config.get_server_nodelay());
+            info!("  SERVER_TTI: {:?}", config.get_server_tti());
+            info!(
+                "  SERVER_PID_FILE_PATH: {}",
+                config.get_server_pid_file_path()
+            );
+            info!(
+                "  SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: {}",
+                config.get_server_request_http_read_timeout_ms()
+            );
+            info!(
+                "  SERVER_REQUEST_MAX_BODY_SIZE: {}",
+                config.get_server_request_max_body_size()
+            );
+        } else {
+            info!(
+                "GPT API URL {}",
+                if config.get_gpt_api_url().is_empty() {
+                    "(not set)"
+                } else {
+                    config.get_gpt_api_url()
+                }
+            );
+            info!(
+                "GPT Model {}",
+                if config.get_gpt_model().is_empty() {
+                    "(not set)"
+                } else {
+                    config.get_gpt_model()
+                }
+            );
+            info!("MySQL Configuration:");
+            if config.get_mysql_instances().is_empty() {
+                info!("  (no MySQL instances configured)");
+            } else {
+                for instance in config.get_mysql_instances() {
+                    info!(
 ```
 # Path: hyperlane-quick-start/plugin/env/struct.rs
 ```rust
@@ -9191,84 +9241,104 @@ use super::*;
 pub struct EnvPlugin;
 #[derive(Clone, Data, Debug, Default)]
 pub struct DockerComposeConfig {
-    #[get(pub(crate))]
     pub(super) mysql_database: Option<String>,
-    #[get(pub(crate))]
     pub(super) mysql_password: Option<String>,
-    #[get(type(copy), pub(crate))]
+    #[get(type(copy))]
     pub(super) mysql_port: Option<usize>,
-    #[get(pub(crate))]
     pub(super) mysql_username: Option<String>,
-    #[get(pub(crate))]
     pub(super) postgresql_database: Option<String>,
-    #[get(pub(crate))]
     pub(super) postgresql_password: Option<String>,
-    #[get(type(copy), pub(crate))]
+    #[get(type(copy))]
     pub(super) postgresql_port: Option<usize>,
-    #[get(pub(crate))]
     pub(super) postgresql_username: Option<String>,
-    #[get(pub(crate))]
     pub(super) redis_password: Option<String>,
-    #[get(type(copy), pub(crate))]
+    #[get(type(copy))]
     pub(super) redis_port: Option<usize>,
-    #[get(pub(crate))]
     pub(super) redis_username: Option<String>,
 }
 #[derive(Clone, Data, Debug, Default)]
 pub struct EnvConfig {
+    #[get(type(copy))]
+    pub(super) db_connection_timeout_millis: u64,
+    #[get(type(copy))]
+    pub(super) db_retry_interval_millis: u64,
     #[get(pub)]
     pub(super) gpt_api_url: String,
     #[get(pub)]
     pub(super) gpt_model: String,
-    #[get(pub(crate))]
     pub(super) mysql_instances: Vec<MySqlInstanceConfig>,
-    #[get(pub(crate))]
     pub(super) postgresql_instances: Vec<PostgreSqlInstanceConfig>,
-    #[get(pub(crate))]
     pub(super) redis_instances: Vec<RedisInstanceConfig>,
+    #[get(type(copy))]
+    pub(super) server_port: u16,
+    #[get(pub)]
+    pub(super) server_host: String,
+    #[get(type(copy))]
+    pub(super) server_buffer: usize,
+    #[get(type(copy))]
+    pub(super) server_log_size: usize,
+    #[get(pub)]
+    pub(super) server_log_dir: String,
+    #[get(type(copy))]
+    pub(super) server_inner_print: bool,
+    #[get(type(copy))]
+    pub(super) server_inner_log: bool,
+    #[get(type(copy))]
+    pub(super) server_nodelay: Option<bool>,
+    #[get(type(copy))]
+    pub(super) server_tti: Option<u32>,
+    #[get(pub)]
+    pub(super) server_pid_file_path: String,
+    #[get(type(copy))]
+    pub(super) server_request_http_read_timeout_ms: u64,
+    #[get(type(copy))]
+    pub(super) server_request_max_body_size: usize,
 }
-#[derive(Clone, Data, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Deserialize, Data)]
 pub struct MySqlInstanceConfig {
-    #[get(pub(crate))]
-    pub(super) database: String,
-    #[get(pub(crate))]
-    pub(super) host: String,
-    #[get(pub(crate))]
+    #[serde(rename = "name")]
     pub(super) name: String,
-    #[get(pub(crate))]
-    pub(super) password: String,
-    #[get(type(copy), pub(crate))]
+    #[serde(rename = "host")]
+    pub(super) host: String,
+    #[get(type(copy))]
+    #[serde(default, rename = "port")]
     pub(super) port: usize,
-    #[get(pub(crate))]
+    #[serde(rename = "database")]
+    pub(super) database: String,
+    #[serde(rename = "username")]
     pub(super) username: String,
+    #[serde(rename = "password")]
+    pub(super) password: String,
 }
-#[derive(Clone, Data, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Deserialize, Data)]
 pub struct PostgreSqlInstanceConfig {
-    #[get(pub(crate))]
+    #[serde(rename = "name")]
+    pub(super) name: String,
+    #[serde(rename = "host")]
+    pub(super) host: String,
+    #[get(type(copy))]
+    #[serde(default, rename = "port")]
+    pub(super) port: usize,
+    #[serde(rename = "database")]
     pub(super) database: String,
-    #[get(pub(crate))]
-    pub(super) host: String,
-    #[get(pub(crate))]
-    pub(super) name: String,
-    #[get(pub(crate))]
-    pub(super) password: String,
-    #[get(type(copy), pub(crate))]
-    pub(super) port: usize,
-    #[get(pub(crate))]
+    #[serde(rename = "username")]
     pub(super) username: String,
+    #[serde(rename = "password")]
+    pub(super) password: String,
 }
-#[derive(Clone, Data, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Deserialize, Data)]
 pub struct RedisInstanceConfig {
-    #[get(pub(crate))]
-    pub(super) host: String,
-    #[get(pub(crate))]
+    #[serde(rename = "name")]
     pub(super) name: String,
-    #[get(pub(crate))]
-    pub(super) password: String,
-    #[get(type(copy), pub(crate))]
+    #[serde(rename = "host")]
+    pub(super) host: String,
+    #[get(type(copy))]
+    #[serde(default, rename = "port")]
     pub(super) port: usize,
-    #[get(pub(crate))]
+    #[serde(default, rename = "username")]
     pub(super) username: String,
+    #[serde(rename = "password")]
+    pub(super) password: String,
 }
 ```
 # Path: hyperlane-quick-start/plugin/env/static.rs
@@ -9289,12 +9359,14 @@ mod r#struct;
 mod r#type;
 pub use {r#const::*, r#struct::*, r#type::*};
 use {super::*, database::*, env::*, r#static::*};
-use hyperlane_utils::redis::*;
-use tokio::{
-    spawn,
-    sync::{RwLock, RwLockWriteGuard},
-    task::{JoinHandle, spawn_blocking},
-    time::timeout,
+use {
+    hyperlane_utils::redis::*,
+    tokio::{
+        spawn,
+        sync::{RwLock, RwLockWriteGuard},
+        task::{JoinHandle, spawn_blocking},
+        time::timeout,
+    },
 };
 ```
 # Path: hyperlane-quick-start/plugin/redis/impl.rs
@@ -9762,10 +9834,8 @@ use super::*;
 pub struct RedisPlugin;
 #[derive(Clone, Data, Debug, New)]
 pub struct RedisAutoCreation {
-    #[get(pub(crate))]
     pub(super) instance: RedisInstanceConfig,
     #[new(skip)]
-    #[get(pub(crate))]
     pub(super) schema: DatabaseSchema,
 }
 ```
@@ -10371,10 +10441,8 @@ use super::*;
 pub struct MySqlPlugin;
 #[derive(Clone, Data, Debug, New)]
 pub struct MySqlAutoCreation {
-    #[get(pub(crate))]
     pub(super) instance: MySqlInstanceConfig,
     #[new(skip)]
-    #[get(pub(crate))]
     pub(super) schema: DatabaseSchema,
 }
 ```
@@ -10972,10 +11040,8 @@ use super::*;
 pub struct PostgreSqlPlugin;
 #[derive(Clone, Data, Debug, New)]
 pub struct PostgreSqlAutoCreation {
-    #[get(pub(crate))]
     pub(super) instance: PostgreSqlInstanceConfig,
     #[new(skip)]
-    #[get(pub(crate))]
     pub(super) schema: DatabaseSchema,
 }
 ```
@@ -11014,6 +11080,7 @@ impl ProcessPlugin {
     {
         let args: Vec<String> = args().collect();
         debug!("Process create args {args:?}");
+        trace!("Pid file path: {}", pid_path.as_ref());
         let mut manager: ServerManager = ServerManager::new();
         manager
             .set_pid_file(pid_path.as_ref())
@@ -11107,14 +11174,22 @@ pub struct ShutdownPlugin;
 use super::*;
 pub(super) static SHUTDOWN: OnceLock<ServerControlHookHandler<()>> = OnceLock::new();
 ```
+# Path: hyperlane-quick-start/plugin/database/const.rs
+```rust
+pub const MYSQL_DISPLAY_NAME: &str = "MySQL";
+pub const POSTGRESQL_DISPLAY_NAME: &str = "PostgreSQL";
+pub const REDIS_DISPLAY_NAME: &str = "Redis";
+```
 # Path: hyperlane-quick-start/plugin/database/mod.rs
 ```rust
+mod r#const;
 mod r#enum;
 mod r#impl;
 mod r#struct;
-pub use {r#enum::*, r#struct::*};
+pub use {r#const::*, r#enum::*, r#struct::*};
 use {super::*, env::*, mysql::*, postgresql::*, redis::*};
 use std::{
+    env::var,
     fmt,
     str::FromStr,
     time::{Duration, Instant},
@@ -11127,9 +11202,9 @@ impl fmt::Display for PluginType {
     #[instrument_trace]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MySQL => write!(f, "MySQL"),
-            Self::PostgreSQL => write!(f, "PostgreSQL"),
-            Self::Redis => write!(f, "Redis"),
+            Self::MySQL => write!(f, "{}", MYSQL_DISPLAY_NAME),
+            Self::PostgreSQL => write!(f, "{}", POSTGRESQL_DISPLAY_NAME),
+            Self::Redis => write!(f, "{}", REDIS_DISPLAY_NAME),
         }
     }
 }
@@ -11138,9 +11213,9 @@ impl FromStr for PluginType {
     #[instrument_trace]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "MySQL" => Ok(Self::MySQL),
-            "PostgreSQL" => Ok(Self::PostgreSQL),
-            "Redis" => Ok(Self::Redis),
+            MYSQL_DISPLAY_NAME => Ok(Self::MySQL),
+            POSTGRESQL_DISPLAY_NAME => Ok(Self::PostgreSQL),
+            REDIS_DISPLAY_NAME => Ok(Self::Redis),
             _ => Err(()),
         }
     }
@@ -11192,18 +11267,28 @@ impl TableSchema {
 impl DatabasePlugin {
     #[instrument_trace]
     pub fn get_connection_timeout_duration() -> Duration {
-        let timeout_seconds: u64 = std::env::var(ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS)
+        let timeout_millis: u64 = var(ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS)
             .ok()
             .and_then(|value: String| value.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_DB_CONNECTION_TIMEOUT_MILLIS);
-        Duration::from_millis(timeout_seconds)
+            .unwrap_or_else(|| {
+                panic!(
+                    "Environment variable {} is not set or invalid",
+                    ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS
+                )
+            });
+        Duration::from_millis(timeout_millis)
     }
     #[instrument_trace]
     pub fn get_retry_duration() -> Duration {
-        let millis: u64 = std::env::var(ENV_KEY_DB_RETRY_INTERVAL_MILLIS)
+        let millis: u64 = var(ENV_KEY_DB_RETRY_INTERVAL_MILLIS)
             .ok()
             .and_then(|value: String| value.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_DB_RETRY_INTERVAL_MILLIS);
+            .unwrap_or_else(|| {
+                panic!(
+                    "Environment variable {} is not set or invalid",
+                    ENV_KEY_DB_RETRY_INTERVAL_MILLIS
+                )
+            });
         Duration::from_millis(millis)
     }
     #[instrument_trace]
@@ -11583,70 +11668,37 @@ use super::*;
 pub struct DatabasePlugin;
 #[derive(Clone, Data, Debug)]
 pub struct ConnectionCache<T: Clone> {
-    #[get(type(copy), pub(crate))]
+    #[get(type(copy))]
     pub(super) last_attempt: Instant,
-    #[get(pub(crate))]
     pub(super) result: Result<T, String>,
 }
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct AutoCreationErrorHandler;
-#[derive(Clone, Data, Debug)]
-pub struct ErrorContext {
-    #[get(pub(crate))]
-    pub(super) database_name: Option<String>,
-    #[get(pub(crate))]
-    pub(super) error_message: String,
-    #[get(pub(crate))]
-    pub(super) error_type: String,
-    #[get(pub(crate))]
-    pub(super) log_level: String,
-    #[get(pub(crate))]
-    pub(super) operation: String,
-    #[get(pub(crate))]
-    pub(super) plugin_name: String,
-    #[get(pub(crate))]
-    pub(super) recovery_suggestion: String,
-    #[get(type(copy), pub(crate))]
-    pub(super) should_continue: bool,
-    #[get(pub(crate))]
-    pub(super) timestamp: SystemTime,
-}
 #[derive(Clone, Data, Debug, Default)]
 pub struct AutoCreationResult {
-    #[get(type(copy), pub(crate))]
+    #[get(type(copy))]
     pub(super) database_created: bool,
-    #[get(pub(crate))]
     pub(super) duration: Duration,
-    #[get(pub(crate))]
     pub(super) errors: Vec<String>,
-    #[get(pub(crate))]
     pub(super) tables_created: Vec<String>,
 }
 #[derive(Clone, Data, Debug, New)]
 pub struct TableSchema {
-    #[get(pub(crate))]
     pub(super) dependencies: Vec<String>,
-    #[get(pub(crate))]
     pub(super) name: String,
-    #[get(pub(crate))]
     pub(super) sql: String,
 }
 #[derive(Clone, Data, Debug, Default)]
 pub struct DatabaseSchema {
-    #[get(pub(crate))]
     pub(super) constraints: Vec<String>,
-    #[get(pub(crate))]
     pub(super) indexes: Vec<String>,
-    #[get(pub(crate))]
     pub(super) init_data: Vec<String>,
-    #[get(pub(crate))]
     pub(super) tables: Vec<TableSchema>,
 }
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct AutoCreationConfig;
 #[derive(Clone, Data, Debug, Default)]
 pub struct PluginAutoCreationConfig {
-    #[get(pub(crate))]
     pub(super) plugin_name: String,
 }
 #[derive(Clone, Copy, Data, Debug, Default)]
@@ -11681,7 +11733,7 @@ pub enum PluginType {
 ```rust
 pub mod application;
 pub mod framework;
-use {hyperlane::*, hyperlane_utils::log::*};
+use hyperlane_utils::log::*;
 ```
 # Path: hyperlane-quick-start/config/application/mod.rs
 ```rust
@@ -11714,22 +11766,6 @@ pub use r#const::*;
 ```
 # Path: hyperlane-quick-start/config/framework/const.rs
 ```rust
-use super::*;
-#[cfg(debug_assertions)]
-pub const SERVER_PORT: u16 = 60000;
-#[cfg(not(debug_assertions))]
-pub const SERVER_PORT: u16 = 65002;
-pub const SERVER_HOST: &str = DEFAULT_HOST;
-pub const SERVER_BUFFER: usize = DEFAULT_BUFFER_SIZE;
-pub const SERVER_LOG_SIZE: usize = 100_024_000;
-pub const SERVER_LOG_DIR: &str = "./data/logs";
-pub const SERVER_INNER_PRINT: bool = true;
-pub const SERVER_INNER_LOG: bool = true;
-pub const SERVER_NODELAY: Option<bool> = Some(false);
-pub const SERVER_TTI: Option<u32> = Some(128);
-pub const SERVER_PID_FILE_PATH: &str = "./data/process/hyperlane.pid";
-pub const SERVER_REQUEST_HTTP_READ_TIMEOUT_MS: u64 = 60000;
-pub const SERVER_REQUEST_MAX_BODY_SIZE: usize = MB_100;
 pub const CACHE_CONTROL_STATIC_ASSETS: &str = "public, max-age=31536000, immutable";
 pub const CACHE_CONTROL_SHORT_TERM: &str = "public, max-age=3600";
 pub const EXPIRES_FAR_FUTURE: &str = "Wed, 1 Apr 8888 00:00:00 GMT";
@@ -11738,7 +11774,6 @@ pub const EXPIRES_FAR_FUTURE: &str = "Wed, 1 Apr 8888 00:00:00 GMT";
 ```rust
 mod r#const;
 pub use r#const::*;
-use super::*;
 ```
 # Path: hyperlane-quick-start/application/README.md
 ## hyperlane-application
@@ -11761,6 +11796,7 @@ pub mod service;
 pub mod utils;
 pub mod view;
 use {
+    chrono::Utc,
     hyperlane::*,
     hyperlane_utils::{log::*, *},
     serde::{Deserialize, Serialize},
@@ -11846,19 +11882,15 @@ use super::*;
 #[task_panic]
 #[derive(Clone, Data, Debug, Default)]
 pub struct TaskPanicHook {
-    #[get(pub(crate))]
     pub(super) content_type: String,
-    #[get(pub(crate))]
     pub(super) response_body: String,
 }
 #[request_error]
 #[derive(Clone, Data, Debug, Default)]
 pub struct RequestErrorHook {
-    #[get(type(copy), pub(crate))]
+    #[get(type(copy))]
     pub(super) response_status_code: ResponseStatusCode,
-    #[get(pub(crate))]
     pub(super) content_type: String,
-    #[get(pub(crate))]
     pub(super) response_body: String,
 }
 ```
@@ -12183,7 +12215,7 @@ where
             .set_code(ResponseCode::Success as i32)
             .set_message("Success".to_string())
             .set_data(None)
-            .set_timestamp(Some(date()));
+            .set_timestamp(Some(Utc::now().timestamp_millis()));
         instance
     }
     #[instrument_trace]
@@ -12193,7 +12225,7 @@ where
             .set_code(ResponseCode::Success as i32)
             .set_message("Success".to_string())
             .set_data(Some(data))
-            .set_timestamp(Some(date()));
+            .set_timestamp(Some(Utc::now().timestamp_millis()));
         instance
     }
     #[instrument_trace]
@@ -12203,7 +12235,7 @@ where
             .set_code(ResponseCode::Success as i32)
             .set_message(message.into())
             .set_data(Some(data))
-            .set_timestamp(Some(date()));
+            .set_timestamp(Some(Utc::now().timestamp_millis()));
         instance
     }
     #[instrument_trace]
@@ -12213,7 +12245,7 @@ where
             .set_code(ResponseCode::InternalError as i32)
             .set_message("Internal server error".to_string())
             .set_data(None)
-            .set_timestamp(Some(date()));
+            .set_timestamp(Some(Utc::now().timestamp_millis()));
         instance
     }
     #[instrument_trace]
@@ -12223,7 +12255,7 @@ where
             .set_code(ResponseCode::InternalError as i32)
             .set_message(message.into())
             .set_data(None)
-            .set_timestamp(Some(date()));
+            .set_timestamp(Some(Utc::now().timestamp_millis()));
         instance
     }
     #[instrument_trace]
@@ -12233,7 +12265,7 @@ where
             .set_code(code as i32)
             .set_message(message.to_string())
             .set_data(None)
-            .set_timestamp(Some(date()));
+            .set_timestamp(Some(Utc::now().timestamp_millis()));
         instance
     }
     #[instrument_trace]
@@ -12249,7 +12281,7 @@ impl ApiResponse<()> {
             .set_code(ResponseCode::Success as i32)
             .set_message(message.into())
             .set_data(None)
-            .set_timestamp(Some(date()));
+            .set_timestamp(Some(Utc::now().timestamp_millis()));
         instance
     }
 }
@@ -12263,14 +12295,12 @@ pub struct ApiResponse<T>
 where
     T: Clone + Default + Serialize,
 {
-    #[get(type(copy), pub(crate))]
+    #[get(type(copy))]
     pub(super) code: i32,
-    #[get(pub(crate))]
     pub(super) message: String,
-    #[get(pub(crate))]
     pub(super) data: Option<T>,
-    #[get(pub(crate))]
-    pub(super) timestamp: Option<String>,
+    #[get(type(copy))]
+    pub(super) timestamp: Option<i64>,
 }
 ```
 # Path: hyperlane-quick-start/application/model/response/common/enum.rs
@@ -12297,17 +12327,18 @@ use {
         common::*,
         framework::{runtime::*, server::*},
     },
-    hyperlane_config::framework::*,
-    hyperlane_plugin::process::*,
+    hyperlane_plugin::{common::GetOrInit, env::*, process::*},
 };
 use hyperlane_utils::log::*;
 fn main() {
-    LoggerBootstrap::init();
     EnvBootstrap::init();
+    LoggerBootstrap::init();
+    EnvConfig::log_config();
     info!("Environment configuration loaded successfully");
+    let env_config: &EnvConfig = EnvPlugin::get_or_init();
     RuntimeBootstrap::init().get_runtime().block_on(async move {
         DbBootstrap::init().await;
-        ProcessPlugin::create(SERVER_PID_FILE_PATH, || async {
+        ProcessPlugin::create(env_config.get_server_pid_file_path(), || async {
             ServerBootstrap::init().await;
         })
         .await;
@@ -12361,8 +12392,8 @@ mod r#struct;
 pub use r#struct::*;
 use super::*;
 use {
-    hyperlane_config::{application::logger::*, framework::*},
-    hyperlane_plugin::logger::*,
+    hyperlane_config::application::logger::*,
+    hyperlane_plugin::{common::*, env::*, logger::*},
 };
 ```
 # Path: hyperlane-quick-start/bootstrap/application/logger/impl.rs
@@ -12370,9 +12401,10 @@ use {
 use super::*;
 impl BootstrapSyncInit for LoggerBootstrap {
     fn init() -> Self {
+        let env_config: &EnvConfig = EnvPlugin::get_or_init();
         let mut file_logger: FileLogger = FileLogger::default();
-        file_logger.set_path(SERVER_LOG_DIR);
-        file_logger.set_limit_file_size(SERVER_LOG_SIZE);
+        file_logger.set_path(env_config.get_server_log_dir());
+        file_logger.set_limit_file_size(env_config.get_server_log_size());
         Logger::init(LOG_LEVEL_FILTER, file_logger);
         Self
     }
@@ -12397,8 +12429,8 @@ use hyperlane_plugin::env::*;
 use super::*;
 impl BootstrapSyncInit for EnvBootstrap {
     fn init() -> Self {
-        if let Err(error) = EnvPlugin::try_get_config() {
-            error!("{error}");
+        if let Err(error) = EnvPlugin::try_load_config() {
+            panic!("{error}");
         }
         Self
     }
@@ -12461,7 +12493,7 @@ mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
-use hyperlane_config::framework::*;
+use hyperlane_plugin::{common::*, env::*};
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/config/impl.rs
 ```rust
@@ -12469,13 +12501,17 @@ use super::*;
 impl BootstrapAsyncInit for ConfigBootstrap {
     #[hyperlane(server_config: ServerConfig)]
     async fn init() -> Self {
+        let env_config: &EnvConfig = EnvPlugin::get_or_init();
         let mut request_config: RequestConfig = RequestConfig::default();
         request_config
-            .set_max_body_size(SERVER_REQUEST_MAX_BODY_SIZE)
-            .set_read_timeout_ms(SERVER_REQUEST_HTTP_READ_TIMEOUT_MS);
-        server_config.set_address(Server::format_bind_address(SERVER_HOST, SERVER_PORT));
-        server_config.set_ttl(SERVER_TTI);
-        server_config.set_nodelay(SERVER_NODELAY);
+            .set_max_body_size(env_config.get_server_request_max_body_size())
+            .set_read_timeout_ms(env_config.get_server_request_http_read_timeout_ms());
+        server_config.set_address(Server::format_bind_address(
+            env_config.get_server_host(),
+            env_config.get_server_port(),
+        ));
+        server_config.set_ttl(env_config.get_server_tti());
+        server_config.set_nodelay(env_config.get_server_nodelay());
         debug!("Server config {server_config:?}");
         info!("Server initialization successful");
         Self {
@@ -12501,10 +12537,11 @@ mod r#struct;
 pub use r#struct::*;
 use {super::*, config::*};
 #[allow(unused_imports)]
-use {hyperlane_application::*, hyperlane_config::framework::*, hyperlane_plugin::shutdown::*};
+use {hyperlane_application::*, hyperlane_plugin::env::*, hyperlane_plugin::shutdown::*};
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/server/impl.rs
 ```rust
+use hyperlane_plugin::{common::GetOrInit, env::EnvPlugin};
 use super::*;
 impl ServerBootstrap {
     async fn print_route_matcher(server: &Server) {
@@ -12533,7 +12570,12 @@ impl BootstrapAsyncInit for ServerBootstrap {
             .server_config(config.get_server_config().clone());
         match server.run().await {
             Ok(server_hook) => {
-                let host_port: String = format!("{SERVER_HOST}{COLON}{SERVER_PORT}");
+                let env_config: &EnvConfig = EnvPlugin::get_or_init();
+                let host_port: String = format!(
+                    "{}{COLON}{}",
+                    env_config.get_server_host(),
+                    env_config.get_server_port()
+                );
                 Self::print_route_matcher(&server).await;
                 info!("Server listen in {host_port}");
                 ShutdownPlugin::set(server_hook.get_shutdown_hook());
@@ -12594,9 +12636,69 @@ pub struct RuntimeBootstrap {
 ## Contact
 # Path: hyperlane-quick-start/resources/lib.rs
 ```rust
+pub mod docker;
+pub mod env;
 pub mod sql;
 pub mod r#static;
 pub mod templates;
+```
+# Path: hyperlane-quick-start/resources/env/const.rs
+```rust
+#[cfg(debug_assertions)]
+pub const SERVER_ENV_FILE_PATH: &str = "./resources/env/dev/server.env";
+#[cfg(not(debug_assertions))]
+pub const SERVER_ENV_FILE_PATH: &str = "./resources/env/release/server.env";
+```
+# Path: hyperlane-quick-start/resources/env/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start/resources/env/release/server.env
+```env
+DOCKER_COMPOSE_FILE_PATH=./resources/docker/release/server_docker_compose.yml
+DB_CONNECTION_TIMEOUT_MILLIS=1000
+DB_RETRY_INTERVAL_MILLIS=30000
+GPT_API_URL=http://hyperlane:1234/v1/chat/completions
+GPT_MODEL=qwen2.5-coder-1.5b-instruct
+MYSQL='[{"name":"mysql_default","host":"hyperlane","port":3306,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
+POSTGRESQL='[{"name":"postgres_default","host":"hyperlane","port":5432,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
+REDIS='[{"name":"redis_default","host":"hyperlane","port":6379,"username":"","password":"hyperlane"}]'
+SERVER_PORT=65002
+SERVER_HOST=0.0.0.0
+SERVER_BUFFER=8192
+SERVER_LOG_SIZE=100024000
+SERVER_LOG_DIR=./data/release/logs
+SERVER_INNER_PRINT=true
+SERVER_INNER_LOG=true
+SERVER_NODELAY=false
+SERVER_TTI=128
+SERVER_PID_FILE_PATH=./data/release/process/hyperlane.pid
+SERVER_REQUEST_HTTP_READ_TIMEOUT_MS=60000
+SERVER_REQUEST_MAX_BODY_SIZE=104857600
+```
+# Path: hyperlane-quick-start/resources/env/dev/server.env
+```env
+DOCKER_COMPOSE_FILE_PATH=./resources/docker/dev/server_docker_compose.yml
+DB_CONNECTION_TIMEOUT_MILLIS=1000
+DB_RETRY_INTERVAL_MILLIS=30000
+GPT_API_URL=http://hyperlane:1234/v1/chat/completions
+GPT_MODEL=qwen2.5-coder-1.5b-instruct
+MYSQL='[{"name":"mysql_default","host":"hyperlane","port":3306,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
+POSTGRESQL='[{"name":"postgres_default","host":"hyperlane","port":5432,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
+REDIS='[{"name":"redis_default","host":"hyperlane","port":6379,"username":"","password":"hyperlane"}]'
+SERVER_PORT=60000
+SERVER_HOST=0.0.0.0
+SERVER_BUFFER=60000
+SERVER_LOG_SIZE=100024000
+SERVER_LOG_DIR=./data/dev/logs
+SERVER_INNER_PRINT=true
+SERVER_INNER_LOG=true
+SERVER_NODELAY=false
+SERVER_TTI=128
+SERVER_PID_FILE_PATH=./data/dev/process/hyperlane.pid
+SERVER_REQUEST_HTTP_READ_TIMEOUT_MS=60000
+SERVER_REQUEST_MAX_BODY_SIZE=104857600
 ```
 # Path: hyperlane-quick-start/resources/templates/const.rs
 ```rust
@@ -12645,6 +12747,56 @@ pub use r#const::*;
     </p>
   </body>
 </html>
+```
+# Path: hyperlane-quick-start/resources/docker/const.rs
+```rust
+#[cfg(debug_assertions)]
+pub const SERVER_DOCKER_COMPOSE_FILE_PATH: &str =
+    "./resources/docker/dev/server_docker_compose.yml";
+#[cfg(not(debug_assertions))]
+pub const SERVER_DOCKER_COMPOSE_FILE_PATH: &str =
+    "./resources/docker/release/server_docker_compose.yml";
+#[cfg(debug_assertions)]
+pub const SERVER_DOCKERFILE_PATH: &str = "./resources/docker/dev/server.dockerfile";
+#[cfg(not(debug_assertions))]
+pub const SERVER_DOCKERFILE_PATH: &str = "./resources/docker/release/server.dockerfile";
+```
+# Path: hyperlane-quick-start/resources/docker/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane-quick-start/resources/docker/release/server.dockerfile
+```dockerfile
+FROM rust:1.93-bookworm AS builder
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update -yqq && \
+    apt-get install -yqq cmake g++ binutils lld
+WORKDIR /hyperlane-quick-start
+COPY . .
+RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu
+FROM debian:bookworm-slim
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+WORKDIR /hyperlane-quick-start
+COPY --from=builder /hyperlane-quick-start/target/x86_64-unknown-linux-gnu/release/hyperlane-quick-start /hyperlane-quick-start/server
+EXPOSE 65002
+CMD ["/hyperlane-quick-start/server"]
+```
+# Path: hyperlane-quick-start/resources/docker/dev/server.dockerfile
+```dockerfile
+FROM rust:1.93-bookworm AS builder
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update -yqq && \
+    apt-get install -yqq cmake g++ binutils lld
+WORKDIR /hyperlane-quick-start
+COPY . .
+RUN cargo build
+FROM debian:bookworm-slim
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+WORKDIR /hyperlane-quick-start
+COPY --from=builder /hyperlane-quick-start/target/debug/hyperlane-quick-start /hyperlane-quick-start/server
+EXPOSE 60000
+CMD ["/hyperlane-quick-start/server"]
 ```
 # Path: hyperlane-quick-start/resources/static/not_found/index.html
 ```html
