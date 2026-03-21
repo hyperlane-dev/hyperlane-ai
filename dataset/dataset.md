@@ -1,4 +1,4 @@
-<!--2026-03-21 06:53:27-->
+<!--2026-03-21 13:00:13-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -12768,35 +12768,31 @@ pub use r#const::*;
 ```
 # Path: hyperlane-quick-start/resources/docker/release/server.dockerfile
 ```dockerfile
-FROM rust:1.93-bookworm AS builder
+FROM rust:1.93-bookworm
 RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update -yqq && \
     apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
-RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu
-FROM debian:bookworm-slim
-RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
-WORKDIR /hyperlane-quick-start
-COPY --from=builder /hyperlane-quick-start/target/x86_64-unknown-linux-gnu/release/hyperlane-quick-start /hyperlane-quick-start/server
+RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu && \
+    cp -f /hyperlane-quick-start/target/x86_64-unknown-linux-gnu/release/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start && \
+    rm -rf /hyperlane-quick-start/target
 EXPOSE 65002
-CMD ["/hyperlane-quick-start/server"]
+CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
 # Path: hyperlane-quick-start/resources/docker/dev/server.dockerfile
 ```dockerfile
-FROM rust:1.93-bookworm AS builder
+FROM rust:1.93-bookworm
 RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update -yqq && \
     apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
-RUN cargo build
-FROM debian:bookworm-slim
-RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
-WORKDIR /hyperlane-quick-start
-COPY --from=builder /hyperlane-quick-start/target/debug/hyperlane-quick-start /hyperlane-quick-start/server
+RUN cargo build && \
+    cp -f /hyperlane-quick-start/target/debug/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start && \
+    rm -rf /hyperlane-quick-start/target
 EXPOSE 60000
-CMD ["/hyperlane-quick-start/server"]
+CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
 # Path: hyperlane-quick-start/resources/static/not_found/index.html
 ```html
