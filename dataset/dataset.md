@@ -1,4 +1,4 @@
-<!--2026-03-21 13:00:13-->
+<!--2026-03-21 18:43:29-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -8576,6 +8576,7 @@ async fn main() {
 ## Contact
 # Path: hyperlane-quick-start/plugin/lib.rs
 ```rust
+#![recursion_limit = "1024"]
 pub mod common;
 pub mod database;
 pub mod env;
@@ -11731,6 +11732,7 @@ pub enum PluginType {
 ## Contact
 # Path: hyperlane-quick-start/config/lib.rs
 ```rust
+#![recursion_limit = "1024"]
 pub mod application;
 pub mod framework;
 use hyperlane_utils::log::*;
@@ -11785,6 +11787,7 @@ pub use r#const::*;
 ## Contact
 # Path: hyperlane-quick-start/application/lib.rs
 ```rust
+#![recursion_limit = "1024"]
 pub mod controller;
 pub mod domain;
 pub mod exception;
@@ -12321,6 +12324,7 @@ pub enum ResponseCode {
 ```
 # Path: hyperlane-quick-start/src/main.rs
 ```rust
+#![recursion_limit = "1024"]
 use {
     hyperlane_bootstrap::{
         application::{db::*, env::*, logger::*},
@@ -12355,6 +12359,7 @@ fn main() {
 ## Contact
 # Path: hyperlane-quick-start/bootstrap/lib.rs
 ```rust
+#![recursion_limit = "1024"]
 pub mod application;
 pub mod common;
 pub mod framework;
@@ -12636,6 +12641,7 @@ pub struct RuntimeBootstrap {
 ## Contact
 # Path: hyperlane-quick-start/resources/lib.rs
 ```rust
+#![recursion_limit = "1024"]
 pub mod docker;
 pub mod env;
 pub mod sql;
@@ -12659,11 +12665,11 @@ pub use r#const::*;
 DOCKER_COMPOSE_FILE_PATH=./resources/docker/release/server_docker_compose.yml
 DB_CONNECTION_TIMEOUT_MILLIS=1000
 DB_RETRY_INTERVAL_MILLIS=30000
-GPT_API_URL=http://hyperlane:1234/v1/chat/completions
+GPT_API_URL=http://127.0.0.1:1234/v1/chat/completions
 GPT_MODEL=qwen2.5-coder-1.5b-instruct
-MYSQL='[{"name":"mysql_default","host":"hyperlane","port":3306,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
-POSTGRESQL='[{"name":"postgres_default","host":"hyperlane","port":5432,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
-REDIS='[{"name":"redis_default","host":"hyperlane","port":6379,"username":"","password":"hyperlane"}]'
+MYSQL='[{"name":"mysql_default","host":"release_hyperlane_quick_start_mysql","port":3306,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
+POSTGRESQL='[{"name":"postgres_default","host":"release_hyperlane_quick_start_postgresql","port":5432,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
+REDIS='[{"name":"redis_default","host":"release_hyperlane_quick_start_redis","port":6379,"username":"","password":"hyperlane"}]'
 SERVER_PORT=65002
 SERVER_HOST=0.0.0.0
 SERVER_BUFFER=8192
@@ -12684,9 +12690,9 @@ DB_CONNECTION_TIMEOUT_MILLIS=1000
 DB_RETRY_INTERVAL_MILLIS=30000
 GPT_API_URL=http://hyperlane:1234/v1/chat/completions
 GPT_MODEL=qwen2.5-coder-1.5b-instruct
-MYSQL='[{"name":"mysql_default","host":"hyperlane","port":3306,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
-POSTGRESQL='[{"name":"postgres_default","host":"hyperlane","port":5432,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
-REDIS='[{"name":"redis_default","host":"hyperlane","port":6379,"username":"","password":"hyperlane"}]'
+MYSQL='[{"name":"mysql_default","host":"dev_hyperlane_quick_start_mysql","port":3306,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
+POSTGRESQL='[{"name":"postgres_default","host":"dev_hyperlane_quick_start_postgresql","port":5432,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
+REDIS='[{"name":"redis_default","host":"dev_hyperlane_quick_start_redis","port":6379,"username":"","password":"hyperlane"}]'
 SERVER_PORT=60000
 SERVER_HOST=0.0.0.0
 SERVER_BUFFER=60000
