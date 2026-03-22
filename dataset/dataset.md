@@ -1,4 +1,4 @@
-<!--2026-03-21 18:43:29-->
+<!--2026-03-22 02:40:44-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -1185,35 +1185,32 @@ impl Server {
         Self::flush_stdout();
         Self::flush_stderr();
     }
-    async fn handle_panic_with_context(&self, ctx: &mut Context, panic: &PanicData) {
-        ctx.set_aborted(false)
-            .set_closed(false)
-            .set_task_panic(panic.clone());
-        for hook in self.get_task_panic().iter() {
-            Box::pin(self.task_handler(ctx, hook, false)).await;
-            if ctx.get_aborted() {
-                return;
+    async fn task_handler<F>(&'static self, stream: &ArcRwLockStream, hook: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        if let Err(error) = spawn(hook).await
+            && error.is_panic()
+        {
+            let mut ctx: Context = stream.into();
+            let panic: PanicData = PanicData::from_join_error(error);
+            ctx.set_task_panic(panic)
+                .get_mut_response()
+                .set_status_code(HttpStatus::InternalServerError.code());
+            let panic_hook = async move {
+                for hook in self.get_task_panic().iter() {
+                    hook(&mut ctx).await;
+                    if ctx.get_aborted() {
+                        return;
+                    }
+                }
+            };
+            if let Err(error) = spawn(panic_hook).await
+                && error.is_panic()
+            {
+                eprintln!("{}", error);
+                let _ = Self::try_flush_stdout_and_stderr();
             }
-        }
-        ctx.set_aborted(true).set_closed(true);
-    }
-    async fn handle_task_panic(&self, ctx: &mut Context, join_error: JoinError) {
-        let panic: PanicData = PanicData::from_join_error(join_error);
-        ctx.get_mut_response()
-            .set_status_code(HttpStatus::InternalServerError.code());
-        self.handle_panic_with_context(ctx, &panic).await
-    }
-    async fn task_handler(&self, ctx: &mut Context, hook: &ServerHookHandler, progress: bool) {
-        if let Err(join_error) = spawn(hook(ctx)).await {
-            if !join_error.is_panic() {
-                return;
-            }
-            if progress {
-                Box::pin(self.handle_task_panic(ctx, join_error)).await;
-                return;
-            }
-            eprintln!("{}", join_error);
-            let _ = Self::try_flush_stdout_and_stderr();
         };
     }
     async fn configure_stream(&self, stream: &TcpStream) {
@@ -1227,7 +1224,7 @@ impl Server {
     }
     pub(super) async fn handle_request_middleware(&self, ctx: &mut Context) -> bool {
         for hook in self.get_request_middleware().iter() {
-            self.task_handler(ctx, hook, true).await;
+            hook(ctx).await;
             if ctx.get_aborted() {
                 return true;
             }
@@ -1236,7 +1233,7 @@ impl Server {
     }
     pub(super) async fn handle_route_matcher(&self, ctx: &mut Context, path: &str) -> bool {
         if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path) {
-            self.task_handler(ctx, &hook, true).await;
+            hook(ctx).await;
             if ctx.get_aborted() {
                 return true;
             }
@@ -1245,31 +1242,32 @@ impl Server {
     }
     pub(super) async fn handle_response_middleware(&self, ctx: &mut Context) -> bool {
         for hook in self.get_response_middleware().iter() {
-            self.task_handler(ctx, hook, true).await;
+            hook(ctx).await;
             if ctx.get_aborted() {
                 return true;
             }
         }
         false
     }
-    async fn spawn_connection_handler(&self, stream: ArcRwLockStream) {
-        let server_address: usize = self.into();
-        spawn(async move {
-            let server: &'static Server = server_address.into();
-            server.handle_connection(stream).await;
-        });
-    }
     pub async fn handle_request_error(&self, ctx: &mut Context, error: &RequestError) {
         ctx.set_aborted(false)
             .set_closed(false)
             .set_request_error_data(error.clone());
         for hook in self.get_request_error().iter() {
-            self.task_handler(ctx, hook, true).await;
+            hook(ctx).await;
             if ctx.get_aborted() {
                 return;
             }
         }
-        ctx.set_aborted(true).set_closed(true);
+    }
+    async fn spawn_connection_handler(&self, stream: &ArcRwLockStream) {
+        let server_address: usize = self.into();
+        let server: &'static Server = server_address.into();
+        let stream_clone: ArcRwLockStream = stream.clone();
+        let hook = async move {
+            server.handle_connection(stream_clone).await;
+        };
+        server.task_handler(stream, hook).await;
     }
     async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
         let route: &str = request.get_path();
@@ -1323,7 +1321,7 @@ impl Server {
         while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            self.spawn_connection_handler(stream).await;
+            self.spawn_connection_handler(&stream).await;
         }
         Ok(())
     }
