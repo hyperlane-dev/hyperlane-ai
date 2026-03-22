@@ -1,4 +1,4 @@
-<!--2026-03-22 02:40:44-->
+<!--2026-03-22 06:58:55-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -164,17 +164,9 @@ impl AsMut<Context> for Context {
 }
 impl Context {
     #[inline(always)]
-    pub(crate) fn new(
-        stream: &ArcRwLockStream,
-        request: &Request,
-        server: &'static Server,
-    ) -> Context {
+    pub(crate) fn new(stream: &ArcRwLockStream, server: &'static Server) -> Context {
         let mut ctx: Context = Context::default();
-        ctx.set_stream(Some(stream.clone()))
-            .set_request(request.clone())
-            .set_server(server)
-            .get_mut_response()
-            .set_version(request.get_version().clone());
+        ctx.set_stream(Some(stream.clone())).set_server(server);
         ctx
     }
     pub async fn http_from_stream(&mut self) -> Result<Request, RequestError> {
@@ -438,14 +430,14 @@ pub struct Context {
     #[set(pub(super))]
     pub(super) stream: Option<ArcRwLockStream>,
     #[get_mut(skip)]
-    #[set(pub(super))]
+    #[set(pub(crate))]
     pub(super) request: Request,
     pub(super) response: Response,
     #[get_mut(skip)]
     #[set(pub(crate))]
     pub(super) route_params: RouteParams,
     #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[set(pub(crate))]
     pub(super) attributes: ThreadSafeAttributeStore,
     #[get_mut(skip)]
     #[set(pub(super))]
@@ -1185,21 +1177,21 @@ impl Server {
         Self::flush_stdout();
         Self::flush_stderr();
     }
-    async fn task_handler<F>(&'static self, stream: &ArcRwLockStream, hook: F)
+    async fn task_handler<F>(&'static self, ctx_address: usize, hook: F)
     where
         F: Future<Output = ()> + Send + 'static,
     {
         if let Err(error) = spawn(hook).await
             && error.is_panic()
         {
-            let mut ctx: Context = stream.into();
+            let ctx: &mut Context = ctx_address.into();
             let panic: PanicData = PanicData::from_join_error(error);
             ctx.set_task_panic(panic)
                 .get_mut_response()
                 .set_status_code(HttpStatus::InternalServerError.code());
             let panic_hook = async move {
                 for hook in self.get_task_panic().iter() {
-                    hook(&mut ctx).await;
+                    hook(ctx).await;
                     if ctx.get_aborted() {
                         return;
                     }
@@ -1211,6 +1203,8 @@ impl Server {
                 eprintln!("{}", error);
                 let _ = Self::try_flush_stdout_and_stderr();
             }
+            let drop_ctx: &mut Context = ctx_address.into();
+            unsafe { drop(Box::from_raw(drop_ctx)) }
         };
     }
     async fn configure_stream(&self, stream: &TcpStream) {
@@ -1260,22 +1254,19 @@ impl Server {
             }
         }
     }
-    async fn spawn_connection_handler(&self, stream: &ArcRwLockStream) {
-        let server_address: usize = self.into();
-        let server: &'static Server = server_address.into();
-        let stream_clone: ArcRwLockStream = stream.clone();
-        let hook = async move {
-            server.handle_connection(stream_clone).await;
-        };
-        server.task_handler(stream, hook).await;
-    }
-    async fn request_hook(&self, state: &HandlerState, request: &Request) -> bool {
-        let route: &str = request.get_path();
-        let ctx: &mut Context = &mut Context::new(state.get_stream(), request, state.get_server());
+    async fn request_hook(&self, ctx: &mut Context, request: &Request) -> bool {
+        let mut response: Response = Response::default();
+        response.set_version(request.get_version().clone());
+        ctx.set_aborted(false)
+            .set_closed(false)
+            .set_response(response)
+            .set_route_params(RouteParams::default())
+            .set_attributes(ThreadSafeAttributeStore::default());
         let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(ctx).await {
             return ctx.is_keep_alive(keep_alive);
         }
+        let route: &str = request.get_path();
         if self.handle_route_matcher(ctx, route).await {
             return ctx.is_keep_alive(keep_alive);
         }
@@ -1284,44 +1275,43 @@ impl Server {
         }
         ctx.is_keep_alive(keep_alive)
     }
-    async fn handle_http_requests(&self, state: &HandlerState, request: &Request) {
-        if !self.request_hook(state, request).await {
+    async fn handle_http_requests(&self, ctx: &mut Context, request: &Request) {
+        if !self.request_hook(ctx, request).await {
             return;
         }
-        let stream: &ArcRwLockStream = state.get_stream();
-        let request_config: &RequestConfig = state.get_server().get_request_config();
         loop {
-            match Request::http_from_stream(stream, request_config).await {
+            match ctx.http_from_stream().await {
                 Ok(new_request) => {
-                    if !self.request_hook(state, &new_request).await {
+                    if !self.request_hook(ctx, &new_request).await {
                         return;
                     }
                 }
                 Err(error) => {
-                    self.handle_request_error(&mut state.get_stream().into(), &error)
-                        .await;
+                    self.handle_request_error(ctx, &error).await;
                     return;
                 }
             }
         }
     }
-    async fn handle_connection(&self, stream: ArcRwLockStream) {
-        match Request::http_from_stream(&stream, self.get_request_config()).await {
+    async fn handle_connection(&self, ctx: &mut Context) {
+        match ctx.http_from_stream().await {
             Ok(request) => {
-                let server_address: usize = self.into();
-                let hook: HandlerState = HandlerState::new(stream, server_address.into());
-                self.handle_http_requests(&hook, &request).await;
+                self.handle_http_requests(ctx, &request).await;
             }
             Err(error) => {
-                self.handle_request_error(&mut stream.into(), &error).await;
+                self.handle_request_error(ctx, &error).await;
             }
         }
+        unsafe { drop(Box::from_raw(ctx)) }
     }
     async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            self.spawn_connection_handler(&stream).await;
+            let server_address: usize = self.into();
+            let server: &'static Server = server_address.into();
+            let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, server)));
+            spawn(server.task_handler(ctx.into(), server.handle_connection(ctx)));
         }
         Ok(())
     }
@@ -1363,11 +1353,6 @@ impl Server {
 # Path: hyperlane/src/server/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, CustomDebug, DisplayDebug, Getter, New)]
-pub(crate) struct HandlerState {
-    pub(super) stream: ArcRwLockStream,
-    pub(super) server: &'static Server,
-}
 #[derive(Clone, CustomDebug, Data, DisplayDebug, New)]
 pub struct Server {
     #[get_mut(skip)]
