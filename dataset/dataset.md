@@ -1,4 +1,4 @@
-<!--2026-03-26 13:27:43-->
+<!--2026-03-26 19:14:58-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -23,10 +23,14 @@ mod config;
 mod context;
 mod error;
 mod hook;
+mod lifetime;
 mod panic;
 mod route;
 mod server;
-pub use {attribute::*, config::*, context::*, error::*, hook::*, panic::*, route::*, server::*};
+pub use {
+    attribute::*, config::*, context::*, error::*, hook::*, lifetime::*, panic::*, route::*,
+    server::*,
+};
 pub use {http_type::*, inventory};
 #[cfg(test)]
 use std::time::{Duration, Instant};
@@ -119,21 +123,21 @@ impl From<ArcRwLockStream> for Context {
 }
 impl From<usize> for Context {
     #[inline(always)]
-    fn from(addr: usize) -> Self {
-        let ctx: &Context = addr.into();
+    fn from(address: usize) -> Self {
+        let ctx: &Context = address.into();
         ctx.clone()
     }
 }
 impl From<usize> for &'static Context {
     #[inline(always)]
-    fn from(addr: usize) -> &'static Context {
-        unsafe { &*(addr as *const Context) }
+    fn from(address: usize) -> &'static Context {
+        unsafe { &*(address as *const Context) }
     }
 }
 impl<'a> From<usize> for &'a mut Context {
     #[inline(always)]
-    fn from(addr: usize) -> &'a mut Context {
-        unsafe { &mut *(addr as *mut Context) }
+    fn from(address: usize) -> &'a mut Context {
+        unsafe { &mut *(address as *mut Context) }
     }
 }
 impl From<&Context> for usize {
@@ -150,21 +154,28 @@ impl From<&mut Context> for usize {
 }
 impl AsRef<Context> for Context {
     #[inline(always)]
-    fn as_ref(&self) -> &Context {
-        let addr: usize = (self as &Context).into();
-        addr.into()
+    fn as_ref(&self) -> &Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 impl AsMut<Context> for Context {
     #[inline(always)]
-    fn as_mut(&mut self) -> &mut Context {
-        let addr: usize = (self as &mut Context).into();
-        addr.into()
+    fn as_mut(&mut self) -> &mut Self {
+        let address: usize = self.into();
+        address.into()
+    }
+}
+impl Lifetime for Context {
+    #[inline(always)]
+    fn leak_mut(&self) -> &'static mut Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 impl Context {
     #[inline(always)]
-    pub(crate) fn new(stream: &ArcRwLockStream, server: &'static Server) -> Context {
+    pub(crate) fn new(stream: &ArcRwLockStream, server: &'static Server) -> Self {
         let mut ctx: Context = Context::default();
         ctx.set_stream(Some(stream.clone())).set_server(server);
         ctx
@@ -448,7 +459,7 @@ pub struct Context {
 ```rust
 use crate::*;
 #[test]
-fn context_from_usize() {
+fn context_from_address() {
     let mut ctx: Context = Context::default();
     ctx.set_aborted(true);
     let ctx_address: usize = (&ctx).into();
@@ -456,7 +467,7 @@ fn context_from_usize() {
     assert_eq!(ctx.get_aborted(), ctx_from_addr.get_aborted());
 }
 #[test]
-fn context_ref_from_usize() {
+fn context_ref_from_address() {
     let mut ctx: Context = Context::default();
     ctx.set_closed(true);
     let ctx_address: usize = (&ctx).into();
@@ -464,7 +475,7 @@ fn context_ref_from_usize() {
     assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
 }
 #[test]
-fn context_mut_from_usize() {
+fn context_mut_from_address() {
     let mut ctx: Context = Context::default();
     let ctx_address: usize = (&mut ctx).into();
     let ctx_mut: &mut Context = ctx_address.into();
@@ -472,13 +483,13 @@ fn context_mut_from_usize() {
     assert!(ctx_mut.get_aborted());
 }
 #[test]
-fn context_ref_into_usize() {
+fn context_ref_into_address() {
     let ctx: Context = Context::default();
     let ctx_address: usize = (&ctx).into();
     assert!(ctx_address > 0);
 }
 #[test]
-fn context_mut_into_usize() {
+fn context_mut_into_address() {
     let mut ctx: Context = Context::default();
     let ctx_address: usize = (&mut ctx).into();
     assert!(ctx_address > 0);
@@ -927,6 +938,17 @@ fn server_config_from_json() {
     assert_eq!(server_config, new_server_config);
 }
 ```
+# Path: hyperlane/src/lifetime/trait.rs
+```rust
+pub trait Lifetime {
+    fn leak_mut(&self) -> &'static mut Self;
+}
+```
+# Path: hyperlane/src/lifetime/mod.rs
+```rust
+mod r#trait;
+pub use r#trait::*;
+```
 # Path: hyperlane/src/server/mod.rs
 ```rust
 mod r#fn;
@@ -998,21 +1020,21 @@ impl PartialEq for Server {
 impl Eq for Server {}
 impl From<usize> for Server {
     #[inline(always)]
-    fn from(addr: usize) -> Self {
-        let server: &Server = addr.into();
+    fn from(address: usize) -> Self {
+        let server: &Server = address.into();
         server.clone()
     }
 }
 impl From<usize> for &'static Server {
     #[inline(always)]
-    fn from(addr: usize) -> &'static Server {
-        unsafe { &*(addr as *const Server) }
+    fn from(address: usize) -> &'static Server {
+        unsafe { &*(address as *const Server) }
     }
 }
 impl From<usize> for &'static mut Server {
     #[inline(always)]
-    fn from(addr: usize) -> &'static mut Server {
-        unsafe { &mut *(addr as *mut Server) }
+    fn from(address: usize) -> &'static mut Server {
+        unsafe { &mut *(address as *mut Server) }
     }
 }
 impl From<&Server> for usize {
@@ -1029,16 +1051,16 @@ impl From<&mut Server> for usize {
 }
 impl AsRef<Server> for Server {
     #[inline(always)]
-    fn as_ref(&self) -> &Server {
-        let addr: usize = (self as &Server).into();
-        addr.into()
+    fn as_ref(&self) -> &Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 impl AsMut<Server> for Server {
     #[inline(always)]
-    fn as_mut(&mut self) -> &mut Server {
-        let addr: usize = (self as &mut Server).into();
-        addr.into()
+    fn as_mut(&mut self) -> &mut Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 impl From<ServerConfig> for Server {
@@ -1057,6 +1079,13 @@ impl From<RequestConfig> for Server {
             request_config,
             ..Default::default()
         }
+    }
+}
+impl Lifetime for Server {
+    #[inline(always)]
+    fn leak_mut(&self) -> &'static mut Self {
+        let address: usize = self.into();
+        address.into()
     }
 }
 impl Server {
@@ -1304,27 +1333,23 @@ impl Server {
         }
         unsafe { drop(Box::from_raw(ctx)) }
     }
-    async fn accept_connections(&self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
+    async fn tcp_accept(&'static mut self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            let server_address: usize = self.into();
-            let server: &'static Server = server_address.into();
-            let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, server)));
-            spawn(server.task_handler(ctx.into(), server.handle_connection(ctx)));
+            let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, self)));
+            spawn(self.task_handler(ctx.into(), self.handle_connection(ctx)));
         }
         Ok(())
     }
-    async fn create_tcp_listener(&self) -> Result<TcpListener, ServerError> {
-        Ok(TcpListener::bind(self.get_server_config().get_address()).await?)
-    }
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
-        let tcp_listener: TcpListener = self.create_tcp_listener().await?;
-        let server: Server = self.clone();
+        let bind_address: &String = self.get_server_config().get_address();
+        let tcp_listener: TcpListener = TcpListener::bind(bind_address).await?;
+        let server: &'static mut Self = self.leak_mut();
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {
-            let _ = server.accept_connections(&tcp_listener).await;
+            let _ = server.tcp_accept(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
@@ -1399,7 +1424,7 @@ fn server_partial_eq() {
     assert_eq!(server1, server1_clone);
 }
 #[test]
-fn server_from_usize() {
+fn server_from_address() {
     let mut server: Server = Server::default();
     server.set_request_config(RequestConfig::default());
     let server_address: usize = (&server).into();
@@ -1410,7 +1435,7 @@ fn server_from_usize() {
     );
 }
 #[test]
-fn server_ref_from_usize() {
+fn server_ref_from_address() {
     let mut server: Server = Server::default();
     server.set_server_config(ServerConfig::default());
     let server_address: usize = (&server).into();
@@ -1418,7 +1443,7 @@ fn server_ref_from_usize() {
     assert_eq!(server.get_server_config(), server_ref.get_server_config());
 }
 #[test]
-fn server_mut_from_usize() {
+fn server_mut_from_address() {
     let mut server: Server = Server::default();
     let server_address: usize = (&mut server).into();
     let server_mut: &mut Server = server_address.into();
@@ -1458,13 +1483,13 @@ fn server_inner_partial_eq() {
     assert_eq!(inner1, inner2);
 }
 #[test]
-fn server_ref_into_usize() {
+fn server_ref_into_address() {
     let server: Server = Server::default();
     let server_address: usize = (&server).into();
     assert!(server_address > 0);
 }
 #[test]
-fn server_mut_into_usize() {
+fn server_mut_into_address() {
     let mut server: Server = Server::default();
     let server_address: usize = (&mut server).into();
     assert!(server_address > 0);
@@ -1716,11 +1741,12 @@ impl ServerHook for WebsocketRoute {
         Self
     }
     async fn handle(self, ctx: &mut Context) {
+        let leak_ctx: &mut Context = ctx.leak_mut();
         loop {
             match ctx.ws_from_stream().await {
                 Ok(_) => {
-                    let body: Vec<u8> = ctx.get_request().get_body().clone();
-                    ctx.get_mut_response().set_body(body);
+                    let body: &Vec<u8> = ctx.get_request().get_body();
+                    leak_ctx.get_mut_response().set_body(body);
                     if self.try_send_body_hook(ctx).await.is_err() {
                         return;
                     }
@@ -2955,8 +2981,8 @@ pub use {
     color_output::*, compare_version::*, dotenvy, file_operation::*, future_fn::*, futures, hex,
     hot_restart::*, http_request::*, hyperlane_broadcast::*, hyperlane_log::*, hyperlane_macros::*,
     hyperlane_plugin_websocket::*, instrument_level::*, jsonwebtoken, jwt_service::*, log,
-    lombok_macros::*, num_cpus, once_cell, recoverable_spawn::*, recoverable_thread_pool::*, redis,
-    regex, rust_decimal, sea_orm, serde_urlencoded, serde_with, serde_xml_rs, serde_yaml,
+    lombok_macros::*, md5, num_cpus, once_cell, recoverable_spawn::*, recoverable_thread_pool::*,
+    redis, regex, rust_decimal, sea_orm, serde_urlencoded, serde_with, serde_xml_rs, serde_yaml,
     server_manager::*, sha2, simd_json, snafu, sqlx, std_macro_extensions::*, sysinfo, tracing_log,
     tracing_subscriber, twox_hash, url, urlencoding, utoipa, utoipa_rapidoc, utoipa_swagger_ui,
     uuid,
@@ -6138,9 +6164,9 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
         None => quote! { None },
     }
 }
-pub(crate) fn into_new_context(context: &Ident) -> TokenStream2 {
+pub(crate) fn leak_mut_context(context: &Ident) -> TokenStream2 {
     quote! {
-        std::convert::Into::<&mut ::hyperlane::Context>::into(#context as *mut ::hyperlane::Context as usize)
+        #context.leak_mut()
     }
 }
 ```
@@ -6528,7 +6554,7 @@ pub(crate) fn context_macro(input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
     let source_ctx: Ident = context_input.source_ctx;
-    into_new_context(&source_ctx).into()
+    leak_mut_context(&source_ctx).into()
 }
 ```
 # Path: hyperlane-macros/src/context/impl.rs
@@ -6632,7 +6658,7 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.set_aborted(true);
         }
@@ -6776,7 +6802,7 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             let _ = #new_context.try_flush().await;
         }
@@ -6918,7 +6944,7 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.set_closed(true);
         }
@@ -6942,7 +6968,7 @@ pub(crate) fn request_body_macro(
 ) -> TokenStream {
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         let statements = multi_body.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
@@ -7036,7 +7062,7 @@ pub(crate) fn attributes_macro(
 ) -> TokenStream {
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         let statements = multi_attrs.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
@@ -7156,7 +7182,7 @@ pub(crate) fn route_params_macro(
 ) -> TokenStream {
     let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         let statements = multi_route_params.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
@@ -7208,7 +7234,7 @@ pub(crate) fn request_querys_macro(
 ) -> TokenStream {
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         let statements = multi_querys.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
@@ -7260,7 +7286,7 @@ pub(crate) fn request_headers_macro(
 ) -> TokenStream {
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         let statements = multi_headers.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
@@ -7330,7 +7356,7 @@ pub(crate) fn request_version_macro(
     let multi_version: MultiRequestVersionData =
         parse_macro_input!(attr as MultiRequestVersionData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         let statements = multi_version.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
@@ -7348,7 +7374,7 @@ pub(crate) fn request_path_macro(
 ) -> TokenStream {
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         let statements = multi_path.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
@@ -7797,7 +7823,7 @@ pub(crate) fn response_status_code_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
         }
@@ -7813,7 +7839,7 @@ pub(crate) fn response_reason_phrase_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().set_reason_phrase(&#value);
         }
@@ -7829,7 +7855,7 @@ pub(crate) fn response_header_macro(
     let value: Expr = header_data.value;
     let operation: HeaderOperation = header_data.operation;
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         match operation {
             HeaderOperation::Add => {
                 quote! {
@@ -7852,7 +7878,7 @@ pub(crate) fn response_body_macro(
     let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
     let body: Expr = body_data.body;
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().set_body(&#body);
         }
@@ -7860,7 +7886,7 @@ pub(crate) fn response_body_macro(
 }
 pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().clear_headers();
         }
@@ -7876,7 +7902,7 @@ pub(crate) fn response_version_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context| {
-        let new_context: TokenStream2 = into_new_context(context);
+        let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().set_version(#value);
         }
