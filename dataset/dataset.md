@@ -1,4 +1,4 @@
-<!--2026-03-27 02:46:38-->
+<!--2026-03-27 07:15:49-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Official Documentation](https://docs.ltpp.vip/hyperlane/)
@@ -167,6 +167,11 @@ impl AsMut<Context> for Context {
     }
 }
 impl Lifetime for Context {
+    #[inline(always)]
+    fn leak(&self) -> &'static Self {
+        let address: usize = self.into();
+        address.into()
+    }
     #[inline(always)]
     fn leak_mut(&self) -> &'static mut Self {
         let address: usize = self.into();
@@ -557,7 +562,7 @@ fn context_as_mut() {
 }
 #[tokio::test]
 async fn test_spawn_write() {
-    let ctx: &mut Context = &mut Context::default();
+    let ctx: Context = Context::default();
     for i in 0..10000 {
         let leak_ctx: &mut Context = ctx.leak_mut();
         spawn(async move {
@@ -951,6 +956,7 @@ fn server_config_from_json() {
 # Path: hyperlane/src/lifetime/trait.rs
 ```rust
 pub trait Lifetime {
+    fn leak(&self) -> &'static Self;
     fn leak_mut(&self) -> &'static mut Self;
 }
 ```
@@ -1092,6 +1098,11 @@ impl From<RequestConfig> for Server {
     }
 }
 impl Lifetime for Server {
+    #[inline(always)]
+    fn leak(&self) -> &'static Self {
+        let address: usize = self.into();
+        address.into()
+    }
     #[inline(always)]
     fn leak_mut(&self) -> &'static mut Self {
         let address: usize = self.into();
@@ -1343,7 +1354,7 @@ impl Server {
         }
         unsafe { drop(Box::from_raw(ctx)) }
     }
-    async fn tcp_accept(&'static mut self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
+    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
         while let Ok((stream, _)) = tcp_listener.accept().await {
             self.configure_stream(&stream).await;
             let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
@@ -1355,7 +1366,7 @@ impl Server {
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
         let bind_address: &String = self.get_server_config().get_address();
         let tcp_listener: TcpListener = TcpListener::bind(bind_address).await?;
-        let server: &'static mut Self = self.leak_mut();
+        let server: &'static Self = self.leak();
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {
@@ -1751,12 +1762,12 @@ impl ServerHook for WebsocketRoute {
         Self
     }
     async fn handle(self, ctx: &mut Context) {
-        let leak_ctx: &mut Context = ctx.leak_mut();
+        let leak_ctx: &Context = ctx.leak();
         loop {
             match ctx.ws_from_stream().await {
                 Ok(_) => {
-                    let body: &Vec<u8> = ctx.get_request().get_body();
-                    leak_ctx.get_mut_response().set_body(body);
+                    let body: &Vec<u8> = leak_ctx.get_request().get_body();
+                    ctx.get_mut_response().set_body(body);
                     if self.try_send_body_hook(ctx).await.is_err() {
                         return;
                     }
@@ -6179,6 +6190,11 @@ pub(crate) fn leak_mut_context(context: &Ident) -> TokenStream2 {
         #context.leak_mut()
     }
 }
+pub(crate) fn leak_context(context: &Ident) -> TokenStream2 {
+    quote! {
+        #context.leak()
+    }
+}
 ```
 # Path: hyperlane-macros/src/common/impl.rs
 ```rust
@@ -6558,13 +6574,28 @@ pub(crate) use {r#fn::*, r#struct::*};
 # Path: hyperlane-macros/src/context/fn.rs
 ```rust
 use crate::*;
+pub(crate) fn is_mutable_reference_type(ty: &Type) -> bool {
+    if let Type::Reference(type_ref) = ty {
+        type_ref.mutability.is_some()
+    } else {
+        false
+    }
+}
 pub(crate) fn context_macro(input: TokenStream) -> TokenStream {
     let context_input: ContextInput = match parse(input) {
         Ok(input) => input,
         Err(err) => return err.to_compile_error().into(),
     };
     let source_ctx: Ident = context_input.source_ctx;
-    leak_mut_context(&source_ctx).into()
+    let is_mut: bool = context_input
+        .ty
+        .as_ref()
+        .is_some_and(is_mutable_reference_type);
+    if is_mut {
+        leak_mut_context(&source_ctx).into()
+    } else {
+        leak_context(&source_ctx).into()
+    }
 }
 ```
 # Path: hyperlane-macros/src/context/impl.rs
@@ -6573,7 +6604,13 @@ use crate::*;
 impl Parse for ContextInput {
     fn parse(input: ParseStream) -> Result<Self> {
         let source_ctx: Ident = input.parse()?;
-        Ok(ContextInput { source_ctx })
+        let ty: Option<Type> = if input.peek(Token![:]) {
+            input.parse::<Token![:]>()?;
+            Some(input.parse()?)
+        } else {
+            None
+        };
+        Ok(ContextInput { source_ctx, ty })
     }
 }
 ```
@@ -6582,6 +6619,7 @@ impl Parse for ContextInput {
 use crate::*;
 pub(crate) struct ContextInput {
     pub(crate) source_ctx: Ident,
+    pub(crate) ty: Option<Type>,
 }
 ```
 # Path: hyperlane-macros/src/hyperlane/mod.rs
@@ -6978,7 +7016,7 @@ pub(crate) fn request_body_macro(
 ) -> TokenStream {
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+        let new_context: TokenStream2 = leak_context(context);
         let statements = multi_body.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
@@ -7072,7 +7110,7 @@ pub(crate) fn attributes_macro(
 ) -> TokenStream {
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+        let new_context: TokenStream2 = leak_context(context);
         let statements = multi_attrs.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
@@ -7192,7 +7230,7 @@ pub(crate) fn route_params_macro(
 ) -> TokenStream {
     let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+        let new_context: TokenStream2 = leak_context(context);
         let statements = multi_route_params.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
@@ -7244,7 +7282,7 @@ pub(crate) fn request_querys_macro(
 ) -> TokenStream {
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+        let new_context: TokenStream2 = leak_context(context);
         let statements = multi_querys.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
@@ -7296,7 +7334,7 @@ pub(crate) fn request_headers_macro(
 ) -> TokenStream {
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+        let new_context: TokenStream2 = leak_context(context);
         let statements = multi_headers.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
@@ -7366,7 +7404,7 @@ pub(crate) fn request_version_macro(
     let multi_version: MultiRequestVersionData =
         parse_macro_input!(attr as MultiRequestVersionData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+        let new_context: TokenStream2 = leak_context(context);
         let statements = multi_version.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
@@ -7384,7 +7422,7 @@ pub(crate) fn request_path_macro(
 ) -> TokenStream {
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
     inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+        let new_context: TokenStream2 = leak_context(context);
         let statements = multi_path.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
