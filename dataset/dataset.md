@@ -1,4 +1,4 @@
-<!--2026-03-29 13:05:53-->
+<!--2026-03-29 18:51:50-->
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
@@ -431,15 +431,6 @@ impl ServerHook for ResponseStatusCodeMiddleware {
     #[instrument_trace]
     async fn handle(self, ctx: &mut Context) {}
 }
-impl ServerHook for ResponseBodyMiddleware {
-    #[instrument_trace]
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace("{{ time }}", &time())))]
-    #[instrument_trace]
-    async fn handle(self, ctx: &mut Context) {}
-}
 impl ServerHook for OptionMethodMiddleware {
     #[instrument_trace]
     async fn new(_ctx: &mut Context) -> Self {
@@ -479,7 +470,6 @@ mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
-use hyperlane_resources::templates::*;
 ```
 # Path: hyperlane-quick-start/application/middleware/request/struct.rs
 ```rust
@@ -498,11 +488,8 @@ pub struct ResponseHeaderMiddleware;
 pub struct ResponseStatusCodeMiddleware;
 #[request_middleware(5)]
 #[derive(Clone, Copy, Data, Debug, Default)]
-pub struct ResponseBodyMiddleware;
-#[request_middleware(6)]
-#[derive(Clone, Copy, Data, Debug, Default)]
 pub struct OptionMethodMiddleware;
-#[request_middleware(7)]
+#[request_middleware(6)]
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct UpgradeMiddleware;
 ```
@@ -3725,9 +3712,9 @@ use hyperlane_utils::log::*;
 ## Contact
 # Path: hyperlane-quick-start/config/framework/const.rs
 ```rust
-pub const CACHE_CONTROL_STATIC_ASSETS: &str = "public, max-age=31536000, immutable";
-pub const CACHE_CONTROL_SHORT_TERM: &str = "public, max-age=3600";
-pub const EXPIRES_FAR_FUTURE: &str = "Wed, 1 Apr 8888 00:00:00 GMT";
+pub const DEFAULT_CACHE_CONTROL_STATIC_ASSETS: &str = "public, max-age=31536000, immutable";
+pub const DEFAULT_CACHE_CONTROL_SHORT_TERM: &str = "public, max-age=3600";
+pub const DEFAULT_EXPIRES_FAR_FUTURE: &str = "Wed, 1 Apr 8888 00:00:00 GMT";
 ```
 # Path: hyperlane-quick-start/config/framework/mod.rs
 ```rust
@@ -4089,54 +4076,6 @@ pub mod templates;
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
-# Path: hyperlane-quick-start/resources/templates/const.rs
-```rust
-pub const TEMPLATES_INDEX_HTML: &str = include_str!("./index/index.html");
-```
-# Path: hyperlane-quick-start/resources/templates/mod.rs
-```rust
-mod r#const;
-pub use r#const::*;
-```
-# Path: hyperlane-quick-start/resources/templates/index/index.html
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hyperlane</title>
-    <style>
-      .center-text {
-        text-align: center;
-      }
-      a {
-        color: #1e90ff;
-        text-decoration: none;
-        transition:
-          color 0.3s,
-          border-bottom-color 0.3s;
-      }
-      a:hover,
-      a:focus {
-        color: pink;
-        border-bottom-color: pink;
-        outline: none;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <h1 class="center-text">Hello hyperlane: {{ time }}</h1>
-    <hr />
-    <p class="center-text">
-      Server:
-      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
-        >Hyperlane</a
-    </p>
-  </body>
-</html>
-```
 # Path: hyperlane-quick-start/resources/docker/const.rs
 ```rust
 #[cfg(debug_assertions)]

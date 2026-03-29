@@ -650,79 +650,25 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for ResponseBodyMiddleware {\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::new方法的源码是怎么实现的？",
-    "input": "",
-    "output": "ServerHook::new方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::new方法的异步实现是如何工作的？",
-    "input": "",
-    "output": "ServerHook::new方法的异步实现机制如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::new方法的参数设计有什么考虑？",
-    "input": "",
-    "output": "ServerHook::new方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n参数列表：\n- _ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::new方法的返回值类型设计有什么特点？",
-    "input": "",
-    "output": "ServerHook::new方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::new方法为什么需要修改状态？",
-    "input": "",
-    "output": "ServerHook::new方法的状态修改逻辑如下：\n\n```rust\n#[instrument_trace]\n    async fn new(_ctx: &mut Context) -> Self {\n        Self\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::handle方法的源码是怎么实现的？",
-    "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
-    "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
-    "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
-    "system": ""
-  },
-  {
-    "instruction": "ServerHook::handle方法为什么需要修改状态？",
-    "input": "",
-    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(TEMPLATES_INDEX_HTML.replace(\"{{ time }}\", &time())))]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[response_status_code(200)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {}\n}\n\nimpl ServerHook for OptionMethodMiddleware {\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -858,21 +804,15 @@
     "system": ""
   },
   {
-    "instruction": "ResponseBodyMiddleware;结构体的源码是怎么实现的？",
-    "input": "",
-    "output": "ResponseBodyMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(5)]\n#[derive(Clone, Copy, Data, Debug, Default)]\npub struct ResponseBodyMiddleware;\n```",
-    "system": ""
-  },
-  {
     "instruction": "OptionMethodMiddleware;结构体的源码是怎么实现的？",
     "input": "",
-    "output": "OptionMethodMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(6)]\n#[derive(Clone, Copy, Data, Debug, Default)]\npub struct OptionMethodMiddleware;\n```",
+    "output": "OptionMethodMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(5)]\n#[derive(Clone, Copy, Data, Debug, Default)]\npub struct OptionMethodMiddleware;\n```",
     "system": ""
   },
   {
     "instruction": "UpgradeMiddleware;结构体的源码是怎么实现的？",
     "input": "",
-    "output": "UpgradeMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(7)]\n#[derive(Clone, Copy, Data, Debug, Default)]\npub struct UpgradeMiddleware;\n```",
+    "output": "UpgradeMiddleware;结构体的源码实现如下：\n\n```rust\n#[request_middleware(6)]\n#[derive(Clone, Copy, Data, Debug, Default)]\npub struct UpgradeMiddleware;\n```",
     "system": ""
   },
   {
@@ -4236,9 +4176,9 @@
     "system": ""
   },
   {
-    "instruction": "CACHE_CONTROL_STATIC_ASSETS常量的源码是怎么实现的？",
+    "instruction": "DEFAULT_CACHE_CONTROL_STATIC_ASSETS常量的源码是怎么实现的？",
     "input": "",
-    "output": "CACHE_CONTROL_STATIC_ASSETS常量的源码实现如下：\n\n```rust\npub const CACHE_CONTROL_STATIC_ASSETS: &str = \"public, max-age=31536000, immutable\";\npub const CACHE_CONTROL_SHORT_TERM: &str = \"public, max-age=3600\";\npub const EXPIRES_FAR_FUTURE: &str = \"Wed, 1 Apr 8888 00:00:00 GMT\";\n```",
+    "output": "DEFAULT_CACHE_CONTROL_STATIC_ASSETS常量的源码实现如下：\n\n```rust\npub const DEFAULT_CACHE_CONTROL_STATIC_ASSETS: &str = \"public, max-age=31536000, immutable\";\npub const DEFAULT_CACHE_CONTROL_SHORT_TERM: &str = \"public, max-age=3600\";\npub const DEFAULT_EXPIRES_FAR_FUTURE: &str = \"Wed, 1 Apr 8888 00:00:00 GMT\";\n```",
     "system": ""
   },
   {
@@ -4473,12 +4413,6 @@
     "instruction": "main函数的异步实现是如何工作的？",
     "input": "",
     "output": "main函数的异步实现机制如下：\n\n```rust\nfn main() {\n    EnvBootstrap::init();\n    LoggerBootstrap::init();\n    EnvConfig::log_config();\n    info!(\"Environment configuration loaded successfully\");\n    let env_config: &EnvConfig = EnvPlugin::get_or_init();\n    RuntimeBootstrap::init().get_runtime().block_on(async move {\n        DbBootstrap::init().await;\n        ProcessPlugin::create(env_config.get_server_pid_file_path(), || async {\n            ServerBootstrap::init().await;\n        })\n        .await;\n    });\n}\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
-    "system": ""
-  },
-  {
-    "instruction": "TEMPLATES_INDEX_HTML常量的源码是怎么实现的？",
-    "input": "",
-    "output": "TEMPLATES_INDEX_HTML常量的源码实现如下：\n\n```rust\npub const TEMPLATES_INDEX_HTML: &str = include_str!(\"./index/index.html\");\n```",
     "system": ""
   },
   {
