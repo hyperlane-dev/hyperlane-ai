@@ -1,4 +1,4 @@
-<!--2026-03-29 07:11:20-->
+<!--2026-03-29 13:05:53-->
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
@@ -4128,45 +4128,6 @@ pub use r#const::*;
   </head>
   <body>
     <h1 class="center-text">Hello hyperlane: {{ time }}</h1>
-    <hr />
-    <p class="center-text">
-      Server:
-      <a href="https://github.com/hyperlane-dev/hyperlane" target="_blank"
-        >Hyperlane</a
-    </p>
-  </body>
-</html>
-```
-# Path: hyperlane-quick-start/resources/static/not_found/index.html
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>404 Not Found</title>
-    <style>
-      .center-text {
-        text-align: center;
-      }
-      a {
-        color: #1e90ff;
-        text-decoration: none;
-        transition:
-          color 0.3s,
-          border-bottom-color 0.3s;
-      }
-      a:hover,
-      a:focus {
-        color: pink;
-        border-bottom-color: pink;
-        outline: none;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <h1 class="center-text">404 Not Found</h1>
     <hr />
     <p class="center-text">
       Server:
