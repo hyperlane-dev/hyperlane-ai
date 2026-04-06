@@ -1,4 +1,4 @@
-<!--2026-04-06 13:20:59-->
+<!--2026-04-06 19:08:49-->
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
@@ -4233,9 +4233,10 @@ mod lifetime;
 mod panic;
 mod route;
 mod server;
+mod task;
 pub use {
     attribute::*, config::*, context::*, error::*, hook::*, lifetime::*, panic::*, route::*,
-    server::*,
+    server::*, task::*,
 };
 pub use {http_type::*, inventory};
 #[cfg(test)]
@@ -4248,7 +4249,10 @@ use std::{
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
     pin::Pin,
-    sync::{Arc, OnceLock},
+    sync::{
+        Arc, OnceLock,
+        atomic::{self, AtomicBool, AtomicUsize},
+    },
 };
 #[cfg(test)]
 use tokio::time::sleep;
@@ -4259,9 +4263,14 @@ use {
     serde::{Deserialize, Serialize},
     tokio::{
         net::{TcpListener, TcpStream},
+        runtime::Handle,
         spawn,
-        sync::watch::{Receiver, Sender, channel},
-        task::{JoinError, JoinHandle},
+        sync::{
+            Notify,
+            mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
+            watch::{Receiver, Sender, channel},
+        },
+        task::{JoinError, JoinHandle, LocalSet, spawn_blocking, spawn_local},
     },
 };
 ```
@@ -4274,6 +4283,7 @@ impl Default for Context {
         Self {
             aborted: false,
             closed: false,
+            leaked: false,
             stream: None,
             request: Request::default(),
             response: Response::default(),
@@ -4288,6 +4298,7 @@ impl PartialEq for Context {
     fn eq(&self, other: &Self) -> bool {
         self.get_aborted() == other.get_aborted()
             && self.get_closed() == other.get_closed()
+            && self.get_leaked() == other.get_leaked()
             && self.get_request() == other.get_request()
             && self.get_response() == other.get_response()
             && self.get_route_params() == other.get_route_params()
@@ -4382,6 +4393,18 @@ impl Context {
         let mut ctx: Context = Context::default();
         ctx.set_stream(Some(stream.clone())).set_server(server);
         ctx
+    }
+    #[inline(always)]
+    pub fn free(&mut self) {
+        let _ = unsafe { Box::from_raw(self) };
+    }
+    pub fn try_spawn_local<F>(&self, hook: F) -> bool
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.get_server()
+            .get_task()
+            .try_spawn_local(Some(self.into()), hook)
     }
     pub async fn http_from_stream(&mut self) -> Result<Request, RequestError> {
         if self.get_aborted() {
@@ -4642,44 +4665,44 @@ pub use r#struct::*;
 # Path: hyperlane/src/context/test.rs
 ```rust
 use crate::*;
-#[test]
-fn context_from_address() {
+#[tokio::test]
+async fn context_from_address() {
     let mut ctx: Context = Context::default();
     ctx.set_aborted(true);
     let ctx_address: usize = (&ctx).into();
     let ctx_from_addr: Context = ctx_address.into();
     assert_eq!(ctx.get_aborted(), ctx_from_addr.get_aborted());
 }
-#[test]
-fn context_ref_from_address() {
+#[tokio::test]
+async fn context_ref_from_address() {
     let mut ctx: Context = Context::default();
     ctx.set_closed(true);
     let ctx_address: usize = (&ctx).into();
     let ctx_ref: &Context = ctx_address.into();
     assert_eq!(ctx.get_closed(), ctx_ref.get_closed());
 }
-#[test]
-fn context_mut_from_address() {
+#[tokio::test]
+async fn context_mut_from_address() {
     let mut ctx: Context = Context::default();
     let ctx_address: usize = (&mut ctx).into();
     let ctx_mut: &mut Context = ctx_address.into();
     ctx_mut.set_aborted(true);
     assert!(ctx_mut.get_aborted());
 }
-#[test]
-fn context_ref_into_address() {
+#[tokio::test]
+async fn context_ref_into_address() {
     let ctx: Context = Context::default();
     let ctx_address: usize = (&ctx).into();
     assert!(ctx_address > 0);
 }
-#[test]
-fn context_mut_into_address() {
+#[tokio::test]
+async fn context_mut_into_address() {
     let mut ctx: Context = Context::default();
     let ctx_address: usize = (&mut ctx).into();
     assert!(ctx_address > 0);
 }
-#[test]
-fn context_aborted_and_closed() {
+#[tokio::test]
+async fn context_aborted_and_closed() {
     let mut ctx: Context = Context::default();
     assert!(!ctx.get_aborted());
     ctx.set_aborted(true);
@@ -4698,8 +4721,8 @@ fn context_aborted_and_closed() {
     ctx.set_closed(true);
     assert!(ctx.is_terminated());
 }
-#[test]
-fn context_route_params() {
+#[tokio::test]
+async fn context_route_params() {
     let mut ctx: Context = Context::default();
     let mut params: RouteParams = RouteParams::default();
     params.insert("id".to_string(), "123".to_string());
@@ -4709,8 +4732,8 @@ fn context_route_params() {
     let name: Option<String> = ctx.try_get_route_param("name");
     assert_eq!(name, None);
 }
-#[test]
-fn context_request_and_response_string() {
+#[tokio::test]
+async fn context_request_and_response_string() {
     let mut ctx: Context = Context::default();
     let request: Request = Request::default();
     ctx.set_request(request.clone());
@@ -4721,8 +4744,8 @@ fn context_request_and_response_string() {
     let fetched_response: &Response = ctx.get_response();
     assert_eq!(response.to_string(), fetched_response.to_string());
 }
-#[test]
-fn context_as_ref() {
+#[tokio::test]
+async fn context_as_ref() {
     let ctx: Context = Context::default();
     let ctx_ref: &Context = ctx.as_ref();
     assert_eq!(ctx.get_aborted(), ctx_ref.get_aborted());
@@ -4730,8 +4753,8 @@ fn context_as_ref() {
     assert_eq!(ctx.get_request(), ctx_ref.get_request());
     assert_eq!(ctx.get_response(), ctx_ref.get_response());
 }
-#[test]
-fn context_as_mut() {
+#[tokio::test]
+async fn context_as_mut() {
     let mut ctx: Context = Context::default();
     ctx.set_aborted(true);
     let ctx_mut: &mut Context = ctx.as_mut();
@@ -4759,6 +4782,8 @@ pub struct Context {
     pub(super) aborted: bool,
     #[get(type(copy))]
     pub(super) closed: bool,
+    #[get(type(copy))]
+    pub(super) leaked: bool,
     #[get_mut(skip)]
     #[set(pub(super))]
     pub(super) stream: Option<ArcRwLockStream>,
@@ -5401,20 +5426,20 @@ impl ServerHook for TestRoute {
         self.data = String::from("test");
     }
 }
-#[test]
+#[tokio::test]
 #[should_panic(expected = "EmptyPattern")]
-fn empty_route() {
+async fn empty_route() {
     let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
 }
-#[test]
+#[tokio::test]
 #[should_panic(expected = "DuplicatePattern")]
-fn duplicate_route() {
+async fn duplicate_route() {
     let _server: &Server = Server::default()
         .route::<TestRoute>(ROOT_PATH)
         .route::<TestRoute>(ROOT_PATH);
 }
-#[test]
-fn get_route() {
+#[tokio::test]
+async fn get_route() {
     let mut server: Server = Server::default();
     server
         .route::<TestRoute>(ROOT_PATH)
@@ -5435,8 +5460,8 @@ fn get_route() {
         }
     }
 }
-#[test]
-fn segment_count_optimization() {
+#[tokio::test]
+async fn segment_count_optimization() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/users/{id}");
     server.route::<TestRoute>("/users/{id}/posts");
@@ -5459,8 +5484,8 @@ fn segment_count_optimization() {
     assert_eq!(route_matcher.get_dynamic_route().get(&3).unwrap().len(), 1);
     assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
 }
-#[test]
-fn regex_route_segment_count() {
+#[tokio::test]
+async fn regex_route_segment_count() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/files/{path:.*}");
     server.route::<TestRoute>("/api/{version:\\d+}/users");
@@ -5479,8 +5504,8 @@ fn regex_route_segment_count() {
         "Should have 4-segment regex routes"
     );
 }
-#[test]
-fn mixed_route_types() {
+#[tokio::test]
+async fn mixed_route_types() {
     let mut server: Server = Server::default();
     server.route::<TestRoute>("/");
     server.route::<TestRoute>("/about");
@@ -5492,8 +5517,8 @@ fn mixed_route_types() {
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
     assert!(route_matcher.get_regex_route().contains_key(&2));
 }
-#[test]
-fn large_dynamic_routes() {
+#[tokio::test]
+async fn large_dynamic_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -5524,8 +5549,8 @@ fn large_dynamic_routes() {
         match_duration / ROUTE_COUNT
     );
 }
-#[test]
-fn large_regex_routes() {
+#[tokio::test]
+async fn large_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -5556,8 +5581,8 @@ fn large_regex_routes() {
         match_duration / ROUTE_COUNT
     );
 }
-#[test]
-fn large_tail_regex_routes() {
+#[tokio::test]
+async fn large_tail_regex_routes() {
     const ROUTE_COUNT: u32 = 1000;
     let mut server: Server = Server::default();
     let start_insert: Instant = Instant::now();
@@ -5670,8 +5695,8 @@ pub(crate) use r#enum::*;
 # Path: hyperlane/src/attribute/test.rs
 ```rust
 use crate::*;
-#[test]
-fn get_panic_from_context() {
+#[tokio::test]
+async fn get_panic_from_context() {
     let mut ctx: Context = Context::default();
     let set_panic: PanicData = PanicData::new(
         Some("test".to_string()),
@@ -5682,8 +5707,8 @@ fn get_panic_from_context() {
     let get_panic: PanicData = ctx.try_get_task_panic_data().unwrap();
     assert_eq!(set_panic, get_panic);
 }
-#[test]
-fn context_attributes() {
+#[tokio::test]
+async fn context_attributes() {
     let mut ctx: Context = Context::default();
     ctx.set_attribute("key1", "value1".to_string());
     let value: Option<String> = ctx.try_get_attribute("key1");
@@ -5713,8 +5738,8 @@ async fn get_panic_from_join_error() {
             .contains(message)
     );
 }
-#[test]
-fn run_set_func() {
+#[tokio::test]
+async fn run_set_func() {
     let mut ctx: Context = Context::default();
     const KEY: &str = "string";
     const PARAM: &str = "test";
@@ -5860,11 +5885,6 @@ fn route_error() {
     assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
 }
 ```
-# Path: hyperlane/src/server/type.rs
-```rust
-use crate::*;
-pub type ArcServer = Arc<Server>;
-```
 # Path: hyperlane/src/server/fn.rs
 ```rust
 use crate::*;
@@ -5882,11 +5902,12 @@ impl Default for Server {
         Self {
             server_config: ServerConfig::default(),
             request_config: RequestConfig::default(),
-            task_panic: vec![],
-            request_error: vec![],
+            task_panic: Vec::new(),
+            request_error: Vec::new(),
             route_matcher: RouteMatcher::new(),
-            request_middleware: vec![],
-            response_middleware: vec![],
+            request_middleware: Vec::new(),
+            response_middleware: Vec::new(),
+            task: Task::default(),
         }
     }
 }
@@ -6143,11 +6164,13 @@ impl Server {
                 let _ = Self::try_flush_stdout_and_stderr();
             }
             let drop_ctx: &mut Context = ctx_address.into();
-            unsafe { drop(Box::from_raw(drop_ctx)) }
+            if !drop_ctx.get_leaked() {
+                drop_ctx.free();
+            }
         };
     }
-    async fn configure_stream(&self, stream: &TcpStream) {
-        let config: ServerConfig = self.get_server_config().clone();
+    fn configure_stream(&self, stream: &TcpStream) {
+        let config: &ServerConfig = self.get_server_config();
         if let Some(nodelay) = config.try_get_nodelay() {
             let _ = stream.set_nodelay(*nodelay);
         }
@@ -6241,16 +6264,19 @@ impl Server {
                 self.handle_request_error(ctx, &error).await;
             }
         }
-        unsafe { drop(Box::from_raw(ctx)) }
-    }
-    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) -> Result<(), ServerError> {
-        while let Ok((stream, _)) = tcp_listener.accept().await {
-            self.configure_stream(&stream).await;
-            let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
-            let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, self)));
-            spawn(self.task_handler(ctx.into(), self.handle_connection(ctx)));
+        if !ctx.get_leaked() {
+            ctx.free();
         }
-        Ok(())
+    }
+    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) {
+        loop {
+            if let Ok((stream, _)) = tcp_listener.accept().await {
+                self.configure_stream(&stream);
+                let stream: ArcRwLockStream = ArcRwLockStream::from_stream(stream);
+                let ctx: &'static mut Context = Box::leak(Box::new(Context::new(&stream, self)));
+                spawn(self.task_handler(ctx.into(), self.handle_connection(ctx)));
+            }
+        }
     }
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
         let bind_address: &String = self.get_server_config().get_address();
@@ -6259,7 +6285,7 @@ impl Server {
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {
-            let _ = server.tcp_accept(&tcp_listener).await;
+            server.tcp_accept(&tcp_listener).await;
             let _ = wait_sender.send(());
         });
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
@@ -6277,6 +6303,7 @@ impl Server {
         spawn(async move {
             let _ = shutdown_receiver.changed().await;
             accept_connections.abort();
+            server.get_task().shutdown();
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
         server_control_hook.set_shutdown_hook(shutdown_hook);
@@ -6292,23 +6319,22 @@ mod r#impl;
 mod r#struct;
 #[cfg(test)]
 mod test;
-mod r#type;
-pub use {r#struct::*, r#type::*};
+pub use r#struct::*;
 pub(crate) use r#fn::*;
 ```
 # Path: hyperlane/src/server/test.rs
 ```rust
 use crate::*;
-#[test]
-fn server_partial_eq() {
+#[tokio::test]
+async fn server_partial_eq() {
     let server1: Server = Server::default();
     let server2: Server = Server::default();
     assert_eq!(server1, server2);
     let server1_clone: Server = server1.clone();
     assert_eq!(server1, server1_clone);
 }
-#[test]
-fn server_from_address() {
+#[tokio::test]
+async fn server_from_address() {
     let mut server: Server = Server::default();
     server.set_request_config(RequestConfig::default());
     let server_address: usize = (&server).into();
@@ -6318,16 +6344,16 @@ fn server_from_address() {
         server_from_addr.get_request_config()
     );
 }
-#[test]
-fn server_ref_from_address() {
+#[tokio::test]
+async fn server_ref_from_address() {
     let mut server: Server = Server::default();
     server.set_server_config(ServerConfig::default());
     let server_address: usize = (&server).into();
     let server_ref: &Server = server_address.into();
     assert_eq!(server.get_server_config(), server_ref.get_server_config());
 }
-#[test]
-fn server_mut_from_address() {
+#[tokio::test]
+async fn server_mut_from_address() {
     let mut server: Server = Server::default();
     let server_address: usize = (&mut server).into();
     let server_mut: &mut Server = server_address.into();
@@ -6336,8 +6362,8 @@ fn server_mut_from_address() {
     server_mut.set_server_config(config);
     assert!(server_mut.get_server_config().try_get_nodelay().is_some());
 }
-#[test]
-fn server_from_server_config() {
+#[tokio::test]
+async fn server_from_server_config() {
     let mut server_config: ServerConfig = ServerConfig::default();
     server_config.set_nodelay(Some(true));
     let server: Server = server_config.clone().into();
@@ -6348,8 +6374,8 @@ fn server_from_server_config() {
     assert!(server.get_request_middleware().is_empty());
     assert!(server.get_response_middleware().is_empty());
 }
-#[test]
-fn server_from_request_config() {
+#[tokio::test]
+async fn server_from_request_config() {
     let mut request_config: RequestConfig = RequestConfig::default();
     request_config.set_buffer_size(KB_1);
     let server: Server = request_config.into();
@@ -6360,34 +6386,34 @@ fn server_from_request_config() {
     assert!(server.get_request_middleware().is_empty());
     assert!(server.get_response_middleware().is_empty());
 }
-#[test]
-fn server_inner_partial_eq() {
+#[tokio::test]
+async fn server_inner_partial_eq() {
     let inner1: Server = Server::default();
     let inner2: Server = Server::default();
     assert_eq!(inner1, inner2);
 }
-#[test]
-fn server_ref_into_address() {
+#[tokio::test]
+async fn server_ref_into_address() {
     let server: Server = Server::default();
     let server_address: usize = (&server).into();
     assert!(server_address > 0);
 }
-#[test]
-fn server_mut_into_address() {
+#[tokio::test]
+async fn server_mut_into_address() {
     let mut server: Server = Server::default();
     let server_address: usize = (&mut server).into();
     assert!(server_address > 0);
 }
-#[test]
-fn server_as_ref() {
+#[tokio::test]
+async fn server_as_ref() {
     let mut server: Server = Server::default();
     server.set_server_config(ServerConfig::default());
     let server_ref: &Server = server.as_ref();
     assert_eq!(server.get_server_config(), server_ref.get_server_config());
     assert_eq!(server.get_request_config(), server_ref.get_request_config());
 }
-#[test]
-fn server_as_mut() {
+#[tokio::test]
+async fn server_as_mut() {
     let mut server: Server = Server::default();
     let server_mut: &mut Server = server.as_mut();
     let mut config: ServerConfig = ServerConfig::default();
@@ -6402,8 +6428,8 @@ impl ServerHook for TestSendRoute {
     }
     async fn handle(self, _ctx: &mut Context) {}
 }
-#[test]
-fn server_send_sync() {
+#[tokio::test]
+async fn server_send_sync() {
     fn assert_send<T: Send>() {}
     fn assert_sync<T: Sync>() {}
     fn assert_send_sync<T: Send + Sync>() {}
@@ -6536,7 +6562,7 @@ impl ServerHook for UpgradeMiddleware {
                 .set_header(UPGRADE, WEBSOCKET)
                 .set_header(CONNECTION, UPGRADE)
                 .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .set_body(vec![]);
+                .set_body(Vec::new());
             if ctx.try_send().await.is_err() {
                 ctx.set_aborted(true).set_closed(true);
             }
@@ -6588,7 +6614,7 @@ impl ServerHook for SseRoute {
     async fn handle(self, ctx: &mut Context) {
         ctx.get_mut_response()
             .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .set_body(vec![]);
+            .set_body(Vec::new());
         if ctx.try_send().await.is_err() {
             ctx.set_aborted(true).set_closed(true);
             return;
@@ -6713,12 +6739,12 @@ async fn main() {
 # Path: hyperlane/src/server/struct.rs
 ```rust
 use crate::*;
-#[derive(Clone, CustomDebug, Data, DisplayDebug, New)]
+#[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Server {
-    #[get_mut(skip)]
+    #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) server_config: ServerConfig,
-    #[get_mut(skip)]
+    #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) request_config: RequestConfig,
     #[get_mut(pub(super))]
@@ -6740,6 +6766,9 @@ pub struct Server {
     #[get_mut(pub(super))]
     #[set(skip)]
     pub(super) response_middleware: ServerHookList,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) task: Task,
 }
 ```
 # Path: hyperlane/src/panic/impl.rs
@@ -6839,6 +6868,194 @@ pub struct PanicData {
     #[get(pub)]
     #[set(pub(crate))]
     pub(super) payload: Option<String>,
+}
+```
+# Path: hyperlane/src/task/impl.rs
+```rust
+use crate::*;
+impl Clone for Task {
+    #[inline(always)]
+    fn clone(&self) -> Self {
+        Self {
+            pool: self.get_pool().clone(),
+            notify: self.get_notify(),
+            counter: AtomicUsize::new(self.get_counter().load(atomic::Ordering::Relaxed)),
+            shutdown: self.get_shutdown(),
+        }
+    }
+}
+impl Default for Task {
+    #[inline(always)]
+    fn default() -> Self {
+        let worker_count: usize = Handle::try_current()
+            .map(|handle: Handle| handle.metrics().num_workers())
+            .unwrap_or_default()
+            .max(1);
+        let notify: &'static Notify = Box::leak(Box::new(Notify::new()));
+        let shutdown: &'static AtomicBool = Box::leak(Box::new(AtomicBool::new(false)));
+        let mut pool: Vec<UnboundedSender<AsyncTask>> = Vec::with_capacity(worker_count);
+        for _ in 0..worker_count {
+            let (sender, mut receiver): (UnboundedSender<AsyncTask>, UnboundedReceiver<AsyncTask>) =
+                unbounded_channel();
+            pool.push(sender);
+            spawn_blocking(move || {
+                Handle::current().block_on(LocalSet::new().run_until(async move {
+                    loop {
+                        if shutdown.load(atomic::Ordering::Relaxed) {
+                            break;
+                        }
+                        match receiver.try_recv() {
+                            Ok(task) => {
+                                spawn_local(task);
+                            }
+                            Err(_) => {
+                                notify.notified().await;
+                            }
+                        }
+                    }
+                }));
+            });
+        }
+        Self {
+            pool,
+            notify,
+            counter: AtomicUsize::new(0),
+            shutdown,
+        }
+    }
+}
+impl Drop for Task {
+    #[inline(always)]
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+impl Task {
+    pub fn try_spawn_local<F>(&self, index_opt: Option<usize>, hook: F) -> bool
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        if self.get_pool().is_empty() {
+            return false;
+        }
+        let index: usize = index_opt
+            .unwrap_or(self.get_counter().fetch_add(1, atomic::Ordering::Relaxed))
+            .wrapping_rem(self.get_pool().len());
+        if let Some(sender) = self.get_pool().get(index) {
+            let result: bool = sender.send(Box::pin(hook)).is_ok();
+            if result {
+                self.get_notify().notify_one();
+            }
+            return result;
+        }
+        false
+    }
+    #[inline(always)]
+    pub fn shutdown(&self) {
+        self.get_shutdown().store(true, atomic::Ordering::Relaxed);
+        self.get_notify().notify_waiters();
+    }
+}
+```
+# Path: hyperlane/src/task/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+#[cfg(test)]
+mod test;
+pub use r#struct::*;
+```
+# Path: hyperlane/src/task/test.rs
+```rust
+use crate::*;
+#[tokio::test]
+async fn task_clone() {
+    let task1: Task = Task::default();
+    let task2: Task = task1.clone();
+    assert_eq!(task1.get_pool().len(), task2.get_pool().len());
+    assert_eq!(
+        task1.get_counter().load(atomic::Ordering::Relaxed),
+        task2.get_counter().load(atomic::Ordering::Relaxed)
+    );
+    assert_eq!(
+        task1.get_shutdown().load(atomic::Ordering::Relaxed),
+        task2.get_shutdown().load(atomic::Ordering::Relaxed)
+    );
+}
+#[tokio::test]
+async fn task_default() {
+    let task: Task = Task::default();
+    let worker_count: usize = Handle::current().metrics().num_workers();
+    if worker_count > 0 {
+        assert_eq!(task.get_pool().len(), worker_count);
+    }
+    assert_eq!(task.get_counter().load(atomic::Ordering::Relaxed), 0);
+    assert!(!task.get_shutdown().load(atomic::Ordering::Relaxed));
+}
+#[tokio::test]
+async fn task_try_spawn_local_with_index() {
+    let task: Task = Task::default();
+    if task.get_pool().is_empty() {
+        return;
+    }
+    let result: bool = task.try_spawn_local(Some(0), async move {});
+    assert!(result);
+}
+#[tokio::test]
+async fn task_try_spawn_local_round_robin() {
+    let task: Task = Task::default();
+    if task.get_pool().is_empty() {
+        return;
+    }
+    let result: bool = task.try_spawn_local(None, async move {});
+    assert!(result);
+}
+#[tokio::test]
+async fn task_try_spawn_local_empty_pool() {
+    let task: Task = Task {
+        pool: Vec::new(),
+        notify: Box::leak(Box::new(Notify::new())),
+        counter: AtomicUsize::new(0),
+        shutdown: Box::leak(Box::new(AtomicBool::new(false))),
+    };
+    let result: bool = task.try_spawn_local(None, async move {});
+    assert!(!result);
+}
+#[tokio::test]
+async fn task_try_spawn_local_with_large_index() {
+    let task: Task = Task::default();
+    if task.get_pool().is_empty() {
+        return;
+    }
+    let large_index: usize = task.get_pool().len() + 100;
+    let result: bool = task.try_spawn_local(Some(large_index), async move {});
+    assert!(result);
+}
+#[tokio::test]
+async fn task_shutdown() {
+    let task: Task = Task::default();
+    assert!(!task.get_shutdown().load(atomic::Ordering::Relaxed));
+    task.shutdown();
+    assert!(task.get_shutdown().load(atomic::Ordering::Relaxed));
+}
+```
+# Path: hyperlane/src/task/struct.rs
+```rust
+use crate::*;
+#[derive(CustomDebug, Data, DisplayDebug)]
+pub struct Task {
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pool: Vec<UnboundedSender<AsyncTask>>,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) notify: &'static Notify,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) counter: AtomicUsize,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) shutdown: &'static AtomicBool,
 }
 ```
 # Path: hyperlane-log/README.md
@@ -8044,7 +8261,7 @@ impl ServerHook for UpgradeHook {
                 .set_header(UPGRADE, WEBSOCKET)
                 .set_header(CONNECTION, UPGRADE)
                 .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .set_body(vec![]);
+                .set_body(Vec::new());
             if ctx.try_send().await.is_err() {
                 ctx.set_aborted(true).set_closed(true);
             }
@@ -8835,7 +9052,7 @@ impl ServerHook for UpgradeHook {
     }
     #[epilogue_macros(
         ws_upgrade_type,
-        response_body(&vec![]),
+        response_body(Vec::new()),
         response_status_code(101),
         response_header(UPGRADE => WEBSOCKET),
         response_header(CONNECTION => UPGRADE),
