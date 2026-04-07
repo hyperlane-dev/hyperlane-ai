@@ -1,4 +1,4 @@
-<!--2026-04-07 13:51:23-->
+<!--2026-04-07 19:11:39-->
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
@@ -6878,9 +6878,9 @@ impl Clone for Task {
     fn clone(&self) -> Self {
         Self {
             pool: self.get_pool().clone(),
-            notify: self.get_notify(),
             counter: AtomicUsize::new(self.get_counter().load(atomic::Ordering::Relaxed)),
             shutdown: self.get_shutdown(),
+            notifies: self.get_notifies(),
         }
     }
 }
@@ -6891,10 +6891,11 @@ impl Default for Task {
             .map(|handle: Handle| handle.metrics().num_workers())
             .unwrap_or_default()
             .max(1);
-        let notify: &'static Notify = Box::leak(Box::new(Notify::new()));
         let shutdown: &'static AtomicBool = Box::leak(Box::new(AtomicBool::new(false)));
         let mut pool: Vec<UnboundedSender<AsyncTask>> = Vec::with_capacity(worker_count);
-        for _ in 0..worker_count {
+        let notifies: &'static Vec<Notify> =
+            Box::leak(Box::new((0..worker_count).map(|_| Notify::new()).collect()));
+        for notify in notifies.iter().take(worker_count) {
             let (sender, mut receiver): (UnboundedSender<AsyncTask>, UnboundedReceiver<AsyncTask>) =
                 unbounded_channel();
             pool.push(sender);
@@ -6918,9 +6919,9 @@ impl Default for Task {
         }
         Self {
             pool,
-            notify,
             counter: AtomicUsize::new(0),
             shutdown,
+            notifies,
         }
     }
 }
@@ -6943,8 +6944,8 @@ impl Task {
             .wrapping_rem(self.get_pool().len());
         if let Some(sender) = self.get_pool().get(index) {
             let result: bool = sender.send(Box::pin(hook)).is_ok();
-            if result {
-                self.get_notify().notify_one();
+            if result && let Some(notify) = self.get_notifies().get(index) {
+                notify.notify_one()
             }
             return result;
         }
@@ -6953,7 +6954,9 @@ impl Task {
     #[inline(always)]
     pub fn shutdown(&self) {
         self.get_shutdown().store(true, atomic::Ordering::Relaxed);
-        self.get_notify().notify_waiters();
+        self.get_notifies()
+            .iter()
+            .for_each(|notify: &Notify| notify.notify_one());
     }
 }
 ```
@@ -7014,9 +7017,9 @@ async fn task_try_spawn_local_round_robin() {
 async fn task_try_spawn_local_empty_pool() {
     let task: Task = Task {
         pool: Vec::new(),
-        notify: Box::leak(Box::new(Notify::new())),
         counter: AtomicUsize::new(0),
         shutdown: Box::leak(Box::new(AtomicBool::new(false))),
+        notifies: Box::leak(Box::new(Vec::new())),
     };
     let result: bool = task.try_spawn_local(None, async move {});
     assert!(!result);
@@ -7049,13 +7052,13 @@ pub struct Task {
     pub(super) pool: Vec<UnboundedSender<AsyncTask>>,
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) notify: &'static Notify,
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
     pub(super) counter: AtomicUsize,
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) shutdown: &'static AtomicBool,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) notifies: &'static Vec<Notify>,
 }
 ```
 # Path: hyperlane-log/README.md
