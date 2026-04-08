@@ -1,4 +1,4 @@
-<!--2026-04-07 19:11:39-->
+<!--2026-04-08 02:48:38-->
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
@@ -4398,6 +4398,7 @@ impl Context {
     pub fn free(&mut self) {
         let _ = unsafe { Box::from_raw(self) };
     }
+    #[inline(always)]
     pub fn try_spawn_local<F>(&self, hook: F) -> bool
     where
         F: Future<Output = ()> + Send + 'static,
