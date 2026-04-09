@@ -1,4 +1,4 @@
-<!--2026-04-08 19:24:05-->
+<!--2026-04-09 02:43:24-->
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
@@ -6624,20 +6624,11 @@ impl ServerHook for WebsocketRoute {
     }
     async fn handle(self, ctx: &mut Context) {
         let leak_ctx: &Context = ctx.leak();
-        loop {
-            match ctx.ws_from_stream().await {
-                Ok(_) => {
-                    let body: &Vec<u8> = leak_ctx.get_request().get_body();
-                    ctx.get_mut_response().set_body(body);
-                    if self.try_send_body_hook(ctx).await.is_err() {
-                        return;
-                    }
-                }
-                Err(error) => {
-                    ctx.get_mut_response().set_body(error.to_string());
-                    let _ = self.try_send_body_hook(ctx).await;
-                    return;
-                }
+        while ctx.ws_from_stream().await.is_ok() {
+            let body: &Vec<u8> = leak_ctx.get_request().get_body();
+            ctx.get_mut_response().set_body(body);
+            if self.try_send_body_hook(ctx).await.is_err() {
+                return;
             }
         }
     }

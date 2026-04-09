@@ -7802,37 +7802,37 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        loop {\n            match ctx.ws_from_stream().await {\n                Ok(_) => {\n                    let body: &Vec<u8> = leak_ctx.get_request().get_body();\n                    ctx.get_mut_response().set_body(body);\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.get_mut_response().set_body(error.to_string());\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        while ctx.ws_from_stream().await.is_ok() {\n            let body: &Vec<u8> = leak_ctx.get_request().get_body();\n            ctx.get_mut_response().set_body(body);\n            if self.try_send_body_hook(ctx).await.is_err() {\n                return;\n            }\n        }\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        loop {\n            match ctx.ws_from_stream().await {\n                Ok(_) => {\n                    let body: &Vec<u8> = leak_ctx.get_request().get_body();\n                    ctx.get_mut_response().set_body(body);\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.get_mut_response().set_body(error.to_string());\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：19\n- 包含高级特性：泛型编程、异步编程",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        while ctx.ws_from_stream().await.is_ok() {\n            let body: &Vec<u8> = leak_ctx.get_request().get_body();\n            ctx.get_mut_response().set_body(body);\n            if self.try_send_body_hook(ctx).await.is_err() {\n                return;\n            }\n        }\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：10\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        loop {\n            match ctx.ws_from_stream().await {\n                Ok(_) => {\n                    let body: &Vec<u8> = leak_ctx.get_request().get_body();\n                    ctx.get_mut_response().set_body(body);\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.get_mut_response().set_body(error.to_string());\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        while ctx.ws_from_stream().await.is_ok() {\n            let body: &Vec<u8> = leak_ctx.get_request().get_body();\n            ctx.get_mut_response().set_body(body);\n            if self.try_send_body_hook(ctx).await.is_err() {\n                return;\n            }\n        }\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        loop {\n            match ctx.ws_from_stream().await {\n                Ok(_) => {\n                    let body: &Vec<u8> = leak_ctx.get_request().get_body();\n                    ctx.get_mut_response().set_body(body);\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.get_mut_response().set_body(error.to_string());\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        while ctx.ws_from_stream().await.is_ok() {\n            let body: &Vec<u8> = leak_ctx.get_request().get_body();\n            ctx.get_mut_response().set_body(body);\n            if self.try_send_body_hook(ctx).await.is_err() {\n                return;\n            }\n        }\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        loop {\n            match ctx.ws_from_stream().await {\n                Ok(_) => {\n                    let body: &Vec<u8> = leak_ctx.get_request().get_body();\n                    ctx.get_mut_response().set_body(body);\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.get_mut_response().set_body(error.to_string());\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        while ctx.ws_from_stream().await.is_ok() {\n            let body: &Vec<u8> = leak_ctx.get_request().get_body();\n            ctx.get_mut_response().set_body(body);\n            if self.try_send_body_hook(ctx).await.is_err() {\n                return;\n            }\n        }\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        loop {\n            match ctx.ws_from_stream().await {\n                Ok(_) => {\n                    let body: &Vec<u8> = leak_ctx.get_request().get_body();\n                    ctx.get_mut_response().set_body(body);\n                    if self.try_send_body_hook(ctx).await.is_err() {\n                        return;\n                    }\n                }\n                Err(error) => {\n                    ctx.get_mut_response().set_body(error.to_string());\n                    let _ = self.try_send_body_hook(ctx).await;\n                    return;\n                }\n            }\n        }\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\nasync fn handle(self, ctx: &mut Context) {\n        let leak_ctx: &Context = ctx.leak();\n        while ctx.ws_from_stream().await.is_ok() {\n            let body: &Vec<u8> = leak_ctx.get_request().get_body();\n            ctx.get_mut_response().set_body(body);\n            if self.try_send_body_hook(ctx).await.is_err() {\n                return;\n            }\n        }\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
