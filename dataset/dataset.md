@@ -1,4 +1,4 @@
-<!--2026-04-10 13:21:39-->
+<!--2026-04-10 19:01:40-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -9489,8 +9489,10 @@ impl ServerHook for TaskPanicHook {
     async fn handle(self, ctx: &mut Context) {
         debug!("TaskPanicHook request => {}", ctx.get_request());
         error!("TaskPanicHook => {}", self.get_response_body());
-        let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
+        let api_response: ApiResponse<&str> = ApiResponse::new(
+            ApiResponseStatus::InternalServerError,
+            self.get_response_body(),
+        );
         let response_body: Vec<u8> = api_response.to_json_bytes();
     }
 }
@@ -9524,8 +9526,10 @@ impl ServerHook for RequestErrorHook {
             debug!("RequestErrorHook request => {}", ctx.get_request());
             error!("RequestErrorHook => {}", self.get_response_body());
         }
-        let api_response: ApiResponse<()> =
-            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());
+        let api_response: ApiResponse<&str> = ApiResponse::new(
+            ApiResponseStatus::InternalServerError,
+            self.get_response_body(),
+        );
         let response_body: Vec<u8> = api_response.to_json_bytes();
     }
 }
@@ -9559,6 +9563,7 @@ where
 {
     #[get(type(copy))]
     pub(super) code: i32,
+    #[set(type(AsRef<str>))]
     pub(super) message: String,
     pub(super) data: Option<T>,
     #[get(type(copy))]
@@ -9568,19 +9573,39 @@ where
 # Path: hyperlane-quick-start/application/model/response/common/impl.rs
 ```rust
 use super::*;
-impl ResponseCode {
-    #[instrument_trace]
-    pub fn default_message(&self) -> &'static str {
-        match self {
-            Self::Success => "Operation successful",
-            Self::BadRequest => "Invalid request parameters",
-            Self::Unauthorized => "Unauthorized access",
-            Self::Forbidden => "Access forbidden",
-            Self::NotFound => "Resource not found",
-            Self::InternalError => "Internal server error",
-            Self::DatabaseError => "Database operation failed",
-            Self::BusinessError => "Business logic error",
+impl From<ApiResponseStatus> for i32 {
+    fn from(status: ApiResponseStatus) -> Self {
+        match status {
+            ApiResponseStatus::Success => 200,
+            ApiResponseStatus::InvalidRequest => 400,
+            ApiResponseStatus::Unauthorized => 401,
+            ApiResponseStatus::Forbidden => 403,
+            ApiResponseStatus::ResourceNotFound => 404,
+            ApiResponseStatus::DatabaseError => 500,
+            ApiResponseStatus::BusinessLogicError => 500,
+            ApiResponseStatus::InternalServerError => 500,
+            ApiResponseStatus::ExternalServiceError => 502,
+            ApiResponseStatus::RateLimitExceeded => 429,
+            ApiResponseStatus::RequestTimeout => 408,
         }
+    }
+}
+impl Display for ApiResponseStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let message: &str = match self {
+            Self::Success => "Success",
+            Self::InvalidRequest => "Invalid request",
+            Self::Unauthorized => "Unauthorized",
+            Self::Forbidden => "Forbidden",
+            Self::ResourceNotFound => "Resource not found",
+            Self::DatabaseError => "Database error",
+            Self::BusinessLogicError => "Business logic error",
+            Self::InternalServerError => "Internal server error",
+            Self::ExternalServiceError => "External service error",
+            Self::RateLimitExceeded => "Rate limit exceeded",
+            Self::RequestTimeout => "Request timeout",
+        };
+        write!(f, "{}", message)
     }
 }
 impl<T> ApiResponse<T>
@@ -9588,80 +9613,30 @@ where
     T: Clone + Default + Serialize,
 {
     #[instrument_trace]
-    pub fn default_success() -> Self {
+    pub fn new(status: ApiResponseStatus, data: T) -> Self {
         let mut instance: ApiResponse<T> = Self::default();
         instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message("Success".to_string())
-            .set_data(None)
-            .set_timestamp(Some(Utc::now().timestamp_millis()));
-        instance
-    }
-    #[instrument_trace]
-    pub fn success(data: T) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message("Success".to_string())
+            .set_code(status.into())
+            .set_message(status.to_string())
             .set_data(Some(data))
             .set_timestamp(Some(Utc::now().timestamp_millis()));
         instance
     }
     #[instrument_trace]
-    pub fn success_with_message(data: T, message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message(message.into())
-            .set_data(Some(data))
-            .set_timestamp(Some(Utc::now().timestamp_millis()));
-        instance
+    pub fn try_to_json_string(&self) -> serde_json::Result<String> {
+        serde_json::to_string(self)
     }
     #[instrument_trace]
-    pub fn default_error() -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::InternalError as i32)
-            .set_message("Internal server error".to_string())
-            .set_data(None)
-            .set_timestamp(Some(Utc::now().timestamp_millis()));
-        instance
+    pub fn to_json_string(&self) -> String {
+        self.try_to_json_string().unwrap_or_default()
     }
     #[instrument_trace]
-    pub fn error(message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(ResponseCode::InternalError as i32)
-            .set_message(message.into())
-            .set_data(None)
-            .set_timestamp(Some(Utc::now().timestamp_millis()));
-        instance
-    }
-    #[instrument_trace]
-    pub fn error_with_code(code: ResponseCode, message: impl ToString) -> Self {
-        let mut instance: ApiResponse<T> = Self::default();
-        instance
-            .set_code(code as i32)
-            .set_message(message.to_string())
-            .set_data(None)
-            .set_timestamp(Some(Utc::now().timestamp_millis()));
-        instance
+    pub fn try_to_json_bytes(&self) -> serde_json::Result<Vec<u8>> {
+        serde_json::to_vec(self)
     }
     #[instrument_trace]
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).unwrap_or_default()
-    }
-}
-impl ApiResponse<()> {
-    #[instrument_trace]
-    pub fn success_without_data(message: impl Into<String>) -> Self {
-        let mut instance: ApiResponse<()> = Self::default();
-        instance
-            .set_code(ResponseCode::Success as i32)
-            .set_message(message.into())
-            .set_data(None)
-            .set_timestamp(Some(Utc::now().timestamp_millis()));
-        instance
+        self.try_to_json_bytes().unwrap_or_default()
     }
 }
 ```
@@ -9672,21 +9647,24 @@ mod r#impl;
 mod r#struct;
 pub use {r#enum::*, r#struct::*};
 use super::*;
+use std::fmt::{self, Display, Formatter};
 ```
 # Path: hyperlane-quick-start/application/model/response/common/enum.rs
 ```rust
 use super::*;
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
-#[repr(i32)]
-pub enum ResponseCode {
-    Success = 200,
-    BadRequest = 400,
-    Unauthorized = 401,
-    Forbidden = 403,
-    NotFound = 404,
-    InternalError = 500,
-    DatabaseError = 501,
-    BusinessError = 502,
+pub enum ApiResponseStatus {
+    Success,
+    InvalidRequest,
+    Unauthorized,
+    Forbidden,
+    ResourceNotFound,
+    DatabaseError,
+    BusinessLogicError,
+    InternalServerError,
+    ExternalServiceError,
+    RateLimitExceeded,
+    RequestTimeout,
 }
 ```
 # Path: hyperlane-quick-start/bootstrap/README.md

@@ -27164,37 +27164,37 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：9\n- 包含高级特性：泛型编程、异步编程",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：11\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        debug!(\"TaskPanicHook request => {}\", ctx.get_request());\n        error!(\"TaskPanicHook => {}\", self.get_response_body());\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
@@ -27230,175 +27230,199 @@
   {
     "instruction": "ServerHook::handle方法的源码是怎么实现的？",
     "input": "",
-    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
+    "output": "ServerHook::handle方法的源码实现如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```",
     "system": ""
   },
   {
     "instruction": "请解释ServerHook::handle这个方法的实现逻辑和设计思路。",
     "input": "",
-    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：16\n- 包含高级特性：泛型编程、异步编程",
+    "output": "ServerHook::handle方法的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：18\n- 包含高级特性：泛型编程、异步编程",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ServerHook::handle方法的泛型设计和使用如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的异步实现是如何工作的？",
     "input": "",
-    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
+    "output": "ServerHook::handle方法的异步实现机制如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这个异步实现利用了Rust的Future trait和async/await语法，提供了非阻塞的执行模式。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "ServerHook::handle方法的参数设计如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n参数列表：\n- ctx: &mut Context\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
     "instruction": "ServerHook::handle方法为什么需要修改状态？",
     "input": "",
-    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<()> =\n            ApiResponse::error_with_code(ResponseCode::InternalError, self.get_response_body());\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
+    "output": "ServerHook::handle方法的状态修改逻辑如下：\n\n```rust\n#[epilogue_macros(response_body(&response_body), try_send)]\n    #[instrument_trace]\n    async fn handle(self, ctx: &mut Context) {\n        if self.get_response_status_code() == HttpStatus::BadRequest.code() {\n            ctx.set_aborted(true);\n            debug!(\"Context aborted\");\n            return;\n        }\n        if self.get_response_status_code() != HttpStatus::RequestTimeout.code() {\n            debug!(\"RequestErrorHook request => {}\", ctx.get_request());\n            error!(\"RequestErrorHook => {}\", self.get_response_body());\n        }\n        let api_response: ApiResponse<&str> = ApiResponse::new(\n            ApiResponseStatus::InternalServerError,\n            self.get_response_body(),\n        );\n        let response_body: Vec<u8> = api_response.to_json_bytes();\n    }\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
     "instruction": "ApiResponse结构体的源码是怎么实现的？",
     "input": "",
-    "output": "ApiResponse结构体的源码实现如下：\n\n```rust\n#[skip_serializing_none]\n#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]\npub struct ApiResponse<T>\nwhere\n    T: Clone + Default + Serialize,\n{\n    #[get(type(copy))]\n    pub(super) code: i32,\n    pub(super) message: String,\n    pub(super) data: Option<T>,\n    #[get(type(copy))]\n    pub(super) timestamp: Option<i64>,\n}\n```",
+    "output": "ApiResponse结构体的源码实现如下：\n\n```rust\n#[skip_serializing_none]\n#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]\npub struct ApiResponse<T>\nwhere\n    T: Clone + Default + Serialize,\n{\n    #[get(type(copy))]\n    pub(super) code: i32,\n    #[set(type(AsRef<str>))]\n    pub(super) message: String,\n    pub(super) data: Option<T>,\n    #[get(type(copy))]\n    pub(super) timestamp: Option<i64>,\n}\n```",
     "system": ""
   },
   {
     "instruction": "请解释ApiResponse这个结构体的实现逻辑和设计思路。",
     "input": "",
-    "output": "ApiResponse结构体的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[skip_serializing_none]\n#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]\npub struct ApiResponse<T>\nwhere\n    T: Clone + Default + Serialize,\n{\n    #[get(type(copy))]\n    pub(super) code: i32,\n    pub(super) message: String,\n    pub(super) data: Option<T>,\n    #[get(type(copy))]\n    pub(super) timestamp: Option<i64>,\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：13\n- 包含高级特性：泛型编程、where子句约束",
+    "output": "ApiResponse结构体的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\n#[skip_serializing_none]\n#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]\npub struct ApiResponse<T>\nwhere\n    T: Clone + Default + Serialize,\n{\n    #[get(type(copy))]\n    pub(super) code: i32,\n    #[set(type(AsRef<str>))]\n    pub(super) message: String,\n    pub(super) data: Option<T>,\n    #[get(type(copy))]\n    pub(super) timestamp: Option<i64>,\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：14\n- 包含高级特性：泛型编程、where子句约束",
     "system": ""
   },
   {
     "instruction": "ApiResponse结构体中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ApiResponse结构体的泛型设计和使用如下：\n\n```rust\n#[skip_serializing_none]\n#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]\npub struct ApiResponse<T>\nwhere\n    T: Clone + Default + Serialize,\n{\n    #[get(type(copy))]\n    pub(super) code: i32,\n    pub(super) message: String,\n    pub(super) data: Option<T>,\n    #[get(type(copy))]\n    pub(super) timestamp: Option<i64>,\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "ApiResponse结构体的泛型设计和使用如下：\n\n```rust\n#[skip_serializing_none]\n#[derive(Clone, Data, Debug, Default, Deserialize, Serialize, ToSchema)]\npub struct ApiResponse<T>\nwhere\n    T: Clone + Default + Serialize,\n{\n    #[get(type(copy))]\n    pub(super) code: i32,\n    #[set(type(AsRef<str>))]\n    pub(super) message: String,\n    pub(super) data: Option<T>,\n    #[get(type(copy))]\n    pub(super) timestamp: Option<i64>,\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ResponseCode::default_message方法的源码是怎么实现的？",
+    "instruction": "From::from方法的源码是怎么实现的？",
     "input": "",
-    "output": "ResponseCode::default_message方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn default_message(&self) -> &'static str {\n        match self {\n            Self::Success => \"Operation successful\",\n            Self::BadRequest => \"Invalid request parameters\",\n            Self::Unauthorized => \"Unauthorized access\",\n            Self::Forbidden => \"Access forbidden\",\n            Self::NotFound => \"Resource not found\",\n            Self::InternalError => \"Internal server error\",\n            Self::DatabaseError => \"Database operation failed\",\n            Self::BusinessError => \"Business logic error\",\n        }\n```",
+    "output": "From::from方法的源码实现如下：\n\n```rust\nfn from(status: ApiResponseStatus) -> Self {\n        match status {\n            ApiResponseStatus::Success => 200,\n            ApiResponseStatus::InvalidRequest => 400,\n            ApiResponseStatus::Unauthorized => 401,\n            ApiResponseStatus::Forbidden => 403,\n            ApiResponseStatus::ResourceNotFound => 404,\n            ApiResponseStatus::DatabaseError => 500,\n            ApiResponseStatus::BusinessLogicError => 500,\n            ApiResponseStatus::InternalServerError => 500,\n            ApiResponseStatus::ExternalServiceError => 502,\n            ApiResponseStatus::RateLimitExceeded => 429,\n            ApiResponseStatus::RequestTimeout => 408,\n        }\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "ResponseCode::default_message方法的返回值类型设计有什么特点？",
+    "instruction": "From::from方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ResponseCode::default_message方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn default_message(&self) -> &'static str {\n        match self {\n            Self::Success => \"Operation successful\",\n            Self::BadRequest => \"Invalid request parameters\",\n            Self::Unauthorized => \"Unauthorized access\",\n            Self::Forbidden => \"Access forbidden\",\n            Self::NotFound => \"Resource not found\",\n            Self::InternalError => \"Internal server error\",\n            Self::DatabaseError => \"Database operation failed\",\n            Self::BusinessError => \"Business logic error\",\n        }\n```\n\n返回类型：&'static str\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "From::from方法的参数设计如下：\n\n```rust\nfn from(status: ApiResponseStatus) -> Self {\n        match status {\n            ApiResponseStatus::Success => 200,\n            ApiResponseStatus::InvalidRequest => 400,\n            ApiResponseStatus::Unauthorized => 401,\n            ApiResponseStatus::Forbidden => 403,\n            ApiResponseStatus::ResourceNotFound => 404,\n            ApiResponseStatus::DatabaseError => 500,\n            ApiResponseStatus::BusinessLogicError => 500,\n            ApiResponseStatus::InternalServerError => 500,\n            ApiResponseStatus::ExternalServiceError => 502,\n            ApiResponseStatus::RateLimitExceeded => 429,\n            ApiResponseStatus::RequestTimeout => 408,\n        }\n    }\n```\n\n参数列表：\n- status: ApiResponseStatus\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "ApiResponse::success_without_data方法的源码是怎么实现的？",
+    "instruction": "From::from方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "ApiResponse::success_without_data方法的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn success_without_data(message: impl Into<String>) -> Self {\n        let mut instance: ApiResponse<()> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(message.into())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```",
+    "output": "From::from方法的返回值类型设计如下：\n\n```rust\nfn from(status: ApiResponseStatus) -> Self {\n        match status {\n            ApiResponseStatus::Success => 200,\n            ApiResponseStatus::InvalidRequest => 400,\n            ApiResponseStatus::Unauthorized => 401,\n            ApiResponseStatus::Forbidden => 403,\n            ApiResponseStatus::ResourceNotFound => 404,\n            ApiResponseStatus::DatabaseError => 500,\n            ApiResponseStatus::BusinessLogicError => 500,\n            ApiResponseStatus::InternalServerError => 500,\n            ApiResponseStatus::ExternalServiceError => 502,\n            ApiResponseStatus::RateLimitExceeded => 429,\n            ApiResponseStatus::RequestTimeout => 408,\n        }\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ApiResponse::success_without_data方法中的泛型是如何设计和使用的？",
+    "instruction": "Display::fmt方法的源码是怎么实现的？",
     "input": "",
-    "output": "ApiResponse::success_without_data方法的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn success_without_data(message: impl Into<String>) -> Self {\n        let mut instance: ApiResponse<()> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(message.into())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Display::fmt方法的源码实现如下：\n\n```rust\nfn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {\n        let message: &str = match self {\n            Self::Success => \"Success\",\n            Self::InvalidRequest => \"Invalid request\",\n            Self::Unauthorized => \"Unauthorized\",\n            Self::Forbidden => \"Forbidden\",\n            Self::ResourceNotFound => \"Resource not found\",\n            Self::DatabaseError => \"Database error\",\n            Self::BusinessLogicError => \"Business logic error\",\n            Self::InternalServerError => \"Internal server error\",\n            Self::ExternalServiceError => \"External service error\",\n            Self::RateLimitExceeded => \"Rate limit exceeded\",\n            Self::RequestTimeout => \"Request timeout\",\n        };\n```",
     "system": ""
   },
   {
-    "instruction": "ApiResponse::success_without_data方法的参数设计有什么考虑？",
+    "instruction": "Display::fmt方法中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "ApiResponse::success_without_data方法的参数设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn success_without_data(message: impl Into<String>) -> Self {\n        let mut instance: ApiResponse<()> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(message.into())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n参数列表：\n- message: impl Into<String>\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "Display::fmt方法的泛型设计和使用如下：\n\n```rust\nfn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {\n        let message: &str = match self {\n            Self::Success => \"Success\",\n            Self::InvalidRequest => \"Invalid request\",\n            Self::Unauthorized => \"Unauthorized\",\n            Self::Forbidden => \"Forbidden\",\n            Self::ResourceNotFound => \"Resource not found\",\n            Self::DatabaseError => \"Database error\",\n            Self::BusinessLogicError => \"Business logic error\",\n            Self::InternalServerError => \"Internal server error\",\n            Self::ExternalServiceError => \"External service error\",\n            Self::RateLimitExceeded => \"Rate limit exceeded\",\n            Self::RequestTimeout => \"Request timeout\",\n        };\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "ApiResponse::success_without_data方法的返回值类型设计有什么特点？",
+    "instruction": "Display::fmt方法的参数设计有什么考虑？",
     "input": "",
-    "output": "ApiResponse::success_without_data方法的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn success_without_data(message: impl Into<String>) -> Self {\n        let mut instance: ApiResponse<()> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(message.into())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "Display::fmt方法的参数设计如下：\n\n```rust\nfn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {\n        let message: &str = match self {\n            Self::Success => \"Success\",\n            Self::InvalidRequest => \"Invalid request\",\n            Self::Unauthorized => \"Unauthorized\",\n            Self::Forbidden => \"Forbidden\",\n            Self::ResourceNotFound => \"Resource not found\",\n            Self::DatabaseError => \"Database error\",\n            Self::BusinessLogicError => \"Business logic error\",\n            Self::InternalServerError => \"Internal server error\",\n            Self::ExternalServiceError => \"External service error\",\n            Self::RateLimitExceeded => \"Rate limit exceeded\",\n            Self::RequestTimeout => \"Request timeout\",\n        };\n```\n\n参数列表：\n- f: &mut Formatter<'_>\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "default_success函数的源码是怎么实现的？",
+    "instruction": "Display::fmt方法的返回值类型设计有什么特点？",
     "input": "",
-    "output": "default_success函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn default_success() -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(\"Success\".to_string())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```",
+    "output": "Display::fmt方法的返回值类型设计如下：\n\n```rust\nfn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {\n        let message: &str = match self {\n            Self::Success => \"Success\",\n            Self::InvalidRequest => \"Invalid request\",\n            Self::Unauthorized => \"Unauthorized\",\n            Self::Forbidden => \"Forbidden\",\n            Self::ResourceNotFound => \"Resource not found\",\n            Self::DatabaseError => \"Database error\",\n            Self::BusinessLogicError => \"Business logic error\",\n            Self::InternalServerError => \"Internal server error\",\n            Self::ExternalServiceError => \"External service error\",\n            Self::RateLimitExceeded => \"Rate limit exceeded\",\n            Self::RequestTimeout => \"Request timeout\",\n        };\n```\n\n返回类型：fmt::Result\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "default_success函数中的泛型是如何设计和使用的？",
+    "instruction": "Display::fmt方法为什么需要修改状态？",
     "input": "",
-    "output": "default_success函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn default_success() -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(\"Success\".to_string())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "Display::fmt方法的状态修改逻辑如下：\n\n```rust\nfn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {\n        let message: &str = match self {\n            Self::Success => \"Success\",\n            Self::InvalidRequest => \"Invalid request\",\n            Self::Unauthorized => \"Unauthorized\",\n            Self::Forbidden => \"Forbidden\",\n            Self::ResourceNotFound => \"Resource not found\",\n            Self::DatabaseError => \"Database error\",\n            Self::BusinessLogicError => \"Business logic error\",\n            Self::InternalServerError => \"Internal server error\",\n            Self::ExternalServiceError => \"External service error\",\n            Self::RateLimitExceeded => \"Rate limit exceeded\",\n            Self::RequestTimeout => \"Request timeout\",\n        };\n```\n\n这种可变性设计是为了提高性能或实现特定的功能需求，同时保持了Rust的安全保证。",
     "system": ""
   },
   {
-    "instruction": "default_success函数的返回值类型设计有什么特点？",
+    "instruction": "new函数的源码是怎么实现的？",
     "input": "",
-    "output": "default_success函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn default_success() -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(\"Success\".to_string())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "new函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn new(status: ApiResponseStatus, data: T) -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(status.into())\n            .set_message(status.to_string())\n            .set_data(Some(data))\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "success函数的源码是怎么实现的？",
+    "instruction": "new函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "success函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn success(data: T) -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(\"Success\".to_string())\n            .set_data(Some(data))\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```",
+    "output": "new函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn new(status: ApiResponseStatus, data: T) -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(status.into())\n            .set_message(status.to_string())\n            .set_data(Some(data))\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "success函数中的泛型是如何设计和使用的？",
+    "instruction": "new函数的参数设计有什么考虑？",
     "input": "",
-    "output": "success函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn success(data: T) -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(\"Success\".to_string())\n            .set_data(Some(data))\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "new函数的参数设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn new(status: ApiResponseStatus, data: T) -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(status.into())\n            .set_message(status.to_string())\n            .set_data(Some(data))\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n参数列表：\n- status: ApiResponseStatus\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
     "system": ""
   },
   {
-    "instruction": "success函数的参数设计有什么考虑？",
+    "instruction": "new函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "success函数的参数设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn success(data: T) -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(\"Success\".to_string())\n            .set_data(Some(data))\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n参数列表：\n- data: T\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "output": "new函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn new(status: ApiResponseStatus, data: T) -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(status.into())\n            .set_message(status.to_string())\n            .set_data(Some(data))\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "success函数的返回值类型设计有什么特点？",
+    "instruction": "try_to_json_string函数的源码是怎么实现的？",
     "input": "",
-    "output": "success函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn success(data: T) -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::Success as i32)\n            .set_message(\"Success\".to_string())\n            .set_data(Some(data))\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "try_to_json_string函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn try_to_json_string(&self) -> serde_json::Result<String> {\n        serde_json::to_string(self)\n    }\n```",
     "system": ""
   },
   {
-    "instruction": "default_error函数的源码是怎么实现的？",
+    "instruction": "try_to_json_string函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "default_error函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn default_error() -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::InternalError as i32)\n            .set_message(\"Internal server error\".to_string())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```",
+    "output": "try_to_json_string函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn try_to_json_string(&self) -> serde_json::Result<String> {\n        serde_json::to_string(self)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
-    "instruction": "default_error函数中的泛型是如何设计和使用的？",
+    "instruction": "try_to_json_string函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "default_error函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn default_error() -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::InternalError as i32)\n            .set_message(\"Internal server error\".to_string())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "try_to_json_string函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn try_to_json_string(&self) -> serde_json::Result<String> {\n        serde_json::to_string(self)\n    }\n```\n\n返回类型：serde_json::Result<String>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "default_error函数的返回值类型设计有什么特点？",
+    "instruction": "to_json_string函数的源码是怎么实现的？",
     "input": "",
-    "output": "default_error函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn default_error() -> Self {\n        let mut instance: ApiResponse<T> = Self::default();\n        instance\n            .set_code(ResponseCode::InternalError as i32)\n            .set_message(\"Internal server error\".to_string())\n            .set_data(None)\n            .set_timestamp(Some(Utc::now().timestamp_millis()));\n        instance\n    }\n```\n\n返回类型：Self\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "to_json_string函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn to_json_string(&self) -> String {\n        self.try_to_json_string().unwrap_or_default()\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "to_json_string函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "to_json_string函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn to_json_string(&self) -> String {\n        self.try_to_json_string().unwrap_or_default()\n    }\n```\n\n返回类型：String\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "try_to_json_bytes函数的源码是怎么实现的？",
+    "input": "",
+    "output": "try_to_json_bytes函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn try_to_json_bytes(&self) -> serde_json::Result<Vec<u8>> {\n        serde_json::to_vec(self)\n    }\n```",
+    "system": ""
+  },
+  {
+    "instruction": "try_to_json_bytes函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "try_to_json_bytes函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn try_to_json_bytes(&self) -> serde_json::Result<Vec<u8>> {\n        serde_json::to_vec(self)\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "try_to_json_bytes函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "try_to_json_bytes函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn try_to_json_bytes(&self) -> serde_json::Result<Vec<u8>> {\n        serde_json::to_vec(self)\n    }\n```\n\n返回类型：serde_json::Result<Vec<u8>>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
     "instruction": "to_json_bytes函数的源码是怎么实现的？",
     "input": "",
-    "output": "to_json_bytes函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn to_json_bytes(&self) -> Vec<u8> {\n        serde_json::to_vec(self).unwrap_or_default()\n    }\n```",
+    "output": "to_json_bytes函数的源码实现如下：\n\n```rust\n#[instrument_trace]\n    pub fn to_json_bytes(&self) -> Vec<u8> {\n        self.try_to_json_bytes().unwrap_or_default()\n    }\n```",
     "system": ""
   },
   {
     "instruction": "to_json_bytes函数中的泛型是如何设计和使用的？",
     "input": "",
-    "output": "to_json_bytes函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn to_json_bytes(&self) -> Vec<u8> {\n        serde_json::to_vec(self).unwrap_or_default()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "output": "to_json_bytes函数的泛型设计和使用如下：\n\n```rust\n#[instrument_trace]\n    pub fn to_json_bytes(&self) -> Vec<u8> {\n        self.try_to_json_bytes().unwrap_or_default()\n    }\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
     "system": ""
   },
   {
     "instruction": "to_json_bytes函数的返回值类型设计有什么特点？",
     "input": "",
-    "output": "to_json_bytes函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn to_json_bytes(&self) -> Vec<u8> {\n        serde_json::to_vec(self).unwrap_or_default()\n    }\n```\n\n返回类型：Vec<u8>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "output": "to_json_bytes函数的返回值类型设计如下：\n\n```rust\n#[instrument_trace]\n    pub fn to_json_bytes(&self) -> Vec<u8> {\n        self.try_to_json_bytes().unwrap_or_default()\n    }\n```\n\n返回类型：Vec<u8>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
     "system": ""
   },
   {
-    "instruction": "ResponseCode枚举的源码是怎么实现的？",
+    "instruction": "ApiResponseStatus枚举的源码是怎么实现的？",
     "input": "",
-    "output": "ResponseCode枚举的源码实现如下：\n\n```rust\n#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]\n#[repr(i32)]\npub enum ResponseCode {\n    Success = 200,\n    BadRequest = 400,\n    Unauthorized = 401,\n    Forbidden = 403,\n    NotFound = 404,\n    InternalError = 500,\n    DatabaseError = 501,\n    BusinessError = 502,\n}\n```",
+    "output": "ApiResponseStatus枚举的源码实现如下：\n\n```rust\n#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]\npub enum ApiResponseStatus {\n    Success,\n    InvalidRequest,\n    Unauthorized,\n    Forbidden,\n    ResourceNotFound,\n    DatabaseError,\n    BusinessLogicError,\n    InternalServerError,\n    ExternalServiceError,\n    RateLimitExceeded,\n    RequestTimeout,\n}\n```",
     "system": ""
   },
   {
