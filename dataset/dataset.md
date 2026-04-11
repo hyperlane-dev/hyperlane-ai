@@ -1,4 +1,4 @@
-<!--2026-04-11 13:08:48-->
+<!--2026-04-11 18:53:42-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -5940,7 +5940,7 @@ COPY . .
 RUN cargo build && \
     cp -f /hyperlane-quick-start/target/debug/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start && \
     rm -rf /hyperlane-quick-start/target
-EXPOSE 60000
+EXPOSE 80
 CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
 # Path: hyperlane-quick-start/resources/env/const.rs
@@ -5960,8 +5960,10 @@ pub use r#const::*;
 DOCKER_COMPOSE_FILE_PATH=./resources/docker/release/server_docker_compose.yml
 DB_CONNECTION_TIMEOUT_MILLIS=1000
 DB_RETRY_INTERVAL_MILLIS=30000
-GPT_API_URL=http://127.0.0.1:1234/v1/chat/completions
-GPT_MODEL=qwen2.5-coder-1.5b-instruct
+GPT_API_URL=http://host.docker.internal:1234/v1/chat/completions
+GPT_API_KEY=
+GPT_MODEL=
+GPT_ENABLE_THINKING=false
 MYSQL='[{"name":"mysql_default","host":"release_hyperlane_quick_start_mysql","port":3306,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
 POSTGRESQL='[{"name":"postgres_default","host":"release_hyperlane_quick_start_postgresql","port":5432,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
 REDIS='[{"name":"redis_default","host":"release_hyperlane_quick_start_redis","port":6379,"username":"","password":"hyperlane"}]'
@@ -5983,14 +5985,16 @@ SERVER_REQUEST_MAX_BODY_SIZE=104857600
 DOCKER_COMPOSE_FILE_PATH=./resources/docker/dev/server_docker_compose.yml
 DB_CONNECTION_TIMEOUT_MILLIS=1000
 DB_RETRY_INTERVAL_MILLIS=30000
-GPT_API_URL=http://hyperlane:1234/v1/chat/completions
-GPT_MODEL=qwen2.5-coder-1.5b-instruct
+GPT_API_URL=http://host.docker.internal:1234/v1/chat/completions
+GPT_API_KEY=
+GPT_MODEL=
+GPT_ENABLE_THINKING=false
 MYSQL='[{"name":"mysql_default","host":"dev_hyperlane_quick_start_mysql","port":3306,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
 POSTGRESQL='[{"name":"postgres_default","host":"dev_hyperlane_quick_start_postgresql","port":5432,"database":"hyperlane","username":"hyperlane","password":"hyperlane"}]'
 REDIS='[{"name":"redis_default","host":"dev_hyperlane_quick_start_redis","port":6379,"username":"","password":"hyperlane"}]'
-SERVER_PORT=60000
+SERVER_PORT=80
 SERVER_HOST=0.0.0.0
-SERVER_BUFFER=60000
+SERVER_BUFFER=8192
 SERVER_LOG_SIZE=100024000
 SERVER_LOG_DIR=./data/dev/logs
 SERVER_INNER_PRINT=true
