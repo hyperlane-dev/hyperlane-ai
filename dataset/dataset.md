@@ -1,4 +1,4 @@
-<!--2026-04-11 18:53:42-->
+<!--2026-04-12 02:58:29-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -5960,7 +5960,7 @@ pub use r#const::*;
 DOCKER_COMPOSE_FILE_PATH=./resources/docker/release/server_docker_compose.yml
 DB_CONNECTION_TIMEOUT_MILLIS=1000
 DB_RETRY_INTERVAL_MILLIS=30000
-GPT_API_URL=http://host.docker.internal:1234/v1/chat/completions
+GPT_API_URL=http://172.17.0.1:1234/v1/chat/completions
 GPT_API_KEY=
 GPT_MODEL=
 GPT_ENABLE_THINKING=false
@@ -5985,7 +5985,7 @@ SERVER_REQUEST_MAX_BODY_SIZE=104857600
 DOCKER_COMPOSE_FILE_PATH=./resources/docker/dev/server_docker_compose.yml
 DB_CONNECTION_TIMEOUT_MILLIS=1000
 DB_RETRY_INTERVAL_MILLIS=30000
-GPT_API_URL=http://host.docker.internal:1234/v1/chat/completions
+GPT_API_URL=http://127.0.0.1:1234/v1/chat/completions
 GPT_API_KEY=
 GPT_MODEL=
 GPT_ENABLE_THINKING=false
