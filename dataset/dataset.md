@@ -1,4 +1,4 @@
-<!--2026-05-10 08:13:16-->
+<!--2026-05-10 13:28:14-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -4898,7 +4898,7 @@ pub fn compute_date(mut days_since_epoch: u64) -> (u64, u64, u64) {
         if days_since_epoch < days_in_year {
             break;
         }
-        days_since_epoch -= days_in_year as u64;
+        days_since_epoch -= days_in_year;
         year += 1;
     }
     let mut month: u64 = 0;
@@ -4908,11 +4908,11 @@ pub fn compute_date(mut days_since_epoch: u64) -> (u64, u64, u64) {
         } else {
             days
         };
-        if days_since_epoch < days_in_month as u64 {
+        if days_since_epoch < days_in_month {
             month = i as u64 + 1;
             return (year, month, days_since_epoch + 1);
         }
-        days_since_epoch -= days_in_month as u64;
+        days_since_epoch -= days_in_month;
     }
     (year, month, 1)
 }
@@ -10218,19 +10218,19 @@ async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, std::io::
     let content: String = read_to_string(manifest_path)?;
     if let Ok(doc) = toml::from_str::<toml::Value>(&content)
         && let Some(workspace) = doc.get("workspace")
-            && let Some(members) = workspace
-                .get("members")
-                .and_then(|m: &toml::Value| m.as_array())
-            {
-                for member in members {
-                    if let Some(pattern) = member.as_str() {
-                        let member_src: PathBuf = workspace_root.join(pattern).join("src");
-                        if member_src.exists() {
-                            find_rust_files_in_dir(&member_src, &mut files).await?;
-                        }
-                    }
+        && let Some(members) = workspace
+            .get("members")
+            .and_then(|m: &toml::Value| m.as_array())
+    {
+        for member in members {
+            if let Some(pattern) = member.as_str() {
+                let member_src: PathBuf = workspace_root.join(pattern).join("src");
+                if member_src.exists() {
+                    find_rust_files_in_dir(&member_src, &mut files).await?;
                 }
             }
+        }
+    }
     Ok(files)
 }
 async fn find_rust_files_in_dir(
@@ -10979,69 +10979,57 @@ pub(crate) fn parse_args() -> Args {
             "-v" | "--version" => {
                 command = CommandType::Version;
             }
-            "fmt" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Fmt;
+            "fmt" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Fmt;
+            }
+            "watch" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Watch;
+            }
+            "bump" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Bump;
+            }
+            "publish" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Publish;
+            }
+            "new" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::New;
+                i += 1;
+                if i < raw_args.len()
+                    && !raw_args[i].starts_with("--")
+                    && !raw_args[i].starts_with("-")
+                {
+                    project_name = Some(raw_args[i].clone());
+                } else {
+                    i -= 1;
                 }
             }
-            "watch" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Watch;
-                }
-            }
-            "bump" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Bump;
-                }
-            }
-            "publish" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Publish;
-                }
-            }
-            "new" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::New;
+            "template" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Template;
+                i += 1;
+                if i < raw_args.len()
+                    && !raw_args[i].starts_with("--")
+                    && !raw_args[i].starts_with("-")
+                {
+                    let type_str: &str = &raw_args[i];
+                    template_type = TemplateType::from_str(type_str).ok();
                     i += 1;
-                    if i < raw_args.len()
+                    if template_type == Some(TemplateType::Model)
+                        && i < raw_args.len()
                         && !raw_args[i].starts_with("--")
                         && !raw_args[i].starts_with("-")
                     {
-                        project_name = Some(raw_args[i].clone());
-                    } else {
-                        i -= 1;
-                    }
-                }
-            }
-            "template" => {
-                if command == CommandType::Help || command == CommandType::Version {
-                    command = CommandType::Template;
-                    i += 1;
-                    if i < raw_args.len()
-                        && !raw_args[i].starts_with("--")
-                        && !raw_args[i].starts_with("-")
-                    {
-                        let type_str: &str = &raw_args[i];
-                        template_type = TemplateType::from_str(type_str).ok();
+                        let sub_type_str: &str = &raw_args[i];
+                        model_sub_type = ModelSubType::from_str(sub_type_str).ok();
                         i += 1;
-                        if template_type == Some(TemplateType::Model)
-                            && i < raw_args.len()
-                            && !raw_args[i].starts_with("--")
-                            && !raw_args[i].starts_with("-")
-                        {
-                            let sub_type_str: &str = &raw_args[i];
-                            model_sub_type = ModelSubType::from_str(sub_type_str).ok();
-                            i += 1;
-                        }
-                        if i < raw_args.len()
-                            && !raw_args[i].starts_with("--")
-                            && !raw_args[i].starts_with("-")
-                        {
-                            component_name = Some(raw_args[i].clone());
-                            i += 1;
-                        }
-                        i -= 1;
                     }
+                    if i < raw_args.len()
+                        && !raw_args[i].starts_with("--")
+                        && !raw_args[i].starts_with("-")
+                    {
+                        component_name = Some(raw_args[i].clone());
+                        i += 1;
+                    }
+                    i -= 1;
                 }
             }
             "--patch" => {
@@ -11077,9 +11065,10 @@ pub(crate) fn parse_args() -> Args {
             "--max-retries" => {
                 i += 1;
                 if i < raw_args.len()
-                    && let Ok(n) = raw_args[i].parse::<u32>() {
-                        max_retries = n;
-                    }
+                    && let Ok(n) = raw_args[i].parse::<u32>()
+                {
+                    max_retries = n;
+                }
             }
             _ => {}
         }
@@ -11242,14 +11231,15 @@ fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError
         toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
     let mut packages: Vec<Package> = Vec::new();
     if let Some(workspace) = doc.get("workspace")
-        && let Some(members) = workspace.get("members").and_then(|m| m.as_array()) {
-            for member in members {
-                if let Some(pattern) = member.as_str() {
-                    let base_path: &Path = workspace_root.parent().unwrap_or(workspace_root);
-                    expand_pattern(base_path, pattern, &mut packages)?;
-                }
+        && let Some(members) = workspace.get("members").and_then(|m| m.as_array())
+    {
+        for member in members {
+            if let Some(pattern) = member.as_str() {
+                let base_path: &Path = workspace_root.parent().unwrap_or(workspace_root);
+                expand_pattern(base_path, pattern, &mut packages)?;
             }
         }
+    }
     if packages.is_empty() {
         let package: Package = read_single_package(workspace_root)?;
         packages.push(package);
@@ -11891,9 +11881,11 @@ fn get_next_prerelease(current: Option<&String>, target_type: &str) -> String {
     match current {
         Some(pre) => {
             if let Some((pre_type, number)) = parse_prerelease(pre)
-                && pre_type == target_type && number > 0 {
-                    return format!("{}.{}", target_type, number + 1);
-                }
+                && pre_type == target_type
+                && number > 0
+            {
+                return format!("{}.{}", target_type, number + 1);
+            }
             format!("{target_type}.1")
         }
         None => target_type.to_string(),
