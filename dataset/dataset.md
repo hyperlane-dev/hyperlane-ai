@@ -1,4 +1,4 @@
-<!--2026-05-12 14:34:10-->
+<!--2026-05-12 19:59:38-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -49,12 +49,10 @@ cargo add hyperlane-macros
 - `#[response_version(version)]` - Set response HTTP version (supports literals and global constants)
 - `#[clear_response_headers]` - Clear all response headers
 ### Send Operation Macros
-- `#[try_send]` - Try to send complete response (headers and body) after function execution (returns Result)
-- `#[send]` - Send complete response (headers and body) after function execution (**panics on failure**)
-- `#[try_send_body]` - Try to send only response body after function execution (returns Result)
-- `#[send_body]` - Send only response body after function execution (**panics on failure**)
-- `#[try_send_body_with_data("data")]` - Try to send only response body with specified data after function execution (returns Result)
-- `#[send_body_with_data("data")]` - Send only response body with specified data after function execution (**panics on failure**)
+- `#[try_send]` - Try to send data via stream after function execution (returns Result). Defaults to sending the response built from context.
+- `#[try_send(data_expr)]` - Try to send the specified data expression via stream after function execution (returns Result)
+- `#[send]` - Send data via stream after function execution (**panics on failure**). Defaults to sending the response built from context.
+- `#[send(data_expr)]` - Send the specified data expression via stream after function execution (**panics on failure**)
 ### Flush Macros
 - `#[try_flush]` - Try to flush response stream after function execution to ensure immediate data transmission (returns Result)
 - `#[flush]` - Flush response stream after function execution to ensure immediate data transmission (**panics on failure**)
@@ -155,10 +153,10 @@ cargo add hyperlane-macros
 - `#[request_error]` - Register a function as a request error hook
 - `#[request_error(order)]` - Register a function as a request error hook with specified order
 ### Stream Processing Macros
-- `#[http_from_stream]` - Wraps function body with HTTP stream processing. The function body only executes if data is successfully read from the HTTP stream.
-- `#[http_from_stream(variable_name)]` - Wraps function body with HTTP stream processing, storing data in specified variable name.
-- `#[ws_from_stream]` - Wraps function body with WebSocket stream processing. The function body only executes if data is successfully read from the WebSocket stream.
-- `#[ws_from_stream(variable_name)]` - Wraps function body with WebSocket stream processing, storing data in specified variable name.
+- `#[try_get_http_request]` - Wraps function body with HTTP stream processing. The function body only executes if data is successfully read from the HTTP stream.
+- `#[try_get_http_request(variable_name)]` - Wraps function body with HTTP stream processing, storing data in specified variable name.
+- `#[try_get_websocket_request]` - Wraps function body with WebSocket stream processing. The function body only executes if data is successfully read from the WebSocket stream.
+- `#[try_get_websocket_request(variable_name)]` - Wraps function body with WebSocket stream processing, storing data in specified variable name.
 ### Response Header Macros
 ### Response Body Macros
 ### Route Macros
@@ -171,7 +169,6 @@ cargo add hyperlane-macros
 ## Contact
 # Path: hyperlane-macros/src/lib.rs
 ```rust
-mod aborted;
 mod closed;
 mod common;
 mod context;
@@ -195,14 +192,13 @@ mod stream;
 mod upgrade;
 mod version;
 use {
-    aborted::*, closed::*, common::*, context::*, filter::*, flush::*, from_stream::*, hook::*,
-    host::*, hyperlane::*, inject::*, method::*, referer::*, reject::*, request::*,
-    request_middleware::*, response::*, response_middleware::*, route::*, send::*, stream::*,
-    upgrade::*, version::*,
+    closed::*, common::*, context::*, filter::*, flush::*, from_stream::*, hook::*, host::*,
+    hyperlane::*, inject::*, method::*, referer::*, reject::*, request::*, request_middleware::*,
+    response::*, response_middleware::*, route::*, send::*, stream::*, upgrade::*, version::*,
 };
 use {
     proc_macro::TokenStream,
-    proc_macro2::TokenStream as TokenStream2,
+    proc_macro2::{Span, TokenStream as TokenStream2},
     quote::quote,
     syn::{
         Ident, Token,
@@ -213,12 +209,12 @@ use {
     },
 };
 #[proc_macro_attribute]
-pub fn ws_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
-    ws_from_stream_macro(attr, item)
+pub fn try_get_websocket_request(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_websocket_request_macro(attr, item)
 }
 #[proc_macro_attribute]
-pub fn http_from_stream(attr: TokenStream, item: TokenStream) -> TokenStream {
-    http_from_stream_macro(attr, item)
+pub fn try_get_http_request(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_http_request_macro(attr, item)
 }
 #[proc_macro_attribute]
 pub fn get_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -335,10 +331,6 @@ pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStr
 #[proc_macro_attribute]
 pub fn response_version(attr: TokenStream, item: TokenStream) -> TokenStream {
     response_version_macro(attr, item, Position::Prologue)
-}
-#[proc_macro_attribute]
-pub fn aborted(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    aborted_macro(item, Position::Prologue)
 }
 #[proc_macro_attribute]
 pub fn closed(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -505,28 +497,12 @@ pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
     epilogue_macros_macro(attr, item)
 }
 #[proc_macro_attribute]
-pub fn try_send(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    try_send_macro(item, Position::Epilogue)
+pub fn try_send(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_send_macro(attr, item, Position::Epilogue)
 }
 #[proc_macro_attribute]
-pub fn send(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    send_macro(item, Position::Epilogue)
-}
-#[proc_macro_attribute]
-pub fn try_send_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    try_send_body_macro(item, Position::Epilogue)
-}
-#[proc_macro_attribute]
-pub fn send_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    send_body_macro(item, Position::Epilogue)
-}
-#[proc_macro_attribute]
-pub fn try_send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream {
-    try_send_body_with_data_macro(attr, item, Position::Epilogue)
-}
-#[proc_macro_attribute]
-pub fn send_body_with_data(attr: TokenStream, item: TokenStream) -> TokenStream {
-    send_body_with_data_macro(attr, item, Position::Epilogue)
+pub fn send(attr: TokenStream, item: TokenStream) -> TokenStream {
+    send_macro(attr, item, Position::Epilogue)
 }
 #[proc_macro_attribute]
 pub fn try_flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -581,11 +557,11 @@ pub(crate) use {r#fn::*, r#struct::*};
 use crate::*;
 pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_host.host_values.iter().map(|host_value| {
             quote! {
                 if #context.get_request().get_host() != #host_value {
-                    return;
+                    return ::hyperlane::Status::Reject;
                 }
             }
         });
@@ -600,11 +576,11 @@ pub(crate) fn reject_host_macro(
     position: Position,
 ) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_host.host_values.iter().map(|host_value| {
             quote! {
                 if #context.get_request().get_host() == #host_value {
-                    return;
+                    return ::hyperlane::Status::Reject;
                 }
             }
         });
@@ -808,13 +784,13 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn create_version_check(
     version: &proc_macro2::Ident,
-) -> impl FnOnce(&Ident) -> TokenStream2 {
+) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
     let version_str: String = version.to_string();
-    move |context| {
+    move |context, _| {
         let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{version_str}"), context.span());
         quote! {
             if !#context.get_request().get_version().#check_fn() {
-                return;
+                return ::hyperlane::Status::Reject;
             }
         }
     }
@@ -827,7 +803,7 @@ macro_rules! impl_version_check_macro {
                 item,
                 create_version_check(&proc_macro2::Ident::new(
                     stringify!($version),
-                    proc_macro2::Span::call_site(),
+                    Span::call_site(),
                 )),
             )
         }
@@ -887,10 +863,10 @@ pub(crate) fn prologue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(position, item, |context| {
+    inject(position, item, |context, stream| {
         let hook_calls = functions.iter().map(|function_expr| {
             quote! {
-                let _ = #function_expr(#context).await;
+                let _ = #function_expr(#stream, #context).await;
             }
         });
         quote! {
@@ -905,10 +881,10 @@ pub(crate) fn epilogue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(position, item, |context| {
+    inject(position, item, |context, stream| {
         let hook_calls = functions.iter().map(|function_expr| {
             quote! {
-                let _ = #function_expr(#context).await;
+                let _ = #function_expr(#stream, #context).await;
             }
         });
         quote! {
@@ -927,14 +903,14 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn create_protocol_check(
     upgrade_type: &proc_macro2::Ident,
-) -> impl FnOnce(&Ident) -> TokenStream2 {
+) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
     let upgrade_type_str: String = upgrade_type.to_string();
-    move |context| {
+    move |context, _| {
         let check_fn: proc_macro2::Ident =
             Ident::new(&format!("is_{upgrade_type_str}"), context.span());
         quote! {
             if !#context.get_request().get_upgrade_type().#check_fn() {
-                return;
+                return ::hyperlane::Status::Reject;
             }
         }
     }
@@ -947,7 +923,7 @@ macro_rules! impl_protocol_check_macro {
                 item,
                 create_protocol_check(&proc_macro2::Ident::new(
                     stringify!($upgrade_type),
-                    proc_macro2::Span::call_site(),
+                    Span::call_site(),
                 )),
             )
         }
@@ -1002,16 +978,16 @@ pub(crate) fn referer_macro(
     position: Position,
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_referer.referer_values.iter().map(|referer_value| {
             quote! {
                 let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(REFERER);
                 if let Some(referer_header) = referer {
                     if referer_header != #referer_value {
-                        return;
+                        return ::hyperlane::Status::Reject;
                     }
                 } else {
-                    return;
+                    return ::hyperlane::Status::Reject;
                 }
             }
         });
@@ -1026,13 +1002,13 @@ pub(crate) fn reject_referer_macro(
     position: Position,
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_referer.referer_values.iter().map(|referer_value| {
             quote! {
                 let referer: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(REFERER);
                 if let Some(referer_header) = referer {
                     if referer_header == #referer_value {
-                        return;
+                        return ::hyperlane::Status::Reject;
                     }
                 }
             }
@@ -1075,57 +1051,47 @@ pub(crate) use {r#fn::*, r#struct::*};
 # Path: hyperlane-macros/src/send/fn.rs
 ```rust
 use crate::*;
-pub(crate) fn try_send_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            let _ = #context.try_send().await;
-        }
-    })
-}
-pub(crate) fn send_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            #context.send().await;
-        }
-    })
-}
-pub(crate) fn try_send_body_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            let _ = #context.try_send_body().await;
-        }
-    })
-}
-pub(crate) fn send_body_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {
-            #context.send_body().await;
-        }
-    })
-}
-pub(crate) fn try_send_body_with_data_macro(
+pub(crate) fn try_send_macro(
     attr: TokenStream,
     item: TokenStream,
     position: Position,
 ) -> TokenStream {
-    let send_data: SendData = parse_macro_input!(attr as SendData);
-    let data: Expr = send_data.data;
-    inject(position, item, |context| {
-        quote! {
-            let _ = #context.try_send_body_with_data(#data).await;
+    let data_expr: Option<Expr> = if attr.is_empty() {
+        None
+    } else {
+        let data: SendData = parse_macro_input!(attr as SendData);
+        Some(data.data)
+    };
+    inject(position, item, |context, stream| match data_expr {
+        Some(expr) => {
+            quote! {
+                let _ = #stream.try_send(#expr).await;
+            }
+        }
+        None => {
+            quote! {
+                let _ = #stream.try_send(#context.get_mut_response().build()).await;
+            }
         }
     })
 }
-pub(crate) fn send_body_with_data_macro(
-    attr: TokenStream,
-    item: TokenStream,
-    position: Position,
-) -> TokenStream {
-    let send_data: SendData = parse_macro_input!(attr as SendData);
-    let data: Expr = send_data.data;
-    inject(position, item, |context| {
-        quote! {
-            #context.send_body_with_data(#data).await;
+pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
+    let data_expr: Option<Expr> = if attr.is_empty() {
+        None
+    } else {
+        let data: SendData = parse_macro_input!(attr as SendData);
+        Some(data.data)
+    };
+    inject(position, item, |context, stream| match data_expr {
+        Some(expr) => {
+            quote! {
+                #stream.send(#expr).await;
+            }
+        }
+        None => {
+            quote! {
+                #stream.send(#context.get_mut_response().build()).await;
+            }
         }
     })
 }
@@ -1178,10 +1144,10 @@ pub(crate) fn reject_macro(
     position: Position,
 ) -> TokenStream {
     let condition: Expr = parse_macro_input!(attr as Expr);
-    inject(position, item, |_| {
+    inject(position, item, |_, _| {
         quote! {
             if #condition {
-                return;
+                return ::hyperlane::Status::Reject;
             }
         }
     })
@@ -1555,7 +1521,7 @@ pub(crate) fn request_body_macro(
     position: Position,
 ) -> TokenStream {
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_context(context);
         let statements = multi_body.variables.iter().map(|variable| {
             quote! {
@@ -1574,7 +1540,7 @@ pub(crate) fn request_body_json_result_macro(
 ) -> TokenStream {
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_body_json.params.iter().map(|(variable, type_name)| {
             quote! {
                 let #variable: Result<#type_name, ::hyperlane::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
@@ -1592,7 +1558,7 @@ pub(crate) fn request_body_json_macro(
 ) -> TokenStream {
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_body_json.params.iter().map(|(variable, type_name)| {
             quote! {
                 let #variable: #type_name = #context.get_request().get_body_json::<#type_name>();
@@ -1609,7 +1575,7 @@ pub(crate) fn attribute_option_macro(
     position: Position,
 ) -> TokenStream {
     let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_attr
             .params
             .iter()
@@ -1629,7 +1595,7 @@ pub(crate) fn attribute_macro(
     position: Position,
 ) -> TokenStream {
     let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_attr
             .params
             .iter()
@@ -1649,7 +1615,7 @@ pub(crate) fn attributes_macro(
     position: Position,
 ) -> TokenStream {
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_context(context);
         let statements = multi_attrs.variables.iter().map(|variable| {
             quote! {
@@ -1667,7 +1633,7 @@ pub(crate) fn task_panic_data_option_macro(
     position: Position,
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_task_panic_data.variables.iter().map(|variable| {
             quote! {
                 let #variable: Option<::hyperlane::PanicData> = #context.try_get_task_panic_data();
@@ -1684,7 +1650,7 @@ pub(crate) fn task_panic_data_macro(
     position: Position,
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_task_panic_data.variables.iter().map(|variable| {
             quote! {
                 let #variable: ::hyperlane::PanicData = #context.get_task_panic_data();
@@ -1701,7 +1667,7 @@ pub(crate) fn request_error_data_option_macro(
     position: Position,
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_error_data.variables.iter().map(|variable| {
             quote! {
                 let #variable: Option<::hyperlane::RequestError> = #context.try_get_request_error_data();
@@ -1718,7 +1684,7 @@ pub(crate) fn request_error_data_macro(
     position: Position,
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_error_data.variables.iter().map(|variable| {
             quote! {
                 let #variable: ::hyperlane::RequestError = #context.get_request_error_data();
@@ -1735,7 +1701,7 @@ pub(crate) fn route_param_option_macro(
     position: Position,
 ) -> TokenStream {
     let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_param.params.iter().map(|(key_name, variable)| {
             quote! {
                 let #variable: Option<std::string::String> = #context.try_get_route_param(#key_name);
@@ -1752,7 +1718,7 @@ pub(crate) fn route_param_macro(
     position: Position,
 ) -> TokenStream {
     let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_param.params.iter().map(|(key_name, variable)| {
             quote! {
                 let #variable: std::string::String = #context.get_route_param(#key_name);
@@ -1769,7 +1735,7 @@ pub(crate) fn route_params_macro(
     position: Position,
 ) -> TokenStream {
     let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_context(context);
         let statements = multi_route_params.variables.iter().map(|variable| {
             quote! {
@@ -1787,7 +1753,7 @@ pub(crate) fn request_query_option_macro(
     position: Position,
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_query.params.iter().map(|(key_name, variable)| {
             quote! {
                 let #variable: Option<::hyperlane::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
@@ -1804,7 +1770,7 @@ pub(crate) fn request_query_macro(
     position: Position,
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_query.params.iter().map(|(key_name, variable)| {
             quote! {
                 let #variable: ::hyperlane::RequestQuerysValue = #context.get_request().get_query(#key_name);
@@ -1821,7 +1787,7 @@ pub(crate) fn request_querys_macro(
     position: Position,
 ) -> TokenStream {
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_context(context);
         let statements = multi_querys.variables.iter().map(|variable| {
             quote! {
@@ -1839,7 +1805,7 @@ pub(crate) fn request_header_option_macro(
     position: Position,
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_header.params.iter().map(|(key_name, variable)| {
             quote! {
                 let #variable: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
@@ -1856,7 +1822,7 @@ pub(crate) fn request_header_macro(
     position: Position,
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_header.params.iter().map(|(key_name, variable)| {
             quote! {
                 let #variable: ::hyperlane::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
@@ -1873,7 +1839,7 @@ pub(crate) fn request_headers_macro(
     position: Position,
 ) -> TokenStream {
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_context(context);
         let statements = multi_headers.variables.iter().map(|variable| {
             quote! {
@@ -1891,7 +1857,7 @@ pub(crate) fn request_cookie_option_macro(
     position: Position,
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_cookie.params.iter().map(|(key_name, variable)| {
             quote! {
                 let #variable: Option<::hyperlane::CookieValue> = #context.get_request().try_get_cookie(#key_name);
@@ -1908,7 +1874,7 @@ pub(crate) fn request_cookie_macro(
     position: Position,
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_cookie.params.iter().map(|(key_name, variable)| {
             quote! {
                 let #variable: ::hyperlane::CookieValue = #context.get_request().get_cookie(#key_name);
@@ -1925,7 +1891,7 @@ pub(crate) fn request_cookies_macro(
     position: Position,
 ) -> TokenStream {
     let multi_cookies: MultiCookiesData = parse_macro_input!(attr as MultiCookiesData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let statements = multi_cookies.variables.iter().map(|variable| {
             quote! {
                 let #variable: ::hyperlane::Cookies = #context.get_request().get_cookies();
@@ -1943,7 +1909,7 @@ pub(crate) fn request_version_macro(
 ) -> TokenStream {
     let multi_version: MultiRequestVersionData =
         parse_macro_input!(attr as MultiRequestVersionData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_context(context);
         let statements = multi_version.variables.iter().map(|variable| {
             quote! {
@@ -1961,7 +1927,7 @@ pub(crate) fn request_path_macro(
     position: Position,
 ) -> TokenStream {
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_context(context);
         let statements = multi_path.variables.iter().map(|variable| {
             quote! {
@@ -1970,23 +1936,6 @@ pub(crate) fn request_path_macro(
         });
         quote! {
             #(#statements)*
-        }
-    })
-}
-```
-# Path: hyperlane-macros/src/aborted/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-macros/src/aborted/fn.rs
-```rust
-use crate::*;
-pub(crate) fn aborted_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
-        quote! {
-            #new_context.set_aborted(true);
         }
     })
 }
@@ -2001,13 +1950,13 @@ pub(crate) use r#fn::*;
 use crate::*;
 pub(crate) fn create_method_check(
     method: &proc_macro2::Ident,
-) -> impl FnOnce(&Ident) -> TokenStream2 {
+) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
     let method_str: String = method.to_string();
-    move |context| {
+    move |context, _| {
         let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{method_str}"), context.span());
         quote! {
             if !#context.get_request().get_method().#check_fn() {
-                return;
+                return ::hyperlane::Status::Reject;
             }
         }
     }
@@ -2019,8 +1968,8 @@ pub(crate) fn methods_macro(
 ) -> TokenStream {
     let item_clone_1: TokenStream = item.clone();
     let methods: RequestMethods = parse_macro_input!(attr as RequestMethods);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
-    let sig: &Signature = &input_fn.sig;
+    let mut input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let sig: &mut Signature = &mut input_fn.sig;
     match parse_context_from_signature(sig) {
         Ok(context) => {
             let method_checks = methods.methods.iter().map(|method| {
@@ -2031,10 +1980,10 @@ pub(crate) fn methods_macro(
                     #context.get_request().get_method().#check_fn()
                 }
             });
-            inject(position, item_clone_1, |_| {
+            inject(position, item_clone_1, |_, _| {
                 quote! {
                     if !(#(#method_checks)||*) {
-                        return;
+                        return ::hyperlane::Status::Reject;
                     }
                 }
             })
@@ -2050,7 +1999,7 @@ macro_rules! impl_http_method_macro {
                 item,
                 create_method_check(&proc_macro2::Ident::new(
                     stringify!($method),
-                    proc_macro2::Span::call_site(),
+                    Span::call_site(),
                 )),
             )
         }
@@ -2172,10 +2121,9 @@ pub(crate) use r#fn::*;
 ```rust
 use crate::*;
 pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+    inject(position, item, |_, stream| {
         quote! {
-            #new_context.set_closed(true);
+            #stream.set_closed(true);
         }
     })
 }
@@ -2189,19 +2137,17 @@ pub(crate) use r#fn::*;
 ```rust
 use crate::*;
 pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        let new_context: TokenStream2 = leak_mut_context(context);
+    inject(position, item, |_, stream| {
         quote! {
-            let _ = #new_context.try_flush().await;
+            let _ = #stream.try_flush().await;
         }
     })
 }
 pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
-        quote! {{
-            let new_context: &mut Context = (#context as *mut Context as usize).into();
-            new_context.flush().await;
-        }}
+    inject(position, item, |_, stream| {
+        quote! {
+            #stream.flush().await;
+        }
     })
 }
 ```
@@ -2271,70 +2217,111 @@ pub(crate) enum Position {
 use crate::*;
 fn inject_at_start(
     input: TokenStream,
-    before_fn: impl FnOnce(&Ident) -> TokenStream2,
+    before_fn: impl FnOnce(&Ident, &Ident) -> TokenStream2,
 ) -> TokenStream {
-    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
+    let mut input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
+    let sig: &mut Signature = &mut input_fn.sig;
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
     match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let before_code: TokenStream2 = before_fn(context);
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let gen_code: TokenStream2 = quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #before_code
-                    #(#stmts)*
-                }
-            };
-            gen_code.into()
-        }
+        Ok(context) => match parse_stream_from_signature(sig) {
+            Ok(stream) => {
+                let before_code: TokenStream2 = before_fn(&context, &stream);
+                let stmts: &Vec<Stmt> = &block.stmts;
+                let gen_code: TokenStream2 = quote! {
+                    #(#attrs)*
+                    #vis #sig {
+                        #before_code
+                        #(#stmts)*
+                    }
+                };
+                gen_code.into()
+            }
+            Err(err) => err.to_compile_error().into(),
+        },
         Err(err) => err.to_compile_error().into(),
     }
 }
-fn inject_at_end(input: TokenStream, after_fn: impl FnOnce(&Ident) -> TokenStream2) -> TokenStream {
-    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
+fn inject_at_end(
+    input: TokenStream,
+    after_fn: impl FnOnce(&Ident, &Ident) -> TokenStream2,
+) -> TokenStream {
+    let mut input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
+    let sig: &mut Signature = &mut input_fn.sig;
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
     match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let after_code: TokenStream2 = after_fn(context);
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let gen_code: TokenStream2 = quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #(#stmts)*
-                    #after_code
-                }
-            };
-            gen_code.into()
-        }
+        Ok(context) => match parse_stream_from_signature(sig) {
+            Ok(stream) => {
+                let after_code: TokenStream2 = after_fn(&context, &stream);
+                let stmts: &Vec<Stmt> = &block.stmts;
+                let (leading_stmts, tail_expr) = if let Some((last, leading)) = stmts.split_last() {
+                    match last {
+                        Stmt::Expr(expr, None) => (leading, Some(quote! { #expr })),
+                        _ => (stmts.as_slice(), None),
+                    }
+                } else {
+                    (stmts.as_slice(), None)
+                };
+                let normalized_leading: Vec<TokenStream2> = leading_stmts
+                    .iter()
+                    .map(|stmt| match stmt {
+                        Stmt::Expr(expr, None) => quote! { #expr; },
+                        _ => quote! { #stmt },
+                    })
+                    .collect();
+                let gen_code: TokenStream2 = match tail_expr {
+                    Some(expr) => quote! {
+                        #(#attrs)*
+                        #vis #sig {
+                            #(#normalized_leading)*
+                            #after_code
+                            #expr
+                        }
+                    },
+                    None => quote! {
+                        #(#attrs)*
+                        #vis #sig {
+                            #(#normalized_leading)*
+                            #after_code
+                        }
+                    },
+                };
+                gen_code.into()
+            }
+            Err(err) => err.to_compile_error().into(),
+        },
         Err(err) => err.to_compile_error().into(),
     }
 }
 pub(crate) fn inject(
     position: Position,
     input: TokenStream,
-    hook: impl FnOnce(&Ident) -> TokenStream2,
+    hook: impl FnOnce(&Ident, &Ident) -> TokenStream2,
 ) -> TokenStream {
     match position {
         Position::Prologue => inject_at_start(input, hook),
         Position::Epilogue => inject_at_end(input, hook),
     }
 }
-#[allow(dead_code)]
-pub(crate) fn parse_context_from_fn(sig: &Signature) -> syn::Result<&Ident> {
-    match sig.inputs.first() {
+#[allow(dead_code, clippy::replace_box)]
+pub(crate) fn parse_context_from_fn(sig: &mut Signature) -> syn::Result<Ident> {
+    let default_ident: Ident = Ident::new("ctx", Span::call_site());
+    match sig.inputs.first_mut() {
         Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
-            Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
-            Pat::Wild(wild) => Err(syn::Error::new_spanned(
-                wild,
-                "The argument cannot be anonymous `_`, please use a named identifier",
-            )),
+            Pat::Ident(pat_ident) => Ok(pat_ident.ident.clone()),
+            Pat::Wild(_) => {
+                pat_type.pat = Box::new(Pat::Ident(PatIdent {
+                    attrs: Vec::new(),
+                    by_ref: None,
+                    mutability: None,
+                    ident: default_ident.clone(),
+                    subpat: None,
+                }));
+                Ok(default_ident)
+            }
             _ => Err(syn::Error::new_spanned(
                 &pat_type.pat,
                 "expected identifier as first argument",
@@ -2346,16 +2333,23 @@ pub(crate) fn parse_context_from_fn(sig: &Signature) -> syn::Result<&Ident> {
         )),
     }
 }
-#[allow(dead_code)]
-pub(crate) fn parse_self_from_method(sig: &Signature) -> syn::Result<&Ident> {
+#[allow(dead_code, clippy::replace_box)]
+pub(crate) fn parse_self_from_method(sig: &mut Signature) -> syn::Result<Ident> {
+    let default_ident: Ident = Ident::new("ctx", Span::call_site());
     match sig.inputs.first() {
-        Some(FnArg::Receiver(_)) => match sig.inputs.iter().nth(1) {
+        Some(FnArg::Receiver(_)) => match sig.inputs.iter_mut().nth(1) {
             Some(FnArg::Typed(pat_type)) => match &*pat_type.pat {
-                Pat::Ident(pat_ident) => Ok(&pat_ident.ident),
-                Pat::Wild(wild) => Err(syn::Error::new_spanned(
-                    wild,
-                    "The context argument cannot be anonymous `_`, please use a named identifier",
-                )),
+                Pat::Ident(pat_ident) => Ok(pat_ident.ident.clone()),
+                Pat::Wild(_) => {
+                    pat_type.pat = Box::new(Pat::Ident(PatIdent {
+                        attrs: Vec::new(),
+                        by_ref: None,
+                        mutability: None,
+                        ident: default_ident.clone(),
+                        subpat: None,
+                    }));
+                    Ok(default_ident)
+                }
                 _ => Err(syn::Error::new_spanned(
                     &pat_type.pat,
                     "expected identifier as second argument (context)",
@@ -2392,18 +2386,44 @@ fn is_context_type(ty: &Type) -> bool {
     }
     false
 }
-pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<&Ident> {
-    for arg in sig.inputs.iter() {
+fn is_stream_type(ty: &Type) -> bool {
+    if let Type::Reference(type_ref) = ty
+        && let Type::Path(type_path) = &*type_ref.elem
+    {
+        let path: &Path = &type_path.path;
+        if path.segments.len() >= 2 {
+            let segments: Vec<_> = path.segments.iter().collect();
+            if segments.len() >= 2 {
+                let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
+                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Stream" {
+                    return true;
+                }
+            }
+        }
+        if path.segments.len() == 1 && path.segments[0].ident == "Stream" {
+            return true;
+        }
+    }
+    false
+}
+#[allow(clippy::replace_box)]
+pub(crate) fn parse_context_from_signature(sig: &mut Signature) -> syn::Result<Ident> {
+    let default_ident: Ident = Ident::new("ctx", Span::call_site());
+    for arg in sig.inputs.iter_mut() {
         if let FnArg::Typed(pat_type) = arg
             && is_context_type(&pat_type.ty)
         {
             match &*pat_type.pat {
-                Pat::Ident(pat_ident) => return Ok(&pat_ident.ident),
-                Pat::Wild(wild) => {
-                    return Err(syn::Error::new_spanned(
-                        wild,
-                        "The context argument cannot be anonymous `_`, please use a named identifier",
-                    ));
+                Pat::Ident(pat_ident) => return Ok(pat_ident.ident.clone()),
+                Pat::Wild(_) => {
+                    pat_type.pat = Box::new(Pat::Ident(PatIdent {
+                        attrs: Vec::new(),
+                        by_ref: None,
+                        mutability: None,
+                        ident: default_ident.clone(),
+                        subpat: None,
+                    }));
+                    return Ok(default_ident);
                 }
                 _ => {
                     return Err(syn::Error::new_spanned(
@@ -2417,6 +2437,39 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<&Iden
     Err(syn::Error::new_spanned(
         &sig.inputs,
         "expected at least one parameter of type &::hyperlane::Context",
+    ))
+}
+#[allow(clippy::replace_box)]
+pub(crate) fn parse_stream_from_signature(sig: &mut Signature) -> syn::Result<Ident> {
+    let default_ident: Ident = Ident::new("stream", Span::call_site());
+    for arg in sig.inputs.iter_mut() {
+        if let FnArg::Typed(pat_type) = arg
+            && is_stream_type(&pat_type.ty)
+        {
+            match &*pat_type.pat {
+                Pat::Ident(pat_ident) => return Ok(pat_ident.ident.clone()),
+                Pat::Wild(_) => {
+                    pat_type.pat = Box::new(Pat::Ident(PatIdent {
+                        attrs: Vec::new(),
+                        by_ref: None,
+                        mutability: None,
+                        ident: default_ident.clone(),
+                        subpat: None,
+                    }));
+                    return Ok(default_ident);
+                }
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        &pat_type.pat,
+                        "expected identifier for stream parameter",
+                    ));
+                }
+            }
+        }
+    }
+    Err(syn::Error::new_spanned(
+        &sig.inputs,
+        "expected at least one parameter of type &::hyperlane::Stream",
     ))
 }
 pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
@@ -2443,12 +2496,12 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
 }
 pub(crate) fn leak_mut_context(context: &Ident) -> TokenStream2 {
     quote! {
-        #context.leak_mut()
+        unsafe { #context.leak_mut() }
     }
 }
 pub(crate) fn leak_context(context: &Ident) -> TokenStream2 {
     quote! {
-        #context.leak()
+        unsafe { #context.leak() }
     }
 }
 ```
@@ -2456,10 +2509,6 @@ pub(crate) fn leak_context(context: &Ident) -> TokenStream2 {
 ```rust
 use crate::*;
 pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
-    InjectableMacro {
-        name: "aborted",
-        handler: Handler::NoAttrPosition(aborted_macro),
-    },
     InjectableMacro {
         name: "closed",
         handler: Handler::NoAttrPosition(closed_macro),
@@ -2694,35 +2743,19 @@ pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
     },
     InjectableMacro {
         name: "try_send",
-        handler: Handler::NoAttrPosition(try_send_macro),
+        handler: Handler::WithAttrPosition(try_send_macro),
     },
     InjectableMacro {
         name: "send",
-        handler: Handler::NoAttrPosition(send_macro),
+        handler: Handler::WithAttrPosition(send_macro),
     },
     InjectableMacro {
-        name: "try_send_body",
-        handler: Handler::NoAttrPosition(try_send_body_macro),
+        name: "try_get_http_request",
+        handler: Handler::WithAttr(try_get_http_request_macro),
     },
     InjectableMacro {
-        name: "send_body",
-        handler: Handler::NoAttrPosition(send_body_macro),
-    },
-    InjectableMacro {
-        name: "try_send_body_with_data",
-        handler: Handler::WithAttrPosition(try_send_body_with_data_macro),
-    },
-    InjectableMacro {
-        name: "send_body_with_data",
-        handler: Handler::WithAttrPosition(send_body_with_data_macro),
-    },
-    InjectableMacro {
-        name: "http_from_stream",
-        handler: Handler::WithAttr(http_from_stream_macro),
-    },
-    InjectableMacro {
-        name: "ws_from_stream",
-        handler: Handler::WithAttr(ws_from_stream_macro),
+        name: "try_get_websocket_request",
+        handler: Handler::WithAttr(try_get_websocket_request_macro),
     },
     InjectableMacro {
         name: "ws_upgrade_type",
@@ -2783,73 +2816,111 @@ pub(crate) use r#fn::*;
 ```rust
 use crate::*;
 use syn::Ident;
-pub(crate) fn generate_stream(
+pub(crate) fn generate_http_stream(
+    stream: &Ident,
     context: &Ident,
-    stream_method: &str,
     data: &FromStreamData,
     stmts: &[Stmt],
 ) -> TokenStream2 {
-    let method_ident: Ident = Ident::new(stream_method, proc_macro2::Span::call_site());
+    let method_ident: Ident = Ident::new("try_get_http_request", Span::call_site());
     match data.variable_name.clone() {
         Some(variable_name) => {
             quote! {
-                while let Ok(#variable_name) = #context.#method_ident().await {
+                while let Ok(#variable_name) = #stream.#method_ident().await {
+                    #context.set_request(#variable_name.clone());
                     #(#stmts)*
                 }
+                ::hyperlane::Status::Reject
             }
         }
         None => {
             quote! {
-                while #context.#method_ident().await.is_ok() {
+                while let Ok(_request) = #stream.#method_ident().await {
+                    #context.set_request(_request);
                     #(#stmts)*
                 }
+                ::hyperlane::Status::Reject
             }
         }
     }
 }
-pub(crate) fn http_from_stream_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn generate_websocket_stream(
+    stream: &Ident,
+    context: &Ident,
+    data: &FromStreamData,
+    stmts: &[Stmt],
+) -> TokenStream2 {
+    let method_ident: Ident = Ident::new("try_get_websocket_request", Span::call_site());
+    match data.variable_name.clone() {
+        Some(variable_name) => {
+            quote! {
+                while let Ok(#variable_name) = #stream.#method_ident().await {
+                    #context.get_mut_request().set_body(#variable_name.clone());
+                    #(#stmts)*
+                }
+                ::hyperlane::Status::Reject
+            }
+        }
+        None => {
+            quote! {
+                while let Ok(_body) = #stream.#method_ident().await {
+                    #context.get_mut_request().set_body(_body);
+                    #(#stmts)*
+                }
+                ::hyperlane::Status::Reject
+            }
+        }
+    }
+}
+pub(crate) fn try_get_http_request_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let mut input_fn: ItemFn = parse_macro_input!(item as ItemFn);
     let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
+    let sig: &mut Signature = &mut input_fn.sig;
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let loop_stream: TokenStream2 =
-                generate_stream(context, "http_from_stream", &data, stmts);
-            quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #loop_stream
+    match parse_stream_from_signature(sig) {
+        Ok(stream) => match parse_context_from_signature(sig) {
+            Ok(context) => {
+                let stmts: &Vec<Stmt> = &block.stmts;
+                let loop_stream: TokenStream2 =
+                    generate_http_stream(&stream, &context, &data, stmts);
+                quote! {
+                    #(#attrs)*
+                    #vis #sig {
+                        #loop_stream
+                    }
                 }
+                .into()
             }
-            .into()
-        }
+            Err(err) => err.to_compile_error().into(),
+        },
         Err(err) => err.to_compile_error().into(),
     }
 }
-pub(crate) fn ws_from_stream_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn try_get_websocket_request_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
-    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let mut input_fn: ItemFn = parse_macro_input!(item as ItemFn);
     let vis: &Visibility = &input_fn.vis;
-    let sig: &Signature = &input_fn.sig;
+    let sig: &mut Signature = &mut input_fn.sig;
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
-    match parse_context_from_signature(sig) {
-        Ok(context) => {
-            let stmts: &Vec<Stmt> = &block.stmts;
-            let loop_stream: TokenStream2 =
-                generate_stream(context, "ws_from_stream", &data, stmts);
-            quote! {
-                #(#attrs)*
-                #vis #sig {
-                    #loop_stream
+    match parse_stream_from_signature(sig) {
+        Ok(stream) => match parse_context_from_signature(sig) {
+            Ok(context) => {
+                let stmts: &Vec<Stmt> = &block.stmts;
+                let loop_stream: TokenStream2 =
+                    generate_websocket_stream(&stream, &context, &data, stmts);
+                quote! {
+                    #(#attrs)*
+                    #vis #sig {
+                        #loop_stream
+                    }
                 }
+                .into()
             }
-            .into()
-        }
+            Err(err) => err.to_compile_error().into(),
+        },
         Err(err) => err.to_compile_error().into(),
     }
 }
@@ -2921,7 +2992,7 @@ pub(crate) fn response_status_code_macro(
         Ok(v) => v,
         Err(err) => return err.to_compile_error().into(),
     };
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
@@ -2937,7 +3008,7 @@ pub(crate) fn response_reason_phrase_macro(
         Ok(v) => v,
         Err(err) => return err.to_compile_error().into(),
     };
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().set_reason_phrase(&#value);
@@ -2953,7 +3024,7 @@ pub(crate) fn response_header_macro(
     let key: Expr = header_data.key;
     let value: Expr = header_data.value;
     let operation: HeaderOperation = header_data.operation;
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_mut_context(context);
         match operation {
             HeaderOperation::Add => {
@@ -2976,7 +3047,7 @@ pub(crate) fn response_body_macro(
 ) -> TokenStream {
     let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
     let body: Expr = body_data.body;
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().set_body(&#body);
@@ -2984,7 +3055,7 @@ pub(crate) fn response_body_macro(
     })
 }
 pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().clear_headers();
@@ -3000,7 +3071,7 @@ pub(crate) fn response_version_macro(
         Ok(v) => v,
         Err(err) => return err.to_compile_error().into(),
     };
-    inject(position, item, |context| {
+    inject(position, item, |context, _| {
         let new_context: TokenStream2 = leak_mut_context(context);
         quote! {
             #new_context.get_mut_response().set_version(#value);
@@ -3022,10 +3093,10 @@ pub(crate) fn filter_macro(
     position: Position,
 ) -> TokenStream {
     let condition: Expr = parse_macro_input!(attr as Expr);
-    inject(position, item, |_| {
+    inject(position, item, |_, _| {
         quote! {
             if !(#condition) {
-                return;
+                return ::hyperlane::Status::Reject;
             }
         }
     })
@@ -3053,7 +3124,7 @@ struct TestData {
 #[task_panic("2")]
 struct TakPanicHook;
 impl ServerHook for TakPanicHook {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -3066,14 +3137,16 @@ impl ServerHook for TakPanicHook {
         response_body(format!("{task_panic_data} {task_panic_data_option:?}")),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[request_error]
 #[request_error(1)]
 #[request_error("2")]
 struct RequestErrorHook;
 impl ServerHook for RequestErrorHook {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -3086,12 +3159,14 @@ impl ServerHook for RequestErrorHook {
         response_body(format!("{request_error_data} {request_error_data_option:?}")),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[request_middleware]
 struct RequestMiddleware;
 impl ServerHook for RequestMiddleware {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(
@@ -3103,12 +3178,14 @@ impl ServerHook for RequestMiddleware {
         response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY),
         response_header(STEP => "request_middleware"),
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[request_middleware(1)]
 struct UpgradeHook;
 impl ServerHook for UpgradeHook {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(
@@ -3121,12 +3198,14 @@ impl ServerHook for UpgradeHook {
         response_header(STEP => "upgrade_hook"),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[request_middleware(2)]
 struct ConnectedHook;
 impl ServerHook for ConnectedHook {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_status_code(200)]
@@ -3134,21 +3213,25 @@ impl ServerHook for ConnectedHook {
     #[response_version(HttpVersion::Http1_1)]
     #[response_header(ACCESS_CONTROL_ALLOW_ORIGIN => WILDCARD_ANY)]
     #[response_header(STEP => "connected_hook")]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[response_middleware]
 struct ResponseMiddleware1;
 impl ServerHook for ResponseMiddleware1 {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_header(STEP => "response_middleware_1")]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[response_middleware(2)]
 struct ResponseMiddleware2;
 impl ServerHook for ResponseMiddleware2 {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -3156,12 +3239,14 @@ impl ServerHook for ResponseMiddleware2 {
         response_header(STEP => "response_middleware_2")
     )]
     #[epilogue_macros(try_send, flush)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[response_middleware("3")]
 struct ResponseMiddleware3;
 impl ServerHook for ResponseMiddleware3 {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -3169,112 +3254,134 @@ impl ServerHook for ResponseMiddleware3 {
         response_header(STEP => "response_middleware_3")
     )]
     #[epilogue_macros(try_send, flush)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 struct PrologueHooks;
 impl ServerHook for PrologueHooks {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[get_method]
     #[http_version]
-    async fn handle(self, _ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 struct EpilogueHooks;
 impl ServerHook for EpilogueHooks {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_status_code(200)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
-async fn prologue_hooks_fn(ctx: &mut Context) {
-    let hook = PrologueHooks::new(ctx).await;
-    hook.handle(ctx).await;
+async fn prologue_hooks_fn(stream: &mut Stream, ctx: &mut Context) -> Status {
+    let hook: PrologueHooks = PrologueHooks::new(stream, ctx).await;
+    hook.handle(stream, ctx).await
 }
-async fn epilogue_hooks_fn(ctx: &mut Context) {
-    let hook = EpilogueHooks::new(ctx).await;
-    hook.handle(ctx).await;
+async fn epilogue_hooks_fn(stream: &mut Stream, ctx: &mut Context) -> Status {
+    let hook: EpilogueHooks = EpilogueHooks::new(stream, ctx).await;
+    hook.handle(stream, ctx).await
 }
 #[route("/response")]
 struct Response;
 impl ServerHook for Response {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&RESPONSE_DATA)]
     #[response_reason_phrase(CUSTOM_REASON)]
     #[response_status_code(CUSTOM_STATUS_CODE)]
     #[response_header(CUSTOM_HEADER_NAME => CUSTOM_HEADER_VALUE)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/connect")]
 struct ConnectMethod;
 impl ServerHook for ConnectMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(connect_method, response_body("connect"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/delete")]
 struct DeleteMethod;
 impl ServerHook for DeleteMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(delete_method, response_body("delete"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/head")]
 struct HeadMethod;
 impl ServerHook for HeadMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(head_method, response_body("head"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/options")]
 struct OptionsMethod;
 impl ServerHook for OptionsMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(options_method, response_body("options"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/patch")]
 struct PatchMethod;
 impl ServerHook for PatchMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(patch_method, response_body("patch"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/put")]
 struct PutMethod;
 impl ServerHook for PutMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(put_method, response_body("put"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/trace")]
 struct TraceMethod;
 impl ServerHook for TraceMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(trace_method, response_body("trace"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/get_post_method")]
 struct GetPostMethod;
 impl ServerHook for GetPostMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[closed]
@@ -3285,662 +3392,750 @@ impl ServerHook for GetPostMethod {
         response_status_code(200),
         response_reason_phrase("OK")
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/get_method")]
 struct GetMethod;
 impl ServerHook for GetMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(ws_upgrade_type, get_method, response_body("get_method"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/post_method")]
 struct PostMethod;
 impl ServerHook for PostMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(post_method, response_body("post_method"), try_send)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/unknown_method")]
 struct UnknownMethod;
 impl ServerHook for UnknownMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(unknown_method, response_body("unknown_method"), try_send)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/http0_9_version")]
 struct Http09Version;
 impl ServerHook for Http09Version {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(http0_9_version, response_body("http0_9_version"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/http1_0_version")]
 struct Http10Version;
 impl ServerHook for Http10Version {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(http1_0_version, response_body("http1_0_version"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/http1_1_version")]
 struct Http11Version;
 impl ServerHook for Http11Version {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(http1_1_version, response_body("http1_1_version"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/http2_version")]
 struct Http2Version;
 impl ServerHook for Http2Version {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(http2_version, response_body("http2_version"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/http3_version")]
 struct Http3Version;
 impl ServerHook for Http3Version {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(http3_version, response_body("http3_version"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/http1_1_or_higher_version")]
 struct Http11OrHigher;
 impl ServerHook for Http11OrHigher {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(http1_1_or_higher_version, response_body("http1_1_or_higher_version"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/http_version")]
 struct HttpAllVersion;
 impl ServerHook for HttpAllVersion {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(http_version, response_body("http_version"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/unknown_version")]
 struct UnknownVersion;
 impl ServerHook for UnknownVersion {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(unknown_version, response_body("unknown_version"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/ws_upgrade_type")]
 struct WsUpgradeType;
 impl ServerHook for WsUpgradeType {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[ws_upgrade_type]
-    async fn handle(self, _ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/h2c_upgrade_type")]
 struct H2cUpgradeType;
 impl ServerHook for H2cUpgradeType {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(h2c_upgrade_type, response_body("h2c_upgrade_type"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/tls_upgrade_type")]
 struct Tls;
 impl ServerHook for Tls {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(tls_upgrade_type, response_body("tls_upgrade_type"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/unknown_upgrade_type")]
 struct UnknownUpgradeType;
 impl ServerHook for UnknownUpgradeType {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(unknown_upgrade_type, response_body("unknown_upgrade_type"))]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/ws1")]
 struct Websocket1;
 impl ServerHook for Websocket1 {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[ws_upgrade_type]
-    #[ws_from_stream]
-    async fn handle(self, ctx: &mut Context) {
-        let body: &RequestBody = ctx.get_request().get_body();
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await;
+    #[try_get_websocket_request(body)]
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        stream.send_list(body_list).await;
     }
 }
 #[route("/ws2")]
 struct Websocket2;
 impl ServerHook for Websocket2 {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[ws_upgrade_type]
-    #[ws_from_stream(request)]
-    async fn handle(self, ctx: &mut Context) {
-        let body: &RequestBody = request.get_body();
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await;
+    #[try_get_websocket_request(request)]
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&request);
+        stream.send_list(body_list).await;
     }
 }
 #[route("/ws3")]
 struct Websocket3;
 impl ServerHook for Websocket3 {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[ws_upgrade_type]
-    #[ws_from_stream(request)]
-    async fn handle(self, ctx: &mut Context) {
-        let body: &RequestBody = request.get_body();
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await;
+    #[try_get_websocket_request(request)]
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&request);
+        stream.send_list(body_list).await;
     }
 }
 #[route("/ws4")]
 struct Websocket4;
 impl ServerHook for Websocket4 {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[ws_upgrade_type]
-    #[ws_from_stream(request)]
-    async fn handle(self, ctx: &mut Context) {
-        let body: &RequestBody = request.get_body();
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await;
+    #[try_get_websocket_request(request)]
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&request);
+        stream.send_list(body_list).await;
     }
 }
 #[route("/ws5")]
 struct Websocket5;
 impl ServerHook for Websocket5 {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[ws_upgrade_type]
-    #[ws_from_stream]
-    async fn handle(self, ctx: &mut Context) {
-        let body: &RequestBody = ctx.get_request().get_body();
-        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-        ctx.send_body_list_with_data(&body_list).await;
+    #[try_get_websocket_request(body)]
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let body_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&body);
+        stream.send_list(body_list).await;
     }
 }
 #[route("/hook")]
 struct Hook;
 impl ServerHook for Hook {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_hooks(prologue_hooks_fn)]
     #[epilogue_hooks(epilogue_hooks_fn)]
     #[response_body("Testing hook macro")]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/attributes")]
 struct Attributes;
 impl ServerHook for Attributes {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("request attributes: {request_attributes:?}"))]
     #[attributes(request_attributes)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/route_params/:test")]
 struct RouteParams;
 impl ServerHook for RouteParams {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("request route params: {request_route_params:?}"))]
     #[route_params(request_route_params)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/route_param_option/:test")]
 struct RouteParamOption;
 impl ServerHook for RouteParamOption {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("route param: {request_route_param_option1:?} {request_route_param_option2:?} {request_route_param_option3:?}"))]
     #[route_param_option("test1" => request_route_param_option1)]
     #[route_param_option("test2" => request_route_param_option2, "test3" => request_route_param_option3)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/route_param/:test")]
 struct RouteParam;
 impl ServerHook for RouteParam {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("route param: {request_route_param1} {request_route_param2} {request_route_param3}"))]
     #[route_param("test1" => request_route_param1)]
     #[route_param("test2" => request_route_param2, "test3" => request_route_param3)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/host")]
 struct Host;
 impl ServerHook for Host {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[host("localhost")]
-    #[epilogue_macros(
-        response_body("host string literal: localhost"),
-        send,
-        http_from_stream
-    )]
+    #[epilogue_macros(response_body("host string literal: localhost"), send)]
     #[prologue_macros(response_body("host string literal: localhost"), send)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_query_option")]
 struct RequestQueryOption;
 impl ServerHook for RequestQueryOption {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(
         request_query_option("test" => request_query_option),
         response_body(&format!("request query: {request_query_option:?}")),
-        send,
-        http_from_stream
+        send
     )]
     #[prologue_macros(
         request_query_option("test" => request_query_option),
         response_body(&format!("request query: {request_query_option:?}")),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_query")]
 struct RequestQuery;
 impl ServerHook for RequestQuery {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(
         request_query("test" => request_query),
         response_body(&format!("request query: {request_query}")),
-        send,
-        http_from_stream
+        send
     )]
     #[prologue_macros(
         request_query("test" => request_query),
         response_body(&format!("request query: {request_query}")),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_header_option")]
 struct RequestHeaderOption;
 impl ServerHook for RequestHeaderOption {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(
         request_header_option(HOST => request_header_option),
         response_body(&format!("request header: {request_header_option:?}")),
-        send,
-        http_from_stream(_request)
+        send
     )]
     #[prologue_macros(
         request_header_option(HOST => request_header_option),
         response_body(&format!("request header: {request_header_option:?}")),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_header")]
 struct RequestHeader;
 impl ServerHook for RequestHeader {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(
         request_header(HOST => request_header),
         response_body(&format!("request header: {request_header}")),
-        send,
-        http_from_stream(_request)
+        send
     )]
     #[prologue_macros(
         request_header(HOST => request_header),
         response_body(&format!("request header: {request_header}")),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_querys")]
 struct RequestQuerys;
 impl ServerHook for RequestQuerys {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(
         request_querys(request_querys),
         response_body(&format!("request querys: {request_querys:?}")),
-        send,
-        http_from_stream(_request)
+        send
     )]
     #[prologue_macros(
         request_querys(request_querys),
         response_body(&format!("request querys: {request_querys:?}")),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_headers")]
 struct RequestHeaders;
 impl ServerHook for RequestHeaders {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[epilogue_macros(
         request_headers(request_headers),
         response_body(&format!("request headers: {request_headers:?}")),
-        send,
-        http_from_stream(_request)
+        send
     )]
     #[prologue_macros(
         request_headers(request_headers),
         response_body(&format!("request headers: {request_headers:?}")),
         send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_body")]
 struct RequestBodyRoute;
 impl ServerHook for RequestBodyRoute {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("raw body: {raw_body:?}"))]
     #[request_body(raw_body)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/reject_host")]
 struct RejectHost;
 impl ServerHook for RejectHost {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
         reject_host("filter.localhost"),
         response_body("host filter string literal")
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/attribute_option")]
 struct AttributeOption;
 impl ServerHook for AttributeOption {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("request attribute: {request_attribute_option:?}"))]
     #[attribute_option(TEST_ATTRIBUTE_KEY => request_attribute_option: TestData)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/attribute")]
 struct Attribute;
 impl ServerHook for Attribute {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("request attribute: {request_attribute:?}"))]
     #[attribute(TEST_ATTRIBUTE_KEY => request_attribute: TestData)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_body_json_result")]
 struct RequestBodyJsonResult;
 impl ServerHook for RequestBodyJsonResult {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("request data: {request_data_result:?}"))]
     #[request_body_json_result(request_data_result: TestData)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_body_json")]
 struct RequestBodyJson;
 impl ServerHook for RequestBodyJson {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("request data: {request_data_result:?}"))]
     #[request_body_json(request_data_result: TestData)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/referer")]
 struct Referer;
 impl ServerHook for Referer {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
         referer("http://localhost"),
         response_body("referer string literal: http://localhost")
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/reject_referer")]
 struct RejectReferer;
 impl ServerHook for RejectReferer {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
         reject_referer("http://localhost"),
         response_body("referer filter string literal")
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/cookies")]
 struct Cookies;
 impl ServerHook for Cookies {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("All cookies: {cookie_value:?}"))]
     #[request_cookies(cookie_value)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_cookie_option")]
 struct CookieOption;
 impl ServerHook for CookieOption {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("Session cookie: {session_cookie1_option:?}, {session_cookie2_option:?}"))]
     #[request_cookie_option("test1" => session_cookie1_option, "test2" => session_cookie2_option)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_cookie")]
 struct Cookie;
 impl ServerHook for Cookie {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("Session cookie: {session_cookie1}, {session_cookie2}"))]
     #[request_cookie("test1" => session_cookie1, "test2" => session_cookie2)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_version")]
 struct RequestVersionTest;
 impl ServerHook for RequestVersionTest {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("HTTP Version: {http_version}"))]
     #[request_version(http_version)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/request_path")]
 struct RequestPathTest;
 impl ServerHook for RequestPathTest {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body(&format!("Request Path: {request_path}"))]
     #[request_path(request_path)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/response_header")]
 struct ResponseHeaderTest;
 impl ServerHook for ResponseHeaderTest {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_body("Testing header set and replace operations")]
     #[response_header("X-Add-Header", "add-value")]
     #[response_header("X-Set-Header" => "set-value")]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/literals")]
 struct Literals;
 impl ServerHook for Literals {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_status_code(201)]
     #[response_header(CONTENT_TYPE => APPLICATION_JSON)]
     #[response_body("{\"message\": \"Resource created\"}")]
     #[response_reason_phrase(HttpStatus::Created.to_string())]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/inject/response_body")]
 struct InjectResponseBody;
 impl ServerHook for InjectResponseBody {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &mut Context) {
-        self.response_body_with_ref_self(ctx).await;
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        self.response_body_with_ref_self(stream, ctx).await
     }
 }
 impl InjectResponseBody {
     #[response_body("response body with ref self")]
-    async fn response_body_with_ref_self(&self, ctx: &mut Context) {}
+    async fn response_body_with_ref_self(&self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/inject/post_method")]
 struct InjectPostMethod;
 impl ServerHook for InjectPostMethod {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &mut Context) {
-        self.post_method_with_ref_self(ctx).await;
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        self.post_method_with_ref_self(stream, ctx).await
     }
 }
 impl InjectPostMethod {
     #[prologue_macros(post_method, response_body("post method with ref self"))]
-    async fn post_method_with_ref_self(&self, ctx: &mut Context) {}
+    async fn post_method_with_ref_self(&self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/inject/send_flush")]
 struct InjectSendFlush;
 impl ServerHook for InjectSendFlush {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &mut Context) {
-        self.send_and_flush_with_ref_self(ctx).await;
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        self.send_and_flush_with_ref_self(stream, ctx).await
     }
 }
 impl InjectSendFlush {
     #[epilogue_macros(try_send, flush)]
-    async fn send_and_flush_with_ref_self(&self, ctx: &mut Context) {}
+    async fn send_and_flush_with_ref_self(&self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/inject/request_body")]
 struct InjectRequestBody;
 impl ServerHook for InjectRequestBody {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &mut Context) {
-        self.extract_request_body_with_ref_self(ctx).await;
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        self.extract_request_body_with_ref_self(stream, ctx).await
     }
 }
 impl InjectRequestBody {
     #[request_body(_raw_body)]
-    async fn extract_request_body_with_ref_self(&self, _ctx: &mut Context) {}
+    async fn extract_request_body_with_ref_self(&self, _: &mut Stream, _: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/inject/multiple_methods")]
 struct InjectMultipleMethods;
 impl ServerHook for InjectMultipleMethods {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &mut Context) {
-        self.multiple_methods_with_ref_self(ctx).await;
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        self.multiple_methods_with_ref_self(stream, ctx).await
     }
 }
 impl InjectMultipleMethods {
     #[methods(get, post)]
-    async fn multiple_methods_with_ref_self(&self, ctx: &mut Context) {}
+    async fn multiple_methods_with_ref_self(&self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
     #[unknown_method]
-    async fn unknown_method_with_ref_self(&self, ctx: &mut Context) {}
+    async fn unknown_method_with_ref_self(&self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
-#[route("/inject/http_stream")]
+#[route("/inject/http_")]
 struct InjectHttpStream;
 impl ServerHook for InjectHttpStream {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &mut Context) {
-        self.http_stream_handler_with_ref_self(ctx).await;
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        self.http_handler_with_ref_self(stream, ctx).await
     }
 }
 impl InjectHttpStream {
-    #[http_from_stream(_request)]
-    async fn http_stream_handler_with_ref_self(&self, _ctx: &mut Context) {}
+    #[try_get_http_request(_request)]
+    async fn http_handler_with_ref_self(&self, stream: &mut Stream, _: &mut Context) -> Status {}
 }
-#[route("/inject/ws_stream")]
+#[route("/inject/ws_")]
 struct InjectWsStream;
 impl ServerHook for InjectWsStream {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &mut Context) {
-        self.websocket_stream_handler_with_ref_self(ctx).await;
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        self.websocket_handler_with_ref_self(stream, ctx).await
     }
 }
 impl InjectWsStream {
-    #[ws_from_stream(_request)]
-    async fn websocket_stream_handler_with_ref_self(&self, _ctx: &mut Context) {}
+    #[try_get_websocket_request(_request)]
+    async fn websocket_handler_with_ref_self(
+        &self,
+        stream: &mut Stream,
+        _: &mut Context,
+    ) -> Status {
+    }
 }
 #[route("/inject/complex_post")]
 struct InjectComplexPost;
 impl ServerHook for InjectComplexPost {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
-    async fn handle(self, ctx: &mut Context) {
-        self.complex_post_handler_with_ref_self(ctx).await;
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        self.complex_post_handler_with_ref_self(stream, ctx).await
     }
 }
 impl InjectComplexPost {
@@ -3953,18 +4148,33 @@ impl InjectComplexPost {
         response_body(&format!("Received: {raw_body:?}"))
     )]
     #[epilogue_macros(try_send, flush)]
-    async fn complex_post_handler_with_ref_self(&self, ctx: &mut Context) {}
+    async fn complex_post_handler_with_ref_self(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+    ) -> Status {
+        Status::Continue
+    }
 }
 impl InjectComplexPost {
     #[post_method]
-    async fn test_with_bool_param(_a: bool, ctx: &mut Context) {}
+    async fn test_with_bool_param(_a: bool, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
     #[get_method]
-    async fn test_with_multiple_params(_a: bool, ctx: &mut Context, _b: i32) {}
+    async fn test_with_multiple_params(
+        _a: bool,
+        _: &mut Stream,
+        ctx: &mut Context,
+        _b: i32,
+    ) -> Status {
+        Status::Continue
+    }
 }
 #[route("/test/send")]
 struct TestSend;
 impl ServerHook for TestSend {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -3974,41 +4184,14 @@ impl ServerHook for TestSend {
         response_body("Test send operation")
     )]
     #[epilogue_macros(send)]
-    async fn handle(self, ctx: &mut Context) {}
-}
-#[route("/test/send_body")]
-struct TestSendBody;
-impl ServerHook for TestSendBody {
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
     }
-    #[prologue_macros(
-        get_method,
-        response_status_code(200),
-        response_header(CONTENT_TYPE => TEXT_PLAIN),
-        response_body("Test send body operation")
-    )]
-    #[epilogue_macros(send_body)]
-    async fn handle(self, ctx: &mut Context) {}
-}
-#[route("/test/send_body_with_data")]
-struct TestSendBodyWithData;
-impl ServerHook for TestSendBodyWithData {
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        get_method,
-        response_status_code(200),
-        response_header(CONTENT_TYPE => TEXT_PLAIN)
-    )]
-    #[epilogue_macros(send_body_with_data("Custom data from send_body_with_data"))]
-    async fn handle(self, ctx: &mut Context) {}
 }
 #[route("/test/try_send")]
 struct TestTrySend;
 impl ServerHook for TestTrySend {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -4018,41 +4201,14 @@ impl ServerHook for TestTrySend {
         response_body("Test try send operation")
     )]
     #[epilogue_macros(try_send)]
-    async fn handle(self, ctx: &mut Context) {}
-}
-#[route("/test/try_send_body")]
-struct TestTrySendBody;
-impl ServerHook for TestTrySendBody {
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
     }
-    #[prologue_macros(
-        get_method,
-        response_status_code(200),
-        response_header(CONTENT_TYPE => TEXT_PLAIN),
-        response_body("Test try send body operation")
-    )]
-    #[epilogue_macros(try_send_body)]
-    async fn handle(self, ctx: &mut Context) {}
-}
-#[route("/test/try_send_body_with_data")]
-struct TestTrySendBodyWithData;
-impl ServerHook for TestTrySendBodyWithData {
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
-    }
-    #[prologue_macros(
-        get_method,
-        response_status_code(200),
-        response_header(CONTENT_TYPE => TEXT_PLAIN)
-    )]
-    #[epilogue_macros(try_send_body_with_data("Custom data from try_send_body_with_data"))]
-    async fn handle(self, ctx: &mut Context) {}
 }
 #[route("/test/try_flush")]
 struct TestTryFlush;
 impl ServerHook for TestTryFlush {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -4062,27 +4218,14 @@ impl ServerHook for TestTryFlush {
         response_body("Test try flush operation")
     )]
     #[epilogue_macros(try_flush)]
-    async fn handle(self, ctx: &mut Context) {}
-}
-#[route("/test/aborted")]
-struct TestAborted;
-impl ServerHook for TestAborted {
-    async fn new(_ctx: &mut Context) -> Self {
-        Self
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
     }
-    #[prologue_macros(
-        get_method,
-        response_status_code(200),
-        response_header(CONTENT_TYPE => TEXT_PLAIN),
-        response_body("Test aborted operation")
-    )]
-    #[epilogue_macros(aborted)]
-    async fn handle(self, ctx: &mut Context) {}
 }
 #[route("/test/closed")]
 struct TestClosed;
 impl ServerHook for TestClosed {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -4092,12 +4235,14 @@ impl ServerHook for TestClosed {
         response_body("Test closed operation")
     )]
     #[epilogue_macros(closed)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/test/flush")]
 struct TestFlush;
 impl ServerHook for TestFlush {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -4107,30 +4252,46 @@ impl ServerHook for TestFlush {
         response_body("Test flush operation")
     )]
     #[epilogue_macros(flush)]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[response_body("standalone response body")]
-async fn standalone_response_body_handler(ctx: &mut Context) {}
+async fn standalone_response_body_handler(_: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[prologue_macros(get_method, response_body("standalone get handler"))]
-async fn standalone_get_handler(ctx: &mut Context) {}
+async fn standalone_get_handler(_: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[epilogue_macros(try_send, flush)]
-async fn standalone_send_and_flush_handler(ctx: &mut Context) {}
+async fn standalone_send_and_flush_handler(stream: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_body(_raw_body)]
-async fn standalone_request_body_extractor(ctx: &mut Context) {}
+async fn standalone_request_body_extractor(_: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[methods(get, post)]
-async fn standalone_multiple_methods_handler(ctx: &mut Context) {}
-#[http_from_stream]
-async fn standalone_http_stream_handler(ctx: &mut Context) {}
-#[ws_from_stream]
-async fn standalone_websocket_stream_handler(ctx: &mut Context) {}
-#[aborted]
-async fn standalone_aborted_handler(ctx: &mut Context) {}
+async fn standalone_multiple_methods_handler(_: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
+#[try_get_http_request]
+async fn standalone_http_handler(stream: &mut Stream, _: &mut Context) -> Status {}
+#[try_get_websocket_request]
+async fn standalone_websocket_handler(stream: &mut Stream, _: &mut Context) -> Status {}
 #[closed]
-async fn standalone_closed_handler(ctx: &mut Context) {}
+async fn standalone_closed_handler(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[flush]
-async fn standalone_flush_handler(ctx: &mut Context) {}
+async fn standalone_flush_handler(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[try_flush]
-async fn standalone_try_flush_handler(ctx: &mut Context) {}
+async fn standalone_try_flush_handler(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[prologue_macros(
     get_method,
     http_version,
@@ -4139,10 +4300,13 @@ async fn standalone_try_flush_handler(ctx: &mut Context) {}
     response_body("standalone complex handler")
 )]
 #[epilogue_macros(try_send, flush)]
-async fn standalone_complex_get_handler(ctx: &mut Context) {}
+async fn standalone_complex_get_handler(stream: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_body(body1, body2, body3)]
-async fn test_multi_request_body(ctx: &mut Context) {
+async fn test_multi_request_body(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("body1: {:?}, body2: {:?}, body3: {:?}", body1, body2, body3);
+    Status::Continue
 }
 #[route("/test_multi_request_body_json")]
 #[derive(Debug, serde::Deserialize)]
@@ -4150,7 +4314,7 @@ struct User {
     name: String,
 }
 impl ServerHook for User {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self {
             name: String::from("test"),
         }
@@ -4164,201 +4328,351 @@ impl ServerHook for User {
         )),
         try_send
     )]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[attribute("key1" => attr1: String, "key2" => attr2: i32)]
-async fn test_multi_attribute(ctx: &mut Context) {
+async fn test_multi_attribute(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("attr1: {:?}, attr2: {:?}", attr1, attr2);
+    Status::Continue
 }
 #[attributes(attrs1, attrs2)]
-async fn test_multi_attributes(ctx: &mut Context) {
+async fn test_multi_attributes(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("attrs1: {:?}, attrs2: {:?}", attrs1, attrs2);
+    Status::Continue
 }
 #[route_params(params1, params2)]
-async fn test_multi_route_params(ctx: &mut Context) {
+async fn test_multi_route_params(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("params1: {:?}, params2: {:?}", params1, params2);
+    Status::Continue
 }
 #[request_querys(querys1, querys2)]
-async fn test_multi_request_querys(ctx: &mut Context) {
+async fn test_multi_request_querys(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("querys1: {:?}, querys2: {:?}", querys1, querys2);
+    Status::Continue
 }
 #[request_headers(headers1, headers2)]
-async fn test_multi_request_headers(ctx: &mut Context) {
+async fn test_multi_request_headers(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("headers1: {:?}, headers2: {:?}", headers1, headers2);
+    Status::Continue
 }
 #[request_cookies(cookies1, cookies2)]
-async fn test_multi_request_cookies(ctx: &mut Context) {
+async fn test_multi_request_cookies(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("cookies1: {:?}, cookies2: {:?}", cookies1, cookies2);
+    Status::Continue
 }
 #[request_version(version1, version2)]
-async fn test_multi_request_version(ctx: &mut Context) {
+async fn test_multi_request_version(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("version1: {:?}, version2: {:?}", version1, version2);
+    Status::Continue
 }
 #[request_path(path1, path2)]
-async fn test_multi_request_path(ctx: &mut Context) {
+async fn test_multi_request_path(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("path1: {:?}, path2: {:?}", path1, path2);
+    Status::Continue
 }
 #[host("localhost", "127.0.0.1")]
-async fn test_multi_host(ctx: &mut Context) {
+async fn test_multi_host(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("Host check passed");
+    Status::Continue
 }
 #[reject_host("localhost", "127.0.0.1")]
-async fn test_multi_reject_host(ctx: &mut Context) {
+async fn test_multi_reject_host(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("Reject host check passed");
+    Status::Continue
 }
 #[referer("http://localhost", "http://127.0.0.1")]
-async fn test_multi_referer(ctx: &mut Context) {
+async fn test_multi_referer(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("Referer check passed");
+    Status::Continue
 }
 #[reject_referer("http://localhost", "http://127.0.0.1")]
-async fn test_multi_reject_referer(ctx: &mut Context) {
+async fn test_multi_reject_referer(_: &mut Stream, ctx: &mut Context) -> Status {
     println!("Reject referer check passed");
+    Status::Continue
 }
 #[hyperlane(server1: Server, server2: Server)]
 async fn test_multi_hyperlane() {
     println!("server1 and server2 initialized");
 }
 #[response_status_code(200)]
-async fn standalone_response_status_code_handler(_ctx: &mut Context) {}
+async fn standalone_response_status_code_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[response_reason_phrase("Custom Reason")]
-async fn standalone_response_reason_phrase_handler(_ctx: &mut Context) {}
+async fn standalone_response_reason_phrase_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[response_header(CONTENT_TYPE => APPLICATION_JSON)]
-async fn standalone_response_header_handler(_ctx: &mut Context) {}
+async fn standalone_response_header_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[response_header("X-Custom-Header", "custom-value")]
-async fn standalone_response_header_with_comma_handler(_ctx: &mut Context) {}
+async fn standalone_response_header_with_comma_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[response_version(HttpVersion::Http1_1)]
-async fn standalone_response_version_handler(_ctx: &mut Context) {}
+async fn standalone_response_version_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[connect_method]
-async fn standalone_connect_handler(_ctx: &mut Context) {}
+async fn standalone_connect_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[delete_method]
-async fn standalone_delete_handler(_ctx: &mut Context) {}
+async fn standalone_delete_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[head_method]
-async fn standalone_head_handler(_ctx: &mut Context) {}
+async fn standalone_head_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[options_method]
-async fn standalone_options_handler(_ctx: &mut Context) {}
+async fn standalone_options_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[patch_method]
-async fn standalone_patch_handler(_ctx: &mut Context) {}
+async fn standalone_patch_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[put_method]
-async fn standalone_put_handler(_ctx: &mut Context) {}
+async fn standalone_put_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[trace_method]
-async fn standalone_trace_handler(_ctx: &mut Context) {}
+async fn standalone_trace_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[get_method]
-async fn standalone_get_handler_with_param(_a: bool, ctx: &mut Context) {}
+async fn standalone_get_handler_with_param(_a: bool, _: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[unknown_method]
-async fn standalone_unknown_method_handler(_ctx: &mut Context) {}
+async fn standalone_unknown_method_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[methods(get, post, put)]
-async fn standalone_methods_multiple_handler(_ctx: &mut Context) {}
+async fn standalone_methods_multiple_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[http0_9_version]
-async fn standalone_http0_9_version_handler(_ctx: &mut Context) {}
+async fn standalone_http0_9_version_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[http1_0_version]
-async fn standalone_http1_0_version_handler(_ctx: &mut Context) {}
+async fn standalone_http1_0_version_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[http1_1_version]
-async fn standalone_http1_1_handler(_ctx: &mut Context) {}
+async fn standalone_http1_1_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[http2_version]
-async fn standalone_http2_version_handler(_ctx: &mut Context) {}
+async fn standalone_http2_version_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[http3_version]
-async fn standalone_http3_version_handler(_ctx: &mut Context) {}
+async fn standalone_http3_version_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[http1_1_or_higher_version]
-async fn standalone_http1_1_or_higher_version_handler(_ctx: &mut Context) {}
+async fn standalone_http1_1_or_higher_version_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[unknown_version]
-async fn standalone_unknown_version_handler(_ctx: &mut Context) {}
+async fn standalone_unknown_version_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[h2c_upgrade_type]
-async fn standalone_h2c_upgrade_type_handler(_ctx: &mut Context) {}
+async fn standalone_h2c_upgrade_type_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[tls_upgrade_type]
-async fn standalone_tls_upgrade_type_handler(_ctx: &mut Context) {}
+async fn standalone_tls_upgrade_type_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[ws_upgrade_type]
-async fn standalone_ws_handler(ctx: &mut Context) {}
+async fn standalone_ws_handler(_: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[unknown_upgrade_type]
-async fn standalone_unknown_upgrade_type_handler(_ctx: &mut Context) {}
-#[filter(_ctx.get_request().get_method().is_get())]
-async fn standalone_filter_handler(_ctx: &mut Context) {}
-#[reject(_ctx.get_request().get_method().is_post())]
-async fn standalone_reject_handler(_ctx: &mut Context) {}
+async fn standalone_unknown_upgrade_type_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
+#[filter(ctx.get_request().get_method().is_get())]
+async fn standalone_filter_handler(_: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
+#[reject(ctx.get_request().get_method().is_post())]
+async fn standalone_reject_handler(_: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[reject_host("example.com")]
-async fn standalone_reject_host_handler(_ctx: &mut Context) {}
+async fn standalone_reject_host_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[referer("https://example.com")]
-async fn standalone_referer_handler(_ctx: &mut Context) {}
+async fn standalone_referer_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[reject_referer("https://malicious.com")]
-async fn standalone_reject_referer_handler(_ctx: &mut Context) {}
+async fn standalone_reject_referer_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_query("param" => _value)]
-async fn standalone_request_query_handler(_ctx: &mut Context) {}
+async fn standalone_request_query_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_query_option("optional_param" => _optional_value)]
-async fn standalone_request_query_option_handler(_ctx: &mut Context) {}
+async fn standalone_request_query_option_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_header(HOST => _host_value)]
-async fn standalone_request_header_handler(_ctx: &mut Context) {}
+async fn standalone_request_header_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_header_option(USER_AGENT => _user_agent)]
-async fn standalone_request_header_option_handler(_ctx: &mut Context) {}
+async fn standalone_request_header_option_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_querys(_querys)]
-async fn standalone_request_querys_handler(_ctx: &mut Context) {}
+async fn standalone_request_querys_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_headers(_headers)]
-async fn standalone_request_headers_handler(_ctx: &mut Context) {}
+async fn standalone_request_headers_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_cookies(_cookies)]
-async fn standalone_request_cookies_handler(_ctx: &mut Context) {}
+async fn standalone_request_cookies_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_cookie("session" => _session_cookie)]
-async fn standalone_request_cookie_handler(_ctx: &mut Context) {}
+async fn standalone_request_cookie_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_cookie_option("optional_cookie" => _optional_cookie)]
-async fn standalone_request_cookie_option_handler(_ctx: &mut Context) {}
+async fn standalone_request_cookie_option_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_version(_version)]
-async fn standalone_request_version_handler(_ctx: &mut Context) {}
+async fn standalone_request_version_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_path(_path)]
-async fn standalone_request_path_handler(_ctx: &mut Context) {}
+async fn standalone_request_path_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[attribute("key" => _attr_value: String)]
-async fn standalone_attribute_handler(_ctx: &mut Context) {}
+async fn standalone_attribute_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[attribute_option("optional_key" => _optional_attr: String)]
-async fn standalone_attribute_option_handler(_ctx: &mut Context) {}
+async fn standalone_attribute_option_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[attributes(_attrs)]
-async fn standalone_attributes_handler(_ctx: &mut Context) {}
+async fn standalone_attributes_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[route_params(_params)]
-async fn standalone_route_params_handler(_ctx: &mut Context) {}
+async fn standalone_route_params_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[route_param("param" => _param_value)]
-async fn standalone_route_param_handler(_ctx: &mut Context) {}
+async fn standalone_route_param_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[route_param_option("optional_param" => _optional_param_value)]
-async fn standalone_route_param_option_handler(_ctx: &mut Context) {}
+async fn standalone_route_param_option_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_body_json(_user: TestData)]
-async fn standalone_request_body_json_handler(_ctx: &mut Context) {}
+async fn standalone_request_body_json_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[request_body_json_result(_user_result: TestData)]
-async fn standalone_request_body_json_result_handler(_ctx: &mut Context) {}
-#[http_from_stream]
-async fn standalone_http_from_stream_with_config_handler(_ctx: &mut Context) {}
-#[ws_from_stream]
-async fn standalone_ws_from_stream_with_config_handler(_ctx: &mut Context) {}
-#[http_from_stream(_request)]
-async fn standalone_http_from_stream_with_request_handler(_ctx: &mut Context) {}
-#[ws_from_stream(_request)]
-async fn standalone_ws_from_stream_with_request_handler(_ctx: &mut Context) {}
-#[http_from_stream(_request)]
-async fn standalone_http_from_stream_full_handler(_ctx: &mut Context) {}
-#[ws_from_stream(_request)]
-async fn standalone_ws_from_stream_full_handler(_ctx: &mut Context) {}
+async fn standalone_request_body_json_result_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
+#[try_get_http_request]
+async fn standalone_try_get_http_request_with_config_handler(
+    stream: &mut Stream,
+    _: &mut Context,
+) -> Status {
+}
+#[try_get_websocket_request]
+async fn standalone_try_get_websocket_request_with_config_handler(
+    stream: &mut Stream,
+    _: &mut Context,
+) -> Status {
+}
+#[try_get_http_request(_request)]
+async fn standalone_try_get_http_request_with_request_handler(
+    stream: &mut Stream,
+    _: &mut Context,
+) -> Status {
+}
+#[try_get_websocket_request(_request)]
+async fn standalone_try_get_websocket_request_with_request_handler(
+    stream: &mut Stream,
+    _: &mut Context,
+) -> Status {
+}
+#[try_get_http_request(_request)]
+async fn standalone_try_get_http_request_full_handler(
+    stream: &mut Stream,
+    _: &mut Context,
+) -> Status {
+}
+#[try_get_websocket_request(_request)]
+async fn standalone_try_get_websocket_request_full_handler(
+    stream: &mut Stream,
+    _: &mut Context,
+) -> Status {
+}
 #[send]
-async fn standalone_send_handler_2(_ctx: &mut Context) {}
-#[send_body]
-async fn standalone_send_body_handler_2(_ctx: &mut Context) {}
-#[send_body_with_data("Custom send body data")]
-async fn standalone_send_body_with_data_handler_2(_ctx: &mut Context) {}
+async fn standalone_send_handler_2(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
+#[send(ctx.get_mut_response().build())]
+async fn standalone_send_with_data_handler(stream: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[try_send]
-async fn standalone_try_send_handler_2(_ctx: &mut Context) {}
-#[try_send_body]
-async fn standalone_try_send_body_handler_2(_ctx: &mut Context) {}
-#[try_send_body_with_data("Custom try send body data")]
-async fn standalone_try_send_body_with_data_handler_2(_ctx: &mut Context) {}
+async fn standalone_try_send_handler_2(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
+#[try_send(ctx.get_mut_response().build())]
+async fn standalone_try_send_with_data_handler(stream: &mut Stream, ctx: &mut Context) -> Status {
+    Status::Continue
+}
 #[flush]
-async fn standalone_flush_handler_2(_ctx: &mut Context) {}
+async fn standalone_flush_handler_2(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[try_flush]
-async fn standalone_try_flush_handler_2(_ctx: &mut Context) {}
-#[aborted]
-async fn standalone_aborted_handler_2(_ctx: &mut Context) {}
+async fn standalone_try_flush_handler_2(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[closed]
-async fn standalone_closed_handler_2(_ctx: &mut Context) {}
+async fn standalone_closed_handler_2(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[clear_response_headers]
-async fn standalone_clear_response_headers_handler(_ctx: &mut Context) {}
+async fn standalone_clear_response_headers_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[prologue_macros(
     get_method,
     response_status_code(200),
     response_header(CONTENT_TYPE => TEXT_PLAIN),
     response_body("prologue macros test")
 )]
-async fn standalone_prologue_macros_complex_handler(_ctx: &mut Context) {}
+async fn standalone_prologue_macros_complex_handler(_: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[epilogue_macros(
     response_status_code(201),
     response_header(CONTENT_TYPE => APPLICATION_JSON),
@@ -4366,36 +4680,53 @@ async fn standalone_prologue_macros_complex_handler(_ctx: &mut Context) {}
     try_send,
     flush
 )]
-async fn standalone_epilogue_macros_complex_handler(_ctx: &mut Context) {}
+async fn standalone_epilogue_macros_complex_handler(
+    stream: &mut Stream,
+    _: &mut Context,
+) -> Status {
+    Status::Continue
+}
 #[prologue_hooks(prologue_hooks_fn)]
-async fn standalone_prologue_hooks_handler(_ctx: &mut Context) {}
+async fn standalone_prologue_hooks_handler(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[epilogue_hooks(epilogue_hooks_fn)]
-async fn standalone_epilogue_hooks_handler(_ctx: &mut Context) {}
+async fn standalone_epilogue_hooks_handler(stream: &mut Stream, _: &mut Context) -> Status {
+    Status::Continue
+}
 #[route("/hooks_expression")]
 struct HooksExpression;
 impl ServerHook for HooksExpression {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[get_method]
     #[prologue_hooks(HooksExpression::new_hook, HooksExpression::method_hook)]
     #[epilogue_hooks(HooksExpression::new_hook, HooksExpression::method_hook)]
     #[response_body("hooks expression test")]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 impl HooksExpression {
-    async fn new_hook(_ctx: &mut Context) {}
-    async fn method_hook(_ctx: &mut Context) {}
+    async fn new_hook(_: &mut Stream, _: &mut Context) -> Status {
+        Status::Continue
+    }
+    async fn method_hook(_: &mut Stream, _: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 #[route("/server_config")]
 struct MultiServerConfig;
 impl ServerHook for MultiServerConfig {
-    async fn new(_ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[get_method]
     #[response_body("multi server config test")]
-    async fn handle(self, ctx: &mut Context) {}
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        Status::Continue
+    }
 }
 impl MultiServerConfig {
     #[hyperlane(server_config: ServerConfig)]
@@ -13206,7 +13537,6 @@ async fn main() {
 use crate::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
-    #[set(pub(crate))]
     pub(super) request: Request,
     pub(super) response: Response,
     #[get_mut(skip)]
