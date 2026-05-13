@@ -1,4 +1,4 @@
-<!--2026-05-13 14:44:32-->
+<!--2026-05-13 20:01:31-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -9632,7 +9632,7 @@ pub struct UpgradeMiddleware;
 use super::*;
 impl ServerHook for HttpRequestMiddleware {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -9647,7 +9647,7 @@ impl ServerHook for HttpRequestMiddleware {
 }
 impl ServerHook for CrossMiddleware {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_version(HttpVersion::Http1_1)]
@@ -9655,13 +9655,13 @@ impl ServerHook for CrossMiddleware {
     #[response_header(ACCESS_CONTROL_ALLOW_METHODS => ALL_METHODS)]
     #[response_header(ACCESS_CONTROL_ALLOW_HEADERS => WILDCARD_ANY)]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, _ctx: &mut Context) -> Status {
+    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
         Status::Continue
     }
 }
 impl ServerHook for ResponseHeaderMiddleware {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_header(DATE => gmt())]
@@ -9670,25 +9670,25 @@ impl ServerHook for ResponseHeaderMiddleware {
     #[response_header(TRACE => uuid::Uuid::new_v4().to_string())]
     #[epilogue_macros(response_header(CONTENT_TYPE => content_type))]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, _ctx: &mut Context) -> Status {
+    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
         let content_type: String = ContentType::format_content_type_with_charset(TEXT_HTML, UTF8);
         Status::Continue
     }
 }
 impl ServerHook for ResponseStatusCodeMiddleware {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[response_status_code(200)]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, _ctx: &mut Context) -> Status {
+    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
         Status::Continue
     }
 }
 impl ServerHook for OptionMethodMiddleware {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -9696,17 +9696,17 @@ impl ServerHook for OptionMethodMiddleware {
         send
     )]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         Status::Reject
     }
 }
 impl ServerHook for UpgradeMiddleware {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
-        ws_upgrade_type,
+        is_ws_upgrade_type,
         response_version(HttpVersion::Http1_1),
         response_status_code(101),
         response_body(&vec![]),
@@ -9716,7 +9716,7 @@ impl ServerHook for UpgradeMiddleware {
         send
     )]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         Status::Continue
     }
 }
@@ -9743,7 +9743,7 @@ pub struct LogMiddleware;
 use super::*;
 impl ServerHook for SendMiddleware {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
@@ -9751,17 +9751,17 @@ impl ServerHook for SendMiddleware {
         try_send
     )]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         Status::Continue
     }
 }
 impl ServerHook for LogMiddleware {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
         let request_json: String = get_request_json(ctx).await;
         let response_json: String = get_response_json(ctx).await;
         info!("{request_json}");
@@ -9794,16 +9794,16 @@ pub struct FaviconRoute;
 use super::*;
 impl ServerHook for FaviconRoute {
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
     }
     #[prologue_macros(
-        get_method,
+        is_get_method,
         response_status_code(302),
         response_header(LOCATION => LOGO_IMG_URL)
     )]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, _ctx: &mut Context) -> Status {
+    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
         Status::Continue
     }
 }
@@ -9855,7 +9855,7 @@ impl ServerHook for TaskPanicHook {
     )]
     #[epilogue_macros(response_body(&response_body), try_send)]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         debug!("TaskPanicHook request => {}", ctx.get_request());
         error!("TaskPanicHook => {}", self.get_response_body());
         let api_response: ApiResponse<&str> = ApiResponse::new(
@@ -9869,7 +9869,7 @@ impl ServerHook for TaskPanicHook {
 impl ServerHook for RequestErrorHook {
     #[request_error_data(request_error_data)]
     #[instrument_trace]
-    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+    async fn new(_stream: &mut Stream, ctx: &mut Context) -> Self {
         Self {
             response_status_code: request_error_data.get_http_status_code(),
             content_type: ContentType::format_content_type_with_charset(APPLICATION_JSON, UTF8),
@@ -9886,7 +9886,7 @@ impl ServerHook for RequestErrorHook {
     )]
     #[epilogue_macros(response_body(&response_body), try_send)]
     #[instrument_trace]
-    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
         if self.get_response_status_code() == HttpStatus::BadRequest.code() {
             debug!("Context aborted");
             return Status::Reject;
