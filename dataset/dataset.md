@@ -1,4 +1,4 @@
-<!--2026-05-24 13:44:48-->
+<!--2026-05-24 19:23:24-->
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
@@ -12721,8 +12721,6 @@ mod r#const;
 mod r#enum;
 mod r#impl;
 mod r#struct;
-#[cfg(test)]
-mod test;
 mod r#trait;
 pub use {r#enum::*, r#struct::*};
 use {r#const::*, r#trait::*};
@@ -12734,10 +12732,6 @@ use std::{
         NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
     },
 };
-#[cfg(test)]
-use std::{sync::OnceLock, time::Duration};
-#[cfg(test)]
-use tokio::{spawn, time::sleep};
 use {
     hyperlane::{
         tokio::sync::broadcast::{Receiver, error::SendError},
@@ -12769,17 +12763,30 @@ pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
     pub(super) closed_hook: ServerHookHandler,
 }
 ```
-# Path: hyperlane-plugin-websocket/src/test.rs
+# Path: hyperlane-plugin-websocket/src/enum.rs
 ```rust
 use crate::*;
-static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
-fn get_broadcast_map() -> &'static WebSocket {
-    BROADCAST_MAP.get_or_init(WebSocket::new)
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum BroadcastType<T: BroadcastTypeTrait> {
+    PointToPoint(T, T),
+    PointToGroup(T),
+    Unknown,
 }
-struct TaskPanicHook {
-    response_body: String,
-    content_type: String,
-}
+```
+# Path: hyperlane-plugin-websocket/tests/mod.rs
+```rust
+mod websocket;
+use {hyperlane_plugin_websocket::*, websocket::*};
+use std::sync::OnceLock;
+use {
+    hyperlane::*,
+    hyperlane_broadcast::*,
+    tokio::{spawn, time::sleep},
+};
+```
+# Path: hyperlane-plugin-websocket/tests/websocket/impl.rs
+```rust
+use crate::*;
 impl ServerHook for TaskPanicHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
@@ -12807,10 +12814,6 @@ impl ServerHook for TaskPanicHook {
         Status::Continue
     }
 }
-struct RequestErrorHook {
-    response_status_code: ResponseStatusCode,
-    response_body: String,
-}
 impl ServerHook for RequestErrorHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
@@ -12833,9 +12836,6 @@ impl ServerHook for RequestErrorHook {
         Status::Continue
     }
 }
-struct RequestMiddleware {
-    socket_addr: String,
-}
 impl ServerHook for RequestMiddleware {
     async fn new(stream: &mut Stream, _: &mut Context) -> Self {
         let socket_addr: String = stream
@@ -12857,7 +12857,6 @@ impl ServerHook for RequestMiddleware {
         Status::Continue
     }
 }
-struct UpgradeHook;
 impl ServerHook for UpgradeHook {
     async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
@@ -12885,24 +12884,20 @@ impl ServerHook for UpgradeHook {
         Status::Continue
     }
 }
-struct ConnectedHook {
-    receiver_count: ReceiverCount,
-    data: String,
-    group_broadcast_type: BroadcastType<String>,
-    private_broadcast_type: BroadcastType<String>,
-}
 impl ServerHook for ConnectedHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let group_name: String = ctx.try_get_route_param("group_name").unwrap_or_default();
         let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let group_receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count(group_broadcast_type.clone());
+        let group_receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count(group_broadcast_type.clone());
         let my_name: String = ctx.try_get_route_param("my_name").unwrap_or_default();
         let your_name: String = ctx.try_get_route_param("your_name").unwrap_or_default();
         let private_broadcast_type: BroadcastType<String> =
             BroadcastType::PointToPoint(my_name, your_name);
-        let private_receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count(private_broadcast_type.clone());
+        let private_receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count(private_broadcast_type.clone());
         let receiver_count: usize = if group_receiver_count > 0 {
             group_receiver_count
         } else {
@@ -12917,13 +12912,15 @@ impl ServerHook for ConnectedHook {
         }
     }
     async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
-        get_broadcast_map()
+        BROADCAST_MAP
+            .get_or_init(WebSocket::new)
             .try_send(self.group_broadcast_type, self.data.clone())
             .unwrap_or_else(|err| {
                 println!("[connected_hook] send group error => {:?}", err.to_string());
                 None
             });
-        get_broadcast_map()
+        BROADCAST_MAP
+            .get_or_init(WebSocket::new)
             .try_send(self.private_broadcast_type, self.data)
             .unwrap_or_else(|err| {
                 println!(
@@ -12940,9 +12937,6 @@ impl ServerHook for ConnectedHook {
         Status::Continue
     }
 }
-struct SendedHook {
-    msg: String,
-}
 impl ServerHook for SendedHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let msg: String = ctx.get_response().get_body_string();
@@ -12954,18 +12948,18 @@ impl ServerHook for SendedHook {
         Status::Continue
     }
 }
-struct GroupChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
-}
 impl ServerHook for GroupChatRequestHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let group_name: String = ctx.try_get_route_param("group_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count(key.clone());
         let mut body: RequestBody = ctx.get_request().get_body().clone();
         if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            receiver_count = BROADCAST_MAP
+                .get_or_init(WebSocket::new)
+                .receiver_count_after_closed(key);
             body = format!("receiver_count => {receiver_count:?}").into();
         }
         Self {
@@ -12980,16 +12974,13 @@ impl ServerHook for GroupChatRequestHook {
         Status::Continue
     }
 }
-struct GroupClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
 impl ServerHook for GroupClosedHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let group_name: String = ctx.try_get_route_param("group_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount =
-            get_broadcast_map().receiver_count_after_closed(key.clone());
+        let receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count_after_closed(key.clone());
         let body: String = format!("receiver_count => {receiver_count:?}");
         Self {
             body,
@@ -13003,7 +12994,6 @@ impl ServerHook for GroupClosedHook {
         Status::Continue
     }
 }
-struct GroupChat;
 impl ServerHook for GroupChat {
     async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
@@ -13018,23 +13008,23 @@ impl ServerHook for GroupChat {
             .set_request_hook::<GroupChatRequestHook>()
             .set_sended_hook::<SendedHook>()
             .set_closed_hook::<GroupClosedHook>();
-        get_broadcast_map().run(config).await;
+        BROADCAST_MAP.get_or_init(WebSocket::new).run(config).await;
         Status::Continue
     }
-}
-struct PrivateChatRequestHook {
-    body: RequestBody,
-    receiver_count: ReceiverCount,
 }
 impl ServerHook for PrivateChatRequestHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let my_name: String = ctx.try_get_route_param("my_name").unwrap();
         let your_name: String = ctx.try_get_route_param("your_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let mut receiver_count: ReceiverCount = get_broadcast_map().receiver_count(key.clone());
+        let mut receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count(key.clone());
         let mut body: RequestBody = ctx.get_request().get_body().clone();
         if body.is_empty() {
-            receiver_count = get_broadcast_map().receiver_count_after_closed(key);
+            receiver_count = BROADCAST_MAP
+                .get_or_init(WebSocket::new)
+                .receiver_count_after_closed(key);
             body = format!("receiver_count => {receiver_count:?}").into();
         }
         Self {
@@ -13049,16 +13039,14 @@ impl ServerHook for PrivateChatRequestHook {
         Status::Continue
     }
 }
-struct PrivateClosedHook {
-    body: String,
-    receiver_count: ReceiverCount,
-}
 impl ServerHook for PrivateClosedHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let my_name: String = ctx.try_get_route_param("my_name").unwrap();
         let your_name: String = ctx.try_get_route_param("your_name").unwrap();
         let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let receiver_count: ReceiverCount = get_broadcast_map().receiver_count_after_closed(key);
+        let receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count_after_closed(key);
         let body: String = format!("receiver_count => {receiver_count:?}");
         Self {
             body,
@@ -13075,7 +13063,6 @@ impl ServerHook for PrivateClosedHook {
         Status::Continue
     }
 }
-struct PrivateChat;
 impl ServerHook for PrivateChat {
     async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
@@ -13091,10 +13078,70 @@ impl ServerHook for PrivateChat {
             .set_request_hook::<PrivateChatRequestHook>()
             .set_sended_hook::<SendedHook>()
             .set_closed_hook::<PrivateClosedHook>();
-        get_broadcast_map().run(config).await;
+        BROADCAST_MAP.get_or_init(WebSocket::new).run(config).await;
         Status::Continue
     }
 }
+```
+# Path: hyperlane-plugin-websocket/tests/websocket/static.rs
+```rust
+use crate::*;
+pub(crate) static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
+```
+# Path: hyperlane-plugin-websocket/tests/websocket/struct.rs
+```rust
+use crate::*;
+pub(crate) struct TaskPanicHook {
+    pub(crate) response_body: String,
+    pub(crate) content_type: String,
+}
+pub(crate) struct RequestErrorHook {
+    pub(crate) response_status_code: ResponseStatusCode,
+    pub(crate) response_body: String,
+}
+pub(crate) struct RequestMiddleware {
+    pub(crate) socket_addr: String,
+}
+pub(crate) struct UpgradeHook;
+pub(crate) struct ConnectedHook {
+    pub(crate) receiver_count: ReceiverCount,
+    pub(crate) data: String,
+    pub(crate) group_broadcast_type: BroadcastType<String>,
+    pub(crate) private_broadcast_type: BroadcastType<String>,
+}
+pub(crate) struct SendedHook {
+    pub(crate) msg: String,
+}
+pub(crate) struct GroupChatRequestHook {
+    pub(crate) body: RequestBody,
+    pub(crate) receiver_count: ReceiverCount,
+}
+pub(crate) struct GroupClosedHook {
+    pub(crate) body: String,
+    pub(crate) receiver_count: ReceiverCount,
+}
+pub(crate) struct GroupChat;
+pub(crate) struct PrivateChatRequestHook {
+    pub(crate) body: RequestBody,
+    pub(crate) receiver_count: ReceiverCount,
+}
+pub(crate) struct PrivateClosedHook {
+    pub(crate) body: String,
+    pub(crate) receiver_count: ReceiverCount,
+}
+pub(crate) struct PrivateChat;
+```
+# Path: hyperlane-plugin-websocket/tests/websocket/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub(crate) use {r#static::*, r#struct::*};
+```
+# Path: hyperlane-plugin-websocket/tests/websocket/fn.rs
+```rust
+use crate::*;
 #[tokio::test]
 async fn main() {
     let mut server: Server = Server::default();
@@ -13109,20 +13156,10 @@ async fn main() {
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     spawn(async move {
-        sleep(Duration::from_secs(60)).await;
+        sleep(std::time::Duration::from_secs(60)).await;
         server_control_hook_2.shutdown().await;
     });
     server_control_hook_1.wait().await;
-}
-```
-# Path: hyperlane-plugin-websocket/src/enum.rs
-```rust
-use crate::*;
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum BroadcastType<T: BroadcastTypeTrait> {
-    PointToPoint(T, T),
-    PointToGroup(T),
-    Unknown,
 }
 ```
 # Path: hyperlane/README.md
@@ -13161,13 +13198,6 @@ use std::{
     pin::Pin,
     sync::Arc,
 };
-#[cfg(test)]
-use std::{
-    sync::OnceLock,
-    time::{Duration, Instant},
-};
-#[cfg(test)]
-use tokio::time::sleep;
 use {
     inventory::collect,
     lombok_macros::*,
@@ -13569,7 +13599,7 @@ impl Context {
         self
     }
     #[inline(always)]
-    pub(crate) fn set_task_panic(&mut self, panic_data: PanicData) -> &mut Self {
+    pub fn set_task_panic(&mut self, panic_data: PanicData) -> &mut Self {
         self.set_internal_attribute(InternalAttribute::TaskPanicData, panic_data)
     }
     #[inline(always)]
@@ -13599,130 +13629,25 @@ impl Context {
 use crate::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
+    #[get(pub)]
+    #[set(pub)]
     pub(super) request: Request,
+    #[get(pub)]
+    #[get_mut(pub)]
+    #[set(pub)]
     pub(super) response: Response,
     #[get_mut(skip)]
-    #[set(pub(crate))]
+    #[set(pub)]
     pub(super) route_params: RouteParams,
-    #[get_mut(pub(super))]
-    #[set(pub(crate))]
+    #[get_mut(pub)]
+    #[set(pub)]
     pub(super) attributes: ThreadSafeAttributeStore,
-}
-```
-# Path: hyperlane/src/context/test.rs
-```rust
-use crate::*;
-#[test]
-fn context_ref_from_address() {
-    let ctx: Context = Context::default();
-    let ctx_address: usize = (&ctx).into();
-    let ctx_ref: &Context = ctx_address.into();
-    assert_eq!(&ctx, ctx_ref);
-}
-#[test]
-fn context_mut_from_address() {
-    let mut ctx: Context = Context::default();
-    let ctx_address: usize = (&mut ctx).into();
-    let ctx_mut: &mut Context = ctx_address.into();
-    assert_eq!(&mut ctx, ctx_mut);
-}
-#[test]
-fn context_ref_into_address() {
-    let ctx: Context = Context::default();
-    let ctx_address: usize = (&ctx).into();
-    assert!(ctx_address > 0);
-}
-#[test]
-fn context_mut_into_address() {
-    let mut ctx: Context = Context::default();
-    let ctx_address: usize = (&mut ctx).into();
-    assert!(ctx_address > 0);
-}
-#[test]
-fn context_route_params() {
-    let mut ctx: Context = Context::default();
-    let mut params: RouteParams = RouteParams::default();
-    params.insert("id".to_string(), "123".to_string());
-    ctx.set_route_params(params);
-    let id: Option<String> = ctx.try_get_route_param("id");
-    assert_eq!(id, Some("123".to_string()));
-    let name: Option<String> = ctx.try_get_route_param("name");
-    assert_eq!(name, None);
-}
-#[test]
-fn context_request_and_response_string() {
-    let mut ctx: Context = Context::default();
-    let request: Request = Request::default();
-    ctx.set_request(request.clone());
-    let fetched_request: &Request = ctx.get_request();
-    assert_eq!(request.to_string(), fetched_request.to_string());
-    let response: Response = Response::default();
-    ctx.set_response(response.clone());
-    let fetched_response: &Response = ctx.get_response();
-    assert_eq!(response.to_string(), fetched_response.to_string());
-}
-#[test]
-fn context_as_ref() {
-    let ctx: Context = Context::default();
-    let ctx_ref: &Context = ctx.as_ref();
-    assert_eq!(ctx.get_request(), ctx_ref.get_request());
-    assert_eq!(ctx.get_response(), ctx_ref.get_response());
-}
-#[test]
-fn context_as_mut() {
-    let mut ctx: Context = Context::default();
-    let new_ctx: Context = ctx.as_mut().clone();
-    assert_eq!(ctx, new_ctx);
-}
-#[test]
-fn get_panic_from_context() {
-    let mut ctx: Context = Context::default();
-    let set_panic: PanicData = PanicData::new(
-        Some("test".to_string()),
-        Some("test".to_string()),
-        Some("test".to_string()),
-    );
-    ctx.set_task_panic(set_panic.clone());
-    let get_panic: PanicData = ctx.try_get_task_panic_data().unwrap();
-    assert_eq!(set_panic, get_panic);
-}
-#[test]
-fn context_attributes() {
-    let mut ctx: Context = Context::default();
-    ctx.set_attribute("key1", "value1".to_string());
-    let value: Option<String> = ctx.try_get_attribute("key1");
-    assert_eq!(value, Some("value1".to_string()));
-    ctx.remove_attribute("key1");
-    let value: Option<String> = ctx.try_get_attribute("key1");
-    assert_eq!(value, None);
-    ctx.set_attribute("key2", 123);
-    ctx.clear_attribute();
-    let value: Option<i32> = ctx.try_get_attribute("key2");
-    assert_eq!(value, None);
-}
-#[test]
-fn run_set_func() {
-    let mut ctx: Context = Context::default();
-    const KEY: &str = "string";
-    const PARAM: &str = "test";
-    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
-    ctx.set_attribute(KEY, func);
-    let get_key: &(dyn Fn(&str) -> String + Send + Sync) = ctx.try_get_attribute(KEY).unwrap();
-    assert_eq!(get_key(PARAM), func(PARAM));
-    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {
-        assert_eq!(msg, PARAM);
-    };
-    ctx.set_attribute(KEY, func);
-    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY);
-    hyperlane(PARAM);
 }
 ```
 # Path: hyperlane/src/context/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
-#[cfg(test)]
-mod test;
 pub use r#struct::*;
 ```
 # Path: hyperlane/src/route/impl.rs
@@ -14029,11 +13954,7 @@ impl RouteMatcher {
         }
         Ok(())
     }
-    pub(crate) fn try_resolve_route(
-        &self,
-        ctx: &mut Context,
-        path: &str,
-    ) -> Option<ServerHookHandler> {
+    pub fn try_resolve_route(&self, ctx: &mut Context, path: &str) -> Option<ServerHookHandler> {
         if let Some(hook) = self.get_static_route().get(path) {
             ctx.set_route_params(RouteParams::default());
             return Some(hook.clone());
@@ -14092,224 +14013,19 @@ pub struct RoutePattern(
 pub struct RouteMatcher {
     #[get]
     #[set(skip)]
-    #[get_mut(pub(super))]
+    #[get_mut(pub)]
     #[debug(skip)]
     pub(super) static_route: ServerHookMap,
     #[get]
     #[set(skip)]
-    #[get_mut(pub(super))]
+    #[get_mut(pub)]
     #[debug(skip)]
     pub(super) dynamic_route: ServerHookPatternRoute,
     #[get]
     #[set(skip)]
-    #[get_mut(pub(super))]
+    #[get_mut(pub)]
     #[debug(skip)]
     pub(super) regex_route: ServerHookPatternRoute,
-}
-```
-# Path: hyperlane/src/route/test.rs
-```rust
-use crate::*;
-struct TestRoute {
-    data: String,
-}
-impl ServerHook for TestRoute {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self {
-            data: String::new(),
-        }
-    }
-    async fn handle(mut self, _: &mut Stream, _: &mut Context) -> Status {
-        self.data = String::from("test");
-        Status::Continue
-    }
-}
-#[tokio::test]
-#[should_panic(expected = "EmptyPattern")]
-async fn empty_route() {
-    let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
-}
-#[tokio::test]
-#[should_panic(expected = "DuplicatePattern")]
-async fn duplicate_route() {
-    let _server: &Server = Server::default()
-        .route::<TestRoute>(ROOT_PATH)
-        .route::<TestRoute>(ROOT_PATH);
-}
-#[test]
-fn get_route() {
-    let mut server: Server = Server::default();
-    server
-        .route::<TestRoute>(ROOT_PATH)
-        .route::<TestRoute>("/dynamic/{routing}")
-        .route::<TestRoute>("/regex/{file:^.*$}");
-    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
-    for key in route_matcher.get_static_route().keys() {
-        println!("Static route: {key}");
-    }
-    for value in route_matcher.get_dynamic_route().values() {
-        for (route_pattern, _) in value {
-            println!("Dynamic route: {route_pattern}");
-        }
-    }
-    for value in route_matcher.get_regex_route().values() {
-        for (route_pattern, _) in value {
-            println!("Regex route: {route_pattern}");
-        }
-    }
-}
-#[test]
-fn segment_count_optimization() {
-    let mut server: Server = Server::default();
-    server.route::<TestRoute>("/users/{id}");
-    server.route::<TestRoute>("/users/{id}/posts");
-    server.route::<TestRoute>("/users/{id}/posts/{post_id}");
-    server.route::<TestRoute>("/api/v1/users/{id}");
-    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
-    assert!(
-        route_matcher.get_dynamic_route().contains_key(&2),
-        "Should have 2-segment routes"
-    );
-    assert!(
-        route_matcher.get_dynamic_route().contains_key(&3),
-        "Should have 3-segment routes"
-    );
-    assert!(
-        route_matcher.get_dynamic_route().contains_key(&4),
-        "Should have 4-segment routes"
-    );
-    assert_eq!(route_matcher.get_dynamic_route().get(&2).unwrap().len(), 1);
-    assert_eq!(route_matcher.get_dynamic_route().get(&3).unwrap().len(), 1);
-    assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
-}
-#[test]
-fn regex_route_segment_count() {
-    let mut server: Server = Server::default();
-    server.route::<TestRoute>("/files/{path:.*}");
-    server.route::<TestRoute>("/api/{version:\\d+}/users");
-    server.route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}");
-    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
-    assert!(
-        route_matcher.get_regex_route().contains_key(&2),
-        "Should have 2-segment regex routes"
-    );
-    assert!(
-        route_matcher.get_regex_route().contains_key(&3),
-        "Should have 3-segment regex routes"
-    );
-    assert!(
-        route_matcher.get_regex_route().contains_key(&4),
-        "Should have 4-segment regex routes"
-    );
-}
-#[test]
-fn mixed_route_types() {
-    let mut server: Server = Server::default();
-    server.route::<TestRoute>("/");
-    server.route::<TestRoute>("/about");
-    server.route::<TestRoute>("/users/{id}");
-    server.route::<TestRoute>("/posts/{slug}");
-    server.route::<TestRoute>("/files/{path:.*}");
-    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
-    assert_eq!(route_matcher.get_static_route().len(), 2);
-    assert!(route_matcher.get_dynamic_route().contains_key(&2));
-    assert!(route_matcher.get_regex_route().contains_key(&2));
-}
-#[test]
-fn large_dynamic_routes() {
-    const ROUTE_COUNT: u32 = 1000;
-    let mut server: Server = Server::default();
-    let start_insert: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/{{id}}");
-        server.route::<TestRoute>(&path);
-    }
-    let insert_duration: Duration = start_insert.elapsed();
-    println!(
-        "Inserted {} dynamic routes in: {:?}",
-        ROUTE_COUNT, insert_duration
-    );
-    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
-    assert!(!route_matcher.get_dynamic_route().is_empty());
-    let mut ctx: Context = Context::default();
-    let start_match: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
-    }
-    let match_duration: Duration = start_match.elapsed();
-    println!(
-        "Matched {} dynamic routes in: {:?}",
-        ROUTE_COUNT, match_duration
-    );
-    println!(
-        "Average per dynamic route match: {:?}",
-        match_duration / ROUTE_COUNT
-    );
-}
-#[test]
-fn large_regex_routes() {
-    const ROUTE_COUNT: u32 = 1000;
-    let mut server: Server = Server::default();
-    let start_insert: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
-        server.route::<TestRoute>(&path);
-    }
-    let insert_duration: Duration = start_insert.elapsed();
-    println!(
-        "Inserted {} regex routes in: {:?}",
-        ROUTE_COUNT, insert_duration
-    );
-    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
-    assert!(!route_matcher.get_regex_route().is_empty());
-    let mut ctx: Context = Context::default();
-    let start_match: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
-    }
-    let match_duration: Duration = start_match.elapsed();
-    println!(
-        "Matched {} regex routes in: {:?}",
-        ROUTE_COUNT, match_duration
-    );
-    println!(
-        "Average per regex route match: {:?}",
-        match_duration / ROUTE_COUNT
-    );
-}
-#[test]
-fn large_tail_regex_routes() {
-    const ROUTE_COUNT: u32 = 1000;
-    let mut server: Server = Server::default();
-    let start_insert: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/{{path:.*}}");
-        server.route::<TestRoute>(&path);
-    }
-    let insert_duration: Duration = start_insert.elapsed();
-    println!(
-        "Inserted {} tail regex routes in: {:?}",
-        ROUTE_COUNT, insert_duration
-    );
-    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
-    assert!(!route_matcher.get_regex_route().is_empty());
-    let mut ctx: Context = Context::default();
-    let start_match: Instant = Instant::now();
-    for i in 0..ROUTE_COUNT {
-        let path: String = format!("/api/resource{i}/some/nested/path");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
-    }
-    let match_duration: Duration = start_match.elapsed();
-    println!(
-        "Matched {} tail regex routes in: {:?}",
-        ROUTE_COUNT, match_duration
-    );
-    println!(
-        "Average per tail regex route match: {:?}",
-        match_duration / ROUTE_COUNT
-    );
 }
 ```
 # Path: hyperlane/src/route/mod.rs
@@ -14317,8 +14033,6 @@ fn large_tail_regex_routes() {
 mod r#enum;
 mod r#impl;
 mod r#struct;
-#[cfg(test)]
-mod test;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
 ```
@@ -14342,44 +14056,10 @@ impl From<std::io::Error> for ServerError {
     }
 }
 ```
-# Path: hyperlane/src/error/test.rs
-```rust
-use crate::*;
-#[test]
-fn server_error() {
-    let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
-    let new_tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
-    assert_eq!(tcp_bind_error, new_tcp_bind_error);
-    let unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
-    let new_unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
-    assert_eq!(unknown_error, new_unknown_error);
-    let request: Request = Request::default();
-    let invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request.clone());
-    let new_invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request);
-    assert_eq!(invalid_http_request_error, new_invalid_http_request_error);
-    let other_error: ServerError = ServerError::Other("other error".to_string());
-    let new_other_error: ServerError = ServerError::Other("other error".to_string());
-    assert_eq!(other_error, new_other_error);
-}
-#[test]
-fn route_error() {
-    let empty_pattern_error: RouteError = RouteError::EmptyPattern;
-    assert_eq!(empty_pattern_error, RouteError::EmptyPattern);
-    let duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
-    let new_duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
-    assert_eq!(duplicate_pattern_error, new_duplicate_pattern_error);
-    let invalid_regex_pattern_error: RouteError = RouteError::InvalidRegexPattern("[".to_string());
-    let new_invalid_regex_pattern_error: RouteError =
-        RouteError::InvalidRegexPattern("[".to_string());
-    assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
-}
-```
 # Path: hyperlane/src/error/mod.rs
 ```rust
 mod r#enum;
 mod r#impl;
-#[cfg(test)]
-mod test;
 pub use r#enum::*;
 ```
 # Path: hyperlane/src/error/enum.rs
@@ -14427,39 +14107,18 @@ impl ServerConfig {
 use crate::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct ServerConfig {
-    #[set(type(AsRef<str>))]
+    #[set(pub, type(AsRef<str>))]
     pub(super) address: String,
+    #[set(pub)]
     pub(super) nodelay: Option<bool>,
+    #[set(pub)]
     pub(super) ttl: Option<u32>,
-}
-```
-# Path: hyperlane/src/config/test.rs
-```rust
-use crate::*;
-#[test]
-fn server_config_from_json() {
-    let server_config_json: &'static str = r#"
-    {
-        "address": "0.0.0.0:80",
-        "nodelay": true,
-        "ttl": 64
-    }
-    "#;
-    let server_config: ServerConfig = ServerConfig::from_json(server_config_json).unwrap();
-    let mut new_server_config: ServerConfig = ServerConfig::default();
-    new_server_config
-        .set_address("0.0.0.0:80")
-        .set_nodelay(Some(true))
-        .set_ttl(Some(64));
-    assert_eq!(server_config, new_server_config);
 }
 ```
 # Path: hyperlane/src/config/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
-#[cfg(test)]
-mod test;
 pub use r#struct::*;
 ```
 # Path: hyperlane/src/server/impl.rs
@@ -14917,34 +14576,728 @@ impl Server {
 use crate::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Server {
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[get_mut(pub)]
+    #[set(pub)]
     pub(super) server_config: ServerConfig,
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
+    #[get_mut(pub)]
+    #[set(pub)]
     pub(super) request_config: RequestConfig,
-    #[get_mut(pub(super))]
+    #[get_mut(pub)]
     #[set(skip)]
     pub(super) route_matcher: RouteMatcher,
     #[debug(skip)]
-    #[get_mut(pub(super))]
+    #[get_mut(pub)]
     #[set(skip)]
     pub(super) request_error: ServerHookList,
     #[debug(skip)]
-    #[get_mut(pub(super))]
+    #[get_mut(pub)]
     #[set(skip)]
     pub(super) task_panic: ServerHookList,
     #[debug(skip)]
-    #[get_mut(pub(super))]
+    #[get_mut(pub)]
     #[set(skip)]
     pub(super) request_middleware: ServerHookList,
     #[debug(skip)]
-    #[get_mut(pub(super))]
+    #[get_mut(pub)]
     #[set(skip)]
     pub(super) response_middleware: ServerHookList,
 }
 ```
-# Path: hyperlane/src/server/test.rs
+# Path: hyperlane/src/server/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+```
+# Path: hyperlane/tests/mod.rs
+```rust
+mod config;
+mod context;
+mod error;
+mod route;
+mod server;
+use {hyperlane::*, route::*, server::*};
+use std::{
+    sync::{Arc, OnceLock},
+    time::{Duration, Instant},
+};
+use tokio::{spawn, task::JoinHandle, time::sleep};
+```
+# Path: hyperlane/tests/context/mod.rs
+```rust
+mod r#fn;
+```
+# Path: hyperlane/tests/context/fn.rs
+```rust
+use crate::*;
+#[test]
+fn context_ref_from_address() {
+    let ctx: Context = Context::default();
+    let ctx_address: usize = (&ctx).into();
+    let ctx_ref: &Context = ctx_address.into();
+    assert_eq!(&ctx, ctx_ref);
+}
+#[test]
+fn context_mut_from_address() {
+    let mut ctx: Context = Context::default();
+    let ctx_address: usize = (&mut ctx).into();
+    let ctx_mut: &mut Context = ctx_address.into();
+    assert_eq!(&mut ctx, ctx_mut);
+}
+#[test]
+fn context_ref_into_address() {
+    let ctx: Context = Context::default();
+    let ctx_address: usize = (&ctx).into();
+    assert!(ctx_address > 0);
+}
+#[test]
+fn context_mut_into_address() {
+    let mut ctx: Context = Context::default();
+    let ctx_address: usize = (&mut ctx).into();
+    assert!(ctx_address > 0);
+}
+#[test]
+fn context_route_params() {
+    let mut ctx: Context = Context::default();
+    let mut params: RouteParams = RouteParams::default();
+    params.insert("id".to_string(), "123".to_string());
+    ctx.set_route_params(params);
+    let id: Option<String> = ctx.try_get_route_param("id");
+    assert_eq!(id, Some("123".to_string()));
+    let name: Option<String> = ctx.try_get_route_param("name");
+    assert_eq!(name, None);
+}
+#[test]
+fn context_request_and_response_string() {
+    let mut ctx: Context = Context::default();
+    let request: Request = Request::default();
+    ctx.set_request(request.clone());
+    let fetched_request: &Request = ctx.get_request();
+    assert_eq!(request.to_string(), fetched_request.to_string());
+    let response: Response = Response::default();
+    ctx.set_response(response.clone());
+    let fetched_response: &Response = ctx.get_response();
+    assert_eq!(response.to_string(), fetched_response.to_string());
+}
+#[test]
+fn context_as_ref() {
+    let ctx: Context = Context::default();
+    let ctx_ref: &Context = ctx.as_ref();
+    assert_eq!(ctx.get_request(), ctx_ref.get_request());
+    assert_eq!(ctx.get_response(), ctx_ref.get_response());
+}
+#[test]
+fn context_as_mut() {
+    let mut ctx: Context = Context::default();
+    let new_ctx: Context = ctx.as_mut().clone();
+    assert_eq!(ctx, new_ctx);
+}
+#[test]
+fn get_panic_from_context() {
+    let mut ctx: Context = Context::default();
+    let set_panic: PanicData = PanicData::new(
+        Some("test".to_string()),
+        Some("test".to_string()),
+        Some("test".to_string()),
+    );
+    ctx.set_task_panic(set_panic.clone());
+    let get_panic: PanicData = ctx.try_get_task_panic_data().unwrap();
+    assert_eq!(set_panic, get_panic);
+}
+#[test]
+fn context_attributes() {
+    let mut ctx: Context = Context::default();
+    ctx.set_attribute("key1", "value1".to_string());
+    let value: Option<String> = ctx.try_get_attribute("key1");
+    assert_eq!(value, Some("value1".to_string()));
+    ctx.remove_attribute("key1");
+    let value: Option<String> = ctx.try_get_attribute("key1");
+    assert_eq!(value, None);
+    ctx.set_attribute("key2", 123);
+    ctx.clear_attribute();
+    let value: Option<i32> = ctx.try_get_attribute("key2");
+    assert_eq!(value, None);
+}
+#[test]
+fn run_set_func() {
+    let mut ctx: Context = Context::default();
+    const KEY: &str = "string";
+    const PARAM: &str = "test";
+    let func: &(dyn Fn(&str) -> String + Send + Sync) = &|msg: &str| msg.to_string();
+    ctx.set_attribute(KEY, func);
+    let get_key: &(dyn Fn(&str) -> String + Send + Sync) = ctx.try_get_attribute(KEY).unwrap();
+    assert_eq!(get_key(PARAM), func(PARAM));
+    let func: &(dyn Fn(&str) + Send + Sync) = &|msg: &str| {
+        assert_eq!(msg, PARAM);
+    };
+    ctx.set_attribute(KEY, func);
+    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY);
+    hyperlane(PARAM);
+}
+```
+# Path: hyperlane/tests/route/impl.rs
+```rust
+use crate::*;
+impl ServerHook for TestRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self {
+            data: String::new(),
+        }
+    }
+    async fn handle(mut self, _: &mut Stream, _: &mut Context) -> Status {
+        self.data = String::from("test");
+        Status::Continue
+    }
+}
+```
+# Path: hyperlane/tests/route/struct.rs
+```rust
+pub(crate) struct TestRoute {
+    pub data: String,
+}
+```
+# Path: hyperlane/tests/route/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+```
+# Path: hyperlane/tests/route/fn.rs
+```rust
+use crate::*;
+#[tokio::test]
+#[should_panic(expected = "EmptyPattern")]
+async fn empty_route() {
+    let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
+}
+#[tokio::test]
+#[should_panic(expected = "DuplicatePattern")]
+async fn duplicate_route() {
+    let _server: &Server = Server::default()
+        .route::<TestRoute>(ROOT_PATH)
+        .route::<TestRoute>(ROOT_PATH);
+}
+#[test]
+fn get_route() {
+    let mut server: Server = Server::default();
+    server
+        .route::<TestRoute>(ROOT_PATH)
+        .route::<TestRoute>("/dynamic/{routing}")
+        .route::<TestRoute>("/regex/{file:^.*$}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
+    for key in route_matcher.get_static_route().keys() {
+        println!("Static route: {key}");
+    }
+    for value in route_matcher.get_dynamic_route().values() {
+        for (route_pattern, _) in value {
+            println!("Dynamic route: {route_pattern}");
+        }
+    }
+    for value in route_matcher.get_regex_route().values() {
+        for (route_pattern, _) in value {
+            println!("Regex route: {route_pattern}");
+        }
+    }
+}
+#[test]
+fn segment_count_optimization() {
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/users/{id}");
+    server.route::<TestRoute>("/users/{id}/posts");
+    server.route::<TestRoute>("/users/{id}/posts/{post_id}");
+    server.route::<TestRoute>("/api/v1/users/{id}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&2),
+        "Should have 2-segment routes"
+    );
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&3),
+        "Should have 3-segment routes"
+    );
+    assert!(
+        route_matcher.get_dynamic_route().contains_key(&4),
+        "Should have 4-segment routes"
+    );
+    assert_eq!(route_matcher.get_dynamic_route().get(&2).unwrap().len(), 1);
+    assert_eq!(route_matcher.get_dynamic_route().get(&3).unwrap().len(), 1);
+    assert_eq!(route_matcher.get_dynamic_route().get(&4).unwrap().len(), 2);
+}
+#[test]
+fn regex_route_segment_count() {
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/files/{path:.*}");
+    server.route::<TestRoute>("/api/{version:\\d+}/users");
+    server.route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
+    assert!(
+        route_matcher.get_regex_route().contains_key(&2),
+        "Should have 2-segment regex routes"
+    );
+    assert!(
+        route_matcher.get_regex_route().contains_key(&3),
+        "Should have 3-segment regex routes"
+    );
+    assert!(
+        route_matcher.get_regex_route().contains_key(&4),
+        "Should have 4-segment regex routes"
+    );
+}
+#[test]
+fn mixed_route_types() {
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/");
+    server.route::<TestRoute>("/about");
+    server.route::<TestRoute>("/users/{id}");
+    server.route::<TestRoute>("/posts/{slug}");
+    server.route::<TestRoute>("/files/{path:.*}");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
+    assert_eq!(route_matcher.get_static_route().len(), 2);
+    assert!(route_matcher.get_dynamic_route().contains_key(&2));
+    assert!(route_matcher.get_regex_route().contains_key(&2));
+}
+#[test]
+fn large_dynamic_routes() {
+    const ROUTE_COUNT: u32 = 1000;
+    let mut server: Server = Server::default();
+    let start_insert: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/{{id}}");
+        server.route::<TestRoute>(&path);
+    }
+    let insert_duration: Duration = start_insert.elapsed();
+    println!(
+        "Inserted {} dynamic routes in: {:?}",
+        ROUTE_COUNT, insert_duration
+    );
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
+    assert!(!route_matcher.get_dynamic_route().is_empty());
+    let mut ctx: Context = Context::default();
+    let start_match: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/123");
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+    }
+    let match_duration: Duration = start_match.elapsed();
+    println!(
+        "Matched {} dynamic routes in: {:?}",
+        ROUTE_COUNT, match_duration
+    );
+    println!(
+        "Average per dynamic route match: {:?}",
+        match_duration / ROUTE_COUNT
+    );
+}
+#[test]
+fn large_regex_routes() {
+    const ROUTE_COUNT: u32 = 1000;
+    let mut server: Server = Server::default();
+    let start_insert: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
+        server.route::<TestRoute>(&path);
+    }
+    let insert_duration: Duration = start_insert.elapsed();
+    println!(
+        "Inserted {} regex routes in: {:?}",
+        ROUTE_COUNT, insert_duration
+    );
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
+    assert!(!route_matcher.get_regex_route().is_empty());
+    let mut ctx: Context = Context::default();
+    let start_match: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/123");
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+    }
+    let match_duration: Duration = start_match.elapsed();
+    println!(
+        "Matched {} regex routes in: {:?}",
+        ROUTE_COUNT, match_duration
+    );
+    println!(
+        "Average per regex route match: {:?}",
+        match_duration / ROUTE_COUNT
+    );
+}
+#[test]
+fn large_tail_regex_routes() {
+    const ROUTE_COUNT: u32 = 1000;
+    let mut server: Server = Server::default();
+    let start_insert: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/{{path:.*}}");
+        server.route::<TestRoute>(&path);
+    }
+    let insert_duration: Duration = start_insert.elapsed();
+    println!(
+        "Inserted {} tail regex routes in: {:?}",
+        ROUTE_COUNT, insert_duration
+    );
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
+    assert!(!route_matcher.get_regex_route().is_empty());
+    let mut ctx: Context = Context::default();
+    let start_match: Instant = Instant::now();
+    for i in 0..ROUTE_COUNT {
+        let path: String = format!("/api/resource{i}/some/nested/path");
+        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+    }
+    let match_duration: Duration = start_match.elapsed();
+    println!(
+        "Matched {} tail regex routes in: {:?}",
+        ROUTE_COUNT, match_duration
+    );
+    println!(
+        "Average per tail regex route match: {:?}",
+        match_duration / ROUTE_COUNT
+    );
+}
+```
+# Path: hyperlane/tests/error/mod.rs
+```rust
+mod r#fn;
+```
+# Path: hyperlane/tests/error/fn.rs
+```rust
+use crate::*;
+#[test]
+fn server_error() {
+    let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
+    let new_tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
+    assert_eq!(tcp_bind_error, new_tcp_bind_error);
+    let unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
+    let new_unknown_error: ServerError = ServerError::Unknown("something went wrong".to_string());
+    assert_eq!(unknown_error, new_unknown_error);
+    let request: Request = Request::default();
+    let invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request.clone());
+    let new_invalid_http_request_error: ServerError = ServerError::InvalidHttpRequest(request);
+    assert_eq!(invalid_http_request_error, new_invalid_http_request_error);
+    let other_error: ServerError = ServerError::Other("other error".to_string());
+    let new_other_error: ServerError = ServerError::Other("other error".to_string());
+    assert_eq!(other_error, new_other_error);
+}
+#[test]
+fn route_error() {
+    let empty_pattern_error: RouteError = RouteError::EmptyPattern;
+    assert_eq!(empty_pattern_error, RouteError::EmptyPattern);
+    let duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
+    let new_duplicate_pattern_error: RouteError = RouteError::DuplicatePattern("/home".to_string());
+    assert_eq!(duplicate_pattern_error, new_duplicate_pattern_error);
+    let invalid_regex_pattern_error: RouteError = RouteError::InvalidRegexPattern("[".to_string());
+    let new_invalid_regex_pattern_error: RouteError =
+        RouteError::InvalidRegexPattern("[".to_string());
+    assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
+}
+```
+# Path: hyperlane/tests/config/mod.rs
+```rust
+mod r#fn;
+```
+# Path: hyperlane/tests/config/fn.rs
+```rust
+use crate::*;
+#[test]
+fn server_config_from_json() {
+    let server_config_json: &'static str = r#"
+    {
+        "address": "0.0.0.0:80",
+        "nodelay": true,
+        "ttl": 64
+    }
+    "#;
+    let server_config: ServerConfig = ServerConfig::from_json(server_config_json).unwrap();
+    let mut new_server_config: ServerConfig = ServerConfig::default();
+    new_server_config
+        .set_address("0.0.0.0:80")
+        .set_nodelay(Some(true))
+        .set_ttl(Some(64));
+    assert_eq!(server_config, new_server_config);
+}
+```
+# Path: hyperlane/tests/server/impl.rs
+```rust
+use crate::*;
+impl ServerHook for TestSendRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        Status::Continue
+    }
+}
+impl ServerHook for TaskPanicHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(500)
+            .clear_headers()
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONTENT_TYPE, &self.content_type)
+            .set_body(&self.response_body)
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for RequestErrorHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
+        Self {
+            response_status_code: request_error.get_http_status_code(),
+            response_body: request_error.to_string(),
+        }
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(self.response_status_code)
+            .set_body(self.response_body)
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for RequestMiddleware {
+    async fn new(stream: &mut Stream, _: &mut Context) -> Self {
+        let mut socket_addr: String = String::new();
+        socket_addr = stream
+            .get_stream()
+            .peer_addr()
+            .map(|data| data.to_string())
+            .unwrap_or_default();
+        Self { socket_addr }
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(200)
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONNECTION, KEEP_ALIVE)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .set_header("SocketAddr", &self.socket_addr);
+        Status::Continue
+    }
+}
+impl ServerHook for UpgradeMiddleware {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        if !ctx.get_request().is_ws_upgrade_type() {
+            return Status::Continue;
+        }
+        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            let data: Vec<u8> = ctx
+                .get_mut_response()
+                .set_version(HttpVersion::Http1_1)
+                .set_status_code(101)
+                .set_header(UPGRADE, WEBSOCKET)
+                .set_header(CONNECTION, UPGRADE)
+                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .set_body(Vec::new())
+                .build();
+            if stream.try_send(data).await.is_err() {
+                stream.set_closed(true);
+                return Status::Reject;
+            }
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for ResponseMiddleware {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        if ctx.get_request().is_ws_upgrade_type() {
+            return Status::Continue;
+        }
+        let data: Vec<u8> = ctx.get_mut_response().build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for RootRoute {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let response_body: String = format!("Hello hyperlane => {}", ctx.get_request().get_path());
+        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
+        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
+        Self {
+            response_body,
+            cookie1,
+            cookie2,
+        }
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response()
+            .add_header(SET_COOKIE, &self.cookie1)
+            .add_header(SET_COOKIE, &self.cookie2)
+            .set_body(&self.response_body);
+        Status::Continue
+    }
+}
+impl ServerHook for SseRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .set_body(Vec::new())
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        for i in 0..10 {
+            let body: String = format!("data:{i}{HTTP_DOUBLE_BR}");
+            if stream.try_send(&body).await.is_err() {
+                break;
+            }
+        }
+        stream.set_closed(true);
+        Status::Reject
+    }
+}
+impl WebsocketRoute {
+    pub async fn try_send_body_hook(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+    ) -> Result<(), ResponseError> {
+        let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {
+            let body: &ResponseBody = ctx.get_response().get_body();
+            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+            stream.try_send_list(&frame_list).await
+        } else {
+            let body: &Vec<u8> = ctx.get_response().get_body();
+            stream.try_send(body).await
+        };
+        if send_result.is_err() {
+            stream.set_closed(true);
+        }
+        send_result
+    }
+}
+impl ServerHook for WebsocketRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        while let Ok(body) = stream.try_get_websocket_request().await {
+            ctx.get_mut_response().set_body(body);
+            if self.try_send_body_hook(stream, ctx).await.is_err() {
+                return Status::Reject;
+            }
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for DynamicRoute {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        Self {
+            params: ctx.get_route_params().clone(),
+        }
+    }
+    async fn handle(mut self, _: &mut Stream, _: &mut Context) -> Status {
+        self.params.insert("key".to_owned(), "value".to_owned());
+        panic!("Test panic {:?}", self.params);
+    }
+}
+impl ServerHook for GetAllRoutes {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        if let Some(server) = SERVER_REF.get() {
+            let route_matcher: &RouteMatcher = server.get_route_matcher();
+            let mut response_body: String = String::new();
+            for key in route_matcher.get_static_route().keys() {
+                response_body.push_str(&format!("Static route: {key}\n"));
+            }
+            for value in route_matcher.get_dynamic_route().values() {
+                for (route_pattern, _) in value {
+                    response_body.push_str(&format!("Dynamic route: {route_pattern}\n"));
+                }
+            }
+            for value in route_matcher.get_regex_route().values() {
+                for (route_pattern, _) in value {
+                    response_body.push_str(&format!("Regex route: {route_pattern}\n"));
+                }
+            }
+            ctx.get_mut_response().set_body(&response_body);
+        }
+        Status::Continue
+    }
+}
+```
+# Path: hyperlane/tests/server/static.rs
+```rust
+use crate::*;
+pub(crate) static SERVER_REF: OnceLock<Server> = OnceLock::new();
+```
+# Path: hyperlane/tests/server/struct.rs
+```rust
+use crate::*;
+pub(crate) struct TestSendRoute;
+pub(crate) struct TaskPanicHook {
+    pub(crate) response_body: String,
+    pub(crate) content_type: String,
+}
+pub(crate) struct RequestErrorHook {
+    pub(crate) response_status_code: ResponseStatusCode,
+    pub(crate) response_body: String,
+}
+pub(crate) struct RequestMiddleware {
+    pub(crate) socket_addr: String,
+}
+pub(crate) struct UpgradeMiddleware;
+pub(crate) struct ResponseMiddleware;
+pub(crate) struct RootRoute {
+    pub(crate) response_body: String,
+    pub(crate) cookie1: String,
+    pub(crate) cookie2: String,
+}
+pub(crate) struct SseRoute;
+pub(crate) struct WebsocketRoute;
+pub(crate) struct DynamicRoute {
+    pub(crate) params: RouteParams,
+}
+pub(crate) struct GetAllRoutes;
+```
+# Path: hyperlane/tests/server/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub(crate) use {r#static::*, r#struct::*};
+```
+# Path: hyperlane/tests/server/fn.rs
 ```rust
 use crate::*;
 #[test]
@@ -15043,15 +15396,6 @@ fn server_as_mut() {
     server_mut.set_server_config(config);
     assert!(server.get_server_config().try_get_nodelay().is_some());
 }
-struct TestSendRoute;
-impl ServerHook for TestSendRoute {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
-        Status::Continue
-    }
-}
 #[test]
 fn server_send_sync() {
     fn assert_send<T: Send>() {}
@@ -15093,259 +15437,6 @@ async fn server_share_across_threads() {
     assert_eq!(result1, "thread1");
     assert_eq!(result2, "thread2");
 }
-static SERVER_REF: OnceLock<Server> = OnceLock::new();
-struct TaskPanicHook {
-    response_body: String,
-    content_type: String,
-}
-impl ServerHook for TaskPanicHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let data: Vec<u8> = ctx
-            .get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(500)
-            .clear_headers()
-            .set_header(SERVER, HYPERLANE)
-            .set_header(CONTENT_TYPE, &self.content_type)
-            .set_body(&self.response_body)
-            .build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        Status::Continue
-    }
-}
-struct RequestErrorHook {
-    response_status_code: ResponseStatusCode,
-    response_body: String,
-}
-impl ServerHook for RequestErrorHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
-        Self {
-            response_status_code: request_error.get_http_status_code(),
-            response_body: request_error.to_string(),
-        }
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let data: Vec<u8> = ctx
-            .get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(self.response_status_code)
-            .set_body(self.response_body)
-            .build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        Status::Continue
-    }
-}
-struct RequestMiddleware {
-    socket_addr: String,
-}
-impl ServerHook for RequestMiddleware {
-    async fn new(stream: &mut Stream, _: &mut Context) -> Self {
-        let mut socket_addr: String = String::new();
-        socket_addr = stream
-            .get_stream()
-            .peer_addr()
-            .map(|data| data.to_string())
-            .unwrap_or_default();
-        Self { socket_addr }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(200)
-            .set_header(SERVER, HYPERLANE)
-            .set_header(CONNECTION, KEEP_ALIVE)
-            .set_header(CONTENT_TYPE, TEXT_PLAIN)
-            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .set_header("SocketAddr", &self.socket_addr);
-        Status::Continue
-    }
-}
-struct UpgradeMiddleware;
-impl ServerHook for UpgradeMiddleware {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        if !ctx.get_request().is_ws_upgrade_type() {
-            return Status::Continue;
-        }
-        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            let data: Vec<u8> = ctx
-                .get_mut_response()
-                .set_version(HttpVersion::Http1_1)
-                .set_status_code(101)
-                .set_header(UPGRADE, WEBSOCKET)
-                .set_header(CONNECTION, UPGRADE)
-                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .set_body(Vec::new())
-                .build();
-            if stream.try_send(data).await.is_err() {
-                stream.set_closed(true);
-                return Status::Reject;
-            }
-        }
-        Status::Continue
-    }
-}
-struct ResponseMiddleware;
-impl ServerHook for ResponseMiddleware {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        if ctx.get_request().is_ws_upgrade_type() {
-            return Status::Continue;
-        }
-        let data: Vec<u8> = ctx.get_mut_response().build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        Status::Continue
-    }
-}
-struct RootRoute {
-    response_body: String,
-    cookie1: String,
-    cookie2: String,
-}
-impl ServerHook for RootRoute {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let response_body: String = format!("Hello hyperlane => {}", ctx.get_request().get_path());
-        let cookie1: String = CookieBuilder::new("key1", "value1").http_only().build();
-        let cookie2: String = CookieBuilder::new("key2", "value2").http_only().build();
-        Self {
-            response_body,
-            cookie1,
-            cookie2,
-        }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response()
-            .add_header(SET_COOKIE, &self.cookie1)
-            .add_header(SET_COOKIE, &self.cookie2)
-            .set_body(&self.response_body);
-        Status::Continue
-    }
-}
-struct SseRoute;
-impl ServerHook for SseRoute {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let data: Vec<u8> = ctx
-            .get_mut_response()
-            .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
-            .set_body(Vec::new())
-            .build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        for i in 0..10 {
-            let body: String = format!("data:{i}{HTTP_DOUBLE_BR}");
-            if stream.try_send(&body).await.is_err() {
-                break;
-            }
-        }
-        stream.set_closed(true);
-        Status::Reject
-    }
-}
-struct WebsocketRoute;
-impl WebsocketRoute {
-    async fn try_send_body_hook(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-    ) -> Result<(), ResponseError> {
-        let send_result: Result<(), ResponseError> = if ctx.get_request().is_ws_upgrade_type() {
-            let body: &ResponseBody = ctx.get_response().get_body();
-            let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
-            stream.try_send_list(&frame_list).await
-        } else {
-            let body: &Vec<u8> = ctx.get_response().get_body();
-            stream.try_send(body).await
-        };
-        if send_result.is_err() {
-            stream.set_closed(true);
-        }
-        send_result
-    }
-}
-impl ServerHook for WebsocketRoute {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        while let Ok(body) = stream.try_get_websocket_request().await {
-            ctx.get_mut_response().set_body(body);
-            if self.try_send_body_hook(stream, ctx).await.is_err() {
-                return Status::Reject;
-            }
-        }
-        Status::Continue
-    }
-}
-struct DynamicRoute {
-    params: RouteParams,
-}
-impl ServerHook for DynamicRoute {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        Self {
-            params: ctx.get_route_params().clone(),
-        }
-    }
-    async fn handle(mut self, _: &mut Stream, _: &mut Context) -> Status {
-        self.params.insert("key".to_owned(), "value".to_owned());
-        panic!("Test panic {:?}", self.params);
-    }
-}
-struct GetAllRoutes;
-impl ServerHook for GetAllRoutes {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        if let Some(server) = SERVER_REF.get() {
-            let route_matcher: &RouteMatcher = server.get_route_matcher();
-            let mut response_body: String = String::new();
-            for key in route_matcher.get_static_route().keys() {
-                response_body.push_str(&format!("Static route: {key}\n"));
-            }
-            for value in route_matcher.get_dynamic_route().values() {
-                for (route_pattern, _) in value {
-                    response_body.push_str(&format!("Dynamic route: {route_pattern}\n"));
-                }
-            }
-            for value in route_matcher.get_regex_route().values() {
-                for (route_pattern, _) in value {
-                    response_body.push_str(&format!("Regex route: {route_pattern}\n"));
-                }
-            }
-            ctx.get_mut_response().set_body(&response_body);
-        }
-        Status::Continue
-    }
-}
 #[tokio::test]
 async fn main() {
     let mut server: Server = Server::default();
@@ -15374,12 +15465,4 @@ async fn main() {
     });
     server_control_hook_1.wait().await;
 }
-```
-# Path: hyperlane/src/server/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-pub use r#struct::*;
 ```
