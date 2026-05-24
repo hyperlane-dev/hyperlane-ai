@@ -1,4 +1,4 @@
-<!--2026-05-24 08:35:07-->
+<!--2026-05-24 13:44:48-->
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
@@ -91,8 +91,6 @@ impl FromStr for Lang {
 mod r#enum;
 mod r#fn;
 mod r#impl;
-#[cfg(test)]
-mod test;
 pub use r#fn::*;
 use r#enum::*;
 use std::{
@@ -101,40 +99,6 @@ use std::{
     str::FromStr,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-```
-# Path: hyperlane-time/src/test.rs
-```rust
-use crate::*;
-#[test]
-fn test_lang() {
-    println!("test_lang: {}", from_env_var());
-}
-#[test]
-fn test_now_time() {
-    println!("test_now_time: {}", time());
-}
-#[test]
-fn test_methods() {
-    println!("Current Time: {}", time());
-    println!("Current Date: {}", date());
-    println!("GMT Date: {}", gmt());
-    println!("Timestamp (s): {}", timestamp());
-    println!("Timestamp (ms): {}", timestamp_millis());
-    println!("Timestamp (μs): {}", timestamp_micros());
-    println!("Current Year: {}", year());
-    println!("Current Month: {}", month());
-    println!("Current Day: {}", day());
-    println!("Current Hour: {}", hour());
-    println!("Current Minute: {}", minute());
-    println!("Current Second: {}", second());
-    println!("Current Millis: {}", millis());
-    println!("Current Micros: {}", micros());
-    println!("Is Leap Year (1949): {}", is_leap_year(1949));
-    println!("Calculate Current Time: {:?}", calculate_time());
-    println!("Compute Date (10000 days): {:?}", compute_date(10000));
-    println!("Current Time with Millis: {}", time_millis());
-    println!("Current Time with Micros: {}", time_micros());
-}
 ```
 # Path: hyperlane-time/src/fn.rs
 ```rust
@@ -346,6 +310,49 @@ pub enum Lang {
     NlNlUtf8,
     SvSeUtf8,
     FiFiUtf8,
+}
+```
+# Path: hyperlane-time/tests/mod.rs
+```rust
+mod time;
+use hyperlane_time::*;
+```
+# Path: hyperlane-time/tests/time/mod.rs
+```rust
+mod r#fn;
+```
+# Path: hyperlane-time/tests/time/fn.rs
+```rust
+use crate::*;
+#[test]
+fn test_lang() {
+    println!("test_lang: {}", from_env_var());
+}
+#[test]
+fn test_now_time() {
+    println!("test_now_time: {}", time());
+}
+#[test]
+fn test_methods() {
+    println!("Current Time: {}", time());
+    println!("Current Date: {}", date());
+    println!("GMT Date: {}", gmt());
+    println!("Timestamp (s): {}", timestamp());
+    println!("Timestamp (ms): {}", timestamp_millis());
+    println!("Timestamp (μs): {}", timestamp_micros());
+    println!("Current Year: {}", year());
+    println!("Current Month: {}", month());
+    println!("Current Day: {}", day());
+    println!("Current Hour: {}", hour());
+    println!("Current Minute: {}", minute());
+    println!("Current Second: {}", second());
+    println!("Current Millis: {}", millis());
+    println!("Current Micros: {}", micros());
+    println!("Is Leap Year (1949): {}", is_leap_year(1949));
+    println!("Calculate Current Time: {:?}", calculate_time());
+    println!("Compute Date (10000 days): {:?}", compute_date(10000));
+    println!("Current Time with Millis: {}", time_millis());
+    println!("Current Time with Micros: {}", time_micros());
 }
 ```
 # Path: hyperlane-macros/README.md
@@ -5087,14 +5094,7 @@ cargo add hyperlane-broadcast
 mod broadcast;
 mod broadcast_map;
 pub use {broadcast::*, broadcast_map::*};
-#[cfg(test)]
-use std::time::Duration;
 use std::{fmt::Debug, hash::BuildHasherDefault};
-#[cfg(test)]
-use tokio::{
-    sync::broadcast::error::RecvError,
-    time::{error::Elapsed, timeout},
-};
 use {
     dashmap::{mapref::one::Ref, *},
     tokio::sync::broadcast::{
@@ -5160,26 +5160,11 @@ use crate::*;
 #[derive(Clone, Debug)]
 pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
 ```
-# Path: hyperlane-broadcast/src/broadcast/test.rs
-```rust
-use crate::*;
-#[tokio::test]
-pub async fn test_broadcast() {
-    let broadcast: Broadcast<usize> = Broadcast::new(10);
-    let mut rec1: BroadcastReceiver<usize> = broadcast.subscribe();
-    let mut rec2: BroadcastReceiver<usize> = broadcast.subscribe();
-    broadcast.send(20).unwrap();
-    assert_eq!(rec1.recv().await, Ok(20));
-    assert_eq!(rec2.recv().await, Ok(20));
-}
-```
 # Path: hyperlane-broadcast/src/broadcast/mod.rs
 ```rust
 mod r#const;
 mod r#impl;
 mod r#struct;
-#[cfg(test)]
-mod test;
 mod r#trait;
 mod r#type;
 pub use {r#const::*, r#struct::*, r#trait::*, r#type::*};
@@ -5290,7 +5275,47 @@ use crate::*;
 #[derive(Clone, Debug)]
 pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>);
 ```
-# Path: hyperlane-broadcast/src/broadcast_map/test.rs
+# Path: hyperlane-broadcast/src/broadcast_map/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+mod r#trait;
+mod r#type;
+pub use {r#struct::*, r#trait::*, r#type::*};
+```
+# Path: hyperlane-broadcast/tests/mod.rs
+```rust
+mod broadcast;
+mod broadcast_map;
+use hyperlane_broadcast::*;
+use std::time::Duration;
+use tokio::{
+    sync::broadcast::error::{RecvError, SendError},
+    time::{error::Elapsed, timeout},
+};
+```
+# Path: hyperlane-broadcast/tests/broadcast/mod.rs
+```rust
+mod r#fn;
+```
+# Path: hyperlane-broadcast/tests/broadcast/fn.rs
+```rust
+use crate::*;
+#[tokio::test]
+pub async fn test_broadcast() {
+    let broadcast: Broadcast<usize> = Broadcast::new(10);
+    let mut rec1: BroadcastReceiver<usize> = broadcast.subscribe();
+    let mut rec2: BroadcastReceiver<usize> = broadcast.subscribe();
+    broadcast.send(20).unwrap();
+    assert_eq!(rec1.recv().await, Ok(20));
+    assert_eq!(rec2.recv().await, Ok(20));
+}
+```
+# Path: hyperlane-broadcast/tests/broadcast_map/mod.rs
+```rust
+mod r#fn;
+```
+# Path: hyperlane-broadcast/tests/broadcast_map/fn.rs
 ```rust
 use crate::*;
 #[tokio::test]
@@ -5362,16 +5387,6 @@ pub async fn test_broadcast_map_send() {
     let non_existent: Option<ReceiverCount> = broadcast_map.send("non_existent_key", 100);
     assert_eq!(non_existent, None);
 }
-```
-# Path: hyperlane-broadcast/src/broadcast_map/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-#[cfg(test)]
-mod test;
-mod r#trait;
-mod r#type;
-pub use {r#struct::*, r#trait::*, r#type::*};
 ```
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
@@ -9566,7 +9581,7 @@ To install `hyperlane-cli` run cmd:
 cargo add hyperlane-cli
 ```
 ## Contact
-# Path: hyperlane-cli/src/main.rs
+# Path: hyperlane-cli/src/lib.rs
 ```rust
 mod bump;
 mod command;
@@ -9578,11 +9593,11 @@ mod publish;
 mod template;
 mod version;
 mod watch;
-pub(crate) use {
+pub use {
     bump::*, command::*, config::*, fmt::*, help::*, new::*, publish::*, template::*, version::*,
     watch::*,
 };
-pub(crate) use std::{
+pub use std::{
     collections::{HashMap, VecDeque},
     env::args,
     fs::{create_dir_all, read_to_string, write},
@@ -9591,10 +9606,14 @@ pub(crate) use std::{
     str::FromStr,
     sync::{Arc, LazyLock},
 };
-pub(crate) use {
+pub use {
     regex::{Captures, Regex},
     tokio::{process::Command, sync::Mutex},
 };
+```
+# Path: hyperlane-cli/src/main.rs
+```rust
+use hyperlane_cli::*;
 #[tokio::main]
 async fn main() {
     let args: Args = parse_args();
@@ -9719,7 +9738,7 @@ impl FromStr for TemplateType {
     }
 }
 impl TemplateConfig {
-    pub(crate) fn new(
+    pub fn new(
         template_type: TemplateType,
         component_name: String,
         model_sub_type: Option<ModelSubType>,
@@ -9748,194 +9767,11 @@ impl FromStr for ModelSubType {
 ```rust
 use crate::*;
 #[derive(Clone, Debug)]
-pub(crate) struct TemplateConfig {
+pub struct TemplateConfig {
     pub template_type: TemplateType,
     pub component_name: String,
     pub model_sub_type: Option<ModelSubType>,
     pub base_directory: String,
-}
-```
-# Path: hyperlane-cli/src/template/test.rs
-```rust
-use std::str::FromStr;
-use crate::*;
-#[test]
-fn test_template_config_new() {
-    let config: TemplateConfig =
-        TemplateConfig::new(TemplateType::Controller, "test".to_string(), None);
-    assert_eq!(config.template_type, TemplateType::Controller);
-    assert_eq!(config.component_name, "test");
-    assert_eq!(config.model_sub_type, None);
-    assert_eq!(config.base_directory, "./application");
-}
-#[test]
-fn test_template_config_with_model_sub_type() {
-    let config: TemplateConfig = TemplateConfig::new(
-        TemplateType::Model,
-        "test".to_string(),
-        Some(ModelSubType::Request),
-    );
-    assert_eq!(config.template_type, TemplateType::Model);
-    assert_eq!(config.model_sub_type, Some(ModelSubType::Request));
-}
-#[test]
-fn test_template_config_clone() {
-    let config: TemplateConfig =
-        TemplateConfig::new(TemplateType::Service, "test".to_string(), None);
-    let cloned: TemplateConfig = config.clone();
-    assert_eq!(cloned.template_type, config.template_type);
-    assert_eq!(cloned.component_name, config.component_name);
-    assert_eq!(cloned.model_sub_type, config.model_sub_type);
-    assert_eq!(cloned.base_directory, config.base_directory);
-}
-#[test]
-fn test_template_config_debug() {
-    let config: TemplateConfig =
-        TemplateConfig::new(TemplateType::Controller, "test".to_string(), None);
-    let debug_str: String = format!("{config:?}");
-    assert!(debug_str.contains("Controller"));
-    assert!(debug_str.contains("test"));
-}
-#[test]
-fn test_template_error_display() {
-    let error1: TemplateError = TemplateError::InvalidModelSubType("bad".to_string());
-    assert!(error1.to_string().contains("bad"));
-    let error2: TemplateError = TemplateError::DirectoryExists("/path".to_string());
-    assert!(error2.to_string().contains("/path"));
-}
-#[test]
-fn test_template_error_from_io() {
-    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
-    let template_error: TemplateError = TemplateError::from(io_error);
-    assert!(template_error.to_string().contains("IO error"));
-}
-#[test]
-fn test_template_error_debug() {
-    let error: TemplateError = TemplateError::InvalidModelSubType("test".to_string());
-    let debug_str: String = format!("{error:?}");
-    assert!(debug_str.contains("InvalidModelSubType"));
-}
-#[test]
-fn test_template_type_equality() {
-    assert_eq!(TemplateType::Controller, TemplateType::Controller);
-    assert_ne!(TemplateType::Controller, TemplateType::Service);
-}
-#[test]
-fn test_model_sub_type_equality() {
-    assert_eq!(ModelSubType::Request, ModelSubType::Request);
-    assert_ne!(ModelSubType::Request, ModelSubType::Response);
-}
-#[test]
-fn test_template_type_debug() {
-    let ty: TemplateType = TemplateType::Controller;
-    let debug_str: String = format!("{ty:?}");
-    assert_eq!(debug_str, "Controller");
-}
-#[test]
-fn test_model_sub_type_debug() {
-    let ty: ModelSubType = ModelSubType::Application;
-    let debug_str: String = format!("{ty:?}");
-    assert_eq!(debug_str, "Application");
-}
-#[test]
-fn test_all_template_types() {
-    let _ = TemplateType::Controller;
-    let _ = TemplateType::Domain;
-    let _ = TemplateType::Exception;
-    let _ = TemplateType::Mapper;
-    let _ = TemplateType::Model;
-    let _ = TemplateType::Repository;
-    let _ = TemplateType::Service;
-    let _ = TemplateType::Utils;
-    let _ = TemplateType::View;
-}
-#[test]
-fn test_all_model_sub_types() {
-    let _ = ModelSubType::Application;
-    let _ = ModelSubType::Request;
-    let _ = ModelSubType::Response;
-}
-#[test]
-fn test_parse_template_type_valid() {
-    assert_eq!(
-        TemplateType::from_str("controller").ok(),
-        Some(TemplateType::Controller)
-    );
-    assert_eq!(
-        TemplateType::from_str("Controller").ok(),
-        Some(TemplateType::Controller)
-    );
-    assert_eq!(
-        TemplateType::from_str("CONTROLLER").ok(),
-        Some(TemplateType::Controller)
-    );
-    assert_eq!(
-        TemplateType::from_str("domain").ok(),
-        Some(TemplateType::Domain)
-    );
-    assert_eq!(
-        TemplateType::from_str("exception").ok(),
-        Some(TemplateType::Exception)
-    );
-    assert_eq!(
-        TemplateType::from_str("mapper").ok(),
-        Some(TemplateType::Mapper)
-    );
-    assert_eq!(
-        TemplateType::from_str("model").ok(),
-        Some(TemplateType::Model)
-    );
-    assert_eq!(
-        TemplateType::from_str("repository").ok(),
-        Some(TemplateType::Repository)
-    );
-    assert_eq!(
-        TemplateType::from_str("service").ok(),
-        Some(TemplateType::Service)
-    );
-    assert_eq!(
-        TemplateType::from_str("utils").ok(),
-        Some(TemplateType::Utils)
-    );
-    assert_eq!(
-        TemplateType::from_str("view").ok(),
-        Some(TemplateType::View)
-    );
-}
-#[test]
-fn test_parse_template_type_invalid() {
-    assert_eq!(TemplateType::from_str("invalid").ok(), None);
-    assert_eq!(TemplateType::from_str("").ok(), None);
-    assert_eq!(TemplateType::from_str("unknown").ok(), None);
-}
-#[test]
-fn test_parse_model_sub_type_valid() {
-    assert_eq!(
-        ModelSubType::from_str("application").ok(),
-        Some(ModelSubType::Application)
-    );
-    assert_eq!(
-        ModelSubType::from_str("Application").ok(),
-        Some(ModelSubType::Application)
-    );
-    assert_eq!(
-        ModelSubType::from_str("APPLICATION").ok(),
-        Some(ModelSubType::Application)
-    );
-    assert_eq!(
-        ModelSubType::from_str("request").ok(),
-        Some(ModelSubType::Request)
-    );
-    assert_eq!(
-        ModelSubType::from_str("response").ok(),
-        Some(ModelSubType::Response)
-    );
-}
-#[test]
-fn test_parse_model_sub_type_invalid() {
-    assert_eq!(ModelSubType::from_str("invalid").ok(), None);
-    assert_eq!(ModelSubType::from_str("").ok(), None);
-    assert_eq!(ModelSubType::from_str("unknown").ok(), None);
 }
 ```
 # Path: hyperlane-cli/src/template/mod.rs
@@ -9944,9 +9780,7 @@ mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#struct;
-#[cfg(test)]
-mod test;
-pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/template/fn.rs
 ```rust
@@ -10134,7 +9968,7 @@ fn create_model_template(
     write(&struct_rs, "use super::*;\n")?;
     Ok(())
 }
-pub(crate) async fn execute_template(
+pub async fn execute_template(
     template_type: TemplateType,
     component_name: &str,
     model_sub_type: Option<ModelSubType>,
@@ -10184,7 +10018,7 @@ pub(crate) async fn execute_template(
 # Path: hyperlane-cli/src/template/enum.rs
 ```rust
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum TemplateType {
+pub enum TemplateType {
     Controller,
     Domain,
     Exception,
@@ -10196,13 +10030,13 @@ pub(crate) enum TemplateType {
     View,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ModelSubType {
+pub enum ModelSubType {
     Application,
     Request,
     Response,
 }
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum TemplateError {
+pub enum TemplateError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Invalid template type: {0}")]
@@ -10216,32 +10050,15 @@ pub(crate) enum TemplateError {
 # Path: hyperlane-cli/src/fmt/static.rs
 ```rust
 use crate::*;
-pub(crate) static DERIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+pub static DERIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     regex::Regex::new(r"#\[derive\s*\(([^)]+)\)\]").expect("Invalid regex pattern")
 });
-```
-# Path: hyperlane-cli/src/fmt/test.rs
-```rust
-use crate::*;
-#[test]
-fn test_format_path_integration() {
-    use std::path::PathBuf;
-    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_fmt");
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let test_file: PathBuf = tmp_dir.join("test.rs");
-    std::fs::write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
-    let rt: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
-    let result: Result<(), std::io::Error> = rt.block_on(format_path(&tmp_dir));
-    assert!(result.is_ok());
-}
 ```
 # Path: hyperlane-cli/src/fmt/mod.rs
 ```rust
 mod r#fn;
 mod r#static;
-#[cfg(test)]
-mod test;
-pub(crate) use {r#fn::*, r#static::*};
+pub use {r#fn::*, r#static::*};
 ```
 # Path: hyperlane-cli/src/fmt/fn.rs
 ```rust
@@ -10397,7 +10214,7 @@ async fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {
     }
     Ok(())
 }
-pub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
+pub async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
     let manifest_path: String = args
         .manifest_path
         .clone()
@@ -10423,7 +10240,7 @@ pub(crate) async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
     }
     Ok(())
 }
-pub(crate) async fn format_path(path: &std::path::Path) -> Result<(), std::io::Error> {
+pub async fn format_path(path: &std::path::Path) -> Result<(), std::io::Error> {
     let mut cmd: Command = Command::new("cargo");
     cmd.arg("fmt").arg("--").arg(path);
     cmd.stdout(Stdio::null()).stderr(Stdio::null());
@@ -10434,11 +10251,11 @@ pub(crate) async fn format_path(path: &std::path::Path) -> Result<(), std::io::E
 # Path: hyperlane-cli/src/help/mod.rs
 ```rust
 mod r#fn;
-pub(crate) use r#fn::*;
+pub use r#fn::*;
 ```
 # Path: hyperlane-cli/src/help/fn.rs
 ```rust
-pub(crate) fn print_help() {
+pub fn print_help() {
     println!("hyperlane-cli [COMMAND] [OPTIONS]");
     println!();
     println!("Commands:");
@@ -10481,24 +10298,14 @@ pub(crate) fn print_help() {
     println!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
 }
 ```
-# Path: hyperlane-cli/src/version/test.rs
-```rust
-use crate::*;
-#[test]
-fn test_print_version_runs() {
-    print_version();
-}
-```
 # Path: hyperlane-cli/src/version/mod.rs
 ```rust
 mod r#fn;
-#[cfg(test)]
-mod test;
-pub(crate) use r#fn::*;
+pub use r#fn::*;
 ```
 # Path: hyperlane-cli/src/version/fn.rs
 ```rust
-pub(crate) fn print_version() {
+pub fn print_version() {
     println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
 }
 ```
@@ -10506,7 +10313,7 @@ pub(crate) fn print_version() {
 ```rust
 use crate::*;
 impl NewProjectConfig {
-    pub(crate) fn new(project_name: String) -> Self {
+    pub fn new(project_name: String) -> Self {
         Self {
             project_name,
             template_url: "https://github.com/hyperlane-dev/hyperlane-quick-start".to_string(),
@@ -10517,58 +10324,9 @@ impl NewProjectConfig {
 # Path: hyperlane-cli/src/new/struct.rs
 ```rust
 #[derive(Clone, Debug)]
-pub(crate) struct NewProjectConfig {
+pub struct NewProjectConfig {
     pub project_name: String,
     pub template_url: String,
-}
-```
-# Path: hyperlane-cli/src/new/test.rs
-```rust
-use crate::*;
-#[test]
-fn test_new_project_config_creation() {
-    let config: NewProjectConfig = NewProjectConfig::new("test-project".to_string());
-    assert_eq!(config.project_name, "test-project");
-    assert_eq!(
-        config.template_url,
-        "https://github.com/hyperlane-dev/hyperlane-quick-start"
-    );
-}
-#[test]
-fn test_new_error_display() {
-    let error1: NewError = NewError::GitNotFound;
-    assert!(error1.to_string().contains("Git is not installed"));
-    let error2: NewError = NewError::ProjectExists("test".to_string());
-    assert!(error2.to_string().contains("test"));
-    let error3: NewError = NewError::CloneFailed("network error".to_string());
-    assert!(error3.to_string().contains("network error"));
-    let error4: NewError = NewError::InvalidName("bad name".to_string());
-    assert!(error4.to_string().contains("bad name"));
-}
-#[test]
-fn test_new_error_from_io() {
-    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
-    let new_error: NewError = NewError::from(io_error);
-    assert!(new_error.to_string().contains("test"));
-}
-#[test]
-fn test_new_error_debug() {
-    let error: NewError = NewError::GitNotFound;
-    let debug_str: String = format!("{error:?}");
-    assert!(debug_str.contains("GitNotFound"));
-}
-#[test]
-fn test_new_project_config_clone() {
-    let config: NewProjectConfig = NewProjectConfig::new("test".to_string());
-    let cloned: NewProjectConfig = config.clone();
-    assert_eq!(cloned.project_name, config.project_name);
-    assert_eq!(cloned.template_url, config.template_url);
-}
-#[test]
-fn test_new_project_config_debug() {
-    let config: NewProjectConfig = NewProjectConfig::new("test".to_string());
-    let debug_str: String = format!("{config:?}");
-    assert!(debug_str.contains("test"));
 }
 ```
 # Path: hyperlane-cli/src/new/mod.rs
@@ -10577,9 +10335,7 @@ mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#struct;
-#[cfg(test)]
-mod test;
-pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/new/fn.rs
 ```rust
@@ -10637,7 +10393,7 @@ async fn git_clone(config: &NewProjectConfig) -> Result<(), NewError> {
         Err(NewError::CloneFailed(stderr))
     }
 }
-pub(crate) async fn execute_new(project_name: &str) -> Result<(), NewError> {
+pub async fn execute_new(project_name: &str) -> Result<(), NewError> {
     validate_project_name(project_name)?;
     check_git_available().await?;
     let config: NewProjectConfig = NewProjectConfig::new(project_name.to_string());
@@ -10655,7 +10411,7 @@ pub(crate) async fn execute_new(project_name: &str) -> Result<(), NewError> {
 # Path: hyperlane-cli/src/new/enum.rs
 ```rust
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum NewError {
+pub enum NewError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Git is not installed or not found in PATH")]
@@ -10684,116 +10440,17 @@ pub struct Args {
     pub component_name: Option<String>,
 }
 ```
-# Path: hyperlane-cli/src/config/test.rs
-```rust
-use crate::*;
-#[test]
-fn test_args_default_values() {
-    let args: Args = Args {
-        command: CommandType::Help,
-        check: false,
-        manifest_path: None,
-        bump_type: None,
-        max_retries: 3,
-        project_name: None,
-        template_type: None,
-        model_sub_type: None,
-        component_name: None,
-    };
-    assert!(!args.check);
-    assert_eq!(args.max_retries, 3);
-    assert!(args.manifest_path.is_none());
-    assert!(args.bump_type.is_none());
-    assert!(args.project_name.is_none());
-    assert!(args.template_type.is_none());
-    assert!(args.model_sub_type.is_none());
-    assert!(args.component_name.is_none());
-}
-#[test]
-fn test_args_with_values() {
-    let args: Args = Args {
-        command: CommandType::Bump,
-        check: true,
-        manifest_path: Some("./test/Cargo.toml".to_string()),
-        bump_type: Some(BumpVersionType::Minor),
-        max_retries: 5,
-        project_name: Some("test-project".to_string()),
-        template_type: Some(TemplateType::Controller),
-        model_sub_type: None,
-        component_name: Some("test".to_string()),
-    };
-    assert!(args.check);
-    assert_eq!(args.max_retries, 5);
-    assert_eq!(args.manifest_path, Some("./test/Cargo.toml".to_string()));
-    assert_eq!(args.bump_type, Some(BumpVersionType::Minor));
-    assert_eq!(args.project_name, Some("test-project".to_string()));
-    assert_eq!(args.template_type, Some(TemplateType::Controller));
-    assert_eq!(args.component_name, Some("test".to_string()));
-}
-#[test]
-fn test_args_with_model_subtype() {
-    let args: Args = Args {
-        command: CommandType::Template,
-        check: false,
-        manifest_path: None,
-        bump_type: None,
-        max_retries: 3,
-        project_name: None,
-        template_type: Some(TemplateType::Model),
-        model_sub_type: Some(ModelSubType::Request),
-        component_name: Some("user".to_string()),
-    };
-    assert_eq!(args.template_type, Some(TemplateType::Model));
-    assert_eq!(args.model_sub_type, Some(ModelSubType::Request));
-    assert_eq!(args.component_name, Some("user".to_string()));
-}
-#[test]
-fn test_command_type_enum_values() {
-    let _: CommandType = CommandType::Fmt;
-    let _: CommandType = CommandType::Watch;
-    let _: CommandType = CommandType::Bump;
-    let _: CommandType = CommandType::Publish;
-    let _: CommandType = CommandType::New;
-    let _: CommandType = CommandType::Template;
-    let _: CommandType = CommandType::Help;
-    let _: CommandType = CommandType::Version;
-}
-#[test]
-fn test_args_clone() {
-    let args: Args = Args {
-        command: CommandType::Bump,
-        check: true,
-        manifest_path: Some("./test/Cargo.toml".to_string()),
-        bump_type: Some(BumpVersionType::Minor),
-        max_retries: 5,
-        project_name: Some("test-project".to_string()),
-        template_type: Some(TemplateType::Controller),
-        model_sub_type: None,
-        component_name: Some("test".to_string()),
-    };
-    let cloned: Args = args.clone();
-    assert_eq!(cloned.check, args.check);
-    assert_eq!(cloned.max_retries, args.max_retries);
-    assert_eq!(cloned.manifest_path, args.manifest_path);
-    assert_eq!(cloned.bump_type, args.bump_type);
-    assert_eq!(cloned.project_name, args.project_name);
-    assert_eq!(cloned.template_type, args.template_type);
-    assert_eq!(cloned.component_name, args.component_name);
-}
-```
 # Path: hyperlane-cli/src/config/mod.rs
 ```rust
 mod r#fn;
 mod r#struct;
-#[cfg(test)]
-mod test;
-pub(crate) use {r#fn::*, r#struct::*};
+pub use {r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/config/fn.rs
 ```rust
 use std::str::FromStr;
 use crate::*;
-pub(crate) fn parse_args() -> Args {
+pub fn parse_args() -> Args {
     let raw_args: Vec<String> = args().collect();
     let mut command: CommandType = CommandType::Help;
     let mut check: bool = false;
@@ -10925,115 +10582,18 @@ pub(crate) fn parse_args() -> Args {
 # Path: hyperlane-cli/src/publish/struct.rs
 ```rust
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Package {
+pub struct Package {
     pub name: String,
     pub version: String,
     pub path: std::path::PathBuf,
     pub local_dependencies: Vec<String>,
 }
 #[derive(Clone, Debug)]
-pub(crate) struct PublishResult {
+pub struct PublishResult {
     pub package_name: String,
     pub success: bool,
     pub error: Option<String>,
     pub retries: u32,
-}
-```
-# Path: hyperlane-cli/src/publish/test.rs
-```rust
-use crate::*;
-#[test]
-fn test_package_creation() {
-    let package: Package = Package {
-        name: "test-package".to_string(),
-        version: "0.1.0".to_string(),
-        path: std::path::PathBuf::from("."),
-        local_dependencies: vec![],
-    };
-    assert_eq!(package.name, "test-package");
-    assert_eq!(package.version, "0.1.0");
-    assert!(package.local_dependencies.is_empty());
-}
-#[test]
-fn test_package_clone() {
-    let package: Package = Package {
-        name: "test-package".to_string(),
-        version: "0.1.0".to_string(),
-        path: std::path::PathBuf::from("."),
-        local_dependencies: vec!["dep1".to_string()],
-    };
-    let cloned: Package = package.clone();
-    assert_eq!(cloned.name, package.name);
-    assert_eq!(cloned.version, package.version);
-    assert_eq!(cloned.local_dependencies.len(), 1);
-}
-#[test]
-fn test_package_equality() {
-    let package1: Package = Package {
-        name: "test".to_string(),
-        version: "0.1.0".to_string(),
-        path: std::path::PathBuf::from("."),
-        local_dependencies: vec![],
-    };
-    let package2: Package = Package {
-        name: "test".to_string(),
-        version: "0.1.0".to_string(),
-        path: std::path::PathBuf::from("."),
-        local_dependencies: vec![],
-    };
-    assert_eq!(package1, package2);
-}
-#[test]
-fn test_publish_result_success() {
-    let result: PublishResult = PublishResult {
-        package_name: "test".to_string(),
-        success: true,
-        error: None,
-        retries: 0,
-    };
-    assert_eq!(result.package_name, "test");
-    assert!(result.success);
-    assert!(result.error.is_none());
-    assert_eq!(result.retries, 0);
-}
-#[test]
-fn test_publish_result_failure() {
-    let result: PublishResult = PublishResult {
-        package_name: "test".to_string(),
-        success: false,
-        error: Some("network error".to_string()),
-        retries: 3,
-    };
-    assert!(!result.success);
-    assert_eq!(result.error, Some("network error".to_string()));
-    assert_eq!(result.retries, 3);
-}
-#[test]
-fn test_publish_result_clone() {
-    let result: PublishResult = PublishResult {
-        package_name: "test".to_string(),
-        success: true,
-        error: None,
-        retries: 0,
-    };
-    let cloned: PublishResult = result.clone();
-    assert_eq!(cloned.package_name, result.package_name);
-    assert_eq!(cloned.success, result.success);
-    assert_eq!(cloned.error, result.error);
-    assert_eq!(cloned.retries, result.retries);
-}
-#[test]
-fn test_publish_error_display() {
-    let error1: PublishError = PublishError::ManifestParseError;
-    assert!(error1.to_string().contains("Failed to parse"));
-    let error2: PublishError = PublishError::CircularDependency;
-    assert!(error2.to_string().contains("Circular dependency"));
-}
-#[test]
-fn test_publish_error_from_io() {
-    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
-    let publish_error: PublishError = PublishError::from(io_error);
-    assert!(publish_error.to_string().contains("IO error"));
 }
 ```
 # Path: hyperlane-cli/src/publish/mod.rs
@@ -11041,9 +10601,7 @@ fn test_publish_error_from_io() {
 mod r#enum;
 mod r#fn;
 mod r#struct;
-#[cfg(test)]
-mod test;
-pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/publish/fn.rs
 ```rust
@@ -11246,7 +10804,7 @@ async fn publish_single_package(package: &Package) -> Result<(), Box<dyn std::er
         Err(stderr.into())
     }
 }
-pub(crate) async fn execute_publish(
+pub async fn execute_publish(
     manifest_path: &str,
     max_retries: u32,
 ) -> Result<Vec<PublishResult>, PublishError> {
@@ -11282,7 +10840,7 @@ pub(crate) async fn execute_publish(
 # Path: hyperlane-cli/src/publish/enum.rs
 ```rust
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum PublishError {
+pub enum PublishError {
     #[error("Failed to parse Cargo.toml")]
     ManifestParseError,
     #[error("Circular dependency detected")]
@@ -11294,12 +10852,12 @@ pub(crate) enum PublishError {
 # Path: hyperlane-cli/src/command/mod.rs
 ```rust
 mod r#enum;
-pub(crate) use r#enum::*;
+pub use r#enum::*;
 ```
 # Path: hyperlane-cli/src/command/enum.rs
 ```rust
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommandType {
+pub enum CommandType {
     Fmt,
     Watch,
     Bump,
@@ -11313,16 +10871,548 @@ pub(crate) enum CommandType {
 # Path: hyperlane-cli/src/bump/struct.rs
 ```rust
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Version {
+pub struct Version {
     pub major: u64,
     pub minor: u64,
     pub patch: u64,
     pub prerelease: Option<String>,
 }
 ```
-# Path: hyperlane-cli/src/bump/test.rs
+# Path: hyperlane-cli/src/bump/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#struct;
+pub use {r#enum::*, r#fn::*, r#struct::*};
+```
+# Path: hyperlane-cli/src/bump/fn.rs
 ```rust
 use crate::*;
+fn parse_version(version_str: &str) -> Option<Version> {
+    let parts: Vec<&str> = version_str.split('-').collect();
+    let version_part: &str = parts.first()?;
+    let prerelease: Option<String> = parts.get(1).map(|s: &&str| s.to_string());
+    let nums: Vec<&str> = version_part.split('.').collect();
+    if nums.len() != 3 {
+        return None;
+    }
+    let major: u64 = nums.first()?.parse().ok()?;
+    let minor: u64 = nums.get(1)?.parse().ok()?;
+    let patch: u64 = nums.get(2)?.parse().ok()?;
+    Some(Version {
+        major,
+        minor,
+        patch,
+        prerelease,
+    })
+}
+fn parse_prerelease(prerelease: &str) -> Option<(&str, u64)> {
+    let parts: Vec<&str> = prerelease.split('.').collect();
+    let pre_type: &str = parts.first()?;
+    let number: u64 = parts
+        .get(1)
+        .and_then(|s: &&str| s.parse().ok())
+        .unwrap_or(0);
+    Some((pre_type, number))
+}
+fn get_next_prerelease(current: Option<&String>, target_type: &str) -> String {
+    match current {
+        Some(pre) => {
+            if let Some((pre_type, number)) = parse_prerelease(pre)
+                && pre_type == target_type
+                && number > 0
+            {
+                return format!("{}.{}", target_type, number + 1);
+            }
+            format!("{target_type}.1")
+        }
+        None => target_type.to_string(),
+    }
+}
+fn version_to_string(version: &Version) -> String {
+    let base: String = format!("{}.{}.{}", version.major, version.minor, version.patch);
+    match &version.prerelease {
+        Some(pre) => format!("{base}-{pre}"),
+        None => base,
+    }
+}
+fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
+    match bump_type {
+        BumpVersionType::Patch => Version {
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch + 1,
+            prerelease: None,
+        },
+        BumpVersionType::Minor => Version {
+            major: version.major,
+            minor: version.minor + 1,
+            patch: 0,
+            prerelease: None,
+        },
+        BumpVersionType::Major => Version {
+            major: version.major + 1,
+            minor: 0,
+            patch: 0,
+            prerelease: None,
+        },
+        BumpVersionType::Release => Version {
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+            prerelease: None,
+        },
+        BumpVersionType::Alpha => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "alpha");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+        BumpVersionType::Beta => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "beta");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+        BumpVersionType::Rc => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "rc");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+    }
+}
+fn find_version_position(line: &str) -> Option<(usize, usize)> {
+    let trimmed: &str = line.trim();
+    if !trimmed.starts_with("version") || !trimmed.contains('=') {
+        return None;
+    }
+    let eq_pos: usize = line.find('=')?;
+    let after_eq: &str = &line[eq_pos + 1..];
+    let quote_start: usize = after_eq.find('"')?;
+    let after_first_quote: &str = &after_eq[quote_start + 1..];
+    let quote_end: usize = after_first_quote.find('"')?;
+    let version_start: usize = eq_pos + 1 + quote_start + 1;
+    let version_end: usize = version_start + quote_end;
+    Some((version_start, version_end))
+}
+pub fn execute_bump(
+    manifest_path: &str,
+    bump_type: &BumpVersionType,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let path: &Path = Path::new(manifest_path);
+    let content: String = read_to_string(path)?;
+    let mut new_version: Option<String> = None;
+    let mut found_version: bool = false;
+    let mut updated_content: String = content.clone();
+    for line in content.lines() {
+        if found_version {
+            break;
+        }
+        if let Some((version_start, version_end)) = find_version_position(line) {
+            let version_str: &str = &line[version_start..version_end];
+            if let Some(version) = parse_version(version_str) {
+                let bumped: Version = bump_version(&version, bump_type);
+                let version_string: String = version_to_string(&bumped);
+                new_version = Some(version_string.clone());
+                let new_line: String = format!(
+                    "{}{}{}",
+                    &line[..version_start],
+                    version_string,
+                    &line[version_end..]
+                );
+                updated_content = updated_content.replacen(line, &new_line, 1);
+                found_version = true;
+            }
+        }
+    }
+    if !found_version {
+        return Err("version field not found in Cargo.toml".into());
+    }
+    write(path, updated_content)?;
+    match new_version {
+        Some(v) => Ok(v),
+        None => Err("failed to bump version".into()),
+    }
+}
+```
+# Path: hyperlane-cli/src/bump/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BumpVersionType {
+    Patch,
+    Minor,
+    Major,
+    Release,
+    Alpha,
+    Beta,
+    Rc,
+}
+```
+# Path: hyperlane-cli/src/watch/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+```
+# Path: hyperlane-cli/src/watch/fn.rs
+```rust
+use crate::*;
+async fn is_cargo_watch_installed() -> bool {
+    Command::new("cargo-watch")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .is_ok_and(|status: ExitStatus| status.success())
+}
+async fn install_cargo_watch() -> Result<(), std::io::Error> {
+    println!("cargo-watch not found, installing...");
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("install").arg("cargo-watch");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("failed to install cargo-watch"));
+    }
+    Ok(())
+}
+pub async fn execute_watch() -> Result<(), std::io::Error> {
+    if !is_cargo_watch_installed().await {
+        install_cargo_watch().await?;
+    }
+    let mut cmd: Command = Command::new("cargo-watch");
+    cmd.arg("--clear")
+        .arg("--skip-local-deps")
+        .arg("-q")
+        .arg("-x")
+        .arg("run");
+    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    let status: ExitStatus = cmd.status().await?;
+    if !status.success() {
+        return Err(std::io::Error::other("cargo-watch failed"));
+    }
+    Ok(())
+}
+```
+# Path: hyperlane-cli/tests/mod.rs
+```rust
+mod bump;
+mod config;
+mod fmt;
+mod new;
+mod publish;
+mod version;
+pub use hyperlane_cli::*;
+```
+# Path: hyperlane-cli/tests/fmt/mod.rs
+```rust
+mod r#fn;
+use crate::*;
+```
+# Path: hyperlane-cli/tests/fmt/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_format_path_integration() {
+    use std::path::PathBuf;
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_fmt");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let test_file: PathBuf = tmp_dir.join("test.rs");
+    std::fs::write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
+    let rt: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
+    let result: Result<(), std::io::Error> = rt.block_on(format_path(&tmp_dir));
+    assert!(result.is_ok());
+}
+```
+# Path: hyperlane-cli/tests/version/mod.rs
+```rust
+mod r#fn;
+use crate::*;
+```
+# Path: hyperlane-cli/tests/version/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_print_version_runs() {
+    print_version();
+}
+```
+# Path: hyperlane-cli/tests/new/mod.rs
+```rust
+mod r#fn;
+use crate::*;
+```
+# Path: hyperlane-cli/tests/new/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_new_project_config_creation() {
+    let config: NewProjectConfig = NewProjectConfig::new("test-project".to_string());
+    assert_eq!(config.project_name, "test-project");
+    assert_eq!(
+        config.template_url,
+        "https://github.com/hyperlane-dev/hyperlane-quick-start"
+    );
+}
+#[test]
+fn test_new_error_display() {
+    let error1: NewError = NewError::GitNotFound;
+    assert!(error1.to_string().contains("Git is not installed"));
+    let error2: NewError = NewError::ProjectExists("test".to_string());
+    assert!(error2.to_string().contains("test"));
+    let error3: NewError = NewError::CloneFailed("network error".to_string());
+    assert!(error3.to_string().contains("network error"));
+    let error4: NewError = NewError::InvalidName("bad name".to_string());
+    assert!(error4.to_string().contains("bad name"));
+}
+#[test]
+fn test_new_error_from_io() {
+    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
+    let new_error: NewError = NewError::from(io_error);
+    assert!(new_error.to_string().contains("test"));
+}
+#[test]
+fn test_new_error_debug() {
+    let error: NewError = NewError::GitNotFound;
+    let debug_str: String = format!("{error:?}");
+    assert!(debug_str.contains("GitNotFound"));
+}
+#[test]
+fn test_new_project_config_clone() {
+    let config: NewProjectConfig = NewProjectConfig::new("test".to_string());
+    let cloned: NewProjectConfig = config.clone();
+    assert_eq!(cloned.project_name, config.project_name);
+    assert_eq!(cloned.template_url, config.template_url);
+}
+#[test]
+fn test_new_project_config_debug() {
+    let config: NewProjectConfig = NewProjectConfig::new("test".to_string());
+    let debug_str: String = format!("{config:?}");
+    assert!(debug_str.contains("test"));
+}
+```
+# Path: hyperlane-cli/tests/config/mod.rs
+```rust
+mod r#fn;
+use crate::*;
+```
+# Path: hyperlane-cli/tests/config/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_args_default_values() {
+    let args: Args = Args {
+        command: CommandType::Help,
+        check: false,
+        manifest_path: None,
+        bump_type: None,
+        max_retries: 3,
+        project_name: None,
+        template_type: None,
+        model_sub_type: None,
+        component_name: None,
+    };
+    assert!(!args.check);
+    assert_eq!(args.max_retries, 3);
+    assert!(args.manifest_path.is_none());
+    assert!(args.bump_type.is_none());
+    assert!(args.project_name.is_none());
+    assert!(args.template_type.is_none());
+    assert!(args.model_sub_type.is_none());
+    assert!(args.component_name.is_none());
+}
+#[test]
+fn test_args_with_values() {
+    let args: Args = Args {
+        command: CommandType::Bump,
+        check: true,
+        manifest_path: Some("./test/Cargo.toml".to_string()),
+        bump_type: Some(BumpVersionType::Minor),
+        max_retries: 5,
+        project_name: Some("test-project".to_string()),
+        template_type: Some(TemplateType::Controller),
+        model_sub_type: None,
+        component_name: Some("test".to_string()),
+    };
+    assert!(args.check);
+    assert_eq!(args.max_retries, 5);
+    assert_eq!(args.manifest_path, Some("./test/Cargo.toml".to_string()));
+    assert_eq!(args.bump_type, Some(BumpVersionType::Minor));
+    assert_eq!(args.project_name, Some("test-project".to_string()));
+    assert_eq!(args.template_type, Some(TemplateType::Controller));
+    assert_eq!(args.component_name, Some("test".to_string()));
+}
+#[test]
+fn test_args_with_model_subtype() {
+    let args: Args = Args {
+        command: CommandType::Template,
+        check: false,
+        manifest_path: None,
+        bump_type: None,
+        max_retries: 3,
+        project_name: None,
+        template_type: Some(TemplateType::Model),
+        model_sub_type: Some(ModelSubType::Request),
+        component_name: Some("user".to_string()),
+    };
+    assert_eq!(args.template_type, Some(TemplateType::Model));
+    assert_eq!(args.model_sub_type, Some(ModelSubType::Request));
+    assert_eq!(args.component_name, Some("user".to_string()));
+}
+#[test]
+fn test_command_type_enum_values() {
+    let _: CommandType = CommandType::Fmt;
+    let _: CommandType = CommandType::Watch;
+    let _: CommandType = CommandType::Bump;
+    let _: CommandType = CommandType::Publish;
+    let _: CommandType = CommandType::New;
+    let _: CommandType = CommandType::Template;
+    let _: CommandType = CommandType::Help;
+    let _: CommandType = CommandType::Version;
+}
+#[test]
+fn test_args_clone() {
+    let args: Args = Args {
+        command: CommandType::Bump,
+        check: true,
+        manifest_path: Some("./test/Cargo.toml".to_string()),
+        bump_type: Some(BumpVersionType::Minor),
+        max_retries: 5,
+        project_name: Some("test-project".to_string()),
+        template_type: Some(TemplateType::Controller),
+        model_sub_type: None,
+        component_name: Some("test".to_string()),
+    };
+    let cloned: Args = args.clone();
+    assert_eq!(cloned.check, args.check);
+    assert_eq!(cloned.max_retries, args.max_retries);
+    assert_eq!(cloned.manifest_path, args.manifest_path);
+    assert_eq!(cloned.bump_type, args.bump_type);
+    assert_eq!(cloned.project_name, args.project_name);
+    assert_eq!(cloned.template_type, args.template_type);
+    assert_eq!(cloned.component_name, args.component_name);
+}
+```
+# Path: hyperlane-cli/tests/publish/mod.rs
+```rust
+mod r#fn;
+use crate::*;
+```
+# Path: hyperlane-cli/tests/publish/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_package_creation() {
+    let package: Package = Package {
+        name: "test-package".to_string(),
+        version: "0.1.0".to_string(),
+        path: std::path::PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    assert_eq!(package.name, "test-package");
+    assert_eq!(package.version, "0.1.0");
+    assert!(package.local_dependencies.is_empty());
+}
+#[test]
+fn test_package_clone() {
+    let package: Package = Package {
+        name: "test-package".to_string(),
+        version: "0.1.0".to_string(),
+        path: std::path::PathBuf::from("."),
+        local_dependencies: vec!["dep1".to_string()],
+    };
+    let cloned: Package = package.clone();
+    assert_eq!(cloned.name, package.name);
+    assert_eq!(cloned.version, package.version);
+    assert_eq!(cloned.local_dependencies.len(), 1);
+}
+#[test]
+fn test_package_equality() {
+    let package1: Package = Package {
+        name: "test".to_string(),
+        version: "0.1.0".to_string(),
+        path: std::path::PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    let package2: Package = Package {
+        name: "test".to_string(),
+        version: "0.1.0".to_string(),
+        path: std::path::PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    assert_eq!(package1, package2);
+}
+#[test]
+fn test_publish_result_success() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: true,
+        error: None,
+        retries: 0,
+    };
+    assert_eq!(result.package_name, "test");
+    assert!(result.success);
+    assert!(result.error.is_none());
+    assert_eq!(result.retries, 0);
+}
+#[test]
+fn test_publish_result_failure() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: false,
+        error: Some("network error".to_string()),
+        retries: 3,
+    };
+    assert!(!result.success);
+    assert_eq!(result.error, Some("network error".to_string()));
+    assert_eq!(result.retries, 3);
+}
+#[test]
+fn test_publish_result_clone() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: true,
+        error: None,
+        retries: 0,
+    };
+    let cloned: PublishResult = result.clone();
+    assert_eq!(cloned.package_name, result.package_name);
+    assert_eq!(cloned.success, result.success);
+    assert_eq!(cloned.error, result.error);
+    assert_eq!(cloned.retries, result.retries);
+}
+#[test]
+fn test_publish_error_display() {
+    let error1: PublishError = PublishError::ManifestParseError;
+    assert!(error1.to_string().contains("Failed to parse"));
+    let error2: PublishError = PublishError::CircularDependency;
+    assert!(error2.to_string().contains("Circular dependency"));
+}
+#[test]
+fn test_publish_error_from_io() {
+    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
+    let publish_error: PublishError = PublishError::from(io_error);
+    assert!(publish_error.to_string().contains("IO error"));
+}
+```
+# Path: hyperlane-cli/tests/bump/mod.rs
+```rust
+mod r#fn;
+use crate::*;
+```
+# Path: hyperlane-cli/tests/bump/fn.rs
+```rust
+use super::*;
 #[test]
 fn test_bump_version_type_enum() {
     assert_eq!(BumpVersionType::Patch, BumpVersionType::Patch);
@@ -11503,234 +11593,6 @@ edition = "2024"
     let result: Result<String, Box<dyn std::error::Error>> =
         execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
     assert!(result.is_err());
-}
-```
-# Path: hyperlane-cli/src/bump/mod.rs
-```rust
-mod r#enum;
-mod r#fn;
-mod r#struct;
-#[cfg(test)]
-mod test;
-pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
-```
-# Path: hyperlane-cli/src/bump/fn.rs
-```rust
-use crate::*;
-fn parse_version(version_str: &str) -> Option<Version> {
-    let parts: Vec<&str> = version_str.split('-').collect();
-    let version_part: &str = parts.first()?;
-    let prerelease: Option<String> = parts.get(1).map(|s: &&str| s.to_string());
-    let nums: Vec<&str> = version_part.split('.').collect();
-    if nums.len() != 3 {
-        return None;
-    }
-    let major: u64 = nums.first()?.parse().ok()?;
-    let minor: u64 = nums.get(1)?.parse().ok()?;
-    let patch: u64 = nums.get(2)?.parse().ok()?;
-    Some(Version {
-        major,
-        minor,
-        patch,
-        prerelease,
-    })
-}
-fn parse_prerelease(prerelease: &str) -> Option<(&str, u64)> {
-    let parts: Vec<&str> = prerelease.split('.').collect();
-    let pre_type: &str = parts.first()?;
-    let number: u64 = parts
-        .get(1)
-        .and_then(|s: &&str| s.parse().ok())
-        .unwrap_or(0);
-    Some((pre_type, number))
-}
-fn get_next_prerelease(current: Option<&String>, target_type: &str) -> String {
-    match current {
-        Some(pre) => {
-            if let Some((pre_type, number)) = parse_prerelease(pre)
-                && pre_type == target_type
-                && number > 0
-            {
-                return format!("{}.{}", target_type, number + 1);
-            }
-            format!("{target_type}.1")
-        }
-        None => target_type.to_string(),
-    }
-}
-fn version_to_string(version: &Version) -> String {
-    let base: String = format!("{}.{}.{}", version.major, version.minor, version.patch);
-    match &version.prerelease {
-        Some(pre) => format!("{base}-{pre}"),
-        None => base,
-    }
-}
-fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
-    match bump_type {
-        BumpVersionType::Patch => Version {
-            major: version.major,
-            minor: version.minor,
-            patch: version.patch + 1,
-            prerelease: None,
-        },
-        BumpVersionType::Minor => Version {
-            major: version.major,
-            minor: version.minor + 1,
-            patch: 0,
-            prerelease: None,
-        },
-        BumpVersionType::Major => Version {
-            major: version.major + 1,
-            minor: 0,
-            patch: 0,
-            prerelease: None,
-        },
-        BumpVersionType::Release => Version {
-            major: version.major,
-            minor: version.minor,
-            patch: version.patch,
-            prerelease: None,
-        },
-        BumpVersionType::Alpha => {
-            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "alpha");
-            Version {
-                major: version.major,
-                minor: version.minor,
-                patch: version.patch,
-                prerelease: Some(prerelease),
-            }
-        }
-        BumpVersionType::Beta => {
-            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "beta");
-            Version {
-                major: version.major,
-                minor: version.minor,
-                patch: version.patch,
-                prerelease: Some(prerelease),
-            }
-        }
-        BumpVersionType::Rc => {
-            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "rc");
-            Version {
-                major: version.major,
-                minor: version.minor,
-                patch: version.patch,
-                prerelease: Some(prerelease),
-            }
-        }
-    }
-}
-fn find_version_position(line: &str) -> Option<(usize, usize)> {
-    let trimmed: &str = line.trim();
-    if !trimmed.starts_with("version") || !trimmed.contains('=') {
-        return None;
-    }
-    let eq_pos: usize = line.find('=')?;
-    let after_eq: &str = &line[eq_pos + 1..];
-    let quote_start: usize = after_eq.find('"')?;
-    let after_first_quote: &str = &after_eq[quote_start + 1..];
-    let quote_end: usize = after_first_quote.find('"')?;
-    let version_start: usize = eq_pos + 1 + quote_start + 1;
-    let version_end: usize = version_start + quote_end;
-    Some((version_start, version_end))
-}
-pub(crate) fn execute_bump(
-    manifest_path: &str,
-    bump_type: &BumpVersionType,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let path: &Path = Path::new(manifest_path);
-    let content: String = read_to_string(path)?;
-    let mut new_version: Option<String> = None;
-    let mut found_version: bool = false;
-    let mut updated_content: String = content.clone();
-    for line in content.lines() {
-        if found_version {
-            break;
-        }
-        if let Some((version_start, version_end)) = find_version_position(line) {
-            let version_str: &str = &line[version_start..version_end];
-            if let Some(version) = parse_version(version_str) {
-                let bumped: Version = bump_version(&version, bump_type);
-                let version_string: String = version_to_string(&bumped);
-                new_version = Some(version_string.clone());
-                let new_line: String = format!(
-                    "{}{}{}",
-                    &line[..version_start],
-                    version_string,
-                    &line[version_end..]
-                );
-                updated_content = updated_content.replacen(line, &new_line, 1);
-                found_version = true;
-            }
-        }
-    }
-    if !found_version {
-        return Err("version field not found in Cargo.toml".into());
-    }
-    write(path, updated_content)?;
-    match new_version {
-        Some(v) => Ok(v),
-        None => Err("failed to bump version".into()),
-    }
-}
-```
-# Path: hyperlane-cli/src/bump/enum.rs
-```rust
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum BumpVersionType {
-    Patch,
-    Minor,
-    Major,
-    Release,
-    Alpha,
-    Beta,
-    Rc,
-}
-```
-# Path: hyperlane-cli/src/watch/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-```
-# Path: hyperlane-cli/src/watch/fn.rs
-```rust
-use crate::*;
-async fn is_cargo_watch_installed() -> bool {
-    Command::new("cargo-watch")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .is_ok_and(|status: ExitStatus| status.success())
-}
-async fn install_cargo_watch() -> Result<(), std::io::Error> {
-    println!("cargo-watch not found, installing...");
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("install").arg("cargo-watch");
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("failed to install cargo-watch"));
-    }
-    Ok(())
-}
-pub(crate) async fn execute_watch() -> Result<(), std::io::Error> {
-    if !is_cargo_watch_installed().await {
-        install_cargo_watch().await?;
-    }
-    let mut cmd: Command = Command::new("cargo-watch");
-    cmd.arg("--clear")
-        .arg("--skip-local-deps")
-        .arg("-q")
-        .arg("-x")
-        .arg("run");
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("cargo-watch failed"));
-    }
-    Ok(())
 }
 ```
 # Path: hyperlane-log/README.md
@@ -11961,8 +11823,6 @@ mod r#const;
 mod r#fn;
 mod r#impl;
 mod r#struct;
-#[cfg(test)]
-mod test;
 mod r#trait;
 pub use {r#const::*, r#fn::*, r#struct::*, r#trait::*};
 use std::fs::read_dir;
@@ -11997,7 +11857,85 @@ pub struct FileLogger {
     pub(super) error_dir: String,
 }
 ```
-# Path: hyperlane-log/src/test.rs
+# Path: hyperlane-log/src/fn.rs
+```rust
+use crate::*;
+pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
+    let mut res_idx: usize = DEFAULT_LOG_FILE_START_IDX;
+    if let Ok(entries) = read_dir(dir_path) {
+        for entry in entries.filter_map(Result::ok) {
+            let file_name: String = entry.file_name().to_string_lossy().to_string();
+            let parts: Vec<&str> = file_name.split(POINT).collect();
+            if parts.len() > 1
+                && let Ok(second_element) = parts[1].parse::<usize>()
+            {
+                res_idx = second_element.max(res_idx);
+            }
+        }
+    }
+    res_idx.max(DEFAULT_LOG_FILE_START_IDX)
+}
+#[inline(always)]
+pub(crate) fn get_file_name(idx: usize) -> String {
+    format!(
+        "{}{}{}{}{}{}",
+        ROOT_PATH,
+        date(),
+        POINT,
+        idx,
+        POINT,
+        LOG_EXTENSION
+    )
+}
+#[inline(always)]
+pub(crate) fn get_file_dir_name() -> String {
+    format!("{}{}", ROOT_PATH, date())
+}
+pub(crate) fn get_log_path(system_dir: &str, base_path: &str, limit_file_size: &usize) -> String {
+    let mut combined_path: String = base_path.trim_end_matches(ROOT_PATH).to_string();
+    if !system_dir.starts_with(ROOT_PATH) {
+        combined_path.push_str(ROOT_PATH);
+    }
+    combined_path.push_str(
+        system_dir
+            .trim_start_matches(ROOT_PATH)
+            .trim_end_matches(ROOT_PATH),
+    );
+    combined_path.push_str(&get_file_dir_name());
+    let idx: usize = get_second_element_from_filename(&combined_path);
+    let mut combined_path_clone: String = combined_path.clone();
+    combined_path.push_str(&get_file_name(idx));
+    let file_size: usize = get_file_size(&combined_path).unwrap_or_default() as usize;
+    if &file_size <= limit_file_size {
+        return combined_path;
+    }
+    combined_path_clone.push_str(&get_file_name(idx + 1));
+    combined_path_clone
+}
+#[inline(always)]
+pub fn common_log<T: AsRef<str>>(data: T) -> String {
+    let mut log_string: String = String::new();
+    for line in data.as_ref().lines() {
+        let line_string: String = format!("{} {}{}", time(), line, BR);
+        log_string.push_str(&line_string);
+    }
+    log_string
+}
+#[inline(always)]
+pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
+    common_log(log_data)
+}
+```
+# Path: hyperlane-log/tests/mod.rs
+```rust
+mod log;
+use hyperlane_log::*;
+```
+# Path: hyperlane-log/tests/log/mod.rs
+```rust
+mod r#fn;
+```
+# Path: hyperlane-log/tests/log/fn.rs
 ```rust
 use crate::*;
 #[tokio::test]
@@ -12225,75 +12163,6 @@ async fn test_log_level_dirs_edge_cases() {
     let long_dir_name: String = "a".repeat(200);
     log.set_trace_dir(&long_dir_name);
     assert_eq!(log.get_trace_dir().as_str(), long_dir_name.as_str());
-}
-```
-# Path: hyperlane-log/src/fn.rs
-```rust
-use crate::*;
-pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
-    let mut res_idx: usize = DEFAULT_LOG_FILE_START_IDX;
-    if let Ok(entries) = read_dir(dir_path) {
-        for entry in entries.filter_map(Result::ok) {
-            let file_name: String = entry.file_name().to_string_lossy().to_string();
-            let parts: Vec<&str> = file_name.split(POINT).collect();
-            if parts.len() > 1
-                && let Ok(second_element) = parts[1].parse::<usize>()
-            {
-                res_idx = second_element.max(res_idx);
-            }
-        }
-    }
-    res_idx.max(DEFAULT_LOG_FILE_START_IDX)
-}
-#[inline(always)]
-pub(crate) fn get_file_name(idx: usize) -> String {
-    format!(
-        "{}{}{}{}{}{}",
-        ROOT_PATH,
-        date(),
-        POINT,
-        idx,
-        POINT,
-        LOG_EXTENSION
-    )
-}
-#[inline(always)]
-pub(crate) fn get_file_dir_name() -> String {
-    format!("{}{}", ROOT_PATH, date())
-}
-pub(crate) fn get_log_path(system_dir: &str, base_path: &str, limit_file_size: &usize) -> String {
-    let mut combined_path: String = base_path.trim_end_matches(ROOT_PATH).to_string();
-    if !system_dir.starts_with(ROOT_PATH) {
-        combined_path.push_str(ROOT_PATH);
-    }
-    combined_path.push_str(
-        system_dir
-            .trim_start_matches(ROOT_PATH)
-            .trim_end_matches(ROOT_PATH),
-    );
-    combined_path.push_str(&get_file_dir_name());
-    let idx: usize = get_second_element_from_filename(&combined_path);
-    let mut combined_path_clone: String = combined_path.clone();
-    combined_path.push_str(&get_file_name(idx));
-    let file_size: usize = get_file_size(&combined_path).unwrap_or_default() as usize;
-    if &file_size <= limit_file_size {
-        return combined_path;
-    }
-    combined_path_clone.push_str(&get_file_name(idx + 1));
-    combined_path_clone
-}
-#[inline(always)]
-pub fn common_log<T: AsRef<str>>(data: T) -> String {
-    let mut log_string: String = String::new();
-    for line in data.as_ref().lines() {
-        let line_string: String = format!("{} {}{}", time(), line, BR);
-        log_string.push_str(&line_string);
-    }
-    log_string
-}
-#[inline(always)]
-pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
-    common_log(log_data)
 }
 ```
 # Path: hyperlane-process-guard/README.md
