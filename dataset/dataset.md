@@ -1,4 +1,4 @@
-<!--2026-05-30 08:33:19-->
+<!--2026-05-30 13:48:25-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
