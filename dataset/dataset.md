@@ -1,4 +1,4 @@
-<!--2026-05-31 04:13:50-->
+<!--2026-05-31 08:52:21-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -5505,15 +5505,27 @@ pub use {
 pub(crate) use std::{
     collections::{HashMap, VecDeque},
     env::args,
-    fs::{create_dir_all, read_to_string, write},
+    io,
     path::{Path, PathBuf},
-    process::{ExitStatus, Stdio},
+    process::Stdio,
     str::FromStr,
     sync::{Arc, LazyLock},
 };
 pub(crate) use {
+    notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
     regex::{Captures, Regex},
-    tokio::{process::Command, sync::Mutex},
+    tokio::{
+        fs::{ReadDir, create_dir_all, read_dir, read_to_string, write},
+        process::Command,
+        spawn,
+        sync::{
+            Mutex, MutexGuard,
+            watch::{Receiver, Sender, channel},
+        },
+        task::JoinHandle,
+        time::{Duration, Interval, interval, sleep},
+    },
+    which::which,
 };
 ```
 # Path: hyperlane-cli/src/main.rs
@@ -5542,7 +5554,7 @@ async fn main() {
                 .manifest_path
                 .unwrap_or_else(|| "Cargo.toml".to_string());
             let bump_type: BumpVersionType = args.bump_type.unwrap_or(BumpVersionType::Patch);
-            match execute_bump(&manifest_path, &bump_type) {
+            match execute_bump(&manifest_path, &bump_type).await {
                 Ok(new_version) => {
                     log::info!("Version bumped to {new_version}");
                 }
@@ -5647,13 +5659,13 @@ fn get_model_sub_type_name(sub_type: &ModelSubType) -> String {
         ModelSubType::Response => "response".to_string(),
     }
 }
-fn ensure_directory(path: &Path) -> Result<(), TemplateError> {
+async fn ensure_directory(path: &Path) -> Result<(), TemplateError> {
     if !path.exists() {
-        create_dir_all(path)?;
+        create_dir_all(path).await?;
     }
     Ok(())
 }
-fn write_mod_rs(path: &Path, modules: &[&str]) -> Result<(), TemplateError> {
+async fn write_mod_rs(path: &Path, modules: &[&str]) -> Result<(), TemplateError> {
     let mut content: String = String::new();
     for module in modules {
         let mod_name: String = if module.starts_with("r#") {
@@ -5691,123 +5703,139 @@ fn write_mod_rs(path: &Path, modules: &[&str]) -> Result<(), TemplateError> {
     }
     content.push('\n');
     content.push_str("use super::*;\n");
-    write(path, content)?;
+    write(path, content).await?;
     Ok(())
 }
-fn write_empty_mod_rs(path: &Path) -> Result<(), TemplateError> {
-    write(path, "\n")?;
+async fn write_empty_mod_rs(path: &Path) -> Result<(), TemplateError> {
+    write(path, "\n").await?;
     Ok(())
 }
-fn create_controller_template(
+async fn create_controller_template(
     target_dir: &Path,
     _component_name: &str,
 ) -> Result<(), TemplateError> {
-    ensure_directory(target_dir)?;
+    ensure_directory(target_dir).await?;
     let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["fn", "impl", "struct"])?;
+    write_mod_rs(&mod_rs, &["fn", "impl", "struct"]).await?;
     let fn_rs: PathBuf = target_dir.join("fn.rs");
-    write(&fn_rs, "use super::*;\n")?;
+    write(&fn_rs, "use super::*;\n").await?;
     let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n")?;
+    write(&impl_rs, "use super::*;\n").await?;
     let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n")?;
+    write(&struct_rs, "use super::*;\n").await?;
     Ok(())
 }
-fn create_view_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
-    ensure_directory(target_dir)?;
+async fn create_view_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
     let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["fn", "impl", "struct"])?;
+    write_mod_rs(&mod_rs, &["fn", "impl", "struct"]).await?;
     let fn_rs: PathBuf = target_dir.join("fn.rs");
-    write(&fn_rs, "use super::*;\n")?;
+    write(&fn_rs, "use super::*;\n").await?;
     let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n")?;
+    write(&impl_rs, "use super::*;\n").await?;
     let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n")?;
+    write(&struct_rs, "use super::*;\n").await?;
     Ok(())
 }
-fn create_service_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
-    ensure_directory(target_dir)?;
+async fn create_service_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
     let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["impl", "struct"])?;
+    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
     let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n")?;
+    write(&impl_rs, "use super::*;\n").await?;
     let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n")?;
+    write(&struct_rs, "use super::*;\n").await?;
     Ok(())
 }
-fn create_domain_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
-    ensure_directory(target_dir)?;
+async fn create_domain_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
     let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["impl", "struct"])?;
+    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
     let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n")?;
+    write(&impl_rs, "use super::*;\n").await?;
     let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n")?;
+    write(&struct_rs, "use super::*;\n").await?;
     Ok(())
 }
-fn create_mapper_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
-    ensure_directory(target_dir)?;
+async fn create_mapper_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
     let mod_rs: PathBuf = target_dir.join("mod.rs");
     write_mod_rs(
         &mod_rs,
         &["const", "enum", "fn", "impl", "static", "struct"],
-    )?;
+    )
+    .await?;
     let const_rs: PathBuf = target_dir.join("const.rs");
-    write(&const_rs, "use super::*;\n")?;
+    write(&const_rs, "use super::*;\n").await?;
     let enum_rs: PathBuf = target_dir.join("enum.rs");
-    write(&enum_rs, "use super::*;\n")?;
+    write(&enum_rs, "use super::*;\n").await?;
     let fn_rs: PathBuf = target_dir.join("fn.rs");
-    write(&fn_rs, "use super::*;\n")?;
+    write(&fn_rs, "use super::*;\n").await?;
     let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n")?;
+    write(&impl_rs, "use super::*;\n").await?;
     let static_rs: PathBuf = target_dir.join("static.rs");
-    write(&static_rs, "use super::*;\n")?;
+    write(&static_rs, "use super::*;\n").await?;
     let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n")?;
+    write(&struct_rs, "use super::*;\n").await?;
     Ok(())
 }
-fn create_utils_template(target_dir: &Path, _component_name: &str) -> Result<(), TemplateError> {
-    ensure_directory(target_dir)?;
+async fn create_utils_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
     let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["fn"])?;
+    write_mod_rs(&mod_rs, &["fn"]).await?;
     let fn_rs: PathBuf = target_dir.join("fn.rs");
-    write(&fn_rs, "use super::*;\n")?;
+    write(&fn_rs, "use super::*;\n").await?;
     Ok(())
 }
-fn create_exception_template(
+async fn create_exception_template(
     target_dir: &Path,
     _component_name: &str,
 ) -> Result<(), TemplateError> {
-    ensure_directory(target_dir)?;
+    ensure_directory(target_dir).await?;
     let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_empty_mod_rs(&mod_rs)?;
+    write_empty_mod_rs(&mod_rs).await?;
     Ok(())
 }
-fn create_repository_template(
+async fn create_repository_template(
     target_dir: &Path,
     _component_name: &str,
 ) -> Result<(), TemplateError> {
-    ensure_directory(target_dir)?;
+    ensure_directory(target_dir).await?;
     let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["impl", "struct"])?;
+    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
     let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n")?;
+    write(&impl_rs, "use super::*;\n").await?;
     let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n")?;
+    write(&struct_rs, "use super::*;\n").await?;
     Ok(())
 }
-fn create_model_template(
+async fn create_model_template(
     target_dir: &Path,
     _component_name: &str,
     sub_type: &ModelSubType,
 ) -> Result<(), TemplateError> {
     let sub_type_name: String = get_model_sub_type_name(sub_type);
     let model_dir: PathBuf = target_dir.join(&sub_type_name);
-    ensure_directory(&model_dir)?;
+    ensure_directory(&model_dir).await?;
     let mod_rs: PathBuf = model_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["struct"])?;
+    write_mod_rs(&mod_rs, &["struct"]).await?;
     let struct_rs: PathBuf = model_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n")?;
+    write(&struct_rs, "use super::*;\n").await?;
     Ok(())
 }
 pub async fn execute_template(
@@ -5826,31 +5854,34 @@ pub async fn execute_template(
             target_dir.to_string_lossy().to_string(),
         ));
     }
-    ensure_directory(&type_dir)?;
+    ensure_directory(&type_dir).await?;
     match config.template_type {
         TemplateType::Controller => {
-            create_controller_template(&target_dir, &config.component_name)?
+            create_controller_template(&target_dir, &config.component_name).await?
         }
-        TemplateType::View => create_view_template(&target_dir, &config.component_name)?,
-        TemplateType::Service => create_service_template(&target_dir, &config.component_name)?,
-        TemplateType::Domain => create_domain_template(&target_dir, &config.component_name)?,
-        TemplateType::Mapper => create_mapper_template(&target_dir, &config.component_name)?,
-        TemplateType::Utils => create_utils_template(&target_dir, &config.component_name)?,
-        TemplateType::Exception => create_exception_template(&target_dir, &config.component_name)?,
+        TemplateType::View => create_view_template(&target_dir, &config.component_name).await?,
+        TemplateType::Service => {
+            create_service_template(&target_dir, &config.component_name).await?
+        }
+        TemplateType::Domain => create_domain_template(&target_dir, &config.component_name).await?,
+        TemplateType::Mapper => create_mapper_template(&target_dir, &config.component_name).await?,
+        TemplateType::Utils => create_utils_template(&target_dir, &config.component_name).await?,
+        TemplateType::Exception => {
+            create_exception_template(&target_dir, &config.component_name).await?
+        }
         TemplateType::Repository => {
-            create_repository_template(&target_dir, &config.component_name)?
+            create_repository_template(&target_dir, &config.component_name).await?
         }
         TemplateType::Model => {
             let sub_type: ModelSubType = config.model_sub_type.ok_or_else(|| {
                 TemplateError::InvalidModelSubType("Missing model subtype".to_string())
             })?;
-            create_model_template(&target_dir, &config.component_name, &sub_type)?;
+            create_model_template(&target_dir, &config.component_name, &sub_type).await?;
         }
     }
-    let _: Result<(), std::io::Error> = crate::fmt::format_path(&target_dir).await;
+    let _: Result<(), io::Error> = crate::fmt::format_path(&target_dir).await;
     log::info!(
-        "Created {} '{}' at {}",
-        dir_name,
+        "Created {dir_name} '{}' at {}",
         config.component_name,
         target_dir.display()
     );
@@ -5924,6 +5955,7 @@ pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/template/enum.rs
 ```rust
+use crate::*;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TemplateType {
     Controller,
@@ -5945,7 +5977,7 @@ pub enum ModelSubType {
 #[derive(Debug, thiserror::Error)]
 pub enum TemplateError {
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    IoError(#[from] io::Error),
     #[error("Invalid template type: {0}")]
     InvalidTemplateType(String),
     #[error("Invalid model subtype: {0}")]
@@ -6026,13 +6058,13 @@ fn sort_derive_in_line(line: &str) -> Option<String> {
         .map(|s: &str| s.trim().to_string())
         .filter(|s: &String| !s.is_empty())
         .collect();
-    traits.sort_by_key(|a| a.to_lowercase());
+    traits.sort_by_key(|a: &String| a.to_lowercase());
     let sorted_traits: String = traits.join(", ");
     let result: String = line.replace(derive_content, &sorted_traits);
     Some(result)
 }
-async fn format_derive_in_file(file_path: &Path) -> Result<bool, std::io::Error> {
-    let content: String = read_to_string(file_path)?;
+async fn format_derive_in_file(file_path: &Path) -> Result<bool, io::Error> {
+    let content: String = read_to_string(file_path).await?;
     let lines: std::str::Lines<'_> = content.lines();
     let mut modified: bool = false;
     let mut new_content: String = String::new();
@@ -6054,18 +6086,18 @@ async fn format_derive_in_file(file_path: &Path) -> Result<bool, std::io::Error>
         new_content.push('\n');
     }
     if modified {
-        write(file_path, new_content)?;
+        write(file_path, new_content).await?;
     }
     Ok(modified)
 }
-async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
+async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, io::Error> {
     let mut files: Vec<PathBuf> = Vec::new();
     let workspace_root: &Path = manifest_path.parent().unwrap_or(Path::new("."));
     let src_dir: PathBuf = workspace_root.join("src");
     if src_dir.exists() {
         find_rust_files_in_dir(&src_dir, &mut files).await?;
     }
-    let content: String = read_to_string(manifest_path)?;
+    let content: String = read_to_string(manifest_path).await?;
     if let Ok(doc) = toml::from_str::<toml::Value>(&content)
         && let Some(workspace) = doc.get("workspace")
         && let Some(members) = workspace
@@ -6083,11 +6115,8 @@ async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, std::io::
     }
     Ok(files)
 }
-async fn find_rust_files_in_dir(
-    dir: &Path,
-    files: &mut Vec<PathBuf>,
-) -> Result<(), std::io::Error> {
-    let mut entries = tokio::fs::read_dir(dir).await?;
+async fn find_rust_files_in_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), io::Error> {
+    let mut entries: ReadDir = read_dir(dir).await?;
     while let Some(entry) = entries.next_entry().await? {
         let path: PathBuf = entry.path();
         if path.is_file()
@@ -6102,21 +6131,20 @@ async fn find_rust_files_in_dir(
     }
     Ok(())
 }
-async fn format_derive_attributes(manifest_path: &str) -> Result<(), std::io::Error> {
+async fn format_derive_attributes(manifest_path: &str) -> Result<(), io::Error> {
     let path: &Path = Path::new(manifest_path);
     let files: Vec<PathBuf> = find_rust_files(path).await?;
     let modified_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
-    let mut handles: Vec<tokio::task::JoinHandle<Result<(), std::io::Error>>> = Vec::new();
+    let mut handles: Vec<JoinHandle<Result<(), io::Error>>> = Vec::new();
     for file in files {
         let counter: Arc<Mutex<usize>> = Arc::clone(&modified_count);
-        let handle: tokio::task::JoinHandle<Result<(), std::io::Error>> =
-            tokio::spawn(async move {
-                if format_derive_in_file(&file).await? {
-                    let mut count: tokio::sync::MutexGuard<'_, usize> = counter.lock().await;
-                    *count += 1;
-                }
-                Ok(())
-            });
+        let handle: JoinHandle<Result<(), io::Error>> = spawn(async move {
+            if format_derive_in_file(&file).await? {
+                let mut count: MutexGuard<'_, usize> = counter.lock().await;
+                *count += 1;
+            }
+            Ok(())
+        });
         handles.push(handle);
     }
     for handle in handles {
@@ -6128,29 +6156,50 @@ async fn format_derive_attributes(manifest_path: &str) -> Result<(), std::io::Er
     }
     Ok(())
 }
-async fn is_cargo_clippy_installed() -> bool {
-    Command::new("cargo")
-        .arg("clippy")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .is_ok_and(|status: ExitStatus| status.success())
+fn is_cargo_clippy_installed() -> bool {
+    which("cargo-clippy").is_ok()
 }
-async fn install_cargo_clippy() -> Result<(), std::io::Error> {
+async fn install_cargo_clippy() -> Result<(), io::Error> {
     log::warn!("cargo-clippy not found, installing...");
-    let mut cmd: Command = Command::new("rustup");
-    cmd.arg("component").arg("add").arg("clippy");
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("failed to install cargo-clippy"));
+    let output: std::process::Output = Command::new("rustup")
+        .arg("component")
+        .arg("add")
+        .arg("clippy")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await?;
+    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stdout.is_empty() {
+        for line in stdout.lines() {
+            log::info!("{line}");
+        }
+    }
+    if !stderr.is_empty() {
+        if output.status.success() {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::info!("{line}");
+            }
+        } else {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::error!("{line}");
+            }
+        }
+    }
+    if !output.status.success() {
+        return Err(io::Error::other("failed to install cargo-clippy"));
     }
     Ok(())
 }
-async fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {
-    if !is_cargo_clippy_installed().await {
+async fn execute_clippy_fix(args: &Args) -> Result<(), io::Error> {
+    if !is_cargo_clippy_installed() {
         install_cargo_clippy().await?;
     }
     let mut cmd: Command = Command::new("cargo");
@@ -6162,14 +6211,38 @@ async fn execute_clippy_fix(args: &Args) -> Result<(), std::io::Error> {
     if let Some(ref manifest_path) = args.manifest_path {
         cmd.arg("--manifest-path").arg(manifest_path);
     }
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("cargo clippy --fix failed"));
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output: std::process::Output = cmd.output().await?;
+    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stdout.is_empty() {
+        for line in stdout.lines() {
+            log::info!("{line}");
+        }
+    }
+    if !stderr.is_empty() {
+        if output.status.success() {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::info!("{line}");
+            }
+        } else {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::error!("{line}");
+            }
+        }
+    }
+    if !output.status.success() {
+        return Err(io::Error::other("cargo clippy --fix failed"));
     }
     Ok(())
 }
-pub async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
+pub async fn execute_fmt(args: &Args) -> Result<(), io::Error> {
     let manifest_path: String = args
         .manifest_path
         .clone()
@@ -6185,17 +6258,41 @@ pub async fn execute_fmt(args: &Args) -> Result<(), std::io::Error> {
     if let Some(ref manifest_path) = args.manifest_path {
         cmd.arg("--manifest-path").arg(manifest_path);
     }
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("cargo fmt failed"));
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output: std::process::Output = cmd.output().await?;
+    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stdout.is_empty() {
+        for line in stdout.lines() {
+            log::info!("{line}");
+        }
+    }
+    if !stderr.is_empty() {
+        if output.status.success() {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::info!("{line}");
+            }
+        } else {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::error!("{line}");
+            }
+        }
+    }
+    if !output.status.success() {
+        return Err(io::Error::other("cargo fmt failed"));
     }
     if !args.check {
         execute_clippy_fix(args).await?;
     }
     Ok(())
 }
-pub async fn format_path(path: &std::path::Path) -> Result<(), std::io::Error> {
+pub async fn format_path(path: &Path) -> Result<(), io::Error> {
     let mut cmd: Command = Command::new("cargo");
     cmd.arg("fmt").arg("--").arg(path);
     cmd.stdout(Stdio::null()).stderr(Stdio::null());
@@ -6219,40 +6316,75 @@ pub use {r#fn::*, r#static::*};
 # Path: hyperlane-cli/src/watch/fn.rs
 ```rust
 use crate::*;
-async fn is_cargo_watch_installed() -> bool {
-    Command::new("cargo-watch")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .is_ok_and(|status: ExitStatus| status.success())
-}
-async fn install_cargo_watch() -> Result<(), std::io::Error> {
-    log::warn!("cargo-watch not found, installing...");
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("install").arg("cargo-watch");
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("failed to install cargo-watch"));
+async fn run_cargo_run() -> Result<(), io::Error> {
+    let output: std::process::Output = Command::new("cargo")
+        .arg("run")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await?;
+    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stdout.is_empty() {
+        for line in stdout.lines() {
+            log::info!("{line}");
+        }
+    }
+    if !stderr.is_empty() {
+        if output.status.success() {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::info!("{line}");
+            }
+        } else {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::error!("{line}");
+            }
+            log::error!("cargo run failed");
+        }
     }
     Ok(())
 }
-pub async fn execute_watch() -> Result<(), std::io::Error> {
-    if !is_cargo_watch_installed().await {
-        install_cargo_watch().await?;
+pub async fn execute_watch() -> Result<(), io::Error> {
+    let src_path: PathBuf = PathBuf::from("src");
+    if !src_path.exists() {
+        return Err(io::Error::other(
+            "src directory not found in current directory",
+        ));
     }
-    let mut cmd: Command = Command::new("cargo-watch");
-    cmd.arg("--clear")
-        .arg("--skip-local-deps")
-        .arg("-q")
-        .arg("-x")
-        .arg("run");
-    cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-    let status: ExitStatus = cmd.status().await?;
-    if !status.success() {
-        return Err(std::io::Error::other("cargo-watch failed"));
+    run_cargo_run().await?;
+    let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));
+    let mut watcher: RecommendedWatcher =
+        recommended_watcher(move |result: Result<Event, notify::Error>| {
+            if let Ok(event) = result {
+                let _ = tx.send(event);
+            }
+        })
+        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
+    watcher
+        .watch(&src_path, RecursiveMode::Recursive)
+        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
+    log::info!("Watching src/ for changes...");
+    let mut debounce: Interval = interval(Duration::from_millis(500));
+    debounce.tick().await;
+    while rx.changed().await.is_ok() {
+        let event: Event = rx.borrow().clone();
+        let has_rust_change: bool = event.paths.iter().any(|path: &PathBuf| {
+            path.extension()
+                .is_some_and(|ext: &std::ffi::OsStr| ext == "rs")
+        });
+        if !has_rust_change {
+            continue;
+        }
+        log::warn!("File change detected: {}", event.paths[0].display());
+        debounce.reset();
+        sleep(Duration::from_millis(300)).await;
+        run_cargo_run().await?;
     }
     Ok(())
 }
@@ -6617,10 +6749,11 @@ pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/new/enum.rs
 ```rust
+use crate::*;
 #[derive(Debug, thiserror::Error)]
 pub enum NewError {
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    IoError(#[from] io::Error),
     #[error("Git is not installed or not found in PATH")]
     GitNotFound,
     #[error("Project directory '{0}' already exists")]
@@ -6634,8 +6767,8 @@ pub enum NewError {
 # Path: hyperlane-cli/src/publish/fn.rs
 ```rust
 use crate::*;
-fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError> {
-    let content: String = read_to_string(workspace_root)?;
+async fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError> {
+    let content: String = read_to_string(workspace_root).await?;
     let doc: toml::Value =
         toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
     let mut packages: Vec<Package> = Vec::new();
@@ -6645,17 +6778,17 @@ fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError
         for member in members {
             if let Some(pattern) = member.as_str() {
                 let base_path: &Path = workspace_root.parent().unwrap_or(workspace_root);
-                expand_pattern(base_path, pattern, &mut packages)?;
+                expand_pattern(base_path, pattern, &mut packages).await?;
             }
         }
     }
     if packages.is_empty() {
-        let package: Package = read_single_package(workspace_root)?;
+        let package: Package = read_single_package(workspace_root).await?;
         packages.push(package);
     }
     Ok(packages)
 }
-fn expand_pattern(
+async fn expand_pattern(
     base_path: &Path,
     pattern: &str,
     packages: &mut Vec<Package>,
@@ -6664,13 +6797,13 @@ fn expand_pattern(
         let parent: &Path = Path::new(pattern).parent().unwrap_or(Path::new("."));
         let full_parent: PathBuf = base_path.join(parent);
         if full_parent.is_dir() {
-            for entry in std::fs::read_dir(&full_parent)? {
-                let entry: std::fs::DirEntry = entry?;
+            let mut entries: ReadDir = read_dir(&full_parent).await?;
+            while let Some(entry) = entries.next_entry().await? {
                 let path: PathBuf = entry.path();
                 if path.is_dir() {
                     let cargo_toml: PathBuf = path.join("Cargo.toml");
                     if cargo_toml.exists() {
-                        let package: Package = read_package_manifest(&cargo_toml)?;
+                        let package: Package = read_package_manifest(&cargo_toml).await?;
                         packages.push(package);
                     }
                 }
@@ -6679,17 +6812,17 @@ fn expand_pattern(
     } else {
         let cargo_toml: PathBuf = base_path.join(pattern).join("Cargo.toml");
         if cargo_toml.exists() {
-            let package: Package = read_package_manifest(&cargo_toml)?;
+            let package: Package = read_package_manifest(&cargo_toml).await?;
             packages.push(package);
         }
     }
     Ok(())
 }
-fn read_single_package(manifest_path: &Path) -> Result<Package, PublishError> {
-    read_package_manifest(manifest_path)
+async fn read_single_package(manifest_path: &Path) -> Result<Package, PublishError> {
+    read_package_manifest(manifest_path).await
 }
-fn read_package_manifest(manifest_path: &Path) -> Result<Package, PublishError> {
-    let content: String = read_to_string(manifest_path)?;
+async fn read_package_manifest(manifest_path: &Path) -> Result<Package, PublishError> {
+    let content: String = read_to_string(manifest_path).await?;
     let doc: toml::Value =
         toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
     let package_table: &toml::Value = doc.get("package").ok_or(PublishError::ManifestParseError)?;
@@ -6804,7 +6937,7 @@ async fn publish_package_with_retry(package: &Package, max_retries: u32) -> Publ
                 last_error = Some(error.to_string());
                 attempt += 1;
                 if attempt <= max_retries {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(2_u64.pow(attempt))).await;
+                    sleep(Duration::from_secs(2_u64.pow(attempt))).await;
                 }
             }
         }
@@ -6837,7 +6970,7 @@ pub async fn execute_publish(
     max_retries: u32,
 ) -> Result<Vec<PublishResult>, PublishError> {
     let path: &Path = Path::new(manifest_path);
-    let packages: Vec<Package> = discover_packages(path)?;
+    let packages: Vec<Package> = discover_packages(path).await?;
     if packages.is_empty() {
         return Ok(Vec::new());
     }
@@ -6868,11 +7001,12 @@ pub async fn execute_publish(
 ```
 # Path: hyperlane-cli/src/publish/struct.rs
 ```rust
+use crate::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Package {
     pub name: String,
     pub version: String,
-    pub path: std::path::PathBuf,
+    pub path: PathBuf,
     pub local_dependencies: Vec<String>,
 }
 #[derive(Clone, Debug)]
@@ -6892,6 +7026,7 @@ pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
 # Path: hyperlane-cli/src/publish/enum.rs
 ```rust
+use crate::*;
 #[derive(Debug, thiserror::Error)]
 pub enum PublishError {
     #[error("Failed to parse Cargo.toml")]
@@ -6899,7 +7034,7 @@ pub enum PublishError {
     #[error("Circular dependency detected")]
     CircularDependency,
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    IoError(#[from] io::Error),
 }
 ```
 # Path: hyperlane-cli/src/bump/fn.rs
@@ -7022,12 +7157,12 @@ fn find_version_position(line: &str) -> Option<(usize, usize)> {
     let version_end: usize = version_start + quote_end;
     Some((version_start, version_end))
 }
-pub fn execute_bump(
+pub async fn execute_bump(
     manifest_path: &str,
     bump_type: &BumpVersionType,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let path: &Path = Path::new(manifest_path);
-    let content: String = read_to_string(path)?;
+    let content: String = read_to_string(path).await?;
     let mut new_version: Option<String> = None;
     let mut found_version: bool = false;
     let mut updated_content: String = content.clone();
@@ -7042,9 +7177,8 @@ pub fn execute_bump(
                 let version_string: String = version_to_string(&bumped);
                 new_version = Some(version_string.clone());
                 let new_line: String = format!(
-                    "{}{}{}",
+                    "{}{version_string}{}",
                     &line[..version_start],
-                    version_string,
                     &line[version_end..]
                 );
                 updated_content = updated_content.replacen(line, &new_line, 1);
@@ -7055,7 +7189,7 @@ pub fn execute_bump(
     if !found_version {
         return Err("version field not found in Cargo.toml".into());
     }
-    write(path, updated_content)?;
+    write(path, updated_content).await?;
     match new_version {
         Some(v) => Ok(v),
         None => Err("failed to bump version".into()),
@@ -7119,7 +7253,9 @@ mod fmt;
 mod new;
 mod publish;
 mod version;
-pub use hyperlane_cli::*;
+use hyperlane_cli::*;
+use std::{io, path::PathBuf};
+use tokio::fs::{create_dir_all, read_to_string, write};
 ```
 # Path: hyperlane-cli/tests/version/fn.rs
 ```rust
@@ -7137,15 +7273,15 @@ use crate::*;
 # Path: hyperlane-cli/tests/fmt/fn.rs
 ```rust
 use super::*;
-#[test]
-fn test_format_path_integration() {
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_format_path_integration() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_fmt");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    let _ = create_dir_all(&tmp_dir).await;
     let test_file: PathBuf = tmp_dir.join("test.rs");
-    std::fs::write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
-    let rt: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
-    let result: Result<(), std::io::Error> = rt.block_on(format_path(&tmp_dir));
+    write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n")
+        .await
+        .unwrap();
+    let result: Result<(), io::Error> = format_path(&tmp_dir).await;
     assert!(result.is_ok());
 }
 ```
@@ -7281,7 +7417,7 @@ fn test_new_error_display() {
 }
 #[test]
 fn test_new_error_from_io() {
-    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
+    let io_error: io::Error = io::Error::new(io::ErrorKind::NotFound, "test");
     let new_error: NewError = NewError::from(io_error);
     assert!(new_error.to_string().contains("test"));
 }
@@ -7318,7 +7454,7 @@ fn test_package_creation() {
     let package: Package = Package {
         name: "test-package".to_string(),
         version: "0.1.0".to_string(),
-        path: std::path::PathBuf::from("."),
+        path: PathBuf::from("."),
         local_dependencies: vec![],
     };
     assert_eq!(package.name, "test-package");
@@ -7330,7 +7466,7 @@ fn test_package_clone() {
     let package: Package = Package {
         name: "test-package".to_string(),
         version: "0.1.0".to_string(),
-        path: std::path::PathBuf::from("."),
+        path: PathBuf::from("."),
         local_dependencies: vec!["dep1".to_string()],
     };
     let cloned: Package = package.clone();
@@ -7343,13 +7479,13 @@ fn test_package_equality() {
     let package1: Package = Package {
         name: "test".to_string(),
         version: "0.1.0".to_string(),
-        path: std::path::PathBuf::from("."),
+        path: PathBuf::from("."),
         local_dependencies: vec![],
     };
     let package2: Package = Package {
         name: "test".to_string(),
         version: "0.1.0".to_string(),
-        path: std::path::PathBuf::from("."),
+        path: PathBuf::from("."),
         local_dependencies: vec![],
     };
     assert_eq!(package1, package2);
@@ -7402,7 +7538,7 @@ fn test_publish_error_display() {
 }
 #[test]
 fn test_publish_error_from_io() {
-    let io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
+    let io_error: io::Error = io::Error::new(io::ErrorKind::NotFound, "test");
     let publish_error: PublishError = PublishError::from(io_error);
     assert!(publish_error.to_string().contains("IO error"));
 }
@@ -7452,148 +7588,132 @@ fn test_version_clone() {
     assert_eq!(cloned.patch, version.patch);
     assert_eq!(cloned.prerelease, version.prerelease);
 }
-#[test]
-fn test_execute_bump_integration() {
-    use std::fs::write;
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_execute_bump_integration() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    create_dir_all(&tmp_dir).await.unwrap();
     let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
     let content: &str = r#"[package]
 name = "test-package"
 version = "0.1.0"
 edition = "2024"
 "#;
-    write(&manifest_path, content).unwrap();
+    write(&manifest_path, content).await.unwrap();
     let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "0.1.1");
-    let updated_content: String = std::fs::read_to_string(&manifest_path).unwrap();
+    let updated_content: String = read_to_string(&manifest_path).await.unwrap();
     assert!(updated_content.contains("version = \"0.1.1\""));
 }
-#[test]
-fn test_execute_bump_minor() {
-    use std::fs::write;
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_execute_bump_minor() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_minor");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    create_dir_all(&tmp_dir).await.unwrap();
     let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
     let content: &str = r#"[package]
 name = "test-package"
 version = "0.1.0"
 edition = "2024"
 "#;
-    write(&manifest_path, content).unwrap();
+    write(&manifest_path, content).await.unwrap();
     let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Minor);
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Minor).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "0.2.0");
 }
-#[test]
-fn test_execute_bump_major() {
-    use std::fs::write;
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_execute_bump_major() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_major");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    create_dir_all(&tmp_dir).await.unwrap();
     let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
     let content: &str = r#"[package]
 name = "test-package"
 version = "0.1.0"
 edition = "2024"
 "#;
-    write(&manifest_path, content).unwrap();
+    write(&manifest_path, content).await.unwrap();
     let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Major);
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Major).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "1.0.0");
 }
-#[test]
-fn test_execute_bump_alpha() {
-    use std::fs::write;
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_execute_bump_alpha() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_alpha");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    create_dir_all(&tmp_dir).await.unwrap();
     let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
     let content: &str = r#"[package]
 name = "test-package"
 version = "0.1.0"
 edition = "2024"
 "#;
-    write(&manifest_path, content).unwrap();
+    write(&manifest_path, content).await.unwrap();
     let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Alpha);
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Alpha).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "0.1.0-alpha");
 }
-#[test]
-fn test_execute_bump_beta() {
-    use std::fs::write;
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_execute_bump_beta() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_beta");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    create_dir_all(&tmp_dir).await.unwrap();
     let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
     let content: &str = r#"[package]
 name = "test-package"
 version = "0.1.0-alpha.2"
 edition = "2024"
 "#;
-    write(&manifest_path, content).unwrap();
+    write(&manifest_path, content).await.unwrap();
     let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Beta);
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Beta).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "0.1.0-beta.1");
 }
-#[test]
-fn test_execute_bump_rc() {
-    use std::fs::write;
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_execute_bump_rc() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_rc");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    create_dir_all(&tmp_dir).await.unwrap();
     let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
     let content: &str = r#"[package]
 name = "test-package"
 version = "0.1.0-beta.1"
 edition = "2024"
 "#;
-    write(&manifest_path, content).unwrap();
+    write(&manifest_path, content).await.unwrap();
     let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Rc);
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Rc).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "0.1.0-rc.1");
 }
-#[test]
-fn test_execute_bump_release() {
-    use std::fs::write;
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_execute_bump_release() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_release");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    create_dir_all(&tmp_dir).await.unwrap();
     let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
     let content: &str = r#"[package]
 name = "test-package"
 version = "0.1.0-alpha"
 edition = "2024"
 "#;
-    write(&manifest_path, content).unwrap();
+    write(&manifest_path, content).await.unwrap();
     let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Release);
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Release).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "0.1.0");
 }
-#[test]
-fn test_execute_bump_no_version_field() {
-    use std::fs::write;
-    use std::path::PathBuf;
+#[tokio::test]
+async fn test_execute_bump_no_version_field() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_no_version");
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    create_dir_all(&tmp_dir).await.unwrap();
     let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
     let content: &str = r#"[package]
 name = "test-package"
 edition = "2024"
 "#;
-    write(&manifest_path, content).unwrap();
+    write(&manifest_path, content).await.unwrap();
     let result: Result<String, Box<dyn std::error::Error>> =
-        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch);
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch).await;
     assert!(result.is_err());
 }
 ```
