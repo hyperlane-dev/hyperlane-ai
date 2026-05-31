@@ -1,4 +1,4 @@
-<!--2026-05-30 19:23:50-->
+<!--2026-05-31 04:13:50-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -5492,25 +5492,26 @@ mod command;
 mod config;
 mod fmt;
 mod help;
+mod logger;
 mod new;
 mod publish;
 mod template;
 mod version;
 mod watch;
 pub use {
-    bump::*, command::*, config::*, fmt::*, help::*, new::*, publish::*, template::*, version::*,
-    watch::*,
+    bump::*, command::*, config::*, fmt::*, help::*, logger::*, new::*, publish::*, template::*,
+    version::*, watch::*,
 };
-pub use std::{
+pub(crate) use std::{
     collections::{HashMap, VecDeque},
     env::args,
     fs::{create_dir_all, read_to_string, write},
     path::{Path, PathBuf},
-    process::{ExitStatus, Stdio, exit},
+    process::{ExitStatus, Stdio},
     str::FromStr,
     sync::{Arc, LazyLock},
 };
-pub use {
+pub(crate) use {
     regex::{Captures, Regex},
     tokio::{process::Command, sync::Mutex},
 };
@@ -5518,19 +5519,21 @@ pub use {
 # Path: hyperlane-cli/src/main.rs
 ```rust
 use hyperlane_cli::*;
+use std::process::exit;
 #[tokio::main]
 async fn main() {
+    Logger::init(log::LevelFilter::Info);
     let args: Args = parse_args();
     match args.command {
         CommandType::Fmt => {
             if let Err(error) = execute_fmt(&args).await {
-                eprintln!("fmt failed: {error}");
+                log::error!("fmt failed: {error}");
                 exit(1);
             }
         }
         CommandType::Watch => {
             if let Err(error) = execute_watch().await {
-                eprintln!("watch failed: {error}");
+                log::error!("watch failed: {error}");
                 exit(1);
             }
         }
@@ -5541,10 +5544,10 @@ async fn main() {
             let bump_type: BumpVersionType = args.bump_type.unwrap_or(BumpVersionType::Patch);
             match execute_bump(&manifest_path, &bump_type) {
                 Ok(new_version) => {
-                    println!("Version bumped to {new_version}");
+                    log::info!("Version bumped to {new_version}");
                 }
                 Err(error) => {
-                    eprintln!("bump failed: {error}");
+                    log::error!("bump failed: {error}");
                     exit(1);
                 }
             }
@@ -5561,14 +5564,14 @@ async fn main() {
                         .filter(|r: &&PublishResult| !r.success)
                         .count();
                     if failed_count > 0 {
-                        eprintln!("Publish completed with {failed_count} failures");
+                        log::error!("Publish completed with {failed_count} failures");
                         exit(1);
                     } else {
-                        println!("All packages published successfully");
+                        log::info!("All packages published successfully");
                     }
                 }
                 Err(error) => {
-                    eprintln!("publish failed: {error}");
+                    log::error!("publish failed: {error}");
                     exit(1);
                 }
             }
@@ -5576,11 +5579,11 @@ async fn main() {
         CommandType::New => {
             if let Some(project_name) = args.project_name {
                 if let Err(error) = execute_new(&project_name).await {
-                    eprintln!("new failed: {error}");
+                    log::error!("new failed: {error}");
                     exit(1);
                 }
             } else {
-                eprintln!(
+                log::error!(
                     "Error: Project name is required. Usage: hyperlane-cli new <PROJECT_NAME>"
                 );
                 exit(1);
@@ -5590,7 +5593,7 @@ async fn main() {
             let template_type: TemplateType = match args.template_type {
                 Some(tt) => tt,
                 None => {
-                    eprintln!(
+                    log::error!(
                         "Error: Template type is required. Usage: hyperlane-cli template <TYPE> [SUBTYPE] <NAME>"
                     );
                     exit(1);
@@ -5599,20 +5602,20 @@ async fn main() {
             let component_name: String = match args.component_name {
                 Some(cn) => cn,
                 None => {
-                    eprintln!(
+                    log::error!(
                         "Error: Component name is required. Usage: hyperlane-cli template <TYPE> [SUBTYPE] <NAME>"
                     );
                     exit(1);
                 }
             };
             if template_type == TemplateType::Model && args.model_sub_type.is_none() {
-                eprintln!("Error: Model type requires subtype (application|request|response)");
+                log::error!("Error: Model type requires subtype (application|request|response)");
                 exit(1);
             }
             if let Err(error) =
                 execute_template(template_type, &component_name, args.model_sub_type).await
             {
-                eprintln!("template failed: {error}");
+                log::error!("template failed: {error}");
                 exit(1);
             }
         }
@@ -5845,7 +5848,7 @@ pub async fn execute_template(
         }
     }
     let _: Result<(), std::io::Error> = crate::fmt::format_path(&target_dir).await;
-    println!(
+    log::info!(
         "Created {} '{}' at {}",
         dir_name,
         config.component_name,
@@ -5954,7 +5957,7 @@ pub enum TemplateError {
 # Path: hyperlane-cli/src/version/fn.rs
 ```rust
 pub fn print_version() {
-    println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
+    log::info!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
 }
 ```
 # Path: hyperlane-cli/src/version/mod.rs
@@ -5965,46 +5968,46 @@ pub use r#fn::*;
 # Path: hyperlane-cli/src/help/fn.rs
 ```rust
 pub fn print_help() {
-    println!("hyperlane-cli [COMMAND] [OPTIONS]");
-    println!();
-    println!("Commands:");
-    println!("  bump      Bump version in Cargo.toml");
-    println!("  fmt       Format Rust code using cargo fmt");
-    println!("  watch     Watch files and run cargo run using cargo-watch");
-    println!("  publish   Publish packages in monorepo with topological ordering");
-    println!("  new       Create a new project from template");
-    println!(
+    log::info!("hyperlane-cli [COMMAND] [OPTIONS]");
+    log::info!("");
+    log::info!("Commands:");
+    log::info!("  bump      Bump version in Cargo.toml");
+    log::info!("  fmt       Format Rust code using cargo fmt");
+    log::info!("  watch     Watch files and run cargo run using cargo-watch");
+    log::info!("  publish   Publish packages in monorepo with topological ordering");
+    log::info!("  new       Create a new project from template");
+    log::info!(
         "  template  Generate template components (controller|domain|exception|mapper|model|repository|service|utils|view)"
     );
-    println!("  -h, --help      Print this help message");
-    println!("  -v, --version   Print version information");
-    println!();
-    println!("New Options:");
-    println!("  <PROJECT_NAME>  Name of the project to create");
-    println!();
-    println!("Bump Options:");
-    println!("  --patch         Bump patch version (0.1.0 -> 0.1.1) [default]");
-    println!("  --minor         Bump minor version (0.1.0 -> 0.2.0)");
-    println!("  --major         Bump major version (0.1.0 -> 1.0.0)");
-    println!(
+    log::info!("  -h, --help      Print this help message");
+    log::info!("  -v, --version   Print version information");
+    log::info!("");
+    log::info!("New Options:");
+    log::info!("  <PROJECT_NAME>  Name of the project to create");
+    log::info!("");
+    log::info!("Bump Options:");
+    log::info!("  --patch         Bump patch version (0.1.0 -> 0.1.1) [default]");
+    log::info!("  --minor         Bump minor version (0.1.0 -> 0.2.0)");
+    log::info!("  --major         Bump major version (0.1.0 -> 1.0.0)");
+    log::info!(
         "  --alpha         Add or bump alpha version (0.1.0 -> 0.1.0-alpha, 0.1.0-alpha -> 0.1.0-alpha.1)"
     );
-    println!(
+    log::info!(
         "  --beta          Add or bump beta version (0.1.0 -> 0.1.0-beta, 0.1.0-alpha.2 -> 0.1.0-beta.1)"
     );
-    println!(
+    log::info!(
         "  --rc            Add or bump rc version (0.1.0 -> 0.1.0-rc, 0.1.0-beta.1 -> 0.1.0-rc.1)"
     );
-    println!("  --release       Remove pre-release identifier (0.1.0-alpha -> 0.1.0)");
-    println!("  --manifest-path <PATH>  Path to Cargo.toml [default: Cargo.toml]");
-    println!();
-    println!("Fmt Options:");
-    println!("  --check         Check formatting without making changes");
-    println!("  --manifest-path <PATH>  Path to Cargo.toml");
-    println!();
-    println!("Publish Options:");
-    println!("  --manifest-path <PATH>  Path to workspace Cargo.toml [default: Cargo.toml]");
-    println!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
+    log::info!("  --release       Remove pre-release identifier (0.1.0-alpha -> 0.1.0)");
+    log::info!("  --manifest-path <PATH>  Path to Cargo.toml [default: Cargo.toml]");
+    log::info!("");
+    log::info!("Fmt Options:");
+    log::info!("  --check         Check formatting without making changes");
+    log::info!("  --manifest-path <PATH>  Path to Cargo.toml");
+    log::info!("");
+    log::info!("Publish Options:");
+    log::info!("  --manifest-path <PATH>  Path to workspace Cargo.toml [default: Cargo.toml]");
+    log::info!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
 }
 ```
 # Path: hyperlane-cli/src/help/mod.rs
@@ -6121,7 +6124,7 @@ async fn format_derive_attributes(manifest_path: &str) -> Result<(), std::io::Er
     }
     let count: usize = *modified_count.lock().await;
     if count > 0 {
-        println!("Sorted derive attributes in {count} files");
+        log::info!("Sorted derive attributes in {count} files");
     }
     Ok(())
 }
@@ -6136,7 +6139,7 @@ async fn is_cargo_clippy_installed() -> bool {
         .is_ok_and(|status: ExitStatus| status.success())
 }
 async fn install_cargo_clippy() -> Result<(), std::io::Error> {
-    println!("cargo-clippy not found, installing...");
+    log::warn!("cargo-clippy not found, installing...");
     let mut cmd: Command = Command::new("rustup");
     cmd.arg("component").arg("add").arg("clippy");
     cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
@@ -6226,7 +6229,7 @@ async fn is_cargo_watch_installed() -> bool {
         .is_ok_and(|status: ExitStatus| status.success())
 }
 async fn install_cargo_watch() -> Result<(), std::io::Error> {
-    println!("cargo-watch not found, installing...");
+    log::warn!("cargo-watch not found, installing...");
     let mut cmd: Command = Command::new("cargo");
     cmd.arg("install").arg("cargo-watch");
     cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
@@ -6414,6 +6417,105 @@ mod r#fn;
 mod r#struct;
 pub use {r#fn::*, r#struct::*};
 ```
+# Path: hyperlane-cli/src/logger/static.rs
+```rust
+use crate::*;
+pub(crate) static LOGGER: Logger = Logger;
+```
+# Path: hyperlane-cli/src/logger/impl.rs
+```rust
+use crate::*;
+impl log::Log for Logger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= log::max_level()
+    }
+    fn log(&self, record: &log::Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let now_time: String = color_output::time();
+        let level: log::Level = record.level();
+        let args: &std::fmt::Arguments<'_> = record.args();
+        let file: Option<&str> = record.file();
+        let module_path: Option<&str> = record.module_path();
+        let target: &str = record.target();
+        let line: u32 = record.line().unwrap_or_default();
+        let location: &str = file.unwrap_or(module_path.unwrap_or(target));
+        let time_text: String = format!("{LOG_SPACE}{now_time}{LOG_SPACE}");
+        let level_text: String = format!("{LOG_SPACE}{level}{LOG_SPACE}");
+        let args_text: String = format!("{args}{LOG_SPACE}");
+        let location_text: String = format!("{LOG_SPACE}{location}{LOG_COLON}{line}{LOG_SPACE}");
+        let color: ColorType = match record.level() {
+            log::Level::Trace => ColorType::Use(Color::Magenta),
+            log::Level::Debug => ColorType::Use(Color::Cyan),
+            log::Level::Info => ColorType::Use(Color::Green),
+            log::Level::Warn => ColorType::Use(Color::Yellow),
+            log::Level::Error => ColorType::Use(Color::Red),
+        };
+        let mut time_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut level_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut location_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut args_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let time_output: ColorOutput<'_> = time_output_builder
+            .text(&time_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(ColorType::Use(Color::Black))
+            .build();
+        let level_output: ColorOutput<'_> = level_output_builder
+            .text(&level_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(color)
+            .build();
+        let location_output: ColorOutput<'_> = location_output_builder
+            .text(&location_text)
+            .bold(true)
+            .color(color)
+            .build();
+        let args_output: ColorOutput<'_> = args_output_builder
+            .text(&args_text)
+            .bold(true)
+            .color(color)
+            .endl(true)
+            .build();
+        ColorOutputListBuilder::new()
+            .add(time_output)
+            .add(level_output)
+            .add(location_output)
+            .add(args_output)
+            .run();
+    }
+    fn flush(&self) {}
+}
+impl Logger {
+    pub fn init(level_filter: log::LevelFilter) {
+        let _ = log::set_logger(&LOGGER);
+        log::set_max_level(level_filter);
+    }
+}
+```
+# Path: hyperlane-cli/src/logger/struct.rs
+```rust
+use lombok_macros::{Data, New};
+#[derive(Data, New)]
+pub struct Logger;
+```
+# Path: hyperlane-cli/src/logger/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use r#struct::*;
+pub use {color_output::*, log};
+pub(crate) use {r#const::*, r#static::*};
+```
+# Path: hyperlane-cli/src/logger/const.rs
+```rust
+pub(crate) const LOG_SPACE: &str = " ";
+pub(crate) const LOG_COLON: &str = ":";
+```
 # Path: hyperlane-cli/src/new/fn.rs
 ```rust
 use crate::*;
@@ -6474,14 +6576,14 @@ pub async fn execute_new(project_name: &str) -> Result<(), NewError> {
     validate_project_name(project_name)?;
     check_git_available().await?;
     let config: NewProjectConfig = NewProjectConfig::new(project_name.to_string());
-    println!(
+    log::info!(
         "Creating new project '{}' from template...",
         config.project_name
     );
     git_clone(&config).await?;
-    println!("Successfully created project '{}'", config.project_name);
-    println!("  cd {}", config.project_name);
-    println!("  cargo build");
+    log::info!("Successfully created project '{}'", config.project_name);
+    log::info!("  cd {}", config.project_name);
+    log::info!("  cargo build");
     Ok(())
 }
 ```
@@ -6742,21 +6844,22 @@ pub async fn execute_publish(
     let sorted_packages: Vec<Package> = topological_sort(&packages)?;
     let mut results: Vec<PublishResult> = Vec::new();
     for package in sorted_packages {
-        println!("Publishing {} v{}...", package.name, package.version);
+        log::info!("Publishing {} v{}...", package.name, package.version);
         let result: PublishResult = publish_package_with_retry(&package, max_retries).await;
         if result.success {
             if result.retries == 0 {
-                println!("Successfully published {}", result.package_name,);
+                log::info!("Successfully published {}", result.package_name,);
             } else {
-                println!(
+                log::info!(
                     "Successfully published {} (retried {} times)",
-                    result.package_name, result.retries
+                    result.package_name,
+                    result.retries
                 );
             }
         } else if let Some(error) = &result.error {
-            eprintln!("Failed to publish {}: {error}", result.package_name);
+            log::error!("Failed to publish {}: {error}", result.package_name);
         } else {
-            eprintln!("Failed to publish {}", result.package_name);
+            log::error!("Failed to publish {}", result.package_name);
         }
         results.push(result);
     }
