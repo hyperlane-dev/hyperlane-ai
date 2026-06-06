@@ -1,4 +1,4 @@
-<!--2026-06-06 13:52:41-->
+<!--2026-06-06 19:38:59-->
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
 [Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
@@ -7911,8 +7911,6 @@ impl EnvPlugin {
     }
 }
 impl MySqlInstanceConfig {
-    pub(crate) fn get_connection_url(&self) -> String {
-        format!(
     #[instrument_trace]
     pub(crate) fn load() -> Result<Self, String> {
         dotenvy::from_path(SERVER_ENV_FILE_PATH)
