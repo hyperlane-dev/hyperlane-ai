@@ -1,4 +1,4 @@
-<!--2026-06-13 14:08:54-->
+<!--2026-06-13 15:16:36-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
@@ -27,7 +27,6 @@ pub use {
 ```
 # Path: hyperlane/README.md
 ## hyperlane
-[Official Documentation](https://docs.ltpp.vip/hyperlane/)
 [Api Docs](https://docs.rs/hyperlane/latest/)
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
 ## Installation
@@ -2345,7 +2344,6 @@ mod r#fn;
 ```
 # Path: hyperlane-time/README.md
 ## hyperlane-time
-[Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
 [Api Docs](https://docs.rs/hyperlane-time/latest/)
 > A library for fetching the current time based on the system's locale settings.
 ## Installation
@@ -2701,7 +2699,6 @@ mod r#fn;
 ```
 # Path: hyperlane-log/README.md
 ## hyperlane-log
-[Official Documentation](https://docs.ltpp.vip/hyperlane-log/)
 [Api Docs](https://docs.rs/hyperlane-log/latest/)
 > A Rust logging library that supports both asynchronous and synchronous logging. It provides multiple log levels, such as error, info, and debug. Users can define custom log handling methods and configure log file paths. The library supports log rotation, automatically creating a new log file when the current file reaches the specified size limit. It allows flexible logging configurations, making it suitable for both high-performance asynchronous applications and traditional synchronous logging scenarios. The asynchronous mode utilizes Tokio's async channels for efficient log buffering, while the synchronous mode writes logs directly to the file system.
 ## Installation
@@ -12171,7 +12168,6 @@ async fn main() {
 ```
 # Path: hyperlane-cli/README.md
 # hyperlane-cli
-[Official Documentation](https://docs.ltpp.vip/hyperlane-cli/)
 [Api Docs](https://docs.rs/hyperlane-cli/latest/)
 ## Description
 > A command-line tool for Hyperlane framework.
@@ -15417,7 +15413,6 @@ async fn main() {
 ```
 # Path: hyperlane-broadcast/README.md
 ## hyperlane-broadcast
-[Official Documentation](https://docs.ltpp.vip/hyperlane-broadcast/)
 [Api Docs](https://docs.rs/hyperlane-broadcast/latest/)
 > hyperlane-broadcast is a lightweight and ergonomic wrapper over Tokio’s broadcast channel designed for easy-to-use publish-subscribe messaging in async Rust applications. It simplifies the native Tokio broadcast API by providing a straightforward interface for broadcasting messages to multiple subscribers with minimal boilerplate.
 ## Installation
