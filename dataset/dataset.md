@@ -1,16 +1,25 @@
 <!--2026-05-27 20:24:26-->
+
 # Path: hyperlane-time/README.md
+
 ## hyperlane-time
-[Official Documentation](https://docs.ltpp.vip/hyperlane-time/)
+
 [Api Docs](https://docs.rs/hyperlane-time/latest/)
+
 > A library for fetching the current time based on the system's locale settings.
+
 ## Installation
+
 To use this crate, you can run cmd:
+
 ```shell
 cargo add hyperlane-time
 ```
+
 ## Contact
+
 # Path: hyperlane-time/src/impl.rs
+
 ```rust
 use crate::*;
 impl fmt::Display for Lang {
@@ -40,23 +49,23 @@ impl fmt::Display for Lang {
 impl Lang {
     pub fn value(&self) -> u64 {
         match self {
-            Lang::EnUsUtf8 => 0,     
-            Lang::ZhCnUtf8 => 28800, 
-            Lang::FrFrUtf8 => 3600,  
-            Lang::DeDeUtf8 => 3600,  
-            Lang::EsEsUtf8 => 3600,  
-            Lang::ItItUtf8 => 3600,  
-            Lang::JaJpUtf8 => 32400, 
-            Lang::KoKrUtf8 => 32400, 
-            Lang::PtPtUtf8 => 3600,  
-            Lang::RuRuUtf8 => 10800, 
-            Lang::ArSaUtf8 => 10800, 
-            Lang::HiInUtf8 => 19800, 
-            Lang::ThThUtf8 => 25200, 
-            Lang::ViVnUtf8 => 25200, 
-            Lang::NlNlUtf8 => 3600,  
-            Lang::SvSeUtf8 => 3600,  
-            Lang::FiFiUtf8 => 3600,  
+            Lang::EnUsUtf8 => 0,
+            Lang::ZhCnUtf8 => 28800,
+            Lang::FrFrUtf8 => 3600,
+            Lang::DeDeUtf8 => 3600,
+            Lang::EsEsUtf8 => 3600,
+            Lang::ItItUtf8 => 3600,
+            Lang::JaJpUtf8 => 32400,
+            Lang::KoKrUtf8 => 32400,
+            Lang::PtPtUtf8 => 3600,
+            Lang::RuRuUtf8 => 10800,
+            Lang::ArSaUtf8 => 10800,
+            Lang::HiInUtf8 => 19800,
+            Lang::ThThUtf8 => 25200,
+            Lang::ViVnUtf8 => 25200,
+            Lang::NlNlUtf8 => 3600,
+            Lang::SvSeUtf8 => 3600,
+            Lang::FiFiUtf8 => 3600,
         }
     }
 }
@@ -86,7 +95,9 @@ impl FromStr for Lang {
     }
 }
 ```
+
 # Path: hyperlane-time/src/lib.rs
+
 ```rust
 mod r#enum;
 mod r#fn;
@@ -100,7 +111,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 ```
+
 # Path: hyperlane-time/src/fn.rs
+
 ```rust
 use crate::*;
 pub const LEAP_YEAR: [u64; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -288,7 +301,9 @@ pub fn timestamp_micros() -> u64 {
         + duration.subsec_micros() as u64
 }
 ```
+
 # Path: hyperlane-time/src/enum.rs
+
 ```rust
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Lang {
@@ -312,16 +327,22 @@ pub enum Lang {
     FiFiUtf8,
 }
 ```
+
 # Path: hyperlane-time/tests/mod.rs
+
 ```rust
 mod time;
 use hyperlane_time::*;
 ```
+
 # Path: hyperlane-time/tests/time/mod.rs
+
 ```rust
 mod r#fn;
 ```
+
 # Path: hyperlane-time/tests/time/fn.rs
+
 ```rust
 use crate::*;
 #[test]
@@ -355,22 +376,33 @@ fn test_methods() {
     println!("Current Time with Micros: {}", time_micros());
 }
 ```
+
 # Path: hyperlane-macros/README.md
+
 ## hyperlane-macros
-[Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
+
 [Api Docs](https://docs.rs/hyperlane-macros/latest/)
+
 > A comprehensive collection of procedural macros for building HTTP servers with enhanced functionality. This crate provides attribute macros that simplify HTTP request handling, protocol validation, response management, and request data extraction.
+
 ## Installation
+
 To use this crate, you can run cmd:
+
 ```shell
 cargo add hyperlane-macros
 ```
+
 ## Available Macros
+
 ### Hyperlane Macro
+
 - `#[hyperlane(server: Server)]` - Creates a new `Server` instance with the specified variable name and type, and automatically registers other hooks and routes defined within the crate.
 - `#[hyperlane(config: ServerConfig)]` - Creates a new `ServerConfig` instance with the specified variable name and type.
 - `#[hyperlane(var1: Type1, var2: Type2, ...)]` - Supports multiple instance initialization in a single call
+
 ### HTTP Method Macros
+
 - `#[methods(method1, method2, ...)]` - Accepts multiple HTTP methods
 - `#[is_get_method]` - GET method handler
 - `#[is_post_method]` - POST method handler
@@ -382,7 +414,9 @@ cargo add hyperlane-macros
 - `#[is_connect_method]` - CONNECT method handler
 - `#[is_trace_method]` - TRACE method handler
 - `#[is_unknown_method]` - Unknown method handler
+
 ### HTTP Version Macros
+
 - `#[is_http0_9_version]` - HTTP/0.9 check, ensures function only executes for HTTP/0.9 protocol requests
 - `#[is_http1_0_version]` - HTTP/1.0 check, ensures function only executes for HTTP/1.0 protocol requests
 - `#[is_http1_1_version]` - HTTP/1.1 check, ensures function only executes for HTTP/1.1 protocol requests
@@ -391,12 +425,16 @@ cargo add hyperlane-macros
 - `#[is_http1_1_or_higher_version]` - HTTP/1.1 or higher version check, ensures function only executes for HTTP/1.1 or newer protocol versions
 - `#[is_http_version]` - HTTP check, ensures function only executes for standard HTTP requests
 - `#[is_unknown_version]` - Unknown version check, ensures function only executes for requests with unknown HTTP versions
+
 ### Upgrade type Macros
+
 - `#[is_ws_upgrade_type]` - WebSocket check, ensures function only executes for WebSocket upgrade requests
 - `#[is_h2c_upgrade_type]` - HTTP/2 Cleartext check, ensures function only executes for HTTP/2 cleartext requests
 - `#[is_tls_upgrade_type]` - TLS check, ensures function only executes for TLS-secured connections
 - `#[is_unknown_upgrade_type]` - Unknown upgrade type check, ensures function only executes for requests with unknown upgrade types
+
 ### Response Setting Macros
+
 - `#[response_status_code(code)]` - Set response status code (supports literals and global constants)
 - `#[response_reason_phrase("phrase")]` - Set response reason phrase (supports literals and global constants)
 - `#[response_header("key", "value")]` - Add response header (supports literals and global constants)
@@ -404,93 +442,139 @@ cargo add hyperlane-macros
 - `#[response_body("data")]` - Set response body (supports literals and global constants)
 - `#[response_version(version)]` - Set response HTTP version (supports literals and global constants)
 - `#[clear_response_headers]` - Clear all response headers
+
 ### Send Operation Macros
+
 - `#[try_send]` - Try to send data via stream after function execution (returns Result). Defaults to sending the response built from context.
 - `#[try_send(data_expr)]` - Try to send the specified data expression via stream after function execution (returns Result)
 - `#[send]` - Send data via stream after function execution (**panics on failure**). Defaults to sending the response built from context.
 - `#[send(data_expr)]` - Send the specified data expression via stream after function execution (**panics on failure**)
+
 ### Flush Macros
+
 - `#[try_flush]` - Try to flush response stream after function execution to ensure immediate data transmission (returns Result)
 - `#[flush]` - Flush response stream after function execution to ensure immediate data transmission (**panics on failure**)
+
 ### Aborted Macros
+
 - `#[aborted]` - Handle aborted requests, providing cleanup logic for prematurely terminated connections
+
 ### Closed Operation Macros
+
 - `#[closed]` - Handle closed streams, providing cleanup logic for completed connections
+
 ### Conditional Macros
+
 - `#[filter(condition)]` - Continues execution only if the `condition` (a code block returning a boolean) is `true`.
 - `#[reject(condition)]` - Continues execution only if the `condition` (a code block returning a boolean) is `false`.
+
 ### Request Body Macros
+
 - `#[request_body(variable_name)]` - Extract raw request body into specified variable with RequestBody type
 - `#[request_body(var1, var2, ...)]` - Supports multiple request body variables
 - `#[request_body_json(variable_name: type)]` - Parse request body as JSON into specified variable and type
 - `#[request_body_json(var1: Type1, var2: Type2, ...)]` - Supports multiple JSON body parsing
+
 ### Attribute Macros
+
 - `#[try_get_attribute(key => variable_name: type)]` - Extract a specific attribute by key into a typed variable
 - `#[try_get_attribute("key1" => var1: Type1, "key2" => var2: Type2, ...)]` - Supports multiple attribute extraction
 - `#[attribute(key => variable_name: type)]` - Extract a specific attribute by key into a typed variable
 - `#[attribute("key1" => var1: Type1, "key2" => var2: Type2, ...)]` - Supports multiple attribute extraction
+
 ### Attributes Macros
+
 - `#[attributes(variable_name)]` - Get all attributes as a HashMap for comprehensive attribute access
 - `#[attributes(var1, var2, ...)]` - Supports multiple attribute collections
+
 ### Panic Data Macros
+
 - `#[try_get_task_panic_data(variable_name)]` - Extract panic data into a variable wrapped in Option type
 - `#[try_get_task_panic_data(var1, var2, ...)]` - Supports multiple panic data variables
 - `#[task_panic_data(variable_name)]` - Extract panic data into a variable with panic on missing value
 - `#[task_panic_data(var1, var2, ...)]` - Supports multiple panic data variables
+
 ### Request Error Data Macros
+
 - `#[try_get_request_error_data(variable_name)]` - Extract request error data into a variable wrapped in Option type
 - `#[try_get_request_error_data(var1, var2, ...)]` - Supports multiple request error data variables
 - `#[request_error_data(variable_name)]` - Extract request error data into a variable with panic on missing value
 - `#[request_error_data(var1, var2, ...)]` - Supports multiple request error data variables
+
 ### Route Param Macros
+
 - `#[try_get_route_param(key => variable_name)]` - Extract a specific route parameter by key into a variable
 - `#[try_get_route_param("key1" => var1, "key2" => var2, ...)]` - Supports multiple route parameter extraction
 - `#[route_param(key => variable_name)]` - Extract a specific route parameter by key into a variable
 - `#[route_param("key1" => var1, "key2" => var2, ...)]` - Supports multiple route parameter extraction
+
 ### Route Params Macros
+
 - `#[route_params(variable_name)]` - Get all route parameters as a collection
 - `#[route_params(var1, var2, ...)]` - Supports multiple route parameter collections
+
 ### Request Query Macros
+
 - `#[try_get_request_query(key => variable_name)]` - Extract a specific query parameter by key from the URL query string
 - `#[try_get_request_query("key1" => var1, "key2" => var2, ...)]` - Supports multiple query parameter extraction
 - `#[request_query(key => variable_name)]` - Extract a specific query parameter by key from the URL query string
 - `#[request_query("key1" => var1, "key2" => var2, ...)]` - Supports multiple query parameter extraction
+
 ### Request Querys Macros
+
 - `#[request_querys(variable_name)]` - Get all query parameters as a collection
 - `#[request_querys(var1, var2, ...)]` - Supports multiple query parameter collections
+
 ### Request Header Macros
+
 - `#[try_get_request_header(key => variable_name)]` - Extract a specific HTTP header by name from the request
 - `#[try_get_request_header(KEY1 => var1, KEY2 => var2, ...)]` - Supports multiple header extraction
 - `#[request_header(key => variable_name)]` - Extract a specific HTTP header by name from the request
 - `#[request_header(KEY1 => var1, KEY2 => var2, ...)]` - Supports multiple header extraction
+
 ### Request Headers Macros
+
 - `#[request_headers(variable_name)]` - Get all HTTP headers as a collection
 - `#[request_headers(var1, var2, ...)]` - Supports multiple header collections
+
 ### Request Cookie Macros
+
 - `#[try_get_request_cookie(key => variable_name)]` - Extract a specific cookie value by key from the request cookie header
 - `#[try_get_request_cookie("key1" => var1, "key2" => var2, ...)]` - Supports multiple cookie extraction
 - `#[request_cookie(key => variable_name)]` - Extract a specific cookie value by key from the request cookie header
 - `#[request_cookie("key1" => var1, "key2" => var2, ...)]` - Supports multiple cookie extraction
+
 ### Request Cookies Macros
+
 - `#[request_cookies(variable_name)]` - Get all cookies as a raw string from the cookie header
 - `#[request_cookies(var1, var2, ...)]` - Supports multiple cookie collections
+
 ### Request Version Macros
+
 - `#[request_version(variable_name)]` - Extract the HTTP request version into a variable
 - `#[request_version(var1, var2, ...)]` - Supports multiple request version variables
+
 ### Request Path Macros
+
 - `#[request_path(variable_name)]` - Extract the HTTP request path into a variable
 - `#[request_path(var1, var2, ...)]` - Supports multiple request path variables
+
 ### Host Macros
+
 - `#[host("hostname")]` - Restrict function execution to requests with a specific host header value
 - `#[host("host1", "host2", ...)]` - Supports multiple host checks
 - `#[reject_host("hostname")]` - Reject requests that match a specific host header value
 - `#[reject_host("host1", "host2", ...)]` - Supports multiple host rejections
+
 ### Referer Macros
+
 - `#[referer("url")]` - Restrict function execution to requests with a specific referer header value
 - `#[referer("url1", "url2", ...)]` - Supports multiple referer checks
 - `#[reject_referer("url")]` - Reject requests that match a specific referer header value
 - `#[reject_referer("url1", "url2", ...)]` - Supports multiple referer rejections
+
 ### Hook Macros
+
 - `#[prologue_hooks(function_name)]` - Execute specified function before the main handler function
 - `#[epilogue_hooks(function_name)]` - Execute specified function after the main handler function
 - `#[prologue_hooks(method::expression, another::method)]` - Supports method expressions for advanced hook configurations
@@ -499,7 +583,9 @@ cargo add hyperlane-macros
 - `#[request_error]` - Execute function when a request error occurs within the server
 - `#[prologue_macros(macro1, macro2, ...)]` - Injects a list of macros before the decorated function.
 - `#[epilogue_macros(macro1, macro2, ...)]` - Injects a list of macros after the decorated function.
+
 ### Middleware Macros
+
 - `#[request_middleware]` - Register a function as a request middleware
 - `#[request_middleware(order)]` - Register a function as a request middleware with specified order
 - `#[response_middleware]` - Register a function as a response middleware
@@ -508,22 +594,33 @@ cargo add hyperlane-macros
 - `#[task_panic(order)]` - Register a function as a panic hook with specified order
 - `#[request_error]` - Register a function as a request error hook
 - `#[request_error(order)]` - Register a function as a request error hook with specified order
+
 ### Stream Processing Macros
+
 - `#[try_get_http_request]` - Wraps function body with HTTP stream processing. The function body only executes if data is successfully read from the HTTP stream.
 - `#[try_get_http_request(variable_name)]` - Wraps function body with HTTP stream processing, storing data in specified variable name.
 - `#[try_get_websocket_request]` - Wraps function body with WebSocket stream processing. The function body only executes if data is successfully read from the WebSocket stream.
 - `#[try_get_websocket_request(variable_name)]` - Wraps function body with WebSocket stream processing, storing data in specified variable name.
+
 ### Response Header Macros
+
 ### Response Body Macros
+
 ### Route Macros
+
 - `#[route("path")]` - Register a route handler for the given path using the default server (Prerequisite: requires the #[hyperlane(server: Server)] macro)
+
 ### Helper Tips
+
 - **Request related macros** (data extraction) use **`get`** operations - they retrieve/query data from the request
 - **Response related macros** (data setting) use **`set`** operations - they assign/configure response data
 - **Hook macros** For hook-related macros that support an `order` parameter, if `order` is not specified, the hook will have higher priority than hooks with a specified `order` (applies only to macros like `#[request_middleware]`, `#[response_middleware]`, `#[task_panic]`, `#[request_error]`)
 - **Multi-parameter support** Most data extraction macros support multiple parameters in a single call (e.g., `#[request_body(var1, var2)]`, `#[request_query("k1" => v1, "k2" => v2)]`). This reduces macro repetition and improves code readability.
+
 ## Contact
+
 # Path: hyperlane-macros/debug/src/main.rs
+
 ```rust
 use hyperlane::*;
 use hyperlane_macros::*;
@@ -2185,7 +2282,9 @@ async fn main() {
     server_control_hook_1.wait().await;
 }
 ```
+
 # Path: hyperlane-macros/src/lib.rs
+
 ```rust
 ﻿
 mod closed;
@@ -2536,12 +2635,16 @@ pub fn context(input: TokenStream) -> TokenStream {
     context_macro(input)
 }
 ```
+
 # Path: hyperlane-macros/src/hook/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/hook/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -2607,7 +2710,9 @@ pub(crate) fn epilogue_hooks_macro(
     })
 }
 ```
+
 # Path: hyperlane-macros/src/host/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for MultiHostData {
@@ -2628,21 +2733,27 @@ impl Parse for MultiHostData {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/host/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct MultiHostData {
     pub(crate) host_values: Vec<Expr>,
 }
 ```
+
 # Path: hyperlane-macros/src/host/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-macros/src/host/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
@@ -2680,7 +2791,9 @@ pub(crate) fn reject_host_macro(
     })
 }
 ```
+
 # Path: hyperlane-macros/src/response/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for ResponseHeaderData {
@@ -2713,14 +2826,18 @@ impl Parse for ResponseBodyData {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/response/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct SendData {
     pub(crate) data: Expr,
 }
 ```
+
 # Path: hyperlane-macros/src/response/mod.rs
+
 ```rust
 mod r#enum;
 mod r#fn;
@@ -2728,7 +2845,9 @@ mod r#impl;
 mod r#struct;
 pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-macros/src/response/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn response_status_code_macro(
@@ -2827,19 +2946,25 @@ pub(crate) fn response_version_macro(
     })
 }
 ```
+
 # Path: hyperlane-macros/src/response/enum.rs
+
 ```rust
 pub(crate) enum HeaderOperation {
     Set,
     Add,
 }
 ```
+
 # Path: hyperlane-macros/src/filter/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/filter/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn filter_macro(
@@ -2857,12 +2982,16 @@ pub(crate) fn filter_macro(
     })
 }
 ```
+
 # Path: hyperlane-macros/src/response_middleware/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/response_middleware/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -2879,12 +3008,16 @@ pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) ->
     gen_code.into()
 }
 ```
+
 # Path: hyperlane-macros/src/request_middleware/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/request_middleware/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -2901,12 +3034,16 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
     gen_code.into()
 }
 ```
+
 # Path: hyperlane-macros/src/closed/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/closed/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
@@ -2917,7 +3054,9 @@ pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream
     })
 }
 ```
+
 # Path: hyperlane-macros/src/from_stream/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for FromStreamData {
@@ -2938,25 +3077,33 @@ impl Parse for FromStreamData {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/from_stream/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct FromStreamData {
     pub(crate) variable_name: Option<Expr>,
 }
 ```
+
 # Path: hyperlane-macros/src/from_stream/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
 pub(crate) use r#struct::*;
 ```
+
 # Path: hyperlane-macros/src/inject/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/inject/fn.rs
+
 ```rust
 use crate::*;
 fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) -> TokenStream {
@@ -3014,7 +3161,9 @@ pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
     current_stream
 }
 ```
+
 # Path: hyperlane-macros/src/referer/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for MultiRefererData {
@@ -3035,21 +3184,27 @@ impl Parse for MultiRefererData {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/referer/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct MultiRefererData {
     pub(crate) referer_values: Vec<Expr>,
 }
 ```
+
 # Path: hyperlane-macros/src/referer/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-macros/src/referer/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn referer_macro(
@@ -3091,7 +3246,9 @@ pub(crate) fn reject_referer_macro(
     })
 }
 ```
+
 # Path: hyperlane-macros/src/context/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for ContextInput {
@@ -3107,7 +3264,9 @@ impl Parse for ContextInput {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/context/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct ContextInput {
@@ -3115,14 +3274,18 @@ pub(crate) struct ContextInput {
     pub(crate) ty: Option<Type>,
 }
 ```
+
 # Path: hyperlane-macros/src/context/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-macros/src/context/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn is_mutable_reference_type(ty: &Type) -> bool {
@@ -3149,7 +3312,9 @@ pub(crate) fn context_macro(input: TokenStream) -> TokenStream {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/route/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for RouteAttr {
@@ -3159,21 +3324,27 @@ impl Parse for RouteAttr {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/route/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct RouteAttr {
     pub(crate) path: Expr,
 }
 ```
+
 # Path: hyperlane-macros/src/route/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-macros/src/route/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -3190,12 +3361,16 @@ pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     gen_code.into()
 }
 ```
+
 # Path: hyperlane-macros/src/version/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/version/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn create_version_check(
@@ -3238,12 +3413,16 @@ impl_version_check_macro!(
 impl_version_check_macro!(is_http_version_macro, is_http_version, http);
 impl_version_check_macro!(is_unknown_version_macro, is_unknown_version, unknown);
 ```
+
 # Path: hyperlane-macros/src/flush/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/flush/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
@@ -3261,12 +3440,16 @@ pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream 
     })
 }
 ```
+
 # Path: hyperlane-macros/src/upgrade/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/upgrade/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn create_protocol_check(
@@ -3306,7 +3489,9 @@ impl_protocol_check_macro!(
     unknown
 );
 ```
+
 # Path: hyperlane-macros/src/send/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for SendData {
@@ -3316,7 +3501,9 @@ impl Parse for SendData {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/send/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct ResponseHeaderData {
@@ -3328,14 +3515,18 @@ pub(crate) struct ResponseBodyData {
     pub(crate) body: Expr,
 }
 ```
+
 # Path: hyperlane-macros/src/send/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-macros/src/send/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn try_send_macro(
@@ -3383,7 +3574,9 @@ pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Positio
     })
 }
 ```
+
 # Path: hyperlane-macros/src/request/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for RequestMethods {
@@ -3680,7 +3873,9 @@ impl Parse for MultiRequestErrorData {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/request/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct RequestMethods {
@@ -3735,14 +3930,18 @@ pub(crate) struct MultiRequestErrorData {
     pub(crate) variables: Vec<Ident>,
 }
 ```
+
 # Path: hyperlane-macros/src/request/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-macros/src/request/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn request_body_macro(
@@ -4170,12 +4369,16 @@ pub(crate) fn request_path_macro(
     })
 }
 ```
+
 # Path: hyperlane-macros/src/stream/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/stream/fn.rs
+
 ```rust
 use crate::*;
 use syn::Ident;
@@ -4288,7 +4491,9 @@ pub(crate) fn try_get_websocket_request_macro(attr: TokenStream, item: TokenStre
     }
 }
 ```
+
 # Path: hyperlane-macros/src/common/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for OrderAttr {
@@ -4301,7 +4506,9 @@ impl Parse for OrderAttr {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/common/type.rs
+
 ```rust
 use crate::*;
 pub(crate) type MacroHandlerPosition = fn(TokenStream, Position) -> TokenStream;
@@ -4309,7 +4516,9 @@ pub(crate) type MacroHandlerWithAttr = fn(TokenStream, TokenStream) -> TokenStre
 pub(crate) type MacroHandlerWithAttrPosition =
     fn(TokenStream, TokenStream, Position) -> TokenStream;
 ```
+
 # Path: hyperlane-macros/src/common/static.rs
+
 ```rust
 use crate::*;
 pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
@@ -4611,11 +4820,15 @@ pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
     },
 ];
 ```
+
 # Path: hyperlane-macros/src/common/const.rs
+
 ```rust
 pub(crate) const SERVER_TYPE_KEY: &str = "Server";
 ```
+
 # Path: hyperlane-macros/src/common/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone)]
@@ -4627,7 +4840,9 @@ pub(crate) struct InjectableMacro {
     pub(crate) handler: Handler,
 }
 ```
+
 # Path: hyperlane-macros/src/common/mod.rs
+
 ```rust
 mod r#const;
 mod r#enum;
@@ -4638,7 +4853,9 @@ mod r#struct;
 mod r#type;
 pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#static::*, r#struct::*, r#type::*};
 ```
+
 # Path: hyperlane-macros/src/common/fn.rs
+
 ```rust
 use crate::*;
 fn inject_at_start(
@@ -4863,7 +5080,9 @@ pub(crate) fn leak_context(is_unsafe_error: bool, context: &Ident) -> TokenStrea
     }
 }
 ```
+
 # Path: hyperlane-macros/src/common/enum.rs
+
 ```rust
 use crate::*;
 pub(crate) enum Handler {
@@ -4876,12 +5095,16 @@ pub(crate) enum Position {
     Epilogue,
 }
 ```
+
 # Path: hyperlane-macros/src/method/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/method/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn create_method_check(
@@ -4955,12 +5178,16 @@ impl_http_method_macro!(is_connect_method_handler, is_connect_method, connect);
 impl_http_method_macro!(is_trace_method_handler, is_trace_method, trace);
 impl_http_method_macro!(is_unknown_method_handler, is_unknown_method, unknown);
 ```
+
 # Path: hyperlane-macros/src/reject/mod.rs
+
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
 ```
+
 # Path: hyperlane-macros/src/reject/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn reject_macro(
@@ -4978,7 +5205,9 @@ pub(crate) fn reject_macro(
     })
 }
 ```
+
 # Path: hyperlane-macros/src/hyperlane/impl.rs
+
 ```rust
 use crate::*;
 impl Parse for MultiHyperlaneAttr {
@@ -5001,21 +5230,27 @@ impl Parse for MultiHyperlaneAttr {
     }
 }
 ```
+
 # Path: hyperlane-macros/src/hyperlane/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct MultiHyperlaneAttr {
     pub(crate) params: Vec<(Ident, Ident)>,
 }
 ```
+
 # Path: hyperlane-macros/src/hyperlane/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-macros/src/hyperlane/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -5052,18 +5287,27 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
     gen_code.into()
 }
 ```
+
 # Path: hyperlane-utils/README.md
+
 ## hyperlane-utils
-[Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
+
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
+
 > A library providing utils for hyperlane.
+
 ## Installation
+
 To use this crate, you can run cmd:
+
 ```shell
 cargo add hyperlane-utils
 ```
+
 ## Contact
+
 # Path: hyperlane-utils/src/lib.rs
+
 ```rust
 pub use {
     aes, ahash, base64, bin_encode_decode::*, bytemuck_derive, chrono, chunkify::*, cipher,
@@ -5078,18 +5322,27 @@ pub use {
     utoipa_swagger_ui, uuid,
 };
 ```
+
 # Path: hyperlane-broadcast/README.md
+
 ## hyperlane-broadcast
-[Official Documentation](https://docs.ltpp.vip/hyperlane-broadcast/)
+
 [Api Docs](https://docs.rs/hyperlane-broadcast/latest/)
+
 > hyperlane-broadcast is a lightweight and ergonomic wrapper over Tokio’s broadcast channel designed for easy-to-use publish-subscribe messaging in async Rust applications. It simplifies the native Tokio broadcast API by providing a straightforward interface for broadcasting messages to multiple subscribers with minimal boilerplate.
+
 ## Installation
+
 To use this crate, you can run cmd:
+
 ```shell
 cargo add hyperlane-broadcast
 ```
+
 ## Contact
+
 # Path: hyperlane-broadcast/src/lib.rs
+
 ```rust
 mod broadcast;
 mod broadcast_map;
@@ -5104,7 +5357,9 @@ use {
     twox_hash::XxHash3_64,
 };
 ```
+
 # Path: hyperlane-broadcast/src/broadcast/impl.rs
+
 ```rust
 use crate::*;
 impl<T: Clone + Debug> BroadcastTrait for T {}
@@ -5135,7 +5390,9 @@ impl<T: BroadcastTrait> Broadcast<T> {
     }
 }
 ```
+
 # Path: hyperlane-broadcast/src/broadcast/type.rs
+
 ```rust
 use crate::*;
 pub type ReceiverCount = usize;
@@ -5145,22 +5402,30 @@ pub type BroadcastReceiver<T> = Receiver<T>;
 pub type BroadcastSender<T> = Sender<T>;
 pub type Capacity = usize;
 ```
+
 # Path: hyperlane-broadcast/src/broadcast/trait.rs
+
 ```rust
 use crate::*;
 pub trait BroadcastTrait: Clone + Debug {}
 ```
+
 # Path: hyperlane-broadcast/src/broadcast/const.rs
+
 ```rust
 pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
 ```
+
 # Path: hyperlane-broadcast/src/broadcast/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, Debug)]
 pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
 ```
+
 # Path: hyperlane-broadcast/src/broadcast/mod.rs
+
 ```rust
 mod r#const;
 mod r#impl;
@@ -5169,7 +5434,9 @@ mod r#trait;
 mod r#type;
 pub use {r#const::*, r#struct::*, r#trait::*, r#type::*};
 ```
+
 # Path: hyperlane-broadcast/src/broadcast_map/impl.rs
+
 ```rust
 use crate::*;
 impl<T: Clone + Debug> BroadcastMapTrait for T {}
@@ -5256,7 +5523,9 @@ impl<T: BroadcastMapTrait> BroadcastMap<T> {
     }
 }
 ```
+
 # Path: hyperlane-broadcast/src/broadcast_map/type.rs
+
 ```rust
 use crate::*;
 pub type BroadcastMapSendError<T> = SendError<T>;
@@ -5264,18 +5533,24 @@ pub type BroadcastMapReceiver<T> = Receiver<T>;
 pub type BroadcastMapSender<T> = Sender<T>;
 pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDefault<XxHash3_64>>;
 ```
+
 # Path: hyperlane-broadcast/src/broadcast_map/trait.rs
+
 ```rust
 use crate::*;
 pub trait BroadcastMapTrait: Clone + Debug {}
 ```
+
 # Path: hyperlane-broadcast/src/broadcast_map/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, Debug)]
 pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>);
 ```
+
 # Path: hyperlane-broadcast/src/broadcast_map/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
@@ -5283,7 +5558,9 @@ mod r#trait;
 mod r#type;
 pub use {r#struct::*, r#trait::*, r#type::*};
 ```
+
 # Path: hyperlane-broadcast/tests/mod.rs
+
 ```rust
 mod broadcast;
 mod broadcast_map;
@@ -5294,11 +5571,15 @@ use tokio::{
     time::{error::Elapsed, timeout},
 };
 ```
+
 # Path: hyperlane-broadcast/tests/broadcast/mod.rs
+
 ```rust
 mod r#fn;
 ```
+
 # Path: hyperlane-broadcast/tests/broadcast/fn.rs
+
 ```rust
 use crate::*;
 #[tokio::test]
@@ -5311,11 +5592,15 @@ pub async fn test_broadcast() {
     assert_eq!(rec2.recv().await, Ok(20));
 }
 ```
+
 # Path: hyperlane-broadcast/tests/broadcast_map/mod.rs
+
 ```rust
 mod r#fn;
 ```
+
 # Path: hyperlane-broadcast/tests/broadcast_map/fn.rs
+
 ```rust
 use crate::*;
 #[tokio::test]
@@ -5388,15 +5673,25 @@ pub async fn test_broadcast_map_send() {
     assert_eq!(non_existent, None);
 }
 ```
+
 # Path: hyperlane-quick-start/README.md
+
 ## hyperlane-quick-start
+
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+
 ## Official Documentation
+
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+
 ## Api Docs
+
 - [Api Docs](https://docs.rs/hyperlane/latest/)
+
 ## Contact
+
 # Path: hyperlane-quick-start/resources/lib.rs
+
 ```rust
 #![recursion_limit = "1024"]
 pub mod docker;
@@ -5405,27 +5700,41 @@ pub mod sql;
 pub mod r#static;
 pub mod templates;
 ```
+
 # Path: hyperlane-quick-start/resources/README.md
+
 ## hyperlane-resources
+
 > Hyperlane resources module containing various resources and utilities used by the framework.
+
 ## Official Documentation
+
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+
 ## Api Docs
+
 - [Api Docs](https://docs.rs/hyperlane/latest/)
+
 ## Contact
+
 # Path: hyperlane-quick-start/resources/env/const.rs
+
 ```rust
 #[cfg(debug_assertions)]
 pub const SERVER_ENV_FILE_PATH: &str = "./resources/env/dev/server.env";
 #[cfg(not(debug_assertions))]
 pub const SERVER_ENV_FILE_PATH: &str = "./resources/env/release/server.env";
 ```
+
 # Path: hyperlane-quick-start/resources/env/mod.rs
+
 ```rust
 mod r#const;
 pub use r#const::*;
 ```
+
 # Path: hyperlane-quick-start/resources/env/dev/server.env
+
 ```env
 DOCKER_COMPOSE_FILE_PATH=./resources/docker/dev/server_docker_compose.yml
 DB_CONNECTION_TIMEOUT_MILLIS=1000
@@ -5450,7 +5759,9 @@ SERVER_PID_FILE_PATH=./data/dev/process/hyperlane.pid
 SERVER_REQUEST_HTTP_READ_TIMEOUT_MS=60000
 SERVER_REQUEST_MAX_BODY_SIZE=104857600
 ```
+
 # Path: hyperlane-quick-start/resources/env/release/server.env
+
 ```env
 DOCKER_COMPOSE_FILE_PATH=./resources/docker/release/server_docker_compose.yml
 DB_CONNECTION_TIMEOUT_MILLIS=1000
@@ -5475,7 +5786,9 @@ SERVER_PID_FILE_PATH=./data/release/process/hyperlane.pid
 SERVER_REQUEST_HTTP_READ_TIMEOUT_MS=60000
 SERVER_REQUEST_MAX_BODY_SIZE=104857600
 ```
+
 # Path: hyperlane-quick-start/resources/docker/const.rs
+
 ```rust
 #[cfg(debug_assertions)]
 pub const SERVER_DOCKER_COMPOSE_FILE_PATH: &str =
@@ -5488,12 +5801,16 @@ pub const SERVER_DOCKERFILE_PATH: &str = "./resources/docker/dev/server.dockerfi
 #[cfg(not(debug_assertions))]
 pub const SERVER_DOCKERFILE_PATH: &str = "./resources/docker/release/server.dockerfile";
 ```
+
 # Path: hyperlane-quick-start/resources/docker/mod.rs
+
 ```rust
 mod r#const;
 pub use r#const::*;
 ```
+
 # Path: hyperlane-quick-start/resources/docker/dev/server.dockerfile
+
 ```dockerfile
 FROM rust:1.93-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
@@ -5505,7 +5822,9 @@ RUN cargo build && \
 EXPOSE 80
 CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
+
 # Path: hyperlane-quick-start/resources/docker/release/server.dockerfile
+
 ```dockerfile
 FROM rust:1.93-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
@@ -5517,7 +5836,9 @@ RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86
 EXPOSE 65002
 CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
+
 # Path: hyperlane-quick-start/application/lib.rs
+
 ```rust
 #![recursion_limit = "1024"]
 pub mod controller;
@@ -5539,21 +5860,33 @@ use {
     utoipa::ToSchema,
 };
 ```
+
 # Path: hyperlane-quick-start/application/README.md
+
 ## hyperlane-application
+
 > Hyperlane application module containing core application logic, controllers, services, and middleware components.
+
 ## Official Documentation
+
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+
 ## Api Docs
+
 - [Api Docs](https://docs.rs/hyperlane/latest/)
+
 ## Contact
+
 # Path: hyperlane-quick-start/application/middleware/mod.rs
+
 ```rust
 pub mod request;
 pub mod response;
 use {super::*, utils::json::*};
 ```
+
 # Path: hyperlane-quick-start/application/middleware/response/impl.rs
+
 ```rust
 use super::*;
 impl ServerHook for SendMiddleware {
@@ -5585,7 +5918,9 @@ impl ServerHook for LogMiddleware {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/application/middleware/response/struct.rs
+
 ```rust
 use super::*;
 #[response_middleware(1)]
@@ -5595,14 +5930,18 @@ pub struct SendMiddleware;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct LogMiddleware;
 ```
+
 # Path: hyperlane-quick-start/application/middleware/response/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/application/middleware/request/impl.rs
+
 ```rust
 use super::*;
 impl ServerHook for HttpRequestMiddleware {
@@ -5696,7 +6035,9 @@ impl ServerHook for UpgradeMiddleware {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/application/middleware/request/struct.rs
+
 ```rust
 use super::*;
 #[request_middleware(1)]
@@ -5718,19 +6059,25 @@ pub struct OptionMethodMiddleware;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct UpgradeMiddleware;
 ```
+
 # Path: hyperlane-quick-start/application/middleware/request/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/application/view/mod.rs
+
 ```rust
 mod favicon;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/application/view/favicon/impl.rs
+
 ```rust
 use super::*;
 impl ServerHook for FaviconRoute {
@@ -5749,14 +6096,18 @@ impl ServerHook for FaviconRoute {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/application/view/favicon/struct.rs
+
 ```rust
 use super::*;
 #[route("/favicon.ico")]
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct FaviconRoute;
 ```
+
 # Path: hyperlane-quick-start/application/view/favicon/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
@@ -5764,18 +6115,24 @@ pub use r#struct::*;
 use super::*;
 use hyperlane_config::application::logo_img::*;
 ```
+
 # Path: hyperlane-quick-start/application/model/mod.rs
+
 ```rust
 pub mod request;
 pub mod response;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/application/model/response/mod.rs
+
 ```rust
 pub mod common;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/application/model/response/common/impl.rs
+
 ```rust
 use super::*;
 impl From<ApiResponseStatus> for i32 {
@@ -5845,7 +6202,9 @@ where
     }
 }
 ```
+
 # Path: hyperlane-quick-start/application/model/response/common/struct.rs
+
 ```rust
 use super::*;
 #[skip_serializing_none]
@@ -5863,7 +6222,9 @@ where
     pub(super) timestamp: Option<i64>,
 }
 ```
+
 # Path: hyperlane-quick-start/application/model/response/common/mod.rs
+
 ```rust
 mod r#enum;
 mod r#impl;
@@ -5872,7 +6233,9 @@ pub use {r#enum::*, r#struct::*};
 use super::*;
 use std::fmt::{self, Display, Formatter};
 ```
+
 # Path: hyperlane-quick-start/application/model/response/common/enum.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
@@ -5890,19 +6253,25 @@ pub enum ApiResponseStatus {
     RequestTimeout,
 }
 ```
+
 # Path: hyperlane-quick-start/application/utils/mod.rs
+
 ```rust
 pub mod json;
 pub mod send;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/application/utils/send/mod.rs
+
 ```rust
 mod r#fn;
 pub use r#fn::*;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/application/utils/send/fn.rs
+
 ```rust
 use super::*;
 #[instrument_trace]
@@ -5928,13 +6297,17 @@ pub async fn send_body_hook(stream: &mut Stream, ctx: &mut Context) {
     try_send_body_hook(stream, ctx).await.unwrap()
 }
 ```
+
 # Path: hyperlane-quick-start/application/utils/json/mod.rs
+
 ```rust
 mod r#fn;
 pub use r#fn::*;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/application/utils/json/fn.rs
+
 ```rust
 use super::*;
 #[instrument_trace]
@@ -5950,7 +6323,9 @@ pub async fn get_response_json(ctx: &Context) -> String {
     serde_json::to_string(&response).unwrap_or(response.to_string())
 }
 ```
+
 # Path: hyperlane-quick-start/application/exception/impl.rs
+
 ```rust
 use super::*;
 impl ServerHook for TaskPanicHook {
@@ -6020,7 +6395,9 @@ impl ServerHook for RequestErrorHook {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/application/exception/struct.rs
+
 ```rust
 use super::*;
 #[task_panic]
@@ -6038,14 +6415,18 @@ pub struct RequestErrorHook {
     pub(super) response_body: String,
 }
 ```
+
 # Path: hyperlane-quick-start/application/exception/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use {super::*, model::response::common::*};
 ```
+
 # Path: hyperlane-quick-start/src/main.rs
+
 ```rust
 #![recursion_limit = "1024"]
 use {
@@ -6072,7 +6453,9 @@ fn main() {
     });
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/lib.rs
+
 ```rust
 #![recursion_limit = "1024"]
 pub mod common;
@@ -6096,15 +6479,25 @@ use {
     sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
 };
 ```
+
 # Path: hyperlane-quick-start/plugin/README.md
+
 ## hyperlane-plugin
+
 > A powerful and extensible plugin system for the hyperlane framework, providing modularity and customization capabilities.
+
 ## Official Documentation
+
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+
 ## Api Docs
+
 - [Api Docs](https://docs.rs/hyperlane/latest/)
+
 ## Contact
+
 # Path: hyperlane-quick-start/plugin/mysql/impl.rs
+
 ```rust
 use super::*;
 impl GetOrInit for MySqlPlugin {
@@ -6671,18 +7064,24 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/mysql/static.rs
+
 ```rust
 use super::*;
 pub static MYSQL_CONNECTIONS: OnceLock<
     RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
 > = OnceLock::new();
 ```
+
 # Path: hyperlane-quick-start/plugin/mysql/const.rs
+
 ```rust
 pub const DEFAULT_MYSQL_INSTANCE_NAME: &str = "mysql_default";
 ```
+
 # Path: hyperlane-quick-start/plugin/mysql/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
@@ -6694,7 +7093,9 @@ pub struct MySqlAutoCreation {
     pub(super) schema: DatabaseSchema,
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/mysql/mod.rs
+
 ```rust
 mod r#const;
 mod r#impl;
@@ -6708,7 +7109,9 @@ use tokio::{
     time::timeout,
 };
 ```
+
 # Path: hyperlane-quick-start/plugin/env/impl.rs
+
 ```rust
 use super::*;
 impl GetOrInit for EnvPlugin {
@@ -7095,12 +7498,16 @@ impl MySqlInstanceConfig {
                 for instance in config.get_mysql_instances() {
                     info!(
 ```
+
 # Path: hyperlane-quick-start/plugin/env/static.rs
+
 ```rust
 use super::*;
 pub static GLOBAL_ENV_CONFIG: OnceLock<EnvConfig> = OnceLock::new();
 ```
+
 # Path: hyperlane-quick-start/plugin/env/const.rs
+
 ```rust
 pub const ENV_KEY_DB_CONNECTION_TIMEOUT_MILLIS: &str = "DB_CONNECTION_TIMEOUT_MILLIS";
 pub const ENV_KEY_DB_RETRY_INTERVAL_MILLIS: &str = "DB_RETRY_INTERVAL_MILLIS";
@@ -7136,7 +7543,9 @@ pub const DOCKER_POSTGRES_USER: &str = "POSTGRES_USER";
 pub const DOCKER_POSTGRES_PASSWORD: &str = "POSTGRES_PASSWORD";
 pub const DOCKER_REDIS_PASSWORD_FLAG: &str = "--requirepass";
 ```
+
 # Path: hyperlane-quick-start/plugin/env/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
@@ -7243,7 +7652,9 @@ pub struct RedisInstanceConfig {
     pub(super) password: String,
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/env/mod.rs
+
 ```rust
 mod r#const;
 mod r#impl;
@@ -7254,7 +7665,9 @@ use {super::*, r#static::*};
 use hyperlane_resources::{docker::*, env::*};
 use std::{env::var, sync::OnceLock};
 ```
+
 # Path: hyperlane-quick-start/plugin/database/impl.rs
+
 ```rust
 use super::*;
 impl fmt::Display for PluginType {
@@ -7720,13 +8133,17 @@ impl AutoCreationLogger {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/database/const.rs
+
 ```rust
 pub const MYSQL_DISPLAY_NAME: &str = "MySQL";
 pub const POSTGRESQL_DISPLAY_NAME: &str = "PostgreSQL";
 pub const REDIS_DISPLAY_NAME: &str = "Redis";
 ```
+
 # Path: hyperlane-quick-start/plugin/database/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
@@ -7769,7 +8186,9 @@ pub struct PluginAutoCreationConfig {
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct AutoCreationLogger;
 ```
+
 # Path: hyperlane-quick-start/plugin/database/mod.rs
+
 ```rust
 mod r#const;
 mod r#enum;
@@ -7784,7 +8203,9 @@ use std::{
     time::{Duration, Instant},
 };
 ```
+
 # Path: hyperlane-quick-start/plugin/database/enum.rs
+
 ```rust
 #[derive(Clone, Debug)]
 pub enum AutoCreationError {
@@ -7801,7 +8222,9 @@ pub enum PluginType {
     Redis,
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/postgresql/impl.rs
+
 ```rust
 use super::*;
 impl GetOrInit for PostgreSqlPlugin {
@@ -8360,18 +8783,24 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/postgresql/static.rs
+
 ```rust
 use super::*;
 pub static POSTGRESQL_CONNECTIONS: OnceLock<
     RwLock<HashMap<String, ConnectionCache<DatabaseConnection>>>,
 > = OnceLock::new();
 ```
+
 # Path: hyperlane-quick-start/plugin/postgresql/const.rs
+
 ```rust
 pub const DEFAULT_POSTGRESQL_INSTANCE_NAME: &str = "postgres_default";
 ```
+
 # Path: hyperlane-quick-start/plugin/postgresql/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
@@ -8383,7 +8812,9 @@ pub struct PostgreSqlAutoCreation {
     pub(super) schema: DatabaseSchema,
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/postgresql/mod.rs
+
 ```rust
 mod r#const;
 mod r#impl;
@@ -8400,7 +8831,9 @@ use {
     },
 };
 ```
+
 # Path: hyperlane-quick-start/plugin/shutdown/impl.rs
+
 ```rust
 use super::*;
 impl GetOrInit for ShutdownPlugin {
@@ -8424,18 +8857,24 @@ impl ShutdownPlugin {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/shutdown/static.rs
+
 ```rust
 use super::*;
 pub(super) static SHUTDOWN: OnceLock<ServerControlHookHandler<()>> = OnceLock::new();
 ```
+
 # Path: hyperlane-quick-start/plugin/shutdown/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct ShutdownPlugin;
 ```
+
 # Path: hyperlane-quick-start/plugin/shutdown/mod.rs
+
 ```rust
 mod r#impl;
 mod r#static;
@@ -8443,7 +8882,9 @@ mod r#struct;
 pub use r#struct::*;
 use {super::*, r#static::*};
 ```
+
 # Path: hyperlane-quick-start/plugin/common/trait.rs
+
 ```rust
 use super::*;
 pub trait GetOrInit: Clone + Copy + Default + Send + Sync + 'static {
@@ -8489,14 +8930,18 @@ pub trait DatabaseAutoCreation: Clone + Send + Sync + 'static {
     fn verify_connection(&self) -> impl Future<Output = Result<(), AutoCreationError>> + Send;
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/common/mod.rs
+
 ```rust
 mod r#trait;
 pub use r#trait::*;
 use crate::database::*;
 use std::future::Future;
 ```
+
 # Path: hyperlane-quick-start/plugin/logger/impl.rs
+
 ```rust
 use super::*;
 impl GetOrInit for LoggerPlugin {
@@ -8626,13 +9071,17 @@ impl Logger {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/logger/static.rs
+
 ```rust
 use super::*;
 pub(super) static LOGGER: Logger = Logger;
 pub(super) static FILE_LOGGER: OnceLock<RwLock<FileLogger>> = OnceLock::new();
 ```
+
 # Path: hyperlane-quick-start/plugin/logger/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
@@ -8640,7 +9089,9 @@ pub struct LoggerPlugin;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct Logger;
 ```
+
 # Path: hyperlane-quick-start/plugin/logger/mod.rs
+
 ```rust
 mod r#impl;
 mod r#static;
@@ -8650,7 +9101,9 @@ use {super::*, r#static::*};
 use std::{fmt::Arguments, sync::OnceLock};
 use hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 ```
+
 # Path: hyperlane-quick-start/plugin/process/impl.rs
+
 ```rust
 use super::*;
 impl ProcessPlugin {
@@ -8708,19 +9161,25 @@ impl ProcessPlugin {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/process/const.rs
+
 ```rust
 pub const CMD_STOP: &str = "stop";
 pub const CMD_RESTART: &str = "restart";
 pub const DAEMON_FLAG: &str = "-d";
 ```
+
 # Path: hyperlane-quick-start/plugin/process/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct ProcessPlugin;
 ```
+
 # Path: hyperlane-quick-start/plugin/process/mod.rs
+
 ```rust
 mod r#const;
 mod r#impl;
@@ -8729,7 +9188,9 @@ pub use r#struct::*;
 use {super::*, r#const::*};
 use std::{env::args, future::Future};
 ```
+
 # Path: hyperlane-quick-start/plugin/redis/impl.rs
+
 ```rust
 use super::*;
 impl GetOrInit for RedisPlugin {
@@ -9187,21 +9648,29 @@ impl DatabaseAutoCreation for RedisAutoCreation {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/redis/type.rs
+
 ```rust
 use super::*;
 pub type RedisConnectionMap = HashMap<String, ConnectionCache<ArcRwLock<Connection>>>;
 ```
+
 # Path: hyperlane-quick-start/plugin/redis/static.rs
+
 ```rust
 use super::*;
 pub static REDIS_CONNECTIONS: OnceLock<RwLock<RedisConnectionMap>> = OnceLock::new();
 ```
+
 # Path: hyperlane-quick-start/plugin/redis/const.rs
+
 ```rust
 pub const DEFAULT_REDIS_INSTANCE_NAME: &str = "redis_default";
 ```
+
 # Path: hyperlane-quick-start/plugin/redis/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
@@ -9213,7 +9682,9 @@ pub struct RedisAutoCreation {
     pub(super) schema: DatabaseSchema,
 }
 ```
+
 # Path: hyperlane-quick-start/plugin/redis/mod.rs
+
 ```rust
 mod r#const;
 mod r#impl;
@@ -9232,28 +9703,42 @@ use {
     },
 };
 ```
+
 # Path: hyperlane-quick-start/config/lib.rs
+
 ```rust
 #![recursion_limit = "1024"]
 pub mod application;
 pub mod framework;
 use hyperlane_utils::log::*;
 ```
+
 # Path: hyperlane-quick-start/config/README.md
+
 ## hyperlane-config
+
 > Hyperlane configuration module providing comprehensive configuration management capabilities for the framework.
+
 ## Official Documentation
+
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+
 ## Api Docs
+
 - [Api Docs](https://docs.rs/hyperlane/latest/)
+
 ## Contact
+
 # Path: hyperlane-quick-start/config/application/mod.rs
+
 ```rust
 pub mod logger;
 pub mod logo_img;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/config/application/logger/const.rs
+
 ```rust
 use super::*;
 #[cfg(debug_assertions)]
@@ -9261,33 +9746,45 @@ pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Trace;
 #[cfg(not(debug_assertions))]
 pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Info;
 ```
+
 # Path: hyperlane-quick-start/config/application/logger/mod.rs
+
 ```rust
 mod r#const;
 pub use r#const::*;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/config/application/logo_img/const.rs
+
 ```rust
 pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
 ```
+
 # Path: hyperlane-quick-start/config/application/logo_img/mod.rs
+
 ```rust
 mod r#const;
 pub use r#const::*;
 ```
+
 # Path: hyperlane-quick-start/config/framework/const.rs
+
 ```rust
 pub const DEFAULT_CACHE_CONTROL_STATIC_ASSETS: &str = "public, max-age=31536000, immutable";
 pub const DEFAULT_CACHE_CONTROL_SHORT_TERM: &str = "public, max-age=3600";
 pub const DEFAULT_EXPIRES_FAR_FUTURE: &str = "Wed, 1 Apr 8888 00:00:00 GMT";
 ```
+
 # Path: hyperlane-quick-start/config/framework/mod.rs
+
 ```rust
 mod r#const;
 pub use r#const::*;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/lib.rs
+
 ```rust
 #![recursion_limit = "1024"]
 pub mod application;
@@ -9299,22 +9796,34 @@ use {
     hyperlane_utils::{log::*, *},
 };
 ```
+
 # Path: hyperlane-quick-start/bootstrap/README.md
+
 ## hyperlane-bootstrap
+
 > Hyperlane bootstrap crate providing application initialization and framework lifecycle management.
+
 ## Official Documentation
+
 - [Official Documentation](https://docs.ltpp.vip/hyperlane/)
+
 ## Api Docs
+
 - [Api Docs](https://docs.rs/hyperlane/latest/)
+
 ## Contact
+
 # Path: hyperlane-quick-start/bootstrap/application/mod.rs
+
 ```rust
 pub mod db;
 pub mod env;
 pub mod logger;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/db/impl.rs
+
 ```rust
 use super::*;
 impl BootstrapAsyncInit for DbBootstrap {
@@ -9337,13 +9846,17 @@ impl BootstrapAsyncInit for DbBootstrap {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/db/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct DbBootstrap;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/db/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
@@ -9352,7 +9865,9 @@ use super::*;
 use hyperlane_plugin::{common::*, database::*, mysql::*, postgresql::*, redis::*};
 use {redis::Connection, sea_orm::DatabaseConnection};
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/env/impl.rs
+
 ```rust
 use super::*;
 impl BootstrapSyncInit for EnvBootstrap {
@@ -9364,13 +9879,17 @@ impl BootstrapSyncInit for EnvBootstrap {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/env/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct EnvBootstrap;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/env/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
@@ -9378,7 +9897,9 @@ pub use r#struct::*;
 use super::*;
 use hyperlane_plugin::env::*;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/logger/impl.rs
+
 ```rust
 use super::*;
 impl BootstrapSyncInit for LoggerBootstrap {
@@ -9392,13 +9913,17 @@ impl BootstrapSyncInit for LoggerBootstrap {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/logger/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct LoggerBootstrap;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/application/logger/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
@@ -9409,7 +9934,9 @@ use {
     hyperlane_plugin::{common::*, env::*, logger::*},
 };
 ```
+
 # Path: hyperlane-quick-start/bootstrap/common/trait.rs
+
 ```rust
 pub trait BootstrapSyncInit {
     fn init() -> Self;
@@ -9418,19 +9945,25 @@ pub trait BootstrapAsyncInit {
     fn init() -> impl Future<Output = Self> + Send;
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/common/mod.rs
+
 ```rust
 mod r#trait;
 pub use r#trait::*;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/mod.rs
+
 ```rust
 pub mod config;
 pub mod runtime;
 pub mod server;
 use super::*;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/config/impl.rs
+
 ```rust
 use super::*;
 impl BootstrapAsyncInit for ConfigBootstrap {
@@ -9456,7 +9989,9 @@ impl BootstrapAsyncInit for ConfigBootstrap {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/config/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Data, Debug, Default)]
@@ -9465,7 +10000,9 @@ pub struct ConfigBootstrap {
     pub(super) request_config: RequestConfig,
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/config/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
@@ -9473,7 +10010,9 @@ pub use r#struct::*;
 use super::*;
 use hyperlane_plugin::{common::*, env::*};
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/runtime/impl.rs
+
 ```rust
 use super::*;
 impl BootstrapSyncInit for RuntimeBootstrap {
@@ -9490,7 +10029,9 @@ impl BootstrapSyncInit for RuntimeBootstrap {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/runtime/struct.rs
+
 ```rust
 use super::*;
 #[derive(Data, Debug)]
@@ -9498,7 +10039,9 @@ pub struct RuntimeBootstrap {
     pub(super) runtime: Runtime,
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/runtime/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
@@ -9506,7 +10049,9 @@ pub use r#struct::*;
 use super::*;
 use tokio::runtime::{Builder, Runtime};
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/server/impl.rs
+
 ```rust
 use hyperlane_plugin::{common::GetOrInit, env::EnvPlugin};
 use super::*;
@@ -9554,13 +10099,17 @@ impl BootstrapAsyncInit for ServerBootstrap {
     }
 }
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/server/struct.rs
+
 ```rust
 use super::*;
 #[derive(Clone, Copy, Data, Debug, Default)]
 pub struct ServerBootstrap;
 ```
+
 # Path: hyperlane-quick-start/bootstrap/framework/server/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
@@ -9569,19 +10118,29 @@ use {super::*, config::*};
 #[allow(unused_imports)]
 use {hyperlane_application::*, hyperlane_plugin::env::*, hyperlane_plugin::shutdown::*};
 ```
+
 # Path: hyperlane-cli/README.md
+
 # hyperlane-cli
-[Official Documentation](https://docs.ltpp.vip/hyperlane-cli/)
+
 [Api Docs](https://docs.rs/hyperlane-cli/latest/)
+
 ## Description
+
 > A command-line tool for Hyperlane framework.
+
 ## Installation
+
 To install `hyperlane-cli` run cmd:
+
 ```shell
 cargo add hyperlane-cli
 ```
+
 ## Contact
+
 # Path: hyperlane-cli/src/lib.rs
+
 ```rust
 mod bump;
 mod command;
@@ -9611,7 +10170,9 @@ pub use {
     tokio::{process::Command, sync::Mutex},
 };
 ```
+
 # Path: hyperlane-cli/src/main.rs
+
 ```rust
 use hyperlane_cli::*;
 #[tokio::main]
@@ -9717,7 +10278,9 @@ async fn main() {
     }
 }
 ```
+
 # Path: hyperlane-cli/src/template/impl.rs
+
 ```rust
 use crate::*;
 impl FromStr for TemplateType {
@@ -9763,7 +10326,9 @@ impl FromStr for ModelSubType {
     }
 }
 ```
+
 # Path: hyperlane-cli/src/template/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, Debug)]
@@ -9774,7 +10339,9 @@ pub struct TemplateConfig {
     pub base_directory: String,
 }
 ```
+
 # Path: hyperlane-cli/src/template/mod.rs
+
 ```rust
 mod r#enum;
 mod r#fn;
@@ -9782,7 +10349,9 @@ mod r#impl;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-cli/src/template/fn.rs
+
 ```rust
 use crate::*;
 fn get_directory_name(template_type: &TemplateType) -> String {
@@ -10015,7 +10584,9 @@ pub async fn execute_template(
     Ok(())
 }
 ```
+
 # Path: hyperlane-cli/src/template/enum.rs
+
 ```rust
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TemplateType {
@@ -10047,20 +10618,26 @@ pub enum TemplateError {
     DirectoryExists(String),
 }
 ```
+
 # Path: hyperlane-cli/src/fmt/static.rs
+
 ```rust
 use crate::*;
 pub static DERIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     regex::Regex::new(r"#\[derive\s*\(([^)]+)\)\]").expect("Invalid regex pattern")
 });
 ```
+
 # Path: hyperlane-cli/src/fmt/mod.rs
+
 ```rust
 mod r#fn;
 mod r#static;
 pub use {r#fn::*, r#static::*};
 ```
+
 # Path: hyperlane-cli/src/fmt/fn.rs
+
 ```rust
 use crate::*;
 fn sort_derive_in_line(line: &str) -> Option<String> {
@@ -10248,12 +10825,16 @@ pub async fn format_path(path: &std::path::Path) -> Result<(), std::io::Error> {
     Ok(())
 }
 ```
+
 # Path: hyperlane-cli/src/help/mod.rs
+
 ```rust
 mod r#fn;
 pub use r#fn::*;
 ```
+
 # Path: hyperlane-cli/src/help/fn.rs
+
 ```rust
 pub fn print_help() {
     println!("hyperlane-cli [COMMAND] [OPTIONS]");
@@ -10298,18 +10879,24 @@ pub fn print_help() {
     println!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
 }
 ```
+
 # Path: hyperlane-cli/src/version/mod.rs
+
 ```rust
 mod r#fn;
 pub use r#fn::*;
 ```
+
 # Path: hyperlane-cli/src/version/fn.rs
+
 ```rust
 pub fn print_version() {
     println!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
 }
 ```
+
 # Path: hyperlane-cli/src/new/impl.rs
+
 ```rust
 use crate::*;
 impl NewProjectConfig {
@@ -10321,7 +10908,9 @@ impl NewProjectConfig {
     }
 }
 ```
+
 # Path: hyperlane-cli/src/new/struct.rs
+
 ```rust
 #[derive(Clone, Debug)]
 pub struct NewProjectConfig {
@@ -10329,7 +10918,9 @@ pub struct NewProjectConfig {
     pub template_url: String,
 }
 ```
+
 # Path: hyperlane-cli/src/new/mod.rs
+
 ```rust
 mod r#enum;
 mod r#fn;
@@ -10337,7 +10928,9 @@ mod r#impl;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-cli/src/new/fn.rs
+
 ```rust
 use crate::*;
 fn validate_project_name(name: &str) -> Result<(), NewError> {
@@ -10408,7 +11001,9 @@ pub async fn execute_new(project_name: &str) -> Result<(), NewError> {
     Ok(())
 }
 ```
+
 # Path: hyperlane-cli/src/new/enum.rs
+
 ```rust
 #[derive(Debug, thiserror::Error)]
 pub enum NewError {
@@ -10424,7 +11019,9 @@ pub enum NewError {
     InvalidName(String),
 }
 ```
+
 # Path: hyperlane-cli/src/config/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, Debug)]
@@ -10440,13 +11037,17 @@ pub struct Args {
     pub component_name: Option<String>,
 }
 ```
+
 # Path: hyperlane-cli/src/config/mod.rs
+
 ```rust
 mod r#fn;
 mod r#struct;
 pub use {r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-cli/src/config/fn.rs
+
 ```rust
 use std::str::FromStr;
 use crate::*;
@@ -10579,7 +11180,9 @@ pub fn parse_args() -> Args {
     }
 }
 ```
+
 # Path: hyperlane-cli/src/publish/struct.rs
+
 ```rust
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Package {
@@ -10596,14 +11199,18 @@ pub struct PublishResult {
     pub retries: u32,
 }
 ```
+
 # Path: hyperlane-cli/src/publish/mod.rs
+
 ```rust
 mod r#enum;
 mod r#fn;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-cli/src/publish/fn.rs
+
 ```rust
 use crate::*;
 fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError> {
@@ -10837,7 +11444,9 @@ pub async fn execute_publish(
     Ok(results)
 }
 ```
+
 # Path: hyperlane-cli/src/publish/enum.rs
+
 ```rust
 #[derive(Debug, thiserror::Error)]
 pub enum PublishError {
@@ -10849,12 +11458,16 @@ pub enum PublishError {
     IoError(#[from] std::io::Error),
 }
 ```
+
 # Path: hyperlane-cli/src/command/mod.rs
+
 ```rust
 mod r#enum;
 pub use r#enum::*;
 ```
+
 # Path: hyperlane-cli/src/command/enum.rs
+
 ```rust
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CommandType {
@@ -10868,7 +11481,9 @@ pub enum CommandType {
     Version,
 }
 ```
+
 # Path: hyperlane-cli/src/bump/struct.rs
+
 ```rust
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Version {
@@ -10878,14 +11493,18 @@ pub struct Version {
     pub prerelease: Option<String>,
 }
 ```
+
 # Path: hyperlane-cli/src/bump/mod.rs
+
 ```rust
 mod r#enum;
 mod r#fn;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
 ```
+
 # Path: hyperlane-cli/src/bump/fn.rs
+
 ```rust
 use crate::*;
 fn parse_version(version_str: &str) -> Option<Version> {
@@ -11045,7 +11664,9 @@ pub fn execute_bump(
     }
 }
 ```
+
 # Path: hyperlane-cli/src/bump/enum.rs
+
 ```rust
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BumpVersionType {
@@ -11058,12 +11679,16 @@ pub enum BumpVersionType {
     Rc,
 }
 ```
+
 # Path: hyperlane-cli/src/watch/mod.rs
+
 ```rust
 mod r#fn;
 pub use r#fn::*;
 ```
+
 # Path: hyperlane-cli/src/watch/fn.rs
+
 ```rust
 use crate::*;
 async fn is_cargo_watch_installed() -> bool {
@@ -11104,7 +11729,9 @@ pub async fn execute_watch() -> Result<(), std::io::Error> {
     Ok(())
 }
 ```
+
 # Path: hyperlane-cli/tests/mod.rs
+
 ```rust
 mod bump;
 mod config;
@@ -11114,12 +11741,16 @@ mod publish;
 mod version;
 pub use hyperlane_cli::*;
 ```
+
 # Path: hyperlane-cli/tests/fmt/mod.rs
+
 ```rust
 mod r#fn;
 use crate::*;
 ```
+
 # Path: hyperlane-cli/tests/fmt/fn.rs
+
 ```rust
 use super::*;
 #[test]
@@ -11134,12 +11765,16 @@ fn test_format_path_integration() {
     assert!(result.is_ok());
 }
 ```
+
 # Path: hyperlane-cli/tests/version/mod.rs
+
 ```rust
 mod r#fn;
 use crate::*;
 ```
+
 # Path: hyperlane-cli/tests/version/fn.rs
+
 ```rust
 use super::*;
 #[test]
@@ -11147,12 +11782,16 @@ fn test_print_version_runs() {
     print_version();
 }
 ```
+
 # Path: hyperlane-cli/tests/new/mod.rs
+
 ```rust
 mod r#fn;
 use crate::*;
 ```
+
 # Path: hyperlane-cli/tests/new/fn.rs
+
 ```rust
 use super::*;
 #[test]
@@ -11201,12 +11840,16 @@ fn test_new_project_config_debug() {
     assert!(debug_str.contains("test"));
 }
 ```
+
 # Path: hyperlane-cli/tests/config/mod.rs
+
 ```rust
 mod r#fn;
 use crate::*;
 ```
+
 # Path: hyperlane-cli/tests/config/fn.rs
+
 ```rust
 use super::*;
 #[test]
@@ -11303,12 +11946,16 @@ fn test_args_clone() {
     assert_eq!(cloned.component_name, args.component_name);
 }
 ```
+
 # Path: hyperlane-cli/tests/publish/mod.rs
+
 ```rust
 mod r#fn;
 use crate::*;
 ```
+
 # Path: hyperlane-cli/tests/publish/fn.rs
+
 ```rust
 use super::*;
 #[test]
@@ -11405,12 +12052,16 @@ fn test_publish_error_from_io() {
     assert!(publish_error.to_string().contains("IO error"));
 }
 ```
+
 # Path: hyperlane-cli/tests/bump/mod.rs
+
 ```rust
 mod r#fn;
 use crate::*;
 ```
+
 # Path: hyperlane-cli/tests/bump/fn.rs
+
 ```rust
 use super::*;
 #[test]
@@ -11595,20 +12246,31 @@ edition = "2024"
     assert!(result.is_err());
 }
 ```
+
 # Path: hyperlane-log/README.md
+
 ## hyperlane-log
-[Official Documentation](https://docs.ltpp.vip/hyperlane-log/)
+
 [Api Docs](https://docs.rs/hyperlane-log/latest/)
+
 > A Rust logging library that supports both asynchronous and synchronous logging. It provides multiple log levels, such as error, info, and debug. Users can define custom log handling methods and configure log file paths. The library supports log rotation, automatically creating a new log file when the current file reaches the specified size limit. It allows flexible logging configurations, making it suitable for both high-performance asynchronous applications and traditional synchronous logging scenarios. The asynchronous mode utilizes Tokio's async channels for efficient log buffering, while the synchronous mode writes logs directly to the file system.
+
 ## Installation
+
 To use this crate, you can run cmd:
+
 ```shell
 cargo add hyperlane-log
 ```
+
 ## Log Storage Location Description
+
 > Three directories will be created under the user-specified directory: one for error logs, one for info logs, and one for debug logs. Each of these directories will contain a subdirectory named by the date, and the log files within these subdirectories will be named in the format `timestamp.index.log`.
+
 ## Contact
+
 # Path: hyperlane-log/src/impl.rs
+
 ```rust
 use crate::*;
 impl<F, T> FileLoggerFuncTrait<T> for F
@@ -11813,11 +12475,15 @@ impl FileLogger {
     }
 }
 ```
+
 # Path: hyperlane-log/src/trait.rs
+
 ```rust
 pub trait FileLoggerFuncTrait<T: AsRef<str>>: Fn(T) -> String + Send + Sync {}
 ```
+
 # Path: hyperlane-log/src/lib.rs
+
 ```rust
 mod r#const;
 mod r#fn;
@@ -11828,7 +12494,9 @@ pub use {r#const::*, r#fn::*, r#struct::*, r#trait::*};
 use std::fs::read_dir;
 use {file_operation::*, hyperlane_time::*};
 ```
+
 # Path: hyperlane-log/src/const.rs
+
 ```rust
 pub const DEFAULT_LOG_DIR: &str = "./logs";
 pub const LOG_EXTENSION: &str = "log";
@@ -11844,7 +12512,9 @@ pub const INFO_DIR: &str = "info";
 pub const WARN_DIR: &str = "warn";
 pub const ERROR_DIR: &str = "error";
 ```
+
 # Path: hyperlane-log/src/struct.rs
+
 ```rust
 #[derive(Clone)]
 pub struct FileLogger {
@@ -11857,7 +12527,9 @@ pub struct FileLogger {
     pub(super) error_dir: String,
 }
 ```
+
 # Path: hyperlane-log/src/fn.rs
+
 ```rust
 use crate::*;
 pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
@@ -11926,16 +12598,22 @@ pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
     common_log(log_data)
 }
 ```
+
 # Path: hyperlane-log/tests/mod.rs
+
 ```rust
 mod log;
 use hyperlane_log::*;
 ```
+
 # Path: hyperlane-log/tests/log/mod.rs
+
 ```rust
 mod r#fn;
 ```
+
 # Path: hyperlane-log/tests/log/fn.rs
+
 ```rust
 use crate::*;
 #[tokio::test]
@@ -12165,17 +12843,27 @@ async fn test_log_level_dirs_edge_cases() {
     assert_eq!(log.get_trace_dir().as_str(), long_dir_name.as_str());
 }
 ```
+
 # Path: hyperlane-process-guard/README.md
+
 ## hyperlane-process-guard
+
 > A process guard service based on Hyperlane web framework for remote script execution and process management.
+
 ## Installation
+
 Install `hyperlane-process-guard` via `cargo`:
+
 ```bash
 cargo install hyperlane-process-guard
 ```
+
 ## Contribution
+
 ## Contact
+
 # Path: hyperlane-process-guard/src/main.rs
+
 ```rust
 use hyperlane::*;
 use std::{env, process::Command};
@@ -12346,18 +13034,27 @@ async fn main() {
     server_control_hook.wait().await;
 }
 ```
+
 # Path: hyperlane-plugin-websocket/README.md
+
 ## hyperlane-plugin-websocket
-[Official Documentation](https://docs.ltpp.vip/hyperlane-plugin-websocket/)
+
 [Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
+
 > A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with hyperlane-broadcast for efficient message dissemination.
+
 ## Installation
+
 To use this crate, you can run cmd:
+
 ```shell
 cargo add hyperlane-plugin-websocket
 ```
+
 ## Contact
+
 # Path: hyperlane-plugin-websocket/src/impl.rs
+
 ```rust
 use crate::*;
 impl BroadcastTypeTrait for String {}
@@ -12711,11 +13408,15 @@ impl WebSocket {
     }
 }
 ```
+
 # Path: hyperlane-plugin-websocket/src/trait.rs
+
 ```rust
 pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
 ```
+
 # Path: hyperlane-plugin-websocket/src/lib.rs
+
 ```rust
 mod r#const;
 mod r#enum;
@@ -12740,12 +13441,16 @@ use {
     hyperlane_broadcast::*,
 };
 ```
+
 # Path: hyperlane-plugin-websocket/src/const.rs
+
 ```rust
 pub(crate) const POINT_TO_POINT_KEY: &str = "ptp-";
 pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
 ```
+
 # Path: hyperlane-plugin-websocket/src/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, Debug, Default)]
@@ -12763,7 +13468,9 @@ pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
     pub(super) closed_hook: ServerHookHandler,
 }
 ```
+
 # Path: hyperlane-plugin-websocket/src/enum.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -12773,7 +13480,9 @@ pub enum BroadcastType<T: BroadcastTypeTrait> {
     Unknown,
 }
 ```
+
 # Path: hyperlane-plugin-websocket/tests/mod.rs
+
 ```rust
 mod websocket;
 use {hyperlane_plugin_websocket::*, websocket::*};
@@ -12784,7 +13493,9 @@ use {
     tokio::{spawn, time::sleep},
 };
 ```
+
 # Path: hyperlane-plugin-websocket/tests/websocket/impl.rs
+
 ```rust
 use crate::*;
 impl ServerHook for TaskPanicHook {
@@ -13083,12 +13794,16 @@ impl ServerHook for PrivateChat {
     }
 }
 ```
+
 # Path: hyperlane-plugin-websocket/tests/websocket/static.rs
+
 ```rust
 use crate::*;
 pub(crate) static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
 ```
+
 # Path: hyperlane-plugin-websocket/tests/websocket/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct TaskPanicHook {
@@ -13131,7 +13846,9 @@ pub(crate) struct PrivateClosedHook {
 }
 pub(crate) struct PrivateChat;
 ```
+
 # Path: hyperlane-plugin-websocket/tests/websocket/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
@@ -13139,7 +13856,9 @@ mod r#static;
 mod r#struct;
 pub(crate) use {r#static::*, r#struct::*};
 ```
+
 # Path: hyperlane-plugin-websocket/tests/websocket/fn.rs
+
 ```rust
 use crate::*;
 #[tokio::test]
@@ -13162,24 +13881,36 @@ async fn main() {
     server_control_hook_1.wait().await;
 }
 ```
+
 # Path: hyperlane/README.md
+
 ## hyperlane
-[Official Documentation](https://docs.ltpp.vip/hyperlane/)
+
 [Api Docs](https://docs.rs/hyperlane/latest/)
+
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+
 ## Installation
+
 To use this crate, you can run cmd:
+
 ```shell
 cargo add hyperlane
 ```
+
 ## Quick start
+
 - [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
 - [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start/)
+
 ```sh
 git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```
+
 ## Contact
+
 # Path: hyperlane/src/lib.rs
+
 ```rust
 mod config;
 mod context;
@@ -13211,7 +13942,9 @@ use {
     },
 };
 ```
+
 # Path: hyperlane/src/hook/impl.rs
+
 ```rust
 use crate::*;
 impl<F, R> FnContext<R> for F where F: Fn(&mut Context) -> R + Send + Sync {}
@@ -13332,7 +14065,9 @@ impl ServerHook for DefaultServerHook {
     }
 }
 ```
+
 # Path: hyperlane/src/hook/type.rs
+
 ```rust
 use crate::*;
 pub type HookHandler<T> = Arc<dyn FnContextPinBox<T>>;
@@ -13346,7 +14081,9 @@ pub type ServerHookList = Vec<ServerHookHandler>;
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
 pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
 ```
+
 # Path: hyperlane/src/hook/trait.rs
+
 ```rust
 use crate::*;
 pub trait FnContext<R>: Fn(&mut Context) -> R + Send + Sync {}
@@ -13357,7 +14094,9 @@ where
 {
 }
 ```
+
 # Path: hyperlane/src/hook/struct.rs
+
 ```rust
 use crate::*;
 #[derive(
@@ -13376,7 +14115,9 @@ pub struct ServerControlHook {
     pub(super) shutdown_hook: ServerControlHookHandler<()>,
 }
 ```
+
 # Path: hyperlane/src/hook/mod.rs
+
 ```rust
 mod r#enum;
 mod r#fn;
@@ -13386,7 +14127,9 @@ mod r#trait;
 mod r#type;
 pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*, r#type::*};
 ```
+
 # Path: hyperlane/src/hook/fn.rs
+
 ```rust
 use crate::*;
 #[inline(always)]
@@ -13428,7 +14171,9 @@ pub fn assert_hook_unique_order(list: Vec<HookType>) {
     });
 }
 ```
+
 # Path: hyperlane/src/hook/enum.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, Copy, Debug, DisplayDebug)]
@@ -13440,7 +14185,9 @@ pub enum HookType {
     ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
 }
 ```
+
 # Path: hyperlane/src/context/impl.rs
+
 ```rust
 use crate::*;
 impl Default for Context {
@@ -13624,7 +14371,9 @@ impl Context {
     }
 }
 ```
+
 # Path: hyperlane/src/context/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
@@ -13644,13 +14393,17 @@ pub struct Context {
     pub(super) attributes: ThreadSafeAttributeStore,
 }
 ```
+
 # Path: hyperlane/src/context/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 ```
+
 # Path: hyperlane/src/route/impl.rs
+
 ```rust
 use crate::*;
 collect!(HookType);
@@ -13994,14 +14747,18 @@ impl RouteMatcher {
     }
 }
 ```
+
 # Path: hyperlane/src/route/type.rs
+
 ```rust
 use crate::*;
 pub type RouteParams = HashMapXxHash3_64<String, String>;
 pub type RouteSegmentList = Vec<RouteSegment>;
 pub(crate) type PathComponentList<'a> = Vec<&'a str>;
 ```
+
 # Path: hyperlane/src/route/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, Debug, DisplayDebug, Getter)]
@@ -14028,7 +14785,9 @@ pub struct RouteMatcher {
     pub(super) regex_route: ServerHookPatternRoute,
 }
 ```
+
 # Path: hyperlane/src/route/mod.rs
+
 ```rust
 mod r#enum;
 mod r#impl;
@@ -14036,7 +14795,9 @@ mod r#struct;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
 ```
+
 # Path: hyperlane/src/route/enum.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, CustomDebug, DisplayDebug)]
@@ -14046,7 +14807,9 @@ pub enum RouteSegment {
     Regex(String, Regex),
 }
 ```
+
 # Path: hyperlane/src/error/impl.rs
+
 ```rust
 use crate::*;
 impl From<std::io::Error> for ServerError {
@@ -14056,13 +14819,17 @@ impl From<std::io::Error> for ServerError {
     }
 }
 ```
+
 # Path: hyperlane/src/error/mod.rs
+
 ```rust
 mod r#enum;
 mod r#impl;
 pub use r#enum::*;
 ```
+
 # Path: hyperlane/src/error/enum.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
@@ -14080,7 +14847,9 @@ pub enum RouteError {
     InvalidRegexPattern(String),
 }
 ```
+
 # Path: hyperlane/src/config/impl.rs
+
 ```rust
 use crate::*;
 impl Default for ServerConfig {
@@ -14102,7 +14871,9 @@ impl ServerConfig {
     }
 }
 ```
+
 # Path: hyperlane/src/config/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
@@ -14115,13 +14886,17 @@ pub struct ServerConfig {
     pub(super) ttl: Option<u32>,
 }
 ```
+
 # Path: hyperlane/src/config/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 ```
+
 # Path: hyperlane/src/server/impl.rs
+
 ```rust
 use crate::*;
 impl Default for Server {
@@ -14571,7 +15346,9 @@ impl Server {
     }
 }
 ```
+
 # Path: hyperlane/src/server/struct.rs
+
 ```rust
 use crate::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
@@ -14603,13 +15380,17 @@ pub struct Server {
     pub(super) response_middleware: ServerHookList,
 }
 ```
+
 # Path: hyperlane/src/server/mod.rs
+
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 ```
+
 # Path: hyperlane/tests/mod.rs
+
 ```rust
 mod config;
 mod context;
@@ -14623,11 +15404,15 @@ use std::{
 };
 use tokio::{spawn, task::JoinHandle, time::sleep};
 ```
+
 # Path: hyperlane/tests/context/mod.rs
+
 ```rust
 mod r#fn;
 ```
+
 # Path: hyperlane/tests/context/fn.rs
+
 ```rust
 use crate::*;
 #[test]
@@ -14735,7 +15520,9 @@ fn run_set_func() {
     hyperlane(PARAM);
 }
 ```
+
 # Path: hyperlane/tests/route/impl.rs
+
 ```rust
 use crate::*;
 impl ServerHook for TestRoute {
@@ -14750,20 +15537,26 @@ impl ServerHook for TestRoute {
     }
 }
 ```
+
 # Path: hyperlane/tests/route/struct.rs
+
 ```rust
 pub(crate) struct TestRoute {
     pub data: String,
 }
 ```
+
 # Path: hyperlane/tests/route/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use r#struct::*;
 ```
+
 # Path: hyperlane/tests/route/fn.rs
+
 ```rust
 use crate::*;
 #[tokio::test]
@@ -14954,11 +15747,15 @@ fn large_tail_regex_routes() {
     );
 }
 ```
+
 # Path: hyperlane/tests/error/mod.rs
+
 ```rust
 mod r#fn;
 ```
+
 # Path: hyperlane/tests/error/fn.rs
+
 ```rust
 use crate::*;
 #[test]
@@ -14990,11 +15787,15 @@ fn route_error() {
     assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
 }
 ```
+
 # Path: hyperlane/tests/config/mod.rs
+
 ```rust
 mod r#fn;
 ```
+
 # Path: hyperlane/tests/config/fn.rs
+
 ```rust
 use crate::*;
 #[test]
@@ -15015,7 +15816,9 @@ fn server_config_from_json() {
     assert_eq!(server_config, new_server_config);
 }
 ```
+
 # Path: hyperlane/tests/server/impl.rs
+
 ```rust
 use crate::*;
 impl ServerHook for TestSendRoute {
@@ -15255,12 +16058,16 @@ impl ServerHook for GetAllRoutes {
     }
 }
 ```
+
 # Path: hyperlane/tests/server/static.rs
+
 ```rust
 use crate::*;
 pub(crate) static SERVER_REF: OnceLock<Server> = OnceLock::new();
 ```
+
 # Path: hyperlane/tests/server/struct.rs
+
 ```rust
 use crate::*;
 pub(crate) struct TestSendRoute;
@@ -15289,7 +16096,9 @@ pub(crate) struct DynamicRoute {
 }
 pub(crate) struct GetAllRoutes;
 ```
+
 # Path: hyperlane/tests/server/mod.rs
+
 ```rust
 mod r#fn;
 mod r#impl;
@@ -15297,7 +16106,9 @@ mod r#static;
 mod r#struct;
 pub(crate) use {r#static::*, r#struct::*};
 ```
+
 # Path: hyperlane/tests/server/fn.rs
+
 ```rust
 use crate::*;
 #[test]
