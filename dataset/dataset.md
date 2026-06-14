@@ -1,7 +1,6 @@
-<!--2026-06-13 15:16:36-->
+<!--2026-06-14 02:31:00-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
-[Official Documentation](https://docs.ltpp.vip/hyperlane-utils/)
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
 > A library providing utils for hyperlane.
 ## Installation
@@ -36,7 +35,6 @@ cargo add hyperlane
 ```
 ## Quick start
 - [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
-- [hyperlane-quick-start docs](https://docs.ltpp.vip/hyperlane/quick-start/)
 ```sh
 git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```
@@ -7471,7 +7469,6 @@ use std::fmt::{self, Display, Formatter};
 ```
 # Path: hyperlane-macros/README.md
 ## hyperlane-macros
-[Official Documentation](https://docs.ltpp.vip/hyperlane-macros/)
 [Api Docs](https://docs.rs/hyperlane-macros/latest/)
 > A comprehensive collection of procedural macros for building HTTP servers with enhanced functionality. This crate provides attribute macros that simplify HTTP request handling, protocol validation, response management, and request data extraction.
 ## Installation
@@ -14416,7 +14413,6 @@ use crate::*;
 ```
 # Path: hyperlane-plugin-websocket/README.md
 ## hyperlane-plugin-websocket
-[Official Documentation](https://docs.ltpp.vip/hyperlane-plugin-websocket/)
 [Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
 > A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with hyperlane-broadcast for efficient message dissemination.
 ## Installation
