@@ -1,4 +1,4 @@
-<!--2026-06-14 04:27:45-->
+<!--2026-06-14 09:42:20-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -3267,16 +3267,12 @@ mod r#fn;
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
-## Official Documentation
-- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
 # Path: hyperlane-quick-start/resources/README.md
 ## hyperlane-resources
 > Hyperlane resources module containing various resources and utilities used by the framework.
-## Official Documentation
-- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
@@ -3423,8 +3419,6 @@ fn main() {
 # Path: hyperlane-quick-start/config/README.md
 ## hyperlane-config
 > Hyperlane configuration module providing comprehensive configuration management capabilities for the framework.
-## Official Documentation
-- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
@@ -3454,7 +3448,7 @@ use super::*;
 ```
 # Path: hyperlane-quick-start/config/application/logo_img/const.rs
 ```rust
-pub const LOGO_IMG_URL: &str = "https://docs.ltpp.vip/img/hyperlane.png";
+pub const LOGO_IMG_URL: &str = "/github/pages/docs-pages/pages/img/hyperlane.png";
 ```
 # Path: hyperlane-quick-start/config/application/logo_img/mod.rs
 ```rust
@@ -3478,8 +3472,6 @@ use super::*;
 # Path: hyperlane-quick-start/plugin/README.md
 ## hyperlane-plugin
 > A powerful and extensible plugin system for the hyperlane framework, providing modularity and customization capabilities.
-## Official Documentation
-- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
@@ -6660,8 +6652,6 @@ use std::{
 # Path: hyperlane-quick-start/bootstrap/README.md
 ## hyperlane-bootstrap
 > Hyperlane bootstrap crate providing application initialization and framework lifecycle management.
-## Official Documentation
-- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
@@ -6942,8 +6932,6 @@ use hyperlane_plugin::env::*;
 # Path: hyperlane-quick-start/application/README.md
 ## hyperlane-application
 > Hyperlane application module containing core application logic, controllers, services, and middleware components.
-## Official Documentation
-- [Official Documentation](https://docs.ltpp.vip/hyperlane/)
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
@@ -15225,187 +15213,6 @@ mod r#impl;
 mod r#static;
 mod r#struct;
 pub(crate) use {r#static::*, r#struct::*};
-```
-# Path: hyperlane-process-guard/README.md
-## hyperlane-process-guard
-> A process guard service based on Hyperlane web framework for remote script execution and process management.
-## Installation
-Install `hyperlane-process-guard` via `cargo`:
-```bash
-cargo install hyperlane-process-guard
-```
-## Contribution
-## Contact
-# Path: hyperlane-process-guard/src/main.rs
-```rust
-use hyperlane::*;
-use std::{env, process::Command};
-fn decode_output(bytes: &[u8]) -> String {
-    if bytes.is_empty() {
-        return String::new();
-    }
-    use encoding::{DecoderTrap, Encoding};
-    if cfg!(target_os = "windows") {
-        encoding::all::GB18030
-            .decode(bytes, DecoderTrap::Replace)
-            .unwrap_or_else(|_| String::from_utf8_lossy(bytes).to_string())
-    } else {
-        String::from_utf8_lossy(bytes).to_string()
-    }
-}
-struct ProcessGuardRoute {
-    response_body: String,
-}
-impl ServerHook for ProcessGuardRoute {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let body: RequestBody = ctx.get_request().get_body().clone();
-        let script: String = String::from_utf8_lossy(&body).to_string();
-        let output: Result<std::process::Output, std::io::Error> = if cfg!(target_os = "windows") {
-            Command::new("cmd").args(["/C", &script]).output()
-        } else {
-            Command::new("sh").arg("-c").arg(&script).output()
-        };
-        let response_body: String = match output {
-            Ok(result) => {
-                let stdout: String = decode_output(&result.stdout);
-                let stderr: String = decode_output(&result.stderr);
-                let exit_code: i32 = result.status.code().unwrap_or(-1);
-                format!(
-                    "{{\"exit_code\": {}, \"stdout\": {:?}, \"stderr\": {:?}}}",
-                    exit_code, stdout, stderr
-                )
-            }
-            Err(error) => {
-                format!("{{\"error\": \"Failed to execute script: {}\"}}", error)
-            }
-        };
-        Self { response_body }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response()
-            .set_status_code(200)
-            .set_header(CONTENT_TYPE, APPLICATION_JSON)
-            .set_body(&self.response_body);
-        Status::Continue
-    }
-}
-struct RequestMiddleware {
-    socket_addr: String,
-}
-impl ServerHook for RequestMiddleware {
-    async fn new(stream: &mut Stream, _: &mut Context) -> Self {
-        let socket_addr: String = stream
-            .get_stream()
-            .peer_addr()
-            .map(|data| data.to_string())
-            .unwrap_or_default();
-        Self { socket_addr }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(200)
-            .set_header(SERVER, HYPERLANE)
-            .set_header(CONNECTION, KEEP_ALIVE)
-            .set_header(CONTENT_TYPE, TEXT_PLAIN)
-            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .set_header("SocketAddr", &self.socket_addr);
-        Status::Continue
-    }
-}
-struct ResponseMiddleware;
-impl ServerHook for ResponseMiddleware {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        if ctx.get_request().is_ws_upgrade_type() {
-            return Status::Continue;
-        }
-        let data: Vec<u8> = ctx.get_mut_response().build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        Status::Continue
-    }
-}
-struct TaskPanicHook {
-    response_body: String,
-    content_type: String,
-}
-impl ServerHook for TaskPanicHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let data: Vec<u8> = ctx
-            .get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(500)
-            .clear_headers()
-            .set_header(SERVER, HYPERLANE)
-            .set_header(CONTENT_TYPE, &self.content_type)
-            .set_body(&self.response_body)
-            .build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        Status::Continue
-    }
-}
-struct RequestErrorHook {
-    response_status_code: ResponseStatusCode,
-    response_body: String,
-}
-impl ServerHook for RequestErrorHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
-        Self {
-            response_status_code: request_error.get_http_status_code(),
-            response_body: request_error.to_string(),
-        }
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let data: Vec<u8> = ctx
-            .get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(self.response_status_code)
-            .set_body(self.response_body)
-            .build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        Status::Continue
-    }
-}
-#[tokio::main]
-async fn main() {
-    let mut server: Server = Server::default();
-    let mut server_config: ServerConfig = ServerConfig::default();
-    if let Ok(address) = env::var("HYPERLANE_PROCESS_GUARD_ADDRESS") {
-        server_config.set_address(address);
-    } else {
-        panic!("HYPERLANE_PROCESS_GUARD_ADDRESS is not set");
-    }
-    server
-        .server_config(server_config)
-        .task_panic::<TaskPanicHook>()
-        .request_error::<RequestErrorHook>()
-        .request_middleware::<RequestMiddleware>()
-        .response_middleware::<ResponseMiddleware>()
-        .route::<ProcessGuardRoute>("/execute");
-    let server_control_hook: ServerControlHook = server.run().await.unwrap_or_default();
-    server_control_hook.wait().await;
-}
 ```
 # Path: hyperlane-broadcast/README.md
 ## hyperlane-broadcast
