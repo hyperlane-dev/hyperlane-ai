@@ -1,4 +1,4 @@
-<!--2026-06-28 13:56:15-->
+<!--2026-06-28 19:27:32-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
