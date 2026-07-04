@@ -1,4 +1,4 @@
-<!--2026-07-04 08:43:24-->
+<!--2026-07-04 13:42:06-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -451,7 +451,7 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_task_panic().push(server_hook_factory::<S>());
+        self.get_mut_task_panic().push(Hook::factory::<S>());
         self
     }
     #[inline(always)]
@@ -459,8 +459,7 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_request_error()
-            .push(server_hook_factory::<S>());
+        self.get_mut_request_error().push(Hook::factory::<S>());
         self
     }
     #[inline(always)]
@@ -469,7 +468,7 @@ impl Server {
         S: ServerHook,
     {
         self.get_mut_route_matcher()
-            .add(path.as_ref(), server_hook_factory::<S>())
+            .add(path.as_ref(), Hook::factory::<S>())
             .unwrap();
         self
     }
@@ -478,8 +477,7 @@ impl Server {
     where
         S: ServerHook,
     {
-        self.get_mut_request_middleware()
-            .push(server_hook_factory::<S>());
+        self.get_mut_request_middleware().push(Hook::factory::<S>());
         self
     }
     #[inline(always)]
@@ -488,7 +486,7 @@ impl Server {
         S: ServerHook,
     {
         self.get_mut_response_middleware()
-            .push(server_hook_factory::<S>());
+            .push(Hook::factory::<S>());
         self
     }
     #[inline(always)]
@@ -828,8 +826,8 @@ impl Default for ServerControlHook {
     #[inline(always)]
     fn default() -> Self {
         Self {
-            wait_hook: default_server_control_hook_handler(),
-            shutdown_hook: default_server_control_hook_handler(),
+            wait_hook: Hook::default_control_handler(),
+            shutdown_hook: Hook::default_control_handler(),
         }
     }
 }
@@ -839,6 +837,35 @@ impl ServerControlHook {
     }
     pub async fn shutdown(&self) {
         self.get_shutdown_hook()().await;
+    }
+}
+impl Hook {
+    #[inline(always)]
+    pub fn default_control_handler() -> ServerControlHookHandler<()> {
+        Arc::new(|| Box::pin(async {}))
+    }
+    #[inline(always)]
+    pub fn default_handler() -> ServerHookHandler {
+        Arc::new(|_: &mut Stream, _: &mut Context| -> FutureBox<Status> {
+            Box::pin(async move { Status::default() })
+        })
+    }
+    #[inline(always)]
+    pub fn factory<R>() -> ServerHookHandler
+    where
+        R: ServerHook,
+    {
+        Arc::new(
+            move |stream: &mut Stream, ctx: &mut Context| -> FutureBox<Status> {
+                let ctx_address: usize = ctx.into();
+                let stream_address: usize = stream.into();
+                Box::pin(async move {
+                    let ctx: &mut Context = ctx_address.into();
+                    let stream: &mut Stream = stream_address.into();
+                    R::new(stream, ctx).await.handle(stream, ctx).await
+                })
+            },
+        )
     }
 }
 impl PartialEq for HookType {
@@ -921,6 +948,17 @@ impl HookType {
             _ => None,
         }
     }
+    #[inline(always)]
+    pub fn assert_unique_order(list: Vec<HookType>) {
+        let mut seen: HashSet<(HookType, isize)> = HashSet::new();
+        list.iter().for_each(|hook: &HookType| {
+            if let Some(order) = hook.try_get_order()
+                && !seen.insert((*hook, order))
+            {
+                panic!("Duplicate hook detected: {} with order {}", hook, order);
+            }
+        });
+    }
 }
 impl ServerHook for DefaultServerHook {
     async fn new(_: &mut Stream, _: &mut Context) -> Self {
@@ -947,9 +985,35 @@ pub enum HookType {
 ```rust
 use crate::*;
 #[derive(
-    Clone, Copy, Debug, Deserialize, DisplayDebug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    DisplayDebug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Default,
 )]
 pub struct DefaultServerHook;
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    DisplayDebug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Default,
+)]
+pub struct Hook;
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
 pub struct ServerControlHook {
     #[debug(skip)]
@@ -960,48 +1024,6 @@ pub struct ServerControlHook {
     #[get(pub)]
     #[set(pub(crate))]
     pub(super) shutdown_hook: ServerControlHookHandler<()>,
-}
-```
-# Path: hyperlane/src/hook/fn.rs
-```rust
-use crate::*;
-#[inline(always)]
-pub fn default_server_control_hook_handler() -> ServerControlHookHandler<()> {
-    Arc::new(|| Box::pin(async {}))
-}
-#[inline(always)]
-pub fn default_server_hook_handler() -> ServerHookHandler {
-    Arc::new(|_: &mut Stream, _: &mut Context| -> FutureBox<Status> {
-        Box::pin(async move { Status::default() })
-    })
-}
-#[inline(always)]
-pub fn server_hook_factory<R>() -> ServerHookHandler
-where
-    R: ServerHook,
-{
-    Arc::new(
-        move |stream: &mut Stream, ctx: &mut Context| -> FutureBox<Status> {
-            let ctx_address: usize = ctx.into();
-            let stream_address: usize = stream.into();
-            Box::pin(async move {
-                let ctx: &mut Context = ctx_address.into();
-                let stream: &mut Stream = stream_address.into();
-                R::new(stream, ctx).await.handle(stream, ctx).await
-            })
-        },
-    )
-}
-#[inline(always)]
-pub fn assert_hook_unique_order(list: Vec<HookType>) {
-    let mut seen: HashSet<(HookType, isize)> = HashSet::new();
-    list.iter().for_each(|hook: &HookType| {
-        if let Some(order) = hook.try_get_order()
-            && !seen.insert((*hook, order))
-        {
-            panic!("Duplicate hook detected: {} with order {}", hook, order);
-        }
-    });
 }
 ```
 # Path: hyperlane/src/hook/trait.rs
@@ -1018,12 +1040,11 @@ where
 # Path: hyperlane/src/hook/mod.rs
 ```rust
 mod r#enum;
-mod r#fn;
 mod r#impl;
 mod r#struct;
 mod r#trait;
 mod r#type;
-pub use {r#enum::*, r#fn::*, r#struct::*, r#trait::*, r#type::*};
+pub use {r#enum::*, r#struct::*, r#trait::*, r#type::*};
 ```
 # Path: hyperlane/src/hook/type.rs
 ```rust
@@ -8279,7 +8300,7 @@ pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) ->
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+            ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -8339,7 +8360,7 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
         if type_name == SERVER_TYPE_KEY {
             init_statements.push(quote! {
                 let mut hooks: Vec<::hyperlane::HookType> = ::hyperlane::inventory::iter().cloned().collect();
-                ::hyperlane::assert_hook_unique_order(hooks.clone());
+                ::hyperlane::HookType::assert_unique_order(hooks.clone());
                 hooks.sort_by_key(|hook| hook.try_get_order());
                 for hook in hooks {
                     #var_name.handle_hook(hook.clone());
@@ -9036,7 +9057,7 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -9106,7 +9127,7 @@ pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStr
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::TaskPanic(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+            ::hyperlane::HookType::TaskPanic(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -9119,7 +9140,7 @@ pub(crate) fn request_error_macro(attr: TokenStream, item: TokenStream) -> Token
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::RequestError(#order, || ::hyperlane::server_hook_factory::<#struct_name>())
+            ::hyperlane::HookType::RequestError(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -10198,7 +10219,7 @@ pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let gen_code: TokenStream2 = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
-            ::hyperlane::HookType::Route(#path, || ::hyperlane::server_hook_factory::<#struct_name>())
+            ::hyperlane::HookType::Route(#path, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -14528,10 +14549,10 @@ where
             context,
             capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
             broadcast_type: BroadcastType::default(),
-            connected_hook: default_server_hook_handler(),
-            request_hook: default_server_hook_handler(),
-            sended_hook: default_server_hook_handler(),
-            closed_hook: default_server_hook_handler(),
+            connected_hook: Hook::default_handler(),
+            request_hook: Hook::default_handler(),
+            sended_hook: Hook::default_handler(),
+            closed_hook: Hook::default_handler(),
         }
     }
 }
@@ -14575,7 +14596,7 @@ where
     where
         S: ServerHook,
     {
-        self.connected_hook = server_hook_factory::<S>();
+        self.connected_hook = Hook::factory::<S>();
         self
     }
     #[inline(always)]
@@ -14583,7 +14604,7 @@ where
     where
         S: ServerHook,
     {
-        self.request_hook = server_hook_factory::<S>();
+        self.request_hook = Hook::factory::<S>();
         self
     }
     #[inline(always)]
@@ -14591,7 +14612,7 @@ where
     where
         S: ServerHook,
     {
-        self.sended_hook = server_hook_factory::<S>();
+        self.sended_hook = Hook::factory::<S>();
         self
     }
     #[inline(always)]
@@ -14599,7 +14620,7 @@ where
     where
         S: ServerHook,
     {
-        self.closed_hook = server_hook_factory::<S>();
+        self.closed_hook = Hook::factory::<S>();
         self
     }
     #[inline(always)]
