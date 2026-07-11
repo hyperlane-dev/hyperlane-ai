@@ -1,4 +1,4 @@
-<!--2026-07-11 08:02:57-->
+<!--2026-07-11 13:28:19-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -55,6 +55,7 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
+    net::{AddrParseError, SocketAddr},
     pin::Pin,
     sync::Arc,
 };
@@ -63,6 +64,7 @@ use {
     lombok_macros::*,
     regex::Regex,
     serde::{Deserialize, Serialize},
+    socket2::{Domain, Socket, Type},
     tokio::{
         net::{TcpListener, TcpStream},
         spawn,
@@ -260,18 +262,10 @@ impl Context {
 use crate::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
-    #[get(pub)]
-    #[set(pub)]
     pub(super) request: Request,
-    #[get(pub)]
-    #[get_mut(pub)]
-    #[set(pub)]
     pub(super) response: Response,
     #[get_mut(skip)]
-    #[set(pub)]
     pub(super) route_params: RouteParams,
-    #[get_mut(pub)]
-    #[set(pub)]
     pub(super) attributes: ThreadSafeAttributeStore,
 }
 ```
@@ -529,28 +523,18 @@ impl Server {
         if let Err(error) = spawn(hook).await
             && error.is_panic()
         {
-            let mut ctx: &mut Context = ctx_address.into();
-            let mut stream: &mut Stream = stream_address.into();
+            let ctx: &mut Context = ctx_address.into();
+            let stream: &mut Stream = stream_address.into();
             let panic: PanicData = PanicData::from_join_error(error);
             ctx.set_task_panic(panic)
                 .get_mut_response()
                 .set_status_code(HttpStatus::InternalServerError.code());
             stream.set_closed(false);
-            let panic_hook = async move {
-                for hook in self.get_task_panic().iter() {
-                    if hook(stream, ctx).await.is_reject() {
-                        return;
-                    }
+            for hook in self.get_task_panic().iter() {
+                if hook(stream, ctx).await.is_reject() {
+                    break;
                 }
-            };
-            if let Err(error) = spawn(panic_hook).await
-                && error.is_panic()
-            {
-                eprintln!("{}", error);
-                let _ = Self::try_flush_stdout_and_stderr();
             }
-            ctx = ctx_address.into();
-            stream = stream_address.into();
             unsafe {
                 let _ = Box::from_raw(ctx);
                 let _ = Box::from_raw(stream);
@@ -625,10 +609,9 @@ impl Server {
     ) -> bool {
         let mut response: Response = Response::default();
         response.set_version(request.get_version().clone());
-        ctx.set_request(request.clone())
-            .set_response(response)
-            .set_route_params(RouteParams::default())
-            .set_attributes(ThreadSafeAttributeStore::default());
+        ctx.set_request(request.clone());
+        ctx.set_response(response);
+        ctx.clear_attribute();
         stream.set_closed(false);
         let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(stream, ctx).await {
@@ -697,8 +680,33 @@ impl Server {
         }
     }
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
-        let bind_address: &String = self.get_server_config().get_address();
-        let tcp_listener: TcpListener = TcpListener::bind(bind_address).await?;
+        let server_config: &ServerConfig = self.get_server_config();
+        let bind_address: &String = server_config.get_address();
+        let socket_addr: SocketAddr =
+            bind_address
+                .as_str()
+                .parse()
+                .map_err(|error: AddrParseError| {
+                    ServerError::TcpBind(format!("invalid bind address: {error}"))
+                })?;
+        let domain: Domain = if socket_addr.is_ipv4() {
+            Domain::IPV4
+        } else {
+            Domain::IPV6
+        };
+        let socket: Socket = Socket::new(domain, Type::STREAM, None)?;
+        if let Some(reuse_address) = server_config.try_get_reuse_address() {
+            socket.set_reuse_address(*reuse_address)?;
+        }
+        if let Some(nonblocking) = server_config.try_get_nonblocking() {
+            socket.set_nonblocking(*nonblocking)?;
+        }
+        let listen_backlog: i32 = server_config
+            .try_get_listen_backlog()
+            .unwrap_or(DEFAULT_LISTEN_BACKLOG);
+        socket.bind(&socket_addr.into())?;
+        socket.listen(listen_backlog)?;
+        let tcp_listener: TcpListener = TcpListener::from_std(socket.into())?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
@@ -734,29 +742,20 @@ impl Server {
 use crate::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Server {
-    #[get_mut(pub)]
-    #[set(pub)]
     pub(super) server_config: ServerConfig,
-    #[get_mut(pub)]
-    #[set(pub)]
     pub(super) request_config: RequestConfig,
-    #[get_mut(pub)]
     #[set(skip)]
     pub(super) route_matcher: RouteMatcher,
     #[debug(skip)]
-    #[get_mut(pub)]
     #[set(skip)]
     pub(super) request_error: ServerHookList,
     #[debug(skip)]
-    #[get_mut(pub)]
     #[set(skip)]
     pub(super) task_panic: ServerHookList,
     #[debug(skip)]
-    #[get_mut(pub)]
     #[set(skip)]
     pub(super) request_middleware: ServerHookList,
     #[debug(skip)]
-    #[get_mut(pub)]
     #[set(skip)]
     pub(super) response_middleware: ServerHookList,
 }
@@ -777,6 +776,9 @@ impl Default for ServerConfig {
             address: Server::format_bind_address(DEFAULT_HOST, DEFAULT_WEB_PORT),
             nodelay: DEFAULT_NODELAY,
             ttl: DEFAULT_TTI,
+            reuse_address: DEFAULT_REUSE_ADDRESS,
+            listen_backlog: Some(DEFAULT_LISTEN_BACKLOG),
+            nonblocking: DEFAULT_NONBLOCKING,
         }
     }
 }
@@ -794,12 +796,13 @@ impl ServerConfig {
 use crate::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct ServerConfig {
-    #[set(pub, type(AsRef<str>))]
+    #[set(type(AsRef<str>))]
     pub(super) address: String,
-    #[set(pub)]
     pub(super) nodelay: Option<bool>,
-    #[set(pub)]
     pub(super) ttl: Option<u32>,
+    pub(super) reuse_address: Option<bool>,
+    pub(super) listen_backlog: Option<i32>,
+    pub(super) nonblocking: Option<bool>,
 }
 ```
 # Path: hyperlane/src/config/mod.rs
@@ -1017,11 +1020,9 @@ pub struct Hook;
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, Setter)]
 pub struct ServerControlHook {
     #[debug(skip)]
-    #[get(pub)]
     #[set(pub(crate))]
     pub(super) wait_hook: ServerControlHookHandler<()>,
     #[debug(skip)]
-    #[get(pub)]
     #[set(pub(crate))]
     pub(super) shutdown_hook: ServerControlHookHandler<()>,
 }
@@ -1247,6 +1248,48 @@ impl RoutePattern {
         }
         Ok(segments)
     }
+    fn try_match_static_path(&self, path: &str) -> Option<RouteParams> {
+        let route_segments_len: usize = self.get_0().len();
+        let path_bytes: &[u8] = path.as_bytes();
+        let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
+        let mut segment_start: usize = 0;
+        let mut matched_segments: usize = 0;
+        let mut saw_content: bool = false;
+        for (byte_index, &current_byte) in path_bytes.iter().enumerate() {
+            if current_byte == path_separator_byte {
+                saw_content = true;
+                let expected: &str = match self.get_0().get(matched_segments) {
+                    Some(RouteSegment::Static(s)) => s.as_str(),
+                    Some(_) => return None,
+                    None => return None,
+                };
+                if &path[segment_start..byte_index] != expected {
+                    return None;
+                }
+                matched_segments += 1;
+                segment_start = byte_index + 1;
+            }
+        }
+        if segment_start < path.len() {
+            saw_content = true;
+            let expected: &str = match self.get_0().get(matched_segments) {
+                Some(RouteSegment::Static(s)) => s.as_str(),
+                Some(_) => return None,
+                None => return None,
+            };
+            if &path[segment_start..] != expected {
+                return None;
+            }
+            matched_segments += 1;
+        }
+        let all_matched: bool = matched_segments == route_segments_len;
+        let empty_single_match: bool = !saw_content && route_segments_len == 1 && path.is_empty();
+        if all_matched || empty_single_match {
+            Some(hash_map_xx_hash3_64())
+        } else {
+            None
+        }
+    }
     pub(crate) fn try_match_path(&self, path: &str) -> Option<RouteParams> {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
@@ -1256,6 +1299,9 @@ impl RoutePattern {
                 return Some(hash_map_xx_hash3_64());
             }
             return None;
+        }
+        if self.is_static() {
+            return self.try_match_static_path(path);
         }
         let mut path_segments: PathComponentList = Vec::with_capacity(route_segments_len);
         let path_bytes: &[u8] = path.as_bytes();
@@ -1378,17 +1424,20 @@ impl RouteMatcher {
         }
         Ok(())
     }
-    pub fn try_resolve_route(&self, ctx: &mut Context, path: &str) -> Option<ServerHookHandler> {
+    pub fn try_resolve_route<'a>(
+        &'a self,
+        ctx: &mut Context,
+        path: &str,
+    ) -> Option<&'a ServerHookHandler> {
         if let Some(hook) = self.get_static_route().get(path) {
-            ctx.set_route_params(RouteParams::default());
-            return Some(hook.clone());
+            return Some(hook);
         }
         let path_segment_count: usize = Self::count_path_segments(path);
         if let Some(routes) = self.get_dynamic_route().get(&path_segment_count) {
             for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params);
-                    return Some(hook.clone());
+                    return Some(hook);
                 }
             }
         }
@@ -1396,21 +1445,20 @@ impl RouteMatcher {
             for (pattern, hook) in routes {
                 if let Some(params) = pattern.try_match_path(path) {
                     ctx.set_route_params(params);
-                    return Some(hook.clone());
+                    return Some(hook);
                 }
             }
         }
         for (&segment_count, routes) in self.get_regex_route() {
-            if segment_count == path_segment_count {
+            if segment_count >= path_segment_count {
                 continue;
             }
             for (pattern, hook) in routes {
                 if pattern.has_tail_regex()
-                    && path_segment_count >= segment_count
                     && let Some(params) = pattern.try_match_path(path)
                 {
                     ctx.set_route_params(params);
-                    return Some(hook.clone());
+                    return Some(hook);
                 }
             }
         }
@@ -1440,17 +1488,14 @@ pub struct RoutePattern(
 pub struct RouteMatcher {
     #[get]
     #[set(skip)]
-    #[get_mut(pub)]
     #[debug(skip)]
     pub(super) static_route: ServerHookMap,
     #[get]
     #[set(skip)]
-    #[get_mut(pub)]
     #[debug(skip)]
     pub(super) dynamic_route: ServerHookPatternRoute,
     #[get]
     #[set(skip)]
-    #[get_mut(pub)]
     #[debug(skip)]
     pub(super) regex_route: ServerHookPatternRoute,
 }
@@ -2050,7 +2095,10 @@ async fn main() {
     let mut server_config: ServerConfig = ServerConfig::default();
     server_config
         .set_address(Server::format_bind_address(DEFAULT_HOST, 80))
-        .set_nodelay(Some(false));
+        .set_nodelay(Some(false))
+        .set_nonblocking(Some(true))
+        .set_reuse_address(Some(true))
+        .set_listen_backlog(Some(DEFAULT_LISTEN_BACKLOG));
     server.server_config(server_config);
     server.task_panic::<TaskPanicHook>();
     server.request_error::<RequestErrorHook>();
@@ -2098,7 +2146,8 @@ fn server_config_from_json() {
     new_server_config
         .set_address("0.0.0.0:80")
         .set_nodelay(Some(true))
-        .set_ttl(Some(64));
+        .set_ttl(Some(64))
+        .set_listen_backlog(None);
     assert_eq!(server_config, new_server_config);
 }
 ```
@@ -6769,12 +6818,13 @@ impl BootstrapAsyncInit for ConfigBootstrap {
         request_config
             .set_max_body_size(env_config.get_server_request_max_body_size())
             .set_read_timeout_ms(env_config.get_server_request_http_read_timeout_ms());
-        server_config.set_address(Server::format_bind_address(
-            env_config.get_server_host(),
-            env_config.get_server_port(),
-        ));
-        server_config.set_ttl(env_config.get_server_tti());
-        server_config.set_nodelay(env_config.get_server_nodelay());
+        server_config
+            .set_address(Server::format_bind_address(
+                env_config.get_server_host(),
+                env_config.get_server_port(),
+            ))
+            .set_ttl(env_config.get_server_tti())
+            .set_nodelay(env_config.get_server_nodelay());
         debug!("Server config {server_config:?}");
         info!("Server initialization successful");
         Self {
