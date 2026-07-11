@@ -1,4 +1,4 @@
-<!--2026-07-11 13:28:19-->
+<!--2026-07-11 19:10:34-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -55,7 +55,6 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
-    net::{AddrParseError, SocketAddr},
     pin::Pin,
     sync::Arc,
 };
@@ -64,7 +63,6 @@ use {
     lombok_macros::*,
     regex::Regex,
     serde::{Deserialize, Serialize},
-    socket2::{Domain, Socket, Type},
     tokio::{
         net::{TcpListener, TcpStream},
         spawn,
@@ -611,6 +609,7 @@ impl Server {
         response.set_version(request.get_version().clone());
         ctx.set_request(request.clone());
         ctx.set_response(response);
+        ctx.set_route_params(RouteParams::default());
         ctx.clear_attribute();
         stream.set_closed(false);
         let keep_alive: bool = request.is_enable_keep_alive();
@@ -680,33 +679,8 @@ impl Server {
         }
     }
     pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
-        let server_config: &ServerConfig = self.get_server_config();
-        let bind_address: &String = server_config.get_address();
-        let socket_addr: SocketAddr =
-            bind_address
-                .as_str()
-                .parse()
-                .map_err(|error: AddrParseError| {
-                    ServerError::TcpBind(format!("invalid bind address: {error}"))
-                })?;
-        let domain: Domain = if socket_addr.is_ipv4() {
-            Domain::IPV4
-        } else {
-            Domain::IPV6
-        };
-        let socket: Socket = Socket::new(domain, Type::STREAM, None)?;
-        if let Some(reuse_address) = server_config.try_get_reuse_address() {
-            socket.set_reuse_address(*reuse_address)?;
-        }
-        if let Some(nonblocking) = server_config.try_get_nonblocking() {
-            socket.set_nonblocking(*nonblocking)?;
-        }
-        let listen_backlog: i32 = server_config
-            .try_get_listen_backlog()
-            .unwrap_or(DEFAULT_LISTEN_BACKLOG);
-        socket.bind(&socket_addr.into())?;
-        socket.listen(listen_backlog)?;
-        let tcp_listener: TcpListener = TcpListener::from_std(socket.into())?;
+        let bind_address: &String = self.get_server_config().get_address();
+        let tcp_listener: TcpListener = TcpListener::bind(&bind_address).await?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
@@ -776,9 +750,6 @@ impl Default for ServerConfig {
             address: Server::format_bind_address(DEFAULT_HOST, DEFAULT_WEB_PORT),
             nodelay: DEFAULT_NODELAY,
             ttl: DEFAULT_TTI,
-            reuse_address: DEFAULT_REUSE_ADDRESS,
-            listen_backlog: Some(DEFAULT_LISTEN_BACKLOG),
-            nonblocking: DEFAULT_NONBLOCKING,
         }
     }
 }
@@ -800,9 +771,6 @@ pub struct ServerConfig {
     pub(super) address: String,
     pub(super) nodelay: Option<bool>,
     pub(super) ttl: Option<u32>,
-    pub(super) reuse_address: Option<bool>,
-    pub(super) listen_backlog: Option<i32>,
-    pub(super) nonblocking: Option<bool>,
 }
 ```
 # Path: hyperlane/src/config/mod.rs
@@ -2095,10 +2063,7 @@ async fn main() {
     let mut server_config: ServerConfig = ServerConfig::default();
     server_config
         .set_address(Server::format_bind_address(DEFAULT_HOST, 80))
-        .set_nodelay(Some(false))
-        .set_nonblocking(Some(true))
-        .set_reuse_address(Some(true))
-        .set_listen_backlog(Some(DEFAULT_LISTEN_BACKLOG));
+        .set_nodelay(Some(false));
     server.server_config(server_config);
     server.task_panic::<TaskPanicHook>();
     server.request_error::<RequestErrorHook>();
@@ -2146,8 +2111,7 @@ fn server_config_from_json() {
     new_server_config
         .set_address("0.0.0.0:80")
         .set_nodelay(Some(true))
-        .set_ttl(Some(64))
-        .set_listen_backlog(None);
+        .set_ttl(Some(64));
     assert_eq!(server_config, new_server_config);
 }
 ```
