@@ -1,4 +1,4 @@
-<!--2026-07-20 19:47:58-->
+<!--2026-07-21 02:57:43-->
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Api Docs](https://docs.rs/hyperlane-time/latest/)
@@ -11719,9 +11719,10 @@ FROM rust:1.93-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
+RUN cargo install wasm-bindgen-cli --locked && \
+    cargo install wasm-pack --locked
 RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu && \
-    cp -f /hyperlane-quick-start/target/x86_64-unknown-linux-gnu/release/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start && \
-    rm -rf /hyperlane-quick-start/target
+    cp -f /hyperlane-quick-start/target/x86_64-unknown-linux-gnu/release/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start
 EXPOSE 65002
 CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
@@ -11731,9 +11732,10 @@ FROM rust:1.93-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
+RUN cargo install wasm-bindgen-cli --locked && \
+    cargo install wasm-pack --locked
 RUN cargo build && \
-    cp -f /hyperlane-quick-start/target/debug/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start && \
-    rm -rf /hyperlane-quick-start/target
+    cp -f /hyperlane-quick-start/target/debug/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start
 EXPOSE 80
 CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
