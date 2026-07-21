@@ -1,4 +1,4 @@
-<!--2026-07-21 08:35:59-->
+<!--2026-07-21 14:01:35-->
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Api Docs](https://docs.rs/hyperlane-time/latest/)
@@ -49,7 +49,7 @@ pub enum Lang {
 ```
 # Path: hyperlane-time/src/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl fmt::Display for Lang {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let lang_str: &str = match self {
@@ -123,9 +123,13 @@ impl FromStr for Lang {
     }
 }
 ```
+# Path: hyperlane-time/src/mod.rs
+```rust
+use super::*;
+```
 # Path: hyperlane-time/src/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub const LEAP_YEAR: [u64; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 pub const COMMON_YEAR: [u64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 pub const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -319,10 +323,11 @@ use hyperlane_time::*;
 # Path: hyperlane-time/tests/time/mod.rs
 ```rust
 mod r#fn;
+use super::*;
 ```
 # Path: hyperlane-time/tests/time/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[test]
 fn test_lang() {
     println!("test_lang: {}", from_env_var());
@@ -1221,18 +1226,18 @@ use {
 ```
 # Path: hyperlane-broadcast/src/broadcast_map/trait.rs
 ```rust
-use crate::*;
+use super::*;
 pub trait BroadcastMapTrait: Clone + Debug {}
 ```
 # Path: hyperlane-broadcast/src/broadcast_map/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Debug)]
 pub struct BroadcastMap<T: BroadcastTrait>(pub(super) DashMapStringBroadcast<T>);
 ```
 # Path: hyperlane-broadcast/src/broadcast_map/type.rs
 ```rust
-use crate::*;
+use super::*;
 pub type BroadcastMapSendError<T> = SendError<T>;
 pub type BroadcastMapReceiver<T> = Receiver<T>;
 pub type BroadcastMapSender<T> = Sender<T>;
@@ -1240,7 +1245,7 @@ pub type DashMapStringBroadcast<T> = DashMap<String, Broadcast<T>, BuildHasherDe
 ```
 # Path: hyperlane-broadcast/src/broadcast_map/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl<T: Clone + Debug> BroadcastMapTrait for T {}
 impl<T: BroadcastMapTrait> Default for BroadcastMap<T> {
     #[inline(always)]
@@ -1332,21 +1337,22 @@ mod r#struct;
 mod r#trait;
 mod r#type;
 pub use {r#struct::*, r#trait::*, r#type::*};
+use super::*;
 ```
 # Path: hyperlane-broadcast/src/broadcast/trait.rs
 ```rust
-use crate::*;
+use super::*;
 pub trait BroadcastTrait: Clone + Debug {}
 ```
 # Path: hyperlane-broadcast/src/broadcast/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Debug)]
 pub struct Broadcast<T: BroadcastTrait>(pub(super) BroadcastSender<T>);
 ```
 # Path: hyperlane-broadcast/src/broadcast/type.rs
 ```rust
-use crate::*;
+use super::*;
 pub type ReceiverCount = usize;
 pub type BroadcastSendError<T> = SendError<T>;
 pub type BroadcastSendResult<T> = Result<ReceiverCount, BroadcastSendError<T>>;
@@ -1360,7 +1366,7 @@ pub const DEFAULT_BROADCAST_SENDER_CAPACITY: usize = 1024;
 ```
 # Path: hyperlane-broadcast/src/broadcast/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl<T: Clone + Debug> BroadcastTrait for T {}
 impl<T: BroadcastTrait> Default for Broadcast<T> {
     #[inline(always)]
@@ -1397,6 +1403,7 @@ mod r#struct;
 mod r#trait;
 mod r#type;
 pub use {r#const::*, r#struct::*, r#trait::*, r#type::*};
+use super::*;
 ```
 # Path: hyperlane-broadcast/tests/mod.rs
 ```rust
@@ -1412,10 +1419,11 @@ use tokio::{
 # Path: hyperlane-broadcast/tests/broadcast_map/mod.rs
 ```rust
 mod r#fn;
+use super::*;
 ```
 # Path: hyperlane-broadcast/tests/broadcast_map/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[tokio::test]
 pub async fn test_broadcast_map() {
     let broadcast_map: BroadcastMap<u128> = BroadcastMap::new();
@@ -1489,10 +1497,11 @@ pub async fn test_broadcast_map_send() {
 # Path: hyperlane-broadcast/tests/broadcast/mod.rs
 ```rust
 mod r#fn;
+use super::*;
 ```
 # Path: hyperlane-broadcast/tests/broadcast/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[tokio::test]
 pub async fn test_broadcast() {
     let broadcast: Broadcast<usize> = Broadcast::new(10);
