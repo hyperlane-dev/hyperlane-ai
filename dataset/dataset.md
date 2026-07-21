@@ -1,4 +1,4 @@
-<!--2026-07-21 14:01:35-->
+<!--2026-07-21 19:37:34-->
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Api Docs](https://docs.rs/hyperlane-time/latest/)
@@ -400,7 +400,7 @@ use {
 ```
 # Path: hyperlane-plugin-websocket/src/enum.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum BroadcastType<T: BroadcastTypeTrait> {
     PointToPoint(T, T),
@@ -410,7 +410,7 @@ pub enum BroadcastType<T: BroadcastTypeTrait> {
 ```
 # Path: hyperlane-plugin-websocket/src/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Debug, Default)]
 pub struct WebSocket {
     pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
@@ -433,7 +433,7 @@ pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
 ```
 # Path: hyperlane-plugin-websocket/src/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl BroadcastTypeTrait for String {}
 impl BroadcastTypeTrait for &str {}
 impl BroadcastTypeTrait for char {}
@@ -788,7 +788,7 @@ impl WebSocket {
 # Path: hyperlane-plugin-websocket/tests/mod.rs
 ```rust
 mod websocket;
-use {hyperlane_plugin_websocket::*, websocket::*};
+use hyperlane_plugin_websocket::*;
 use std::sync::OnceLock;
 use {
     hyperlane::*,
@@ -798,7 +798,7 @@ use {
 ```
 # Path: hyperlane-plugin-websocket/tests/websocket/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct TaskPanicHook {
     pub(crate) response_body: String,
     pub(crate) content_type: String,
@@ -841,12 +841,12 @@ pub(crate) struct PrivateChat;
 ```
 # Path: hyperlane-plugin-websocket/tests/websocket/static.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
 ```
 # Path: hyperlane-plugin-websocket/tests/websocket/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl ServerHook for TaskPanicHook {
     async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
         let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
@@ -1150,10 +1150,11 @@ mod r#impl;
 mod r#static;
 mod r#struct;
 pub(crate) use {r#static::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-plugin-websocket/tests/websocket/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[tokio::test]
 async fn main() {
     let mut server: Server = Server::default();
@@ -1561,7 +1562,7 @@ use {
 ```
 # Path: hyperlane/src/hook/trait.rs
 ```rust
-use crate::*;
+use super::*;
 pub trait FnContext<R>: Fn(&mut Context) -> R + Send + Sync {}
 pub trait FnContextPinBox<T>: FnContext<FutureBox<T>> {}
 pub trait FnContextStatic<Fut, T>: FnContext<Fut> + 'static
@@ -1572,7 +1573,7 @@ where
 ```
 # Path: hyperlane/src/hook/enum.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Copy, Debug, DisplayDebug)]
 pub enum HookType {
     TaskPanic(Option<isize>, ServerHookHandlerFactory),
@@ -1584,7 +1585,7 @@ pub enum HookType {
 ```
 # Path: hyperlane/src/hook/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(
     Clone,
     Copy,
@@ -1627,7 +1628,7 @@ pub struct ServerControlHook {
 ```
 # Path: hyperlane/src/hook/type.rs
 ```rust
-use crate::*;
+use super::*;
 pub type HookHandler<T> = Arc<dyn FnContextPinBox<T>>;
 pub type HookHandlerChain<T> = Vec<HookHandler<T>>;
 pub type FutureBox<T> = Pin<Box<dyn Future<Output = T> + Send>>;
@@ -1641,7 +1642,7 @@ pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, Se
 ```
 # Path: hyperlane/src/hook/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl<F, R> FnContext<R> for F where F: Fn(&mut Context) -> R + Send + Sync {}
 impl<F, T> FnContextPinBox<T> for F where F: FnContext<FutureBox<T>> {}
 impl<F, Fut, T> FnContextStatic<Fut, T> for F
@@ -1808,10 +1809,11 @@ mod r#struct;
 mod r#trait;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#trait::*, r#type::*};
+use super::*;
 ```
 # Path: hyperlane/src/config/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct ServerConfig {
     #[set(type(AsRef<str>))]
@@ -1822,7 +1824,7 @@ pub struct ServerConfig {
 ```
 # Path: hyperlane/src/config/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Default for ServerConfig {
     #[inline(always)]
     fn default() -> Self {
@@ -1847,10 +1849,11 @@ impl ServerConfig {
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
+use super::*;
 ```
 # Path: hyperlane/src/context/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
     pub(super) request: Request,
@@ -1862,7 +1865,7 @@ pub struct Context {
 ```
 # Path: hyperlane/src/context/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Default for Context {
     #[inline(always)]
     fn default() -> Self {
@@ -2049,10 +2052,11 @@ impl Context {
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
+use super::*;
 ```
 # Path: hyperlane/src/server/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Server {
     pub(super) server_config: ServerConfig,
@@ -2075,7 +2079,7 @@ pub struct Server {
 ```
 # Path: hyperlane/src/server/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Default for Server {
     #[inline(always)]
     fn default() -> Self {
@@ -2516,10 +2520,11 @@ impl Server {
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
+use super::*;
 ```
 # Path: hyperlane/src/route/enum.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, CustomDebug, DisplayDebug)]
 pub enum RouteSegment {
     Static(String),
@@ -2529,7 +2534,7 @@ pub enum RouteSegment {
 ```
 # Path: hyperlane/src/route/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Debug, DisplayDebug, Getter)]
 pub struct RoutePattern(
     #[get]
@@ -2553,14 +2558,14 @@ pub struct RouteMatcher {
 ```
 # Path: hyperlane/src/route/type.rs
 ```rust
-use crate::*;
+use super::*;
 pub type RouteParams = HashMapXxHash3_64<String, String>;
 pub type RouteSegmentList = Vec<RouteSegment>;
 pub(crate) type PathComponentList<'a> = Vec<&'a str>;
 ```
 # Path: hyperlane/src/route/impl.rs
 ```rust
-use crate::*;
+use super::*;
 collect!(HookType);
 impl Default for RouteMatcher {
     #[inline(always)]
@@ -2970,10 +2975,11 @@ mod r#impl;
 mod r#struct;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
+use super::*;
 ```
 # Path: hyperlane/src/error/enum.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub enum ServerError {
     TcpBind(String),
@@ -2991,7 +2997,7 @@ pub enum RouteError {
 ```
 # Path: hyperlane/src/error/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl From<std::io::Error> for ServerError {
     #[inline(always)]
     fn from(error: std::io::Error) -> Self {
@@ -3004,6 +3010,7 @@ impl From<std::io::Error> for ServerError {
 mod r#enum;
 mod r#impl;
 pub use r#enum::*;
+use super::*;
 ```
 # Path: hyperlane/tests/mod.rs
 ```rust
@@ -3012,7 +3019,7 @@ mod context;
 mod error;
 mod route;
 mod server;
-use {hyperlane::*, route::*, server::*};
+use hyperlane::*;
 use std::{
     sync::{Arc, OnceLock},
     time::{Duration, Instant},
@@ -3022,10 +3029,11 @@ use tokio::{spawn, task::JoinHandle, time::sleep};
 # Path: hyperlane/tests/config/mod.rs
 ```rust
 mod r#fn;
+use super::*;
 ```
 # Path: hyperlane/tests/config/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[test]
 fn server_config_from_json() {
     let server_config_json: &'static str = r#"
@@ -3047,10 +3055,11 @@ fn server_config_from_json() {
 # Path: hyperlane/tests/context/mod.rs
 ```rust
 mod r#fn;
+use super::*;
 ```
 # Path: hyperlane/tests/context/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[test]
 fn context_ref_from_address() {
     let ctx: Context = Context::default();
@@ -3158,7 +3167,7 @@ fn run_set_func() {
 ```
 # Path: hyperlane/tests/server/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct TestSendRoute;
 pub(crate) struct TaskPanicHook {
     pub(crate) response_body: String,
@@ -3187,12 +3196,12 @@ pub(crate) struct GetAllRoutes;
 ```
 # Path: hyperlane/tests/server/static.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) static SERVER_REF: OnceLock<Server> = OnceLock::new();
 ```
 # Path: hyperlane/tests/server/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl ServerHook for TestSendRoute {
     async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
@@ -3437,10 +3446,11 @@ mod r#impl;
 mod r#static;
 mod r#struct;
 pub(crate) use {r#static::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane/tests/server/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[test]
 fn server_partial_eq() {
     let server1: Server = Server::default();
@@ -3615,7 +3625,7 @@ pub(crate) struct TestRoute {
 ```
 # Path: hyperlane/tests/route/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl ServerHook for TestRoute {
     async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self {
@@ -3634,10 +3644,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use r#struct::*;
+use super::*;
 ```
 # Path: hyperlane/tests/route/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[tokio::test]
 #[should_panic(expected = "EmptyPattern")]
 async fn empty_route() {
@@ -3829,10 +3840,11 @@ fn large_tail_regex_routes() {
 # Path: hyperlane/tests/error/mod.rs
 ```rust
 mod r#fn;
+use super::*;
 ```
 # Path: hyperlane/tests/error/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[test]
 fn server_error() {
     let tcp_bind_error: ServerError = ServerError::TcpBind("address in use".to_string());
@@ -4384,10 +4396,11 @@ pub fn context(input: TokenStream) -> TokenStream {
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/hook/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
@@ -4453,14 +4466,14 @@ pub(crate) fn epilogue_hooks_macro(
 ```
 # Path: hyperlane-macros/src/from_stream/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct FromStreamData {
     pub(crate) variable_name: Option<Expr>,
 }
 ```
 # Path: hyperlane-macros/src/from_stream/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for FromStreamData {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let variable_name: Option<Expr> = if input.is_empty() {
@@ -4484,16 +4497,17 @@ impl Parse for FromStreamData {
 mod r#impl;
 mod r#struct;
 pub(crate) use r#struct::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/stream/mod.rs
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/stream/fn.rs
 ```rust
-use crate::*;
-use syn::Ident;
+use super::*;
 pub(crate) fn generate_http_stream(
     stream: &Ident,
     context: &Ident,
@@ -4607,10 +4621,11 @@ pub(crate) fn try_get_websocket_request_macro(attr: TokenStream, item: TokenStre
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/version/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn create_version_check(
     version: &proc_macro2::Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
@@ -4660,14 +4675,14 @@ pub(crate) enum HeaderOperation {
 ```
 # Path: hyperlane-macros/src/response/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct SendData {
     pub(crate) data: Expr,
 }
 ```
 # Path: hyperlane-macros/src/response/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for ResponseHeaderData {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let key: Expr = input.parse()?;
@@ -4705,10 +4720,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/response/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn response_status_code_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -4807,14 +4823,14 @@ pub(crate) fn response_version_macro(
 ```
 # Path: hyperlane-macros/src/referer/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct MultiRefererData {
     pub(crate) referer_values: Vec<Expr>,
 }
 ```
 # Path: hyperlane-macros/src/referer/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for MultiRefererData {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut referer_values: Vec<Expr> = Vec::new();
@@ -4839,10 +4855,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/referer/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn referer_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -4886,10 +4903,11 @@ pub(crate) fn reject_referer_macro(
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/method/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn create_method_check(
     method: &proc_macro2::Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
@@ -4963,14 +4981,14 @@ impl_http_method_macro!(is_unknown_method_handler, is_unknown_method, unknown);
 ```
 # Path: hyperlane-macros/src/host/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct MultiHostData {
     pub(crate) host_values: Vec<Expr>,
 }
 ```
 # Path: hyperlane-macros/src/host/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for MultiHostData {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut host_values: Vec<Expr> = Vec::new();
@@ -4995,10 +5013,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/host/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
@@ -5036,7 +5055,7 @@ pub(crate) fn reject_host_macro(
 ```
 # Path: hyperlane-macros/src/request/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct RequestMethods {
     pub(crate) methods: Punctuated<Ident, Token![,]>,
 }
@@ -5091,7 +5110,7 @@ pub(crate) struct MultiRequestErrorData {
 ```
 # Path: hyperlane-macros/src/request/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for RequestMethods {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(RequestMethods {
@@ -5392,10 +5411,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/request/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn request_body_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -5823,7 +5843,7 @@ pub(crate) fn request_path_macro(
 ```
 # Path: hyperlane-macros/src/send/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct ResponseHeaderData {
     pub(crate) key: Expr,
     pub(crate) value: Expr,
@@ -5835,7 +5855,7 @@ pub(crate) struct ResponseBodyData {
 ```
 # Path: hyperlane-macros/src/send/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for SendData {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let data: Expr = input.parse()?;
@@ -5849,10 +5869,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/send/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn try_send_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -5902,10 +5923,11 @@ pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Positio
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/flush/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |_: &Ident, stream: &Ident| {
         quote! {
@@ -5925,10 +5947,11 @@ pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream 
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/upgrade/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn create_protocol_check(
     upgrade_type: &proc_macro2::Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
@@ -5968,7 +5991,7 @@ impl_protocol_check_macro!(
 ```
 # Path: hyperlane-macros/src/context/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct ContextInput {
     pub(crate) source_ctx: Ident,
     pub(crate) ty: Option<Type>,
@@ -5976,7 +5999,7 @@ pub(crate) struct ContextInput {
 ```
 # Path: hyperlane-macros/src/context/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for ContextInput {
     fn parse(input: ParseStream) -> Result<Self> {
         let source_ctx: Ident = input.parse()?;
@@ -5996,10 +6019,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/context/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn is_mutable_reference_type(ty: &Type) -> bool {
     if let Type::Reference(type_ref) = ty {
         type_ref.mutability.is_some()
@@ -6028,10 +6052,11 @@ pub(crate) fn context_macro(input: TokenStream) -> TokenStream {
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/filter/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn filter_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -6049,14 +6074,14 @@ pub(crate) fn filter_macro(
 ```
 # Path: hyperlane-macros/src/hyperlane/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct MultiHyperlaneAttr {
     pub(crate) params: Vec<(Ident, Ident)>,
 }
 ```
 # Path: hyperlane-macros/src/hyperlane/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for MultiHyperlaneAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Ident, Ident)> = Vec::new();
@@ -6083,10 +6108,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/hyperlane/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let multi_hyperlane: MultiHyperlaneAttr = parse_macro_input!(attr as MultiHyperlaneAttr);
     let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
@@ -6125,10 +6151,11 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/inject/fn.rs
 ```rust
-use crate::*;
+use super::*;
 fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) -> TokenStream {
     let (macro_name, macro_attr) = match macro_meta {
         Meta::Path(path) => (
@@ -6188,10 +6215,11 @@ pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/response_middleware/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
@@ -6210,10 +6238,11 @@ pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) ->
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/request_middleware/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
     let order: TokenStream2 = expr_to_isize(&attr_args.order);
@@ -6230,7 +6259,7 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
 ```
 # Path: hyperlane-macros/src/common/enum.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) enum Handler {
     WithAttr(MacroHandlerWithAttr),
     NoAttrPosition(MacroHandlerPosition),
@@ -6243,7 +6272,7 @@ pub(crate) enum Position {
 ```
 # Path: hyperlane-macros/src/common/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone)]
 pub(crate) struct OrderAttr {
     pub(crate) order: Option<Expr>,
@@ -6255,7 +6284,7 @@ pub(crate) struct InjectableMacro {
 ```
 # Path: hyperlane-macros/src/common/type.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) type MacroHandlerPosition = fn(TokenStream, Position) -> TokenStream;
 pub(crate) type MacroHandlerWithAttr = fn(TokenStream, TokenStream) -> TokenStream;
 pub(crate) type MacroHandlerWithAttrPosition =
@@ -6267,7 +6296,7 @@ pub(crate) const SERVER_TYPE_KEY: &str = "Server";
 ```
 # Path: hyperlane-macros/src/common/static.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
     InjectableMacro {
         name: "closed",
@@ -6569,7 +6598,7 @@ pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
 ```
 # Path: hyperlane-macros/src/common/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for OrderAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         if input.is_empty() {
@@ -6590,10 +6619,11 @@ mod r#static;
 mod r#struct;
 mod r#type;
 pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#static::*, r#struct::*, r#type::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/common/fn.rs
 ```rust
-use crate::*;
+use super::*;
 fn inject_at_start(
     input: TokenStream,
     before_fn: impl FnOnce(&Ident, &Ident) -> TokenStream2,
@@ -6820,10 +6850,11 @@ pub(crate) fn leak_context(is_unsafe_error: bool, context: &Ident) -> TokenStrea
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/closed/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |_: &Ident, stream: &Ident| {
         quote! {
@@ -6834,14 +6865,14 @@ pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream
 ```
 # Path: hyperlane-macros/src/route/struct.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) struct RouteAttr {
     pub(crate) path: Expr,
 }
 ```
 # Path: hyperlane-macros/src/route/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl Parse for RouteAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let first_expr: Expr = input.parse()?;
@@ -6855,10 +6886,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-macros/src/route/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let route_attr: RouteAttr = parse_macro_input!(attr as RouteAttr);
     let path: &Expr = &route_attr.path;
@@ -6877,10 +6909,11 @@ pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
 ```rust
 mod r#fn;
 pub(crate) use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-macros/src/reject/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn reject_macro(
     attr: TokenStream,
     item: TokenStream,
@@ -8596,8 +8629,12 @@ pub(crate) use std::{
     sync::{Arc, LazyLock},
 };
 pub(crate) use {
-    notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
+    notify::{
+        Error as NotifyError, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
+        recommended_watcher,
+    },
     regex::{Captures, Regex},
+    std::ffi::OsStr,
     tokio::{
         fs::{ReadDir, create_dir_all, read_dir, read_to_string, write},
         process::Command,
@@ -8609,6 +8646,7 @@ pub(crate) use {
         task::JoinHandle,
         time::{Duration, Interval, interval, sleep},
     },
+    toml::Value,
     which::which,
 };
 ```
@@ -8722,7 +8760,7 @@ async fn main() {
 ```
 # Path: hyperlane-cli/src/fmt/static.rs
 ```rust
-use crate::*;
+use super::*;
 pub static DERIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     regex::Regex::new(r"#\[derive\s*\(([^)]+)\)\]").expect("Invalid regex pattern")
 });
@@ -8732,10 +8770,11 @@ pub static DERIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 mod r#fn;
 mod r#static;
 pub use {r#fn::*, r#static::*};
+use super::*;
 ```
 # Path: hyperlane-cli/src/fmt/fn.rs
 ```rust
-use crate::*;
+use super::*;
 fn sort_derive_in_line(line: &str) -> Option<String> {
     let captures: Captures<'_> = DERIVE_REGEX.captures(line)?;
     let derive_content: &str = captures.get(1)?.as_str();
@@ -8784,11 +8823,9 @@ async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, io::Error
         find_rust_files_in_dir(&src_dir, &mut files).await?;
     }
     let content: String = read_to_string(manifest_path).await?;
-    if let Ok(doc) = toml::from_str::<toml::Value>(&content)
+    if let Ok(doc) = toml::from_str::<Value>(&content)
         && let Some(workspace) = doc.get("workspace")
-        && let Some(members) = workspace
-            .get("members")
-            .and_then(|m: &toml::Value| m.as_array())
+        && let Some(members) = workspace.get("members").and_then(|m: &Value| m.as_array())
     {
         for member in members {
             if let Some(pattern) = member.as_str() {
@@ -8805,11 +8842,7 @@ async fn find_rust_files_in_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<
     let mut entries: ReadDir = read_dir(dir).await?;
     while let Some(entry) = entries.next_entry().await? {
         let path: PathBuf = entry.path();
-        if path.is_file()
-            && path
-                .extension()
-                .is_some_and(|ext: &std::ffi::OsStr| ext == "rs")
-        {
+        if path.is_file() && path.extension().is_some_and(|ext: &OsStr| ext == "rs") {
             files.push(path);
         } else if path.is_dir() {
             Box::pin(find_rust_files_in_dir(&path, files)).await?;
@@ -9038,7 +9071,7 @@ pub fn print_help() {
 ```
 # Path: hyperlane-cli/src/template/enum.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TemplateType {
     Controller,
@@ -9071,7 +9104,7 @@ pub enum TemplateError {
 ```
 # Path: hyperlane-cli/src/template/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Debug)]
 pub struct TemplateConfig {
     pub template_type: TemplateType,
@@ -9082,7 +9115,7 @@ pub struct TemplateConfig {
 ```
 # Path: hyperlane-cli/src/template/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl FromStr for TemplateType {
     type Err = TemplateError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -9133,10 +9166,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-cli/src/template/fn.rs
 ```rust
-use crate::*;
+use super::*;
 fn get_directory_name(template_type: &TemplateType) -> String {
     match template_type {
         TemplateType::Controller => "controller".to_string(),
@@ -9410,12 +9444,12 @@ pub(crate) const LOG_COLON: &str = ":";
 ```
 # Path: hyperlane-cli/src/logger/static.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) static LOGGER: Logger = Logger;
 ```
 # Path: hyperlane-cli/src/logger/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl log::Log for Logger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         metadata.level() <= log::max_level()
@@ -9493,7 +9527,7 @@ mod r#impl;
 mod r#static;
 mod r#struct;
 pub use r#struct::*;
-pub use {color_output::*, log};
+pub use {::log, color_output::*};
 pub(crate) use {r#const::*, r#static::*};
 ```
 # Path: hyperlane-cli/src/bump/enum.rs
@@ -9525,10 +9559,11 @@ mod r#enum;
 mod r#fn;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-cli/src/bump/fn.rs
 ```rust
-use crate::*;
+use super::*;
 fn parse_version(version_str: &str) -> Option<Version> {
     let parts: Vec<&str> = version_str.split('-').collect();
     let version_part: &str = parts.first()?;
@@ -9687,7 +9722,7 @@ pub async fn execute_bump(
 ```
 # Path: hyperlane-cli/src/config/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Debug)]
 pub struct Args {
     pub command: CommandType,
@@ -9706,11 +9741,11 @@ pub struct Args {
 mod r#fn;
 mod r#struct;
 pub use {r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-cli/src/config/fn.rs
 ```rust
-use std::str::FromStr;
-use crate::*;
+use super::*;
 pub fn parse_args() -> Args {
     let raw_args: Vec<String> = args().collect();
     let mut command: CommandType = CommandType::Help;
@@ -9842,7 +9877,7 @@ pub fn parse_args() -> Args {
 ```
 # Path: hyperlane-cli/src/publish/enum.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Debug, thiserror::Error)]
 pub enum PublishError {
     #[error("Failed to parse Cargo.toml")]
@@ -9855,7 +9890,7 @@ pub enum PublishError {
 ```
 # Path: hyperlane-cli/src/publish/struct.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Package {
     pub name: String,
@@ -9877,17 +9912,19 @@ mod r#enum;
 mod r#fn;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-cli/src/publish/fn.rs
 ```rust
-use crate::*;
+use super::*;
 async fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError> {
     let content: String = read_to_string(workspace_root).await?;
-    let doc: toml::Value =
-        toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
+    let doc: Value = toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
     let mut packages: Vec<Package> = Vec::new();
     if let Some(workspace) = doc.get("workspace")
-        && let Some(members) = workspace.get("members").and_then(|m| m.as_array())
+        && let Some(members) = workspace
+            .get("members")
+            .and_then(|members_value: &Value| members_value.as_array())
     {
         for member in members {
             if let Some(pattern) = member.as_str() {
@@ -9937,17 +9974,16 @@ async fn read_single_package(manifest_path: &Path) -> Result<Package, PublishErr
 }
 async fn read_package_manifest(manifest_path: &Path) -> Result<Package, PublishError> {
     let content: String = read_to_string(manifest_path).await?;
-    let doc: toml::Value =
-        toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
-    let package_table: &toml::Value = doc.get("package").ok_or(PublishError::ManifestParseError)?;
+    let doc: Value = toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
+    let package_table: &Value = doc.get("package").ok_or(PublishError::ManifestParseError)?;
     let name: String = package_table
         .get("name")
-        .and_then(|n: &toml::Value| n.as_str())
+        .and_then(|n: &Value| n.as_str())
         .ok_or(PublishError::ManifestParseError)?
         .to_string();
     let version: String = package_table
         .get("version")
-        .and_then(|v: &toml::Value| v.as_str())
+        .and_then(|v: &Value| v.as_str())
         .ok_or(PublishError::ManifestParseError)?
         .to_string();
     let path: PathBuf = manifest_path
@@ -9963,19 +9999,22 @@ async fn read_package_manifest(manifest_path: &Path) -> Result<Package, PublishE
     })
 }
 fn extract_local_dependencies(
-    doc: &toml::Value,
+    doc: &Value,
     _manifest_path: &Path,
 ) -> Result<Vec<String>, PublishError> {
     let mut deps: Vec<String> = Vec::new();
     let dep_sections: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
     for section in &dep_sections {
-        if let Some(table) = doc.get(section).and_then(|s| s.as_table()) {
+        if let Some(table) = doc
+            .get(section)
+            .and_then(|section_value: &Value| section_value.as_table())
+        {
             for (dep_name, dep_value) in table {
                 let is_local: bool = match dep_value {
-                    toml::Value::Table(t) => {
+                    Value::Table(t) => {
                         t.get("path").is_some()
                             || t.get("workspace")
-                                .and_then(|w| w.as_bool())
+                                .and_then(|workspace_value: &Value| workspace_value.as_bool())
                                 .unwrap_or(false)
                     }
                     _ => false,
@@ -9993,7 +10032,7 @@ fn topological_sort(packages: &[Package]) -> Result<Vec<Package>, PublishError> 
     let mut graph: HashMap<String, Vec<String>> = HashMap::new();
     let package_map: HashMap<String, Package> = packages
         .iter()
-        .map(|p| (p.name.clone(), p.clone()))
+        .map(|package: &Package| (package.name.clone(), package.clone()))
         .collect();
     for package in packages {
         in_degree.entry(package.name.clone()).or_insert(0);
@@ -10115,7 +10154,7 @@ pub async fn execute_publish(
 ```
 # Path: hyperlane-cli/src/new/enum.rs
 ```rust
-use crate::*;
+use super::*;
 #[derive(Debug, thiserror::Error)]
 pub enum NewError {
     #[error("IO error: {0}")]
@@ -10140,7 +10179,7 @@ pub struct NewProjectConfig {
 ```
 # Path: hyperlane-cli/src/new/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl NewProjectConfig {
     pub fn new(project_name: String) -> Self {
         Self {
@@ -10157,10 +10196,11 @@ mod r#fn;
 mod r#impl;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane-cli/src/new/fn.rs
 ```rust
-use crate::*;
+use super::*;
 fn validate_project_name(name: &str) -> Result<(), NewError> {
     if name.is_empty() {
         return Err(NewError::InvalidName(
@@ -10252,10 +10292,11 @@ pub use r#enum::*;
 ```rust
 mod r#fn;
 pub use r#fn::*;
+use super::*;
 ```
 # Path: hyperlane-cli/src/watch/fn.rs
 ```rust
-use crate::*;
+use super::*;
 async fn run_cargo_run() -> Result<(), io::Error> {
     let output: std::process::Output = Command::new("cargo")
         .arg("run")
@@ -10300,24 +10341,24 @@ pub async fn execute_watch() -> Result<(), io::Error> {
     run_cargo_run().await?;
     let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));
     let mut watcher: RecommendedWatcher =
-        recommended_watcher(move |result: Result<Event, notify::Error>| {
+        recommended_watcher(move |result: Result<Event, NotifyError>| {
             if let Ok(event) = result {
                 let _ = tx.send(event);
             }
         })
-        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
+        .map_err(|error: NotifyError| io::Error::other(error.to_string()))?;
     watcher
         .watch(&src_path, RecursiveMode::Recursive)
-        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
+        .map_err(|error: NotifyError| io::Error::other(error.to_string()))?;
     log::info!("Watching src/ for changes...");
     let mut debounce: Interval = interval(Duration::from_millis(500));
     debounce.tick().await;
     while rx.changed().await.is_ok() {
         let event: Event = rx.borrow().clone();
-        let has_rust_change: bool = event.paths.iter().any(|path: &PathBuf| {
-            path.extension()
-                .is_some_and(|ext: &std::ffi::OsStr| ext == "rs")
-        });
+        let has_rust_change: bool = event
+            .paths
+            .iter()
+            .any(|path: &PathBuf| path.extension().is_some_and(|ext: &OsStr| ext == "rs"));
         if !has_rust_change {
             continue;
         }
@@ -10864,7 +10905,7 @@ pub const ERROR_DIR: &str = "error";
 ```
 # Path: hyperlane-log/src/impl.rs
 ```rust
-use crate::*;
+use super::*;
 impl<F, T> FileLoggerFuncTrait<T> for F
 where
     F: Fn(T) -> String + Send + Sync,
@@ -11069,7 +11110,7 @@ impl FileLogger {
 ```
 # Path: hyperlane-log/src/fn.rs
 ```rust
-use crate::*;
+use super::*;
 pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
     let mut res_idx: usize = DEFAULT_LOG_FILE_START_IDX;
     if let Ok(entries) = read_dir(dir_path) {
@@ -11144,64 +11185,65 @@ use hyperlane_log::*;
 # Path: hyperlane-log/tests/log/mod.rs
 ```rust
 mod r#fn;
+use super::*;
 ```
 # Path: hyperlane-log/tests/log/fn.rs
 ```rust
-use crate::*;
+use super::*;
 #[tokio::test]
 async fn test() {
     let log: FileLogger = FileLogger::new("./logs", 1_024_000);
     let trace_str: String = String::from("custom trace message");
-    log.trace(trace_str, |trace| {
+    log.trace(trace_str, |trace: String| {
         let write_data: String = format!("User trace func => {trace:#?}\n");
         write_data
     });
     let debug_str: String = String::from("custom debug message");
-    log.debug(debug_str, |debug| {
+    log.debug(debug_str, |debug: String| {
         let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     });
     let info_str: String = String::from("custom info message");
-    log.info(info_str, |info| {
+    log.info(info_str, |info: String| {
         let write_data: String = format!("User info func => {info:?}\n");
         write_data
     });
     let warn_str: String = String::from("custom warn message");
-    log.warn(warn_str, |warn| {
+    log.warn(warn_str, |warn: String| {
         let write_data: String = format!("User warn func => {warn:#?}\n");
         write_data
     });
     let error_str: String = String::from("custom error message");
-    log.error(error_str, |error| {
+    log.error(error_str, |error: String| {
         let write_data: String = format!("User error func => {error:?}\n");
         write_data
     });
     let async_trace_str: String = String::from("custom async trace message");
-    log.async_trace(async_trace_str, |trace| {
+    log.async_trace(async_trace_str, |trace: String| {
         let write_data: String = format!("User trace func => {trace:#?}\n");
         write_data
     })
     .await;
     let async_debug_str: String = String::from("custom async debug message");
-    log.async_debug(async_debug_str, |debug| {
+    log.async_debug(async_debug_str, |debug: String| {
         let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     })
     .await;
     let async_info_str: String = String::from("custom async info message");
-    log.async_info(async_info_str, |info| {
+    log.async_info(async_info_str, |info: String| {
         let write_data: String = format!("User info func => {info:?}\n");
         write_data
     })
     .await;
     let async_warn_str: String = String::from("custom async warn message");
-    log.async_warn(async_warn_str, |warn| {
+    log.async_warn(async_warn_str, |warn: String| {
         let write_data: String = format!("User warn func => {warn:#?}\n");
         write_data
     })
     .await;
     let async_error_str: String = String::from("custom async error message");
-    log.async_error(async_error_str, |error| {
+    log.async_error(async_error_str, |error: String| {
         let write_data: String = format!("User error func => {error:?}\n");
         write_data
     })
@@ -11210,47 +11252,47 @@ async fn test() {
 #[tokio::test]
 async fn test_more_log_first() {
     let log: FileLogger = FileLogger::new("./logs", DISABLE_LOG_FILE_SIZE);
-    log.trace("trace data => ", |trace| {
+    log.trace("trace data => ", |trace: &str| {
         let write_data: String = format!("User trace func => {trace:#?}\n");
         write_data
     });
-    log.debug("debug data => ", |debug| {
+    log.debug("debug data => ", |debug: &str| {
         let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     });
-    log.info("info data => ", |info| {
+    log.info("info data => ", |info: &str| {
         let write_data: String = format!("User info func => {info:?}\n");
         write_data
     });
-    log.warn("warn data => ", |warn| {
+    log.warn("warn data => ", |warn: &str| {
         let write_data: String = format!("User warn func => {warn:#?}\n");
         write_data
     });
-    log.error("error data => ", |error| {
+    log.error("error data => ", |error: &str| {
         let write_data: String = format!("User error func => {error:?}\n");
         write_data
     });
-    log.async_trace("async trace data => ", |trace| {
+    log.async_trace("async trace data => ", |trace: &str| {
         let write_data: String = format!("User trace func => {trace:#?}\n");
         write_data
     })
     .await;
-    log.async_debug("async debug data => ", |debug| {
+    log.async_debug("async debug data => ", |debug: &str| {
         let write_data: String = format!("User debug func => {debug:#?}\n");
         write_data
     })
     .await;
-    log.async_info("async info data => ", |info| {
+    log.async_info("async info data => ", |info: &str| {
         let write_data: String = format!("User info func => {info:?}\n");
         write_data
     })
     .await;
-    log.async_warn("async warn data => ", |warn| {
+    log.async_warn("async warn data => ", |warn: &str| {
         let write_data: String = format!("User warn func => {warn:#?}\n");
         write_data
     })
     .await;
-    log.async_error("async error data => ", |error| {
+    log.async_error("async error data => ", |error: &str| {
         let write_data: String = format!("User error func => {error:?}\n");
         write_data
     })
