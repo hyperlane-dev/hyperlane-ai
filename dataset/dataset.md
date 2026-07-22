@@ -1,4 +1,4 @@
-<!--2026-07-22 14:04:21-->
+<!--2026-07-22 19:26:23-->
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Api Docs](https://docs.rs/hyperlane-time/latest/)
@@ -2338,18 +2338,18 @@ impl Server {
                 }
             }
             unsafe {
-                let _ = Box::from_raw(ctx);
-                let _ = Box::from_raw(stream);
+                let _: Box<Context> = Box::from_raw(ctx);
+                let _: Box<Stream> = Box::from_raw(stream);
             }
         };
     }
     fn configure_stream(&self, stream: &TcpStream) {
         let config: &ServerConfig = self.get_server_config();
         if let Some(nodelay) = config.try_get_nodelay() {
-            let _ = stream.set_nodelay(*nodelay);
+            let _: Result<(), std::io::Error> = stream.set_nodelay(*nodelay);
         }
         if let Some(ttl) = config.try_get_ttl() {
-            let _ = stream.set_ttl(*ttl);
+            let _: Result<(), std::io::Error> = stream.set_ttl(*ttl);
         }
     }
     pub(super) async fn handle_request_middleware(
@@ -2462,8 +2462,8 @@ impl Server {
             }
         }
         unsafe {
-            let _ = Box::from_raw(ctx);
-            let _ = Box::from_raw(stream);
+            let _: Box<Context> = Box::from_raw(ctx);
+            let _: Box<Stream> = Box::from_raw(stream);
         }
     }
     async fn tcp_accept(&'static self, tcp_listener: &TcpListener) {
@@ -2490,22 +2490,25 @@ impl Server {
         let (shutdown_sender, mut shutdown_receiver) = channel(());
         let accept_connections: JoinHandle<()> = spawn(async move {
             server.tcp_accept(&tcp_listener).await;
-            let _ = wait_sender.send(());
+            let _: Result<(), tokio::sync::watch::error::SendError<()>> = wait_sender.send(());
         });
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
             Box::pin(async move {
-                let _ = wait_receiver_clone.changed().await;
+                let _: Result<(), tokio::sync::watch::error::RecvError> =
+                    wait_receiver_clone.changed().await;
             })
         });
         let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
-                let _ = shutdown_sender_clone.send(());
+                let _: Result<(), tokio::sync::watch::error::SendError<()>> =
+                    shutdown_sender_clone.send(());
             })
         });
         spawn(async move {
-            let _ = shutdown_receiver.changed().await;
+            let _: Result<(), tokio::sync::watch::error::RecvError> =
+                shutdown_receiver.changed().await;
             accept_connections.abort();
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
@@ -3607,7 +3610,7 @@ async fn main() {
     server.route::<GetAllRoutes>("/get/all/routes");
     server.route::<DynamicRoute>("/dynamic/{routing}");
     server.route::<DynamicRoute>("/regex/{file:^.*$}");
-    let _ = SERVER_REF.set(server.clone());
+    let _: Result<(), Server> = SERVER_REF.set(server.clone());
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     spawn(async move {
@@ -3760,7 +3763,7 @@ fn large_dynamic_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+        let _: Option<&ServerHookHandler> = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -3792,7 +3795,7 @@ fn large_regex_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/123");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+        let _: Option<&ServerHookHandler> = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -3824,7 +3827,7 @@ fn large_tail_regex_routes() {
     let start_match: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/some/nested/path");
-        let _ = route_matcher.try_resolve_route(&mut ctx, &path);
+        let _: Option<&ServerHookHandler> = route_matcher.try_resolve_route(&mut ctx, &path);
     }
     let match_duration: Duration = start_match.elapsed();
     println!(
@@ -4073,7 +4076,7 @@ use {
 };
 use {
     proc_macro::TokenStream,
-    proc_macro2::{Span, TokenStream as TokenStream2},
+    proc_macro2::Span,
     quote::quote,
     syn::{
         Ident, Token,
@@ -4403,10 +4406,10 @@ use super::*;
 use super::*;
 pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
-    let order: TokenStream2 = expr_to_isize(&attr_args.order);
+    let order: proc_macro2::TokenStream = expr_to_isize(&attr_args.order);
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
     let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
+    let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
             ::hyperlane::HookType::TaskPanic(#order, || ::hyperlane::Hook::factory::<#struct_name>())
@@ -4416,10 +4419,10 @@ pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStr
 }
 pub(crate) fn request_error_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
-    let order: TokenStream2 = expr_to_isize(&attr_args.order);
+    let order: proc_macro2::TokenStream = expr_to_isize(&attr_args.order);
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
     let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
+    let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
             ::hyperlane::HookType::RequestError(#order, || ::hyperlane::Hook::factory::<#struct_name>())
@@ -4513,7 +4516,7 @@ pub(crate) fn generate_http_stream(
     context: &Ident,
     data: &FromStreamData,
     stmts: &[Stmt],
-) -> TokenStream2 {
+) -> proc_macro2::TokenStream {
     let method_ident: Ident = Ident::new("try_get_http_request", Span::call_site());
     match data.variable_name.clone() {
         Some(variable_name) => {
@@ -4541,7 +4544,7 @@ pub(crate) fn generate_websocket_stream(
     context: &Ident,
     data: &FromStreamData,
     stmts: &[Stmt],
-) -> TokenStream2 {
+) -> proc_macro2::TokenStream {
     let method_ident: Ident = Ident::new("try_get_websocket_request", Span::call_site());
     match data.variable_name.clone() {
         Some(variable_name) => {
@@ -4575,7 +4578,7 @@ pub(crate) fn try_get_http_request_macro(attr: TokenStream, item: TokenStream) -
         Ok(stream) => match parse_context_from_signature(sig) {
             Ok(context) => {
                 let stmts: &Vec<Stmt> = &block.stmts;
-                let loop_stream: TokenStream2 =
+                let loop_stream: proc_macro2::TokenStream =
                     generate_http_stream(&stream, &context, &data, stmts);
                 quote! {
                     #(#attrs)*
@@ -4601,7 +4604,7 @@ pub(crate) fn try_get_websocket_request_macro(attr: TokenStream, item: TokenStre
         Ok(stream) => match parse_context_from_signature(sig) {
             Ok(context) => {
                 let stmts: &Vec<Stmt> = &block.stmts;
-                let loop_stream: TokenStream2 =
+                let loop_stream: proc_macro2::TokenStream =
                     generate_websocket_stream(&stream, &context, &data, stmts);
                 quote! {
                     #(#attrs)*
@@ -4628,7 +4631,7 @@ use super::*;
 use super::*;
 pub(crate) fn create_version_check(
     version: &proc_macro2::Ident,
-) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
+) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let version_str: String = version.to_string();
     move |context: &Ident, _: &Ident| {
         let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{version_str}"), context.span());
@@ -4735,7 +4738,7 @@ pub(crate) fn response_status_code_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_mut_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
         quote! {
             #new_context.get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
         }
@@ -4751,7 +4754,7 @@ pub(crate) fn response_reason_phrase_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_mut_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
         quote! {
             #new_context.get_mut_response().set_reason_phrase(&#value);
         }
@@ -4767,7 +4770,7 @@ pub(crate) fn response_header_macro(
     let value: Expr = header_data.value;
     let operation: HeaderOperation = header_data.operation;
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_mut_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
         match operation {
             HeaderOperation::Add => {
                 quote! {
@@ -4790,7 +4793,7 @@ pub(crate) fn response_body_macro(
     let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
     let body: Expr = body_data.body;
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_mut_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
         quote! {
             #new_context.get_mut_response().set_body(&#body);
         }
@@ -4798,7 +4801,7 @@ pub(crate) fn response_body_macro(
 }
 pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_mut_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
         quote! {
             #new_context.get_mut_response().clear_headers();
         }
@@ -4814,7 +4817,7 @@ pub(crate) fn response_version_macro(
         Err(err) => return err.to_compile_error().into(),
     };
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_mut_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
         quote! {
             #new_context.get_mut_response().set_version(#value);
         }
@@ -4910,7 +4913,7 @@ use super::*;
 use super::*;
 pub(crate) fn create_method_check(
     method: &proc_macro2::Ident,
-) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
+) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let method_str: String = method.to_string();
     move |context: &Ident, _: &Ident| {
         let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{method_str}"), context.span());
@@ -5423,7 +5426,7 @@ pub(crate) fn request_body_macro(
 ) -> TokenStream {
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_body.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
@@ -5517,7 +5520,7 @@ pub(crate) fn attributes_macro(
 ) -> TokenStream {
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_attrs.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
@@ -5637,7 +5640,7 @@ pub(crate) fn route_params_macro(
 ) -> TokenStream {
     let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_route_params.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
@@ -5689,7 +5692,7 @@ pub(crate) fn request_querys_macro(
 ) -> TokenStream {
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_querys.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
@@ -5741,7 +5744,7 @@ pub(crate) fn request_headers_macro(
 ) -> TokenStream {
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_headers.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
@@ -5811,7 +5814,7 @@ pub(crate) fn request_version_macro(
     let multi_version: MultiRequestVersionData =
         parse_macro_input!(attr as MultiRequestVersionData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_version.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
@@ -5829,7 +5832,7 @@ pub(crate) fn request_path_macro(
 ) -> TokenStream {
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let new_context: TokenStream2 = leak_context(false, context);
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_path.variables.iter().map(|variable| {
             quote! {
                 let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
@@ -5888,12 +5891,12 @@ pub(crate) fn try_send_macro(
     inject(position, item, |context, stream| match data_expr {
         Some(expr) => {
             quote! {
-                let _ = #stream.try_send(#expr).await;
+                let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_send(#expr).await;
             }
         }
         None => {
             quote! {
-                let _ = #stream.try_send(#context.get_mut_response().build()).await;
+                let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
             }
         }
     })
@@ -5931,7 +5934,7 @@ use super::*;
 pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |_: &Ident, stream: &Ident| {
         quote! {
-            let _ = #stream.try_flush().await;
+            let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_flush().await;
         }
     })
 }
@@ -5954,7 +5957,7 @@ use super::*;
 use super::*;
 pub(crate) fn create_protocol_check(
     upgrade_type: &proc_macro2::Ident,
-) -> impl FnOnce(&Ident, &Ident) -> TokenStream2 {
+) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let upgrade_type_str: String = upgrade_type.to_string();
     move |context: &Ident, _: &Ident| {
         let check_fn: proc_macro2::Ident =
@@ -6121,7 +6124,7 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
     let block: &Block = &input_fn.block;
     let attrs: &Vec<Attribute> = &input_fn.attrs;
     let stmts: &Vec<Stmt> = &block.stmts;
-    let mut init_statements: Vec<TokenStream2> = Vec::new();
+    let mut init_statements: Vec<proc_macro2::TokenStream> = Vec::new();
     for (var_name, type_name) in &multi_hyperlane.params {
         init_statements.push(quote! {
             let mut #var_name: #type_name = #type_name::default();
@@ -6137,7 +6140,7 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
             });
         }
     }
-    let gen_code: TokenStream2 = quote! {
+    let gen_code: proc_macro2::TokenStream = quote! {
         #(#attrs)*
         #vis #sig {
             #(#init_statements)*
@@ -6222,10 +6225,10 @@ use super::*;
 use super::*;
 pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
-    let order: TokenStream2 = expr_to_isize(&attr_args.order);
+    let order: proc_macro2::TokenStream = expr_to_isize(&attr_args.order);
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
     let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
+    let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
             ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::Hook::factory::<#struct_name>())
@@ -6245,10 +6248,10 @@ use super::*;
 use super::*;
 pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
-    let order: TokenStream2 = expr_to_isize(&attr_args.order);
+    let order: proc_macro2::TokenStream = expr_to_isize(&attr_args.order);
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
     let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
+    let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
             ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::Hook::factory::<#struct_name>())
@@ -6626,7 +6629,7 @@ use super::*;
 use super::*;
 fn inject_at_start(
     input: TokenStream,
-    before_fn: impl FnOnce(&Ident, &Ident) -> TokenStream2,
+    before_fn: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
 ) -> TokenStream {
     let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
@@ -6636,9 +6639,9 @@ fn inject_at_start(
     match parse_context_from_signature(sig) {
         Ok(context) => match parse_stream_from_signature(sig) {
             Ok(stream) => {
-                let before_code: TokenStream2 = before_fn(&context, &stream);
+                let before_code: proc_macro2::TokenStream = before_fn(&context, &stream);
                 let stmts: &Vec<Stmt> = &block.stmts;
-                let gen_code: TokenStream2 = quote! {
+                let gen_code: proc_macro2::TokenStream = quote! {
                     #(#attrs)*
                     #vis #sig {
                         #before_code
@@ -6654,7 +6657,7 @@ fn inject_at_start(
 }
 fn inject_at_end(
     input: TokenStream,
-    after_fn: impl FnOnce(&Ident, &Ident) -> TokenStream2,
+    after_fn: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
 ) -> TokenStream {
     let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
@@ -6664,7 +6667,7 @@ fn inject_at_end(
     match parse_context_from_signature(sig) {
         Ok(context) => match parse_stream_from_signature(sig) {
             Ok(stream) => {
-                let after_code: TokenStream2 = after_fn(&context, &stream);
+                let after_code: proc_macro2::TokenStream = after_fn(&context, &stream);
                 let stmts: &Vec<Stmt> = &block.stmts;
                 let (leading_stmts, tail_expr) = if let Some((last, leading)) = stmts.split_last() {
                     match last {
@@ -6674,14 +6677,14 @@ fn inject_at_end(
                 } else {
                     (stmts.as_slice(), None)
                 };
-                let normalized_leading: Vec<TokenStream2> = leading_stmts
+                let normalized_leading: Vec<proc_macro2::TokenStream> = leading_stmts
                     .iter()
                     .map(|stmt| match stmt {
                         Stmt::Expr(expr, None) => quote! { #expr; },
                         _ => quote! { #stmt },
                     })
                     .collect();
-                let gen_code: TokenStream2 = match tail_expr {
+                let gen_code: proc_macro2::TokenStream = match tail_expr {
                     Some(expr) => quote! {
                         #(#attrs)*
                         #vis #sig {
@@ -6708,7 +6711,7 @@ fn inject_at_end(
 pub(crate) fn inject(
     position: Position,
     input: TokenStream,
-    hook: impl FnOnce(&Ident, &Ident) -> TokenStream2,
+    hook: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
 ) -> TokenStream {
     match position {
         Position::Prologue => inject_at_start(input, hook),
@@ -6801,7 +6804,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
         "expected at least one parameter of type &::hyperlane::Stream",
     ))
 }
-pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
+pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream {
     match opt_expr {
         Some(expr) => match expr {
             Expr::Lit(ExprLit {
@@ -6823,7 +6826,7 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> TokenStream2 {
         None => quote! { None },
     }
 }
-pub(crate) fn leak_mut_context(is_unsafe_error: bool, context: &Ident) -> TokenStream2 {
+pub(crate) fn leak_mut_context(is_unsafe_error: bool, context: &Ident) -> proc_macro2::TokenStream {
     if is_unsafe_error {
         quote! {
           #context.leak_mut()
@@ -6834,7 +6837,7 @@ pub(crate) fn leak_mut_context(is_unsafe_error: bool, context: &Ident) -> TokenS
         }
     }
 }
-pub(crate) fn leak_context(is_unsafe_error: bool, context: &Ident) -> TokenStream2 {
+pub(crate) fn leak_context(is_unsafe_error: bool, context: &Ident) -> proc_macro2::TokenStream {
     if is_unsafe_error {
         quote! {
           #context.leak()
@@ -6896,7 +6899,7 @@ pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let path: &Expr = &route_attr.path;
     let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
     let struct_name: &Ident = &input_struct.ident;
-    let gen_code: TokenStream2 = quote! {
+    let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
         ::hyperlane::inventory::submit! {
             ::hyperlane::HookType::Route(#path, || ::hyperlane::Hook::factory::<#struct_name>())
@@ -8521,11 +8524,11 @@ async fn standalone_epilogue_hooks_handler(stream: &mut Stream, ctx: &mut Contex
 #[closed]
 async fn context_macro(stream: &mut Stream, ctx: &mut Context) -> Status {
     let new_ctx: &Context = unsafe { context!(ctx) };
-    let _ = new_ctx.get_response();
+    let _: &Response = new_ctx.get_response();
     let new_ctx: &Context = unsafe { context!(ctx: &Context) };
-    let _ = new_ctx.get_response();
+    let _: &Response = new_ctx.get_response();
     let new_ctx: &mut Context = unsafe { context!(ctx: &mut Context) };
-    let _ = new_ctx.get_mut_response();
+    let _: &mut Response = new_ctx.get_mut_response();
     Status::Continue
 }
 #[route("/hooks_expression")]
@@ -8629,10 +8632,7 @@ pub(crate) use std::{
     sync::{Arc, LazyLock},
 };
 pub(crate) use {
-    notify::{
-        Error as NotifyError, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
-        recommended_watcher,
-    },
+    notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
     regex::{Captures, Regex},
     std::ffi::OsStr,
     tokio::{
@@ -9515,7 +9515,7 @@ impl log::Log for Logger {
 }
 impl Logger {
     pub fn init(level_filter: log::LevelFilter) {
-        let _ = log::set_logger(&LOGGER);
+        let _: Result<(), SetLoggerError> = log::set_logger(&LOGGER);
         log::set_max_level(level_filter);
     }
 }
@@ -9529,6 +9529,7 @@ mod r#struct;
 pub use r#struct::*;
 pub use {::log, color_output::*};
 pub(crate) use {r#const::*, r#static::*};
+use log::SetLoggerError;
 ```
 # Path: hyperlane-cli/src/bump/enum.rs
 ```rust
@@ -10341,15 +10342,15 @@ pub async fn execute_watch() -> Result<(), io::Error> {
     run_cargo_run().await?;
     let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));
     let mut watcher: RecommendedWatcher =
-        recommended_watcher(move |result: Result<Event, NotifyError>| {
+        recommended_watcher(move |result: Result<Event, notify::Error>| {
             if let Ok(event) = result {
-                let _ = tx.send(event);
+                let _: Result<(), tokio::sync::watch::error::SendError<Event>> = tx.send(event);
             }
         })
-        .map_err(|error: NotifyError| io::Error::other(error.to_string()))?;
+        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
     watcher
         .watch(&src_path, RecursiveMode::Recursive)
-        .map_err(|error: NotifyError| io::Error::other(error.to_string()))?;
+        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
     log::info!("Watching src/ for changes...");
     let mut debounce: Interval = interval(Duration::from_millis(500));
     debounce.tick().await;
@@ -10379,7 +10380,10 @@ mod new;
 mod publish;
 mod version;
 use hyperlane_cli::*;
-use std::{io, path::PathBuf};
+use std::{
+    io::{self, Error},
+    path::PathBuf,
+};
 use tokio::fs::{create_dir_all, read_to_string, write};
 ```
 # Path: hyperlane-cli/tests/fmt/mod.rs
@@ -10393,7 +10397,7 @@ use super::*;
 #[tokio::test]
 async fn test_format_path_integration() {
     let tmp_dir: PathBuf = PathBuf::from("./tmp/test_fmt");
-    let _ = create_dir_all(&tmp_dir).await;
+    let _: Result<(), Error> = create_dir_all(&tmp_dir).await;
     let test_file: PathBuf = tmp_dir.join("test.rs");
     write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n")
         .await
@@ -10871,7 +10875,7 @@ mod r#impl;
 mod r#struct;
 mod r#trait;
 pub use {r#const::*, r#fn::*, r#struct::*, r#trait::*};
-use std::fs::read_dir;
+use std::{fs::read_dir, io::Error};
 use {file_operation::*, hyperlane_time::*};
 ```
 # Path: hyperlane-log/src/struct.rs
@@ -11020,7 +11024,7 @@ impl FileLogger {
         }
         let out: String = func(data);
         let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
-        let _ = append_to_file(&path, out.as_bytes());
+        let _: Result<(), Error> = append_to_file(&path, out.as_bytes());
         self
     }
     async fn write_async<T, L>(&self, data: T, func: L, dir: &str) -> &Self
@@ -11033,7 +11037,7 @@ impl FileLogger {
         }
         let out: String = func(data);
         let path: String = get_log_path(dir, &self.path, &self.limit_file_size);
-        let _ = async_append_to_file(&path, out.as_bytes()).await;
+        let _: Result<(), Error> = async_append_to_file(&path, out.as_bytes()).await;
         self
     }
     pub fn trace<T, L>(&self, data: T, func: L) -> &Self
