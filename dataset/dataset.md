@@ -1,4 +1,4 @@
-<!--2026-07-22 19:26:23-->
+<!--2026-07-23 03:17:30-->
 # Path: hyperlane-time/README.md
 ## hyperlane-time
 [Api Docs](https://docs.rs/hyperlane-time/latest/)
@@ -10389,7 +10389,7 @@ use tokio::fs::{create_dir_all, read_to_string, write};
 # Path: hyperlane-cli/tests/fmt/mod.rs
 ```rust
 mod r#fn;
-use crate::*;
+use super::*;
 ```
 # Path: hyperlane-cli/tests/fmt/fn.rs
 ```rust
@@ -10409,7 +10409,7 @@ async fn test_format_path_integration() {
 # Path: hyperlane-cli/tests/version/mod.rs
 ```rust
 mod r#fn;
-use crate::*;
+use super::*;
 ```
 # Path: hyperlane-cli/tests/version/fn.rs
 ```rust
@@ -10422,7 +10422,7 @@ fn test_print_version_runs() {
 # Path: hyperlane-cli/tests/bump/mod.rs
 ```rust
 mod r#fn;
-use crate::*;
+use super::*;
 ```
 # Path: hyperlane-cli/tests/bump/fn.rs
 ```rust
@@ -10596,7 +10596,7 @@ edition = "2024"
 # Path: hyperlane-cli/tests/config/mod.rs
 ```rust
 mod r#fn;
-use crate::*;
+use super::*;
 ```
 # Path: hyperlane-cli/tests/config/fn.rs
 ```rust
@@ -10698,7 +10698,7 @@ fn test_args_clone() {
 # Path: hyperlane-cli/tests/publish/mod.rs
 ```rust
 mod r#fn;
-use crate::*;
+use super::*;
 ```
 # Path: hyperlane-cli/tests/publish/fn.rs
 ```rust
@@ -10800,7 +10800,7 @@ fn test_publish_error_from_io() {
 # Path: hyperlane-cli/tests/new/mod.rs
 ```rust
 mod r#fn;
-use crate::*;
+use super::*;
 ```
 # Path: hyperlane-cli/tests/new/fn.rs
 ```rust
