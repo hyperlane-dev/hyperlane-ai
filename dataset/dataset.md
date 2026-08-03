@@ -1,4 +1,4 @@
-<!--2026-08-03 14:47:46-->
+<!--2026-08-03 19:43:18-->
 # Path: hyperlane-plugin-websocket/README.md
 ## hyperlane-plugin-websocket
 [Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
