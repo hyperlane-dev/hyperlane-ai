@@ -1,4 +1,4 @@
-<!--2026-08-09 01:59:41-->
+<!--2026-08-09 07:02:07-->
 # Path: hyperlane-plugin-websocket/README.md
 ## hyperlane-plugin-websocket
 [Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
@@ -4653,6 +4653,7 @@ FROM rust:1.93-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
+RUN rustup target add wasm32-unknown-unknown
 RUN cargo install wasm-bindgen-cli --locked && \
     cargo install wasm-pack --locked
 RUN cargo build && \
@@ -4666,6 +4667,7 @@ FROM rust:1.93-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
+RUN rustup target add wasm32-unknown-unknown
 RUN cargo install wasm-bindgen-cli --locked && \
     cargo install wasm-pack --locked
 RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu && \
