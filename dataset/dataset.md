@@ -1,4 +1,4 @@
-<!--2026-08-31 04:37:53-->
+<!--2026-08-31 22:40:55-->
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
@@ -10328,6 +10328,833 @@ pub async fn test_broadcast() {
 ```rust
 mod r#fn;
 use super::*;
+```
+# Path: hyperlane-mcp-upload/README.md
+# hyperlane-mcp-upload
+MCP server that uploads local files to [ltpp.vip](https://ltpp.vip) and returns the public download URL.
+The server speaks JSON-RPC 2.0 over HTTP at `/mcp` and exposes a single tool, `upload_file`, that takes a `file_path` argument pointing at a file on the local filesystem.
+## Protocol
+The implementation follows the [Model Context Protocol](https://modelcontextprotocol.io/) JSON-RPC conventions.
+- `initialize` — handshake returning server identity and capabilities.
+- `tools/list` — returns the registered tool descriptors.
+- `tools/call` — invokes a tool by name.
+### `tools/call` example
+```bash
+curl -X POST http://127.0.0.1:7842/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "upload_file",
+      "arguments": { "file_path": "/path/to/file.png" }
+    }
+  }'
+```
+The response contains a `content` array whose single text element is a JSON object with `url`, `file_name`, and `size`.
+## Endpoints
+| Path | Method | Purpose |
+|------|--------|---------|
+| `/mcp` | POST | JSON-RPC 2.0 endpoint |
+| `/health` | GET | Static health check returning `{"status":"ok"}` |
+| `/*` | ANY | 404 fallback |
+## Upload Pipeline
+Files are streamed to ltpp.vip through the same three-step REST protocol used by the `hyperlane-upload` Node CLI:
+1. `POST /api/upload/register` — register the upload with file size, chunk size, total chunks, and MD5 hash.
+2. `POST /api/upload/save` — send one or more `application/octet-stream` chunks.
+3. `POST /api/upload/merge` — ask ltpp.vip to merge the chunks into a single URL.
+The MD5 hash and HTTP transport are delegated to the system `md5sum` and `curl` commands so no extra Rust dependencies are required.
+## Configuration
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `MCP_DEFAULT_HOST` | `0.0.0.0` | Bind address |
+| `MCP_DEFAULT_PORT` | `7842` | Bind port |
+| `LTPP_HOST` | `ltpp.vip` | Upload service host |
+| `LTPP_BASE_PATH` | `/api/upload` | Upload service base path |
+| `DEFAULT_CHUNK_SIZE` | `5 MiB` | Chunk size sent to ltpp.vip |
+## Build
+```bash
+cargo build --release
+hyperlane fmt
+cargo clippy --all-targets
+```
+## Run
+```bash
+./target/release/hyperlane-mcp-upload
+```
+The server listens on `0.0.0.0:7842` by default.
+# Path: hyperlane-mcp-upload/src/lib.rs
+```rust
+mod config;
+mod error;
+mod mcp;
+mod server;
+mod upload;
+pub use {config::*, error::*, hyperlane::*, mcp::*, server::*, upload::*};
+use serde::{Deserialize, Serialize};
+```
+# Path: hyperlane-mcp-upload/src/main.rs
+```rust
+use hyperlane_mcp_upload::{
+    RequestConfig, Server, ServerAddress, ServerConfig, ServerControlHook, UploadConfig,
+    format_bind, register,
+};
+#[tokio::main]
+async fn main() {
+    let address: ServerAddress = ServerAddress::default();
+    let bind: String = format_bind(&address);
+    let mut server_config: ServerConfig = ServerConfig::default();
+    server_config.set_address(bind.clone());
+    let mut server: Server = Server::default();
+    server.server_config(server_config);
+    server.request_config(RequestConfig::default());
+    let _upload_config: UploadConfig = UploadConfig::default();
+    register(&mut server);
+    let control: ServerControlHook = server.run().await.unwrap_or_default();
+    eprintln!("hyperlane-mcp-upload: listening on {bind}");
+    control.wait().await;
+}
+```
+# Path: hyperlane-mcp-upload/src/error/mod.rs
+```rust
+mod r#enum;
+pub use r#enum::*;
+#[allow(unused_imports)]
+use super::*;
+```
+# Path: hyperlane-mcp-upload/src/error/enum.rs
+```rust
+#[allow(unused_imports)]
+use super::*;
+#[derive(Clone, Debug, thiserror::Error)]
+pub enum McpError {
+    #[error("file not found: {0}")]
+    FileNotFound(String),
+    #[error("failed to read file: {0}")]
+    FileRead(String),
+    #[error("json error: {0}")]
+    Json(String),
+    #[error("upload service returned status {status}: {message}")]
+    UploadStatus {
+        status: u16,
+        message: String,
+    },
+    #[error("network error: {0}")]
+    Network(String),
+    #[error("invalid mcp request: {0}")]
+    InvalidRequest(String),
+    #[error("unknown tool: {0}")]
+    UnknownTool(String),
+    #[error("io error: {0}")]
+    Io(String),
+}
+pub type McpResult<T> = Result<T, McpError>;
+```
+# Path: hyperlane-mcp-upload/src/upload/fn.rs
+```rust
+use super::*;
+pub fn build_endpoint(config: &UploadConfig, suffix: &str) -> String {
+    let trimmed: &str = suffix.trim_start_matches('/');
+    let base: &str = config.base_path.trim_end_matches('/');
+    let host: &str = config.host.as_str();
+    let mut url: String = String::from("https://");
+    url.push_str(host);
+    url.push_str(base);
+    url.push('/');
+    url.push_str(trimmed);
+    url
+}
+pub fn upload_file(config: &UploadConfig, file_path: &str) -> McpResult<UploadResult> {
+    let resolved: std::path::PathBuf = resolve_path(file_path)?;
+    let bytes: Vec<u8> = std::fs::read(&resolved).map_err(|err: std::io::Error| {
+        McpError::FileRead(format!("{}: {err}", resolved.display()))
+    })?;
+    let size: u64 = bytes.len() as u64;
+    let file_name: String = file_name_of(&resolved);
+    let file_id: String = format!(
+        "upload_{}_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d: std::time::Duration| d.as_millis())
+            .unwrap_or(0),
+        std::process::id()
+    );
+    let chunk_size: usize = config.chunk_size;
+    let total_chunks: usize = if size == 0 {
+        1
+    } else {
+        (size as usize).div_ceil(chunk_size)
+    };
+    let hash: String = md5_hex(&bytes)?;
+    register_chunked(
+        config,
+        &file_id,
+        &file_name,
+        size,
+        chunk_size,
+        total_chunks,
+        &hash,
+    )?;
+    save_chunks(config, &file_id, &file_name, &bytes)?;
+    let url_path: String = merge_chunks(config, &file_id, &file_name, total_chunks, &hash)?;
+    let url: String = format!("https://{}{}", config.host, url_path);
+    let result: UploadResult = UploadResult {
+        url,
+        file_name,
+        size,
+    };
+    Ok(result)
+}
+pub fn resolve_path(file_path: &str) -> McpResult<std::path::PathBuf> {
+    let candidate: std::path::PathBuf = std::path::PathBuf::from(file_path);
+    let resolved: std::path::PathBuf = if candidate.is_absolute() {
+        candidate
+    } else {
+        let cwd: std::path::PathBuf = std::env::current_dir().map_err(|err: std::io::Error| {
+            McpError::Io(format!("cannot read current directory: {err}"))
+        })?;
+        cwd.join(candidate)
+    };
+    if !resolved.exists() {
+        let path_str: String = resolved.display().to_string();
+        return Err(McpError::FileNotFound(path_str));
+    }
+    Ok(resolved)
+}
+pub fn file_name_of(path: &std::path::Path) -> String {
+    let raw: std::ffi::OsString = path
+        .file_name()
+        .map(|n: &std::ffi::OsStr| n.to_os_string())
+        .unwrap_or_else(|| std::ffi::OsString::from("upload.bin"));
+    raw.to_string_lossy().into_owned()
+}
+pub fn md5_hex(bytes: &[u8]) -> McpResult<String> {
+    use std::io::Write;
+    let mut child: std::process::Child = std::process::Command::new("md5sum")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|err: std::io::Error| McpError::Network(format!("md5sum spawn: {err}")))?;
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin
+            .write_all(bytes)
+            .map_err(|err: std::io::Error| McpError::Network(format!("md5sum stdin: {err}")))?;
+    }
+    let output: std::process::Output = child
+        .wait_with_output()
+        .map_err(|err: std::io::Error| McpError::Network(format!("md5sum wait: {err}")))?;
+    if !output.status.success() {
+        let stderr_text: String = String::from_utf8_lossy(&output.stderr).into_owned();
+        return Err(McpError::Network(format!("md5sum failed: {stderr_text}")));
+    }
+    let stdout_text: String = String::from_utf8_lossy(&output.stdout).into_owned();
+    let digest: String = stdout_text
+        .split_whitespace()
+        .next()
+        .map(|s: &str| s.to_owned())
+        .unwrap_or_default();
+    Ok(digest)
+}
+fn register_chunked(
+    config: &UploadConfig,
+    file_id: &str,
+    file_name: &str,
+    size: u64,
+    chunk_size: usize,
+    total_chunks: usize,
+    hash: &str,
+) -> McpResult<()> {
+    let url: String = build_endpoint(config, "register");
+    let body: String = format!(
+        r#"{{"fileName":"{file_name}","fileSize":{size},"fileHash":"{hash}","chunkSize":{chunk_size},"totalChunks":{total_chunks}}}"#
+    );
+    run_curl_void(
+        &url,
+        &[
+            ("X-File-Id", file_id),
+            ("X-File-Name", file_name),
+            ("X-Total-Chunks", &total_chunks.to_string()),
+            ("Content-Type", "application/json"),
+        ],
+        body.as_bytes(),
+    )?;
+    Ok(())
+}
+fn save_chunks(
+    config: &UploadConfig,
+    file_id: &str,
+    file_name: &str,
+    bytes: &[u8],
+) -> McpResult<()> {
+    let url: String = build_endpoint(config, "save");
+    let chunk_size: usize = config.chunk_size;
+    let total: usize = bytes.len();
+    if total == 0 {
+        let index_str: String = "0".to_owned();
+        let temp_path: std::path::PathBuf = write_temp_chunk(file_id, b"")?;
+        run_curl_octet(
+            &url,
+            &[
+                ("X-File-Id", file_id),
+                ("X-File-Name", file_name),
+                ("X-Chunk-Index", index_str.as_str()),
+                ("X-Chunk-Size", "0"),
+            ],
+            temp_path
+                .to_str()
+                .ok_or_else(|| McpError::Io("temp chunk path is not valid utf-8".to_owned()))?,
+        )?;
+        let _ = std::fs::remove_file(&temp_path);
+        return Ok(());
+    }
+    let mut offset: usize = 0;
+    let mut index: usize = 0;
+    while offset < total {
+        let end: usize = if offset + chunk_size > total {
+            total
+        } else {
+            offset + chunk_size
+        };
+        let slice: &[u8] = &bytes[offset..end];
+        let temp_path: std::path::PathBuf = write_temp_chunk(file_id, slice)?;
+        let index_str: String = index.to_string();
+        let chunk_size_str: String = slice.len().to_string();
+        run_curl_octet(
+            &url,
+            &[
+                ("X-File-Id", file_id),
+                ("X-File-Name", file_name),
+                ("X-Chunk-Index", index_str.as_str()),
+                ("X-Chunk-Size", chunk_size_str.as_str()),
+            ],
+            temp_path
+                .to_str()
+                .ok_or_else(|| McpError::Io("temp chunk path is not valid utf-8".to_owned()))?,
+        )?;
+        let _ = std::fs::remove_file(&temp_path);
+        offset = end;
+        index = index.saturating_add(1);
+    }
+    Ok(())
+}
+fn merge_chunks(
+    config: &UploadConfig,
+    file_id: &str,
+    file_name: &str,
+    total_chunks: usize,
+    hash: &str,
+) -> McpResult<String> {
+    let url: String = build_endpoint(config, "merge");
+    let body: String =
+        format!(r#"{{"fileName":"{file_name}","fileHash":"{hash}","totalChunks":{total_chunks}}}"#);
+    let resp: String = run_curl_capture(
+        &url,
+        &[
+            ("X-File-Id", file_id),
+            ("X-File-Name", file_name),
+            ("Content-Type", "application/json"),
+        ],
+        body.as_bytes(),
+    )?;
+    let url_path: String = parse_url_from_merge(&resp)?;
+    Ok(url_path)
+}
+fn parse_url_from_merge(body: &str) -> McpResult<String> {
+    let value: serde_json::Value = serde_json::from_str(body)
+        .map_err(|err: serde_json::Error| McpError::Json(format!("merge response: {err}")))?;
+    let url_path: String = value
+        .get("url")
+        .and_then(|v: &serde_json::Value| v.as_str())
+        .map(|s: &str| s.to_owned())
+        .ok_or_else(|| McpError::UploadStatus {
+            status: 200,
+            message: format!("merge response missing url field: {body}"),
+        })?;
+    Ok(url_path)
+}
+```
+# Path: hyperlane-mcp-upload/src/upload/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Serialize)]
+pub struct UploadResult {
+    pub url: String,
+    pub file_name: String,
+    pub size: u64,
+}
+#[derive(Clone, Debug)]
+pub struct UploadConfig {
+    pub host: String,
+    pub base_path: String,
+    pub chunk_size: usize,
+}
+impl Default for UploadConfig {
+    fn default() -> Self {
+        let host: String = LTPP_HOST.to_owned();
+        let base_path: String = LTPP_BASE_PATH.to_owned();
+        let chunk_size: usize = DEFAULT_CHUNK_SIZE;
+        Self {
+            host,
+            base_path,
+            chunk_size,
+        }
+    }
+}
+```
+# Path: hyperlane-mcp-upload/src/upload/mod.rs
+```rust
+mod r#fn;
+mod r#struct;
+pub use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane-mcp-upload/src/config/struct.rs
+```rust
+#[allow(unused_imports)]
+use super::*;
+#[derive(Clone, Debug)]
+pub struct ServerAddress {
+    pub host: String,
+    pub port: u16,
+}
+impl Default for ServerAddress {
+    fn default() -> Self {
+        let host: String = MCP_DEFAULT_HOST.to_owned();
+        let port: u16 = MCP_DEFAULT_PORT;
+        Self { host, port }
+    }
+}
+```
+# Path: hyperlane-mcp-upload/src/config/mod.rs
+```rust
+mod r#const;
+mod r#struct;
+pub use {r#const::*, r#struct::*};
+#[allow(unused_imports)]
+use super::*;
+```
+# Path: hyperlane-mcp-upload/src/config/const.rs
+```rust
+#[allow(unused_imports)]
+use super::*;
+pub const MCP_DEFAULT_HOST: &str = "0.0.0.0";
+pub const MCP_DEFAULT_PORT: u16 = 7842;
+pub const DEFAULT_CHUNK_SIZE: usize = 5 * 1024 * 1024;
+pub const LTPP_HOST: &str = "ltpp.vip";
+pub const LTPP_BASE_PATH: &str = "/api/upload";
+```
+# Path: hyperlane-mcp-upload/src/mcp/fn.rs
+```rust
+use super::*;
+pub const TOOL_UPLOAD_FILE: &str = "upload_file";
+pub fn upload_file_input_schema() -> serde_json::Value {
+    let mut properties: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+    properties.insert(
+        "file_path".to_owned(),
+        serde_json::json!({
+            "type": "string",
+            "description": "Absolute or relative path of the file to upload to ltpp.vip.",
+        }),
+    );
+    let schema: serde_json::Value = serde_json::json!({
+        "type": "object",
+        "properties": properties,
+        "required": ["file_path"],
+    });
+    schema
+}
+pub fn upload_file_descriptor() -> ToolDescriptor {
+    let name: String = TOOL_UPLOAD_FILE.to_owned();
+    let description: String =
+        "Upload a local file to ltpp.vip and return the public URL.".to_owned();
+    let input_schema: serde_json::Value = upload_file_input_schema();
+    ToolDescriptor {
+        name,
+        description,
+        input_schema,
+    }
+}
+pub fn tools_list_payload() -> serde_json::Value {
+    let descriptor: ToolDescriptor = upload_file_descriptor();
+    let payload: serde_json::Value = serde_json::json!({
+        "tools": [descriptor],
+    });
+    payload
+}
+pub fn dispatch(request: &McpRequest, config: &UploadConfig) -> serde_json::Value {
+    match request.method.as_str() {
+        "tools/list" => serde_json::json!({
+            "result": tools_list_payload(),
+        }),
+        "tools/call" => handle_tools_call(&request.params, config),
+        "initialize" => serde_json::json!({
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {
+                    "name": "hyperlane-mcp-upload",
+                    "version": env!("CARGO_PKG_VERSION"),
+                },
+                "capabilities": {
+                    "tools": {},
+                },
+            },
+        }),
+        _ => error_value(
+            JsonRpcError::MethodNotFound,
+            &format!("unknown method: {}", request.method),
+        ),
+    }
+}
+fn handle_tools_call(params: &serde_json::Value, config: &UploadConfig) -> serde_json::Value {
+    let tool_name: String = match params
+        .get("name")
+        .and_then(|v: &serde_json::Value| v.as_str())
+    {
+        Some(name) => name.to_owned(),
+        None => return error_value(JsonRpcError::InvalidParams, "missing tool name"),
+    };
+    let arguments: serde_json::Value = params
+        .get("arguments")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+    if tool_name == TOOL_UPLOAD_FILE {
+        let raw_path: Option<&str> = arguments
+            .get("file_path")
+            .and_then(|v: &serde_json::Value| v.as_str());
+        let file_path: String = match raw_path {
+            Some(path) => path.to_owned(),
+            None => {
+                return error_value(
+                    JsonRpcError::InvalidParams,
+                    "upload_file requires string arguments.file_path",
+                );
+            }
+        };
+        return invoke_upload_file(&file_path, config);
+    }
+    error_value(
+        JsonRpcError::MethodNotFound,
+        &format!("unknown tool: {tool_name}"),
+    )
+}
+fn invoke_upload_file(file_path: &str, config: &UploadConfig) -> serde_json::Value {
+    match upload_file(config, file_path) {
+        Ok(result) => {
+            let payload: serde_json::Value =
+                serde_json::to_value(&result).unwrap_or_else(|err: serde_json::Error| {
+                    serde_json::json!({
+                        "error": format!("serialise result: {err}"),
+                    })
+                });
+            let text: String = serde_json::to_string(&payload)
+                .unwrap_or_else(|err: serde_json::Error| format!("{{\"error\":\"{err}\"}}"));
+            let content: ToolCallContent = ToolCallContent {
+                content: vec![ToolCallResult {
+                    r#type: "text".to_owned(),
+                    text,
+                }],
+            };
+            serde_json::json!({
+                "result": content,
+            })
+        }
+        Err(err) => error_value(JsonRpcError::InternalError, &format!("{err}")),
+    }
+}
+fn error_value(code: JsonRpcError, message: &str) -> serde_json::Value {
+    serde_json::json!({
+        "error": {
+            "code": code.code(),
+            "message": format!("{}: {}", code.message(), message),
+        },
+    })
+}
+pub fn parse_request(body: &str) -> Result<McpRequest, serde_json::Value> {
+    serde_json::from_str::<McpRequest>(body)
+        .map_err(|err: serde_json::Error| error_value(JsonRpcError::ParseError, &format!("{err}")))
+}
+```
+# Path: hyperlane-mcp-upload/src/mcp/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Deserialize)]
+pub struct McpRequest {
+    pub jsonrpc: String,
+    pub id: serde_json::Value,
+    pub method: String,
+    #[serde(default)]
+    pub params: serde_json::Value,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct McpResponse {
+    pub jsonrpc: String,
+    pub id: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct McpErrorResponse {
+    pub jsonrpc: String,
+    pub id: serde_json::Value,
+    pub error: McpErrorBody,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct McpErrorBody {
+    pub code: i32,
+    pub message: String,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct ToolDescriptor {
+    pub name: String,
+    pub description: String,
+    pub input_schema: serde_json::Value,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct ToolCallResult {
+    pub r#type: String,
+    pub text: String,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct ToolCallContent {
+    pub content: Vec<ToolCallResult>,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JsonRpcError {
+    ParseError,
+    InvalidRequest,
+    MethodNotFound,
+    InvalidParams,
+    InternalError,
+}
+impl JsonRpcError {
+    pub fn code(&self) -> i32 {
+        match self {
+            Self::ParseError => -32700,
+            Self::InvalidRequest => -32600,
+            Self::MethodNotFound => -32601,
+            Self::InvalidParams => -32602,
+            Self::InternalError => -32603,
+        }
+    }
+    pub fn message(&self) -> &'static str {
+        match self {
+            Self::ParseError => "Parse error",
+            Self::InvalidRequest => "Invalid Request",
+            Self::MethodNotFound => "Method not found",
+            Self::InvalidParams => "Invalid params",
+            Self::InternalError => "Internal error",
+        }
+    }
+}
+```
+# Path: hyperlane-mcp-upload/src/mcp/mod.rs
+```rust
+mod r#fn;
+mod r#struct;
+pub use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane-mcp-upload/src/server/impl.rs
+```rust
+use super::*;
+impl ServerHook for McpHandler {
+    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let config: UploadConfig = UploadConfig::default();
+        let body: String = String::from_utf8_lossy(&ctx.get_request().body).into_owned();
+        let response: String = handle_mcp_body(&body, &config);
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(200)
+            .set_header(HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON)
+            .set_body(response)
+            .build();
+        let _ = stream.try_send(data).await;
+        Status::Continue
+    }
+}
+impl ServerHook for HealthHandler {
+    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let body: String = "{\"status\":\"ok\"}".to_owned();
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(200)
+            .set_header(HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON)
+            .set_body(body)
+            .build();
+        let _ = stream.try_send(data).await;
+        Status::Continue
+    }
+}
+impl ServerHook for NotFoundHandler {
+    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let body: String = "404 not found".to_owned();
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(404)
+            .set_header(HEADER_CONTENT_TYPE, "text/plain; charset=utf-8")
+            .set_body(body)
+            .build();
+        let _ = stream.try_send(data).await;
+        Status::Continue
+    }
+}
+impl ServerHook for PanicHandler {
+    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _stream: &mut Stream, _ctx: &mut Context) -> Status {
+        eprintln!("hyperlane-mcp-upload: task panic captured");
+        Status::Continue
+    }
+}
+impl ServerHook for RequestErrorHandler {
+    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
+        let status_code: ResponseStatusCode = error.get_http_status_code();
+        let message: String = error.to_string();
+        let body: String = format!(
+            r#"{{"error":"{}","status":{}}}"#,
+            message.replace('"', "'"),
+            status_code as u16,
+        );
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(status_code)
+            .set_header(HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON)
+            .set_body(body)
+            .build();
+        let _ = stream.try_send(data).await;
+        Status::Continue
+    }
+}
+impl ServerHook for RequestLogMiddleware {
+    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+        let method: String = format!("{:?}", ctx.get_request().method);
+        let path: String = ctx.get_request().path.clone();
+        eprintln!("hyperlane-mcp-upload: -> {method} {path}");
+        Status::Continue
+    }
+}
+impl ServerHook for ResponseLogMiddleware {
+    async fn new(_stream: &mut Stream, _ctx: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _stream: &mut Stream, ctx: &mut Context) -> Status {
+        let status_code: ResponseStatusCode = ctx.get_response().get_status_code();
+        eprintln!("hyperlane-mcp-upload: <- {}", status_code as u16);
+        Status::Continue
+    }
+}
+```
+# Path: hyperlane-mcp-upload/src/server/fn.rs
+```rust
+use super::*;
+pub fn register(server: &mut Server) {
+    server.route::<McpHandler>("/mcp");
+    server.route::<HealthHandler>("/health");
+    server.route::<NotFoundHandler>("/*");
+    server.task_panic::<PanicHandler>();
+    server.request_error::<RequestErrorHandler>();
+    server.request_middleware::<RequestLogMiddleware>();
+    server.response_middleware::<ResponseLogMiddleware>();
+}
+pub fn handle_mcp_body(body: &str, config: &UploadConfig) -> String {
+    match parse_request(body) {
+        Ok(request) => {
+            let payload: serde_json::Value = dispatch(&request, config);
+            let id: serde_json::Value = request.id;
+            let mut envelope: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+            envelope.insert(
+                "jsonrpc".to_owned(),
+                serde_json::Value::String("2.0".to_owned()),
+            );
+            envelope.insert("id".to_owned(), id);
+            if let Some(result) = payload.get("result") {
+                envelope.insert("result".to_owned(), result.clone());
+            }
+            if let Some(error) = payload.get("error") {
+                envelope.insert("error".to_owned(), error.clone());
+            }
+            serde_json::to_string(&serde_json::Value::Object(envelope))
+                .unwrap_or_else(|_: serde_json::Error| {
+                    r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"serialize failure"}}"#
+                        .to_owned()
+                })
+        }
+        Err(error) => {
+            let mut envelope: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+            envelope.insert(
+                "jsonrpc".to_owned(),
+                serde_json::Value::String("2.0".to_owned()),
+            );
+            envelope.insert("id".to_owned(), serde_json::Value::Null);
+            if let Some(err) = error.get("error") {
+                envelope.insert("error".to_owned(), err.clone());
+            }
+            serde_json::to_string(&serde_json::Value::Object(envelope))
+                .unwrap_or_else(|_: serde_json::Error| {
+                    r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"serialize failure"}}"#
+                        .to_owned()
+                })
+        }
+    }
+}
+pub fn load_upload_config(ctx: &Context) -> UploadConfig {
+    if let Some(cfg) = ctx.try_get_attribute::<UploadConfig>(UPLOAD_CONFIG_ATTR) {
+        return cfg.clone();
+    }
+    UploadConfig::default()
+}
+pub fn format_bind(address: &ServerAddress) -> String {
+    Server::format_bind_address(address.host.as_str(), address.port)
+}
+```
+# Path: hyperlane-mcp-upload/src/server/struct.rs
+```rust
+#[allow(unused_imports)]
+use super::*;
+pub struct McpHandler;
+pub struct HealthHandler;
+pub struct NotFoundHandler;
+pub struct PanicHandler;
+pub struct RequestErrorHandler;
+pub struct RequestLogMiddleware;
+pub struct ResponseLogMiddleware;
+```
+# Path: hyperlane-mcp-upload/src/server/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub use {r#const::*, r#fn::*, r#struct::*};
+#[allow(unused_imports)]
+use {super::*, r#impl::*};
+```
+# Path: hyperlane-mcp-upload/src/server/const.rs
+```rust
+#[allow(unused_imports)]
+use super::*;
+pub const UPLOAD_CONFIG_ATTR: &str = "mcp_upload_config";
+pub const HEADER_CONTENT_TYPE: &str = "Content-Type";
+pub const CONTENT_TYPE_JSON: &str = "application/json";
 ```
 # Path: hyperlane-log/README.md
 ## hyperlane-log
