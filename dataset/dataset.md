@@ -1,4 +1,4 @@
-<!--2026-09-25 04:10:46-->
+<!--2026-09-25 11:29:46-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -16164,7 +16164,7 @@ mod hook;
 mod route;
 mod server;
 pub use {config::*, context::*, error::*, hook::*, route::*, server::*};
-pub use {hyperlane_type::*, inventory};
+pub use {http_type::*, inventory};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -17669,6 +17669,7 @@ mod config;
 mod fmt;
 mod new;
 mod publish;
+mod sync;
 mod version;
 use hyperlane_cli::*;
 use std::{
@@ -18142,6 +18143,289 @@ edition = "2024"
 mod r#fn;
 use super::*;
 ```
+# Path: hyperlane/cli/tests/sync/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_sync_report_creation() {
+    let report: SyncReport = SyncReport {
+        workspace_version: "1.2.3".to_string(),
+        renamed_entries: vec![("old".to_string(), "new".to_string())],
+        versioned_entries: vec![("a".to_string(), "b".to_string())],
+        file_changed: true,
+    };
+    assert_eq!(report.workspace_version, "1.2.3");
+    assert_eq!(report.renamed_entries.len(), 1);
+    assert_eq!(report.versioned_entries.len(), 1);
+    assert!(report.file_changed);
+}
+#[test]
+fn test_sync_report_clone() {
+    let report: SyncReport = SyncReport {
+        workspace_version: "0.1.0".to_string(),
+        renamed_entries: Vec::new(),
+        versioned_entries: Vec::new(),
+        file_changed: false,
+    };
+    let cloned: SyncReport = report.clone();
+    assert_eq!(cloned, report);
+}
+#[test]
+fn test_sync_report_equality() {
+    let report_a: SyncReport = SyncReport {
+        workspace_version: "1.0.0".to_string(),
+        renamed_entries: vec![],
+        versioned_entries: vec![],
+        file_changed: false,
+    };
+    let report_b: SyncReport = SyncReport {
+        workspace_version: "1.0.0".to_string(),
+        renamed_entries: vec![],
+        versioned_entries: vec![],
+        file_changed: false,
+    };
+    assert_eq!(report_a, report_b);
+}
+#[test]
+fn test_sync_error_display() {
+    let error_a: SyncError = SyncError::ManifestParseError;
+    assert!(error_a.to_string().contains("Failed to parse"));
+    let error_b: SyncError = SyncError::ManifestSerializeError;
+    assert!(error_b.to_string().contains("Failed to serialize"));
+    let error_c: SyncError = SyncError::WorkspaceVersionMissing("test".to_string());
+    assert!(error_c.to_string().contains("workspace.package.version"));
+    assert!(error_c.to_string().contains("test"));
+    let error_d: SyncError = SyncError::WorkspaceMembersMissing("test".to_string());
+    assert!(error_d.to_string().contains("workspace.members"));
+    let error_e: SyncError = SyncError::MemberManifestMissing("test".to_string());
+    assert!(error_e.to_string().contains("member crate Cargo.toml"));
+    let error_f: SyncError = SyncError::MemberNameMissing("test".to_string());
+    assert!(error_f.to_string().contains("[package].name"));
+}
+#[test]
+fn test_sync_error_from_io() {
+    let io_error: io::Error = io::Error::new(io::ErrorKind::NotFound, "missing");
+    let sync_error: SyncError = SyncError::from(io_error);
+    assert!(sync_error.to_string().contains("IO error"));
+}
+#[tokio::test]
+async fn test_execute_sync_idempotent_when_already_synced() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_idempotent");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let member_dir: PathBuf = tmp_dir.join("alpha");
+    create_dir_all(&member_dir).await.unwrap();
+    let member_manifest: PathBuf = member_dir.join("Cargo.toml");
+    let workspace_content: &str = r#"[workspace]
+members = ["alpha"]
+[workspace.package]
+version = "0.1.0"
+[workspace.dependencies]
+alpha = { path = "alpha", version = "0.1.0" }
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    let member_content: &str = r#"[package]
+name = "alpha"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&member_manifest, member_content).await.unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(report.workspace_version, "0.1.0");
+    assert_eq!(report.versioned_entries.len(), 0);
+    assert_eq!(report.renamed_entries.len(), 0);
+    assert!(!report.file_changed);
+    let second_report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert!(!second_report.file_changed);
+}
+#[tokio::test]
+async fn test_execute_sync_rewrites_version_literal() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_rewrite_version");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let member_dir: PathBuf = tmp_dir.join("beta");
+    create_dir_all(&member_dir).await.unwrap();
+    let member_manifest: PathBuf = member_dir.join("Cargo.toml");
+    let workspace_content: &str = r#"[workspace]
+members = ["beta"]
+[workspace.package]
+version = "0.2.0"
+[workspace.dependencies]
+beta = { path = "beta", version = "0.1.5" }
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    let member_content: &str = r#"[package]
+name = "beta"
+version = "0.1.5"
+edition = "2024"
+"#;
+    write(&member_manifest, member_content).await.unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(report.workspace_version, "0.2.0");
+    assert!(report.file_changed);
+    let updated: String = read_to_string(&workspace_manifest).await.unwrap();
+    assert!(updated.contains("[workspace.dependencies.beta]\npath = \"beta\""));
+    assert!(updated.contains(r#"version = "0.2.0""#));
+    assert!(!updated.contains(r#"version = "0.1.5""#));
+    let second_report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert!(!second_report.file_changed);
+}
+#[tokio::test]
+async fn test_execute_sync_renames_dep_alias_to_match_member_crate_name() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_rename_alias");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let member_dir: PathBuf = tmp_dir.join("gamma");
+    create_dir_all(&member_dir).await.unwrap();
+    let member_manifest: PathBuf = member_dir.join("Cargo.toml");
+    let workspace_content: &str = r#"[workspace]
+members = ["gamma"]
+[workspace.package]
+version = "0.3.0"
+[workspace.dependencies]
+stale_alias = { path = "gamma", version = "0.3.0" }
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    let member_content: &str = r#"[package]
+name = "gamma"
+version = "0.3.0"
+edition = "2024"
+"#;
+    write(&member_manifest, member_content).await.unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(report.renamed_entries.len(), 1);
+    assert_eq!(report.renamed_entries[0].0, "stale_alias");
+    assert_eq!(report.renamed_entries[0].1, "gamma");
+    assert!(report.file_changed);
+    let updated: String = read_to_string(&workspace_manifest).await.unwrap();
+    assert!(updated.contains("[workspace.dependencies.gamma]"));
+    assert!(updated.contains(r#"path = "gamma""#));
+    assert!(updated.contains(r#"version = "0.3.0""#));
+    assert!(!updated.contains("stale_alias"));
+}
+#[tokio::test]
+async fn test_execute_sync_handles_multiple_members() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_multiple");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    for member in ["one", "two", "three"] {
+        let member_dir: PathBuf = tmp_dir.join(member);
+        create_dir_all(&member_dir).await.unwrap();
+        let member_content: String = format!(
+            r#"[package]
+name = "{member}"
+version = "0.0.0"
+edition = "2024"
+"#
+        );
+        write(&member_dir.join("Cargo.toml"), member_content)
+            .await
+            .unwrap();
+    }
+    let workspace_content: &str = r#"[workspace]
+members = ["one", "two", "three"]
+[workspace.package]
+version = "9.9.9"
+[workspace.dependencies]
+one = { path = "one", version = "0.0.0" }
+two = { path = "two", version = "0.0.0" }
+three = { path = "three", version = "0.0.0" }
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(report.workspace_version, "9.9.9");
+    assert_eq!(report.versioned_entries.len(), 3);
+    let updated: String = read_to_string(&workspace_manifest).await.unwrap();
+    for member in ["one", "two", "three"] {
+        assert!(
+            updated.contains(&format!("[workspace.dependencies.{member}]")),
+            "expected dotted-form workspace.dependencies.{member} entry in:\n{updated}"
+        );
+        assert!(
+            updated.contains(r#"version = "9.9.9""#),
+            "expected version 9.9.9 in updated manifest:\n{updated}"
+        );
+    }
+}
+#[tokio::test]
+async fn test_execute_sync_errors_on_missing_member_manifest() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_missing_member");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let workspace_content: &str = r#"[workspace]
+members = ["does_not_exist"]
+[workspace.package]
+version = "1.0.0"
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    let result: Result<SyncReport, SyncError> =
+        execute_sync(workspace_manifest.to_str().unwrap()).await;
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        SyncError::MemberManifestMissing(_) => {}
+        other => panic!("expected MemberManifestMissing, got {other:?}"),
+    }
+}
+#[tokio::test]
+async fn test_execute_sync_errors_on_missing_workspace_version() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_no_version");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let workspace_content: &str = r#"[workspace]
+members = []
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    let result: Result<SyncReport, SyncError> =
+        execute_sync(workspace_manifest.to_str().unwrap()).await;
+    assert!(result.is_err());
+}
+#[tokio::test]
+async fn test_execute_sync_skips_members_without_dep_entry() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_no_dep");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let member_dir: PathBuf = tmp_dir.join("solo");
+    create_dir_all(&member_dir).await.unwrap();
+    write(
+        &member_dir.join("Cargo.toml"),
+        r#"[package]
+name = "solo"
+version = "0.0.0"
+edition = "2024"
+"#,
+    )
+    .await
+    .unwrap();
+    let workspace_content: &str = r#"[workspace]
+members = ["solo"]
+[workspace.package]
+version = "0.1.0"
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert!(!report.file_changed);
+    assert_eq!(report.versioned_entries.len(), 0);
+}
+```
+# Path: hyperlane/cli/tests/sync/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
 # Path: hyperlane/cli/src/main.rs
 ```rust
 use hyperlane_cli::*;
@@ -18198,6 +18482,26 @@ async fn main() {
                 }
                 Err(error) => {
                     log::error!("publish failed: {error}");
+                    exit(1);
+                }
+            }
+        }
+        CommandType::Sync => {
+            let manifest_path: String = args
+                .manifest_path
+                .unwrap_or_else(|| "Cargo.toml".to_string());
+            match execute_sync(&manifest_path).await {
+                Ok(report) => {
+                    log::info!(
+                        "sync complete: v{} (renamed {}, versioned {}, file_changed {})",
+                        report.workspace_version,
+                        report.renamed_entries.len(),
+                        report.versioned_entries.len(),
+                        report.file_changed,
+                    );
+                }
+                Err(error) => {
+                    log::error!("sync failed: {error}");
                     exit(1);
                 }
             }
@@ -18260,12 +18564,13 @@ mod help;
 mod logger;
 mod new;
 mod publish;
+mod sync;
 mod template;
 mod version;
 mod watch;
 pub use {
-    bump::*, command::*, config::*, fmt::*, help::*, logger::*, new::*, publish::*, template::*,
-    version::*, watch::*,
+    bump::*, command::*, config::*, fmt::*, help::*, logger::*, new::*, publish::*, sync::*,
+    template::*, version::*, watch::*,
 };
 pub(crate) use std::{
     collections::{HashMap, VecDeque},
@@ -19116,7 +19421,25 @@ pub async fn execute_publish(
     max_retries: u32,
 ) -> Result<Vec<PublishResult>, PublishError> {
     let path: &Path = Path::new(manifest_path);
-    let packages: Vec<Package> = discover_packages(path).await?;
+    let path: &Path = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    let workspace_manifest: PathBuf = path.join("Cargo.toml");
+    let sync_report: SyncReport =
+        match execute_sync(workspace_manifest.to_str().unwrap_or("Cargo.toml")).await {
+            Ok(report) => report,
+            Err(error) => return Err(PublishError::SyncFailed(error)),
+        };
+    if sync_report.file_changed {
+        log::info!(
+            "publish: synced workspace dependencies ({} renamed, {} versioned) to v{}",
+            sync_report.renamed_entries.len(),
+            sync_report.versioned_entries.len(),
+            sync_report.workspace_version,
+        );
+    }
+    let packages: Vec<Package> = discover_packages(&workspace_manifest).await?;
     if packages.is_empty() {
         return Ok(Vec::new());
     }
@@ -19154,6 +19477,8 @@ pub enum PublishError {
     ManifestParseError,
     #[error("Circular dependency detected")]
     CircularDependency,
+    #[error("workspace sync failed: {0}")]
+    SyncFailed(#[from] crate::sync::SyncError),
     #[error("IO error: {0}")]
     IoError(#[from] io::Error),
 }
@@ -19294,6 +19619,9 @@ pub fn print_help() {
     log::info!("  fmt       Format Rust code using cargo fmt");
     log::info!("  watch     Watch files and run cargo run using cargo-watch");
     log::info!("  publish   Publish packages in monorepo with topological ordering");
+    log::info!(
+        "  sync      Sync [workspace.dependencies] versions/aliases to workspace.package.version"
+    );
     log::info!("  new       Create a new project from template");
     log::info!(
         "  template  Generate template components (controller|domain|exception|mapper|model|repository|service|utils|view)"
@@ -19327,6 +19655,9 @@ pub fn print_help() {
     log::info!("Publish Options:");
     log::info!("  --manifest-path <PATH>  Path to workspace Cargo.toml [default: Cargo.toml]");
     log::info!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
+    log::info!("");
+    log::info!("Sync Options:");
+    log::info!("  --manifest-path <PATH>  Path to workspace Cargo.toml [default: Cargo.toml]");
 }
 ```
 # Path: hyperlane/cli/src/help/mod.rs
@@ -19369,6 +19700,9 @@ pub fn parse_args() -> Args {
             }
             "publish" if (command == CommandType::Help || command == CommandType::Version) => {
                 command = CommandType::Publish;
+            }
+            "sync" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Sync;
             }
             "new" if (command == CommandType::Help || command == CommandType::Version) => {
                 command = CommandType::New;
@@ -19744,11 +20078,19 @@ pub async fn execute_bump(
     let path: &Path = Path::new(manifest_path);
     let content: String = read_to_string(path).await?;
     let mut new_version: Option<String> = None;
-    let mut found_version: bool = false;
     let mut updated_content: String = content.clone();
+    let mut in_workspace_package: bool = false;
+    let mut in_package: bool = false;
+    let mut line_count: usize = 0;
     for line in content.lines() {
-        if found_version {
-            break;
+        line_count += 1;
+        let trimmed: &str = line.trim();
+        if trimmed.starts_with('[') {
+            in_workspace_package = trimmed == "[workspace.package]";
+            in_package = trimmed == "[package]";
+        }
+        if !in_workspace_package && !in_package {
+            continue;
         }
         if let Some((version_start, version_end)) = find_version_position(line) {
             let version_str: &str = &line[version_start..version_end];
@@ -19761,12 +20103,24 @@ pub async fn execute_bump(
                     &line[..version_start],
                     &line[version_end..]
                 );
-                updated_content = updated_content.replacen(line, &new_line, 1);
-                found_version = true;
+                let mut rebuilt: String = String::with_capacity(content.len());
+                let mut current: usize = 0;
+                for existing_line in content.lines() {
+                    current += 1;
+                    if current == line_count {
+                        rebuilt.push_str(&new_line);
+                        rebuilt.push('\n');
+                    } else {
+                        rebuilt.push_str(existing_line);
+                        rebuilt.push('\n');
+                    }
+                }
+                updated_content = rebuilt;
+                break;
             }
         }
     }
-    if !found_version {
+    if new_version.is_none() {
         return Err("version field not found in Cargo.toml".into());
     }
     write(path, updated_content).await?;
@@ -19815,6 +20169,7 @@ pub enum CommandType {
     Watch,
     Bump,
     Publish,
+    Sync,
     New,
     Template,
     Help,
@@ -19825,6 +20180,242 @@ pub enum CommandType {
 ```rust
 mod r#enum;
 pub use r#enum::*;
+```
+# Path: hyperlane/cli/src/sync/fn.rs
+```rust
+use super::*;
+fn read_workspace_version(doc: &Value) -> Result<String, SyncError> {
+    let version: String = doc
+        .get("workspace")
+        .and_then(|workspace: &Value| workspace.get("package"))
+        .and_then(|package: &Value| package.get("version"))
+        .and_then(|version_value: &Value| version_value.as_str())
+        .ok_or_else(|| SyncError::WorkspaceVersionMissing("Cargo.toml".to_string()))?
+        .to_string();
+    Ok(version)
+}
+fn read_workspace_members(doc: &Value) -> Result<Vec<String>, SyncError> {
+    let members: Vec<String> = doc
+        .get("workspace")
+        .and_then(|workspace: &Value| workspace.get("members"))
+        .and_then(|members_value: &Value| members_value.as_array())
+        .ok_or_else(|| SyncError::WorkspaceMembersMissing("Cargo.toml".to_string()))?
+        .iter()
+        .filter_map(|member: &Value| member.as_str().map(|s: &str| s.to_string()))
+        .collect();
+    Ok(members)
+}
+fn read_member_crate_name(doc: &Value) -> Result<String, SyncError> {
+    let name: String = doc
+        .get("package")
+        .and_then(|package: &Value| package.get("name"))
+        .and_then(|name_value: &Value| name_value.as_str())
+        .ok_or_else(|| SyncError::MemberNameMissing("Cargo.toml".to_string()))?
+        .to_string();
+    Ok(name)
+}
+fn find_dep_alias_for_member_path(deps: &Value, member_path: &str) -> Option<String> {
+    let table: &toml::map::Map<String, Value> = deps.as_table()?;
+    for (alias, entry) in table {
+        if let Some(entry_table) = entry.as_table()
+            && let Some(path) = entry_table.get("path")
+            && path.as_str() == Some(member_path)
+        {
+            return Some(alias.clone());
+        }
+    }
+    None
+}
+fn rewrite_dep_entry(
+    deps: &mut toml::map::Map<String, Value>,
+    member_path: &str,
+    current_alias: &str,
+    canonical_alias: &str,
+    workspace_version: &str,
+) -> Option<(String, String)> {
+    let entry: &mut Value = deps.get_mut(current_alias)?;
+    let entry_table: &mut toml::map::Map<String, Value> = entry.as_table_mut()?;
+    let path_matches: bool = entry_table
+        .get("path")
+        .and_then(|path_value: &Value| path_value.as_str())
+        .map(|s: &str| s == member_path)
+        .unwrap_or(false);
+    if !path_matches {
+        return None;
+    }
+    entry_table.insert(
+        "version".to_string(),
+        Value::String(workspace_version.to_string()),
+    );
+    if current_alias != canonical_alias {
+        let renamed: (String, String) = (current_alias.to_string(), canonical_alias.to_string());
+        let new_entry: Value = entry.clone();
+        deps.remove(current_alias);
+        let entry_to_set: &mut Value = deps.entry(canonical_alias.to_string()).or_insert(new_entry);
+        let canonical_table: &mut toml::map::Map<String, Value> =
+            entry_to_set.as_table_mut().unwrap();
+        canonical_table.insert("path".to_string(), Value::String(member_path.to_string()));
+        canonical_table.insert(
+            "version".to_string(),
+            Value::String(workspace_version.to_string()),
+        );
+        Some(renamed)
+    } else {
+        None
+    }
+}
+pub async fn execute_sync(manifest_path: &str) -> Result<SyncReport, SyncError> {
+    let path: &Path = Path::new(manifest_path);
+    let content: String = read_to_string(path).await?;
+    let mut doc: Value = toml::from_str(&content).map_err(|_| SyncError::ManifestParseError)?;
+    let workspace_version: String = read_workspace_version(&doc)?;
+    let members: Vec<String> = read_workspace_members(&doc)?;
+    if members.is_empty() {
+        log::info!("sync: no workspace members, nothing to do");
+        return Ok(SyncReport {
+            workspace_version,
+            renamed_entries: Vec::new(),
+            versioned_entries: Vec::new(),
+            file_changed: false,
+        });
+    }
+    let mut renamed_entries: Vec<(String, String)> = Vec::new();
+    let mut versioned_entries: Vec<(String, String)> = Vec::new();
+    let mut needs_rewrite: bool = false;
+    let deps_value: Option<&Value> = doc
+        .get("workspace")
+        .and_then(|workspace: &Value| workspace.get("dependencies"));
+    let mut deps: toml::map::Map<String, Value> = deps_value
+        .and_then(|value: &Value| value.as_table())
+        .cloned()
+        .unwrap_or_default();
+    for member_path in &members {
+        let member_manifest_path: PathBuf = path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(member_path)
+            .join("Cargo.toml");
+        if !member_manifest_path.exists() {
+            return Err(SyncError::MemberManifestMissing(
+                member_manifest_path.display().to_string(),
+            ));
+        }
+        let member_content: String = read_to_string(&member_manifest_path).await?;
+        let member_doc: Value =
+            toml::from_str(&member_content).map_err(|_| SyncError::ManifestParseError)?;
+        let canonical_alias: String = read_member_crate_name(&member_doc)?;
+        let current_alias: Option<String> =
+            find_dep_alias_for_member_path(&Value::Table(deps.clone()), member_path);
+        let current_alias: String = match current_alias {
+            Some(alias) => alias,
+            None => {
+                log::info!(
+                    "sync: {} -> no [workspace.dependencies] entry, skipping",
+                    member_path
+                );
+                continue;
+            }
+        };
+        let existing_version: Option<String> = deps
+            .get(&current_alias)
+            .and_then(|entry: &Value| entry.as_table())
+            .and_then(|table: &toml::map::Map<String, Value>| table.get("version"))
+            .and_then(|version_value: &Value| version_value.as_str())
+            .map(|s: &str| s.to_string());
+        let alias_needs_rename: bool = current_alias != canonical_alias;
+        let version_needs_rewrite: bool = existing_version
+            .as_deref()
+            .map(|existing: &str| existing != workspace_version)
+            .unwrap_or(true);
+        if !alias_needs_rename && !version_needs_rewrite {
+            continue;
+        }
+        needs_rewrite = true;
+        let renamed: Option<(String, String)> = rewrite_dep_entry(
+            &mut deps,
+            member_path,
+            &current_alias,
+            &canonical_alias,
+            &workspace_version,
+        );
+        if let Some((old, new)) = &renamed {
+            log::info!("sync: {} renamed {} -> {}", member_path, old, new);
+            renamed_entries.push((old.clone(), new.clone()));
+        } else {
+            log::info!(
+                "sync: {} -> {} v{}",
+                member_path,
+                canonical_alias,
+                workspace_version
+            );
+        }
+        versioned_entries.push((member_path.clone(), canonical_alias));
+    }
+    let file_changed: bool = needs_rewrite;
+    if file_changed {
+        if let Some(workspace_table) = doc
+            .get_mut("workspace")
+            .and_then(|workspace: &mut Value| workspace.as_table_mut())
+        {
+            workspace_table.insert("dependencies".to_string(), Value::Table(deps.clone()));
+        }
+        let updated_content: String =
+            toml::to_string(&doc).map_err(|_| SyncError::ManifestSerializeError)?;
+        write(path, updated_content).await?;
+        log::info!(
+            "sync: wrote {} entries to v{}",
+            versioned_entries.len(),
+            workspace_version
+        );
+    } else {
+        log::info!("sync: already in sync: v{}", workspace_version);
+    }
+    Ok(SyncReport {
+        workspace_version,
+        renamed_entries,
+        versioned_entries,
+        file_changed,
+    })
+}
+```
+# Path: hyperlane/cli/src/sync/enum.rs
+```rust
+use super::*;
+#[derive(Debug, thiserror::Error)]
+pub enum SyncError {
+    #[error("Failed to parse Cargo.toml")]
+    ManifestParseError,
+    #[error("Failed to serialize Cargo.toml")]
+    ManifestSerializeError,
+    #[error("workspace.package.version not found in {0}")]
+    WorkspaceVersionMissing(String),
+    #[error("workspace.members not found in {0}")]
+    WorkspaceMembersMissing(String),
+    #[error("member crate Cargo.toml not found: {0}")]
+    MemberManifestMissing(String),
+    #[error("member crate [package].name not found in {0}")]
+    MemberNameMissing(String),
+    #[error("IO error: {0}")]
+    IoError(#[from] io::Error),
+}
+```
+# Path: hyperlane/cli/src/sync/struct.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncReport {
+    pub workspace_version: String,
+    pub renamed_entries: Vec<(String, String)>,
+    pub versioned_entries: Vec<(String, String)>,
+    pub file_changed: bool,
+}
+```
+# Path: hyperlane/cli/src/sync/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#struct;
+pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
 ```
 # Path: hyperlane/cli/src/watch/fn.rs
 ```rust
@@ -23093,7 +23684,7 @@ mod stream;
 mod task;
 mod upgrade_type;
 mod websocket_frame;
-use hyperlane_type::*;
+use http_type::*;
 use std::{
     collections::VecDeque,
     io::ErrorKind,
