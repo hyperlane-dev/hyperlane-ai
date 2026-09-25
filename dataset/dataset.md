@@ -1,4 +1,4 @@
-<!--2026-09-25 11:29:46-->
+<!--2026-09-25 16:55:07-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -18137,6 +18137,45 @@ edition = "2024"
         execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch).await;
     assert!(result.is_err());
 }
+#[tokio::test]
+async fn test_execute_bump_preserves_manifest_formatting() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_preserve_format");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "root"
+version.workspace = true
+[workspace.package]
+version = "21.5.2"
+edition = "2024"
+# comment above workspace.dependencies must survive
+[workspace.dependencies]
+hyperlane-core = { path = "core", version = "21.5.2" }
+serde = { version = "1.0.229", features = ["derive"] }
+[profile.dev]
+opt-level = 3
+"#;
+    let expected: &str = r#"[package]
+name = "root"
+version.workspace = true
+[workspace.package]
+version = "21.5.3"
+edition = "2024"
+# comment above workspace.dependencies must survive
+[workspace.dependencies]
+hyperlane-core = { path = "core", version = "21.5.2" }
+serde = { version = "1.0.229", features = ["derive"] }
+[profile.dev]
+opt-level = 3
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "21.5.3");
+    let updated: String = read_to_string(&manifest_path).await.unwrap();
+    assert_eq!(updated, expected);
+}
 ```
 # Path: hyperlane/cli/tests/bump/mod.rs
 ```rust
@@ -18270,8 +18309,7 @@ edition = "2024"
     assert_eq!(report.workspace_version, "0.2.0");
     assert!(report.file_changed);
     let updated: String = read_to_string(&workspace_manifest).await.unwrap();
-    assert!(updated.contains("[workspace.dependencies.beta]\npath = \"beta\""));
-    assert!(updated.contains(r#"version = "0.2.0""#));
+    assert!(updated.contains(r#"beta = { path = "beta", version = "0.2.0" }"#));
     assert!(!updated.contains(r#"version = "0.1.5""#));
     let second_report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
         .await
@@ -18308,9 +18346,7 @@ edition = "2024"
     assert_eq!(report.renamed_entries[0].1, "gamma");
     assert!(report.file_changed);
     let updated: String = read_to_string(&workspace_manifest).await.unwrap();
-    assert!(updated.contains("[workspace.dependencies.gamma]"));
-    assert!(updated.contains(r#"path = "gamma""#));
-    assert!(updated.contains(r#"version = "0.3.0""#));
+    assert!(updated.contains(r#"gamma = { path = "gamma", version = "0.3.0" }"#));
     assert!(!updated.contains("stale_alias"));
 }
 #[tokio::test]
@@ -18350,12 +18386,10 @@ three = { path = "three", version = "0.0.0" }
     let updated: String = read_to_string(&workspace_manifest).await.unwrap();
     for member in ["one", "two", "three"] {
         assert!(
-            updated.contains(&format!("[workspace.dependencies.{member}]")),
-            "expected dotted-form workspace.dependencies.{member} entry in:\n{updated}"
-        );
-        assert!(
-            updated.contains(r#"version = "9.9.9""#),
-            "expected version 9.9.9 in updated manifest:\n{updated}"
+            updated.contains(&format!(
+                r#"{member} = {{ path = "{member}", version = "9.9.9" }}"#
+            )),
+            "expected preserved inline-form workspace.dependencies.{member} entry in:\n{updated}"
         );
     }
 }
@@ -18419,6 +18453,88 @@ version = "0.1.0"
         .unwrap();
     assert!(!report.file_changed);
     assert_eq!(report.versioned_entries.len(), 0);
+}
+#[tokio::test]
+async fn test_execute_sync_preserves_manifest_formatting() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_preserve_format");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let member_dir: PathBuf = tmp_dir.join("delta");
+    create_dir_all(&member_dir).await.unwrap();
+    let workspace_content: &str = r#"[workspace]
+members = ["delta"]
+[workspace.package]
+version = "1.0.0"
+# comment above workspace.dependencies must survive
+[workspace.dependencies]
+delta = { path = "delta", version = "0.9.9" }
+serde = { version = "1.0.0", features = ["derive"] }
+[profile.dev]
+opt-level = 3
+"#;
+    let expected_content: &str = r#"[workspace]
+members = ["delta"]
+[workspace.package]
+version = "1.0.0"
+# comment above workspace.dependencies must survive
+[workspace.dependencies]
+delta = { path = "delta", version = "1.0.0" }
+serde = { version = "1.0.0", features = ["derive"] }
+[profile.dev]
+opt-level = 3
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    write(
+        &member_dir.join("Cargo.toml"),
+        r#"[package]
+name = "delta"
+version = "0.9.9"
+edition = "2024"
+"#,
+    )
+    .await
+    .unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert!(report.file_changed);
+    let updated: String = read_to_string(&workspace_manifest).await.unwrap();
+    assert_eq!(updated, expected_content);
+}
+#[tokio::test]
+async fn test_execute_sync_falls_back_to_package_version() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_sync_package_version_fallback");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let workspace_manifest: PathBuf = tmp_dir.join("Cargo.toml");
+    let member_dir: PathBuf = tmp_dir.join("epsilon");
+    create_dir_all(&member_dir).await.unwrap();
+    let workspace_content: &str = r#"[package]
+name = "root"
+version = "2.0.0"
+[workspace]
+members = ["epsilon"]
+[workspace.dependencies]
+epsilon = { path = "epsilon", version = "1.0.0" }
+"#;
+    write(&workspace_manifest, workspace_content).await.unwrap();
+    write(
+        &member_dir.join("Cargo.toml"),
+        r#"[package]
+name = "epsilon"
+version = "1.0.0"
+edition = "2024"
+"#,
+    )
+    .await
+    .unwrap();
+    let report: SyncReport = execute_sync(workspace_manifest.to_str().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(report.workspace_version, "2.0.0");
+    assert!(report.file_changed);
+    let updated: String = read_to_string(&workspace_manifest).await.unwrap();
+    assert!(updated.contains(r#"epsilon = { path = "epsilon", version = "2.0.0" }"#));
+    assert!(updated.contains("[package]\nname = \"root\"\nversion = \"2.0.0\""));
 }
 ```
 # Path: hyperlane/cli/tests/sync/mod.rs
@@ -18597,6 +18713,7 @@ pub(crate) use {
         time::{Duration, Interval, interval, sleep},
     },
     toml::Value,
+    toml_edit::{DocumentMut, Item, TableLike, TomlError, Value as TomlEditValue, value},
     which::which,
 };
 ```
@@ -20057,77 +20174,46 @@ fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
         }
     }
 }
-fn find_version_position(line: &str) -> Option<(usize, usize)> {
-    let trimmed: &str = line.trim();
-    if !trimmed.starts_with("version") || !trimmed.contains('=') {
-        return None;
-    }
-    let eq_pos: usize = line.find('=')?;
-    let after_eq: &str = &line[eq_pos + 1..];
-    let quote_start: usize = after_eq.find('"')?;
-    let after_first_quote: &str = &after_eq[quote_start + 1..];
-    let quote_end: usize = after_first_quote.find('"')?;
-    let version_start: usize = eq_pos + 1 + quote_start + 1;
-    let version_end: usize = version_start + quote_end;
-    Some((version_start, version_end))
-}
 pub async fn execute_bump(
     manifest_path: &str,
     bump_type: &BumpVersionType,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let path: &Path = Path::new(manifest_path);
     let content: String = read_to_string(path).await?;
-    let mut new_version: Option<String> = None;
-    let mut updated_content: String = content.clone();
-    let mut in_workspace_package: bool = false;
-    let mut in_package: bool = false;
-    let mut line_count: usize = 0;
-    for line in content.lines() {
-        line_count += 1;
-        let trimmed: &str = line.trim();
-        if trimmed.starts_with('[') {
-            in_workspace_package = trimmed == "[workspace.package]";
-            in_package = trimmed == "[package]";
-        }
-        if !in_workspace_package && !in_package {
-            continue;
-        }
-        if let Some((version_start, version_end)) = find_version_position(line) {
-            let version_str: &str = &line[version_start..version_end];
-            if let Some(version) = parse_version(version_str) {
-                let bumped: Version = bump_version(&version, bump_type);
-                let version_string: String = version_to_string(&bumped);
-                new_version = Some(version_string.clone());
-                let new_line: String = format!(
-                    "{}{version_string}{}",
-                    &line[..version_start],
-                    &line[version_end..]
-                );
-                let mut rebuilt: String = String::with_capacity(content.len());
-                let mut current: usize = 0;
-                for existing_line in content.lines() {
-                    current += 1;
-                    if current == line_count {
-                        rebuilt.push_str(&new_line);
-                        rebuilt.push('\n');
-                    } else {
-                        rebuilt.push_str(existing_line);
-                        rebuilt.push('\n');
-                    }
-                }
-                updated_content = rebuilt;
-                break;
-            }
-        }
-    }
-    if new_version.is_none() {
-        return Err("version field not found in Cargo.toml".into());
-    }
-    write(path, updated_content).await?;
-    match new_version {
-        Some(v) => Ok(v),
-        None => Err("failed to bump version".into()),
-    }
+    let mut doc: DocumentMut = content
+        .parse()
+        .map_err(|e: TomlError| format!("failed to parse {}: {}", manifest_path, e))?;
+    let version_slot: &mut Item = if doc
+        .get("workspace")
+        .and_then(|workspace: &Item| workspace.get("package"))
+        .is_some()
+    {
+        doc.get_mut("workspace")
+            .and_then(|workspace: &mut Item| workspace.get_mut("package"))
+            .and_then(|package: &mut Item| package.get_mut("version"))
+            .ok_or_else(|| -> Box<dyn std::error::Error> {
+                "workspace.package.version not found".into()
+            })?
+    } else if doc.get("package").is_some() {
+        doc.get_mut("package")
+            .and_then(|package: &mut Item| package.get_mut("version"))
+            .ok_or_else(|| -> Box<dyn std::error::Error> { "package.version not found".into() })?
+    } else {
+        return Err("neither [package] nor [workspace.package] found in Cargo.toml".into());
+    };
+    let version_str: String = version_slot
+        .as_str()
+        .ok_or_else(|| -> Box<dyn std::error::Error> { "version field is not a string".into() })?
+        .to_string();
+    let version: Version =
+        parse_version(&version_str).ok_or_else(|| -> Box<dyn std::error::Error> {
+            format!("failed to parse version: {}", version_str).into()
+        })?;
+    let bumped: Version = bump_version(&version, bump_type);
+    let version_string: String = version_to_string(&bumped);
+    set_item_string_preserving_decor(version_slot, &version_string);
+    write(path, doc.to_string()).await?;
+    Ok(version_string)
 }
 ```
 # Path: hyperlane/cli/src/bump/enum.rs
@@ -20184,91 +20270,93 @@ pub use r#enum::*;
 # Path: hyperlane/cli/src/sync/fn.rs
 ```rust
 use super::*;
-fn read_workspace_version(doc: &Value) -> Result<String, SyncError> {
-    let version: String = doc
-        .get("workspace")
-        .and_then(|workspace: &Value| workspace.get("package"))
-        .and_then(|package: &Value| package.get("version"))
-        .and_then(|version_value: &Value| version_value.as_str())
-        .ok_or_else(|| SyncError::WorkspaceVersionMissing("Cargo.toml".to_string()))?
-        .to_string();
-    Ok(version)
+pub(crate) fn set_item_string_preserving_decor(slot: &mut Item, new_string: &str) {
+    let mut replacement: Item = value(new_string);
+    if let Some(old_value) = slot.as_value()
+        && let Some(new_value) = replacement.as_value_mut()
+    {
+        *new_value.decor_mut() = old_value.decor().clone();
+    }
+    *slot = replacement;
 }
-fn read_workspace_members(doc: &Value) -> Result<Vec<String>, SyncError> {
+fn read_root_version(doc: &DocumentMut) -> Result<String, SyncError> {
+    let workspace_version: Option<&str> = doc
+        .get("workspace")
+        .and_then(|workspace: &Item| workspace.get("package"))
+        .and_then(|package: &Item| package.get("version"))
+        .and_then(|version_item: &Item| version_item.as_str());
+    let package_version: Option<&str> = doc
+        .get("package")
+        .and_then(|package: &Item| package.get("version"))
+        .and_then(|version_item: &Item| version_item.as_str());
+    workspace_version
+        .or(package_version)
+        .map(|version: &str| version.to_string())
+        .ok_or_else(|| SyncError::WorkspaceVersionMissing("Cargo.toml".to_string()))
+}
+fn read_workspace_members(doc: &DocumentMut) -> Result<Vec<String>, SyncError> {
     let members: Vec<String> = doc
         .get("workspace")
-        .and_then(|workspace: &Value| workspace.get("members"))
-        .and_then(|members_value: &Value| members_value.as_array())
+        .and_then(|workspace: &Item| workspace.get("members"))
+        .and_then(|members_item: &Item| members_item.as_array())
         .ok_or_else(|| SyncError::WorkspaceMembersMissing("Cargo.toml".to_string()))?
         .iter()
-        .filter_map(|member: &Value| member.as_str().map(|s: &str| s.to_string()))
+        .filter_map(|member: &TomlEditValue| member.as_str().map(|s: &str| s.to_string()))
         .collect();
     Ok(members)
 }
-fn read_member_crate_name(doc: &Value) -> Result<String, SyncError> {
+fn read_member_crate_name(doc: &DocumentMut) -> Result<String, SyncError> {
     let name: String = doc
         .get("package")
-        .and_then(|package: &Value| package.get("name"))
-        .and_then(|name_value: &Value| name_value.as_str())
+        .and_then(|package: &Item| package.get("name"))
+        .and_then(|name_item: &Item| name_item.as_str())
         .ok_or_else(|| SyncError::MemberNameMissing("Cargo.toml".to_string()))?
         .to_string();
     Ok(name)
 }
-fn find_dep_alias_for_member_path(deps: &Value, member_path: &str) -> Option<String> {
-    let table: &toml::map::Map<String, Value> = deps.as_table()?;
-    for (alias, entry) in table {
-        if let Some(entry_table) = entry.as_table()
-            && let Some(path) = entry_table.get("path")
-            && path.as_str() == Some(member_path)
+fn find_dep_alias_for_member_path(deps: &dyn TableLike, member_path: &str) -> Option<String> {
+    for (alias, entry) in deps.iter() {
+        if let Some(path) = entry
+            .get("path")
+            .and_then(|path_item: &Item| path_item.as_str())
+            && path == member_path
         {
-            return Some(alias.clone());
+            return Some(alias.to_string());
         }
     }
     None
 }
-fn rewrite_dep_entry(
-    deps: &mut toml::map::Map<String, Value>,
-    member_path: &str,
-    current_alias: &str,
-    canonical_alias: &str,
-    workspace_version: &str,
-) -> Option<(String, String)> {
-    let entry: &mut Value = deps.get_mut(current_alias)?;
-    let entry_table: &mut toml::map::Map<String, Value> = entry.as_table_mut()?;
-    let path_matches: bool = entry_table
-        .get("path")
-        .and_then(|path_value: &Value| path_value.as_str())
-        .map(|s: &str| s == member_path)
-        .unwrap_or(false);
-    if !path_matches {
-        return None;
-    }
-    entry_table.insert(
-        "version".to_string(),
-        Value::String(workspace_version.to_string()),
-    );
-    if current_alias != canonical_alias {
-        let renamed: (String, String) = (current_alias.to_string(), canonical_alias.to_string());
-        let new_entry: Value = entry.clone();
-        deps.remove(current_alias);
-        let entry_to_set: &mut Value = deps.entry(canonical_alias.to_string()).or_insert(new_entry);
-        let canonical_table: &mut toml::map::Map<String, Value> =
-            entry_to_set.as_table_mut().unwrap();
-        canonical_table.insert("path".to_string(), Value::String(member_path.to_string()));
-        canonical_table.insert(
-            "version".to_string(),
-            Value::String(workspace_version.to_string()),
-        );
-        Some(renamed)
-    } else {
-        None
+fn scan_dep_entry(doc: &DocumentMut, member_path: &str) -> Option<(String, Option<String>)> {
+    let deps: &dyn TableLike = doc
+        .get("workspace")
+        .and_then(|workspace: &Item| workspace.get("dependencies"))
+        .and_then(|deps_item: &Item| deps_item.as_table_like())?;
+    let current_alias: String = find_dep_alias_for_member_path(deps, member_path)?;
+    let existing_version: Option<String> = deps
+        .get(&current_alias)
+        .and_then(|entry: &Item| entry.get("version"))
+        .and_then(|version_item: &Item| version_item.as_str())
+        .map(|version: &str| version.to_string());
+    Some((current_alias, existing_version))
+}
+fn rewrite_entry_version(deps: &mut dyn TableLike, current_alias: &str, workspace_version: &str) {
+    let Some(entry) = deps.get_mut(current_alias) else {
+        return;
+    };
+    match entry.get_mut("version") {
+        Some(version_slot) => set_item_string_preserving_decor(version_slot, workspace_version),
+        None => {
+            if let Some(entry_table) = entry.as_table_like_mut() {
+                entry_table.insert("version", value(workspace_version));
+            }
+        }
     }
 }
 pub async fn execute_sync(manifest_path: &str) -> Result<SyncReport, SyncError> {
     let path: &Path = Path::new(manifest_path);
     let content: String = read_to_string(path).await?;
-    let mut doc: Value = toml::from_str(&content).map_err(|_| SyncError::ManifestParseError)?;
-    let workspace_version: String = read_workspace_version(&doc)?;
+    let mut doc: DocumentMut = content.parse().map_err(|_| SyncError::ManifestParseError)?;
+    let workspace_version: String = read_root_version(&doc)?;
     let members: Vec<String> = read_workspace_members(&doc)?;
     if members.is_empty() {
         log::info!("sync: no workspace members, nothing to do");
@@ -20282,13 +20370,6 @@ pub async fn execute_sync(manifest_path: &str) -> Result<SyncReport, SyncError> 
     let mut renamed_entries: Vec<(String, String)> = Vec::new();
     let mut versioned_entries: Vec<(String, String)> = Vec::new();
     let mut needs_rewrite: bool = false;
-    let deps_value: Option<&Value> = doc
-        .get("workspace")
-        .and_then(|workspace: &Value| workspace.get("dependencies"));
-    let mut deps: toml::map::Map<String, Value> = deps_value
-        .and_then(|value: &Value| value.as_table())
-        .cloned()
-        .unwrap_or_default();
     for member_path in &members {
         let member_manifest_path: PathBuf = path
             .parent()
@@ -20301,46 +20382,45 @@ pub async fn execute_sync(manifest_path: &str) -> Result<SyncReport, SyncError> 
             ));
         }
         let member_content: String = read_to_string(&member_manifest_path).await?;
-        let member_doc: Value =
-            toml::from_str(&member_content).map_err(|_| SyncError::ManifestParseError)?;
+        let member_doc: DocumentMut = member_content
+            .parse()
+            .map_err(|_| SyncError::ManifestParseError)?;
         let canonical_alias: String = read_member_crate_name(&member_doc)?;
-        let current_alias: Option<String> =
-            find_dep_alias_for_member_path(&Value::Table(deps.clone()), member_path);
-        let current_alias: String = match current_alias {
-            Some(alias) => alias,
-            None => {
-                log::info!(
-                    "sync: {} -> no [workspace.dependencies] entry, skipping",
-                    member_path
-                );
-                continue;
-            }
-        };
-        let existing_version: Option<String> = deps
-            .get(&current_alias)
-            .and_then(|entry: &Value| entry.as_table())
-            .and_then(|table: &toml::map::Map<String, Value>| table.get("version"))
-            .and_then(|version_value: &Value| version_value.as_str())
-            .map(|s: &str| s.to_string());
+        let (current_alias, existing_version): (String, Option<String>) =
+            match scan_dep_entry(&doc, member_path) {
+                Some(scanned) => scanned,
+                None => {
+                    log::info!(
+                        "sync: {} -> no [workspace.dependencies] entry, skipping",
+                        member_path
+                    );
+                    continue;
+                }
+            };
         let alias_needs_rename: bool = current_alias != canonical_alias;
-        let version_needs_rewrite: bool = existing_version
-            .as_deref()
-            .map(|existing: &str| existing != workspace_version)
-            .unwrap_or(true);
+        let version_needs_rewrite: bool =
+            existing_version.as_deref() != Some(workspace_version.as_str());
         if !alias_needs_rename && !version_needs_rewrite {
             continue;
         }
         needs_rewrite = true;
-        let renamed: Option<(String, String)> = rewrite_dep_entry(
-            &mut deps,
-            member_path,
-            &current_alias,
-            &canonical_alias,
-            &workspace_version,
-        );
-        if let Some((old, new)) = &renamed {
-            log::info!("sync: {} renamed {} -> {}", member_path, old, new);
-            renamed_entries.push((old.clone(), new.clone()));
+        let deps: &mut dyn TableLike = doc
+            .get_mut("workspace")
+            .and_then(|workspace: &mut Item| workspace.get_mut("dependencies"))
+            .and_then(|deps_item: &mut Item| deps_item.as_table_like_mut())
+            .ok_or(SyncError::ManifestParseError)?;
+        rewrite_entry_version(deps, &current_alias, &workspace_version);
+        if alias_needs_rename {
+            if let Some(entry) = deps.remove(&current_alias) {
+                deps.insert(&canonical_alias, entry);
+            }
+            log::info!(
+                "sync: {} renamed {} -> {}",
+                member_path,
+                current_alias,
+                canonical_alias
+            );
+            renamed_entries.push((current_alias, canonical_alias.clone()));
         } else {
             log::info!(
                 "sync: {} -> {} v{}",
@@ -20353,15 +20433,7 @@ pub async fn execute_sync(manifest_path: &str) -> Result<SyncReport, SyncError> 
     }
     let file_changed: bool = needs_rewrite;
     if file_changed {
-        if let Some(workspace_table) = doc
-            .get_mut("workspace")
-            .and_then(|workspace: &mut Value| workspace.as_table_mut())
-        {
-            workspace_table.insert("dependencies".to_string(), Value::Table(deps.clone()));
-        }
-        let updated_content: String =
-            toml::to_string(&doc).map_err(|_| SyncError::ManifestSerializeError)?;
-        write(path, updated_content).await?;
+        write(path, doc.to_string()).await?;
         log::info!(
             "sync: wrote {} entries to v{}",
             versioned_entries.len(),
