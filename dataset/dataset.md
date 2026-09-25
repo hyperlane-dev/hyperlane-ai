@@ -1,4 +1,4 @@
-<!--2026-09-24 21:19:58-->
+<!--2026-09-25 04:10:46-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -2866,21 +2866,12199 @@ cargo add hyperlane
 git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ```
 ## Contact
-# Path: hyperlane/tests/mod.rs
+# Path: hyperlane/constant/README.md
+## http-constant
+[Api Docs](https://docs.rs/http-constant/latest/)
+> A comprehensive library providing common HTTP constants for header names, versions, MIME types, and protocol identifiers.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add http-constant
+```
+## Contact
+# Path: hyperlane/constant/src/lib.rs
+```rust
+mod body;
+mod common;
+mod content_type_value;
+mod file_extension;
+mod header_key;
+mod header_value;
+mod http2;
+mod http_status;
+mod http_version;
+mod method;
+mod path;
+mod protocol;
+mod query;
+mod session;
+pub use {
+    body::*, common::*, content_type_value::*, file_extension::*, header_key::*, header_value::*,
+    http_status::*, http_version::*, http2::*, method::*, path::*, protocol::*, query::*,
+    session::*,
+};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    time::Duration,
+};
+```
+# Path: hyperlane/constant/src/http2/const.rs
+```rust
+use super::*;
+pub const CONNECTION_PREFACE: &[u8] = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+pub const HEADER_TABLE_SIZE: u16 = 0x1;
+pub const ENABLE_PUSH: u16 = 0x2;
+pub const MAX_CONCURRENT_STREAMS: u16 = 0x3;
+pub const INITIAL_WINDOW_SIZE: u16 = 0x4;
+pub const SETTINGS_MAX_FRAME_SIZE: u16 = 0x5;
+pub const MAX_HEADER_LIST_SIZE: u16 = 0x6;
+pub const COLON_STATUS: &str = ":status";
+pub const GZIP_DEFLATE: &str = "gzip, deflate";
+pub const INDEX_HTML_PATH: &str = "/index.html";
+pub const STATIC_TABLE: &[(&str, &str)] = &[
+    (COLON_AUTHORITY, EMPTY_STR),
+    (COLON_METHOD, GET),
+    (COLON_METHOD, POST),
+    (COLON_PATH, DEFAULT_HTTP_PATH),
+    (COLON_PATH, INDEX_HTML_PATH),
+    (COLON_SCHEME, HTTP_LOWERCASE),
+    (COLON_SCHEME, HTTPS_LOWERCASE),
+    (COLON_STATUS, STATUS_CODE_200),
+    (COLON_STATUS, STATUS_CODE_204),
+    (COLON_STATUS, STATUS_CODE_206),
+    (COLON_STATUS, STATUS_CODE_304),
+    (COLON_STATUS, STATUS_CODE_400),
+    (COLON_STATUS, STATUS_CODE_404),
+    (COLON_STATUS, STATUS_CODE_500),
+    (ACCEPT_CHARSET, EMPTY_STR),
+    (ACCEPT_ENCODING, GZIP_DEFLATE),
+    (ACCEPT_LANGUAGE, EMPTY_STR),
+    (ACCEPT_RANGES, EMPTY_STR),
+    (ACCEPT, EMPTY_STR),
+    (ACCESS_CONTROL_ALLOW_ORIGIN, EMPTY_STR),
+    (AGE, EMPTY_STR),
+    (ALLOW, EMPTY_STR),
+    (AUTHORIZATION, EMPTY_STR),
+    (CACHE_CONTROL, EMPTY_STR),
+    (CONTENT_DISPOSITION, EMPTY_STR),
+    (CONTENT_ENCODING, EMPTY_STR),
+    (CONTENT_LANGUAGE, EMPTY_STR),
+    (CONTENT_LENGTH, EMPTY_STR),
+    (CONTENT_LOCATION, EMPTY_STR),
+    (CONTENT_RANGE, EMPTY_STR),
+    (CONTENT_TYPE, EMPTY_STR),
+    (COOKIE, EMPTY_STR),
+    (DATE, EMPTY_STR),
+    (ETAG, EMPTY_STR),
+    (EXPECT, EMPTY_STR),
+    (EXPIRES, EMPTY_STR),
+    (FROM, EMPTY_STR),
+    (HOST, EMPTY_STR),
+    (IF_MATCH, EMPTY_STR),
+    (IF_MODIFIED_SINCE, EMPTY_STR),
+    (IF_NONE_MATCH, EMPTY_STR),
+    (IF_RANGE, EMPTY_STR),
+    (IF_UNMODIFIED_SINCE, EMPTY_STR),
+    (LAST_MODIFIED, EMPTY_STR),
+    (LINK, EMPTY_STR),
+    (LOCATION, EMPTY_STR),
+    (MAX_FORWARDS, EMPTY_STR),
+    (PROXY_AUTHENTICATE, EMPTY_STR),
+    (PROXY_AUTHORIZATION, EMPTY_STR),
+    (RANGE, EMPTY_STR),
+    (REFERER, EMPTY_STR),
+    (REFRESH, EMPTY_STR),
+    (RETRY_AFTER, EMPTY_STR),
+    (SERVER, EMPTY_STR),
+    (SET_COOKIE, EMPTY_STR),
+    (STRICT_TRANSPORT_SECURITY, EMPTY_STR),
+    (TRANSFER_ENCODING, EMPTY_STR),
+    (USER_AGENT, EMPTY_STR),
+    (VARY, EMPTY_STR),
+    (VIA, EMPTY_STR),
+    (WWW_AUTHENTICATE, EMPTY_STR),
+];
+```
+# Path: hyperlane/constant/src/http2/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+use super::*;
+```
+# Path: hyperlane/constant/src/body/const.rs
+```rust
+pub const BODY: &str = "body";
+```
+# Path: hyperlane/constant/src/body/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/file_extension/const.rs
+```rust
+pub const FILE_EXTENSION_123: &str = "123";
+pub const FILE_EXTENSION_3DML: &str = "3dml";
+pub const FILE_EXTENSION_3DS: &str = "3ds";
+pub const FILE_EXTENSION_3G2: &str = "3g2";
+pub const FILE_EXTENSION_3GP: &str = "3gp";
+pub const FILE_EXTENSION_7Z: &str = "7z";
+pub const FILE_EXTENSION_AAB: &str = "aab";
+pub const FILE_EXTENSION_AAC: &str = "aac";
+pub const FILE_EXTENSION_AAM: &str = "aam";
+pub const FILE_EXTENSION_AAS: &str = "aas";
+pub const FILE_EXTENSION_ABS: &str = "abs";
+pub const FILE_EXTENSION_ABW: &str = "abw";
+pub const FILE_EXTENSION_AC: &str = "ac";
+pub const FILE_EXTENSION_ACC: &str = "acc";
+pub const FILE_EXTENSION_ACE: &str = "ace";
+pub const FILE_EXTENSION_ACU: &str = "acu";
+pub const FILE_EXTENSION_ACUTC: &str = "acutc";
+pub const FILE_EXTENSION_ADP: &str = "adp";
+pub const FILE_EXTENSION_AEP: &str = "aep";
+pub const FILE_EXTENSION_AFM: &str = "afm";
+pub const FILE_EXTENSION_AFP: &str = "afp";
+pub const FILE_EXTENSION_AHEAD: &str = "ahead";
+pub const FILE_EXTENSION_AI: &str = "ai";
+pub const FILE_EXTENSION_AIF: &str = "aif";
+pub const FILE_EXTENSION_AIFC: &str = "aifc";
+pub const FILE_EXTENSION_AIFF: &str = "aiff";
+pub const FILE_EXTENSION_AIM: &str = "aim";
+pub const FILE_EXTENSION_AIR: &str = "air";
+pub const FILE_EXTENSION_AIT: &str = "ait";
+pub const FILE_EXTENSION_AMI: &str = "ami";
+pub const FILE_EXTENSION_ANX: &str = "anx";
+pub const FILE_EXTENSION_APK: &str = "apk";
+pub const FILE_EXTENSION_APPCACHE: &str = "appcache";
+pub const FILE_EXTENSION_APPLICATION: &str = "application";
+pub const FILE_EXTENSION_APR: &str = "apr";
+pub const FILE_EXTENSION_ARC: &str = "arc";
+pub const FILE_EXTENSION_ART: &str = "art";
+pub const FILE_EXTENSION_ASC: &str = "asc";
+pub const FILE_EXTENSION_ASF: &str = "asf";
+pub const FILE_EXTENSION_ASM: &str = "asm";
+pub const FILE_EXTENSION_ASO: &str = "aso";
+pub const FILE_EXTENSION_ASX: &str = "asx";
+pub const FILE_EXTENSION_ATC: &str = "atc";
+pub const FILE_EXTENSION_ATOM: &str = "atom";
+pub const FILE_EXTENSION_ATOMCAT: &str = "atomcat";
+pub const FILE_EXTENSION_ATOMSVC: &str = "atomsvc";
+pub const FILE_EXTENSION_ATX: &str = "atx";
+pub const FILE_EXTENSION_AU: &str = "au";
+pub const FILE_EXTENSION_AVI: &str = "avi";
+pub const FILE_EXTENSION_AVX: &str = "avx";
+pub const FILE_EXTENSION_AW: &str = "aw";
+pub const FILE_EXTENSION_AXA: &str = "axa";
+pub const FILE_EXTENSION_AXV: &str = "axv";
+pub const FILE_EXTENSION_AZF: &str = "azf";
+pub const FILE_EXTENSION_AZS: &str = "azs";
+pub const FILE_EXTENSION_AZW: &str = "azw";
+pub const FILE_EXTENSION_BAT: &str = "bat";
+pub const FILE_EXTENSION_BCPIO: &str = "bcpio";
+pub const FILE_EXTENSION_BDF: &str = "bdf";
+pub const FILE_EXTENSION_BDM: &str = "bdm";
+pub const FILE_EXTENSION_BED: &str = "bed";
+pub const FILE_EXTENSION_BH2: &str = "bh2";
+pub const FILE_EXTENSION_BIN: &str = "bin";
+pub const FILE_EXTENSION_BLB: &str = "blb";
+pub const FILE_EXTENSION_BLORB: &str = "blorb";
+pub const FILE_EXTENSION_BMI: &str = "bmi";
+pub const FILE_EXTENSION_BMP: &str = "bmp";
+pub const FILE_EXTENSION_BODY: &str = "body";
+pub const FILE_EXTENSION_BOOK: &str = "book";
+pub const FILE_EXTENSION_BOX: &str = "box";
+pub const FILE_EXTENSION_BOZ: &str = "boz";
+pub const FILE_EXTENSION_BPK: &str = "bpk";
+pub const FILE_EXTENSION_BTIF: &str = "btif";
+pub const FILE_EXTENSION_BZ: &str = "bz";
+pub const FILE_EXTENSION_BZ2: &str = "bz2";
+pub const FILE_EXTENSION_C: &str = "c";
+pub const FILE_EXTENSION_C11AMC: &str = "c11amc";
+pub const FILE_EXTENSION_C11AMZ: &str = "c11amz";
+pub const FILE_EXTENSION_C4D: &str = "c4d";
+pub const FILE_EXTENSION_C4F: &str = "c4f";
+pub const FILE_EXTENSION_C4G: &str = "c4g";
+pub const FILE_EXTENSION_C4P: &str = "c4p";
+pub const FILE_EXTENSION_C4U: &str = "c4u";
+pub const FILE_EXTENSION_CAB: &str = "cab";
+pub const FILE_EXTENSION_CAF: &str = "caf";
+pub const FILE_EXTENSION_CAP: &str = "cap";
+pub const FILE_EXTENSION_CAR: &str = "car";
+pub const FILE_EXTENSION_CAT: &str = "cat";
+pub const FILE_EXTENSION_CB7: &str = "cb7";
+pub const FILE_EXTENSION_CBA: &str = "cba";
+pub const FILE_EXTENSION_CBR: &str = "cbr";
+pub const FILE_EXTENSION_CBT: &str = "cbt";
+pub const FILE_EXTENSION_CBZ: &str = "cbz";
+pub const FILE_EXTENSION_CC: &str = "cc";
+pub const FILE_EXTENSION_CCT: &str = "cct";
+pub const FILE_EXTENSION_CCXML: &str = "ccxml";
+pub const FILE_EXTENSION_CDBCMSG: &str = "cdbcmsg";
+pub const FILE_EXTENSION_CDF: &str = "cdf";
+pub const FILE_EXTENSION_CDKEY: &str = "cdkey";
+pub const FILE_EXTENSION_CDMIA: &str = "cdmia";
+pub const FILE_EXTENSION_CDMIC: &str = "cdmic";
+pub const FILE_EXTENSION_CDMID: &str = "cdmid";
+pub const FILE_EXTENSION_CDMIO: &str = "cdmio";
+pub const FILE_EXTENSION_CDMIQ: &str = "cdmiq";
+pub const FILE_EXTENSION_CDX: &str = "cdx";
+pub const FILE_EXTENSION_CDXML: &str = "cdxml";
+pub const FILE_EXTENSION_CDY: &str = "cdy";
+pub const FILE_EXTENSION_CER: &str = "cer";
+pub const FILE_EXTENSION_CFS: &str = "cfs";
+pub const FILE_EXTENSION_CGM: &str = "cgm";
+pub const FILE_EXTENSION_CHAT: &str = "chat";
+pub const FILE_EXTENSION_CHM: &str = "chm";
+pub const FILE_EXTENSION_CHRT: &str = "chrt";
+pub const FILE_EXTENSION_CIF: &str = "cif";
+```
+# Path: hyperlane/constant/src/file_extension/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/content_type_value/const.rs
+```rust
+pub const APPLICATION_VND_LOTUS_1_2_3: &str = "application/vnd.lotus-1-2-3";
+pub const TEXT_VND_IN3D_3DML: &str = "text/vnd.in3d.3dml";
+pub const IMAGE_X_3DS: &str = "image/x-3ds";
+pub const VIDEO_3GPP2: &str = "video/3gpp2";
+pub const VIDEO_3GPP: &str = "video/3gpp";
+pub const APPLICATION_X_7Z_COMPRESSED: &str = "application/x-7z-compressed";
+pub const APPLICATION_X_AUTHORWARE_BIN: &str = "application/x-authorware-bin";
+pub const AUDIO_X_AAC: &str = "audio/x-aac";
+pub const APPLICATION_X_AUTHORWARE_MAP: &str = "application/x-authorware-map";
+pub const APPLICATION_X_AUTHORWARE_SEG: &str = "application/x-authorware-seg";
+pub const AUDIO_X_MPEG: &str = "audio/x-mpeg";
+pub const APPLICATION_X_ABIWORD: &str = "application/x-abiword";
+pub const APPLICATION_PKIX_ATTR_CERT: &str = "application/pkix-attr-cert";
+pub const APPLICATION_VND_AMERICANDYNAMICS_ACC: &str = "application/vnd.americandynamics.acc";
+pub const APPLICATION_X_ACE_COMPRESSED: &str = "application/x-ace-compressed";
+pub const APPLICATION_VND_ACUCOBOL: &str = "application/vnd.acucobol";
+pub const APPLICATION_VND_ACUCORP: &str = "application/vnd.acucorp";
+pub const AUDIO_ADPCM: &str = "audio/adpcm";
+pub const APPLICATION_VND_AUDIOGRAPH: &str = "application/vnd.audiograph";
+pub const APPLICATION_X_FONT_TYPE1: &str = "application/x-font-type1";
+pub const APPLICATION_VND_IBM_MODCAP: &str = "application/vnd.ibm.modcap";
+pub const APPLICATION_VND_AHEAD_SPACE: &str = "application/vnd.ahead.space";
+pub const APPLICATION_POSTSCRIPT: &str = "application/postscript";
+pub const AUDIO_X_AIFF: &str = "audio/x-aiff";
+pub const APPLICATION_X_AIM: &str = "application/x-aim";
+pub const APPLICATION_VND_ADOBE_AIR_APPLICATION_INSTALLER_PACKAGE_ZIP: &str =
+    "application/vnd.adobe.air-application-installer-package+zip";
+pub const APPLICATION_VND_DVB_AIT: &str = "application/vnd.dvb.ait";
+pub const APPLICATION_VND_AMIGA_AMI: &str = "application/vnd.amiga.ami";
+pub const APPLICATION_ANNODEX: &str = "application/annodex";
+pub const APPLICATION_VND_ANDROID_PACKAGE_ARCHIVE: &str = "application/vnd.android.package-archive";
+pub const TEXT_CACHE_MANIFEST: &str = "text/cache-manifest";
+pub const TEXT_EVENT_STREAM: &str = "text/event-stream";
+pub const APPLICATION_X_MS_APPLICATION: &str = "application/x-ms-application";
+pub const APPLICATION_VND_LOTUS_APPROACH: &str = "application/vnd.lotus-approach";
+pub const APPLICATION_X_FREEARC: &str = "application/x-freearc";
+pub const IMAGE_X_JG: &str = "image/x-jg";
+pub const APPLICATION_PGP_SIGNATURE: &str = "application/pgp-signature";
+pub const VIDEO_X_MS_ASF: &str = "video/x-ms-asf";
+pub const TEXT_X_ASM: &str = "text/x-asm";
+pub const APPLICATION_VND_ACCPAC_SIMPLY_ASO: &str = "application/vnd.accpac.simply.aso";
+pub const APPLICATION_ATOM_XML: &str = "application/atom+xml";
+pub const APPLICATION_ATOMCAT_XML: &str = "application/atomcat+xml";
+pub const APPLICATION_ATOMSVC_XML: &str = "application/atomsvc+xml";
+pub const APPLICATION_VND_ANTIX_GAME_COMPONENT: &str = "application/vnd.antix.game-component";
+pub const AUDIO_BASIC: &str = "audio/basic";
+pub const VIDEO_X_MSVIDEO: &str = "video/x-msvideo";
+pub const VIDEO_X_RAD_SCREENPLAY: &str = "video/x-rad-screenplay";
+pub const APPLICATION_APPLIXWARE: &str = "application/applixware";
+pub const AUDIO_ANNODEX: &str = "audio/annodex";
+pub const VIDEO_ANNODEX: &str = "video/annodex";
+pub const APPLICATION_VND_AIRZIP_FILESECURE_AZF: &str = "application/vnd.airzip.filesecure.azf";
+pub const APPLICATION_VND_AIRZIP_FILESECURE_AZS: &str = "application/vnd.airzip.filesecure.azs";
+pub const APPLICATION_VND_AMAZON_EBOOK: &str = "application/vnd.amazon.ebook";
+pub const APPLICATION_X_MSDOWNLOAD: &str = "application/x-msdownload";
+pub const APPLICATION_X_BCPIO: &str = "application/x-bcpio";
+pub const APPLICATION_X_FONT_BDF: &str = "application/x-font-bdf";
+pub const APPLICATION_VND_SYNCML_DM_WBXML: &str = "application/vnd.syncml.dm+wbxml";
+pub const APPLICATION_VND_REALVNC_BED: &str = "application/vnd.realvnc.bed";
+pub const APPLICATION_VND_FUJITSU_OASYSPRS: &str = "application/vnd.fujitsu.oasysprs";
+pub const APPLICATION_OCTET_STREAM: &str = "application/octet-stream";
+pub const APPLICATION_X_BLORB: &str = "application/x-blorb";
+pub const APPLICATION_VND_BMI: &str = "application/vnd.bmi";
+pub const IMAGE_BMP: &str = "image/bmp";
+pub const TEXT_HTML: &str = "text/html";
+pub const FORM_URLENCODED: &str = "application/x-www-form-urlencoded";
+pub const APPLICATION_VND_FRAMEMAKER: &str = "application/vnd.framemaker";
+pub const APPLICATION_VND_PREVIEWSYSTEMS_BOX: &str = "application/vnd.previewsystems.box";
+pub const APPLICATION_X_BZIP2: &str = "application/x-bzip2";
+pub const IMAGE_PRS_BTIF: &str = "image/prs.btif";
+pub const APPLICATION_X_BZIP: &str = "application/x-bzip";
+pub const TEXT_X_C: &str = "text/x-c";
+pub const APPLICATION_VND_CLUETRUST_CARTOMOBILE_CONFIG: &str =
+    "application/vnd.cluetrust.cartomobile-config";
+pub const APPLICATION_VND_CLUETRUST_CARTOMOBILE_CONFIG_PKG: &str =
+    "application/vnd.cluetrust.cartomobile-config-pkg";
+pub const APPLICATION_VND_CLONK_C4GROUP: &str = "application/vnd.clonk.c4group";
+pub const APPLICATION_VND_MS_CAB_COMPRESSED: &str = "application/vnd.ms-cab-compressed";
+pub const AUDIO_X_CAF: &str = "audio/x-caf";
+pub const APPLICATION_VND_TCPDUMP_PCAP: &str = "application/vnd.tcpdump.pcap";
+pub const APPLICATION_VND_CURL_CAR: &str = "application/vnd.curl.car";
+pub const APPLICATION_VND_MS_PKI_SECCAT: &str = "application/vnd.ms-pki.seccat";
+pub const APPLICATION_X_CBR: &str = "application/x-cbr";
+pub const APPLICATION_X_DIRECTOR: &str = "application/x-director";
+pub const APPLICATION_CCXML_XML: &str = "application/ccxml+xml";
+pub const APPLICATION_VND_CONTACT_CMSG: &str = "application/vnd.contact.cmsg";
+pub const APPLICATION_X_CDF: &str = "application/x-cdf";
+pub const APPLICATION_VND_MEDIASTATION_CDKEY: &str = "application/vnd.mediastation.cdkey";
+pub const APPLICATION_CDMI_CAPABILITY: &str = "application/cdmi-capability";
+pub const APPLICATION_CDMI_CONTAINER: &str = "application/cdmi-container";
+pub const APPLICATION_CDMI_DOMAIN: &str = "application/cdmi-domain";
+pub const APPLICATION_CDMI_OBJECT: &str = "application/cdmi-object";
+pub const APPLICATION_CDMI_QUEUE: &str = "application/cdmi-queue";
+pub const CHEMICAL_X_CDX: &str = "chemical/x-cdx";
+pub const APPLICATION_VND_CHEMDRAW_XML: &str = "application/vnd.chemdraw+xml";
+pub const APPLICATION_VND_CINDERELLA: &str = "application/vnd.cinderella";
+pub const APPLICATION_PKIX_CERT: &str = "application/pkix-cert";
+pub const APPLICATION_X_CFS_COMPRESSED: &str = "application/x-cfs-compressed";
+pub const IMAGE_CGM: &str = "image/cgm";
+pub const APPLICATION_X_CHAT: &str = "application/x-chat";
+pub const APPLICATION_VND_MS_HTMLHELP: &str = "application/vnd.ms-htmlhelp";
+pub const APPLICATION_VND_KDE_KCHART: &str = "application/vnd.kde.kchart";
+pub const CHEMICAL_X_CIF: &str = "chemical/x-cif";
+```
+# Path: hyperlane/constant/src/content_type_value/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/http_version/const.rs
+```rust
+pub const VERSION: &str = "version";
+pub const HTTP_VERSION_0: &str = "HTTP/0";
+pub const HTTP_VERSION_0_9: &str = "HTTP/0.9";
+pub const HTTP_VERSION_1: &str = "HTTP/1";
+pub const HTTP_VERSION_1_0: &str = "HTTP/1.0";
+pub const HTTP_VERSION_1_1: &str = "HTTP/1.1";
+pub const HTTP_VERSION_2: &str = "HTTP/2";
+pub const HTTP_VERSION_2_0: &str = "HTTP/2.0";
+pub const HTTP_VERSION_3: &str = "HTTP/3";
+pub const HTTP_VERSION_3_0: &str = "HTTP/3.0";
+pub const EMPTY_HTTP_VERSION: &str = "";
+```
+# Path: hyperlane/constant/src/http_version/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/http_status/const.rs
+```rust
+pub const STATUS_CODE: &str = "status_code";
+pub const REASON_PHRASE: &str = "reason_phrase";
+pub const CONTINUE: &str = "Continue";
+pub const SWITCHING_PROTOCOLS: &str = "Switching Protocols";
+pub const PROCESSING: &str = "Processing";
+pub const EARLY_HINTS: &str = "Early Hints";
+pub const OK: &str = "OK";
+pub const CREATED: &str = "Created";
+pub const ACCEPTED: &str = "Accepted";
+pub const NON_AUTHORITATIVE_INFORMATION: &str = "Non-Authoritative Information";
+pub const NO_CONTENT: &str = "No Content";
+pub const RESET_CONTENT: &str = "Reset Content";
+pub const PARTIAL_CONTENT: &str = "Partial Content";
+pub const MULTI_STATUS: &str = "Multi-Status";
+pub const ALREADY_REPORTED: &str = "Already Reported";
+pub const IM_USED: &str = "IM Used";
+pub const MULTIPLE_CHOICES: &str = "Multiple Choices";
+pub const MOVED_PERMANENTLY: &str = "Moved Permanently";
+pub const FOUND: &str = "Found";
+pub const SEE_OTHER: &str = "See Other";
+pub const NOT_MODIFIED: &str = "Not Modified";
+pub const USE_PROXY: &str = "Use Proxy";
+pub const TEMPORARY_REDIRECT: &str = "Temporary Redirect";
+pub const PERMANENT_REDIRECT: &str = "Permanent Redirect";
+pub const BAD_REQUEST: &str = "Bad Request";
+pub const UNAUTHORIZED: &str = "Unauthorized";
+pub const PAYMENT_REQUIRED: &str = "Payment Required";
+pub const FORBIDDEN: &str = "Forbidden";
+pub const NOT_FOUND: &str = "Not Found";
+pub const METHOD_NOT_ALLOWED: &str = "Method Not Allowed";
+pub const NOT_ACCEPTABLE: &str = "Not Acceptable";
+pub const PROXY_AUTHENTICATION_REQUIRED: &str = "Proxy Authentication Required";
+pub const REQUEST_TIMEOUT: &str = "Request Timeout";
+pub const CONFLICT: &str = "Conflict";
+pub const GONE: &str = "Gone";
+pub const LENGTH_REQUIRED: &str = "Length Required";
+pub const PRECONDITION_FAILED: &str = "Precondition Failed";
+pub const PAYLOAD_TOO_LARGE: &str = "Payload Too Large";
+pub const URI_TOO_LONG: &str = "URI Too Long";
+pub const UNSUPPORTED_MEDIA_TYPE: &str = "Unsupported Media Type";
+pub const RANGE_NOT_SATISFIABLE: &str = "Range Not Satisfiable";
+pub const EXPECTATION_FAILED: &str = "Expectation Failed";
+pub const IM_A_TEAPOT: &str = "I'm a teapot";
+pub const MISDIRECTED_REQUEST: &str = "Misdirected Request";
+pub const UNPROCESSABLE_ENTITY: &str = "Unprocessable Entity";
+pub const LOCKED: &str = "Locked";
+pub const FAILED_DEPENDENCY: &str = "Failed Dependency";
+pub const TOO_EARLY: &str = "Too Early";
+pub const UPGRADE_REQUIRED: &str = "Upgrade Required";
+pub const PRECONDITION_REQUIRED: &str = "Precondition Required";
+pub const TOO_MANY_REQUESTS: &str = "Too Many Requests";
+pub const REQUEST_HEADER_FIELDS_TOO_LARGE: &str = "Request Header Fields Too Large";
+pub const UNAVAILABLE_FOR_LEGAL_REASONS: &str = "Unavailable For Legal Reasons";
+pub const INTERNAL_SERVER_ERROR: &str = "Internal Server Error";
+pub const NOT_IMPLEMENTED: &str = "Not Implemented";
+pub const BAD_GATEWAY: &str = "Bad Gateway";
+pub const SERVICE_UNAVAILABLE: &str = "Service Unavailable";
+pub const GATEWAY_TIMEOUT: &str = "Gateway Timeout";
+pub const HTTP_VERSION_NOT_SUPPORTED: &str = "HTTP Version Not Supported";
+pub const VARIANT_ALSO_NEGOTIATES: &str = "Variant Also Negotiates";
+pub const INSUFFICIENT_STORAGE: &str = "Insufficient Storage";
+pub const LOOP_DETECTED: &str = "Loop Detected";
+pub const NOT_EXTENDED: &str = "Not Extended";
+pub const NETWORK_AUTHENTICATION_REQUIRED: &str = "Network Authentication Required";
+pub const UNKNOWN: &str = "Unknown";
+pub const STATUS_CODE_100: &str = "100";
+pub const STATUS_CODE_101: &str = "101";
+pub const STATUS_CODE_102: &str = "102";
+pub const STATUS_CODE_103: &str = "103";
+pub const STATUS_CODE_200: &str = "200";
+pub const STATUS_CODE_201: &str = "201";
+pub const STATUS_CODE_202: &str = "202";
+pub const STATUS_CODE_203: &str = "203";
+pub const STATUS_CODE_204: &str = "204";
+pub const STATUS_CODE_205: &str = "205";
+pub const STATUS_CODE_206: &str = "206";
+pub const STATUS_CODE_207: &str = "207";
+pub const STATUS_CODE_208: &str = "208";
+pub const STATUS_CODE_226: &str = "226";
+pub const STATUS_CODE_300: &str = "300";
+pub const STATUS_CODE_301: &str = "301";
+pub const STATUS_CODE_302: &str = "302";
+pub const STATUS_CODE_303: &str = "303";
+pub const STATUS_CODE_304: &str = "304";
+pub const STATUS_CODE_305: &str = "305";
+pub const STATUS_CODE_307: &str = "307";
+pub const STATUS_CODE_308: &str = "308";
+pub const STATUS_CODE_400: &str = "400";
+pub const STATUS_CODE_401: &str = "401";
+pub const STATUS_CODE_402: &str = "402";
+pub const STATUS_CODE_403: &str = "403";
+pub const STATUS_CODE_404: &str = "404";
+pub const STATUS_CODE_405: &str = "405";
+pub const STATUS_CODE_406: &str = "406";
+pub const STATUS_CODE_407: &str = "407";
+pub const STATUS_CODE_408: &str = "408";
+pub const STATUS_CODE_409: &str = "409";
+pub const STATUS_CODE_410: &str = "410";
+pub const STATUS_CODE_411: &str = "411";
+pub const STATUS_CODE_412: &str = "412";
+pub const STATUS_CODE_413: &str = "413";
+pub const STATUS_CODE_414: &str = "414";
+pub const STATUS_CODE_415: &str = "415";
+pub const STATUS_CODE_416: &str = "416";
+pub const STATUS_CODE_417: &str = "417";
+pub const STATUS_CODE_418: &str = "418";
+pub const STATUS_CODE_421: &str = "421";
+pub const STATUS_CODE_422: &str = "422";
+pub const STATUS_CODE_423: &str = "423";
+pub const STATUS_CODE_424: &str = "424";
+pub const STATUS_CODE_425: &str = "425";
+pub const STATUS_CODE_426: &str = "426";
+pub const STATUS_CODE_428: &str = "428";
+pub const STATUS_CODE_429: &str = "429";
+pub const STATUS_CODE_431: &str = "431";
+pub const STATUS_CODE_451: &str = "451";
+pub const STATUS_CODE_500: &str = "500";
+pub const STATUS_CODE_501: &str = "501";
+pub const STATUS_CODE_502: &str = "502";
+pub const STATUS_CODE_503: &str = "503";
+pub const STATUS_CODE_504: &str = "504";
+pub const STATUS_CODE_505: &str = "505";
+pub const STATUS_CODE_506: &str = "506";
+pub const STATUS_CODE_507: &str = "507";
+pub const STATUS_CODE_508: &str = "508";
+pub const STATUS_CODE_510: &str = "510";
+pub const STATUS_CODE_511: &str = "511";
+```
+# Path: hyperlane/constant/src/http_status/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/path/const.rs
+```rust
+pub const PATH: &str = "path";
+```
+# Path: hyperlane/constant/src/path/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/header_value/const.rs
+```rust
+pub const BASIC: &str = "Basic";
+pub const NO_CACHE: &str = "no-cache";
+pub const KEEP_ALIVE: &str = "keep-alive";
+pub const CHUNKED: &str = "chunked";
+pub const DENY: &str = "DENY";
+pub const NOSNIFF: &str = "nosniff";
+pub const XMLHTTPREQUEST: &str = "XMLHttpRequest";
+pub const GZIP: &str = "gzip";
+pub const DEFLATE: &str = "deflate";
+pub const BROTLI: &str = "br";
+pub const IDENTITY: &str = "identity";
+pub const ACCEPT_ANY: &str = "*/*";
+pub const WILDCARD_ANY: &str = "*";
+pub const ENGLISH: &str = "en";
+pub const BEARER: &str = "Bearer";
+pub const BEARER_WITH_SPACE: &str = "Bearer ";
+pub const PRIVATE: &str = "private";
+pub const PUBLIC: &str = "public";
+pub const CLOSE: &str = "close";
+pub const SAMEORIGIN: &str = "SAMEORIGIN";
+pub const CHARSET: &str = "charset";
+pub const CHARSET_EQUAL: &str = "charset=";
+pub const UTF8: &str = "utf-8";
+pub const ASCII: &str = "us-ascii";
+pub const ISO_8859_1: &str = "iso-8859-1";
+pub const ISO_8859_2: &str = "iso-8859-2";
+pub const ISO_8859_3: &str = "iso-8859-3";
+pub const ISO_8859_4: &str = "iso-8859-4";
+pub const ISO_8859_5: &str = "iso-8859-5";
+pub const ISO_8859_6: &str = "iso-8859-6";
+pub const ISO_8859_7: &str = "iso-8859-7";
+pub const ISO_8859_8: &str = "iso-8859-8";
+pub const ISO_8859_9: &str = "iso-8859-9";
+pub const ISO_8859_10: &str = "iso-8859-10";
+pub const ISO_8859_11: &str = "iso-8859-11";
+pub const ISO_8859_13: &str = "iso-8859-13";
+pub const ISO_8859_14: &str = "iso-8859-14";
+pub const ISO_8859_15: &str = "iso-8859-15";
+pub const ISO_8859_16: &str = "iso-8859-16";
+pub const WINDOWS_1250: &str = "windows-1250";
+pub const WINDOWS_1251: &str = "windows-1251";
+pub const WINDOWS_1252: &str = "windows-1252";
+pub const WINDOWS_1253: &str = "windows-1253";
+pub const WINDOWS_1254: &str = "windows-1254";
+pub const WINDOWS_1255: &str = "windows-1255";
+pub const WINDOWS_1256: &str = "windows-1256";
+pub const WINDOWS_1257: &str = "windows-1257";
+pub const WINDOWS_1258: &str = "windows-1258";
+pub const KOI8_R: &str = "koi8-r";
+pub const KOI8_U: &str = "koi8-u";
+pub const SHIFT_JIS: &str = "shift_jis";
+pub const EUC_JP: &str = "euc-jp";
+pub const EUC_KR: &str = "euc-kr";
+pub const GB2312: &str = "gb2312";
+pub const BIG5: &str = "big5";
+pub const UTF16: &str = "utf-16";
+pub const UTF16LE: &str = "utf-16le";
+pub const UTF16BE: &str = "utf-16be";
+pub const UTF32: &str = "utf-32";
+pub const UTF32LE: &str = "utf-32le";
+pub const UTF32BE: &str = "utf-32be";
+pub const CHARSET_UTF_8: &str = "charset=utf-8";
+pub const CHARSET_ISO_8859_1: &str = "charset=iso-8859-1";
+pub const CHARSET_WINDOWS_1252: &str = "charset=windows-1252";
+pub const CHARSET_SHIFT_JIS: &str = "charset=shift_jis";
+pub const CHARSET_GB2312: &str = "charset=gb2312";
+pub const CHARSET_BIG5: &str = "charset=big5";
+pub const CHARSET_UTF_16: &str = "charset=utf-16";
+pub const CHARSET_UTF_32: &str = "charset=utf-32";
+pub const CHARSET_MACINTOSH: &str = "charset=macintosh";
+pub const CHARSET_EUC_KR: &str = "charset=euc-kr";
+pub const CHARSET_ASCII: &str = "charset=us-ascii";
+pub const CHARSET_ISO_8859_2: &str = "charset=iso-8859-2";
+pub const CHARSET_ISO_8859_3: &str = "charset=iso-8859-3";
+pub const CHARSET_ISO_8859_4: &str = "charset=iso-8859-4";
+pub const CHARSET_ISO_8859_5: &str = "charset=iso-8859-5";
+pub const CHARSET_ISO_8859_6: &str = "charset=iso-8859-6";
+pub const CHARSET_ISO_8859_7: &str = "charset=iso-8859-7";
+pub const CHARSET_ISO_8859_8: &str = "charset=iso-8859-8";
+pub const CHARSET_ISO_8859_9: &str = "charset=iso-8859-9";
+pub const CHARSET_ISO_8859_10: &str = "charset=iso-8859-10";
+pub const CHARSET_ISO_8859_11: &str = "charset=iso-8859-11";
+pub const CHARSET_ISO_8859_13: &str = "charset=iso-8859-13";
+pub const CHARSET_ISO_8859_14: &str = "charset=iso-8859-14";
+pub const CHARSET_ISO_8859_15: &str = "charset=iso-8859-15";
+pub const CHARSET_ISO_8859_16: &str = "charset=iso-8859-16";
+pub const CHARSET_WINDOWS_1250: &str = "charset=windows-1250";
+pub const CHARSET_WINDOWS_1251: &str = "charset=windows-1251";
+pub const CHARSET_WINDOWS_1253: &str = "charset=windows-1253";
+pub const CHARSET_WINDOWS_1254: &str = "charset=windows-1254";
+pub const CHARSET_WINDOWS_1255: &str = "charset=windows-1255";
+pub const CHARSET_WINDOWS_1256: &str = "charset=windows-1256";
+pub const CHARSET_WINDOWS_1257: &str = "charset=windows-1257";
+pub const CHARSET_WINDOWS_1258: &str = "charset=windows-1258";
+pub const CHARSET_KOI8_R: &str = "charset=koi8-r";
+pub const CHARSET_KOI8_U: &str = "charset=koi8-u";
+pub const CHARSET_EUC_JP: &str = "charset=euc-jp";
+pub const CHARSET_UTF_16LE: &str = "charset=utf-16le";
+pub const CHARSET_UTF_16BE: &str = "charset=utf-16be";
+pub const CHARSET_UTF_32LE: &str = "charset=utf-32le";
+pub const CHARSET_UTF_32BE: &str = "charset=utf-32be";
+pub const H2C_LOWERCASE: &str = "h2c";
+pub const H2C_UPPERCASE: &str = "H2C";
+pub const WEBSOCKET: &str = "websocket";
+pub const WEBSOCKET_LOWERCASE: &str = "websocket";
+pub const WEBSOCKET_UPPERCASE: &str = "WEBSOCKET";
+pub const TLS_LOWERCASE: &str = "tls";
+pub const TLS_UPPERCASE: &str = "TLS";
+pub const TLS_1_0: &str = "TLS/1.0";
+pub const TLS_1_1: &str = "TLS/1.1";
+pub const TLS_1_2: &str = "TLS/1.2";
+pub const TLS_1_3: &str = "TLS/1.3";
+pub const BYTES: &str = "bytes";
+pub const MAX_AGE: &str = "max-age";
+pub const MUST_REVALIDATE: &str = "must-revalidate";
+pub const NO_STORE: &str = "no-store";
+pub const NO_TRANSFORM: &str = "no-transform";
+pub const PROXY_REVALIDATE: &str = "proxy-revalidate";
+pub const S_MAXAGE: &str = "s-maxage";
+pub const IMMUTABLE: &str = "immutable";
+pub const STALE_WHILE_REVALIDATE: &str = "stale-while-revalidate";
+pub const STALE_IF_ERROR: &str = "stale-if-error";
+pub const NO_CACHE_NO_STORE: &str = "no-cache, no-store";
+pub const NO_CACHE_MUST_REVALIDATE: &str = "no-cache, must-revalidate";
+pub const NO_STORE_MUST_REVALIDATE: &str = "no-store, must-revalidate";
+pub const NO_CACHE_NO_STORE_MUST_REVALIDATE: &str = "no-cache, no-store, must-revalidate";
+pub const INLINE: &str = "inline";
+pub const ATTACHMENT: &str = "attachment";
+pub const FILENAME: &str = "filename";
+pub const FORM_DATA: &str = "form-data";
+pub const ALLOWALL: &str = "ALLOWALL";
+pub const NO_REFERRER: &str = "no-referrer";
+pub const NO_REFERRER_WHEN_DOWNGRADE: &str = "no-referrer-when-downgrade";
+pub const ORIGIN_ONLY: &str = "origin";
+pub const ORIGIN_WHEN_CROSS_ORIGIN: &str = "origin-when-cross-origin";
+pub const SAME_ORIGIN: &str = "same-origin";
+pub const STRICT_ORIGIN: &str = "strict-origin";
+pub const STRICT_ORIGIN_WHEN_CROSS_ORIGIN: &str = "strict-origin-when-cross-origin";
+pub const UNSAFE_URL: &str = "unsafe-url";
+pub const REQUIRE_CORP: &str = "require-corp";
+pub const CREDENTIALLESS: &str = "credentialless";
+pub const SAME_ORIGIN_COOP: &str = "same-origin";
+pub const SAME_ORIGIN_ALLOW_POPUPS: &str = "same-origin-allow-popups";
+pub const UNSAFE_NONE: &str = "unsafe-none";
+pub const SAME_SITE: &str = "same-site";
+pub const CROSS_ORIGIN: &str = "cross-origin";
+pub const XSS_PROTECTION_BLOCK: &str = "1; mode=block";
+pub const XSS_PROTECTION_DISABLED: &str = "0";
+pub const DNS_PREFETCH_ON: &str = "on";
+pub const DNS_PREFETCH_OFF: &str = "off";
+pub const NOOPEN: &str = "noopen";
+pub const NONE: &str = "none";
+pub const MASTER_ONLY: &str = "master-only";
+pub const BY_CONTENT_TYPE: &str = "by-content-type";
+pub const ALL: &str = "all";
+pub const NOINDEX: &str = "noindex";
+pub const NOFOLLOW: &str = "nofollow";
+pub const NOARCHIVE: &str = "noarchive";
+pub const NOSNIPPET: &str = "nosnippet";
+pub const NOIMAGEINDEX: &str = "noimageindex";
+pub const IE_EDGE: &str = "IE=edge";
+pub const CONTINUE_EXPECT: &str = "100-continue";
+pub const COMPRESS: &str = "compress";
+pub const NONE_RANGES: &str = "none";
+pub const VARY_ACCEPT_ENCODING: &str = "accept-encoding";
+pub const VARY_USER_AGENT: &str = "user-agent";
+pub const VARY_ORIGIN: &str = "origin";
+pub const COOKIE_DOMAIN: &str = "Domain";
+pub const COOKIE_DOMAIN_LOWERCASE: &str = "domain";
+pub const COOKIE_PATH: &str = "Path";
+pub const COOKIE_PATH_LOWERCASE: &str = "path";
+pub const COOKIE_SECURE: &str = "Secure";
+pub const COOKIE_SECURE_LOWERCASE: &str = "secure";
+pub const COOKIE_HTTP_ONLY: &str = "HttpOnly";
+pub const COOKIE_HTTP_ONLY_LOWERCASE: &str = "httponly";
+pub const COOKIE_SAME_SITE: &str = "SameSite";
+pub const COOKIE_SAME_SITE_LOWERCASE: &str = "samesite";
+pub const COOKIE_MAX_AGE: &str = "Max-Age";
+pub const COOKIE_MAX_AGE_LOWERCASE: &str = "max-age";
+pub const COOKIE_EXPIRES: &str = "Expires";
+pub const COOKIE_EXPIRES_LOWERCASE: &str = "expires";
+pub const COOKIE_PRIORITY: &str = "Priority";
+pub const COOKIE_PRIORITY_LOWERCASE: &str = "priority";
+pub const COOKIE_PRELOAD: &str = "Preload";
+pub const COOKIE_PRELOAD_LOWERCASE: &str = "preload";
+pub const COOKIE_SAME_SITE_STRICT: &str = "Strict";
+pub const COOKIE_SAME_SITE_LAX: &str = "Lax";
+pub const COOKIE_SAME_SITE_NONE: &str = "None";
+pub const COOKIE_SAME_SITE_STRICT_LOWERCASE: &str = "strict";
+pub const COOKIE_SAME_SITE_LAX_LOWERCASE: &str = "lax";
+pub const COOKIE_SAME_SITE_NONE_LOWERCASE: &str = "none";
+pub const COOKIE_PRIORITY_LOW: &str = "Low";
+pub const COOKIE_PRIORITY_MEDIUM: &str = "Medium";
+pub const COOKIE_PRIORITY_HIGH: &str = "High";
+pub const COOKIE_PRIORITY_LOW_LOWERCASE: &str = "low";
+pub const COOKIE_PRIORITY_MEDIUM_LOWERCASE: &str = "medium";
+pub const COOKIE_PRIORITY_HIGH_LOWERCASE: &str = "high";
+pub const COOKIE_SAME_SITE_STRICT_ATTR: &str = "SameSite=Strict";
+pub const COOKIE_SAME_SITE_LAX_ATTR: &str = "SameSite=Lax";
+pub const COOKIE_SAME_SITE_NONE_ATTR: &str = "SameSite=None";
+pub const COOKIE_SAME_SITE_STRICT_ATTR_LOWERCASE: &str = "samesite=strict";
+pub const COOKIE_SAME_SITE_LAX_ATTR_LOWERCASE: &str = "samesite=lax";
+pub const COOKIE_SAME_SITE_NONE_ATTR_LOWERCASE: &str = "samesite=none";
+pub const COOKIE_PRIORITY_LOW_ATTR: &str = "Priority=Low";
+pub const COOKIE_PRIORITY_MEDIUM_ATTR: &str = "Priority=Medium";
+pub const COOKIE_PRIORITY_HIGH_ATTR: &str = "Priority=High";
+pub const COOKIE_PRIORITY_LOW_ATTR_LOWERCASE: &str = "priority=low";
+pub const COOKIE_PRIORITY_MEDIUM_ATTR_LOWERCASE: &str = "priority=medium";
+pub const COOKIE_PRIORITY_HIGH_ATTR_LOWERCASE: &str = "priority=high";
+pub const COOKIE_SEPARATOR: &str = "; ";
+pub const COOKIE_NAME_VALUE_SEPARATOR: &str = "=";
+pub const COOKIE_DOMAIN_PREFIX: &str = "Domain=";
+pub const COOKIE_DOMAIN_PREFIX_LOWERCASE: &str = "domain=";
+pub const COOKIE_PATH_PREFIX: &str = "Path=";
+pub const COOKIE_PATH_PREFIX_LOWERCASE: &str = "path=";
+pub const COOKIE_MAX_AGE_PREFIX: &str = "Max-Age=";
+pub const COOKIE_MAX_AGE_PREFIX_LOWERCASE: &str = "max-age=";
+pub const COOKIE_EXPIRES_PREFIX: &str = "Expires=";
+pub const COOKIE_EXPIRES_PREFIX_LOWERCASE: &str = "expires=";
+pub const COOKIE_SAME_SITE_PREFIX: &str = "SameSite=";
+pub const COOKIE_SAME_SITE_PREFIX_LOWERCASE: &str = "samesite=";
+pub const COOKIE_PRIORITY_PREFIX: &str = "Priority=";
+pub const COOKIE_PRIORITY_PREFIX_LOWERCASE: &str = "priority=";
+pub const COOKIE_MAX_AGE_DELETE: &str = "0";
+pub const EXPIRES_DISABLED: &str = "0";
+pub const COOKIE_MAX_AGE_SESSION: &str = "";
+pub const COOKIE_MAX_AGE_1_HOUR: &str = "3600";
+pub const COOKIE_MAX_AGE_1_DAY: &str = "86400";
+pub const COOKIE_MAX_AGE_1_WEEK: &str = "604800";
+pub const COOKIE_MAX_AGE_1_MONTH: &str = "2592000";
+pub const COOKIE_MAX_AGE_1_YEAR: &str = "31536000";
+pub const COOKIE_PATH_ROOT: &str = "/";
+pub const COOKIE_DOMAIN_LOCALHOST: &str = "localhost";
+pub const COOKIE_SECURE_PREFIX: &str = "__Secure-";
+pub const COOKIE_HOST_PREFIX: &str = "__Host-";
+pub const COOKIE_SECURE_HTTP_ONLY: &str = "Secure; HttpOnly";
+pub const COOKIE_SECURE_HTTP_ONLY_LOWERCASE: &str = "secure; httponly";
+pub const COOKIE_SECURE_HTTP_ONLY_SAME_SITE_STRICT: &str = "Secure; HttpOnly; SameSite=Strict";
+pub const COOKIE_SECURE_HTTP_ONLY_SAME_SITE_STRICT_LOWERCASE: &str =
+    "secure; httponly; samesite=strict";
+pub const COOKIE_SECURE_HTTP_ONLY_SAME_SITE_LAX: &str = "Secure; HttpOnly; SameSite=Lax";
+pub const COOKIE_SECURE_HTTP_ONLY_SAME_SITE_LAX_LOWERCASE: &str = "secure; httponly; samesite=lax";
+pub const COOKIE_SECURE_HTTP_ONLY_SAME_SITE_NONE: &str = "Secure; HttpOnly; SameSite=None";
+pub const COOKIE_SECURE_HTTP_ONLY_SAME_SITE_NONE_LOWERCASE: &str =
+    "secure; httponly; samesite=none";
+pub const COOKIE_PATH_ROOT_ATTR: &str = "Path=/";
+pub const COOKIE_PATH_ROOT_ATTR_LOWERCASE: &str = "path=/";
+pub const COOKIE_DELETE_ATTRS: &str = "Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT";
+pub const COOKIE_DELETE_ATTRS_LOWERCASE: &str = "max-age=0; expires=thu, 01 jan 1970 00:00:00 gmt";
+pub const COOKIE_EXPIRES_EPOCH: &str = "Thu, 01 Jan 1970 00:00:00 GMT";
+pub const COOKIE_EXPIRES_ATTRIBUTE: &str = "; Expires=";
+pub const COOKIE_EXPIRES_ATTRIBUTE_LOWERCASE: &str = "; expires=";
+pub const COOKIE_MAX_AGE_ATTRIBUTE: &str = "; Max-Age=";
+pub const COOKIE_MAX_AGE_ATTRIBUTE_LOWERCASE: &str = "; max-age=";
+pub const COOKIE_DOMAIN_ATTRIBUTE: &str = "; Domain=";
+pub const COOKIE_DOMAIN_ATTRIBUTE_LOWERCASE: &str = "; domain=";
+pub const COOKIE_PATH_ATTRIBUTE: &str = "; Path=";
+pub const COOKIE_PATH_ATTRIBUTE_LOWERCASE: &str = "; path=";
+pub const COOKIE_SECURE_ATTRIBUTE: &str = "; Secure";
+pub const COOKIE_SECURE_ATTRIBUTE_LOWERCASE: &str = "; secure";
+pub const COOKIE_HTTP_ONLY_ATTRIBUTE: &str = "; HttpOnly";
+pub const COOKIE_HTTP_ONLY_ATTRIBUTE_LOWERCASE: &str = "; httponly";
+pub const COOKIE_SAME_SITE_ATTRIBUTE: &str = "; SameSite=";
+pub const COOKIE_SAME_SITE_ATTRIBUTE_LOWERCASE: &str = "; samesite=";
+```
+# Path: hyperlane/constant/src/header_value/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/header_key/const.rs
+```rust
+use super::*;
+pub const HEADERS: &str = "headers";
+pub const SERVER: &str = "server";
+pub const ACCEPT: &str = "accept";
+pub const ACCEPT_ENCODING: &str = "accept-encoding";
+pub const ACCEPT_LANGUAGE: &str = "accept-language";
+pub const AUTHORIZATION: &str = "authorization";
+pub const CACHE_CONTROL: &str = "cache-control";
+pub const CONNECTION: &str = "connection";
+pub const COOKIE: &str = "cookie";
+pub const DATE: &str = "date";
+pub const ETAG: &str = "etag";
+pub const HOST: &str = "host";
+pub const LAST_MODIFIED: &str = "last-modified";
+pub const LOCATION: &str = "location";
+pub const REFERER: &str = "referer";
+pub const REFRESH: &str = "refresh";
+pub const SET_COOKIE: &str = "set-cookie";
+pub const TRANSFER_ENCODING: &str = "transfer-encoding";
+pub const UPGRADE: &str = "upgrade";
+pub const SEC_WEBSOCKET_ACCEPT: &str = "sec-websocket-accept";
+pub const SEC_WEBSOCKET_KEY: &str = "sec-websocket-key";
+pub const SEC_WEBSOCKET_VERSION: &str = "sec-websocket-version";
+pub const SEC_WEBSOCKET_PROTOCOL: &str = "sec-websocket-protocol";
+pub const SEC_WEBSOCKET_EXTENSIONS: &str = "sec-websocket-extensions";
+pub const VARY: &str = "vary";
+pub const X_FRAME_OPTIONS: &str = "x-frame-options";
+pub const X_CONTENT_TYPE_OPTIONS: &str = "x-content-type-options";
+pub const X_POWERED_BY: &str = "x-powered-by";
+pub const X_REQUESTED_WITH: &str = "x-requested-with";
+pub const CONTENT_LENGTH: &str = "content-length";
+pub const CONTENT_ENCODING: &str = "content-encoding";
+pub const CONTENT_TYPE: &str = "content-type";
+pub const USER_AGENT: &str = "user-agent";
+pub const ACCESS_CONTROL_ALLOW_ORIGIN: &str = "access-control-allow-origin";
+pub const ACCESS_CONTROL_ALLOW_METHODS: &str = "access-control-allow-methods";
+pub const ACCESS_CONTROL_ALLOW_HEADERS: &str = "access-control-allow-headers";
+pub const EXPIRES: &str = "expires";
+pub const IF_MATCH: &str = "if-match";
+pub const IF_NONE_MATCH: &str = "if-none-match";
+pub const IF_MODIFIED_SINCE: &str = "if-modified-since";
+pub const IF_UNMODIFIED_SINCE: &str = "if-unmodified-since";
+pub const ACCEPT_CHARSET: &str = "accept-charset";
+pub const ACCESS_CONTROL_MAX_AGE: &str = "access-control-max-age";
+pub const ACCESS_CONTROL_EXPOSE_HEADERS: &str = "access-control-expose-headers";
+pub const ACCESS_CONTROL_REQUEST_HEADERS: &str = "access-control-request-headers";
+pub const ACCESS_CONTROL_REQUEST_METHOD: &str = "access-control-request-method";
+pub const ALLOW: &str = "allow";
+pub const CONTENT_DISPOSITION: &str = "content-disposition";
+pub const CONTENT_LANGUAGE: &str = "content-language";
+pub const CONTENT_RANGE: &str = "content-range";
+pub const ORIGIN: &str = "origin";
+pub const PRAGMA: &str = "pragma";
+pub const PROXY_AUTHENTICATE: &str = "proxy-authenticate";
+pub const PROXY_AUTHORIZATION: &str = "proxy-authorization";
+pub const RETRY_AFTER: &str = "retry-after";
+pub const STRICT_TRANSPORT_SECURITY: &str = "strict-transport-security";
+pub const WWW_AUTHENTICATE: &str = "www-authenticate";
+pub const X_API_KEY: &str = "x-api-key";
+pub const X_AUTH_TOKEN: &str = "x-auth-token";
+pub const COLON_AUTHORITY: &str = ":authority";
+pub const COLON_METHOD: &str = ":method";
+pub const COLON_PATH: &str = ":path";
+pub const COLON_SCHEME: &str = ":scheme";
+pub const PRIORITY: &str = "priority";
+pub const SEC_CH_UA: &str = "sec-ch-ua";
+pub const SEC_CH_UA_MOBILE: &str = "sec-ch-ua-mobile";
+pub const SEC_CH_UA_PLATFORM: &str = "sec-ch-ua-platform";
+pub const SEC_FETCH_DEST: &str = "sec-fetch-dest";
+pub const SEC_FETCH_MODE: &str = "sec-fetch-mode";
+pub const SEC_FETCH_SITE: &str = "sec-fetch-site";
+pub const AGE: &str = "age";
+pub const ALT_SVC: &str = "alt-svc";
+pub const EXPECT: &str = "expect";
+pub const FORWARDED: &str = "forwarded";
+pub const FROM: &str = "from";
+pub const LINK: &str = "link";
+pub const MAX_FORWARDS: &str = "max-forwards";
+pub const RANGE: &str = "range";
+pub const TE: &str = "te";
+pub const VIA: &str = "via";
+pub const DNT: &str = "dnt";
+pub const SEC_FETCH_USER: &str = "sec-fetch-user";
+pub const ACCEPT_RANGES: &str = "accept-ranges";
+pub const CONTENT_MD5: &str = "content-md5";
+pub const CONTENT_LOCATION: &str = "content-location";
+pub const CONTENT_SECURITY_POLICY: &str = "content-security-policy";
+pub const CONTENT_SECURITY_POLICY_REPORT_ONLY: &str = "content-security-policy-report-only";
+pub const CONTENT_SECURITY_POLICY_REPORT: &str = "content-security-policy-report";
+pub const CONTENT_SECURITY_POLICY_REPORT_TO: &str = "content-security-policy-report-to";
+pub const CONTENT_SECURITY_POLICY_REPORT_URI: &str = "content-security-policy-report-uri";
+pub const X_FORWARDED_FOR: &str = "x-forwarded-for";
+pub const X_FORWARDED_HOST: &str = "x-forwarded-host";
+pub const X_FORWARDED_PROTO: &str = "x-forwarded-proto";
+pub const X_FORWARDED_PORT: &str = "x-forwarded-port";
+pub const X_REAL_IP: &str = "x-real-ip";
+pub const X_REQUEST_ID: &str = "x-request-id";
+pub const X_CORRELATION_ID: &str = "x-correlation-id";
+pub const X_TRACE_ID: &str = "x-trace-id";
+pub const ACCEPT_PATCH: &str = "accept-patch";
+pub const IF_RANGE: &str = "if-range";
+pub const WARNING_HEADER: &str = "warning";
+pub const UPGRADE_INSECURE_REQUESTS: &str = "upgrade-insecure-requests";
+pub const X_XSS_PROTECTION: &str = "x-xss-protection";
+pub const REFERRER_POLICY: &str = "referrer-policy";
+pub const FEATURE_POLICY: &str = "feature-policy";
+pub const PERMISSIONS_POLICY: &str = "permissions-policy";
+pub const CROSS_ORIGIN_EMBEDDER_POLICY: &str = "cross-origin-embedder-policy";
+pub const CROSS_ORIGIN_OPENER_POLICY: &str = "cross-origin-opener-policy";
+pub const CROSS_ORIGIN_RESOURCE_POLICY: &str = "cross-origin-resource-policy";
+pub const TIMING_ALLOW_ORIGIN: &str = "timing-allow-origin";
+pub const SERVER_TIMING: &str = "server-timing";
+pub const CLEAR_SITE_DATA: &str = "clear-site-data";
+pub const EARLY_DATA: &str = "early-data";
+pub const ACCEPT_POST: &str = "accept-post";
+pub const ACCESS_CONTROL_ALLOW_CREDENTIALS: &str = "access-control-allow-credentials";
+pub const NEL: &str = "nel";
+pub const REPORT_TO: &str = "report-to";
+pub const SOURCEMAP: &str = "sourcemap";
+pub const X_DNS_PREFETCH_CONTROL: &str = "x-dns-prefetch-control";
+pub const X_DOWNLOAD_OPTIONS: &str = "x-download-options";
+pub const X_PERMITTED_CROSS_DOMAIN_POLICIES: &str = "x-permitted-cross-domain-policies";
+pub const X_ROBOTS_TAG: &str = "x-robots-tag";
+pub const X_UA_COMPATIBLE: &str = "x-ua-compatible";
+pub const CDN_LOOP: &str = "cdn-loop";
+pub const CF_CONNECTING_IP: &str = "cf-connecting-ip";
+pub const CF_RAY: &str = "cf-ray";
+pub const CF_VISITOR: &str = "cf-visitor";
+pub const TRUE_CLIENT_IP: &str = "true-client-ip";
+pub const PROXY_CONNECTION: &str = "proxy-connection";
+pub const HTTP2_FORBIDDEN_HEADERS: [&str; 5] = [
+    CONNECTION,
+    KEEP_ALIVE,
+    PROXY_CONNECTION,
+    TRANSFER_ENCODING,
+    UPGRADE,
+];
+pub const SOCKET_ADDRESS: &str = "socket-address";
+pub const TOKEN: &str = "token";
+```
+# Path: hyperlane/constant/src/header_key/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+use super::*;
+```
+# Path: hyperlane/constant/src/query/const.rs
+```rust
+pub const QUERYS: &str = "querys";
+```
+# Path: hyperlane/constant/src/query/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/method/const.rs
+```rust
+pub const METHOD: &str = "method";
+pub const GET: &str = "GET";
+pub const POST: &str = "POST";
+pub const PUT: &str = "PUT";
+pub const DELETE: &str = "DELETE";
+pub const PATCH: &str = "PATCH";
+pub const HEAD: &str = "HEAD";
+pub const OPTIONS: &str = "OPTIONS";
+pub const CONNECT: &str = "CONNECT";
+pub const TRACE: &str = "TRACE";
+pub const GET_POST: &str = "GET, POST";
+pub const GET_PUT: &str = "GET, PUT";
+pub const GET_DELETE: &str = "GET, DELETE";
+pub const GET_PATCH: &str = "GET, PATCH";
+pub const GET_HEAD: &str = "GET, HEAD";
+pub const GET_OPTIONS: &str = "GET, OPTIONS";
+pub const GET_CONNECT: &str = "GET, CONNECT";
+pub const GET_TRACE: &str = "GET, TRACE";
+pub const POST_PUT: &str = "POST, PUT";
+pub const POST_DELETE: &str = "POST, DELETE";
+pub const POST_PATCH: &str = "POST, PATCH";
+pub const POST_HEAD: &str = "POST, HEAD";
+pub const POST_OPTIONS: &str = "POST, OPTIONS";
+pub const POST_CONNECT: &str = "POST, CONNECT";
+pub const POST_TRACE: &str = "POST, TRACE";
+pub const PUT_DELETE: &str = "PUT, DELETE";
+pub const PUT_PATCH: &str = "PUT, PATCH";
+pub const PUT_HEAD: &str = "PUT, HEAD";
+pub const PUT_OPTIONS: &str = "PUT, OPTIONS";
+pub const PUT_CONNECT: &str = "PUT, CONNECT";
+pub const PUT_TRACE: &str = "PUT, TRACE";
+pub const DELETE_PATCH: &str = "DELETE, PATCH";
+pub const DELETE_HEAD: &str = "DELETE, HEAD";
+pub const DELETE_OPTIONS: &str = "DELETE, OPTIONS";
+pub const DELETE_CONNECT: &str = "DELETE, CONNECT";
+pub const DELETE_TRACE: &str = "DELETE, TRACE";
+pub const PATCH_HEAD: &str = "PATCH, HEAD";
+pub const PATCH_OPTIONS: &str = "PATCH, OPTIONS";
+pub const PATCH_CONNECT: &str = "PATCH, CONNECT";
+pub const PATCH_TRACE: &str = "PATCH, TRACE";
+pub const HEAD_OPTIONS: &str = "HEAD, OPTIONS";
+pub const HEAD_CONNECT: &str = "HEAD, CONNECT";
+pub const HEAD_TRACE: &str = "HEAD, TRACE";
+pub const OPTIONS_CONNECT: &str = "OPTIONS, CONNECT";
+pub const OPTIONS_TRACE: &str = "OPTIONS, TRACE";
+pub const CONNECT_TRACE: &str = "CONNECT, TRACE";
+pub const GET_POST_PUT: &str = "GET, POST, PUT";
+pub const GET_POST_DELETE: &str = "GET, POST, DELETE";
+pub const GET_POST_PATCH: &str = "GET, POST, PATCH";
+pub const GET_POST_HEAD: &str = "GET, POST, HEAD";
+pub const GET_POST_OPTIONS: &str = "GET, POST, OPTIONS";
+pub const GET_POST_CONNECT: &str = "GET, POST, CONNECT";
+pub const GET_POST_TRACE: &str = "GET, POST, TRACE";
+pub const GET_PUT_DELETE: &str = "GET, PUT, DELETE";
+pub const GET_PUT_PATCH: &str = "GET, PUT, PATCH";
+pub const GET_PUT_HEAD: &str = "GET, PUT, HEAD";
+pub const GET_PUT_OPTIONS: &str = "GET, PUT, OPTIONS";
+pub const GET_PUT_CONNECT: &str = "GET, PUT, CONNECT";
+pub const GET_PUT_TRACE: &str = "GET, PUT, TRACE";
+pub const GET_DELETE_PATCH: &str = "GET, DELETE, PATCH";
+pub const GET_DELETE_HEAD: &str = "GET, DELETE, HEAD";
+pub const GET_DELETE_OPTIONS: &str = "GET, DELETE, OPTIONS";
+pub const GET_DELETE_CONNECT: &str = "GET, DELETE, CONNECT";
+pub const GET_DELETE_TRACE: &str = "GET, DELETE, TRACE";
+pub const GET_PATCH_HEAD: &str = "GET, PATCH, HEAD";
+pub const GET_PATCH_OPTIONS: &str = "GET, PATCH, OPTIONS";
+pub const GET_PATCH_CONNECT: &str = "GET, PATCH, CONNECT";
+pub const GET_PATCH_TRACE: &str = "GET, PATCH, TRACE";
+pub const GET_HEAD_OPTIONS: &str = "GET, HEAD, OPTIONS";
+pub const GET_HEAD_CONNECT: &str = "GET, HEAD, CONNECT";
+pub const GET_HEAD_TRACE: &str = "GET, HEAD, TRACE";
+pub const GET_OPTIONS_CONNECT: &str = "GET, OPTIONS, CONNECT";
+pub const GET_OPTIONS_TRACE: &str = "GET, OPTIONS, TRACE";
+pub const GET_CONNECT_TRACE: &str = "GET, CONNECT, TRACE";
+pub const POST_PUT_DELETE: &str = "POST, PUT, DELETE";
+pub const POST_PUT_PATCH: &str = "POST, PUT, PATCH";
+pub const POST_PUT_HEAD: &str = "POST, PUT, HEAD";
+pub const POST_PUT_OPTIONS: &str = "POST, PUT, OPTIONS";
+pub const POST_PUT_CONNECT: &str = "POST, PUT, CONNECT";
+pub const POST_PUT_TRACE: &str = "POST, PUT, TRACE";
+pub const POST_DELETE_PATCH: &str = "POST, DELETE, PATCH";
+pub const POST_DELETE_HEAD: &str = "POST, DELETE, HEAD";
+pub const POST_DELETE_OPTIONS: &str = "POST, DELETE, OPTIONS";
+pub const POST_DELETE_CONNECT: &str = "POST, DELETE, CONNECT";
+pub const POST_DELETE_TRACE: &str = "POST, DELETE, TRACE";
+pub const POST_PATCH_HEAD: &str = "POST, PATCH, HEAD";
+pub const POST_PATCH_OPTIONS: &str = "POST, PATCH, OPTIONS";
+pub const POST_PATCH_CONNECT: &str = "POST, PATCH, CONNECT";
+pub const POST_PATCH_TRACE: &str = "POST, PATCH, TRACE";
+pub const POST_HEAD_OPTIONS: &str = "POST, HEAD, OPTIONS";
+pub const POST_HEAD_CONNECT: &str = "POST, HEAD, CONNECT";
+pub const POST_HEAD_TRACE: &str = "POST, HEAD, TRACE";
+pub const POST_OPTIONS_CONNECT: &str = "POST, OPTIONS, CONNECT";
+pub const POST_OPTIONS_TRACE: &str = "POST, OPTIONS, TRACE";
+pub const POST_CONNECT_TRACE: &str = "POST, CONNECT, TRACE";
+pub const PUT_DELETE_PATCH: &str = "PUT, DELETE, PATCH";
+pub const PUT_DELETE_HEAD: &str = "PUT, DELETE, HEAD";
+pub const PUT_DELETE_OPTIONS: &str = "PUT, DELETE, OPTIONS";
+pub const PUT_DELETE_CONNECT: &str = "PUT, DELETE, CONNECT";
+pub const PUT_DELETE_TRACE: &str = "PUT, DELETE, TRACE";
+pub const PUT_PATCH_HEAD: &str = "PUT, PATCH, HEAD";
+pub const PUT_PATCH_OPTIONS: &str = "PUT, PATCH, OPTIONS";
+pub const PUT_PATCH_CONNECT: &str = "PUT, PATCH, CONNECT";
+pub const PUT_PATCH_TRACE: &str = "PUT, PATCH, TRACE";
+pub const PUT_HEAD_OPTIONS: &str = "PUT, HEAD, OPTIONS";
+pub const PUT_HEAD_CONNECT: &str = "PUT, HEAD, CONNECT";
+pub const PUT_HEAD_TRACE: &str = "PUT, HEAD, TRACE";
+pub const PUT_OPTIONS_CONNECT: &str = "PUT, OPTIONS, CONNECT";
+pub const PUT_OPTIONS_TRACE: &str = "PUT, OPTIONS, TRACE";
+pub const PUT_CONNECT_TRACE: &str = "PUT, CONNECT, TRACE";
+pub const DELETE_PATCH_HEAD: &str = "DELETE, PATCH, HEAD";
+pub const DELETE_PATCH_OPTIONS: &str = "DELETE, PATCH, OPTIONS";
+pub const DELETE_PATCH_CONNECT: &str = "DELETE, PATCH, CONNECT";
+pub const DELETE_PATCH_TRACE: &str = "DELETE, PATCH, TRACE";
+pub const DELETE_HEAD_OPTIONS: &str = "DELETE, HEAD, OPTIONS";
+pub const DELETE_HEAD_CONNECT: &str = "DELETE, HEAD, CONNECT";
+pub const DELETE_HEAD_TRACE: &str = "DELETE, HEAD, TRACE";
+pub const DELETE_OPTIONS_CONNECT: &str = "DELETE, OPTIONS, CONNECT";
+pub const DELETE_OPTIONS_TRACE: &str = "DELETE, OPTIONS, TRACE";
+pub const DELETE_CONNECT_TRACE: &str = "DELETE, CONNECT, TRACE";
+pub const PATCH_HEAD_OPTIONS: &str = "PATCH, HEAD, OPTIONS";
+pub const PATCH_HEAD_CONNECT: &str = "PATCH, HEAD, CONNECT";
+pub const PATCH_HEAD_TRACE: &str = "PATCH, HEAD, TRACE";
+pub const PATCH_OPTIONS_CONNECT: &str = "PATCH, OPTIONS, CONNECT";
+pub const PATCH_OPTIONS_TRACE: &str = "PATCH, OPTIONS, TRACE";
+pub const PATCH_CONNECT_TRACE: &str = "PATCH, CONNECT, TRACE";
+pub const HEAD_OPTIONS_CONNECT: &str = "HEAD, OPTIONS, CONNECT";
+pub const HEAD_OPTIONS_TRACE: &str = "HEAD, OPTIONS, TRACE";
+pub const HEAD_CONNECT_TRACE: &str = "HEAD, CONNECT, TRACE";
+pub const OPTIONS_CONNECT_TRACE: &str = "OPTIONS, CONNECT, TRACE";
+pub const GET_POST_PUT_DELETE: &str = "GET, POST, PUT, DELETE";
+pub const GET_POST_PUT_PATCH: &str = "GET, POST, PUT, PATCH";
+pub const GET_POST_PUT_HEAD: &str = "GET, POST, PUT, HEAD";
+pub const GET_POST_PUT_OPTIONS: &str = "GET, POST, PUT, OPTIONS";
+pub const GET_POST_PUT_CONNECT: &str = "GET, POST, PUT, CONNECT";
+pub const GET_POST_PUT_TRACE: &str = "GET, POST, PUT, TRACE";
+pub const GET_POST_DELETE_PATCH: &str = "GET, POST, DELETE, PATCH";
+pub const GET_POST_DELETE_HEAD: &str = "GET, POST, DELETE, HEAD";
+pub const GET_POST_DELETE_OPTIONS: &str = "GET, POST, DELETE, OPTIONS";
+pub const GET_POST_DELETE_CONNECT: &str = "GET, POST, DELETE, CONNECT";
+pub const GET_POST_DELETE_TRACE: &str = "GET, POST, DELETE, TRACE";
+pub const GET_POST_PATCH_HEAD: &str = "GET, POST, PATCH, HEAD";
+pub const GET_POST_PATCH_OPTIONS: &str = "GET, POST, PATCH, OPTIONS";
+pub const GET_POST_PATCH_CONNECT: &str = "GET, POST, PATCH, CONNECT";
+pub const GET_POST_PATCH_TRACE: &str = "GET, POST, PATCH, TRACE";
+pub const GET_POST_HEAD_OPTIONS: &str = "GET, POST, HEAD, OPTIONS";
+pub const GET_POST_HEAD_CONNECT: &str = "GET, POST, HEAD, CONNECT";
+pub const GET_POST_HEAD_TRACE: &str = "GET, POST, HEAD, TRACE";
+pub const GET_POST_OPTIONS_CONNECT: &str = "GET, POST, OPTIONS, CONNECT";
+pub const GET_POST_OPTIONS_TRACE: &str = "GET, POST, OPTIONS, TRACE";
+pub const GET_POST_CONNECT_TRACE: &str = "GET, POST, CONNECT, TRACE";
+pub const GET_PUT_DELETE_PATCH: &str = "GET, PUT, DELETE, PATCH";
+pub const GET_PUT_DELETE_HEAD: &str = "GET, PUT, DELETE, HEAD";
+pub const GET_PUT_DELETE_OPTIONS: &str = "GET, PUT, DELETE, OPTIONS";
+pub const GET_PUT_DELETE_CONNECT: &str = "GET, PUT, DELETE, CONNECT";
+pub const GET_PUT_DELETE_TRACE: &str = "GET, PUT, DELETE, TRACE";
+pub const GET_PUT_PATCH_HEAD: &str = "GET, PUT, PATCH, HEAD";
+pub const GET_PUT_PATCH_OPTIONS: &str = "GET, PUT, PATCH, OPTIONS";
+pub const GET_PUT_PATCH_CONNECT: &str = "GET, PUT, PATCH, CONNECT";
+pub const GET_PUT_PATCH_TRACE: &str = "GET, PUT, PATCH, TRACE";
+pub const GET_PUT_HEAD_OPTIONS: &str = "GET, PUT, HEAD, OPTIONS";
+pub const GET_PUT_HEAD_CONNECT: &str = "GET, PUT, HEAD, CONNECT";
+pub const GET_PUT_HEAD_TRACE: &str = "GET, PUT, HEAD, TRACE";
+pub const GET_PUT_OPTIONS_CONNECT: &str = "GET, PUT, OPTIONS, CONNECT";
+pub const GET_PUT_OPTIONS_TRACE: &str = "GET, PUT, OPTIONS, TRACE";
+pub const GET_PUT_CONNECT_TRACE: &str = "GET, PUT, CONNECT, TRACE";
+pub const GET_DELETE_PATCH_HEAD: &str = "GET, DELETE, PATCH, HEAD";
+pub const GET_DELETE_PATCH_OPTIONS: &str = "GET, DELETE, PATCH, OPTIONS";
+pub const GET_DELETE_PATCH_CONNECT: &str = "GET, DELETE, PATCH, CONNECT";
+pub const GET_DELETE_PATCH_TRACE: &str = "GET, DELETE, PATCH, TRACE";
+pub const GET_DELETE_HEAD_OPTIONS: &str = "GET, DELETE, HEAD, OPTIONS";
+pub const GET_DELETE_HEAD_CONNECT: &str = "GET, DELETE, HEAD, CONNECT";
+pub const GET_DELETE_HEAD_TRACE: &str = "GET, DELETE, HEAD, TRACE";
+pub const GET_DELETE_OPTIONS_CONNECT: &str = "GET, DELETE, OPTIONS, CONNECT";
+pub const GET_DELETE_OPTIONS_TRACE: &str = "GET, DELETE, OPTIONS, TRACE";
+pub const GET_DELETE_CONNECT_TRACE: &str = "GET, DELETE, CONNECT, TRACE";
+pub const GET_PATCH_HEAD_OPTIONS: &str = "GET, PATCH, HEAD, OPTIONS";
+pub const GET_PATCH_HEAD_CONNECT: &str = "GET, PATCH, HEAD, CONNECT";
+pub const GET_PATCH_HEAD_TRACE: &str = "GET, PATCH, HEAD, TRACE";
+pub const GET_PATCH_OPTIONS_CONNECT: &str = "GET, PATCH, OPTIONS, CONNECT";
+pub const GET_PATCH_OPTIONS_TRACE: &str = "GET, PATCH, OPTIONS, TRACE";
+pub const GET_PATCH_CONNECT_TRACE: &str = "GET, PATCH, CONNECT, TRACE";
+pub const GET_HEAD_OPTIONS_CONNECT: &str = "GET, HEAD, OPTIONS, CONNECT";
+pub const GET_HEAD_OPTIONS_TRACE: &str = "GET, HEAD, OPTIONS, TRACE";
+pub const GET_HEAD_CONNECT_TRACE: &str = "GET, HEAD, CONNECT, TRACE";
+pub const GET_OPTIONS_CONNECT_TRACE: &str = "GET, OPTIONS, CONNECT, TRACE";
+pub const POST_PUT_DELETE_PATCH_HEAD_OPTIONS: &str = "POST, PUT, DELETE, PATCH, HEAD, OPTIONS";
+pub const POST_PUT_DELETE_PATCH_HEAD_CONNECT: &str = "POST, PUT, DELETE, PATCH, HEAD, CONNECT";
+pub const POST_PUT_DELETE_PATCH_HEAD_TRACE: &str = "POST, PUT, DELETE, PATCH, HEAD, TRACE";
+pub const POST_PUT_DELETE_PATCH_OPTIONS_CONNECT: &str =
+    "POST, PUT, DELETE, PATCH, OPTIONS, CONNECT";
+pub const POST_PUT_DELETE_PATCH_OPTIONS_TRACE: &str = "POST, PUT, DELETE, PATCH, OPTIONS, TRACE";
+pub const POST_PUT_DELETE_PATCH_CONNECT_TRACE: &str = "POST, PUT, DELETE, PATCH, CONNECT, TRACE";
+pub const POST_PUT_DELETE_HEAD_OPTIONS_CONNECT: &str = "POST, PUT, DELETE, HEAD, OPTIONS, CONNECT";
+pub const POST_PUT_DELETE_HEAD_OPTIONS_TRACE: &str = "POST, PUT, DELETE, HEAD, OPTIONS, TRACE";
+pub const POST_PUT_DELETE_HEAD_CONNECT_TRACE: &str = "POST, PUT, DELETE, HEAD, CONNECT, TRACE";
+pub const POST_PUT_DELETE_OPTIONS_CONNECT_TRACE: &str =
+    "POST, PUT, DELETE, OPTIONS, CONNECT, TRACE";
+pub const POST_PUT_PATCH_HEAD_OPTIONS_CONNECT: &str = "POST, PUT, PATCH, HEAD, OPTIONS, CONNECT";
+pub const POST_PUT_PATCH_HEAD_OPTIONS_TRACE: &str = "POST, PUT, PATCH, HEAD, OPTIONS, TRACE";
+pub const POST_PUT_PATCH_HEAD_CONNECT_TRACE: &str = "POST, PUT, PATCH, HEAD, CONNECT, TRACE";
+pub const POST_PUT_PATCH_OPTIONS_CONNECT_TRACE: &str = "POST, PUT, PATCH, OPTIONS, CONNECT, TRACE";
+pub const POST_PUT_HEAD_OPTIONS_CONNECT_TRACE: &str = "POST, PUT, HEAD, OPTIONS, CONNECT, TRACE";
+pub const POST_DELETE_PATCH_HEAD_OPTIONS_CONNECT: &str =
+    "POST, DELETE, PATCH, HEAD, OPTIONS, CONNECT";
+pub const POST_DELETE_PATCH_HEAD_OPTIONS_TRACE: &str = "POST, DELETE, PATCH, HEAD, OPTIONS, TRACE";
+pub const POST_DELETE_PATCH_HEAD_CONNECT_TRACE: &str = "POST, DELETE, PATCH, HEAD, CONNECT, TRACE";
+pub const POST_DELETE_PATCH_OPTIONS_CONNECT_TRACE: &str =
+    "POST, DELETE, PATCH, OPTIONS, CONNECT, TRACE";
+pub const POST_DELETE_HEAD_OPTIONS_CONNECT_TRACE: &str =
+    "POST, DELETE, HEAD, OPTIONS, CONNECT, TRACE";
+pub const POST_PATCH_HEAD_OPTIONS_CONNECT_TRACE: &str =
+    "POST, PATCH, HEAD, OPTIONS, CONNECT, TRACE";
+pub const PUT_DELETE_PATCH_HEAD_OPTIONS_CONNECT: &str =
+    "PUT, DELETE, PATCH, HEAD, OPTIONS, CONNECT";
+pub const PUT_DELETE_PATCH_HEAD_OPTIONS_TRACE: &str = "PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE";
+pub const PUT_DELETE_PATCH_HEAD_CONNECT_TRACE: &str = "PUT, DELETE, PATCH, HEAD, CONNECT, TRACE";
+pub const PUT_DELETE_PATCH_OPTIONS_CONNECT_TRACE: &str =
+    "PUT, DELETE, PATCH, OPTIONS, CONNECT, TRACE";
+pub const PUT_DELETE_HEAD_OPTIONS_CONNECT_TRACE: &str =
+    "PUT, DELETE, HEAD, OPTIONS, CONNECT, TRACE";
+pub const PUT_PATCH_HEAD_OPTIONS_CONNECT_TRACE: &str = "PUT, PATCH, HEAD, OPTIONS, CONNECT, TRACE";
+pub const DELETE_PATCH_HEAD_OPTIONS_CONNECT_TRACE: &str =
+    "DELETE, PATCH, HEAD, OPTIONS, CONNECT, TRACE";
+pub const GET_POST_PUT_DELETE_PATCH_HEAD_OPTIONS_CONNECT_TRACE: &str =
+    "GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, CONNECT, TRACE";
+pub const ALL_METHODS: &str = GET_POST_PUT_DELETE_PATCH_HEAD_OPTIONS_CONNECT_TRACE;
+```
+# Path: hyperlane/constant/src/method/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/common/const.rs
+```rust
+use super::*;
+pub const SPACE: &str = " ";
+pub const SPACE_BYTES: &[u8] = SPACE.as_bytes();
+pub const SPACE_U8: u8 = SPACE_BYTES[0];
+pub const TAB: &str = "\t";
+pub const TAB_BYTES: &[u8] = TAB.as_bytes();
+pub const TAB_U8: u8 = TAB_BYTES[0];
+pub const BR: &str = "\n";
+pub const BR_BYTES: &[u8] = BR.as_bytes();
+pub const BR_U8: u8 = BR_BYTES[0];
+pub const DOUBLE_BR: &str = "\n\n";
+pub const DOUBLE_BR_BYTES: &[u8] = DOUBLE_BR.as_bytes();
+pub const COLON_SPACE: &str = ": ";
+pub const COLON_SPACE_BYTES: &[u8] = COLON_SPACE.as_bytes();
+pub const COLON: &str = ":";
+pub const COLON_BYTES: &[u8] = COLON.as_bytes();
+pub const COLON_U8: u8 = COLON_BYTES[0];
+pub const QUERY: &str = "?";
+pub const QUERY_BYTES: &[u8] = QUERY.as_bytes();
+pub const QUERY_U8: u8 = QUERY_BYTES[0];
+pub const COMMA: &str = ",";
+pub const COMMA_BYTES: &[u8] = COMMA.as_bytes();
+pub const COMMA_U8: u8 = COMMA_BYTES[0];
+pub const HASH: &str = "#";
+pub const HASH_BYTES: &[u8] = HASH.as_bytes();
+pub const HASH_U8: u8 = HASH_BYTES[0];
+pub const EMPTY_STR: &str = "";
+pub const EMPTY_STR_BYTES: &[u8] = EMPTY_STR.as_bytes();
+pub const DEFAULT_HOST: &str = "0.0.0.0";
+pub const DEFAULT_HOST_BYTES: &[u8] = DEFAULT_HOST.as_bytes();
+pub const DEFAULT_HTTP_PORT: u16 = 80;
+pub const DEFAULT_HTTP_PORT_STR: &str = "80";
+pub const DEFAULT_HTTPS_PORT: u16 = 443;
+pub const DEFAULT_HTTPS_PORT_STR: &str = "443";
+pub const DEFAULT_WEB_PORT: u16 = DEFAULT_HTTP_PORT;
+pub const DEFAULT_WEB_PORT_STR: &str = DEFAULT_HTTP_PORT_STR;
+pub const HTTP_BR: &str = "\r\n";
+pub const HTTP_BR_BYTES: &[u8] = HTTP_BR.as_bytes();
+pub const HTTP_DOUBLE_BR: &str = "\r\n\r\n";
+pub const HTTP_DOUBLE_BR_BYTES: &[u8] = HTTP_DOUBLE_BR.as_bytes();
+pub const DEFAULT_HTTP_PATH: &str = "/";
+pub const DEFAULT_HTTP_PATH_BYTES: &[u8] = DEFAULT_HTTP_PATH.as_bytes();
+pub const AND: &str = "&";
+pub const AND_BYTES: &[u8] = AND.as_bytes();
+pub const AND_U8: u8 = AND_BYTES[0];
+pub const EQUAL: &str = "=";
+pub const EQUAL_BYTES: &[u8] = EQUAL.as_bytes();
+pub const EQUAL_U8: u8 = EQUAL_BYTES[0];
+pub const ZERO_STR: &str = "0";
+pub const ZERO_STR_BYTES: &[u8] = ZERO_STR.as_bytes();
+pub const ZERO_STR_U8: u8 = ZERO_STR_BYTES[0];
+pub const DEFAULT_BUFFER_SIZE: usize = KB_4;
+pub const DEFAULT_MAX_PATH_SIZE: usize = KB_8;
+pub const DEFAULT_MAX_HEADER_COUNT: usize = 100;
+pub const DEFAULT_MAX_HEADER_KEY_SIZE: usize = KB_8;
+pub const DEFAULT_MAX_HEADER_VALUE_SIZE: usize = KB_8;
+pub const DEFAULT_MAX_BODY_SIZE: usize = MB_2;
+pub const DEFAULT_READ_TIMEOUT_MS: u64 = 6000;
+pub const DEFAULT_LOW_SECURITY_BUFFER_SIZE: usize = KB_4;
+pub const DEFAULT_LOW_SECURITY_MAX_PATH_SIZE: usize = usize::MAX;
+pub const DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT: usize = usize::MAX;
+pub const DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE: usize = usize::MAX;
+pub const DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE: usize = usize::MAX;
+pub const DEFAULT_LOW_SECURITY_MAX_BODY_SIZE: usize = usize::MAX;
+pub const DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS: u64 = u64::MAX;
+pub const DEFAULT_HIGH_SECURITY_BUFFER_SIZE: usize = KB_4;
+pub const DEFAULT_HIGH_SECURITY_MAX_PATH_SIZE: usize = KB_4;
+pub const DEFAULT_HIGH_SECURITY_MAX_HEADER_COUNT: usize = 50;
+pub const DEFAULT_HIGH_SECURITY_MAX_HEADER_KEY_SIZE: usize = KB_4;
+pub const DEFAULT_HIGH_SECURITY_MAX_HEADER_VALUE_SIZE: usize = KB_4;
+pub const DEFAULT_HIGH_SECURITY_MAX_BODY_SIZE: usize = MB_1;
+pub const DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS: u64 = 3000;
+pub const DEFAULT_MAX_REDIRECT_TIMES: usize = 8;
+pub const POINT: &str = ".";
+pub const POINT_BYTES: &[u8] = POINT.as_bytes();
+pub const POINT_U8: u8 = POINT_BYTES[0];
+pub const ROOT_PATH: &str = "/";
+pub const ROOT_PATH_BYTES: &[u8] = ROOT_PATH.as_bytes();
+pub const ROOT_PATH_U8: u8 = ROOT_PATH_BYTES[0];
+pub const SEMICOLON: &str = ";";
+pub const SEMICOLON_BYTES: &[u8] = SEMICOLON.as_bytes();
+pub const SEMICOLON_U8: u8 = SEMICOLON_BYTES[0];
+pub const SEMICOLON_SPACE: &str = "; ";
+pub const TIME: &str = "time";
+pub const PUB: &str = "pub";
+pub const PUB_SUPER: &str = "pub(super)";
+pub const PUB_CRATE: &str = "pub(crate)";
+pub const URL: &str = "url";
+pub const SEMICOLON_SPACE_BYTES: &[u8] = SEMICOLON_SPACE.as_bytes();
+pub const GUID: &[u8; 36] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+pub const HASH_STATE: [u32; 5] = [
+    0x67452301u32,
+    0xEFCDAB89,
+    0x98BADCFE,
+    0x10325476,
+    0xC3D2E1F0,
+];
+pub const BASE64_CHARSET_TABLE: &[u8] =
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+pub const MAX_FRAME_SIZE: usize = 65535;
+pub const CLOSE_FRAME: [u8; 2] = [0x88, 0x00];
+pub const PING_FRAME: [u8; 2] = [0x89, 0x00];
+pub const PONG_FRAME: [u8; 2] = [0x8A, 0x00];
+pub const MAX_UTF8_ATTEMPTS: usize = 4;
+pub const DEFAULT_HOST_IPV4_ADDR: Ipv4Addr = Ipv4Addr::new(0, 0, 0, 0);
+pub const DEFAULT_HOST_IPV6_ADDR: Ipv6Addr = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0);
+pub const DEFAULT_IPV4_ADDR: IpAddr = IpAddr::V4(DEFAULT_HOST_IPV4_ADDR);
+pub const DEFAULT_IPV6_ADDR: IpAddr = IpAddr::V6(DEFAULT_HOST_IPV6_ADDR);
+pub const DEFAULT_IP_ADDR: IpAddr = IpAddr::V4(DEFAULT_HOST_IPV4_ADDR);
+pub const DEFAULT_SOCKET_IPV4_ADDR: SocketAddrV4 =
+    SocketAddrV4::new(DEFAULT_HOST_IPV4_ADDR, DEFAULT_WEB_PORT);
+pub const DEFAULT_SOCKET_IPV6_ADDR: SocketAddrV6 =
+    SocketAddrV6::new(DEFAULT_HOST_IPV6_ADDR, DEFAULT_WEB_PORT, 0, 0);
+pub const DEFAULT_SOCKET_ADDR: SocketAddr =
+    SocketAddr::V4(SocketAddrV4::new(DEFAULT_HOST_IPV4_ADDR, DEFAULT_WEB_PORT));
+pub const SOCKET_ADDR_127_0_0_1: SocketAddr = SocketAddr::V4(SocketAddrV4::new(
+    Ipv4Addr::new(127, 0, 0, 1),
+    DEFAULT_WEB_PORT,
+));
+pub const HYPERLANE: &str = "hyperlane";
+pub const HYPERLANE_BYTES: &[u8] = HYPERLANE.as_bytes();
+pub const HYPERLANE_PASCAL_CASE: &str = "Hyperlane";
+pub const HYPERLANE_PASCAL_CASE_BYTES: &[u8] = HYPERLANE_PASCAL_CASE.as_bytes();
+pub const HYPERLANE_UPPERCASE: &str = "HYPERLANE";
+pub const HYPERLANE_UPPERCASE_BYTES: &[u8] = HYPERLANE_UPPERCASE.as_bytes();
+pub const DEFAULT_INNER_PRINT: bool = true;
+pub const DEFAULT_INNER_LOG: bool = true;
+pub const DEFAULT_NODELAY: Option<bool> = None;
+pub const DEFAULT_LINGER: Option<Duration> = None;
+pub const DEFAULT_REUSE_ADDRESS: Option<bool> = None;
+pub const DEFAULT_LISTEN_BACKLOG: Option<i32> = None;
+pub const DEFAULT_NONBLOCKING: Option<bool> = None;
+pub const DEFAULT_TTI: Option<u32> = None;
+pub const WARNING: &str = "warning";
+pub const WARNING_BYTES: &[u8] = WARNING.as_bytes();
+pub const SUCCESS: &str = "success";
+pub const SUCCESS_BYTES: &[u8] = SUCCESS.as_bytes();
+pub const FAIL: &str = "fail";
+pub const FAIL_BYTES: &[u8] = FAIL.as_bytes();
+pub const ERROR: &str = "error";
+pub const ERROR_BYTES: &[u8] = ERROR.as_bytes();
+pub const INFO: &str = "info";
+pub const INFO_BYTES: &[u8] = INFO.as_bytes();
+pub const DEBUG: &str = "debug";
+pub const DEBUG_BYTES: &[u8] = DEBUG.as_bytes();
+pub const PLAIN: &str = "plain";
+pub const PLAIN_BYTES: &[u8] = PLAIN.as_bytes();
+pub const BINARY: &str = "binary";
+pub const BINARY_BYTES: &[u8] = BINARY.as_bytes();
+pub const LEFT_BRACKET: &str = "{";
+pub const LEFT_BRACKET_BYTES: &[u8] = LEFT_BRACKET.as_bytes();
+pub const LEFT_BRACKET_U8: u8 = LEFT_BRACKET_BYTES[0];
+pub const RIGHT_BRACKET: &str = "}";
+pub const RIGHT_BRACKET_BYTES: &[u8] = RIGHT_BRACKET.as_bytes();
+pub const RIGHT_BRACKET_U8: u8 = RIGHT_BRACKET_BYTES[0];
+pub const LEFT_PAREN: &str = "(";
+pub const LEFT_PAREN_BYTES: &[u8] = LEFT_PAREN.as_bytes();
+pub const LEFT_PAREN_U8: u8 = LEFT_PAREN_BYTES[0];
+pub const RIGHT_PAREN: &str = ")";
+pub const RIGHT_PAREN_BYTES: &[u8] = RIGHT_PAREN.as_bytes();
+pub const RIGHT_PAREN_U8: u8 = RIGHT_PAREN_BYTES[0];
+pub const LEFT_SQUARE_BRACKET: &str = "[";
+pub const LEFT_SQUARE_BRACKET_BYTES: &[u8] = LEFT_SQUARE_BRACKET.as_bytes();
+pub const LEFT_SQUARE_BRACKET_U8: u8 = LEFT_SQUARE_BRACKET_BYTES[0];
+pub const RIGHT_SQUARE_BRACKET: &str = "]";
+pub const RIGHT_SQUARE_BRACKET_BYTES: &[u8] = RIGHT_SQUARE_BRACKET.as_bytes();
+pub const RIGHT_SQUARE_BRACKET_U8: u8 = RIGHT_SQUARE_BRACKET_BYTES[0];
+pub const LOCALHOST: &str = "localhost";
+pub const LOCALHOST_BYTES: &[u8] = LOCALHOST.as_bytes();
+pub const LOOPBACK: &str = "127.0.0.1";
+pub const LOOPBACK_BYTES: &[u8] = LOOPBACK.as_bytes();
+pub const B_1: usize = 1;
+pub const B_2: usize = 2;
+pub const B_3: usize = 3;
+pub const B_4: usize = 4;
+pub const B_5: usize = 5;
+pub const B_6: usize = 6;
+pub const B_7: usize = 7;
+pub const B_8: usize = 8;
+pub const B_9: usize = 9;
+pub const B_10: usize = 10;
+pub const B_11: usize = 11;
+pub const B_12: usize = 12;
+pub const B_13: usize = 13;
+pub const B_14: usize = 14;
+pub const B_15: usize = 15;
+pub const B_16: usize = 16;
+pub const B_17: usize = 17;
+pub const B_18: usize = 18;
+pub const B_19: usize = 19;
+pub const B_20: usize = 20;
+pub const B_21: usize = 21;
+pub const B_22: usize = 22;
+pub const B_23: usize = 23;
+pub const B_24: usize = 24;
+pub const B_25: usize = 25;
+pub const B_26: usize = 26;
+pub const B_27: usize = 27;
+pub const B_28: usize = 28;
+pub const B_29: usize = 29;
+pub const B_30: usize = 30;
+pub const B_31: usize = 31;
+pub const B_32: usize = 32;
+pub const B_33: usize = 33;
+pub const B_34: usize = 34;
+pub const B_35: usize = 35;
+pub const B_36: usize = 36;
+pub const B_37: usize = 37;
+pub const B_38: usize = 38;
+pub const B_39: usize = 39;
+pub const B_40: usize = 40;
+pub const B_41: usize = 41;
+pub const B_42: usize = 42;
+pub const B_43: usize = 43;
+pub const B_44: usize = 44;
+pub const B_45: usize = 45;
+pub const B_46: usize = 46;
+pub const B_47: usize = 47;
+pub const B_48: usize = 48;
+pub const B_49: usize = 49;
+pub const B_50: usize = 50;
+pub const B_51: usize = 51;
+pub const B_52: usize = 52;
+pub const B_53: usize = 53;
+pub const B_54: usize = 54;
+pub const B_55: usize = 55;
+pub const B_56: usize = 56;
+pub const B_57: usize = 57;
+pub const B_58: usize = 58;
+pub const B_59: usize = 59;
+pub const B_60: usize = 60;
+pub const B_61: usize = 61;
+pub const B_62: usize = 62;
+pub const B_63: usize = 63;
+pub const B_64: usize = 64;
+pub const B_65: usize = 65;
+pub const B_66: usize = 66;
+pub const B_67: usize = 67;
+pub const B_68: usize = 68;
+pub const B_69: usize = 69;
+pub const B_70: usize = 70;
+pub const B_71: usize = 71;
+pub const B_72: usize = 72;
+pub const B_73: usize = 73;
+pub const B_74: usize = 74;
+pub const B_75: usize = 75;
+pub const B_76: usize = 76;
+pub const B_77: usize = 77;
+pub const B_78: usize = 78;
+pub const B_79: usize = 79;
+pub const B_80: usize = 80;
+pub const B_81: usize = 81;
+pub const B_82: usize = 82;
+pub const B_83: usize = 83;
+pub const B_84: usize = 84;
+pub const B_85: usize = 85;
+pub const B_86: usize = 86;
+pub const B_87: usize = 87;
+pub const B_88: usize = 88;
+pub const B_89: usize = 89;
+pub const B_90: usize = 90;
+pub const B_91: usize = 91;
+pub const B_92: usize = 92;
+pub const B_93: usize = 93;
+pub const B_94: usize = 94;
+pub const B_95: usize = 95;
+pub const B_96: usize = 96;
+pub const B_97: usize = 97;
+pub const B_98: usize = 98;
+pub const B_99: usize = 99;
+pub const B_100: usize = 100;
+pub const B_101: usize = 101;
+pub const B_102: usize = 102;
+pub const B_103: usize = 103;
+pub const B_104: usize = 104;
+pub const B_105: usize = 105;
+pub const B_106: usize = 106;
+pub const B_107: usize = 107;
+pub const B_108: usize = 108;
+pub const B_109: usize = 109;
+pub const B_110: usize = 110;
+pub const B_111: usize = 111;
+pub const B_112: usize = 112;
+pub const B_113: usize = 113;
+pub const B_114: usize = 114;
+pub const B_115: usize = 115;
+pub const B_116: usize = 116;
+pub const B_117: usize = 117;
+pub const B_118: usize = 118;
+pub const B_119: usize = 119;
+pub const B_120: usize = 120;
+pub const B_121: usize = 121;
+pub const B_122: usize = 122;
+pub const B_123: usize = 123;
+pub const B_124: usize = 124;
+pub const B_125: usize = 125;
+pub const B_126: usize = 126;
+pub const B_127: usize = 127;
+pub const B_128: usize = 128;
+pub const B_129: usize = 129;
+pub const B_130: usize = 130;
+pub const B_131: usize = 131;
+pub const B_132: usize = 132;
+pub const B_133: usize = 133;
+pub const B_134: usize = 134;
+pub const B_135: usize = 135;
+pub const B_136: usize = 136;
+pub const B_137: usize = 137;
+pub const B_138: usize = 138;
+pub const B_139: usize = 139;
+pub const B_140: usize = 140;
+pub const B_141: usize = 141;
+pub const B_142: usize = 142;
+pub const B_143: usize = 143;
+pub const B_144: usize = 144;
+pub const B_145: usize = 145;
+pub const B_146: usize = 146;
+pub const B_147: usize = 147;
+pub const B_148: usize = 148;
+pub const B_149: usize = 149;
+pub const B_150: usize = 150;
+pub const B_151: usize = 151;
+pub const B_152: usize = 152;
+pub const B_153: usize = 153;
+pub const B_154: usize = 154;
+pub const B_155: usize = 155;
+pub const B_156: usize = 156;
+pub const B_157: usize = 157;
+pub const B_158: usize = 158;
+pub const B_159: usize = 159;
+pub const B_160: usize = 160;
+pub const B_161: usize = 161;
+pub const B_162: usize = 162;
+pub const B_163: usize = 163;
+pub const B_164: usize = 164;
+pub const B_165: usize = 165;
+pub const B_166: usize = 166;
+pub const B_167: usize = 167;
+pub const B_168: usize = 168;
+pub const B_169: usize = 169;
+pub const B_170: usize = 170;
+pub const B_171: usize = 171;
+pub const B_172: usize = 172;
+pub const B_173: usize = 173;
+pub const B_174: usize = 174;
+pub const B_175: usize = 175;
+pub const B_176: usize = 176;
+pub const B_177: usize = 177;
+pub const B_178: usize = 178;
+pub const B_179: usize = 179;
+pub const B_180: usize = 180;
+pub const B_181: usize = 181;
+pub const B_182: usize = 182;
+pub const B_183: usize = 183;
+pub const B_184: usize = 184;
+pub const B_185: usize = 185;
+pub const B_186: usize = 186;
+pub const B_187: usize = 187;
+pub const B_188: usize = 188;
+pub const B_189: usize = 189;
+pub const B_190: usize = 190;
+pub const B_191: usize = 191;
+pub const B_192: usize = 192;
+pub const B_193: usize = 193;
+pub const B_194: usize = 194;
+pub const B_195: usize = 195;
+pub const B_196: usize = 196;
+pub const B_197: usize = 197;
+pub const B_198: usize = 198;
+pub const B_199: usize = 199;
+pub const B_200: usize = 200;
+pub const B_201: usize = 201;
+pub const B_202: usize = 202;
+pub const B_203: usize = 203;
+pub const B_204: usize = 204;
+pub const B_205: usize = 205;
+pub const B_206: usize = 206;
+pub const B_207: usize = 207;
+pub const B_208: usize = 208;
+pub const B_209: usize = 209;
+pub const B_210: usize = 210;
+pub const B_211: usize = 211;
+pub const B_212: usize = 212;
+pub const B_213: usize = 213;
+pub const B_214: usize = 214;
+pub const B_215: usize = 215;
+pub const B_216: usize = 216;
+pub const B_217: usize = 217;
+pub const B_218: usize = 218;
+pub const B_219: usize = 219;
+pub const B_220: usize = 220;
+pub const B_221: usize = 221;
+pub const B_222: usize = 222;
+pub const B_223: usize = 223;
+pub const B_224: usize = 224;
+pub const B_225: usize = 225;
+pub const B_226: usize = 226;
+pub const B_227: usize = 227;
+pub const B_228: usize = 228;
+pub const B_229: usize = 229;
+pub const B_230: usize = 230;
+pub const B_231: usize = 231;
+pub const B_232: usize = 232;
+pub const B_233: usize = 233;
+pub const B_234: usize = 234;
+pub const B_235: usize = 235;
+pub const B_236: usize = 236;
+pub const B_237: usize = 237;
+pub const B_238: usize = 238;
+pub const B_239: usize = 239;
+pub const B_240: usize = 240;
+pub const B_241: usize = 241;
+pub const B_242: usize = 242;
+pub const B_243: usize = 243;
+pub const B_244: usize = 244;
+pub const B_245: usize = 245;
+pub const B_246: usize = 246;
+pub const B_247: usize = 247;
+pub const B_248: usize = 248;
+pub const B_249: usize = 249;
+pub const B_250: usize = 250;
+pub const B_251: usize = 251;
+pub const B_252: usize = 252;
+pub const B_253: usize = 253;
+pub const B_254: usize = 254;
+pub const B_255: usize = 255;
+pub const B_256: usize = 256;
+pub const B_257: usize = 257;
+pub const B_258: usize = 258;
+pub const B_259: usize = 259;
+pub const B_260: usize = 260;
+pub const B_261: usize = 261;
+pub const B_262: usize = 262;
+pub const B_263: usize = 263;
+pub const B_264: usize = 264;
+pub const B_265: usize = 265;
+pub const B_266: usize = 266;
+pub const B_267: usize = 267;
+pub const B_268: usize = 268;
+pub const B_269: usize = 269;
+pub const B_270: usize = 270;
+pub const B_271: usize = 271;
+pub const B_272: usize = 272;
+pub const B_273: usize = 273;
+pub const B_274: usize = 274;
+pub const B_275: usize = 275;
+pub const B_276: usize = 276;
+pub const B_277: usize = 277;
+pub const B_278: usize = 278;
+pub const B_279: usize = 279;
+pub const B_280: usize = 280;
+pub const B_281: usize = 281;
+pub const B_282: usize = 282;
+pub const B_283: usize = 283;
+pub const B_284: usize = 284;
+pub const B_285: usize = 285;
+pub const B_286: usize = 286;
+pub const B_287: usize = 287;
+pub const B_288: usize = 288;
+pub const B_289: usize = 289;
+pub const B_290: usize = 290;
+pub const B_291: usize = 291;
+pub const B_292: usize = 292;
+pub const B_293: usize = 293;
+pub const B_294: usize = 294;
+pub const B_295: usize = 295;
+pub const B_296: usize = 296;
+pub const B_297: usize = 297;
+pub const B_298: usize = 298;
+pub const B_299: usize = 299;
+pub const B_300: usize = 300;
+pub const B_301: usize = 301;
+pub const B_302: usize = 302;
+pub const B_303: usize = 303;
+pub const B_304: usize = 304;
+pub const B_305: usize = 305;
+pub const B_306: usize = 306;
+pub const B_307: usize = 307;
+pub const B_308: usize = 308;
+pub const B_309: usize = 309;
+pub const B_310: usize = 310;
+pub const B_311: usize = 311;
+pub const B_312: usize = 312;
+pub const B_313: usize = 313;
+pub const B_314: usize = 314;
+pub const B_315: usize = 315;
+pub const B_316: usize = 316;
+pub const B_317: usize = 317;
+pub const B_318: usize = 318;
+pub const B_319: usize = 319;
+pub const B_320: usize = 320;
+pub const B_321: usize = 321;
+pub const B_322: usize = 322;
+pub const B_323: usize = 323;
+pub const B_324: usize = 324;
+pub const B_325: usize = 325;
+pub const B_326: usize = 326;
+pub const B_327: usize = 327;
+pub const B_328: usize = 328;
+pub const B_329: usize = 329;
+pub const B_330: usize = 330;
+pub const B_331: usize = 331;
+pub const B_332: usize = 332;
+pub const B_333: usize = 333;
+pub const B_334: usize = 334;
+pub const B_335: usize = 335;
+pub const B_336: usize = 336;
+pub const B_337: usize = 337;
+pub const B_338: usize = 338;
+pub const B_339: usize = 339;
+pub const B_340: usize = 340;
+pub const B_341: usize = 341;
+pub const B_342: usize = 342;
+pub const B_343: usize = 343;
+pub const B_344: usize = 344;
+pub const B_345: usize = 345;
+pub const B_346: usize = 346;
+pub const B_347: usize = 347;
+pub const B_348: usize = 348;
+pub const B_349: usize = 349;
+pub const B_350: usize = 350;
+pub const B_351: usize = 351;
+pub const B_352: usize = 352;
+pub const B_353: usize = 353;
+pub const B_354: usize = 354;
+pub const B_355: usize = 355;
+pub const B_356: usize = 356;
+pub const B_357: usize = 357;
+pub const B_358: usize = 358;
+pub const B_359: usize = 359;
+pub const B_360: usize = 360;
+pub const B_361: usize = 361;
+pub const B_362: usize = 362;
+pub const B_363: usize = 363;
+pub const B_364: usize = 364;
+pub const B_365: usize = 365;
+pub const B_366: usize = 366;
+pub const B_367: usize = 367;
+pub const B_368: usize = 368;
+pub const B_369: usize = 369;
+pub const B_370: usize = 370;
+pub const B_371: usize = 371;
+pub const B_372: usize = 372;
+pub const B_373: usize = 373;
+pub const B_374: usize = 374;
+pub const B_375: usize = 375;
+pub const B_376: usize = 376;
+pub const B_377: usize = 377;
+pub const B_378: usize = 378;
+pub const B_379: usize = 379;
+pub const B_380: usize = 380;
+pub const B_381: usize = 381;
+pub const B_382: usize = 382;
+pub const B_383: usize = 383;
+pub const B_384: usize = 384;
+pub const B_385: usize = 385;
+pub const B_386: usize = 386;
+pub const B_387: usize = 387;
+pub const B_388: usize = 388;
+pub const B_389: usize = 389;
+pub const B_390: usize = 390;
+pub const B_391: usize = 391;
+pub const B_392: usize = 392;
+pub const B_393: usize = 393;
+pub const B_394: usize = 394;
+pub const B_395: usize = 395;
+pub const B_396: usize = 396;
+pub const B_397: usize = 397;
+pub const B_398: usize = 398;
+pub const B_399: usize = 399;
+pub const B_400: usize = 400;
+pub const B_401: usize = 401;
+pub const B_402: usize = 402;
+pub const B_403: usize = 403;
+pub const B_404: usize = 404;
+pub const B_405: usize = 405;
+pub const B_406: usize = 406;
+pub const B_407: usize = 407;
+pub const B_408: usize = 408;
+pub const B_409: usize = 409;
+pub const B_410: usize = 410;
+pub const B_411: usize = 411;
+pub const B_412: usize = 412;
+pub const B_413: usize = 413;
+pub const B_414: usize = 414;
+pub const B_415: usize = 415;
+pub const B_416: usize = 416;
+pub const B_417: usize = 417;
+pub const B_418: usize = 418;
+pub const B_419: usize = 419;
+pub const B_420: usize = 420;
+pub const B_421: usize = 421;
+pub const B_422: usize = 422;
+pub const B_423: usize = 423;
+pub const B_424: usize = 424;
+pub const B_425: usize = 425;
+pub const B_426: usize = 426;
+pub const B_427: usize = 427;
+pub const B_428: usize = 428;
+pub const B_429: usize = 429;
+pub const B_430: usize = 430;
+pub const B_431: usize = 431;
+pub const B_432: usize = 432;
+pub const B_433: usize = 433;
+pub const B_434: usize = 434;
+pub const B_435: usize = 435;
+pub const B_436: usize = 436;
+pub const B_437: usize = 437;
+pub const B_438: usize = 438;
+pub const B_439: usize = 439;
+pub const B_440: usize = 440;
+pub const B_441: usize = 441;
+pub const B_442: usize = 442;
+pub const B_443: usize = 443;
+pub const B_444: usize = 444;
+pub const B_445: usize = 445;
+pub const B_446: usize = 446;
+pub const B_447: usize = 447;
+pub const B_448: usize = 448;
+pub const B_449: usize = 449;
+pub const B_450: usize = 450;
+pub const B_451: usize = 451;
+pub const B_452: usize = 452;
+pub const B_453: usize = 453;
+pub const B_454: usize = 454;
+pub const B_455: usize = 455;
+pub const B_456: usize = 456;
+pub const B_457: usize = 457;
+pub const B_458: usize = 458;
+pub const B_459: usize = 459;
+pub const B_460: usize = 460;
+pub const B_461: usize = 461;
+pub const B_462: usize = 462;
+pub const B_463: usize = 463;
+pub const B_464: usize = 464;
+pub const B_465: usize = 465;
+pub const B_466: usize = 466;
+pub const B_467: usize = 467;
+pub const B_468: usize = 468;
+pub const B_469: usize = 469;
+pub const B_470: usize = 470;
+pub const B_471: usize = 471;
+pub const B_472: usize = 472;
+pub const B_473: usize = 473;
+pub const B_474: usize = 474;
+pub const B_475: usize = 475;
+pub const B_476: usize = 476;
+pub const B_477: usize = 477;
+pub const B_478: usize = 478;
+pub const B_479: usize = 479;
+pub const B_480: usize = 480;
+pub const B_481: usize = 481;
+pub const B_482: usize = 482;
+pub const B_483: usize = 483;
+pub const B_484: usize = 484;
+pub const B_485: usize = 485;
+pub const B_486: usize = 486;
+pub const B_487: usize = 487;
+pub const B_488: usize = 488;
+pub const B_489: usize = 489;
+pub const B_490: usize = 490;
+pub const B_491: usize = 491;
+pub const B_492: usize = 492;
+pub const B_493: usize = 493;
+pub const B_494: usize = 494;
+pub const B_495: usize = 495;
+pub const B_496: usize = 496;
+pub const B_497: usize = 497;
+pub const B_498: usize = 498;
+pub const B_499: usize = 499;
+pub const B_500: usize = 500;
+pub const B_501: usize = 501;
+pub const B_502: usize = 502;
+pub const B_503: usize = 503;
+pub const B_504: usize = 504;
+pub const B_505: usize = 505;
+pub const B_506: usize = 506;
+pub const B_507: usize = 507;
+pub const B_508: usize = 508;
+pub const B_509: usize = 509;
+pub const B_510: usize = 510;
+pub const B_511: usize = 511;
+pub const B_512: usize = 512;
+pub const B_513: usize = 513;
+pub const B_514: usize = 514;
+pub const B_515: usize = 515;
+pub const B_516: usize = 516;
+pub const B_517: usize = 517;
+pub const B_518: usize = 518;
+pub const B_519: usize = 519;
+pub const B_520: usize = 520;
+pub const B_521: usize = 521;
+pub const B_522: usize = 522;
+pub const B_523: usize = 523;
+pub const B_524: usize = 524;
+pub const B_525: usize = 525;
+pub const B_526: usize = 526;
+pub const B_527: usize = 527;
+pub const B_528: usize = 528;
+pub const B_529: usize = 529;
+pub const B_530: usize = 530;
+pub const B_531: usize = 531;
+pub const B_532: usize = 532;
+pub const B_533: usize = 533;
+pub const B_534: usize = 534;
+pub const B_535: usize = 535;
+pub const B_536: usize = 536;
+pub const B_537: usize = 537;
+pub const B_538: usize = 538;
+pub const B_539: usize = 539;
+pub const B_540: usize = 540;
+pub const B_541: usize = 541;
+pub const B_542: usize = 542;
+pub const B_543: usize = 543;
+pub const B_544: usize = 544;
+pub const B_545: usize = 545;
+pub const B_546: usize = 546;
+pub const B_547: usize = 547;
+pub const B_548: usize = 548;
+pub const B_549: usize = 549;
+pub const B_550: usize = 550;
+pub const B_551: usize = 551;
+pub const B_552: usize = 552;
+pub const B_553: usize = 553;
+pub const B_554: usize = 554;
+pub const B_555: usize = 555;
+pub const B_556: usize = 556;
+pub const B_557: usize = 557;
+pub const B_558: usize = 558;
+pub const B_559: usize = 559;
+pub const B_560: usize = 560;
+pub const B_561: usize = 561;
+pub const B_562: usize = 562;
+pub const B_563: usize = 563;
+pub const B_564: usize = 564;
+pub const B_565: usize = 565;
+pub const B_566: usize = 566;
+pub const B_567: usize = 567;
+pub const B_568: usize = 568;
+pub const B_569: usize = 569;
+pub const B_570: usize = 570;
+pub const B_571: usize = 571;
+pub const B_572: usize = 572;
+pub const B_573: usize = 573;
+pub const B_574: usize = 574;
+pub const B_575: usize = 575;
+pub const B_576: usize = 576;
+pub const B_577: usize = 577;
+pub const B_578: usize = 578;
+pub const B_579: usize = 579;
+pub const B_580: usize = 580;
+pub const B_581: usize = 581;
+pub const B_582: usize = 582;
+pub const B_583: usize = 583;
+pub const B_584: usize = 584;
+pub const B_585: usize = 585;
+pub const B_586: usize = 586;
+pub const B_587: usize = 587;
+pub const B_588: usize = 588;
+pub const B_589: usize = 589;
+pub const B_590: usize = 590;
+pub const B_591: usize = 591;
+pub const B_592: usize = 592;
+pub const B_593: usize = 593;
+pub const B_594: usize = 594;
+pub const B_595: usize = 595;
+pub const B_596: usize = 596;
+pub const B_597: usize = 597;
+pub const B_598: usize = 598;
+pub const B_599: usize = 599;
+pub const B_600: usize = 600;
+pub const B_601: usize = 601;
+pub const B_602: usize = 602;
+pub const B_603: usize = 603;
+pub const B_604: usize = 604;
+pub const B_605: usize = 605;
+pub const B_606: usize = 606;
+pub const B_607: usize = 607;
+pub const B_608: usize = 608;
+pub const B_609: usize = 609;
+pub const B_610: usize = 610;
+pub const B_611: usize = 611;
+pub const B_612: usize = 612;
+pub const B_613: usize = 613;
+pub const B_614: usize = 614;
+pub const B_615: usize = 615;
+pub const B_616: usize = 616;
+pub const B_617: usize = 617;
+pub const B_618: usize = 618;
+pub const B_619: usize = 619;
+pub const B_620: usize = 620;
+pub const B_621: usize = 621;
+pub const B_622: usize = 622;
+pub const B_623: usize = 623;
+pub const B_624: usize = 624;
+pub const B_625: usize = 625;
+pub const B_626: usize = 626;
+pub const B_627: usize = 627;
+pub const B_628: usize = 628;
+pub const B_629: usize = 629;
+pub const B_630: usize = 630;
+pub const B_631: usize = 631;
+pub const B_632: usize = 632;
+pub const B_633: usize = 633;
+pub const B_634: usize = 634;
+pub const B_635: usize = 635;
+pub const B_636: usize = 636;
+pub const B_637: usize = 637;
+pub const B_638: usize = 638;
+pub const B_639: usize = 639;
+pub const B_640: usize = 640;
+pub const B_641: usize = 641;
+pub const B_642: usize = 642;
+pub const B_643: usize = 643;
+pub const B_644: usize = 644;
+pub const B_645: usize = 645;
+pub const B_646: usize = 646;
+pub const B_647: usize = 647;
+pub const B_648: usize = 648;
+pub const B_649: usize = 649;
+pub const B_650: usize = 650;
+pub const B_651: usize = 651;
+pub const B_652: usize = 652;
+pub const B_653: usize = 653;
+pub const B_654: usize = 654;
+pub const B_655: usize = 655;
+pub const B_656: usize = 656;
+pub const B_657: usize = 657;
+pub const B_658: usize = 658;
+pub const B_659: usize = 659;
+pub const B_660: usize = 660;
+pub const B_661: usize = 661;
+pub const B_662: usize = 662;
+pub const B_663: usize = 663;
+pub const B_664: usize = 664;
+pub const B_665: usize = 665;
+pub const B_666: usize = 666;
+pub const B_667: usize = 667;
+pub const B_668: usize = 668;
+pub const B_669: usize = 669;
+pub const B_670: usize = 670;
+pub const B_671: usize = 671;
+pub const B_672: usize = 672;
+pub const B_673: usize = 673;
+pub const B_674: usize = 674;
+pub const B_675: usize = 675;
+pub const B_676: usize = 676;
+pub const B_677: usize = 677;
+pub const B_678: usize = 678;
+pub const B_679: usize = 679;
+pub const B_680: usize = 680;
+pub const B_681: usize = 681;
+pub const B_682: usize = 682;
+pub const B_683: usize = 683;
+pub const B_684: usize = 684;
+pub const B_685: usize = 685;
+pub const B_686: usize = 686;
+pub const B_687: usize = 687;
+pub const B_688: usize = 688;
+pub const B_689: usize = 689;
+pub const B_690: usize = 690;
+pub const B_691: usize = 691;
+pub const B_692: usize = 692;
+pub const B_693: usize = 693;
+pub const B_694: usize = 694;
+pub const B_695: usize = 695;
+pub const B_696: usize = 696;
+pub const B_697: usize = 697;
+pub const B_698: usize = 698;
+pub const B_699: usize = 699;
+pub const B_700: usize = 700;
+pub const B_701: usize = 701;
+pub const B_702: usize = 702;
+pub const B_703: usize = 703;
+pub const B_704: usize = 704;
+pub const B_705: usize = 705;
+pub const B_706: usize = 706;
+pub const B_707: usize = 707;
+pub const B_708: usize = 708;
+pub const B_709: usize = 709;
+pub const B_710: usize = 710;
+pub const B_711: usize = 711;
+pub const B_712: usize = 712;
+pub const B_713: usize = 713;
+pub const B_714: usize = 714;
+pub const B_715: usize = 715;
+pub const B_716: usize = 716;
+pub const B_717: usize = 717;
+pub const B_718: usize = 718;
+pub const B_719: usize = 719;
+pub const B_720: usize = 720;
+pub const B_721: usize = 721;
+pub const B_722: usize = 722;
+pub const B_723: usize = 723;
+pub const B_724: usize = 724;
+pub const B_725: usize = 725;
+pub const B_726: usize = 726;
+pub const B_727: usize = 727;
+pub const B_728: usize = 728;
+pub const B_729: usize = 729;
+pub const B_730: usize = 730;
+pub const B_731: usize = 731;
+pub const B_732: usize = 732;
+pub const B_733: usize = 733;
+pub const B_734: usize = 734;
+pub const B_735: usize = 735;
+pub const B_736: usize = 736;
+pub const B_737: usize = 737;
+pub const B_738: usize = 738;
+pub const B_739: usize = 739;
+pub const B_740: usize = 740;
+pub const B_741: usize = 741;
+pub const B_742: usize = 742;
+pub const B_743: usize = 743;
+pub const B_744: usize = 744;
+pub const B_745: usize = 745;
+pub const B_746: usize = 746;
+pub const B_747: usize = 747;
+pub const B_748: usize = 748;
+pub const B_749: usize = 749;
+pub const B_750: usize = 750;
+pub const B_751: usize = 751;
+pub const B_752: usize = 752;
+pub const B_753: usize = 753;
+pub const B_754: usize = 754;
+pub const B_755: usize = 755;
+pub const B_756: usize = 756;
+pub const B_757: usize = 757;
+pub const B_758: usize = 758;
+pub const B_759: usize = 759;
+pub const B_760: usize = 760;
+pub const B_761: usize = 761;
+pub const B_762: usize = 762;
+pub const B_763: usize = 763;
+pub const B_764: usize = 764;
+pub const B_765: usize = 765;
+pub const B_766: usize = 766;
+pub const B_767: usize = 767;
+pub const B_768: usize = 768;
+pub const B_769: usize = 769;
+pub const B_770: usize = 770;
+pub const B_771: usize = 771;
+pub const B_772: usize = 772;
+pub const B_773: usize = 773;
+pub const B_774: usize = 774;
+pub const B_775: usize = 775;
+pub const B_776: usize = 776;
+pub const B_777: usize = 777;
+pub const B_778: usize = 778;
+pub const B_779: usize = 779;
+pub const B_780: usize = 780;
+pub const B_781: usize = 781;
+pub const B_782: usize = 782;
+pub const B_783: usize = 783;
+pub const B_784: usize = 784;
+pub const B_785: usize = 785;
+pub const B_786: usize = 786;
+pub const B_787: usize = 787;
+pub const B_788: usize = 788;
+pub const B_789: usize = 789;
+pub const B_790: usize = 790;
+pub const B_791: usize = 791;
+pub const B_792: usize = 792;
+pub const B_793: usize = 793;
+pub const B_794: usize = 794;
+pub const B_795: usize = 795;
+pub const B_796: usize = 796;
+pub const B_797: usize = 797;
+pub const B_798: usize = 798;
+pub const B_799: usize = 799;
+pub const B_800: usize = 800;
+pub const B_801: usize = 801;
+pub const B_802: usize = 802;
+pub const B_803: usize = 803;
+pub const B_804: usize = 804;
+pub const B_805: usize = 805;
+pub const B_806: usize = 806;
+pub const B_807: usize = 807;
+pub const B_808: usize = 808;
+pub const B_809: usize = 809;
+pub const B_810: usize = 810;
+pub const B_811: usize = 811;
+pub const B_812: usize = 812;
+pub const B_813: usize = 813;
+pub const B_814: usize = 814;
+pub const B_815: usize = 815;
+pub const B_816: usize = 816;
+pub const B_817: usize = 817;
+pub const B_818: usize = 818;
+pub const B_819: usize = 819;
+pub const B_820: usize = 820;
+pub const B_821: usize = 821;
+pub const B_822: usize = 822;
+pub const B_823: usize = 823;
+pub const B_824: usize = 824;
+pub const B_825: usize = 825;
+pub const B_826: usize = 826;
+pub const B_827: usize = 827;
+pub const B_828: usize = 828;
+pub const B_829: usize = 829;
+pub const B_830: usize = 830;
+pub const B_831: usize = 831;
+pub const B_832: usize = 832;
+pub const B_833: usize = 833;
+pub const B_834: usize = 834;
+pub const B_835: usize = 835;
+pub const B_836: usize = 836;
+pub const B_837: usize = 837;
+pub const B_838: usize = 838;
+pub const B_839: usize = 839;
+pub const B_840: usize = 840;
+pub const B_841: usize = 841;
+pub const B_842: usize = 842;
+pub const B_843: usize = 843;
+pub const B_844: usize = 844;
+pub const B_845: usize = 845;
+pub const B_846: usize = 846;
+pub const B_847: usize = 847;
+pub const B_848: usize = 848;
+pub const B_849: usize = 849;
+pub const B_850: usize = 850;
+pub const B_851: usize = 851;
+pub const B_852: usize = 852;
+pub const B_853: usize = 853;
+pub const B_854: usize = 854;
+pub const B_855: usize = 855;
+pub const B_856: usize = 856;
+pub const B_857: usize = 857;
+pub const B_858: usize = 858;
+pub const B_859: usize = 859;
+pub const B_860: usize = 860;
+pub const B_861: usize = 861;
+pub const B_862: usize = 862;
+pub const B_863: usize = 863;
+pub const B_864: usize = 864;
+pub const B_865: usize = 865;
+pub const B_866: usize = 866;
+pub const B_867: usize = 867;
+pub const B_868: usize = 868;
+pub const B_869: usize = 869;
+pub const B_870: usize = 870;
+pub const B_871: usize = 871;
+pub const B_872: usize = 872;
+pub const B_873: usize = 873;
+pub const B_874: usize = 874;
+pub const B_875: usize = 875;
+pub const B_876: usize = 876;
+pub const B_877: usize = 877;
+pub const B_878: usize = 878;
+pub const B_879: usize = 879;
+pub const B_880: usize = 880;
+pub const B_881: usize = 881;
+pub const B_882: usize = 882;
+pub const B_883: usize = 883;
+pub const B_884: usize = 884;
+pub const B_885: usize = 885;
+pub const B_886: usize = 886;
+pub const B_887: usize = 887;
+pub const B_888: usize = 888;
+pub const B_889: usize = 889;
+pub const B_890: usize = 890;
+pub const B_891: usize = 891;
+pub const B_892: usize = 892;
+pub const B_893: usize = 893;
+pub const B_894: usize = 894;
+pub const B_895: usize = 895;
+pub const B_896: usize = 896;
+pub const B_897: usize = 897;
+pub const B_898: usize = 898;
+pub const B_899: usize = 899;
+pub const B_900: usize = 900;
+pub const B_901: usize = 901;
+pub const B_902: usize = 902;
+pub const B_903: usize = 903;
+pub const B_904: usize = 904;
+pub const B_905: usize = 905;
+pub const B_906: usize = 906;
+pub const B_907: usize = 907;
+pub const B_908: usize = 908;
+pub const B_909: usize = 909;
+pub const B_910: usize = 910;
+pub const B_911: usize = 911;
+pub const B_912: usize = 912;
+pub const B_913: usize = 913;
+pub const B_914: usize = 914;
+pub const B_915: usize = 915;
+pub const B_916: usize = 916;
+pub const B_917: usize = 917;
+pub const B_918: usize = 918;
+pub const B_919: usize = 919;
+pub const B_920: usize = 920;
+pub const B_921: usize = 921;
+pub const B_922: usize = 922;
+pub const B_923: usize = 923;
+pub const B_924: usize = 924;
+pub const B_925: usize = 925;
+pub const B_926: usize = 926;
+pub const B_927: usize = 927;
+pub const B_928: usize = 928;
+pub const B_929: usize = 929;
+pub const B_930: usize = 930;
+pub const B_931: usize = 931;
+pub const B_932: usize = 932;
+pub const B_933: usize = 933;
+pub const B_934: usize = 934;
+pub const B_935: usize = 935;
+pub const B_936: usize = 936;
+pub const B_937: usize = 937;
+pub const B_938: usize = 938;
+pub const B_939: usize = 939;
+pub const B_940: usize = 940;
+pub const B_941: usize = 941;
+pub const B_942: usize = 942;
+pub const B_943: usize = 943;
+pub const B_944: usize = 944;
+pub const B_945: usize = 945;
+pub const B_946: usize = 946;
+pub const B_947: usize = 947;
+pub const B_948: usize = 948;
+pub const B_949: usize = 949;
+pub const B_950: usize = 950;
+pub const B_951: usize = 951;
+pub const B_952: usize = 952;
+pub const B_953: usize = 953;
+pub const B_954: usize = 954;
+pub const B_955: usize = 955;
+pub const B_956: usize = 956;
+pub const B_957: usize = 957;
+pub const B_958: usize = 958;
+pub const B_959: usize = 959;
+pub const B_960: usize = 960;
+pub const B_961: usize = 961;
+pub const B_962: usize = 962;
+pub const B_963: usize = 963;
+pub const B_964: usize = 964;
+pub const B_965: usize = 965;
+pub const B_966: usize = 966;
+pub const B_967: usize = 967;
+pub const B_968: usize = 968;
+pub const B_969: usize = 969;
+pub const B_970: usize = 970;
+pub const B_971: usize = 971;
+pub const B_972: usize = 972;
+pub const B_973: usize = 973;
+pub const B_974: usize = 974;
+pub const B_975: usize = 975;
+pub const B_976: usize = 976;
+pub const B_977: usize = 977;
+pub const B_978: usize = 978;
+pub const B_979: usize = 979;
+pub const B_980: usize = 980;
+pub const B_981: usize = 981;
+pub const B_982: usize = 982;
+pub const B_983: usize = 983;
+pub const B_984: usize = 984;
+pub const B_985: usize = 985;
+pub const B_986: usize = 986;
+pub const B_987: usize = 987;
+pub const B_988: usize = 988;
+pub const B_989: usize = 989;
+pub const B_990: usize = 990;
+pub const B_991: usize = 991;
+pub const B_992: usize = 992;
+pub const B_993: usize = 993;
+pub const B_994: usize = 994;
+pub const B_995: usize = 995;
+pub const B_996: usize = 996;
+pub const B_997: usize = 997;
+pub const B_998: usize = 998;
+pub const B_999: usize = 999;
+pub const B_1000: usize = 1000;
+pub const B_1001: usize = 1001;
+pub const B_1002: usize = 1002;
+pub const B_1003: usize = 1003;
+pub const B_1004: usize = 1004;
+pub const B_1005: usize = 1005;
+pub const B_1006: usize = 1006;
+pub const B_1007: usize = 1007;
+pub const B_1008: usize = 1008;
+pub const B_1009: usize = 1009;
+pub const B_1010: usize = 1010;
+pub const B_1011: usize = 1011;
+pub const B_1012: usize = 1012;
+pub const B_1013: usize = 1013;
+pub const B_1014: usize = 1014;
+pub const B_1015: usize = 1015;
+pub const B_1016: usize = 1016;
+pub const B_1017: usize = 1017;
+pub const B_1018: usize = 1018;
+pub const B_1019: usize = 1019;
+pub const B_1020: usize = 1020;
+pub const B_1021: usize = 1021;
+pub const B_1022: usize = 1022;
+pub const B_1023: usize = 1023;
+pub const B_1024: usize = 1024;
+pub const KB_1: usize = 1024;
+pub const KB_2: usize = 2048;
+pub const KB_3: usize = 3072;
+pub const KB_4: usize = 4096;
+pub const KB_5: usize = 5120;
+pub const KB_6: usize = 6144;
+pub const KB_7: usize = 7168;
+pub const KB_8: usize = 8192;
+pub const KB_9: usize = 9216;
+pub const KB_10: usize = 10240;
+pub const KB_11: usize = 11264;
+pub const KB_12: usize = 12288;
+pub const KB_13: usize = 13312;
+pub const KB_14: usize = 14336;
+pub const KB_15: usize = 15360;
+pub const KB_16: usize = 16384;
+pub const KB_17: usize = 17408;
+pub const KB_18: usize = 18432;
+pub const KB_19: usize = 19456;
+pub const KB_20: usize = 20480;
+pub const KB_21: usize = 21504;
+pub const KB_22: usize = 22528;
+pub const KB_23: usize = 23552;
+pub const KB_24: usize = 24576;
+pub const KB_25: usize = 25600;
+pub const KB_26: usize = 26624;
+pub const KB_27: usize = 27648;
+pub const KB_28: usize = 28672;
+pub const KB_29: usize = 29696;
+pub const KB_30: usize = 30720;
+pub const KB_31: usize = 31744;
+pub const KB_32: usize = 32768;
+pub const KB_33: usize = 33792;
+pub const KB_34: usize = 34816;
+pub const KB_35: usize = 35840;
+pub const KB_36: usize = 36864;
+pub const KB_37: usize = 37888;
+pub const KB_38: usize = 38912;
+pub const KB_39: usize = 39936;
+pub const KB_40: usize = 40960;
+pub const KB_41: usize = 41984;
+pub const KB_42: usize = 43008;
+pub const KB_43: usize = 44032;
+pub const KB_44: usize = 45056;
+pub const KB_45: usize = 46080;
+pub const KB_46: usize = 47104;
+pub const KB_47: usize = 48128;
+pub const KB_48: usize = 49152;
+pub const KB_49: usize = 50176;
+pub const KB_50: usize = 51200;
+pub const KB_51: usize = 52224;
+pub const KB_52: usize = 53248;
+pub const KB_53: usize = 54272;
+pub const KB_54: usize = 55296;
+pub const KB_55: usize = 56320;
+pub const KB_56: usize = 57344;
+pub const KB_57: usize = 58368;
+pub const KB_58: usize = 59392;
+pub const KB_59: usize = 60416;
+pub const KB_60: usize = 61440;
+pub const KB_61: usize = 62464;
+pub const KB_62: usize = 63488;
+pub const KB_63: usize = 64512;
+pub const KB_64: usize = 65536;
+pub const KB_65: usize = 66560;
+pub const KB_66: usize = 67584;
+pub const KB_67: usize = 68608;
+pub const KB_68: usize = 69632;
+pub const KB_69: usize = 70656;
+pub const KB_70: usize = 71680;
+pub const KB_71: usize = 72704;
+pub const KB_72: usize = 73728;
+pub const KB_73: usize = 74752;
+pub const KB_74: usize = 75776;
+pub const KB_75: usize = 76800;
+pub const KB_76: usize = 77824;
+pub const KB_77: usize = 78848;
+pub const KB_78: usize = 79872;
+pub const KB_79: usize = 80896;
+pub const KB_80: usize = 81920;
+pub const KB_81: usize = 82944;
+pub const KB_82: usize = 83968;
+pub const KB_83: usize = 84992;
+pub const KB_84: usize = 86016;
+pub const KB_85: usize = 87040;
+pub const KB_86: usize = 88064;
+pub const KB_87: usize = 89088;
+pub const KB_88: usize = 90112;
+pub const KB_89: usize = 91136;
+pub const KB_90: usize = 92160;
+pub const KB_91: usize = 93184;
+pub const KB_92: usize = 94208;
+pub const KB_93: usize = 95232;
+pub const KB_94: usize = 96256;
+pub const KB_95: usize = 97280;
+pub const KB_96: usize = 98304;
+pub const KB_97: usize = 99328;
+pub const KB_98: usize = 100352;
+pub const KB_99: usize = 101376;
+pub const KB_100: usize = 102400;
+pub const KB_101: usize = 103424;
+pub const KB_102: usize = 104448;
+pub const KB_103: usize = 105472;
+pub const KB_104: usize = 106496;
+pub const KB_105: usize = 107520;
+pub const KB_106: usize = 108544;
+pub const KB_107: usize = 109568;
+pub const KB_108: usize = 110592;
+pub const KB_109: usize = 111616;
+pub const KB_110: usize = 112640;
+pub const KB_111: usize = 113664;
+pub const KB_112: usize = 114688;
+pub const KB_113: usize = 115712;
+pub const KB_114: usize = 116736;
+pub const KB_115: usize = 117760;
+pub const KB_116: usize = 118784;
+pub const KB_117: usize = 119808;
+pub const KB_118: usize = 120832;
+pub const KB_119: usize = 121856;
+pub const KB_120: usize = 122880;
+pub const KB_121: usize = 123904;
+pub const KB_122: usize = 124928;
+pub const KB_123: usize = 125952;
+pub const KB_124: usize = 126976;
+pub const KB_125: usize = 128000;
+pub const KB_126: usize = 129024;
+pub const KB_127: usize = 130048;
+pub const KB_128: usize = 131072;
+pub const KB_129: usize = 132096;
+pub const KB_130: usize = 133120;
+pub const KB_131: usize = 134144;
+pub const KB_132: usize = 135168;
+pub const KB_133: usize = 136192;
+pub const KB_134: usize = 137216;
+pub const KB_135: usize = 138240;
+pub const KB_136: usize = 139264;
+pub const KB_137: usize = 140288;
+pub const KB_138: usize = 141312;
+pub const KB_139: usize = 142336;
+pub const KB_140: usize = 143360;
+pub const KB_141: usize = 144384;
+pub const KB_142: usize = 145408;
+pub const KB_143: usize = 146432;
+pub const KB_144: usize = 147456;
+pub const KB_145: usize = 148480;
+pub const KB_146: usize = 149504;
+pub const KB_147: usize = 150528;
+pub const KB_148: usize = 151552;
+pub const KB_149: usize = 152576;
+pub const KB_150: usize = 153600;
+pub const KB_151: usize = 154624;
+pub const KB_152: usize = 155648;
+pub const KB_153: usize = 156672;
+pub const KB_154: usize = 157696;
+pub const KB_155: usize = 158720;
+pub const KB_156: usize = 159744;
+pub const KB_157: usize = 160768;
+pub const KB_158: usize = 161792;
+pub const KB_159: usize = 162816;
+pub const KB_160: usize = 163840;
+pub const KB_161: usize = 164864;
+pub const KB_162: usize = 165888;
+pub const KB_163: usize = 166912;
+pub const KB_164: usize = 167936;
+pub const KB_165: usize = 168960;
+pub const KB_166: usize = 169984;
+pub const KB_167: usize = 171008;
+pub const KB_168: usize = 172032;
+pub const KB_169: usize = 173056;
+pub const KB_170: usize = 174080;
+pub const KB_171: usize = 175104;
+pub const KB_172: usize = 176128;
+pub const KB_173: usize = 177152;
+pub const KB_174: usize = 178176;
+pub const KB_175: usize = 179200;
+pub const KB_176: usize = 180224;
+pub const KB_177: usize = 181248;
+pub const KB_178: usize = 182272;
+pub const KB_179: usize = 183296;
+pub const KB_180: usize = 184320;
+pub const KB_181: usize = 185344;
+pub const KB_182: usize = 186368;
+pub const KB_183: usize = 187392;
+pub const KB_184: usize = 188416;
+pub const KB_185: usize = 189440;
+pub const KB_186: usize = 190464;
+pub const KB_187: usize = 191488;
+pub const KB_188: usize = 192512;
+pub const KB_189: usize = 193536;
+pub const KB_190: usize = 194560;
+pub const KB_191: usize = 195584;
+pub const KB_192: usize = 196608;
+pub const KB_193: usize = 197632;
+pub const KB_194: usize = 198656;
+pub const KB_195: usize = 199680;
+pub const KB_196: usize = 200704;
+pub const KB_197: usize = 201728;
+pub const KB_198: usize = 202752;
+pub const KB_199: usize = 203776;
+pub const KB_200: usize = 204800;
+pub const KB_201: usize = 205824;
+pub const KB_202: usize = 206848;
+pub const KB_203: usize = 207872;
+pub const KB_204: usize = 208896;
+pub const KB_205: usize = 209920;
+pub const KB_206: usize = 210944;
+pub const KB_207: usize = 211968;
+pub const KB_208: usize = 212992;
+pub const KB_209: usize = 214016;
+pub const KB_210: usize = 215040;
+pub const KB_211: usize = 216064;
+pub const KB_212: usize = 217088;
+pub const KB_213: usize = 218112;
+pub const KB_214: usize = 219136;
+pub const KB_215: usize = 220160;
+pub const KB_216: usize = 221184;
+pub const KB_217: usize = 222208;
+pub const KB_218: usize = 223232;
+pub const KB_219: usize = 224256;
+pub const KB_220: usize = 225280;
+pub const KB_221: usize = 226304;
+pub const KB_222: usize = 227328;
+pub const KB_223: usize = 228352;
+pub const KB_224: usize = 229376;
+pub const KB_225: usize = 230400;
+pub const KB_226: usize = 231424;
+pub const KB_227: usize = 232448;
+pub const KB_228: usize = 233472;
+pub const KB_229: usize = 234496;
+pub const KB_230: usize = 235520;
+pub const KB_231: usize = 236544;
+pub const KB_232: usize = 237568;
+pub const KB_233: usize = 238592;
+pub const KB_234: usize = 239616;
+pub const KB_235: usize = 240640;
+pub const KB_236: usize = 241664;
+pub const KB_237: usize = 242688;
+pub const KB_238: usize = 243712;
+pub const KB_239: usize = 244736;
+pub const KB_240: usize = 245760;
+pub const KB_241: usize = 246784;
+pub const KB_242: usize = 247808;
+pub const KB_243: usize = 248832;
+pub const KB_244: usize = 249856;
+pub const KB_245: usize = 250880;
+pub const KB_246: usize = 251904;
+pub const KB_247: usize = 252928;
+pub const KB_248: usize = 253952;
+pub const KB_249: usize = 254976;
+pub const KB_250: usize = 256000;
+pub const KB_251: usize = 257024;
+pub const KB_252: usize = 258048;
+pub const KB_253: usize = 259072;
+pub const KB_254: usize = 260096;
+pub const KB_255: usize = 261120;
+pub const KB_256: usize = 262144;
+pub const KB_257: usize = 263168;
+pub const KB_258: usize = 264192;
+pub const KB_259: usize = 265216;
+pub const KB_260: usize = 266240;
+pub const KB_261: usize = 267264;
+pub const KB_262: usize = 268288;
+pub const KB_263: usize = 269312;
+pub const KB_264: usize = 270336;
+pub const KB_265: usize = 271360;
+pub const KB_266: usize = 272384;
+pub const KB_267: usize = 273408;
+pub const KB_268: usize = 274432;
+pub const KB_269: usize = 275456;
+pub const KB_270: usize = 276480;
+pub const KB_271: usize = 277504;
+pub const KB_272: usize = 278528;
+pub const KB_273: usize = 279552;
+pub const KB_274: usize = 280576;
+pub const KB_275: usize = 281600;
+pub const KB_276: usize = 282624;
+pub const KB_277: usize = 283648;
+pub const KB_278: usize = 284672;
+pub const KB_279: usize = 285696;
+pub const KB_280: usize = 286720;
+pub const KB_281: usize = 287744;
+pub const KB_282: usize = 288768;
+pub const KB_283: usize = 289792;
+pub const KB_284: usize = 290816;
+pub const KB_285: usize = 291840;
+pub const KB_286: usize = 292864;
+pub const KB_287: usize = 293888;
+pub const KB_288: usize = 294912;
+pub const KB_289: usize = 295936;
+pub const KB_290: usize = 296960;
+pub const KB_291: usize = 297984;
+pub const KB_292: usize = 299008;
+pub const KB_293: usize = 300032;
+pub const KB_294: usize = 301056;
+pub const KB_295: usize = 302080;
+pub const KB_296: usize = 303104;
+pub const KB_297: usize = 304128;
+pub const KB_298: usize = 305152;
+pub const KB_299: usize = 306176;
+pub const KB_300: usize = 307200;
+pub const KB_301: usize = 308224;
+pub const KB_302: usize = 309248;
+pub const KB_303: usize = 310272;
+pub const KB_304: usize = 311296;
+pub const KB_305: usize = 312320;
+pub const KB_306: usize = 313344;
+pub const KB_307: usize = 314368;
+pub const KB_308: usize = 315392;
+pub const KB_309: usize = 316416;
+pub const KB_310: usize = 317440;
+pub const KB_311: usize = 318464;
+pub const KB_312: usize = 319488;
+pub const KB_313: usize = 320512;
+pub const KB_314: usize = 321536;
+pub const KB_315: usize = 322560;
+pub const KB_316: usize = 323584;
+pub const KB_317: usize = 324608;
+pub const KB_318: usize = 325632;
+pub const KB_319: usize = 326656;
+pub const KB_320: usize = 327680;
+pub const KB_321: usize = 328704;
+pub const KB_322: usize = 329728;
+pub const KB_323: usize = 330752;
+pub const KB_324: usize = 331776;
+pub const KB_325: usize = 332800;
+pub const KB_326: usize = 333824;
+pub const KB_327: usize = 334848;
+pub const KB_328: usize = 335872;
+pub const KB_329: usize = 336896;
+pub const KB_330: usize = 337920;
+pub const KB_331: usize = 338944;
+pub const KB_332: usize = 339968;
+pub const KB_333: usize = 340992;
+pub const KB_334: usize = 342016;
+pub const KB_335: usize = 343040;
+pub const KB_336: usize = 344064;
+pub const KB_337: usize = 345088;
+pub const KB_338: usize = 346112;
+pub const KB_339: usize = 347136;
+pub const KB_340: usize = 348160;
+pub const KB_341: usize = 349184;
+pub const KB_342: usize = 350208;
+pub const KB_343: usize = 351232;
+pub const KB_344: usize = 352256;
+pub const KB_345: usize = 353280;
+pub const KB_346: usize = 354304;
+pub const KB_347: usize = 355328;
+pub const KB_348: usize = 356352;
+pub const KB_349: usize = 357376;
+pub const KB_350: usize = 358400;
+pub const KB_351: usize = 359424;
+pub const KB_352: usize = 360448;
+pub const KB_353: usize = 361472;
+pub const KB_354: usize = 362496;
+pub const KB_355: usize = 363520;
+pub const KB_356: usize = 364544;
+pub const KB_357: usize = 365568;
+pub const KB_358: usize = 366592;
+pub const KB_359: usize = 367616;
+pub const KB_360: usize = 368640;
+pub const KB_361: usize = 369664;
+pub const KB_362: usize = 370688;
+pub const KB_363: usize = 371712;
+pub const KB_364: usize = 372736;
+pub const KB_365: usize = 373760;
+pub const KB_366: usize = 374784;
+pub const KB_367: usize = 375808;
+pub const KB_368: usize = 376832;
+pub const KB_369: usize = 377856;
+pub const KB_370: usize = 378880;
+pub const KB_371: usize = 379904;
+pub const KB_372: usize = 380928;
+pub const KB_373: usize = 381952;
+pub const KB_374: usize = 382976;
+pub const KB_375: usize = 384000;
+pub const KB_376: usize = 385024;
+pub const KB_377: usize = 386048;
+pub const KB_378: usize = 387072;
+pub const KB_379: usize = 388096;
+pub const KB_380: usize = 389120;
+pub const KB_381: usize = 390144;
+pub const KB_382: usize = 391168;
+pub const KB_383: usize = 392192;
+pub const KB_384: usize = 393216;
+pub const KB_385: usize = 394240;
+pub const KB_386: usize = 395264;
+pub const KB_387: usize = 396288;
+pub const KB_388: usize = 397312;
+pub const KB_389: usize = 398336;
+pub const KB_390: usize = 399360;
+pub const KB_391: usize = 400384;
+pub const KB_392: usize = 401408;
+pub const KB_393: usize = 402432;
+pub const KB_394: usize = 403456;
+pub const KB_395: usize = 404480;
+pub const KB_396: usize = 405504;
+pub const KB_397: usize = 406528;
+pub const KB_398: usize = 407552;
+pub const KB_399: usize = 408576;
+pub const KB_400: usize = 409600;
+pub const KB_401: usize = 410624;
+pub const KB_402: usize = 411648;
+pub const KB_403: usize = 412672;
+pub const KB_404: usize = 413696;
+pub const KB_405: usize = 414720;
+pub const KB_406: usize = 415744;
+pub const KB_407: usize = 416768;
+pub const KB_408: usize = 417792;
+pub const KB_409: usize = 418816;
+pub const KB_410: usize = 419840;
+pub const KB_411: usize = 420864;
+pub const KB_412: usize = 421888;
+pub const KB_413: usize = 422912;
+pub const KB_414: usize = 423936;
+pub const KB_415: usize = 424960;
+pub const KB_416: usize = 425984;
+pub const KB_417: usize = 427008;
+pub const KB_418: usize = 428032;
+pub const KB_419: usize = 429056;
+pub const KB_420: usize = 430080;
+pub const KB_421: usize = 431104;
+pub const KB_422: usize = 432128;
+pub const KB_423: usize = 433152;
+pub const KB_424: usize = 434176;
+pub const KB_425: usize = 435200;
+pub const KB_426: usize = 436224;
+pub const KB_427: usize = 437248;
+pub const KB_428: usize = 438272;
+pub const KB_429: usize = 439296;
+pub const KB_430: usize = 440320;
+pub const KB_431: usize = 441344;
+pub const KB_432: usize = 442368;
+pub const KB_433: usize = 443392;
+pub const KB_434: usize = 444416;
+pub const KB_435: usize = 445440;
+pub const KB_436: usize = 446464;
+pub const KB_437: usize = 447488;
+pub const KB_438: usize = 448512;
+pub const KB_439: usize = 449536;
+pub const KB_440: usize = 450560;
+pub const KB_441: usize = 451584;
+pub const KB_442: usize = 452608;
+pub const KB_443: usize = 453632;
+pub const KB_444: usize = 454656;
+pub const KB_445: usize = 455680;
+pub const KB_446: usize = 456704;
+pub const KB_447: usize = 457728;
+pub const KB_448: usize = 458752;
+pub const KB_449: usize = 459776;
+pub const KB_450: usize = 460800;
+pub const KB_451: usize = 461824;
+pub const KB_452: usize = 462848;
+pub const KB_453: usize = 463872;
+pub const KB_454: usize = 464896;
+pub const KB_455: usize = 465920;
+pub const KB_456: usize = 466944;
+pub const KB_457: usize = 467968;
+pub const KB_458: usize = 468992;
+pub const KB_459: usize = 470016;
+pub const KB_460: usize = 471040;
+pub const KB_461: usize = 472064;
+pub const KB_462: usize = 473088;
+pub const KB_463: usize = 474112;
+pub const KB_464: usize = 475136;
+pub const KB_465: usize = 476160;
+pub const KB_466: usize = 477184;
+pub const KB_467: usize = 478208;
+pub const KB_468: usize = 479232;
+pub const KB_469: usize = 480256;
+pub const KB_470: usize = 481280;
+pub const KB_471: usize = 482304;
+pub const KB_472: usize = 483328;
+pub const KB_473: usize = 484352;
+pub const KB_474: usize = 485376;
+pub const KB_475: usize = 486400;
+pub const KB_476: usize = 487424;
+pub const KB_477: usize = 488448;
+pub const KB_478: usize = 489472;
+pub const KB_479: usize = 490496;
+pub const KB_480: usize = 491520;
+pub const KB_481: usize = 492544;
+pub const KB_482: usize = 493568;
+pub const KB_483: usize = 494592;
+pub const KB_484: usize = 495616;
+pub const KB_485: usize = 496640;
+pub const KB_486: usize = 497664;
+pub const KB_487: usize = 498688;
+pub const KB_488: usize = 499712;
+pub const KB_489: usize = 500736;
+pub const KB_490: usize = 501760;
+pub const KB_491: usize = 502784;
+pub const KB_492: usize = 503808;
+pub const KB_493: usize = 504832;
+pub const KB_494: usize = 505856;
+pub const KB_495: usize = 506880;
+pub const KB_496: usize = 507904;
+pub const KB_497: usize = 508928;
+pub const KB_498: usize = 509952;
+pub const KB_499: usize = 510976;
+pub const KB_500: usize = 512000;
+pub const KB_501: usize = 513024;
+pub const KB_502: usize = 514048;
+pub const KB_503: usize = 515072;
+pub const KB_504: usize = 516096;
+pub const KB_505: usize = 517120;
+pub const KB_506: usize = 518144;
+pub const KB_507: usize = 519168;
+pub const KB_508: usize = 520192;
+pub const KB_509: usize = 521216;
+pub const KB_510: usize = 522240;
+pub const KB_511: usize = 523264;
+pub const KB_512: usize = 524288;
+pub const KB_513: usize = 525312;
+pub const KB_514: usize = 526336;
+pub const KB_515: usize = 527360;
+pub const KB_516: usize = 528384;
+pub const KB_517: usize = 529408;
+pub const KB_518: usize = 530432;
+pub const KB_519: usize = 531456;
+pub const KB_520: usize = 532480;
+pub const KB_521: usize = 533504;
+pub const KB_522: usize = 534528;
+pub const KB_523: usize = 535552;
+pub const KB_524: usize = 536576;
+pub const KB_525: usize = 537600;
+pub const KB_526: usize = 538624;
+pub const KB_527: usize = 539648;
+pub const KB_528: usize = 540672;
+pub const KB_529: usize = 541696;
+pub const KB_530: usize = 542720;
+pub const KB_531: usize = 543744;
+pub const KB_532: usize = 544768;
+pub const KB_533: usize = 545792;
+pub const KB_534: usize = 546816;
+pub const KB_535: usize = 547840;
+pub const KB_536: usize = 548864;
+pub const KB_537: usize = 549888;
+pub const KB_538: usize = 550912;
+pub const KB_539: usize = 551936;
+pub const KB_540: usize = 552960;
+pub const KB_541: usize = 553984;
+pub const KB_542: usize = 555008;
+pub const KB_543: usize = 556032;
+pub const KB_544: usize = 557056;
+pub const KB_545: usize = 558080;
+pub const KB_546: usize = 559104;
+pub const KB_547: usize = 560128;
+pub const KB_548: usize = 561152;
+pub const KB_549: usize = 562176;
+pub const KB_550: usize = 563200;
+pub const KB_551: usize = 564224;
+pub const KB_552: usize = 565248;
+pub const KB_553: usize = 566272;
+pub const KB_554: usize = 567296;
+pub const KB_555: usize = 568320;
+pub const KB_556: usize = 569344;
+pub const KB_557: usize = 570368;
+pub const KB_558: usize = 571392;
+pub const KB_559: usize = 572416;
+pub const KB_560: usize = 573440;
+pub const KB_561: usize = 574464;
+pub const KB_562: usize = 575488;
+pub const KB_563: usize = 576512;
+pub const KB_564: usize = 577536;
+pub const KB_565: usize = 578560;
+pub const KB_566: usize = 579584;
+pub const KB_567: usize = 580608;
+pub const KB_568: usize = 581632;
+pub const KB_569: usize = 582656;
+pub const KB_570: usize = 583680;
+pub const KB_571: usize = 584704;
+pub const KB_572: usize = 585728;
+pub const KB_573: usize = 586752;
+pub const KB_574: usize = 587776;
+pub const KB_575: usize = 588800;
+pub const KB_576: usize = 589824;
+pub const KB_577: usize = 590848;
+pub const KB_578: usize = 591872;
+pub const KB_579: usize = 592896;
+pub const KB_580: usize = 593920;
+pub const KB_581: usize = 594944;
+pub const KB_582: usize = 595968;
+pub const KB_583: usize = 596992;
+pub const KB_584: usize = 598016;
+pub const KB_585: usize = 599040;
+pub const KB_586: usize = 600064;
+pub const KB_587: usize = 601088;
+pub const KB_588: usize = 602112;
+pub const KB_589: usize = 603136;
+pub const KB_590: usize = 604160;
+pub const KB_591: usize = 605184;
+pub const KB_592: usize = 606208;
+pub const KB_593: usize = 607232;
+pub const KB_594: usize = 608256;
+pub const KB_595: usize = 609280;
+pub const KB_596: usize = 610304;
+pub const KB_597: usize = 611328;
+pub const KB_598: usize = 612352;
+pub const KB_599: usize = 613376;
+pub const KB_600: usize = 614400;
+pub const KB_601: usize = 615424;
+pub const KB_602: usize = 616448;
+pub const KB_603: usize = 617472;
+pub const KB_604: usize = 618496;
+pub const KB_605: usize = 619520;
+pub const KB_606: usize = 620544;
+pub const KB_607: usize = 621568;
+pub const KB_608: usize = 622592;
+pub const KB_609: usize = 623616;
+pub const KB_610: usize = 624640;
+pub const KB_611: usize = 625664;
+pub const KB_612: usize = 626688;
+pub const KB_613: usize = 627712;
+pub const KB_614: usize = 628736;
+pub const KB_615: usize = 629760;
+pub const KB_616: usize = 630784;
+pub const KB_617: usize = 631808;
+pub const KB_618: usize = 632832;
+pub const KB_619: usize = 633856;
+pub const KB_620: usize = 634880;
+pub const KB_621: usize = 635904;
+pub const KB_622: usize = 636928;
+pub const KB_623: usize = 637952;
+pub const KB_624: usize = 638976;
+pub const KB_625: usize = 640000;
+pub const KB_626: usize = 641024;
+pub const KB_627: usize = 642048;
+pub const KB_628: usize = 643072;
+pub const KB_629: usize = 644096;
+pub const KB_630: usize = 645120;
+pub const KB_631: usize = 646144;
+pub const KB_632: usize = 647168;
+pub const KB_633: usize = 648192;
+pub const KB_634: usize = 649216;
+pub const KB_635: usize = 650240;
+pub const KB_636: usize = 651264;
+pub const KB_637: usize = 652288;
+pub const KB_638: usize = 653312;
+pub const KB_639: usize = 654336;
+pub const KB_640: usize = 655360;
+pub const KB_641: usize = 656384;
+pub const KB_642: usize = 657408;
+pub const KB_643: usize = 658432;
+pub const KB_644: usize = 659456;
+pub const KB_645: usize = 660480;
+pub const KB_646: usize = 661504;
+pub const KB_647: usize = 662528;
+pub const KB_648: usize = 663552;
+pub const KB_649: usize = 664576;
+pub const KB_650: usize = 665600;
+pub const KB_651: usize = 666624;
+pub const KB_652: usize = 667648;
+pub const KB_653: usize = 668672;
+pub const KB_654: usize = 669696;
+pub const KB_655: usize = 670720;
+pub const KB_656: usize = 671744;
+pub const KB_657: usize = 672768;
+pub const KB_658: usize = 673792;
+pub const KB_659: usize = 674816;
+pub const KB_660: usize = 675840;
+pub const KB_661: usize = 676864;
+pub const KB_662: usize = 677888;
+pub const KB_663: usize = 678912;
+pub const KB_664: usize = 679936;
+pub const KB_665: usize = 680960;
+pub const KB_666: usize = 681984;
+pub const KB_667: usize = 683008;
+pub const KB_668: usize = 684032;
+pub const KB_669: usize = 685056;
+pub const KB_670: usize = 686080;
+pub const KB_671: usize = 687104;
+pub const KB_672: usize = 688128;
+pub const KB_673: usize = 689152;
+pub const KB_674: usize = 690176;
+pub const KB_675: usize = 691200;
+pub const KB_676: usize = 692224;
+pub const KB_677: usize = 693248;
+pub const KB_678: usize = 694272;
+pub const KB_679: usize = 695296;
+pub const KB_680: usize = 696320;
+pub const KB_681: usize = 697344;
+pub const KB_682: usize = 698368;
+pub const KB_683: usize = 699392;
+pub const KB_684: usize = 700416;
+pub const KB_685: usize = 701440;
+pub const KB_686: usize = 702464;
+pub const KB_687: usize = 703488;
+pub const KB_688: usize = 704512;
+pub const KB_689: usize = 705536;
+pub const KB_690: usize = 706560;
+pub const KB_691: usize = 707584;
+pub const KB_692: usize = 708608;
+pub const KB_693: usize = 709632;
+pub const KB_694: usize = 710656;
+pub const KB_695: usize = 711680;
+pub const KB_696: usize = 712704;
+pub const KB_697: usize = 713728;
+pub const KB_698: usize = 714752;
+pub const KB_699: usize = 715776;
+pub const KB_700: usize = 716800;
+pub const KB_701: usize = 717824;
+pub const KB_702: usize = 718848;
+pub const KB_703: usize = 719872;
+pub const KB_704: usize = 720896;
+pub const KB_705: usize = 721920;
+pub const KB_706: usize = 722944;
+pub const KB_707: usize = 723968;
+pub const KB_708: usize = 724992;
+pub const KB_709: usize = 726016;
+pub const KB_710: usize = 727040;
+pub const KB_711: usize = 728064;
+pub const KB_712: usize = 729088;
+pub const KB_713: usize = 730112;
+pub const KB_714: usize = 731136;
+pub const KB_715: usize = 732160;
+pub const KB_716: usize = 733184;
+pub const KB_717: usize = 734208;
+pub const KB_718: usize = 735232;
+pub const KB_719: usize = 736256;
+pub const KB_720: usize = 737280;
+pub const KB_721: usize = 738304;
+pub const KB_722: usize = 739328;
+pub const KB_723: usize = 740352;
+pub const KB_724: usize = 741376;
+pub const KB_725: usize = 742400;
+pub const KB_726: usize = 743424;
+pub const KB_727: usize = 744448;
+pub const KB_728: usize = 745472;
+pub const KB_729: usize = 746496;
+pub const KB_730: usize = 747520;
+pub const KB_731: usize = 748544;
+pub const KB_732: usize = 749568;
+pub const KB_733: usize = 750592;
+pub const KB_734: usize = 751616;
+pub const KB_735: usize = 752640;
+pub const KB_736: usize = 753664;
+pub const KB_737: usize = 754688;
+pub const KB_738: usize = 755712;
+pub const KB_739: usize = 756736;
+pub const KB_740: usize = 757760;
+pub const KB_741: usize = 758784;
+pub const KB_742: usize = 759808;
+pub const KB_743: usize = 760832;
+pub const KB_744: usize = 761856;
+pub const KB_745: usize = 762880;
+pub const KB_746: usize = 763904;
+pub const KB_747: usize = 764928;
+pub const KB_748: usize = 765952;
+pub const KB_749: usize = 766976;
+pub const KB_750: usize = 768000;
+pub const KB_751: usize = 769024;
+pub const KB_752: usize = 770048;
+pub const KB_753: usize = 771072;
+pub const KB_754: usize = 772096;
+pub const KB_755: usize = 773120;
+pub const KB_756: usize = 774144;
+pub const KB_757: usize = 775168;
+pub const KB_758: usize = 776192;
+pub const KB_759: usize = 777216;
+pub const KB_760: usize = 778240;
+pub const KB_761: usize = 779264;
+pub const KB_762: usize = 780288;
+pub const KB_763: usize = 781312;
+pub const KB_764: usize = 782336;
+pub const KB_765: usize = 783360;
+pub const KB_766: usize = 784384;
+pub const KB_767: usize = 785408;
+pub const KB_768: usize = 786432;
+pub const KB_769: usize = 787456;
+pub const KB_770: usize = 788480;
+pub const KB_771: usize = 789504;
+pub const KB_772: usize = 790528;
+pub const KB_773: usize = 791552;
+pub const KB_774: usize = 792576;
+pub const KB_775: usize = 793600;
+pub const KB_776: usize = 794624;
+pub const KB_777: usize = 795648;
+pub const KB_778: usize = 796672;
+pub const KB_779: usize = 797696;
+pub const KB_780: usize = 798720;
+pub const KB_781: usize = 799744;
+pub const KB_782: usize = 800768;
+pub const KB_783: usize = 801792;
+pub const KB_784: usize = 802816;
+pub const KB_785: usize = 803840;
+pub const KB_786: usize = 804864;
+pub const KB_787: usize = 805888;
+pub const KB_788: usize = 806912;
+pub const KB_789: usize = 807936;
+pub const KB_790: usize = 808960;
+pub const KB_791: usize = 809984;
+pub const KB_792: usize = 811008;
+pub const KB_793: usize = 812032;
+pub const KB_794: usize = 813056;
+pub const KB_795: usize = 814080;
+pub const KB_796: usize = 815104;
+pub const KB_797: usize = 816128;
+pub const KB_798: usize = 817152;
+pub const KB_799: usize = 818176;
+pub const KB_800: usize = 819200;
+pub const KB_801: usize = 820224;
+pub const KB_802: usize = 821248;
+pub const KB_803: usize = 822272;
+pub const KB_804: usize = 823296;
+pub const KB_805: usize = 824320;
+pub const KB_806: usize = 825344;
+pub const KB_807: usize = 826368;
+pub const KB_808: usize = 827392;
+pub const KB_809: usize = 828416;
+pub const KB_810: usize = 829440;
+pub const KB_811: usize = 830464;
+pub const KB_812: usize = 831488;
+pub const KB_813: usize = 832512;
+pub const KB_814: usize = 833536;
+pub const KB_815: usize = 834560;
+pub const KB_816: usize = 835584;
+pub const KB_817: usize = 836608;
+pub const KB_818: usize = 837632;
+pub const KB_819: usize = 838656;
+pub const KB_820: usize = 839680;
+pub const KB_821: usize = 840704;
+pub const KB_822: usize = 841728;
+pub const KB_823: usize = 842752;
+pub const KB_824: usize = 843776;
+pub const KB_825: usize = 844800;
+pub const KB_826: usize = 845824;
+pub const KB_827: usize = 846848;
+pub const KB_828: usize = 847872;
+pub const KB_829: usize = 848896;
+pub const KB_830: usize = 849920;
+pub const KB_831: usize = 850944;
+pub const KB_832: usize = 851968;
+pub const KB_833: usize = 852992;
+pub const KB_834: usize = 854016;
+pub const KB_835: usize = 855040;
+pub const KB_836: usize = 856064;
+pub const KB_837: usize = 857088;
+pub const KB_838: usize = 858112;
+pub const KB_839: usize = 859136;
+pub const KB_840: usize = 860160;
+pub const KB_841: usize = 861184;
+pub const KB_842: usize = 862208;
+pub const KB_843: usize = 863232;
+pub const KB_844: usize = 864256;
+pub const KB_845: usize = 865280;
+pub const KB_846: usize = 866304;
+pub const KB_847: usize = 867328;
+pub const KB_848: usize = 868352;
+pub const KB_849: usize = 869376;
+pub const KB_850: usize = 870400;
+pub const KB_851: usize = 871424;
+pub const KB_852: usize = 872448;
+pub const KB_853: usize = 873472;
+pub const KB_854: usize = 874496;
+pub const KB_855: usize = 875520;
+pub const KB_856: usize = 876544;
+pub const KB_857: usize = 877568;
+pub const KB_858: usize = 878592;
+pub const KB_859: usize = 879616;
+pub const KB_860: usize = 880640;
+pub const KB_861: usize = 881664;
+pub const KB_862: usize = 882688;
+pub const KB_863: usize = 883712;
+pub const KB_864: usize = 884736;
+pub const KB_865: usize = 885760;
+pub const KB_866: usize = 886784;
+pub const KB_867: usize = 887808;
+pub const KB_868: usize = 888832;
+pub const KB_869: usize = 889856;
+pub const KB_870: usize = 890880;
+pub const KB_871: usize = 891904;
+pub const KB_872: usize = 892928;
+pub const KB_873: usize = 893952;
+pub const KB_874: usize = 894976;
+pub const KB_875: usize = 896000;
+pub const KB_876: usize = 897024;
+pub const KB_877: usize = 898048;
+pub const KB_878: usize = 899072;
+pub const KB_879: usize = 900096;
+pub const KB_880: usize = 901120;
+pub const KB_881: usize = 902144;
+pub const KB_882: usize = 903168;
+pub const KB_883: usize = 904192;
+pub const KB_884: usize = 905216;
+pub const KB_885: usize = 906240;
+pub const KB_886: usize = 907264;
+pub const KB_887: usize = 908288;
+pub const KB_888: usize = 909312;
+pub const KB_889: usize = 910336;
+pub const KB_890: usize = 911360;
+pub const KB_891: usize = 912384;
+pub const KB_892: usize = 913408;
+pub const KB_893: usize = 914432;
+pub const KB_894: usize = 915456;
+pub const KB_895: usize = 916480;
+pub const KB_896: usize = 917504;
+pub const KB_897: usize = 918528;
+pub const KB_898: usize = 919552;
+pub const KB_899: usize = 920576;
+pub const KB_900: usize = 921600;
+pub const KB_901: usize = 922624;
+pub const KB_902: usize = 923648;
+pub const KB_903: usize = 924672;
+pub const KB_904: usize = 925696;
+pub const KB_905: usize = 926720;
+pub const KB_906: usize = 927744;
+pub const KB_907: usize = 928768;
+pub const KB_908: usize = 929792;
+pub const KB_909: usize = 930816;
+pub const KB_910: usize = 931840;
+pub const KB_911: usize = 932864;
+pub const KB_912: usize = 933888;
+pub const KB_913: usize = 934912;
+pub const KB_914: usize = 935936;
+pub const KB_915: usize = 936960;
+pub const KB_916: usize = 937984;
+pub const KB_917: usize = 939008;
+pub const KB_918: usize = 940032;
+pub const KB_919: usize = 941056;
+pub const KB_920: usize = 942080;
+pub const KB_921: usize = 943104;
+pub const KB_922: usize = 944128;
+pub const KB_923: usize = 945152;
+pub const KB_924: usize = 946176;
+pub const KB_925: usize = 947200;
+pub const KB_926: usize = 948224;
+pub const KB_927: usize = 949248;
+pub const KB_928: usize = 950272;
+pub const KB_929: usize = 951296;
+pub const KB_930: usize = 952320;
+pub const KB_931: usize = 953344;
+pub const KB_932: usize = 954368;
+pub const KB_933: usize = 955392;
+pub const KB_934: usize = 956416;
+pub const KB_935: usize = 957440;
+pub const KB_936: usize = 958464;
+pub const KB_937: usize = 959488;
+pub const KB_938: usize = 960512;
+pub const KB_939: usize = 961536;
+pub const KB_940: usize = 962560;
+pub const KB_941: usize = 963584;
+pub const KB_942: usize = 964608;
+pub const KB_943: usize = 965632;
+pub const KB_944: usize = 966656;
+pub const KB_945: usize = 967680;
+pub const KB_946: usize = 968704;
+pub const KB_947: usize = 969728;
+pub const KB_948: usize = 970752;
+pub const KB_949: usize = 971776;
+pub const KB_950: usize = 972800;
+pub const KB_951: usize = 973824;
+pub const KB_952: usize = 974848;
+pub const KB_953: usize = 975872;
+pub const KB_954: usize = 976896;
+pub const KB_955: usize = 977920;
+pub const KB_956: usize = 978944;
+pub const KB_957: usize = 979968;
+pub const KB_958: usize = 980992;
+pub const KB_959: usize = 982016;
+pub const KB_960: usize = 983040;
+pub const KB_961: usize = 984064;
+pub const KB_962: usize = 985088;
+pub const KB_963: usize = 986112;
+pub const KB_964: usize = 987136;
+pub const KB_965: usize = 988160;
+pub const KB_966: usize = 989184;
+pub const KB_967: usize = 990208;
+pub const KB_968: usize = 991232;
+pub const KB_969: usize = 992256;
+pub const KB_970: usize = 993280;
+pub const KB_971: usize = 994304;
+pub const KB_972: usize = 995328;
+pub const KB_973: usize = 996352;
+pub const KB_974: usize = 997376;
+pub const KB_975: usize = 998400;
+pub const KB_976: usize = 999424;
+pub const KB_977: usize = 1000448;
+pub const KB_978: usize = 1001472;
+pub const KB_979: usize = 1002496;
+pub const KB_980: usize = 1003520;
+pub const KB_981: usize = 1004544;
+pub const KB_982: usize = 1005568;
+pub const KB_983: usize = 1006592;
+pub const KB_984: usize = 1007616;
+pub const KB_985: usize = 1008640;
+pub const KB_986: usize = 1009664;
+pub const KB_987: usize = 1010688;
+pub const KB_988: usize = 1011712;
+pub const KB_989: usize = 1012736;
+pub const KB_990: usize = 1013760;
+pub const KB_991: usize = 1014784;
+pub const KB_992: usize = 1015808;
+pub const KB_993: usize = 1016832;
+pub const KB_994: usize = 1017856;
+pub const KB_995: usize = 1018880;
+pub const KB_996: usize = 1019904;
+pub const KB_997: usize = 1020928;
+pub const KB_998: usize = 1021952;
+pub const KB_999: usize = 1022976;
+pub const KB_1000: usize = 1024000;
+pub const KB_1001: usize = 1025024;
+pub const KB_1002: usize = 1026048;
+pub const KB_1003: usize = 1027072;
+pub const KB_1004: usize = 1028096;
+pub const KB_1005: usize = 1029120;
+pub const KB_1006: usize = 1030144;
+pub const KB_1007: usize = 1031168;
+pub const KB_1008: usize = 1032192;
+pub const KB_1009: usize = 1033216;
+pub const KB_1010: usize = 1034240;
+pub const KB_1011: usize = 1035264;
+pub const KB_1012: usize = 1036288;
+pub const KB_1013: usize = 1037312;
+pub const KB_1014: usize = 1038336;
+pub const KB_1015: usize = 1039360;
+pub const KB_1016: usize = 1040384;
+pub const KB_1017: usize = 1041408;
+pub const KB_1018: usize = 1042432;
+pub const KB_1019: usize = 1043456;
+pub const KB_1020: usize = 1044480;
+pub const KB_1021: usize = 1045504;
+pub const KB_1022: usize = 1046528;
+pub const KB_1023: usize = 1047552;
+pub const KB_1024: usize = 1048576;
+pub const MB_1: usize = 1048576;
+pub const MB_2: usize = 2097152;
+pub const MB_3: usize = 3145728;
+pub const MB_4: usize = 4194304;
+pub const MB_5: usize = 5242880;
+pub const MB_6: usize = 6291456;
+pub const MB_7: usize = 7340032;
+pub const MB_8: usize = 8388608;
+pub const MB_9: usize = 9437184;
+pub const MB_10: usize = 10485760;
+pub const MB_11: usize = 11534336;
+pub const MB_12: usize = 12582912;
+pub const MB_13: usize = 13631488;
+pub const MB_14: usize = 14680064;
+pub const MB_15: usize = 15728640;
+pub const MB_16: usize = 16777216;
+pub const MB_17: usize = 17825792;
+pub const MB_18: usize = 18874368;
+pub const MB_19: usize = 19922944;
+pub const MB_20: usize = 20971520;
+pub const MB_21: usize = 22020096;
+pub const MB_22: usize = 23068672;
+pub const MB_23: usize = 24117248;
+pub const MB_24: usize = 25165824;
+pub const MB_25: usize = 26214400;
+pub const MB_26: usize = 27262976;
+pub const MB_27: usize = 28311552;
+pub const MB_28: usize = 29360128;
+pub const MB_29: usize = 30408704;
+pub const MB_30: usize = 31457280;
+pub const MB_31: usize = 32505856;
+pub const MB_32: usize = 33554432;
+pub const MB_33: usize = 34603008;
+pub const MB_34: usize = 35651584;
+pub const MB_35: usize = 36700160;
+pub const MB_36: usize = 37748736;
+pub const MB_37: usize = 38797312;
+pub const MB_38: usize = 39845888;
+pub const MB_39: usize = 40894464;
+pub const MB_40: usize = 41943040;
+pub const MB_41: usize = 42991616;
+pub const MB_42: usize = 44040192;
+pub const MB_43: usize = 45088768;
+pub const MB_44: usize = 46137344;
+pub const MB_45: usize = 47185920;
+pub const MB_46: usize = 48234496;
+pub const MB_47: usize = 49283072;
+pub const MB_48: usize = 50331648;
+pub const MB_49: usize = 51380224;
+pub const MB_50: usize = 52428800;
+pub const MB_51: usize = 53477376;
+pub const MB_52: usize = 54525952;
+pub const MB_53: usize = 55574528;
+pub const MB_54: usize = 56623104;
+pub const MB_55: usize = 57671680;
+pub const MB_56: usize = 58720256;
+pub const MB_57: usize = 59768832;
+pub const MB_58: usize = 60817408;
+pub const MB_59: usize = 61865984;
+pub const MB_60: usize = 62914560;
+pub const MB_61: usize = 63963136;
+pub const MB_62: usize = 65011712;
+pub const MB_63: usize = 66060288;
+pub const MB_64: usize = 67108864;
+pub const MB_65: usize = 68157440;
+pub const MB_66: usize = 69206016;
+pub const MB_67: usize = 70254592;
+pub const MB_68: usize = 71303168;
+pub const MB_69: usize = 72351744;
+pub const MB_70: usize = 73400320;
+pub const MB_71: usize = 74448896;
+pub const MB_72: usize = 75497472;
+pub const MB_73: usize = 76546048;
+pub const MB_74: usize = 77594624;
+pub const MB_75: usize = 78643200;
+pub const MB_76: usize = 79691776;
+pub const MB_77: usize = 80740352;
+pub const MB_78: usize = 81788928;
+pub const MB_79: usize = 82837504;
+pub const MB_80: usize = 83886080;
+pub const MB_81: usize = 84934656;
+pub const MB_82: usize = 85983232;
+pub const MB_83: usize = 87031808;
+pub const MB_84: usize = 88080384;
+pub const MB_85: usize = 89128960;
+pub const MB_86: usize = 90177536;
+pub const MB_87: usize = 91226112;
+pub const MB_88: usize = 92274688;
+pub const MB_89: usize = 93323264;
+pub const MB_90: usize = 94371840;
+pub const MB_91: usize = 95420416;
+pub const MB_92: usize = 96468992;
+pub const MB_93: usize = 97517568;
+pub const MB_94: usize = 98566144;
+pub const MB_95: usize = 99614720;
+pub const MB_96: usize = 100663296;
+pub const MB_97: usize = 101711872;
+pub const MB_98: usize = 102760448;
+pub const MB_99: usize = 103809024;
+pub const MB_100: usize = 104857600;
+pub const MB_101: usize = 105906176;
+pub const MB_102: usize = 106954752;
+pub const MB_103: usize = 108003328;
+pub const MB_104: usize = 109051904;
+pub const MB_105: usize = 110100480;
+pub const MB_106: usize = 111149056;
+pub const MB_107: usize = 112197632;
+pub const MB_108: usize = 113246208;
+pub const MB_109: usize = 114294784;
+pub const MB_110: usize = 115343360;
+pub const MB_111: usize = 116391936;
+pub const MB_112: usize = 117440512;
+pub const MB_113: usize = 118489088;
+pub const MB_114: usize = 119537664;
+pub const MB_115: usize = 120586240;
+pub const MB_116: usize = 121634816;
+pub const MB_117: usize = 122683392;
+pub const MB_118: usize = 123731968;
+pub const MB_119: usize = 124780544;
+pub const MB_120: usize = 125829120;
+pub const MB_121: usize = 126877696;
+pub const MB_122: usize = 127926272;
+pub const MB_123: usize = 128974848;
+pub const MB_124: usize = 130023424;
+pub const MB_125: usize = 131072000;
+pub const MB_126: usize = 132120576;
+pub const MB_127: usize = 133169152;
+pub const MB_128: usize = 134217728;
+pub const MB_129: usize = 135266304;
+pub const MB_130: usize = 136314880;
+pub const MB_131: usize = 137363456;
+pub const MB_132: usize = 138412032;
+pub const MB_133: usize = 139460608;
+pub const MB_134: usize = 140509184;
+pub const MB_135: usize = 141557760;
+pub const MB_136: usize = 142606336;
+pub const MB_137: usize = 143654912;
+pub const MB_138: usize = 144703488;
+pub const MB_139: usize = 145752064;
+pub const MB_140: usize = 146800640;
+pub const MB_141: usize = 147849216;
+pub const MB_142: usize = 148897792;
+pub const MB_143: usize = 149946368;
+pub const MB_144: usize = 150994944;
+pub const MB_145: usize = 152043520;
+pub const MB_146: usize = 153092096;
+pub const MB_147: usize = 154140672;
+pub const MB_148: usize = 155189248;
+pub const MB_149: usize = 156237824;
+pub const MB_150: usize = 157286400;
+pub const MB_151: usize = 158334976;
+pub const MB_152: usize = 159383552;
+pub const MB_153: usize = 160432128;
+pub const MB_154: usize = 161480704;
+pub const MB_155: usize = 162529280;
+pub const MB_156: usize = 163577856;
+pub const MB_157: usize = 164626432;
+pub const MB_158: usize = 165675008;
+pub const MB_159: usize = 166723584;
+pub const MB_160: usize = 167772160;
+pub const MB_161: usize = 168820736;
+pub const MB_162: usize = 169869312;
+pub const MB_163: usize = 170917888;
+pub const MB_164: usize = 171966464;
+pub const MB_165: usize = 173015040;
+pub const MB_166: usize = 174063616;
+pub const MB_167: usize = 175112192;
+pub const MB_168: usize = 176160768;
+pub const MB_169: usize = 177209344;
+pub const MB_170: usize = 178257920;
+pub const MB_171: usize = 179306496;
+pub const MB_172: usize = 180355072;
+pub const MB_173: usize = 181403648;
+pub const MB_174: usize = 182452224;
+pub const MB_175: usize = 183500800;
+pub const MB_176: usize = 184549376;
+pub const MB_177: usize = 185597952;
+pub const MB_178: usize = 186646528;
+pub const MB_179: usize = 187695104;
+pub const MB_180: usize = 188743680;
+pub const MB_181: usize = 189792256;
+pub const MB_182: usize = 190840832;
+pub const MB_183: usize = 191889408;
+pub const MB_184: usize = 192937984;
+pub const MB_185: usize = 193986560;
+pub const MB_186: usize = 195035136;
+pub const MB_187: usize = 196083712;
+pub const MB_188: usize = 197132288;
+pub const MB_189: usize = 198180864;
+pub const MB_190: usize = 199229440;
+pub const MB_191: usize = 200278016;
+pub const MB_192: usize = 201326592;
+pub const MB_193: usize = 202375168;
+pub const MB_194: usize = 203423744;
+pub const MB_195: usize = 204472320;
+pub const MB_196: usize = 205520896;
+pub const MB_197: usize = 206569472;
+pub const MB_198: usize = 207618048;
+pub const MB_199: usize = 208666624;
+pub const MB_200: usize = 209715200;
+pub const MB_201: usize = 210763776;
+pub const MB_202: usize = 211812352;
+pub const MB_203: usize = 212860928;
+pub const MB_204: usize = 213909504;
+pub const MB_205: usize = 214958080;
+pub const MB_206: usize = 216006656;
+pub const MB_207: usize = 217055232;
+pub const MB_208: usize = 218103808;
+pub const MB_209: usize = 219152384;
+pub const MB_210: usize = 220200960;
+pub const MB_211: usize = 221249536;
+pub const MB_212: usize = 222298112;
+pub const MB_213: usize = 223346688;
+pub const MB_214: usize = 224395264;
+pub const MB_215: usize = 225443840;
+pub const MB_216: usize = 226492416;
+pub const MB_217: usize = 227540992;
+pub const MB_218: usize = 228589568;
+pub const MB_219: usize = 229638144;
+pub const MB_220: usize = 230686720;
+pub const MB_221: usize = 231735296;
+pub const MB_222: usize = 232783872;
+pub const MB_223: usize = 233832448;
+pub const MB_224: usize = 234881024;
+pub const MB_225: usize = 235929600;
+pub const MB_226: usize = 236978176;
+pub const MB_227: usize = 238026752;
+pub const MB_228: usize = 239075328;
+pub const MB_229: usize = 240123904;
+pub const MB_230: usize = 241172480;
+pub const MB_231: usize = 242221056;
+pub const MB_232: usize = 243269632;
+pub const MB_233: usize = 244318208;
+pub const MB_234: usize = 245366784;
+pub const MB_235: usize = 246415360;
+pub const MB_236: usize = 247463936;
+pub const MB_237: usize = 248512512;
+pub const MB_238: usize = 249561088;
+pub const MB_239: usize = 250609664;
+pub const MB_240: usize = 251658240;
+pub const MB_241: usize = 252706816;
+pub const MB_242: usize = 253755392;
+pub const MB_243: usize = 254803968;
+pub const MB_244: usize = 255852544;
+pub const MB_245: usize = 256901120;
+pub const MB_246: usize = 257949696;
+pub const MB_247: usize = 258998272;
+pub const MB_248: usize = 260046848;
+pub const MB_249: usize = 261095424;
+pub const MB_250: usize = 262144000;
+pub const MB_251: usize = 263192576;
+pub const MB_252: usize = 264241152;
+pub const MB_253: usize = 265289728;
+pub const MB_254: usize = 266338304;
+pub const MB_255: usize = 267386880;
+pub const MB_256: usize = 268435456;
+pub const MB_257: usize = 269484032;
+pub const MB_258: usize = 270532608;
+pub const MB_259: usize = 271581184;
+pub const MB_260: usize = 272629760;
+pub const MB_261: usize = 273678336;
+pub const MB_262: usize = 274726912;
+pub const MB_263: usize = 275775488;
+pub const MB_264: usize = 276824064;
+pub const MB_265: usize = 277872640;
+pub const MB_266: usize = 278921216;
+pub const MB_267: usize = 279969792;
+pub const MB_268: usize = 281018368;
+pub const MB_269: usize = 282066944;
+pub const MB_270: usize = 283115520;
+pub const MB_271: usize = 284164096;
+pub const MB_272: usize = 285212672;
+pub const MB_273: usize = 286261248;
+pub const MB_274: usize = 287309824;
+pub const MB_275: usize = 288358400;
+pub const MB_276: usize = 289406976;
+pub const MB_277: usize = 290455552;
+pub const MB_278: usize = 291504128;
+pub const MB_279: usize = 292552704;
+pub const MB_280: usize = 293601280;
+pub const MB_281: usize = 294649856;
+pub const MB_282: usize = 295698432;
+pub const MB_283: usize = 296747008;
+pub const MB_284: usize = 297795584;
+pub const MB_285: usize = 298844160;
+pub const MB_286: usize = 299892736;
+pub const MB_287: usize = 300941312;
+pub const MB_288: usize = 301989888;
+pub const MB_289: usize = 303038464;
+pub const MB_290: usize = 304087040;
+pub const MB_291: usize = 305135616;
+pub const MB_292: usize = 306184192;
+pub const MB_293: usize = 307232768;
+pub const MB_294: usize = 308281344;
+pub const MB_295: usize = 309329920;
+pub const MB_296: usize = 310378496;
+pub const MB_297: usize = 311427072;
+pub const MB_298: usize = 312475648;
+pub const MB_299: usize = 313524224;
+pub const MB_300: usize = 314572800;
+pub const MB_301: usize = 315621376;
+pub const MB_302: usize = 316669952;
+pub const MB_303: usize = 317718528;
+pub const MB_304: usize = 318767104;
+pub const MB_305: usize = 319815680;
+pub const MB_306: usize = 320864256;
+pub const MB_307: usize = 321912832;
+pub const MB_308: usize = 322961408;
+pub const MB_309: usize = 324009984;
+pub const MB_310: usize = 325058560;
+pub const MB_311: usize = 326107136;
+pub const MB_312: usize = 327155712;
+pub const MB_313: usize = 328204288;
+pub const MB_314: usize = 329252864;
+pub const MB_315: usize = 330301440;
+pub const MB_316: usize = 331350016;
+pub const MB_317: usize = 332398592;
+pub const MB_318: usize = 333447168;
+pub const MB_319: usize = 334495744;
+pub const MB_320: usize = 335544320;
+pub const MB_321: usize = 336592896;
+pub const MB_322: usize = 337641472;
+pub const MB_323: usize = 338690048;
+pub const MB_324: usize = 339738624;
+pub const MB_325: usize = 340787200;
+pub const MB_326: usize = 341835776;
+pub const MB_327: usize = 342884352;
+pub const MB_328: usize = 343932928;
+pub const MB_329: usize = 344981504;
+pub const MB_330: usize = 346030080;
+pub const MB_331: usize = 347078656;
+pub const MB_332: usize = 348127232;
+pub const MB_333: usize = 349175808;
+pub const MB_334: usize = 350224384;
+pub const MB_335: usize = 351272960;
+pub const MB_336: usize = 352321536;
+pub const MB_337: usize = 353370112;
+pub const MB_338: usize = 354418688;
+pub const MB_339: usize = 355467264;
+pub const MB_340: usize = 356515840;
+pub const MB_341: usize = 357564416;
+pub const MB_342: usize = 358612992;
+pub const MB_343: usize = 359661568;
+pub const MB_344: usize = 360710144;
+pub const MB_345: usize = 361758720;
+pub const MB_346: usize = 362807296;
+pub const MB_347: usize = 363855872;
+pub const MB_348: usize = 364904448;
+pub const MB_349: usize = 365953024;
+pub const MB_350: usize = 367001600;
+pub const MB_351: usize = 368050176;
+pub const MB_352: usize = 369098752;
+pub const MB_353: usize = 370147328;
+pub const MB_354: usize = 371195904;
+pub const MB_355: usize = 372244480;
+pub const MB_356: usize = 373293056;
+pub const MB_357: usize = 374341632;
+pub const MB_358: usize = 375390208;
+pub const MB_359: usize = 376438784;
+pub const MB_360: usize = 377487360;
+pub const MB_361: usize = 378535936;
+pub const MB_362: usize = 379584512;
+pub const MB_363: usize = 380633088;
+pub const MB_364: usize = 381681664;
+pub const MB_365: usize = 382730240;
+pub const MB_366: usize = 383778816;
+pub const MB_367: usize = 384827392;
+pub const MB_368: usize = 385875968;
+pub const MB_369: usize = 386924544;
+pub const MB_370: usize = 387973120;
+pub const MB_371: usize = 389021696;
+pub const MB_372: usize = 390070272;
+pub const MB_373: usize = 391118848;
+pub const MB_374: usize = 392167424;
+pub const MB_375: usize = 393216000;
+pub const MB_376: usize = 394264576;
+pub const MB_377: usize = 395313152;
+pub const MB_378: usize = 396361728;
+pub const MB_379: usize = 397410304;
+pub const MB_380: usize = 398458880;
+pub const MB_381: usize = 399507456;
+pub const MB_382: usize = 400556032;
+pub const MB_383: usize = 401604608;
+pub const MB_384: usize = 402653184;
+pub const MB_385: usize = 403701760;
+pub const MB_386: usize = 404750336;
+pub const MB_387: usize = 405798912;
+pub const MB_388: usize = 406847488;
+pub const MB_389: usize = 407896064;
+pub const MB_390: usize = 408944640;
+pub const MB_391: usize = 409993216;
+pub const MB_392: usize = 411041792;
+pub const MB_393: usize = 412090368;
+pub const MB_394: usize = 413138944;
+pub const MB_395: usize = 414187520;
+pub const MB_396: usize = 415236096;
+pub const MB_397: usize = 416284672;
+pub const MB_398: usize = 417333248;
+pub const MB_399: usize = 418381824;
+pub const MB_400: usize = 419430400;
+pub const MB_401: usize = 420478976;
+pub const MB_402: usize = 421527552;
+pub const MB_403: usize = 422576128;
+pub const MB_404: usize = 423624704;
+pub const MB_405: usize = 424673280;
+pub const MB_406: usize = 425721856;
+pub const MB_407: usize = 426770432;
+pub const MB_408: usize = 427819008;
+pub const MB_409: usize = 428867584;
+pub const MB_410: usize = 429916160;
+pub const MB_411: usize = 430964736;
+pub const MB_412: usize = 432013312;
+pub const MB_413: usize = 433061888;
+pub const MB_414: usize = 434110464;
+pub const MB_415: usize = 435159040;
+pub const MB_416: usize = 436207616;
+pub const MB_417: usize = 437256192;
+pub const MB_418: usize = 438304768;
+pub const MB_419: usize = 439353344;
+pub const MB_420: usize = 440401920;
+pub const MB_421: usize = 441450496;
+pub const MB_422: usize = 442499072;
+pub const MB_423: usize = 443547648;
+pub const MB_424: usize = 444596224;
+pub const MB_425: usize = 445644800;
+pub const MB_426: usize = 446693376;
+pub const MB_427: usize = 447741952;
+pub const MB_428: usize = 448790528;
+pub const MB_429: usize = 449839104;
+pub const MB_430: usize = 450887680;
+pub const MB_431: usize = 451936256;
+pub const MB_432: usize = 452984832;
+pub const MB_433: usize = 454033408;
+pub const MB_434: usize = 455081984;
+pub const MB_435: usize = 456130560;
+pub const MB_436: usize = 457179136;
+pub const MB_437: usize = 458227712;
+pub const MB_438: usize = 459276288;
+pub const MB_439: usize = 460324864;
+pub const MB_440: usize = 461373440;
+pub const MB_441: usize = 462422016;
+pub const MB_442: usize = 463470592;
+pub const MB_443: usize = 464519168;
+pub const MB_444: usize = 465567744;
+pub const MB_445: usize = 466616320;
+pub const MB_446: usize = 467664896;
+pub const MB_447: usize = 468713472;
+pub const MB_448: usize = 469762048;
+pub const MB_449: usize = 470810624;
+pub const MB_450: usize = 471859200;
+pub const MB_451: usize = 472907776;
+pub const MB_452: usize = 473956352;
+pub const MB_453: usize = 475004928;
+pub const MB_454: usize = 476053504;
+pub const MB_455: usize = 477102080;
+pub const MB_456: usize = 478150656;
+pub const MB_457: usize = 479199232;
+pub const MB_458: usize = 480247808;
+pub const MB_459: usize = 481296384;
+pub const MB_460: usize = 482344960;
+pub const MB_461: usize = 483393536;
+pub const MB_462: usize = 484442112;
+pub const MB_463: usize = 485490688;
+pub const MB_464: usize = 486539264;
+pub const MB_465: usize = 487587840;
+pub const MB_466: usize = 488636416;
+pub const MB_467: usize = 489684992;
+pub const MB_468: usize = 490733568;
+pub const MB_469: usize = 491782144;
+pub const MB_470: usize = 492830720;
+pub const MB_471: usize = 493879296;
+pub const MB_472: usize = 494927872;
+pub const MB_473: usize = 495976448;
+pub const MB_474: usize = 497025024;
+pub const MB_475: usize = 498073600;
+pub const MB_476: usize = 499122176;
+pub const MB_477: usize = 500170752;
+pub const MB_478: usize = 501219328;
+pub const MB_479: usize = 502267904;
+pub const MB_480: usize = 503316480;
+pub const MB_481: usize = 504365056;
+pub const MB_482: usize = 505413632;
+pub const MB_483: usize = 506462208;
+pub const MB_484: usize = 507510784;
+pub const MB_485: usize = 508559360;
+pub const MB_486: usize = 509607936;
+pub const MB_487: usize = 510656512;
+pub const MB_488: usize = 511705088;
+pub const MB_489: usize = 512753664;
+pub const MB_490: usize = 513802240;
+pub const MB_491: usize = 514850816;
+pub const MB_492: usize = 515899392;
+pub const MB_493: usize = 516947968;
+pub const MB_494: usize = 517996544;
+pub const MB_495: usize = 519045120;
+pub const MB_496: usize = 520093696;
+pub const MB_497: usize = 521142272;
+pub const MB_498: usize = 522190848;
+pub const MB_499: usize = 523239424;
+pub const MB_500: usize = 524288000;
+pub const MB_501: usize = 525336576;
+pub const MB_502: usize = 526385152;
+pub const MB_503: usize = 527433728;
+pub const MB_504: usize = 528482304;
+pub const MB_505: usize = 529530880;
+pub const MB_506: usize = 530579456;
+pub const MB_507: usize = 531628032;
+pub const MB_508: usize = 532676608;
+pub const MB_509: usize = 533725184;
+pub const MB_510: usize = 534773760;
+pub const MB_511: usize = 535822336;
+pub const MB_512: usize = 536870912;
+pub const MB_513: usize = 537919488;
+pub const MB_514: usize = 538968064;
+pub const MB_515: usize = 540016640;
+pub const MB_516: usize = 541065216;
+pub const MB_517: usize = 542113792;
+pub const MB_518: usize = 543162368;
+pub const MB_519: usize = 544210944;
+pub const MB_520: usize = 545259520;
+pub const MB_521: usize = 546308096;
+pub const MB_522: usize = 547356672;
+pub const MB_523: usize = 548405248;
+pub const MB_524: usize = 549453824;
+pub const MB_525: usize = 550502400;
+pub const MB_526: usize = 551550976;
+pub const MB_527: usize = 552599552;
+pub const MB_528: usize = 553648128;
+pub const MB_529: usize = 554696704;
+pub const MB_530: usize = 555745280;
+pub const MB_531: usize = 556793856;
+pub const MB_532: usize = 557842432;
+pub const MB_533: usize = 558891008;
+pub const MB_534: usize = 559939584;
+pub const MB_535: usize = 560988160;
+pub const MB_536: usize = 562036736;
+pub const MB_537: usize = 563085312;
+pub const MB_538: usize = 564133888;
+pub const MB_539: usize = 565182464;
+pub const MB_540: usize = 566231040;
+pub const MB_541: usize = 567279616;
+pub const MB_542: usize = 568328192;
+pub const MB_543: usize = 569376768;
+pub const MB_544: usize = 570425344;
+pub const MB_545: usize = 571473920;
+pub const MB_546: usize = 572522496;
+pub const MB_547: usize = 573571072;
+pub const MB_548: usize = 574619648;
+pub const MB_549: usize = 575668224;
+pub const MB_550: usize = 576716800;
+pub const MB_551: usize = 577765376;
+pub const MB_552: usize = 578813952;
+pub const MB_553: usize = 579862528;
+pub const MB_554: usize = 580911104;
+pub const MB_555: usize = 581959680;
+pub const MB_556: usize = 583008256;
+pub const MB_557: usize = 584056832;
+pub const MB_558: usize = 585105408;
+pub const MB_559: usize = 586153984;
+pub const MB_560: usize = 587202560;
+pub const MB_561: usize = 588251136;
+pub const MB_562: usize = 589299712;
+pub const MB_563: usize = 590348288;
+pub const MB_564: usize = 591396864;
+pub const MB_565: usize = 592445440;
+pub const MB_566: usize = 593494016;
+pub const MB_567: usize = 594542592;
+pub const MB_568: usize = 595591168;
+pub const MB_569: usize = 596639744;
+pub const MB_570: usize = 597688320;
+pub const MB_571: usize = 598736896;
+pub const MB_572: usize = 599785472;
+pub const MB_573: usize = 600834048;
+pub const MB_574: usize = 601882624;
+pub const MB_575: usize = 602931200;
+pub const MB_576: usize = 603979776;
+pub const MB_577: usize = 605028352;
+pub const MB_578: usize = 606076928;
+pub const MB_579: usize = 607125504;
+pub const MB_580: usize = 608174080;
+pub const MB_581: usize = 609222656;
+pub const MB_582: usize = 610271232;
+pub const MB_583: usize = 611319808;
+pub const MB_584: usize = 612368384;
+pub const MB_585: usize = 613416960;
+pub const MB_586: usize = 614465536;
+pub const MB_587: usize = 615514112;
+pub const MB_588: usize = 616562688;
+pub const MB_589: usize = 617611264;
+pub const MB_590: usize = 618659840;
+pub const MB_591: usize = 619708416;
+pub const MB_592: usize = 620756992;
+pub const MB_593: usize = 621805568;
+pub const MB_594: usize = 622854144;
+pub const MB_595: usize = 623902720;
+pub const MB_596: usize = 624951296;
+pub const MB_597: usize = 625999872;
+pub const MB_598: usize = 627048448;
+pub const MB_599: usize = 628097024;
+pub const MB_600: usize = 629145600;
+pub const MB_601: usize = 630194176;
+pub const MB_602: usize = 631242752;
+pub const MB_603: usize = 632291328;
+pub const MB_604: usize = 633339904;
+pub const MB_605: usize = 634388480;
+pub const MB_606: usize = 635437056;
+pub const MB_607: usize = 636485632;
+pub const MB_608: usize = 637534208;
+pub const MB_609: usize = 638582784;
+pub const MB_610: usize = 639631360;
+pub const MB_611: usize = 640679936;
+pub const MB_612: usize = 641728512;
+pub const MB_613: usize = 642777088;
+pub const MB_614: usize = 643825664;
+pub const MB_615: usize = 644874240;
+pub const MB_616: usize = 645922816;
+pub const MB_617: usize = 646971392;
+pub const MB_618: usize = 648019968;
+pub const MB_619: usize = 649068544;
+pub const MB_620: usize = 650117120;
+pub const MB_621: usize = 651165696;
+pub const MB_622: usize = 652214272;
+pub const MB_623: usize = 653262848;
+pub const MB_624: usize = 654311424;
+pub const MB_625: usize = 655360000;
+pub const MB_626: usize = 656408576;
+pub const MB_627: usize = 657457152;
+pub const MB_628: usize = 658505728;
+pub const MB_629: usize = 659554304;
+pub const MB_630: usize = 660602880;
+pub const MB_631: usize = 661651456;
+pub const MB_632: usize = 662700032;
+pub const MB_633: usize = 663748608;
+pub const MB_634: usize = 664797184;
+pub const MB_635: usize = 665845760;
+pub const MB_636: usize = 666894336;
+pub const MB_637: usize = 667942912;
+pub const MB_638: usize = 668991488;
+pub const MB_639: usize = 670040064;
+pub const MB_640: usize = 671088640;
+pub const MB_641: usize = 672137216;
+pub const MB_642: usize = 673185792;
+pub const MB_643: usize = 674234368;
+pub const MB_644: usize = 675282944;
+pub const MB_645: usize = 676331520;
+pub const MB_646: usize = 677380096;
+pub const MB_647: usize = 678428672;
+pub const MB_648: usize = 679477248;
+pub const MB_649: usize = 680525824;
+pub const MB_650: usize = 681574400;
+pub const MB_651: usize = 682622976;
+pub const MB_652: usize = 683671552;
+pub const MB_653: usize = 684720128;
+pub const MB_654: usize = 685768704;
+pub const MB_655: usize = 686817280;
+pub const MB_656: usize = 687865856;
+pub const MB_657: usize = 688914432;
+pub const MB_658: usize = 689963008;
+pub const MB_659: usize = 691011584;
+pub const MB_660: usize = 692060160;
+pub const MB_661: usize = 693108736;
+pub const MB_662: usize = 694157312;
+pub const MB_663: usize = 695205888;
+pub const MB_664: usize = 696254464;
+pub const MB_665: usize = 697303040;
+pub const MB_666: usize = 698351616;
+pub const MB_667: usize = 699400192;
+pub const MB_668: usize = 700448768;
+pub const MB_669: usize = 701497344;
+pub const MB_670: usize = 702545920;
+pub const MB_671: usize = 703594496;
+pub const MB_672: usize = 704643072;
+pub const MB_673: usize = 705691648;
+pub const MB_674: usize = 706740224;
+pub const MB_675: usize = 707788800;
+pub const MB_676: usize = 708837376;
+pub const MB_677: usize = 709885952;
+pub const MB_678: usize = 710934528;
+pub const MB_679: usize = 711983104;
+pub const MB_680: usize = 713031680;
+pub const MB_681: usize = 714080256;
+pub const MB_682: usize = 715128832;
+pub const MB_683: usize = 716177408;
+pub const MB_684: usize = 717225984;
+pub const MB_685: usize = 718274560;
+pub const MB_686: usize = 719323136;
+pub const MB_687: usize = 720371712;
+pub const MB_688: usize = 721420288;
+pub const MB_689: usize = 722468864;
+pub const MB_690: usize = 723517440;
+pub const MB_691: usize = 724566016;
+pub const MB_692: usize = 725614592;
+pub const MB_693: usize = 726663168;
+pub const MB_694: usize = 727711744;
+pub const MB_695: usize = 728760320;
+pub const MB_696: usize = 729808896;
+pub const MB_697: usize = 730857472;
+pub const MB_698: usize = 731906048;
+pub const MB_699: usize = 732954624;
+pub const MB_700: usize = 734003200;
+pub const MB_701: usize = 735051776;
+pub const MB_702: usize = 736100352;
+pub const MB_703: usize = 737148928;
+pub const MB_704: usize = 738197504;
+pub const MB_705: usize = 739246080;
+pub const MB_706: usize = 740294656;
+pub const MB_707: usize = 741343232;
+pub const MB_708: usize = 742391808;
+pub const MB_709: usize = 743440384;
+pub const MB_710: usize = 744488960;
+pub const MB_711: usize = 745537536;
+pub const MB_712: usize = 746586112;
+pub const MB_713: usize = 747634688;
+pub const MB_714: usize = 748683264;
+pub const MB_715: usize = 749731840;
+pub const MB_716: usize = 750780416;
+pub const MB_717: usize = 751828992;
+pub const MB_718: usize = 752877568;
+pub const MB_719: usize = 753926144;
+pub const MB_720: usize = 754974720;
+pub const MB_721: usize = 756023296;
+pub const MB_722: usize = 757071872;
+pub const MB_723: usize = 758120448;
+pub const MB_724: usize = 759169024;
+pub const MB_725: usize = 760217600;
+pub const MB_726: usize = 761266176;
+pub const MB_727: usize = 762314752;
+pub const MB_728: usize = 763363328;
+pub const MB_729: usize = 764411904;
+pub const MB_730: usize = 765460480;
+pub const MB_731: usize = 766509056;
+pub const MB_732: usize = 767557632;
+pub const MB_733: usize = 768606208;
+pub const MB_734: usize = 769654784;
+pub const MB_735: usize = 770703360;
+pub const MB_736: usize = 771751936;
+pub const MB_737: usize = 772800512;
+pub const MB_738: usize = 773849088;
+pub const MB_739: usize = 774897664;
+pub const MB_740: usize = 775946240;
+pub const MB_741: usize = 776994816;
+pub const MB_742: usize = 778043392;
+pub const MB_743: usize = 779091968;
+pub const MB_744: usize = 780140544;
+pub const MB_745: usize = 781189120;
+pub const MB_746: usize = 782237696;
+pub const MB_747: usize = 783286272;
+pub const MB_748: usize = 784334848;
+pub const MB_749: usize = 785383424;
+pub const MB_750: usize = 786432000;
+pub const MB_751: usize = 787480576;
+pub const MB_752: usize = 788529152;
+pub const MB_753: usize = 789577728;
+pub const MB_754: usize = 790626304;
+pub const MB_755: usize = 791674880;
+pub const MB_756: usize = 792723456;
+pub const MB_757: usize = 793772032;
+pub const MB_758: usize = 794820608;
+pub const MB_759: usize = 795869184;
+pub const MB_760: usize = 796917760;
+pub const MB_761: usize = 797966336;
+pub const MB_762: usize = 799014912;
+pub const MB_763: usize = 800063488;
+pub const MB_764: usize = 801112064;
+pub const MB_765: usize = 802160640;
+pub const MB_766: usize = 803209216;
+pub const MB_767: usize = 804257792;
+pub const MB_768: usize = 805306368;
+pub const MB_769: usize = 806354944;
+pub const MB_770: usize = 807403520;
+pub const MB_771: usize = 808452096;
+pub const MB_772: usize = 809500672;
+pub const MB_773: usize = 810549248;
+pub const MB_774: usize = 811597824;
+pub const MB_775: usize = 812646400;
+pub const MB_776: usize = 813694976;
+pub const MB_777: usize = 814743552;
+pub const MB_778: usize = 815792128;
+pub const MB_779: usize = 816840704;
+pub const MB_780: usize = 817889280;
+pub const MB_781: usize = 818937856;
+pub const MB_782: usize = 819986432;
+pub const MB_783: usize = 821035008;
+pub const MB_784: usize = 822083584;
+pub const MB_785: usize = 823132160;
+pub const MB_786: usize = 824180736;
+pub const MB_787: usize = 825229312;
+pub const MB_788: usize = 826277888;
+pub const MB_789: usize = 827326464;
+pub const MB_790: usize = 828375040;
+pub const MB_791: usize = 829423616;
+pub const MB_792: usize = 830472192;
+pub const MB_793: usize = 831520768;
+pub const MB_794: usize = 832569344;
+pub const MB_795: usize = 833617920;
+pub const MB_796: usize = 834666496;
+pub const MB_797: usize = 835715072;
+pub const MB_798: usize = 836763648;
+pub const MB_799: usize = 837812224;
+pub const MB_800: usize = 838860800;
+pub const MB_801: usize = 839909376;
+pub const MB_802: usize = 840957952;
+pub const MB_803: usize = 842006528;
+pub const MB_804: usize = 843055104;
+pub const MB_805: usize = 844103680;
+pub const MB_806: usize = 845152256;
+pub const MB_807: usize = 846200832;
+pub const MB_808: usize = 847249408;
+pub const MB_809: usize = 848297984;
+pub const MB_810: usize = 849346560;
+pub const MB_811: usize = 850395136;
+pub const MB_812: usize = 851443712;
+pub const MB_813: usize = 852492288;
+pub const MB_814: usize = 853540864;
+pub const MB_815: usize = 854589440;
+pub const MB_816: usize = 855638016;
+pub const MB_817: usize = 856686592;
+pub const MB_818: usize = 857735168;
+pub const MB_819: usize = 858783744;
+pub const MB_820: usize = 859832320;
+pub const MB_821: usize = 860880896;
+pub const MB_822: usize = 861929472;
+pub const MB_823: usize = 862978048;
+pub const MB_824: usize = 864026624;
+pub const MB_825: usize = 865075200;
+pub const MB_826: usize = 866123776;
+pub const MB_827: usize = 867172352;
+pub const MB_828: usize = 868220928;
+pub const MB_829: usize = 869269504;
+pub const MB_830: usize = 870318080;
+pub const MB_831: usize = 871366656;
+pub const MB_832: usize = 872415232;
+pub const MB_833: usize = 873463808;
+pub const MB_834: usize = 874512384;
+pub const MB_835: usize = 875560960;
+pub const MB_836: usize = 876609536;
+pub const MB_837: usize = 877658112;
+pub const MB_838: usize = 878706688;
+pub const MB_839: usize = 879755264;
+pub const MB_840: usize = 880803840;
+pub const MB_841: usize = 881852416;
+pub const MB_842: usize = 882900992;
+pub const MB_843: usize = 883949568;
+pub const MB_844: usize = 884998144;
+pub const MB_845: usize = 886046720;
+pub const MB_846: usize = 887095296;
+pub const MB_847: usize = 888143872;
+pub const MB_848: usize = 889192448;
+pub const MB_849: usize = 890241024;
+pub const MB_850: usize = 891289600;
+pub const MB_851: usize = 892338176;
+pub const MB_852: usize = 893386752;
+pub const MB_853: usize = 894435328;
+pub const MB_854: usize = 895483904;
+pub const MB_855: usize = 896532480;
+pub const MB_856: usize = 897581056;
+pub const MB_857: usize = 898629632;
+pub const MB_858: usize = 899678208;
+pub const MB_859: usize = 900726784;
+pub const MB_860: usize = 901775360;
+pub const MB_861: usize = 902823936;
+pub const MB_862: usize = 903872512;
+pub const MB_863: usize = 904921088;
+pub const MB_864: usize = 905969664;
+pub const MB_865: usize = 907018240;
+pub const MB_866: usize = 908066816;
+pub const MB_867: usize = 909115392;
+pub const MB_868: usize = 910163968;
+pub const MB_869: usize = 911212544;
+pub const MB_870: usize = 912261120;
+pub const MB_871: usize = 913309696;
+pub const MB_872: usize = 914358272;
+pub const MB_873: usize = 915406848;
+pub const MB_874: usize = 916455424;
+pub const MB_875: usize = 917504000;
+pub const MB_876: usize = 918552576;
+pub const MB_877: usize = 919601152;
+pub const MB_878: usize = 920649728;
+pub const MB_879: usize = 921698304;
+pub const MB_880: usize = 922746880;
+pub const MB_881: usize = 923795456;
+pub const MB_882: usize = 924844032;
+pub const MB_883: usize = 925892608;
+pub const MB_884: usize = 926941184;
+pub const MB_885: usize = 927989760;
+pub const MB_886: usize = 929038336;
+pub const MB_887: usize = 930086912;
+pub const MB_888: usize = 931135488;
+pub const MB_889: usize = 932184064;
+pub const MB_890: usize = 933232640;
+pub const MB_891: usize = 934281216;
+pub const MB_892: usize = 935329792;
+pub const MB_893: usize = 936378368;
+pub const MB_894: usize = 937426944;
+pub const MB_895: usize = 938475520;
+pub const MB_896: usize = 939524096;
+pub const MB_897: usize = 940572672;
+pub const MB_898: usize = 941621248;
+pub const MB_899: usize = 942669824;
+pub const MB_900: usize = 943718400;
+pub const MB_901: usize = 944766976;
+pub const MB_902: usize = 945815552;
+pub const MB_903: usize = 946864128;
+pub const MB_904: usize = 947912704;
+pub const MB_905: usize = 948961280;
+pub const MB_906: usize = 950009856;
+pub const MB_907: usize = 951058432;
+pub const MB_908: usize = 952107008;
+pub const MB_909: usize = 953155584;
+pub const MB_910: usize = 954204160;
+pub const MB_911: usize = 955252736;
+pub const MB_912: usize = 956301312;
+pub const MB_913: usize = 957349888;
+pub const MB_914: usize = 958398464;
+pub const MB_915: usize = 959447040;
+pub const MB_916: usize = 960495616;
+pub const MB_917: usize = 961544192;
+pub const MB_918: usize = 962592768;
+pub const MB_919: usize = 963641344;
+pub const MB_920: usize = 964689920;
+pub const MB_921: usize = 965738496;
+pub const MB_922: usize = 966787072;
+pub const MB_923: usize = 967835648;
+pub const MB_924: usize = 968884224;
+pub const MB_925: usize = 969932800;
+pub const MB_926: usize = 970981376;
+pub const MB_927: usize = 972029952;
+pub const MB_928: usize = 973078528;
+pub const MB_929: usize = 974127104;
+pub const MB_930: usize = 975175680;
+pub const MB_931: usize = 976224256;
+pub const MB_932: usize = 977272832;
+pub const MB_933: usize = 978321408;
+pub const MB_934: usize = 979369984;
+pub const MB_935: usize = 980418560;
+pub const MB_936: usize = 981467136;
+pub const MB_937: usize = 982515712;
+pub const MB_938: usize = 983564288;
+pub const MB_939: usize = 984612864;
+pub const MB_940: usize = 985661440;
+pub const MB_941: usize = 986710016;
+pub const MB_942: usize = 987758592;
+pub const MB_943: usize = 988807168;
+pub const MB_944: usize = 989855744;
+pub const MB_945: usize = 990904320;
+pub const MB_946: usize = 991952896;
+pub const MB_947: usize = 993001472;
+pub const MB_948: usize = 994050048;
+pub const MB_949: usize = 995098624;
+pub const MB_950: usize = 996147200;
+pub const MB_951: usize = 997195776;
+pub const MB_952: usize = 998244352;
+pub const MB_953: usize = 999292928;
+pub const MB_954: usize = 1000341504;
+pub const MB_955: usize = 1001390080;
+pub const MB_956: usize = 1002438656;
+pub const MB_957: usize = 1003487232;
+pub const MB_958: usize = 1004535808;
+pub const MB_959: usize = 1005584384;
+pub const MB_960: usize = 1006632960;
+pub const MB_961: usize = 1007681536;
+pub const MB_962: usize = 1008730112;
+pub const MB_963: usize = 1009778688;
+pub const MB_964: usize = 1010827264;
+pub const MB_965: usize = 1011875840;
+pub const MB_966: usize = 1012924416;
+pub const MB_967: usize = 1013972992;
+pub const MB_968: usize = 1015021568;
+pub const MB_969: usize = 1016070144;
+pub const MB_970: usize = 1017118720;
+pub const MB_971: usize = 1018167296;
+pub const MB_972: usize = 1019215872;
+pub const MB_973: usize = 1020264448;
+pub const MB_974: usize = 1021313024;
+pub const MB_975: usize = 1022361600;
+pub const MB_976: usize = 1023410176;
+pub const MB_977: usize = 1024458752;
+pub const MB_978: usize = 1025507328;
+pub const MB_979: usize = 1026555904;
+pub const MB_980: usize = 1027604480;
+pub const MB_981: usize = 1028653056;
+pub const MB_982: usize = 1029701632;
+pub const MB_983: usize = 1030750208;
+pub const MB_984: usize = 1031798784;
+pub const MB_985: usize = 1032847360;
+pub const MB_986: usize = 1033895936;
+pub const MB_987: usize = 1034944512;
+pub const MB_988: usize = 1035993088;
+pub const MB_989: usize = 1037041664;
+pub const MB_990: usize = 1038090240;
+pub const MB_991: usize = 1039138816;
+pub const MB_992: usize = 1040187392;
+pub const MB_993: usize = 1041235968;
+pub const MB_994: usize = 1042284544;
+pub const MB_995: usize = 1043333120;
+pub const MB_996: usize = 1044381696;
+pub const MB_997: usize = 1045430272;
+pub const MB_998: usize = 1046478848;
+pub const MB_999: usize = 1047527424;
+pub const MB_1000: usize = 1048576000;
+pub const MB_1001: usize = 1049624576;
+pub const MB_1002: usize = 1050673152;
+pub const MB_1003: usize = 1051721728;
+pub const MB_1004: usize = 1052770304;
+pub const MB_1005: usize = 1053818880;
+pub const MB_1006: usize = 1054867456;
+pub const MB_1007: usize = 1055916032;
+pub const MB_1008: usize = 1056964608;
+pub const MB_1009: usize = 1058013184;
+pub const MB_1010: usize = 1059061760;
+pub const MB_1011: usize = 1060110336;
+pub const MB_1012: usize = 1061158912;
+pub const MB_1013: usize = 1062207488;
+pub const MB_1014: usize = 1063256064;
+pub const MB_1015: usize = 1064304640;
+pub const MB_1016: usize = 1065353216;
+pub const MB_1017: usize = 1066401792;
+pub const MB_1018: usize = 1067450368;
+pub const MB_1019: usize = 1068498944;
+pub const MB_1020: usize = 1069547520;
+pub const MB_1021: usize = 1070596096;
+pub const MB_1022: usize = 1071644672;
+pub const MB_1023: usize = 1072693248;
+pub const MB_1024: usize = 1073741824;
+pub const GB_1: usize = 1073741824;
+pub const GB_2: usize = 2147483648;
+pub const GB_3: usize = 3221225472;
+pub const GB_4: usize = 4294967296;
+pub const GB_5: usize = 5368709120;
+pub const GB_6: usize = 6442450944;
+pub const GB_7: usize = 7516192768;
+pub const GB_8: usize = 8589934592;
+pub const GB_9: usize = 9663676416;
+pub const GB_10: usize = 10737418240;
+pub const GB_11: usize = 11811160064;
+pub const GB_12: usize = 12884901888;
+pub const GB_13: usize = 13958643712;
+pub const GB_14: usize = 15032385536;
+pub const GB_15: usize = 16106127360;
+pub const GB_16: usize = 17179869184;
+pub const GB_17: usize = 18253611008;
+pub const GB_18: usize = 19327352832;
+pub const GB_19: usize = 20401094656;
+pub const GB_20: usize = 21474836480;
+pub const GB_21: usize = 22548578304;
+pub const GB_22: usize = 23622320128;
+pub const GB_23: usize = 24696061952;
+pub const GB_24: usize = 25769803776;
+pub const GB_25: usize = 26843545600;
+pub const GB_26: usize = 27917287424;
+pub const GB_27: usize = 28991029248;
+pub const GB_28: usize = 30064771072;
+pub const GB_29: usize = 31138512896;
+pub const GB_30: usize = 32212254720;
+pub const GB_31: usize = 33285996544;
+pub const GB_32: usize = 34359738368;
+pub const GB_33: usize = 35433480192;
+pub const GB_34: usize = 36507222016;
+pub const GB_35: usize = 37580963840;
+pub const GB_36: usize = 38654705664;
+pub const GB_37: usize = 39728447488;
+pub const GB_38: usize = 40802189312;
+pub const GB_39: usize = 41875931136;
+pub const GB_40: usize = 42949672960;
+pub const GB_41: usize = 44023414784;
+pub const GB_42: usize = 45097156608;
+pub const GB_43: usize = 46170898432;
+pub const GB_44: usize = 47244640256;
+pub const GB_45: usize = 48318382080;
+pub const GB_46: usize = 49392123904;
+pub const GB_47: usize = 50465865728;
+pub const GB_48: usize = 51539607552;
+pub const GB_49: usize = 52613349376;
+pub const GB_50: usize = 53687091200;
+pub const GB_51: usize = 54760833024;
+pub const GB_52: usize = 55834574848;
+pub const GB_53: usize = 56908316672;
+pub const GB_54: usize = 57982058496;
+pub const GB_55: usize = 59055800320;
+pub const GB_56: usize = 60129542144;
+pub const GB_57: usize = 61203283968;
+pub const GB_58: usize = 62277025792;
+pub const GB_59: usize = 63350767616;
+pub const GB_60: usize = 64424509440;
+pub const GB_61: usize = 65498251264;
+pub const GB_62: usize = 66571993088;
+pub const GB_63: usize = 67645734912;
+pub const GB_64: usize = 68719476736;
+pub const GB_65: usize = 69793218560;
+pub const GB_66: usize = 70866960384;
+pub const GB_67: usize = 71940702208;
+pub const GB_68: usize = 73014444032;
+pub const GB_69: usize = 74088185856;
+pub const GB_70: usize = 75161927680;
+pub const GB_71: usize = 76235669504;
+pub const GB_72: usize = 77309411328;
+pub const GB_73: usize = 78383153152;
+pub const GB_74: usize = 79456894976;
+pub const GB_75: usize = 80530636800;
+pub const GB_76: usize = 81604378624;
+pub const GB_77: usize = 82678120448;
+pub const GB_78: usize = 83751862272;
+pub const GB_79: usize = 84825604096;
+pub const GB_80: usize = 85899345920;
+pub const GB_81: usize = 86973087744;
+pub const GB_82: usize = 88046829568;
+pub const GB_83: usize = 89120571392;
+pub const GB_84: usize = 90194313216;
+pub const GB_85: usize = 91268055040;
+pub const GB_86: usize = 92341796864;
+pub const GB_87: usize = 93415538688;
+pub const GB_88: usize = 94489280512;
+pub const GB_89: usize = 95563022336;
+pub const GB_90: usize = 96636764160;
+pub const GB_91: usize = 97710505984;
+pub const GB_92: usize = 98784247808;
+pub const GB_93: usize = 99857989632;
+pub const GB_94: usize = 100931731456;
+pub const GB_95: usize = 102005473280;
+pub const GB_96: usize = 103079215104;
+pub const GB_97: usize = 104152956928;
+pub const GB_98: usize = 105226698752;
+pub const GB_99: usize = 106300440576;
+pub const GB_100: usize = 107374182400;
+pub const GB_101: usize = 108447924224;
+pub const GB_102: usize = 109521666048;
+pub const GB_103: usize = 110595407872;
+pub const GB_104: usize = 111669149696;
+pub const GB_105: usize = 112742891520;
+pub const GB_106: usize = 113816633344;
+pub const GB_107: usize = 114890375168;
+pub const GB_108: usize = 115964116992;
+pub const GB_109: usize = 117037858816;
+pub const GB_110: usize = 118111600640;
+pub const GB_111: usize = 119185342464;
+pub const GB_112: usize = 120259084288;
+pub const GB_113: usize = 121332826112;
+pub const GB_114: usize = 122406567936;
+pub const GB_115: usize = 123480309760;
+pub const GB_116: usize = 124554051584;
+pub const GB_117: usize = 125627793408;
+pub const GB_118: usize = 126701535232;
+pub const GB_119: usize = 127775277056;
+pub const GB_120: usize = 128849018880;
+pub const GB_121: usize = 129922760704;
+pub const GB_122: usize = 130996502528;
+pub const GB_123: usize = 132070244352;
+pub const GB_124: usize = 133143986176;
+pub const GB_125: usize = 134217728000;
+pub const GB_126: usize = 135291469824;
+pub const GB_127: usize = 136365211648;
+pub const GB_128: usize = 137438953472;
+pub const GB_129: usize = 138512695296;
+pub const GB_130: usize = 139586437120;
+pub const GB_131: usize = 140660178944;
+pub const GB_132: usize = 141733920768;
+pub const GB_133: usize = 142807662592;
+pub const GB_134: usize = 143881404416;
+pub const GB_135: usize = 144955146240;
+pub const GB_136: usize = 146028888064;
+pub const GB_137: usize = 147102629888;
+pub const GB_138: usize = 148176371712;
+pub const GB_139: usize = 149250113536;
+pub const GB_140: usize = 150323855360;
+pub const GB_141: usize = 151397597184;
+pub const GB_142: usize = 152471339008;
+pub const GB_143: usize = 153545080832;
+pub const GB_144: usize = 154618822656;
+pub const GB_145: usize = 155692564480;
+pub const GB_146: usize = 156766306304;
+pub const GB_147: usize = 157840048128;
+pub const GB_148: usize = 158913789952;
+pub const GB_149: usize = 159987531776;
+pub const GB_150: usize = 161061273600;
+pub const GB_151: usize = 162135015424;
+pub const GB_152: usize = 163208757248;
+pub const GB_153: usize = 164282499072;
+pub const GB_154: usize = 165356240896;
+pub const GB_155: usize = 166429982720;
+pub const GB_156: usize = 167503724544;
+pub const GB_157: usize = 168577466368;
+pub const GB_158: usize = 169651208192;
+pub const GB_159: usize = 170724950016;
+pub const GB_160: usize = 171798691840;
+pub const GB_161: usize = 172872433664;
+pub const GB_162: usize = 173946175488;
+pub const GB_163: usize = 175019917312;
+pub const GB_164: usize = 176093659136;
+pub const GB_165: usize = 177167400960;
+pub const GB_166: usize = 178241142784;
+pub const GB_167: usize = 179314884608;
+pub const GB_168: usize = 180388626432;
+pub const GB_169: usize = 181462368256;
+pub const GB_170: usize = 182536110080;
+pub const GB_171: usize = 183609851904;
+pub const GB_172: usize = 184683593728;
+pub const GB_173: usize = 185757335552;
+pub const GB_174: usize = 186831077376;
+pub const GB_175: usize = 187904819200;
+pub const GB_176: usize = 188978561024;
+pub const GB_177: usize = 190052302848;
+pub const GB_178: usize = 191126044672;
+pub const GB_179: usize = 192199786496;
+pub const GB_180: usize = 193273528320;
+pub const GB_181: usize = 194347270144;
+pub const GB_182: usize = 195421011968;
+pub const GB_183: usize = 196494753792;
+pub const GB_184: usize = 197568495616;
+pub const GB_185: usize = 198642237440;
+pub const GB_186: usize = 199715979264;
+pub const GB_187: usize = 200789721088;
+pub const GB_188: usize = 201863462912;
+pub const GB_189: usize = 202937204736;
+pub const GB_190: usize = 204010946560;
+pub const GB_191: usize = 205084688384;
+pub const GB_192: usize = 206158430208;
+pub const GB_193: usize = 207232172032;
+pub const GB_194: usize = 208305913856;
+pub const GB_195: usize = 209379655680;
+pub const GB_196: usize = 210453397504;
+pub const GB_197: usize = 211527139328;
+pub const GB_198: usize = 212600881152;
+pub const GB_199: usize = 213674622976;
+pub const GB_200: usize = 214748364800;
+pub const GB_201: usize = 215822106624;
+pub const GB_202: usize = 216895848448;
+pub const GB_203: usize = 217969590272;
+pub const GB_204: usize = 219043332096;
+pub const GB_205: usize = 220117073920;
+pub const GB_206: usize = 221190815744;
+pub const GB_207: usize = 222264557568;
+pub const GB_208: usize = 223338299392;
+pub const GB_209: usize = 224412041216;
+pub const GB_210: usize = 225485783040;
+pub const GB_211: usize = 226559524864;
+pub const GB_212: usize = 227633266688;
+pub const GB_213: usize = 228707008512;
+pub const GB_214: usize = 229780750336;
+pub const GB_215: usize = 230854492160;
+pub const GB_216: usize = 231928233984;
+pub const GB_217: usize = 233001975808;
+pub const GB_218: usize = 234075717632;
+pub const GB_219: usize = 235149459456;
+pub const GB_220: usize = 236223201280;
+pub const GB_221: usize = 237296943104;
+pub const GB_222: usize = 238370684928;
+pub const GB_223: usize = 239444426752;
+pub const GB_224: usize = 240518168576;
+pub const GB_225: usize = 241591910400;
+pub const GB_226: usize = 242665652224;
+pub const GB_227: usize = 243739394048;
+pub const GB_228: usize = 244813135872;
+pub const GB_229: usize = 245886877696;
+pub const GB_230: usize = 246960619520;
+pub const GB_231: usize = 248034361344;
+pub const GB_232: usize = 249108103168;
+pub const GB_233: usize = 250181844992;
+pub const GB_234: usize = 251255586816;
+pub const GB_235: usize = 252329328640;
+pub const GB_236: usize = 253403070464;
+pub const GB_237: usize = 254476812288;
+pub const GB_238: usize = 255550554112;
+pub const GB_239: usize = 256624295936;
+pub const GB_240: usize = 257698037760;
+pub const GB_241: usize = 258771779584;
+pub const GB_242: usize = 259845521408;
+pub const GB_243: usize = 260919263232;
+pub const GB_244: usize = 261993005056;
+pub const GB_245: usize = 263066746880;
+pub const GB_246: usize = 264140488704;
+pub const GB_247: usize = 265214230528;
+pub const GB_248: usize = 266287972352;
+pub const GB_249: usize = 267361714176;
+pub const GB_250: usize = 268435456000;
+pub const GB_251: usize = 269509197824;
+pub const GB_252: usize = 270582939648;
+pub const GB_253: usize = 271656681472;
+pub const GB_254: usize = 272730423296;
+pub const GB_255: usize = 273804165120;
+pub const GB_256: usize = 274877906944;
+pub const GB_257: usize = 275951648768;
+pub const GB_258: usize = 277025390592;
+pub const GB_259: usize = 278099132416;
+pub const GB_260: usize = 279172874240;
+pub const GB_261: usize = 280246616064;
+pub const GB_262: usize = 281320357888;
+pub const GB_263: usize = 282394099712;
+pub const GB_264: usize = 283467841536;
+pub const GB_265: usize = 284541583360;
+pub const GB_266: usize = 285615325184;
+pub const GB_267: usize = 286689067008;
+pub const GB_268: usize = 287762808832;
+pub const GB_269: usize = 288836550656;
+pub const GB_270: usize = 289910292480;
+pub const GB_271: usize = 290984034304;
+pub const GB_272: usize = 292057776128;
+pub const GB_273: usize = 293131517952;
+pub const GB_274: usize = 294205259776;
+pub const GB_275: usize = 295279001600;
+pub const GB_276: usize = 296352743424;
+pub const GB_277: usize = 297426485248;
+pub const GB_278: usize = 298500227072;
+pub const GB_279: usize = 299573968896;
+pub const GB_280: usize = 300647710720;
+pub const GB_281: usize = 301721452544;
+pub const GB_282: usize = 302795194368;
+pub const GB_283: usize = 303868936192;
+pub const GB_284: usize = 304942678016;
+pub const GB_285: usize = 306016419840;
+pub const GB_286: usize = 307090161664;
+pub const GB_287: usize = 308163903488;
+pub const GB_288: usize = 309237645312;
+pub const GB_289: usize = 310311387136;
+pub const GB_290: usize = 311385128960;
+pub const GB_291: usize = 312458870784;
+pub const GB_292: usize = 313532612608;
+pub const GB_293: usize = 314606354432;
+pub const GB_294: usize = 315680096256;
+pub const GB_295: usize = 316753838080;
+pub const GB_296: usize = 317827579904;
+pub const GB_297: usize = 318901321728;
+pub const GB_298: usize = 319975063552;
+pub const GB_299: usize = 321048805376;
+pub const GB_300: usize = 322122547200;
+pub const GB_301: usize = 323196289024;
+pub const GB_302: usize = 324270030848;
+pub const GB_303: usize = 325343772672;
+pub const GB_304: usize = 326417514496;
+pub const GB_305: usize = 327491256320;
+pub const GB_306: usize = 328564998144;
+pub const GB_307: usize = 329638739968;
+pub const GB_308: usize = 330712481792;
+pub const GB_309: usize = 331786223616;
+pub const GB_310: usize = 332859965440;
+pub const GB_311: usize = 333933707264;
+pub const GB_312: usize = 335007449088;
+pub const GB_313: usize = 336081190912;
+pub const GB_314: usize = 337154932736;
+pub const GB_315: usize = 338228674560;
+pub const GB_316: usize = 339302416384;
+pub const GB_317: usize = 340376158208;
+pub const GB_318: usize = 341449900032;
+pub const GB_319: usize = 342523641856;
+pub const GB_320: usize = 343597383680;
+pub const GB_321: usize = 344671125504;
+pub const GB_322: usize = 345744867328;
+pub const GB_323: usize = 346818609152;
+pub const GB_324: usize = 347892350976;
+pub const GB_325: usize = 348966092800;
+pub const GB_326: usize = 350039834624;
+pub const GB_327: usize = 351113576448;
+pub const GB_328: usize = 352187318272;
+pub const GB_329: usize = 353261060096;
+pub const GB_330: usize = 354334801920;
+pub const GB_331: usize = 355408543744;
+pub const GB_332: usize = 356482285568;
+pub const GB_333: usize = 357556027392;
+pub const GB_334: usize = 358629769216;
+pub const GB_335: usize = 359703511040;
+pub const GB_336: usize = 360777252864;
+pub const GB_337: usize = 361850994688;
+pub const GB_338: usize = 362924736512;
+pub const GB_339: usize = 363998478336;
+pub const GB_340: usize = 365072220160;
+pub const GB_341: usize = 366145961984;
+pub const GB_342: usize = 367219703808;
+pub const GB_343: usize = 368293445632;
+pub const GB_344: usize = 369367187456;
+pub const GB_345: usize = 370440929280;
+pub const GB_346: usize = 371514671104;
+pub const GB_347: usize = 372588412928;
+pub const GB_348: usize = 373662154752;
+pub const GB_349: usize = 374735896576;
+pub const GB_350: usize = 375809638400;
+pub const GB_351: usize = 376883380224;
+pub const GB_352: usize = 377957122048;
+pub const GB_353: usize = 379030863872;
+pub const GB_354: usize = 380104605696;
+pub const GB_355: usize = 381178347520;
+pub const GB_356: usize = 382252089344;
+pub const GB_357: usize = 383325831168;
+pub const GB_358: usize = 384399572992;
+pub const GB_359: usize = 385473314816;
+pub const GB_360: usize = 386547056640;
+pub const GB_361: usize = 387620798464;
+pub const GB_362: usize = 388694540288;
+pub const GB_363: usize = 389768282112;
+pub const GB_364: usize = 390842023936;
+pub const GB_365: usize = 391915765760;
+pub const GB_366: usize = 392989507584;
+pub const GB_367: usize = 394063249408;
+pub const GB_368: usize = 395136991232;
+pub const GB_369: usize = 396210733056;
+pub const GB_370: usize = 397284474880;
+pub const GB_371: usize = 398358216704;
+pub const GB_372: usize = 399431958528;
+pub const GB_373: usize = 400505700352;
+pub const GB_374: usize = 401579442176;
+pub const GB_375: usize = 402653184000;
+pub const GB_376: usize = 403726925824;
+pub const GB_377: usize = 404800667648;
+pub const GB_378: usize = 405874409472;
+pub const GB_379: usize = 406948151296;
+pub const GB_380: usize = 408021893120;
+pub const GB_381: usize = 409095634944;
+pub const GB_382: usize = 410169376768;
+pub const GB_383: usize = 411243118592;
+pub const GB_384: usize = 412316860416;
+pub const GB_385: usize = 413390602240;
+pub const GB_386: usize = 414464344064;
+pub const GB_387: usize = 415538085888;
+pub const GB_388: usize = 416611827712;
+pub const GB_389: usize = 417685569536;
+pub const GB_390: usize = 418759311360;
+pub const GB_391: usize = 419833053184;
+pub const GB_392: usize = 420906795008;
+pub const GB_393: usize = 421980536832;
+pub const GB_394: usize = 423054278656;
+pub const GB_395: usize = 424128020480;
+pub const GB_396: usize = 425201762304;
+pub const GB_397: usize = 426275504128;
+pub const GB_398: usize = 427349245952;
+pub const GB_399: usize = 428422987776;
+pub const GB_400: usize = 429496729600;
+pub const GB_401: usize = 430570471424;
+pub const GB_402: usize = 431644213248;
+pub const GB_403: usize = 432717955072;
+pub const GB_404: usize = 433791696896;
+pub const GB_405: usize = 434865438720;
+pub const GB_406: usize = 435939180544;
+pub const GB_407: usize = 437012922368;
+pub const GB_408: usize = 438086664192;
+pub const GB_409: usize = 439160406016;
+pub const GB_410: usize = 440234147840;
+pub const GB_411: usize = 441307889664;
+pub const GB_412: usize = 442381631488;
+pub const GB_413: usize = 443455373312;
+pub const GB_414: usize = 444529115136;
+pub const GB_415: usize = 445602856960;
+pub const GB_416: usize = 446676598784;
+pub const GB_417: usize = 447750340608;
+pub const GB_418: usize = 448824082432;
+pub const GB_419: usize = 449897824256;
+pub const GB_420: usize = 450971566080;
+pub const GB_421: usize = 452045307904;
+pub const GB_422: usize = 453119049728;
+pub const GB_423: usize = 454192791552;
+pub const GB_424: usize = 455266533376;
+pub const GB_425: usize = 456340275200;
+pub const GB_426: usize = 457414017024;
+pub const GB_427: usize = 458487758848;
+pub const GB_428: usize = 459561500672;
+pub const GB_429: usize = 460635242496;
+pub const GB_430: usize = 461708984320;
+pub const GB_431: usize = 462782726144;
+pub const GB_432: usize = 463856467968;
+pub const GB_433: usize = 464930209792;
+pub const GB_434: usize = 466003951616;
+pub const GB_435: usize = 467077693440;
+pub const GB_436: usize = 468151435264;
+pub const GB_437: usize = 469225177088;
+pub const GB_438: usize = 470298918912;
+pub const GB_439: usize = 471372660736;
+pub const GB_440: usize = 472446402560;
+pub const GB_441: usize = 473520144384;
+pub const GB_442: usize = 474593886208;
+pub const GB_443: usize = 475667628032;
+pub const GB_444: usize = 476741369856;
+pub const GB_445: usize = 477815111680;
+pub const GB_446: usize = 478888853504;
+pub const GB_447: usize = 479962595328;
+pub const GB_448: usize = 481036337152;
+pub const GB_449: usize = 482110078976;
+pub const GB_450: usize = 483183820800;
+pub const GB_451: usize = 484257562624;
+pub const GB_452: usize = 485331304448;
+pub const GB_453: usize = 486405046272;
+pub const GB_454: usize = 487478788096;
+pub const GB_455: usize = 488552529920;
+pub const GB_456: usize = 489626271744;
+pub const GB_457: usize = 490700013568;
+pub const GB_458: usize = 491773755392;
+pub const GB_459: usize = 492847497216;
+pub const GB_460: usize = 493921239040;
+pub const GB_461: usize = 494994980864;
+pub const GB_462: usize = 496068722688;
+pub const GB_463: usize = 497142464512;
+pub const GB_464: usize = 498216206336;
+pub const GB_465: usize = 499289948160;
+pub const GB_466: usize = 500363689984;
+pub const GB_467: usize = 501437431808;
+pub const GB_468: usize = 502511173632;
+pub const GB_469: usize = 503584915456;
+pub const GB_470: usize = 504658657280;
+pub const GB_471: usize = 505732399104;
+pub const GB_472: usize = 506806140928;
+pub const GB_473: usize = 507879882752;
+pub const GB_474: usize = 508953624576;
+pub const GB_475: usize = 510027366400;
+pub const GB_476: usize = 511101108224;
+pub const GB_477: usize = 512174850048;
+pub const GB_478: usize = 513248591872;
+pub const GB_479: usize = 514322333696;
+pub const GB_480: usize = 515396075520;
+pub const GB_481: usize = 516469817344;
+pub const GB_482: usize = 517543559168;
+pub const GB_483: usize = 518617300992;
+pub const GB_484: usize = 519691042816;
+pub const GB_485: usize = 520764784640;
+pub const GB_486: usize = 521838526464;
+pub const GB_487: usize = 522912268288;
+pub const GB_488: usize = 523986010112;
+pub const GB_489: usize = 525059751936;
+pub const GB_490: usize = 526133493760;
+pub const GB_491: usize = 527207235584;
+pub const GB_492: usize = 528280977408;
+pub const GB_493: usize = 529354719232;
+pub const GB_494: usize = 530428461056;
+pub const GB_495: usize = 531502202880;
+pub const GB_496: usize = 532575944704;
+pub const GB_497: usize = 533649686528;
+pub const GB_498: usize = 534723428352;
+pub const GB_499: usize = 535797170176;
+pub const GB_500: usize = 536870912000;
+pub const GB_501: usize = 537944653824;
+pub const GB_502: usize = 539018395648;
+pub const GB_503: usize = 540092137472;
+pub const GB_504: usize = 541165879296;
+pub const GB_505: usize = 542239621120;
+pub const GB_506: usize = 543313362944;
+pub const GB_507: usize = 544387104768;
+pub const GB_508: usize = 545460846592;
+pub const GB_509: usize = 546534588416;
+pub const GB_510: usize = 547608330240;
+pub const GB_511: usize = 548682072064;
+pub const GB_512: usize = 549755813888;
+pub const GB_513: usize = 550829555712;
+pub const GB_514: usize = 551903297536;
+pub const GB_515: usize = 552977039360;
+pub const GB_516: usize = 554050781184;
+pub const GB_517: usize = 555124523008;
+pub const GB_518: usize = 556198264832;
+pub const GB_519: usize = 557272006656;
+pub const GB_520: usize = 558345748480;
+pub const GB_521: usize = 559419490304;
+pub const GB_522: usize = 560493232128;
+pub const GB_523: usize = 561566973952;
+pub const GB_524: usize = 562640715776;
+pub const GB_525: usize = 563714457600;
+pub const GB_526: usize = 564788199424;
+pub const GB_527: usize = 565861941248;
+pub const GB_528: usize = 566935683072;
+pub const GB_529: usize = 568009424896;
+pub const GB_530: usize = 569083166720;
+pub const GB_531: usize = 570156908544;
+pub const GB_532: usize = 571230650368;
+pub const GB_533: usize = 572304392192;
+pub const GB_534: usize = 573378134016;
+pub const GB_535: usize = 574451875840;
+pub const GB_536: usize = 575525617664;
+pub const GB_537: usize = 576599359488;
+pub const GB_538: usize = 577673101312;
+pub const GB_539: usize = 578746843136;
+pub const GB_540: usize = 579820584960;
+pub const GB_541: usize = 580894326784;
+pub const GB_542: usize = 581968068608;
+pub const GB_543: usize = 583041810432;
+pub const GB_544: usize = 584115552256;
+pub const GB_545: usize = 585189294080;
+pub const GB_546: usize = 586263035904;
+pub const GB_547: usize = 587336777728;
+pub const GB_548: usize = 588410519552;
+pub const GB_549: usize = 589484261376;
+pub const GB_550: usize = 590558003200;
+pub const GB_551: usize = 591631745024;
+pub const GB_552: usize = 592705486848;
+pub const GB_553: usize = 593779228672;
+pub const GB_554: usize = 594852970496;
+pub const GB_555: usize = 595926712320;
+pub const GB_556: usize = 597000454144;
+pub const GB_557: usize = 598074195968;
+pub const GB_558: usize = 599147937792;
+pub const GB_559: usize = 600221679616;
+pub const GB_560: usize = 601295421440;
+pub const GB_561: usize = 602369163264;
+pub const GB_562: usize = 603442905088;
+pub const GB_563: usize = 604516646912;
+pub const GB_564: usize = 605590388736;
+pub const GB_565: usize = 606664130560;
+pub const GB_566: usize = 607737872384;
+pub const GB_567: usize = 608811614208;
+pub const GB_568: usize = 609885356032;
+pub const GB_569: usize = 610959097856;
+pub const GB_570: usize = 612032839680;
+pub const GB_571: usize = 613106581504;
+pub const GB_572: usize = 614180323328;
+pub const GB_573: usize = 615254065152;
+pub const GB_574: usize = 616327806976;
+pub const GB_575: usize = 617401548800;
+pub const GB_576: usize = 618475290624;
+pub const GB_577: usize = 619549032448;
+pub const GB_578: usize = 620622774272;
+pub const GB_579: usize = 621696516096;
+pub const GB_580: usize = 622770257920;
+pub const GB_581: usize = 623843999744;
+pub const GB_582: usize = 624917741568;
+pub const GB_583: usize = 625991483392;
+pub const GB_584: usize = 627065225216;
+pub const GB_585: usize = 628138967040;
+pub const GB_586: usize = 629212708864;
+pub const GB_587: usize = 630286450688;
+pub const GB_588: usize = 631360192512;
+pub const GB_589: usize = 632433934336;
+pub const GB_590: usize = 633507676160;
+pub const GB_591: usize = 634581417984;
+pub const GB_592: usize = 635655159808;
+pub const GB_593: usize = 636728901632;
+pub const GB_594: usize = 637802643456;
+pub const GB_595: usize = 638876385280;
+pub const GB_596: usize = 639950127104;
+pub const GB_597: usize = 641023868928;
+pub const GB_598: usize = 642097610752;
+pub const GB_599: usize = 643171352576;
+pub const GB_600: usize = 644245094400;
+pub const GB_601: usize = 645318836224;
+pub const GB_602: usize = 646392578048;
+pub const GB_603: usize = 647466319872;
+pub const GB_604: usize = 648540061696;
+pub const GB_605: usize = 649613803520;
+pub const GB_606: usize = 650687545344;
+pub const GB_607: usize = 651761287168;
+pub const GB_608: usize = 652835028992;
+pub const GB_609: usize = 653908770816;
+pub const GB_610: usize = 654982512640;
+pub const GB_611: usize = 656056254464;
+pub const GB_612: usize = 657129996288;
+pub const GB_613: usize = 658203738112;
+pub const GB_614: usize = 659277479936;
+pub const GB_615: usize = 660351221760;
+pub const GB_616: usize = 661424963584;
+pub const GB_617: usize = 662498705408;
+pub const GB_618: usize = 663572447232;
+pub const GB_619: usize = 664646189056;
+pub const GB_620: usize = 665719930880;
+pub const GB_621: usize = 666793672704;
+pub const GB_622: usize = 667867414528;
+pub const GB_623: usize = 668941156352;
+pub const GB_624: usize = 670014898176;
+pub const GB_625: usize = 671088640000;
+pub const GB_626: usize = 672162381824;
+pub const GB_627: usize = 673236123648;
+pub const GB_628: usize = 674309865472;
+pub const GB_629: usize = 675383607296;
+pub const GB_630: usize = 676457349120;
+pub const GB_631: usize = 677531090944;
+pub const GB_632: usize = 678604832768;
+pub const GB_633: usize = 679678574592;
+pub const GB_634: usize = 680752316416;
+pub const GB_635: usize = 681826058240;
+pub const GB_636: usize = 682899800064;
+pub const GB_637: usize = 683973541888;
+pub const GB_638: usize = 685047283712;
+pub const GB_639: usize = 686121025536;
+pub const GB_640: usize = 687194767360;
+pub const GB_641: usize = 688268509184;
+pub const GB_642: usize = 689342251008;
+pub const GB_643: usize = 690415992832;
+pub const GB_644: usize = 691489734656;
+pub const GB_645: usize = 692563476480;
+pub const GB_646: usize = 693637218304;
+pub const GB_647: usize = 694710960128;
+pub const GB_648: usize = 695784701952;
+pub const GB_649: usize = 696858443776;
+pub const GB_650: usize = 697932185600;
+pub const GB_651: usize = 699005927424;
+pub const GB_652: usize = 700079669248;
+pub const GB_653: usize = 701153411072;
+pub const GB_654: usize = 702227152896;
+pub const GB_655: usize = 703300894720;
+pub const GB_656: usize = 704374636544;
+pub const GB_657: usize = 705448378368;
+pub const GB_658: usize = 706522120192;
+pub const GB_659: usize = 707595862016;
+pub const GB_660: usize = 708669603840;
+pub const GB_661: usize = 709743345664;
+pub const GB_662: usize = 710817087488;
+pub const GB_663: usize = 711890829312;
+pub const GB_664: usize = 712964571136;
+pub const GB_665: usize = 714038312960;
+pub const GB_666: usize = 715112054784;
+pub const GB_667: usize = 716185796608;
+pub const GB_668: usize = 717259538432;
+pub const GB_669: usize = 718333280256;
+pub const GB_670: usize = 719407022080;
+pub const GB_671: usize = 720480763904;
+pub const GB_672: usize = 721554505728;
+pub const GB_673: usize = 722628247552;
+pub const GB_674: usize = 723701989376;
+pub const GB_675: usize = 724775731200;
+pub const GB_676: usize = 725849473024;
+pub const GB_677: usize = 726923214848;
+pub const GB_678: usize = 727996956672;
+pub const GB_679: usize = 729070698496;
+pub const GB_680: usize = 730144440320;
+pub const GB_681: usize = 731218182144;
+pub const GB_682: usize = 732291923968;
+pub const GB_683: usize = 733365665792;
+pub const GB_684: usize = 734439407616;
+pub const GB_685: usize = 735513149440;
+pub const GB_686: usize = 736586891264;
+pub const GB_687: usize = 737660633088;
+pub const GB_688: usize = 738734374912;
+pub const GB_689: usize = 739808116736;
+pub const GB_690: usize = 740881858560;
+pub const GB_691: usize = 741955600384;
+pub const GB_692: usize = 743029342208;
+pub const GB_693: usize = 744103084032;
+pub const GB_694: usize = 745176825856;
+pub const GB_695: usize = 746250567680;
+pub const GB_696: usize = 747324309504;
+pub const GB_697: usize = 748398051328;
+pub const GB_698: usize = 749471793152;
+pub const GB_699: usize = 750545534976;
+pub const GB_700: usize = 751619276800;
+pub const GB_701: usize = 752693018624;
+pub const GB_702: usize = 753766760448;
+pub const GB_703: usize = 754840502272;
+pub const GB_704: usize = 755914244096;
+pub const GB_705: usize = 756987985920;
+pub const GB_706: usize = 758061727744;
+pub const GB_707: usize = 759135469568;
+pub const GB_708: usize = 760209211392;
+pub const GB_709: usize = 761282953216;
+pub const GB_710: usize = 762356695040;
+pub const GB_711: usize = 763430436864;
+pub const GB_712: usize = 764504178688;
+pub const GB_713: usize = 765577920512;
+pub const GB_714: usize = 766651662336;
+pub const GB_715: usize = 767725404160;
+pub const GB_716: usize = 768799145984;
+pub const GB_717: usize = 769872887808;
+pub const GB_718: usize = 770946629632;
+pub const GB_719: usize = 772020371456;
+pub const GB_720: usize = 773094113280;
+pub const GB_721: usize = 774167855104;
+pub const GB_722: usize = 775241596928;
+pub const GB_723: usize = 776315338752;
+pub const GB_724: usize = 777389080576;
+pub const GB_725: usize = 778462822400;
+pub const GB_726: usize = 779536564224;
+pub const GB_727: usize = 780610306048;
+pub const GB_728: usize = 781684047872;
+pub const GB_729: usize = 782757789696;
+pub const GB_730: usize = 783831531520;
+pub const GB_731: usize = 784905273344;
+pub const GB_732: usize = 785979015168;
+pub const GB_733: usize = 787052756992;
+pub const GB_734: usize = 788126498816;
+pub const GB_735: usize = 789200240640;
+pub const GB_736: usize = 790273982464;
+pub const GB_737: usize = 791347724288;
+pub const GB_738: usize = 792421466112;
+pub const GB_739: usize = 793495207936;
+pub const GB_740: usize = 794568949760;
+pub const GB_741: usize = 795642691584;
+pub const GB_742: usize = 796716433408;
+pub const GB_743: usize = 797790175232;
+pub const GB_744: usize = 798863917056;
+pub const GB_745: usize = 799937658880;
+pub const GB_746: usize = 801011400704;
+pub const GB_747: usize = 802085142528;
+pub const GB_748: usize = 803158884352;
+pub const GB_749: usize = 804232626176;
+pub const GB_750: usize = 805306368000;
+pub const GB_751: usize = 806380109824;
+pub const GB_752: usize = 807453851648;
+pub const GB_753: usize = 808527593472;
+pub const GB_754: usize = 809601335296;
+pub const GB_755: usize = 810675077120;
+pub const GB_756: usize = 811748818944;
+pub const GB_757: usize = 812822560768;
+pub const GB_758: usize = 813896302592;
+pub const GB_759: usize = 814970044416;
+pub const GB_760: usize = 816043786240;
+pub const GB_761: usize = 817117528064;
+pub const GB_762: usize = 818191269888;
+pub const GB_763: usize = 819265011712;
+pub const GB_764: usize = 820338753536;
+pub const GB_765: usize = 821412495360;
+pub const GB_766: usize = 822486237184;
+pub const GB_767: usize = 823559979008;
+pub const GB_768: usize = 824633720832;
+pub const GB_769: usize = 825707462656;
+pub const GB_770: usize = 826781204480;
+pub const GB_771: usize = 827854946304;
+pub const GB_772: usize = 828928688128;
+pub const GB_773: usize = 830002429952;
+pub const GB_774: usize = 831076171776;
+pub const GB_775: usize = 832149913600;
+pub const GB_776: usize = 833223655424;
+pub const GB_777: usize = 834297397248;
+pub const GB_778: usize = 835371139072;
+pub const GB_779: usize = 836444880896;
+pub const GB_780: usize = 837518622720;
+pub const GB_781: usize = 838592364544;
+pub const GB_782: usize = 839666106368;
+pub const GB_783: usize = 840739848192;
+pub const GB_784: usize = 841813590016;
+pub const GB_785: usize = 842887331840;
+pub const GB_786: usize = 843961073664;
+pub const GB_787: usize = 845034815488;
+pub const GB_788: usize = 846108557312;
+pub const GB_789: usize = 847182299136;
+pub const GB_790: usize = 848256040960;
+pub const GB_791: usize = 849329782784;
+pub const GB_792: usize = 850403524608;
+pub const GB_793: usize = 851477266432;
+pub const GB_794: usize = 852551008256;
+pub const GB_795: usize = 853624750080;
+pub const GB_796: usize = 854698491904;
+pub const GB_797: usize = 855772233728;
+pub const GB_798: usize = 856845975552;
+pub const GB_799: usize = 857919717376;
+pub const GB_800: usize = 858993459200;
+pub const GB_801: usize = 860067201024;
+pub const GB_802: usize = 861140942848;
+pub const GB_803: usize = 862214684672;
+pub const GB_804: usize = 863288426496;
+pub const GB_805: usize = 864362168320;
+pub const GB_806: usize = 865435910144;
+pub const GB_807: usize = 866509651968;
+pub const GB_808: usize = 867583393792;
+pub const GB_809: usize = 868657135616;
+pub const GB_810: usize = 869730877440;
+pub const GB_811: usize = 870804619264;
+pub const GB_812: usize = 871878361088;
+pub const GB_813: usize = 872952102912;
+pub const GB_814: usize = 874025844736;
+pub const GB_815: usize = 875099586560;
+pub const GB_816: usize = 876173328384;
+pub const GB_817: usize = 877247070208;
+pub const GB_818: usize = 878320812032;
+pub const GB_819: usize = 879394553856;
+pub const GB_820: usize = 880468295680;
+pub const GB_821: usize = 881542037504;
+pub const GB_822: usize = 882615779328;
+pub const GB_823: usize = 883689521152;
+pub const GB_824: usize = 884763262976;
+pub const GB_825: usize = 885837004800;
+pub const GB_826: usize = 886910746624;
+pub const GB_827: usize = 887984488448;
+pub const GB_828: usize = 889058230272;
+pub const GB_829: usize = 890131972096;
+pub const GB_830: usize = 891205713920;
+pub const GB_831: usize = 892279455744;
+pub const GB_832: usize = 893353197568;
+pub const GB_833: usize = 894426939392;
+pub const GB_834: usize = 895500681216;
+pub const GB_835: usize = 896574423040;
+pub const GB_836: usize = 897648164864;
+pub const GB_837: usize = 898721906688;
+pub const GB_838: usize = 899795648512;
+pub const GB_839: usize = 900869390336;
+pub const GB_840: usize = 901943132160;
+pub const GB_841: usize = 903016873984;
+pub const GB_842: usize = 904090615808;
+pub const GB_843: usize = 905164357632;
+pub const GB_844: usize = 906238099456;
+pub const GB_845: usize = 907311841280;
+pub const GB_846: usize = 908385583104;
+pub const GB_847: usize = 909459324928;
+pub const GB_848: usize = 910533066752;
+pub const GB_849: usize = 911606808576;
+pub const GB_850: usize = 912680550400;
+pub const GB_851: usize = 913754292224;
+pub const GB_852: usize = 914828034048;
+pub const GB_853: usize = 915901775872;
+pub const GB_854: usize = 916975517696;
+pub const GB_855: usize = 918049259520;
+pub const GB_856: usize = 919123001344;
+pub const GB_857: usize = 920196743168;
+pub const GB_858: usize = 921270484992;
+pub const GB_859: usize = 922344226816;
+pub const GB_860: usize = 923417968640;
+pub const GB_861: usize = 924491710464;
+pub const GB_862: usize = 925565452288;
+pub const GB_863: usize = 926639194112;
+pub const GB_864: usize = 927712935936;
+pub const GB_865: usize = 928786677760;
+pub const GB_866: usize = 929860419584;
+pub const GB_867: usize = 930934161408;
+pub const GB_868: usize = 932007903232;
+pub const GB_869: usize = 933081645056;
+pub const GB_870: usize = 934155386880;
+pub const GB_871: usize = 935229128704;
+pub const GB_872: usize = 936302870528;
+pub const GB_873: usize = 937376612352;
+pub const GB_874: usize = 938450354176;
+pub const GB_875: usize = 939524096000;
+pub const GB_876: usize = 940597837824;
+pub const GB_877: usize = 941671579648;
+pub const GB_878: usize = 942745321472;
+pub const GB_879: usize = 943819063296;
+pub const GB_880: usize = 944892805120;
+pub const GB_881: usize = 945966546944;
+pub const GB_882: usize = 947040288768;
+pub const GB_883: usize = 948114030592;
+pub const GB_884: usize = 949187772416;
+pub const GB_885: usize = 950261514240;
+pub const GB_886: usize = 951335256064;
+pub const GB_887: usize = 952408997888;
+pub const GB_888: usize = 953482739712;
+pub const GB_889: usize = 954556481536;
+pub const GB_890: usize = 955630223360;
+pub const GB_891: usize = 956703965184;
+pub const GB_892: usize = 957777707008;
+pub const GB_893: usize = 958851448832;
+pub const GB_894: usize = 959925190656;
+pub const GB_895: usize = 960998932480;
+pub const GB_896: usize = 962072674304;
+pub const GB_897: usize = 963146416128;
+pub const GB_898: usize = 964220157952;
+pub const GB_899: usize = 965293899776;
+pub const GB_900: usize = 966367641600;
+pub const GB_901: usize = 967441383424;
+pub const GB_902: usize = 968515125248;
+pub const GB_903: usize = 969588867072;
+pub const GB_904: usize = 970662608896;
+pub const GB_905: usize = 971736350720;
+pub const GB_906: usize = 972810092544;
+pub const GB_907: usize = 973883834368;
+pub const GB_908: usize = 974957576192;
+pub const GB_909: usize = 976031318016;
+pub const GB_910: usize = 977105059840;
+pub const GB_911: usize = 978178801664;
+pub const GB_912: usize = 979252543488;
+pub const GB_913: usize = 980326285312;
+pub const GB_914: usize = 981400027136;
+pub const GB_915: usize = 982473768960;
+pub const GB_916: usize = 983547510784;
+pub const GB_917: usize = 984621252608;
+pub const GB_918: usize = 985694994432;
+pub const GB_919: usize = 986768736256;
+pub const GB_920: usize = 987842478080;
+pub const GB_921: usize = 988916219904;
+pub const GB_922: usize = 989989961728;
+pub const GB_923: usize = 991063703552;
+pub const GB_924: usize = 992137445376;
+pub const GB_925: usize = 993211187200;
+pub const GB_926: usize = 994284929024;
+pub const GB_927: usize = 995358670848;
+pub const GB_928: usize = 996432412672;
+pub const GB_929: usize = 997506154496;
+pub const GB_930: usize = 998579896320;
+pub const GB_931: usize = 999653638144;
+pub const GB_932: usize = 1000727379968;
+pub const GB_933: usize = 1001801121792;
+pub const GB_934: usize = 1002874863616;
+pub const GB_935: usize = 1003948605440;
+pub const GB_936: usize = 1005022347264;
+pub const GB_937: usize = 1006096089088;
+pub const GB_938: usize = 1007169830912;
+pub const GB_939: usize = 1008243572736;
+pub const GB_940: usize = 1009317314560;
+pub const GB_941: usize = 1010391056384;
+pub const GB_942: usize = 1011464798208;
+pub const GB_943: usize = 1012538540032;
+pub const GB_944: usize = 1013612281856;
+pub const GB_945: usize = 1014686023680;
+pub const GB_946: usize = 1015759765504;
+pub const GB_947: usize = 1016833507328;
+pub const GB_948: usize = 1017907249152;
+pub const GB_949: usize = 1018980990976;
+pub const GB_950: usize = 1020054732800;
+pub const GB_951: usize = 1021128474624;
+pub const GB_952: usize = 1022202216448;
+pub const GB_953: usize = 1023275958272;
+pub const GB_954: usize = 1024349700096;
+pub const GB_955: usize = 1025423441920;
+pub const GB_956: usize = 1026497183744;
+pub const GB_957: usize = 1027570925568;
+pub const GB_958: usize = 1028644667392;
+pub const GB_959: usize = 1029718409216;
+pub const GB_960: usize = 1030792151040;
+pub const GB_961: usize = 1031865892864;
+pub const GB_962: usize = 1032939634688;
+pub const GB_963: usize = 1034013376512;
+pub const GB_964: usize = 1035087118336;
+pub const GB_965: usize = 1036160860160;
+pub const GB_966: usize = 1037234601984;
+pub const GB_967: usize = 1038308343808;
+pub const GB_968: usize = 1039382085632;
+pub const GB_969: usize = 1040455827456;
+pub const GB_970: usize = 1041529569280;
+pub const GB_971: usize = 1042603311104;
+pub const GB_972: usize = 1043677052928;
+pub const GB_973: usize = 1044750794752;
+pub const GB_974: usize = 1045824536576;
+pub const GB_975: usize = 1046898278400;
+pub const GB_976: usize = 1047972020224;
+pub const GB_977: usize = 1049045762048;
+pub const GB_978: usize = 1050119503872;
+pub const GB_979: usize = 1051193245696;
+pub const GB_980: usize = 1052266987520;
+pub const GB_981: usize = 1053340729344;
+pub const GB_982: usize = 1054414471168;
+pub const GB_983: usize = 1055488212992;
+pub const GB_984: usize = 1056561954816;
+pub const GB_985: usize = 1057635696640;
+pub const GB_986: usize = 1058709438464;
+pub const GB_987: usize = 1059783180288;
+pub const GB_988: usize = 1060856922112;
+pub const GB_989: usize = 1061930663936;
+pub const GB_990: usize = 1063004405760;
+pub const GB_991: usize = 1064078147584;
+pub const GB_992: usize = 1065151889408;
+pub const GB_993: usize = 1066225631232;
+pub const GB_994: usize = 1067299373056;
+pub const GB_995: usize = 1068373114880;
+pub const GB_996: usize = 1069446856704;
+pub const GB_997: usize = 1070520598528;
+pub const GB_998: usize = 1071594340352;
+pub const GB_999: usize = 1072668082176;
+pub const GB_1000: usize = 1073741824000;
+pub const GB_1001: usize = 1074815565824;
+pub const GB_1002: usize = 1075889307648;
+pub const GB_1003: usize = 1076963049472;
+pub const GB_1004: usize = 1078036791296;
+pub const GB_1005: usize = 1079110533120;
+pub const GB_1006: usize = 1080184274944;
+pub const GB_1007: usize = 1081258016768;
+pub const GB_1008: usize = 1082331758592;
+pub const GB_1009: usize = 1083405500416;
+pub const GB_1010: usize = 1084479242240;
+pub const GB_1011: usize = 1085552984064;
+pub const GB_1012: usize = 1086626725888;
+pub const GB_1013: usize = 1087700467712;
+pub const GB_1014: usize = 1088774209536;
+pub const GB_1015: usize = 1089847951360;
+pub const GB_1016: usize = 1090921693184;
+pub const GB_1017: usize = 1091995435008;
+pub const GB_1018: usize = 1093069176832;
+pub const GB_1019: usize = 1094142918656;
+pub const GB_1020: usize = 1095216660480;
+pub const GB_1021: usize = 1096290402304;
+pub const GB_1022: usize = 1097364144128;
+pub const GB_1023: usize = 1098437885952;
+pub const GB_1024: usize = 1099511627776;
+pub const TB_1: usize = 1099511627776;
+pub const TB_2: usize = 2199023255552;
+pub const TB_3: usize = 3298534883328;
+pub const TB_4: usize = 4398046511104;
+pub const TB_5: usize = 5497558138880;
+pub const TB_6: usize = 6597069766656;
+pub const TB_7: usize = 7696581394432;
+pub const TB_8: usize = 8796093022208;
+pub const TB_9: usize = 9895604649984;
+pub const TB_10: usize = 10995116277760;
+pub const TB_11: usize = 12094627905536;
+pub const TB_12: usize = 13194139533312;
+pub const TB_13: usize = 14293651161088;
+pub const TB_14: usize = 15393162788864;
+pub const TB_15: usize = 16492674416640;
+pub const TB_16: usize = 17592186044416;
+pub const TB_17: usize = 18691697672192;
+pub const TB_18: usize = 19791209299968;
+pub const TB_19: usize = 20890720927744;
+pub const TB_20: usize = 21990232555520;
+pub const TB_21: usize = 23089744183296;
+pub const TB_22: usize = 24189255811072;
+pub const TB_23: usize = 25288767438848;
+pub const TB_24: usize = 26388279066624;
+pub const TB_25: usize = 27487790694400;
+pub const TB_26: usize = 28587302322176;
+pub const TB_27: usize = 29686813949952;
+pub const TB_28: usize = 30786325577728;
+pub const TB_29: usize = 31885837205504;
+pub const TB_30: usize = 32985348833280;
+pub const TB_31: usize = 34084860461056;
+pub const TB_32: usize = 35184372088832;
+pub const TB_33: usize = 36283883716608;
+pub const TB_34: usize = 37383395344384;
+pub const TB_35: usize = 38482906972160;
+pub const TB_36: usize = 39582418599936;
+pub const TB_37: usize = 40681930227712;
+pub const TB_38: usize = 41781441855488;
+pub const TB_39: usize = 42880953483264;
+pub const TB_40: usize = 43980465111040;
+pub const TB_41: usize = 45079976738816;
+pub const TB_42: usize = 46179488366592;
+pub const TB_43: usize = 47278999994368;
+pub const TB_44: usize = 48378511622144;
+pub const TB_45: usize = 49478023249920;
+pub const TB_46: usize = 50577534877696;
+pub const TB_47: usize = 51677046505472;
+pub const TB_48: usize = 52776558133248;
+pub const TB_49: usize = 53876069761024;
+pub const TB_50: usize = 54975581388800;
+pub const TB_51: usize = 56075093016576;
+pub const TB_52: usize = 57174604644352;
+pub const TB_53: usize = 58274116272128;
+pub const TB_54: usize = 59373627899904;
+pub const TB_55: usize = 60473139527680;
+pub const TB_56: usize = 61572651155456;
+pub const TB_57: usize = 62672162783232;
+pub const TB_58: usize = 63771674411008;
+pub const TB_59: usize = 64871186038784;
+pub const TB_60: usize = 65970697666560;
+pub const TB_61: usize = 67070209294336;
+pub const TB_62: usize = 68169720922112;
+pub const TB_63: usize = 69269232549888;
+pub const TB_64: usize = 70368744177664;
+pub const TB_65: usize = 71468255805440;
+pub const TB_66: usize = 72567767433216;
+pub const TB_67: usize = 73667279060992;
+pub const TB_68: usize = 74766790688768;
+pub const TB_69: usize = 75866302316544;
+pub const TB_70: usize = 76965813944320;
+pub const TB_71: usize = 78065325572096;
+pub const TB_72: usize = 79164837199872;
+pub const TB_73: usize = 80264348827648;
+pub const TB_74: usize = 81363860455424;
+pub const TB_75: usize = 82463372083200;
+pub const TB_76: usize = 83562883710976;
+pub const TB_77: usize = 84662395338752;
+pub const TB_78: usize = 85761906966528;
+pub const TB_79: usize = 86861418594304;
+pub const TB_80: usize = 87960930222080;
+pub const TB_81: usize = 89060441849856;
+pub const TB_82: usize = 90159953477632;
+pub const TB_83: usize = 91259465105408;
+pub const TB_84: usize = 92358976733184;
+pub const TB_85: usize = 93458488360960;
+pub const TB_86: usize = 94557999988736;
+pub const TB_87: usize = 95657511616512;
+pub const TB_88: usize = 96757023244288;
+pub const TB_89: usize = 97856534872064;
+pub const TB_90: usize = 98956046499840;
+pub const TB_91: usize = 100055558127616;
+pub const TB_92: usize = 101155069755392;
+pub const TB_93: usize = 102254581383168;
+pub const TB_94: usize = 103354093010944;
+pub const TB_95: usize = 104453604638720;
+pub const TB_96: usize = 105553116266496;
+pub const TB_97: usize = 106652627894272;
+pub const TB_98: usize = 107752139522048;
+pub const TB_99: usize = 108851651149824;
+pub const TB_100: usize = 109951162777600;
+pub const TB_101: usize = 111050674405376;
+pub const TB_102: usize = 112150186033152;
+pub const TB_103: usize = 113249697660928;
+pub const TB_104: usize = 114349209288704;
+pub const TB_105: usize = 115448720916480;
+pub const TB_106: usize = 116548232544256;
+pub const TB_107: usize = 117647744172032;
+pub const TB_108: usize = 118747255799808;
+pub const TB_109: usize = 119846767427584;
+pub const TB_110: usize = 120946279055360;
+pub const TB_111: usize = 122045790683136;
+pub const TB_112: usize = 123145302310912;
+pub const TB_113: usize = 124244813938688;
+pub const TB_114: usize = 125344325566464;
+pub const TB_115: usize = 126443837194240;
+pub const TB_116: usize = 127543348822016;
+pub const TB_117: usize = 128642860449792;
+pub const TB_118: usize = 129742372077568;
+pub const TB_119: usize = 130841883705344;
+pub const TB_120: usize = 131941395333120;
+pub const TB_121: usize = 133040906960896;
+pub const TB_122: usize = 134140418588672;
+pub const TB_123: usize = 135239930216448;
+pub const TB_124: usize = 136339441844224;
+pub const TB_125: usize = 137438953472000;
+pub const TB_126: usize = 138538465099776;
+pub const TB_127: usize = 139637976727552;
+pub const TB_128: usize = 140737488355328;
+pub const TB_129: usize = 141836999983104;
+pub const TB_130: usize = 142936511610880;
+pub const TB_131: usize = 144036023238656;
+pub const TB_132: usize = 145135534866432;
+pub const TB_133: usize = 146235046494208;
+pub const TB_134: usize = 147334558121984;
+pub const TB_135: usize = 148434069749760;
+pub const TB_136: usize = 149533581377536;
+pub const TB_137: usize = 150633093005312;
+pub const TB_138: usize = 151732604633088;
+pub const TB_139: usize = 152832116260864;
+pub const TB_140: usize = 153931627888640;
+pub const TB_141: usize = 155031139516416;
+pub const TB_142: usize = 156130651144192;
+pub const TB_143: usize = 157230162771968;
+pub const TB_144: usize = 158329674399744;
+pub const TB_145: usize = 159429186027520;
+pub const TB_146: usize = 160528697655296;
+pub const TB_147: usize = 161628209283072;
+pub const TB_148: usize = 162727720910848;
+pub const TB_149: usize = 163827232538624;
+pub const TB_150: usize = 164926744166400;
+pub const TB_151: usize = 166026255794176;
+pub const TB_152: usize = 167125767421952;
+pub const TB_153: usize = 168225279049728;
+pub const TB_154: usize = 169324790677504;
+pub const TB_155: usize = 170424302305280;
+pub const TB_156: usize = 171523813933056;
+pub const TB_157: usize = 172623325560832;
+pub const TB_158: usize = 173722837188608;
+pub const TB_159: usize = 174822348816384;
+pub const TB_160: usize = 175921860444160;
+pub const TB_161: usize = 177021372071936;
+pub const TB_162: usize = 178120883699712;
+pub const TB_163: usize = 179220395327488;
+pub const TB_164: usize = 180319906955264;
+pub const TB_165: usize = 181419418583040;
+pub const TB_166: usize = 182518930210816;
+pub const TB_167: usize = 183618441838592;
+pub const TB_168: usize = 184717953466368;
+pub const TB_169: usize = 185817465094144;
+pub const TB_170: usize = 186916976721920;
+pub const TB_171: usize = 188016488349696;
+pub const TB_172: usize = 189115999977472;
+pub const TB_173: usize = 190215511605248;
+pub const TB_174: usize = 191315023233024;
+pub const TB_175: usize = 192414534860800;
+pub const TB_176: usize = 193514046488576;
+pub const TB_177: usize = 194613558116352;
+pub const TB_178: usize = 195713069744128;
+pub const TB_179: usize = 196812581371904;
+pub const TB_180: usize = 197912092999680;
+pub const TB_181: usize = 199011604627456;
+pub const TB_182: usize = 200111116255232;
+pub const TB_183: usize = 201210627883008;
+pub const TB_184: usize = 202310139510784;
+pub const TB_185: usize = 203409651138560;
+pub const TB_186: usize = 204509162766336;
+pub const TB_187: usize = 205608674394112;
+pub const TB_188: usize = 206708186021888;
+pub const TB_189: usize = 207807697649664;
+pub const TB_190: usize = 208907209277440;
+pub const TB_191: usize = 210006720905216;
+pub const TB_192: usize = 211106232532992;
+pub const TB_193: usize = 212205744160768;
+pub const TB_194: usize = 213305255788544;
+pub const TB_195: usize = 214404767416320;
+pub const TB_196: usize = 215504279044096;
+pub const TB_197: usize = 216603790671872;
+pub const TB_198: usize = 217703302299648;
+pub const TB_199: usize = 218802813927424;
+pub const TB_200: usize = 219902325555200;
+pub const TB_201: usize = 221001837182976;
+pub const TB_202: usize = 222101348810752;
+pub const TB_203: usize = 223200860438528;
+pub const TB_204: usize = 224300372066304;
+pub const TB_205: usize = 225399883694080;
+pub const TB_206: usize = 226499395321856;
+pub const TB_207: usize = 227598906949632;
+pub const TB_208: usize = 228698418577408;
+pub const TB_209: usize = 229797930205184;
+pub const TB_210: usize = 230897441832960;
+pub const TB_211: usize = 231996953460736;
+pub const TB_212: usize = 233096465088512;
+pub const TB_213: usize = 234195976716288;
+pub const TB_214: usize = 235295488344064;
+pub const TB_215: usize = 236394999971840;
+pub const TB_216: usize = 237494511599616;
+pub const TB_217: usize = 238594023227392;
+pub const TB_218: usize = 239693534855168;
+pub const TB_219: usize = 240793046482944;
+pub const TB_220: usize = 241892558110720;
+pub const TB_221: usize = 242992069738496;
+pub const TB_222: usize = 244091581366272;
+pub const TB_223: usize = 245191092994048;
+pub const TB_224: usize = 246290604621824;
+pub const TB_225: usize = 247390116249600;
+pub const TB_226: usize = 248489627877376;
+pub const TB_227: usize = 249589139505152;
+pub const TB_228: usize = 250688651132928;
+pub const TB_229: usize = 251788162760704;
+pub const TB_230: usize = 252887674388480;
+pub const TB_231: usize = 253987186016256;
+pub const TB_232: usize = 255086697644032;
+pub const TB_233: usize = 256186209271808;
+pub const TB_234: usize = 257285720899584;
+pub const TB_235: usize = 258385232527360;
+pub const TB_236: usize = 259484744155136;
+pub const TB_237: usize = 260584255782912;
+pub const TB_238: usize = 261683767410688;
+pub const TB_239: usize = 262783279038464;
+pub const TB_240: usize = 263882790666240;
+pub const TB_241: usize = 264982302294016;
+pub const TB_242: usize = 266081813921792;
+pub const TB_243: usize = 267181325549568;
+pub const TB_244: usize = 268280837177344;
+pub const TB_245: usize = 269380348805120;
+pub const TB_246: usize = 270479860432896;
+pub const TB_247: usize = 271579372060672;
+pub const TB_248: usize = 272678883688448;
+pub const TB_249: usize = 273778395316224;
+pub const TB_250: usize = 274877906944000;
+pub const TB_251: usize = 275977418571776;
+pub const TB_252: usize = 277076930199552;
+pub const TB_253: usize = 278176441827328;
+pub const TB_254: usize = 279275953455104;
+pub const TB_255: usize = 280375465082880;
+pub const TB_256: usize = 281474976710656;
+pub const TB_257: usize = 282574488338432;
+pub const TB_258: usize = 283673999966208;
+pub const TB_259: usize = 284773511593984;
+pub const TB_260: usize = 285873023221760;
+pub const TB_261: usize = 286972534849536;
+pub const TB_262: usize = 288072046477312;
+pub const TB_263: usize = 289171558105088;
+pub const TB_264: usize = 290271069732864;
+pub const TB_265: usize = 291370581360640;
+pub const TB_266: usize = 292470092988416;
+pub const TB_267: usize = 293569604616192;
+pub const TB_268: usize = 294669116243968;
+pub const TB_269: usize = 295768627871744;
+pub const TB_270: usize = 296868139499520;
+pub const TB_271: usize = 297967651127296;
+pub const TB_272: usize = 299067162755072;
+pub const TB_273: usize = 300166674382848;
+pub const TB_274: usize = 301266186010624;
+pub const TB_275: usize = 302365697638400;
+pub const TB_276: usize = 303465209266176;
+pub const TB_277: usize = 304564720893952;
+pub const TB_278: usize = 305664232521728;
+pub const TB_279: usize = 306763744149504;
+pub const TB_280: usize = 307863255777280;
+pub const TB_281: usize = 308962767405056;
+pub const TB_282: usize = 310062279032832;
+pub const TB_283: usize = 311161790660608;
+pub const TB_284: usize = 312261302288384;
+pub const TB_285: usize = 313360813916160;
+pub const TB_286: usize = 314460325543936;
+pub const TB_287: usize = 315559837171712;
+pub const TB_288: usize = 316659348799488;
+pub const TB_289: usize = 317758860427264;
+pub const TB_290: usize = 318858372055040;
+pub const TB_291: usize = 319957883682816;
+pub const TB_292: usize = 321057395310592;
+pub const TB_293: usize = 322156906938368;
+pub const TB_294: usize = 323256418566144;
+pub const TB_295: usize = 324355930193920;
+pub const TB_296: usize = 325455441821696;
+pub const TB_297: usize = 326554953449472;
+pub const TB_298: usize = 327654465077248;
+pub const TB_299: usize = 328753976705024;
+pub const TB_300: usize = 329853488332800;
+pub const TB_301: usize = 330952999960576;
+pub const TB_302: usize = 332052511588352;
+pub const TB_303: usize = 333152023216128;
+pub const TB_304: usize = 334251534843904;
+pub const TB_305: usize = 335351046471680;
+pub const TB_306: usize = 336450558099456;
+pub const TB_307: usize = 337550069727232;
+pub const TB_308: usize = 338649581355008;
+pub const TB_309: usize = 339749092982784;
+pub const TB_310: usize = 340848604610560;
+pub const TB_311: usize = 341948116238336;
+pub const TB_312: usize = 343047627866112;
+pub const TB_313: usize = 344147139493888;
+pub const TB_314: usize = 345246651121664;
+pub const TB_315: usize = 346346162749440;
+pub const TB_316: usize = 347445674377216;
+pub const TB_317: usize = 348545186004992;
+pub const TB_318: usize = 349644697632768;
+pub const TB_319: usize = 350744209260544;
+pub const TB_320: usize = 351843720888320;
+pub const TB_321: usize = 352943232516096;
+pub const TB_322: usize = 354042744143872;
+pub const TB_323: usize = 355142255771648;
+pub const TB_324: usize = 356241767399424;
+pub const TB_325: usize = 357341279027200;
+pub const TB_326: usize = 358440790654976;
+pub const TB_327: usize = 359540302282752;
+pub const TB_328: usize = 360639813910528;
+pub const TB_329: usize = 361739325538304;
+pub const TB_330: usize = 362838837166080;
+pub const TB_331: usize = 363938348793856;
+pub const TB_332: usize = 365037860421632;
+pub const TB_333: usize = 366137372049408;
+pub const TB_334: usize = 367236883677184;
+pub const TB_335: usize = 368336395304960;
+pub const TB_336: usize = 369435906932736;
+pub const TB_337: usize = 370535418560512;
+pub const TB_338: usize = 371634930188288;
+pub const TB_339: usize = 372734441816064;
+pub const TB_340: usize = 373833953443840;
+pub const TB_341: usize = 374933465071616;
+pub const TB_342: usize = 376032976699392;
+pub const TB_343: usize = 377132488327168;
+pub const TB_344: usize = 378231999954944;
+pub const TB_345: usize = 379331511582720;
+pub const TB_346: usize = 380431023210496;
+pub const TB_347: usize = 381530534838272;
+pub const TB_348: usize = 382630046466048;
+pub const TB_349: usize = 383729558093824;
+pub const TB_350: usize = 384829069721600;
+pub const TB_351: usize = 385928581349376;
+pub const TB_352: usize = 387028092977152;
+pub const TB_353: usize = 388127604604928;
+pub const TB_354: usize = 389227116232704;
+pub const TB_355: usize = 390326627860480;
+pub const TB_356: usize = 391426139488256;
+pub const TB_357: usize = 392525651116032;
+pub const TB_358: usize = 393625162743808;
+pub const TB_359: usize = 394724674371584;
+pub const TB_360: usize = 395824185999360;
+pub const TB_361: usize = 396923697627136;
+pub const TB_362: usize = 398023209254912;
+pub const TB_363: usize = 399122720882688;
+pub const TB_364: usize = 400222232510464;
+pub const TB_365: usize = 401321744138240;
+pub const TB_366: usize = 402421255766016;
+pub const TB_367: usize = 403520767393792;
+pub const TB_368: usize = 404620279021568;
+pub const TB_369: usize = 405719790649344;
+pub const TB_370: usize = 406819302277120;
+pub const TB_371: usize = 407918813904896;
+pub const TB_372: usize = 409018325532672;
+pub const TB_373: usize = 410117837160448;
+pub const TB_374: usize = 411217348788224;
+pub const TB_375: usize = 412316860416000;
+pub const TB_376: usize = 413416372043776;
+pub const TB_377: usize = 414515883671552;
+pub const TB_378: usize = 415615395299328;
+pub const TB_379: usize = 416714906927104;
+pub const TB_380: usize = 417814418554880;
+pub const TB_381: usize = 418913930182656;
+pub const TB_382: usize = 420013441810432;
+pub const TB_383: usize = 421112953438208;
+pub const TB_384: usize = 422212465065984;
+pub const TB_385: usize = 423311976693760;
+pub const TB_386: usize = 424411488321536;
+pub const TB_387: usize = 425510999949312;
+pub const TB_388: usize = 426610511577088;
+pub const TB_389: usize = 427710023204864;
+pub const TB_390: usize = 428809534832640;
+pub const TB_391: usize = 429909046460416;
+pub const TB_392: usize = 431008558088192;
+pub const TB_393: usize = 432108069715968;
+pub const TB_394: usize = 433207581343744;
+pub const TB_395: usize = 434307092971520;
+pub const TB_396: usize = 435406604599296;
+pub const TB_397: usize = 436506116227072;
+pub const TB_398: usize = 437605627854848;
+pub const TB_399: usize = 438705139482624;
+pub const TB_400: usize = 439804651110400;
+pub const TB_401: usize = 440904162738176;
+pub const TB_402: usize = 442003674365952;
+pub const TB_403: usize = 443103185993728;
+pub const TB_404: usize = 444202697621504;
+pub const TB_405: usize = 445302209249280;
+pub const TB_406: usize = 446401720877056;
+pub const TB_407: usize = 447501232504832;
+pub const TB_408: usize = 448600744132608;
+pub const TB_409: usize = 449700255760384;
+pub const TB_410: usize = 450799767388160;
+pub const TB_411: usize = 451899279015936;
+pub const TB_412: usize = 452998790643712;
+pub const TB_413: usize = 454098302271488;
+pub const TB_414: usize = 455197813899264;
+pub const TB_415: usize = 456297325527040;
+pub const TB_416: usize = 457396837154816;
+pub const TB_417: usize = 458496348782592;
+pub const TB_418: usize = 459595860410368;
+pub const TB_419: usize = 460695372038144;
+pub const TB_420: usize = 461794883665920;
+pub const TB_421: usize = 462894395293696;
+pub const TB_422: usize = 463993906921472;
+pub const TB_423: usize = 465093418549248;
+pub const TB_424: usize = 466192930177024;
+pub const TB_425: usize = 467292441804800;
+pub const TB_426: usize = 468391953432576;
+pub const TB_427: usize = 469491465060352;
+pub const TB_428: usize = 470590976688128;
+pub const TB_429: usize = 471690488315904;
+pub const TB_430: usize = 472789999943680;
+pub const TB_431: usize = 473889511571456;
+pub const TB_432: usize = 474989023199232;
+pub const TB_433: usize = 476088534827008;
+pub const TB_434: usize = 477188046454784;
+pub const TB_435: usize = 478287558082560;
+pub const TB_436: usize = 479387069710336;
+pub const TB_437: usize = 480486581338112;
+pub const TB_438: usize = 481586092965888;
+pub const TB_439: usize = 482685604593664;
+pub const TB_440: usize = 483785116221440;
+pub const TB_441: usize = 484884627849216;
+pub const TB_442: usize = 485984139476992;
+pub const TB_443: usize = 487083651104768;
+pub const TB_444: usize = 488183162732544;
+pub const TB_445: usize = 489282674360320;
+pub const TB_446: usize = 490382185988096;
+pub const TB_447: usize = 491481697615872;
+pub const TB_448: usize = 492581209243648;
+pub const TB_449: usize = 493680720871424;
+pub const TB_450: usize = 494780232499200;
+pub const TB_451: usize = 495879744126976;
+pub const TB_452: usize = 496979255754752;
+pub const TB_453: usize = 498078767382528;
+pub const TB_454: usize = 499178279010304;
+pub const TB_455: usize = 500277790638080;
+pub const TB_456: usize = 501377302265856;
+pub const TB_457: usize = 502476813893632;
+pub const TB_458: usize = 503576325521408;
+pub const TB_459: usize = 504675837149184;
+pub const TB_460: usize = 505775348776960;
+pub const TB_461: usize = 506874860404736;
+pub const TB_462: usize = 507974372032512;
+pub const TB_463: usize = 509073883660288;
+pub const TB_464: usize = 510173395288064;
+pub const TB_465: usize = 511272906915840;
+pub const TB_466: usize = 512372418543616;
+pub const TB_467: usize = 513471930171392;
+pub const TB_468: usize = 514571441799168;
+pub const TB_469: usize = 515670953426944;
+pub const TB_470: usize = 516770465054720;
+pub const TB_471: usize = 517869976682496;
+pub const TB_472: usize = 518969488310272;
+pub const TB_473: usize = 520068999938048;
+pub const TB_474: usize = 521168511565824;
+pub const TB_475: usize = 522268023193600;
+pub const TB_476: usize = 523367534821376;
+pub const TB_477: usize = 524467046449152;
+pub const TB_478: usize = 525566558076928;
+pub const TB_479: usize = 526666069704704;
+pub const TB_480: usize = 527765581332480;
+pub const TB_481: usize = 528865092960256;
+pub const TB_482: usize = 529964604588032;
+pub const TB_483: usize = 531064116215808;
+pub const TB_484: usize = 532163627843584;
+pub const TB_485: usize = 533263139471360;
+pub const TB_486: usize = 534362651099136;
+pub const TB_487: usize = 535462162726912;
+pub const TB_488: usize = 536561674354688;
+pub const TB_489: usize = 537661185982464;
+pub const TB_490: usize = 538760697610240;
+pub const TB_491: usize = 539860209238016;
+pub const TB_492: usize = 540959720865792;
+pub const TB_493: usize = 542059232493568;
+pub const TB_494: usize = 543158744121344;
+pub const TB_495: usize = 544258255749120;
+pub const TB_496: usize = 545357767376896;
+pub const TB_497: usize = 546457279004672;
+pub const TB_498: usize = 547556790632448;
+pub const TB_499: usize = 548656302260224;
+pub const TB_500: usize = 549755813888000;
+pub const TB_501: usize = 550855325515776;
+pub const TB_502: usize = 551954837143552;
+pub const TB_503: usize = 553054348771328;
+pub const TB_504: usize = 554153860399104;
+pub const TB_505: usize = 555253372026880;
+pub const TB_506: usize = 556352883654656;
+pub const TB_507: usize = 557452395282432;
+pub const TB_508: usize = 558551906910208;
+pub const TB_509: usize = 559651418537984;
+pub const TB_510: usize = 560750930165760;
+pub const TB_511: usize = 561850441793536;
+pub const TB_512: usize = 562949953421312;
+pub const TB_513: usize = 564049465049088;
+pub const TB_514: usize = 565148976676864;
+pub const TB_515: usize = 566248488304640;
+pub const TB_516: usize = 567347999932416;
+pub const TB_517: usize = 568447511560192;
+pub const TB_518: usize = 569547023187968;
+pub const TB_519: usize = 570646534815744;
+pub const TB_520: usize = 571746046443520;
+pub const TB_521: usize = 572845558071296;
+pub const TB_522: usize = 573945069699072;
+pub const TB_523: usize = 575044581326848;
+pub const TB_524: usize = 576144092954624;
+pub const TB_525: usize = 577243604582400;
+pub const TB_526: usize = 578343116210176;
+pub const TB_527: usize = 579442627837952;
+pub const TB_528: usize = 580542139465728;
+pub const TB_529: usize = 581641651093504;
+pub const TB_530: usize = 582741162721280;
+pub const TB_531: usize = 583840674349056;
+pub const TB_532: usize = 584940185976832;
+pub const TB_533: usize = 586039697604608;
+pub const TB_534: usize = 587139209232384;
+pub const TB_535: usize = 588238720860160;
+pub const TB_536: usize = 589338232487936;
+pub const TB_537: usize = 590437744115712;
+pub const TB_538: usize = 591537255743488;
+pub const TB_539: usize = 592636767371264;
+pub const TB_540: usize = 593736278999040;
+pub const TB_541: usize = 594835790626816;
+pub const TB_542: usize = 595935302254592;
+pub const TB_543: usize = 597034813882368;
+pub const TB_544: usize = 598134325510144;
+pub const TB_545: usize = 599233837137920;
+pub const TB_546: usize = 600333348765696;
+pub const TB_547: usize = 601432860393472;
+pub const TB_548: usize = 602532372021248;
+pub const TB_549: usize = 603631883649024;
+pub const TB_550: usize = 604731395276800;
+pub const TB_551: usize = 605830906904576;
+pub const TB_552: usize = 606930418532352;
+pub const TB_553: usize = 608029930160128;
+pub const TB_554: usize = 609129441787904;
+pub const TB_555: usize = 610228953415680;
+pub const TB_556: usize = 611328465043456;
+pub const TB_557: usize = 612427976671232;
+pub const TB_558: usize = 613527488299008;
+pub const TB_559: usize = 614626999926784;
+pub const TB_560: usize = 615726511554560;
+pub const TB_561: usize = 616826023182336;
+pub const TB_562: usize = 617925534810112;
+pub const TB_563: usize = 619025046437888;
+pub const TB_564: usize = 620124558065664;
+pub const TB_565: usize = 621224069693440;
+pub const TB_566: usize = 622323581321216;
+pub const TB_567: usize = 623423092948992;
+pub const TB_568: usize = 624522604576768;
+pub const TB_569: usize = 625622116204544;
+pub const TB_570: usize = 626721627832320;
+pub const TB_571: usize = 627821139460096;
+pub const TB_572: usize = 628920651087872;
+pub const TB_573: usize = 630020162715648;
+pub const TB_574: usize = 631119674343424;
+pub const TB_575: usize = 632219185971200;
+pub const TB_576: usize = 633318697598976;
+pub const TB_577: usize = 634418209226752;
+pub const TB_578: usize = 635517720854528;
+pub const TB_579: usize = 636617232482304;
+pub const TB_580: usize = 637716744110080;
+pub const TB_581: usize = 638816255737856;
+pub const TB_582: usize = 639915767365632;
+pub const TB_583: usize = 641015278993408;
+pub const TB_584: usize = 642114790621184;
+pub const TB_585: usize = 643214302248960;
+pub const TB_586: usize = 644313813876736;
+pub const TB_587: usize = 645413325504512;
+pub const TB_588: usize = 646512837132288;
+pub const TB_589: usize = 647612348760064;
+pub const TB_590: usize = 648711860387840;
+pub const TB_591: usize = 649811372015616;
+pub const TB_592: usize = 650910883643392;
+pub const TB_593: usize = 652010395271168;
+pub const TB_594: usize = 653109906898944;
+pub const TB_595: usize = 654209418526720;
+pub const TB_596: usize = 655308930154496;
+pub const TB_597: usize = 656408441782272;
+pub const TB_598: usize = 657507953410048;
+pub const TB_599: usize = 658607465037824;
+pub const TB_600: usize = 659706976665600;
+pub const TB_601: usize = 660806488293376;
+pub const TB_602: usize = 661905999921152;
+pub const TB_603: usize = 663005511548928;
+pub const TB_604: usize = 664105023176704;
+pub const TB_605: usize = 665204534804480;
+pub const TB_606: usize = 666304046432256;
+pub const TB_607: usize = 667403558060032;
+pub const TB_608: usize = 668503069687808;
+pub const TB_609: usize = 669602581315584;
+pub const TB_610: usize = 670702092943360;
+pub const TB_611: usize = 671801604571136;
+pub const TB_612: usize = 672901116198912;
+pub const TB_613: usize = 674000627826688;
+pub const TB_614: usize = 675100139454464;
+pub const TB_615: usize = 676199651082240;
+pub const TB_616: usize = 677299162710016;
+pub const TB_617: usize = 678398674337792;
+pub const TB_618: usize = 679498185965568;
+pub const TB_619: usize = 680597697593344;
+pub const TB_620: usize = 681697209221120;
+pub const TB_621: usize = 682796720848896;
+pub const TB_622: usize = 683896232476672;
+pub const TB_623: usize = 684995744104448;
+pub const TB_624: usize = 686095255732224;
+pub const TB_625: usize = 687194767360000;
+pub const TB_626: usize = 688294278987776;
+pub const TB_627: usize = 689393790615552;
+pub const TB_628: usize = 690493302243328;
+pub const TB_629: usize = 691592813871104;
+pub const TB_630: usize = 692692325498880;
+pub const TB_631: usize = 693791837126656;
+pub const TB_632: usize = 694891348754432;
+pub const TB_633: usize = 695990860382208;
+pub const TB_634: usize = 697090372009984;
+pub const TB_635: usize = 698189883637760;
+pub const TB_636: usize = 699289395265536;
+pub const TB_637: usize = 700388906893312;
+pub const TB_638: usize = 701488418521088;
+pub const TB_639: usize = 702587930148864;
+pub const TB_640: usize = 703687441776640;
+pub const TB_641: usize = 704786953404416;
+pub const TB_642: usize = 705886465032192;
+pub const TB_643: usize = 706985976659968;
+pub const TB_644: usize = 708085488287744;
+pub const TB_645: usize = 709184999915520;
+pub const TB_646: usize = 710284511543296;
+pub const TB_647: usize = 711384023171072;
+pub const TB_648: usize = 712483534798848;
+pub const TB_649: usize = 713583046426624;
+pub const TB_650: usize = 714682558054400;
+pub const TB_651: usize = 715782069682176;
+pub const TB_652: usize = 716881581309952;
+pub const TB_653: usize = 717981092937728;
+pub const TB_654: usize = 719080604565504;
+pub const TB_655: usize = 720180116193280;
+pub const TB_656: usize = 721279627821056;
+pub const TB_657: usize = 722379139448832;
+pub const TB_658: usize = 723478651076608;
+pub const TB_659: usize = 724578162704384;
+pub const TB_660: usize = 725677674332160;
+pub const TB_661: usize = 726777185959936;
+pub const TB_662: usize = 727876697587712;
+pub const TB_663: usize = 728976209215488;
+pub const TB_664: usize = 730075720843264;
+pub const TB_665: usize = 731175232471040;
+pub const TB_666: usize = 732274744098816;
+pub const TB_667: usize = 733374255726592;
+pub const TB_668: usize = 734473767354368;
+pub const TB_669: usize = 735573278982144;
+pub const TB_670: usize = 736672790609920;
+pub const TB_671: usize = 737772302237696;
+pub const TB_672: usize = 738871813865472;
+pub const TB_673: usize = 739971325493248;
+pub const TB_674: usize = 741070837121024;
+pub const TB_675: usize = 742170348748800;
+pub const TB_676: usize = 743269860376576;
+pub const TB_677: usize = 744369372004352;
+pub const TB_678: usize = 745468883632128;
+pub const TB_679: usize = 746568395259904;
+pub const TB_680: usize = 747667906887680;
+pub const TB_681: usize = 748767418515456;
+pub const TB_682: usize = 749866930143232;
+pub const TB_683: usize = 750966441771008;
+pub const TB_684: usize = 752065953398784;
+pub const TB_685: usize = 753165465026560;
+pub const TB_686: usize = 754264976654336;
+pub const TB_687: usize = 755364488282112;
+pub const TB_688: usize = 756463999909888;
+pub const TB_689: usize = 757563511537664;
+pub const TB_690: usize = 758663023165440;
+pub const TB_691: usize = 759762534793216;
+pub const TB_692: usize = 760862046420992;
+pub const TB_693: usize = 761961558048768;
+pub const TB_694: usize = 763061069676544;
+pub const TB_695: usize = 764160581304320;
+pub const TB_696: usize = 765260092932096;
+pub const TB_697: usize = 766359604559872;
+pub const TB_698: usize = 767459116187648;
+pub const TB_699: usize = 768558627815424;
+pub const TB_700: usize = 769658139443200;
+pub const TB_701: usize = 770757651070976;
+pub const TB_702: usize = 771857162698752;
+pub const TB_703: usize = 772956674326528;
+pub const TB_704: usize = 774056185954304;
+pub const TB_705: usize = 775155697582080;
+pub const TB_706: usize = 776255209209856;
+pub const TB_707: usize = 777354720837632;
+pub const TB_708: usize = 778454232465408;
+pub const TB_709: usize = 779553744093184;
+pub const TB_710: usize = 780653255720960;
+pub const TB_711: usize = 781752767348736;
+pub const TB_712: usize = 782852278976512;
+pub const TB_713: usize = 783951790604288;
+pub const TB_714: usize = 785051302232064;
+pub const TB_715: usize = 786150813859840;
+pub const TB_716: usize = 787250325487616;
+pub const TB_717: usize = 788349837115392;
+pub const TB_718: usize = 789449348743168;
+pub const TB_719: usize = 790548860370944;
+pub const TB_720: usize = 791648371998720;
+pub const TB_721: usize = 792747883626496;
+pub const TB_722: usize = 793847395254272;
+pub const TB_723: usize = 794946906882048;
+pub const TB_724: usize = 796046418509824;
+pub const TB_725: usize = 797145930137600;
+pub const TB_726: usize = 798245441765376;
+pub const TB_727: usize = 799344953393152;
+pub const TB_728: usize = 800444465020928;
+pub const TB_729: usize = 801543976648704;
+pub const TB_730: usize = 802643488276480;
+pub const TB_731: usize = 803742999904256;
+pub const TB_732: usize = 804842511532032;
+pub const TB_733: usize = 805942023159808;
+pub const TB_734: usize = 807041534787584;
+pub const TB_735: usize = 808141046415360;
+pub const TB_736: usize = 809240558043136;
+pub const TB_737: usize = 810340069670912;
+pub const TB_738: usize = 811439581298688;
+pub const TB_739: usize = 812539092926464;
+pub const TB_740: usize = 813638604554240;
+pub const TB_741: usize = 814738116182016;
+pub const TB_742: usize = 815837627809792;
+pub const TB_743: usize = 816937139437568;
+pub const TB_744: usize = 818036651065344;
+pub const TB_745: usize = 819136162693120;
+pub const TB_746: usize = 820235674320896;
+pub const TB_747: usize = 821335185948672;
+pub const TB_748: usize = 822434697576448;
+pub const TB_749: usize = 823534209204224;
+pub const TB_750: usize = 824633720832000;
+pub const TB_751: usize = 825733232459776;
+pub const TB_752: usize = 826832744087552;
+pub const TB_753: usize = 827932255715328;
+pub const TB_754: usize = 829031767343104;
+pub const TB_755: usize = 830131278970880;
+pub const TB_756: usize = 831230790598656;
+pub const TB_757: usize = 832330302226432;
+pub const TB_758: usize = 833429813854208;
+pub const TB_759: usize = 834529325481984;
+pub const TB_760: usize = 835628837109760;
+pub const TB_761: usize = 836728348737536;
+pub const TB_762: usize = 837827860365312;
+pub const TB_763: usize = 838927371993088;
+pub const TB_764: usize = 840026883620864;
+pub const TB_765: usize = 841126395248640;
+pub const TB_766: usize = 842225906876416;
+pub const TB_767: usize = 843325418504192;
+pub const TB_768: usize = 844424930131968;
+pub const TB_769: usize = 845524441759744;
+pub const TB_770: usize = 846623953387520;
+pub const TB_771: usize = 847723465015296;
+pub const TB_772: usize = 848822976643072;
+pub const TB_773: usize = 849922488270848;
+pub const TB_774: usize = 851021999898624;
+pub const TB_775: usize = 852121511526400;
+pub const TB_776: usize = 853221023154176;
+pub const TB_777: usize = 854320534781952;
+pub const TB_778: usize = 855420046409728;
+pub const TB_779: usize = 856519558037504;
+pub const TB_780: usize = 857619069665280;
+pub const TB_781: usize = 858718581293056;
+pub const TB_782: usize = 859818092920832;
+pub const TB_783: usize = 860917604548608;
+pub const TB_784: usize = 862017116176384;
+pub const TB_785: usize = 863116627804160;
+pub const TB_786: usize = 864216139431936;
+pub const TB_787: usize = 865315651059712;
+pub const TB_788: usize = 866415162687488;
+pub const TB_789: usize = 867514674315264;
+pub const TB_790: usize = 868614185943040;
+pub const TB_791: usize = 869713697570816;
+pub const TB_792: usize = 870813209198592;
+pub const TB_793: usize = 871912720826368;
+pub const TB_794: usize = 873012232454144;
+pub const TB_795: usize = 874111744081920;
+pub const TB_796: usize = 875211255709696;
+pub const TB_797: usize = 876310767337472;
+pub const TB_798: usize = 877410278965248;
+pub const TB_799: usize = 878509790593024;
+pub const TB_800: usize = 879609302220800;
+pub const TB_801: usize = 880708813848576;
+pub const TB_802: usize = 881808325476352;
+pub const TB_803: usize = 882907837104128;
+pub const TB_804: usize = 884007348731904;
+pub const TB_805: usize = 885106860359680;
+pub const TB_806: usize = 886206371987456;
+pub const TB_807: usize = 887305883615232;
+pub const TB_808: usize = 888405395243008;
+pub const TB_809: usize = 889504906870784;
+pub const TB_810: usize = 890604418498560;
+pub const TB_811: usize = 891703930126336;
+pub const TB_812: usize = 892803441754112;
+pub const TB_813: usize = 893902953381888;
+pub const TB_814: usize = 895002465009664;
+pub const TB_815: usize = 896101976637440;
+pub const TB_816: usize = 897201488265216;
+pub const TB_817: usize = 898300999892992;
+pub const TB_818: usize = 899400511520768;
+pub const TB_819: usize = 900500023148544;
+pub const TB_820: usize = 901599534776320;
+pub const TB_821: usize = 902699046404096;
+pub const TB_822: usize = 903798558031872;
+pub const TB_823: usize = 904898069659648;
+pub const TB_824: usize = 905997581287424;
+pub const TB_825: usize = 907097092915200;
+pub const TB_826: usize = 908196604542976;
+pub const TB_827: usize = 909296116170752;
+pub const TB_828: usize = 910395627798528;
+pub const TB_829: usize = 911495139426304;
+pub const TB_830: usize = 912594651054080;
+pub const TB_831: usize = 913694162681856;
+pub const TB_832: usize = 914793674309632;
+pub const TB_833: usize = 915893185937408;
+pub const TB_834: usize = 916992697565184;
+pub const TB_835: usize = 918092209192960;
+pub const TB_836: usize = 919191720820736;
+pub const TB_837: usize = 920291232448512;
+pub const TB_838: usize = 921390744076288;
+pub const TB_839: usize = 922490255704064;
+pub const TB_840: usize = 923589767331840;
+pub const TB_841: usize = 924689278959616;
+pub const TB_842: usize = 925788790587392;
+pub const TB_843: usize = 926888302215168;
+pub const TB_844: usize = 927987813842944;
+pub const TB_845: usize = 929087325470720;
+pub const TB_846: usize = 930186837098496;
+pub const TB_847: usize = 931286348726272;
+pub const TB_848: usize = 932385860354048;
+pub const TB_849: usize = 933485371981824;
+pub const TB_850: usize = 934584883609600;
+pub const TB_851: usize = 935684395237376;
+pub const TB_852: usize = 936783906865152;
+pub const TB_853: usize = 937883418492928;
+pub const TB_854: usize = 938982930120704;
+pub const TB_855: usize = 940082441748480;
+pub const TB_856: usize = 941181953376256;
+pub const TB_857: usize = 942281465004032;
+pub const TB_858: usize = 943380976631808;
+pub const TB_859: usize = 944480488259584;
+pub const TB_860: usize = 945579999887360;
+pub const TB_861: usize = 946679511515136;
+pub const TB_862: usize = 947779023142912;
+pub const TB_863: usize = 948878534770688;
+pub const TB_864: usize = 949978046398464;
+pub const TB_865: usize = 951077558026240;
+pub const TB_866: usize = 952177069654016;
+pub const TB_867: usize = 953276581281792;
+pub const TB_868: usize = 954376092909568;
+pub const TB_869: usize = 955475604537344;
+pub const TB_870: usize = 956575116165120;
+pub const TB_871: usize = 957674627792896;
+pub const TB_872: usize = 958774139420672;
+pub const TB_873: usize = 959873651048448;
+pub const TB_874: usize = 960973162676224;
+pub const TB_875: usize = 962072674304000;
+pub const TB_876: usize = 963172185931776;
+pub const TB_877: usize = 964271697559552;
+pub const TB_878: usize = 965371209187328;
+pub const TB_879: usize = 966470720815104;
+pub const TB_880: usize = 967570232442880;
+pub const TB_881: usize = 968669744070656;
+pub const TB_882: usize = 969769255698432;
+pub const TB_883: usize = 970868767326208;
+pub const TB_884: usize = 971968278953984;
+pub const TB_885: usize = 973067790581760;
+pub const TB_886: usize = 974167302209536;
+pub const TB_887: usize = 975266813837312;
+pub const TB_888: usize = 976366325465088;
+pub const TB_889: usize = 977465837092864;
+pub const TB_890: usize = 978565348720640;
+pub const TB_891: usize = 979664860348416;
+pub const TB_892: usize = 980764371976192;
+pub const TB_893: usize = 981863883603968;
+pub const TB_894: usize = 982963395231744;
+pub const TB_895: usize = 984062906859520;
+pub const TB_896: usize = 985162418487296;
+pub const TB_897: usize = 986261930115072;
+pub const TB_898: usize = 987361441742848;
+pub const TB_899: usize = 988460953370624;
+pub const TB_900: usize = 989560464998400;
+pub const TB_901: usize = 990659976626176;
+pub const TB_902: usize = 991759488253952;
+pub const TB_903: usize = 992858999881728;
+pub const TB_904: usize = 993958511509504;
+pub const TB_905: usize = 995058023137280;
+pub const TB_906: usize = 996157534765056;
+pub const TB_907: usize = 997257046392832;
+pub const TB_908: usize = 998356558020608;
+pub const TB_909: usize = 999456069648384;
+pub const TB_910: usize = 1000555581276160;
+pub const TB_911: usize = 1001655092903936;
+pub const TB_912: usize = 1002754604531712;
+pub const TB_913: usize = 1003854116159488;
+pub const TB_914: usize = 1004953627787264;
+pub const TB_915: usize = 1006053139415040;
+pub const TB_916: usize = 1007152651042816;
+pub const TB_917: usize = 1008252162670592;
+pub const TB_918: usize = 1009351674298368;
+pub const TB_919: usize = 1010451185926144;
+pub const TB_920: usize = 1011550697553920;
+pub const TB_921: usize = 1012650209181696;
+pub const TB_922: usize = 1013749720809472;
+pub const TB_923: usize = 1014849232437248;
+pub const TB_924: usize = 1015948744065024;
+pub const TB_925: usize = 1017048255692800;
+pub const TB_926: usize = 1018147767320576;
+pub const TB_927: usize = 1019247278948352;
+pub const TB_928: usize = 1020346790576128;
+pub const TB_929: usize = 1021446302203904;
+pub const TB_930: usize = 1022545813831680;
+pub const TB_931: usize = 1023645325459456;
+pub const TB_932: usize = 1024744837087232;
+pub const TB_933: usize = 1025844348715008;
+pub const TB_934: usize = 1026943860342784;
+pub const TB_935: usize = 1028043371970560;
+pub const TB_936: usize = 1029142883598336;
+pub const TB_937: usize = 1030242395226112;
+pub const TB_938: usize = 1031341906853888;
+pub const TB_939: usize = 1032441418481664;
+pub const TB_940: usize = 1033540930109440;
+pub const TB_941: usize = 1034640441737216;
+pub const TB_942: usize = 1035739953364992;
+pub const TB_943: usize = 1036839464992768;
+pub const TB_944: usize = 1037938976620544;
+pub const TB_945: usize = 1039038488248320;
+pub const TB_946: usize = 1040137999876096;
+pub const TB_947: usize = 1041237511503872;
+pub const TB_948: usize = 1042337023131648;
+pub const TB_949: usize = 1043436534759424;
+pub const TB_950: usize = 1044536046387200;
+pub const TB_951: usize = 1045635558014976;
+pub const TB_952: usize = 1046735069642752;
+pub const TB_953: usize = 1047834581270528;
+pub const TB_954: usize = 1048934092898304;
+pub const TB_955: usize = 1050033604526080;
+pub const TB_956: usize = 1051133116153856;
+pub const TB_957: usize = 1052232627781632;
+pub const TB_958: usize = 1053332139409408;
+pub const TB_959: usize = 1054431651037184;
+pub const TB_960: usize = 1055531162664960;
+pub const TB_961: usize = 1056630674292736;
+pub const TB_962: usize = 1057730185920512;
+pub const TB_963: usize = 1058829697548288;
+pub const TB_964: usize = 1059929209176064;
+pub const TB_965: usize = 1061028720803840;
+pub const TB_966: usize = 1062128232431616;
+pub const TB_967: usize = 1063227744059392;
+pub const TB_968: usize = 1064327255687168;
+pub const TB_969: usize = 1065426767314944;
+pub const TB_970: usize = 1066526278942720;
+pub const TB_971: usize = 1067625790570496;
+pub const TB_972: usize = 1068725302198272;
+pub const TB_973: usize = 1069824813826048;
+pub const TB_974: usize = 1070924325453824;
+pub const TB_975: usize = 1072023837081600;
+pub const TB_976: usize = 1073123348709376;
+pub const TB_977: usize = 1074222860337152;
+pub const TB_978: usize = 1075322371964928;
+pub const TB_979: usize = 1076421883592704;
+pub const TB_980: usize = 1077521395220480;
+pub const TB_981: usize = 1078620906848256;
+pub const TB_982: usize = 1079720418476032;
+pub const TB_983: usize = 1080819930103808;
+pub const TB_984: usize = 1081919441731584;
+pub const TB_985: usize = 1083018953359360;
+pub const TB_986: usize = 1084118464987136;
+pub const TB_987: usize = 1085217976614912;
+pub const TB_988: usize = 1086317488242688;
+pub const TB_989: usize = 1087416999870464;
+pub const TB_990: usize = 1088516511498240;
+pub const TB_991: usize = 1089616023126016;
+pub const TB_992: usize = 1090715534753792;
+pub const TB_993: usize = 1091815046381568;
+pub const TB_994: usize = 1092914558009344;
+pub const TB_995: usize = 1094014069637120;
+pub const TB_996: usize = 1095113581264896;
+pub const TB_997: usize = 1096213092892672;
+pub const TB_998: usize = 1097312604520448;
+pub const TB_999: usize = 1098412116148224;
+pub const TB_1000: usize = 1099511627776000;
+pub const TB_1001: usize = 1100611139403776;
+pub const TB_1002: usize = 1101710651031552;
+pub const TB_1003: usize = 1102810162659328;
+pub const TB_1004: usize = 1103909674287104;
+pub const TB_1005: usize = 1105009185914880;
+pub const TB_1006: usize = 1106108697542656;
+pub const TB_1007: usize = 1107208209170432;
+pub const TB_1008: usize = 1108307720798208;
+pub const TB_1009: usize = 1109407232425984;
+pub const TB_1010: usize = 1110506744053760;
+pub const TB_1011: usize = 1111606255681536;
+pub const TB_1012: usize = 1112705767309312;
+pub const TB_1013: usize = 1113805278937088;
+pub const TB_1014: usize = 1114904790564864;
+pub const TB_1015: usize = 1116004302192640;
+pub const TB_1016: usize = 1117103813820416;
+pub const TB_1017: usize = 1118203325448192;
+pub const TB_1018: usize = 1119302837075968;
+pub const TB_1019: usize = 1120402348703744;
+pub const TB_1020: usize = 1121501860331520;
+pub const TB_1021: usize = 1122601371959296;
+pub const TB_1022: usize = 1123700883587072;
+pub const TB_1023: usize = 1124800395214848;
+pub const TB_1024: usize = 1125899906842624;
+pub const PB_1: usize = 1125899906842624;
+pub const PB_2: usize = 2251799813685248;
+pub const PB_3: usize = 3377699720527872;
+pub const PB_4: usize = 4503599627370496;
+pub const PB_5: usize = 5629499534213120;
+pub const PB_6: usize = 6755399441055744;
+pub const PB_7: usize = 7881299347898368;
+pub const PB_8: usize = 9007199254740992;
+pub const PB_9: usize = 10133099161583616;
+pub const PB_10: usize = 11258999068426240;
+pub const PB_11: usize = 12384898975268864;
+pub const PB_12: usize = 13510798882111488;
+pub const PB_13: usize = 14636698788954112;
+pub const PB_14: usize = 15762598695796736;
+pub const PB_15: usize = 16888498602639360;
+pub const PB_16: usize = 18014398509481984;
+pub const PB_17: usize = 19140298416324608;
+pub const PB_18: usize = 20266198323167232;
+pub const PB_19: usize = 21392098230009856;
+pub const PB_20: usize = 22517998136852480;
+pub const PB_21: usize = 23643898043695104;
+pub const PB_22: usize = 24769797950537728;
+pub const PB_23: usize = 25895697857380352;
+pub const PB_24: usize = 27021597764222976;
+pub const PB_25: usize = 28147497671065600;
+pub const PB_26: usize = 29273397577908224;
+pub const PB_27: usize = 30399297484750848;
+pub const PB_28: usize = 31525197391593472;
+pub const PB_29: usize = 32651097298436096;
+pub const PB_30: usize = 33776997205278720;
+pub const PB_31: usize = 34902897112121344;
+pub const PB_32: usize = 36028797018963968;
+pub const PB_33: usize = 37154696925806592;
+pub const PB_34: usize = 38280596832649216;
+pub const PB_35: usize = 39406496739491840;
+pub const PB_36: usize = 40532396646334464;
+pub const PB_37: usize = 41658296553177088;
+pub const PB_38: usize = 42784196460019712;
+pub const PB_39: usize = 43910096366862336;
+pub const PB_40: usize = 45035996273704960;
+pub const PB_41: usize = 46161896180547584;
+pub const PB_42: usize = 47287796087390208;
+pub const PB_43: usize = 48413695994232832;
+pub const PB_44: usize = 49539595901075456;
+pub const PB_45: usize = 50665495807918080;
+pub const PB_46: usize = 51791395714760704;
+pub const PB_47: usize = 52917295621603328;
+pub const PB_48: usize = 54043195528445952;
+pub const PB_49: usize = 55169095435288576;
+pub const PB_50: usize = 56294995342131200;
+pub const PB_51: usize = 57420895248973824;
+pub const PB_52: usize = 58546795155816448;
+pub const PB_53: usize = 59672695062659072;
+pub const PB_54: usize = 60798594969501696;
+pub const PB_55: usize = 61924494876344320;
+pub const PB_56: usize = 63050394783186944;
+pub const PB_57: usize = 64176294690029568;
+pub const PB_58: usize = 65302194596872192;
+pub const PB_59: usize = 66428094503714816;
+pub const PB_60: usize = 67553994410557440;
+pub const PB_61: usize = 68679894317400064;
+pub const PB_62: usize = 69805794224242688;
+pub const PB_63: usize = 70931694131085312;
+pub const PB_64: usize = 72057594037927936;
+pub const PB_65: usize = 73183493944770560;
+pub const PB_66: usize = 74309393851613184;
+pub const PB_67: usize = 75435293758455808;
+pub const PB_68: usize = 76561193665298432;
+pub const PB_69: usize = 77687093572141056;
+pub const PB_70: usize = 78812993478983680;
+pub const PB_71: usize = 79938893385826304;
+pub const PB_72: usize = 81064793292668928;
+pub const PB_73: usize = 82190693199511552;
+pub const PB_74: usize = 83316593106354176;
+pub const PB_75: usize = 84442493013196800;
+pub const PB_76: usize = 85568392920039424;
+pub const PB_77: usize = 86694292826882048;
+pub const PB_78: usize = 87820192733724672;
+pub const PB_79: usize = 88946092640567296;
+pub const PB_80: usize = 90071992547409920;
+pub const PB_81: usize = 91197892454252544;
+pub const PB_82: usize = 92323792361095168;
+pub const PB_83: usize = 93449692267937792;
+pub const PB_84: usize = 94575592174780416;
+pub const PB_85: usize = 95701492081623040;
+pub const PB_86: usize = 96827391988465664;
+pub const PB_87: usize = 97953291895308288;
+pub const PB_88: usize = 99079191802150912;
+pub const PB_89: usize = 100205091708993536;
+pub const PB_90: usize = 101330991615836160;
+pub const PB_91: usize = 102456891522678784;
+pub const PB_92: usize = 103582791429521408;
+pub const PB_93: usize = 104708691336364032;
+pub const PB_94: usize = 105834591243206656;
+pub const PB_95: usize = 106960491150049280;
+pub const PB_96: usize = 108086391056891904;
+pub const PB_97: usize = 109212290963734528;
+pub const PB_98: usize = 110338190870577152;
+pub const PB_99: usize = 111464090777419776;
+pub const PB_100: usize = 112589990684262400;
+pub const PB_101: usize = 113715890591105024;
+pub const PB_102: usize = 114841790497947648;
+pub const PB_103: usize = 115967690404790272;
+pub const PB_104: usize = 117093590311632896;
+pub const PB_105: usize = 118219490218475520;
+pub const PB_106: usize = 119345390125318144;
+pub const PB_107: usize = 120471290032160768;
+pub const PB_108: usize = 121597189939003392;
+pub const PB_109: usize = 122723089845846016;
+pub const PB_110: usize = 123848989752688640;
+pub const PB_111: usize = 124974889659531264;
+pub const PB_112: usize = 126100789566373888;
+pub const PB_113: usize = 127226689473216512;
+pub const PB_114: usize = 128352589380059136;
+pub const PB_115: usize = 129478489286901760;
+pub const PB_116: usize = 130604389193744384;
+pub const PB_117: usize = 131730289100587008;
+pub const PB_118: usize = 132856189007429632;
+pub const PB_119: usize = 133982088914272256;
+pub const PB_120: usize = 135107988821114880;
+pub const PB_121: usize = 136233888727957504;
+pub const PB_122: usize = 137359788634800128;
+pub const PB_123: usize = 138485688541642752;
+pub const PB_124: usize = 139611588448485376;
+pub const PB_125: usize = 140737488355328000;
+pub const PB_126: usize = 141863388262170624;
+pub const PB_127: usize = 142989288169013248;
+pub const PB_128: usize = 144115188075855872;
+pub const PB_129: usize = 145241087982698496;
+pub const PB_130: usize = 146366987889541120;
+pub const PB_131: usize = 147492887796383744;
+pub const PB_132: usize = 148618787703226368;
+pub const PB_133: usize = 149744687610068992;
+pub const PB_134: usize = 150870587516911616;
+pub const PB_135: usize = 151996487423754240;
+pub const PB_136: usize = 153122387330596864;
+pub const PB_137: usize = 154248287237439488;
+pub const PB_138: usize = 155374187144282112;
+pub const PB_139: usize = 156500087051124736;
+pub const PB_140: usize = 157625986957967360;
+pub const PB_141: usize = 158751886864809984;
+pub const PB_142: usize = 159877786771652608;
+pub const PB_143: usize = 161003686678495232;
+pub const PB_144: usize = 162129586585337856;
+pub const PB_145: usize = 163255486492180480;
+pub const PB_146: usize = 164381386399023104;
+pub const PB_147: usize = 165507286305865728;
+pub const PB_148: usize = 166633186212708352;
+pub const PB_149: usize = 167759086119550976;
+pub const PB_150: usize = 168884986026393600;
+pub const PB_151: usize = 170010885933236224;
+pub const PB_152: usize = 171136785840078848;
+pub const PB_153: usize = 172262685746921472;
+pub const PB_154: usize = 173388585653764096;
+pub const PB_155: usize = 174514485560606720;
+pub const PB_156: usize = 175640385467449344;
+pub const PB_157: usize = 176766285374291968;
+pub const PB_158: usize = 177892185281134592;
+pub const PB_159: usize = 179018085187977216;
+pub const PB_160: usize = 180143985094819840;
+pub const PB_161: usize = 181269885001662464;
+pub const PB_162: usize = 182395784908505088;
+pub const PB_163: usize = 183521684815347712;
+pub const PB_164: usize = 184647584722190336;
+pub const PB_165: usize = 185773484629032960;
+pub const PB_166: usize = 186899384535875584;
+pub const PB_167: usize = 188025284442718208;
+pub const PB_168: usize = 189151184349560832;
+pub const PB_169: usize = 190277084256403456;
+pub const PB_170: usize = 191402984163246080;
+pub const PB_171: usize = 192528884070088704;
+pub const PB_172: usize = 193654783976931328;
+pub const PB_173: usize = 194780683883773952;
+pub const PB_174: usize = 195906583790616576;
+pub const PB_175: usize = 197032483697459200;
+pub const PB_176: usize = 198158383604301824;
+pub const PB_177: usize = 199284283511144448;
+pub const PB_178: usize = 200410183417987072;
+pub const PB_179: usize = 201536083324829696;
+pub const PB_180: usize = 202661983231672320;
+pub const PB_181: usize = 203787883138514944;
+pub const PB_182: usize = 204913783045357568;
+pub const PB_183: usize = 206039682952200192;
+pub const PB_184: usize = 207165582859042816;
+pub const PB_185: usize = 208291482765885440;
+pub const PB_186: usize = 209417382672728064;
+pub const PB_187: usize = 210543282579570688;
+pub const PB_188: usize = 211669182486413312;
+pub const PB_189: usize = 212795082393255936;
+pub const PB_190: usize = 213920982300098560;
+pub const PB_191: usize = 215046882206941184;
+pub const PB_192: usize = 216172782113783808;
+pub const PB_193: usize = 217298682020626432;
+pub const PB_194: usize = 218424581927469056;
+pub const PB_195: usize = 219550481834311680;
+pub const PB_196: usize = 220676381741154304;
+pub const PB_197: usize = 221802281647996928;
+pub const PB_198: usize = 222928181554839552;
+pub const PB_199: usize = 224054081461682176;
+pub const PB_200: usize = 225179981368524800;
+pub const PB_201: usize = 226305881275367424;
+pub const PB_202: usize = 227431781182210048;
+pub const PB_203: usize = 228557681089052672;
+pub const PB_204: usize = 229683580995895296;
+pub const PB_205: usize = 230809480902737920;
+pub const PB_206: usize = 231935380809580544;
+pub const PB_207: usize = 233061280716423168;
+pub const PB_208: usize = 234187180623265792;
+pub const PB_209: usize = 235313080530108416;
+pub const PB_210: usize = 236438980436951040;
+pub const PB_211: usize = 237564880343793664;
+pub const PB_212: usize = 238690780250636288;
+pub const PB_213: usize = 239816680157478912;
+pub const PB_214: usize = 240942580064321536;
+pub const PB_215: usize = 242068479971164160;
+pub const PB_216: usize = 243194379878006784;
+pub const PB_217: usize = 244320279784849408;
+pub const PB_218: usize = 245446179691692032;
+pub const PB_219: usize = 246572079598534656;
+pub const PB_220: usize = 247697979505377280;
+pub const PB_221: usize = 248823879412219904;
+pub const PB_222: usize = 249949779319062528;
+pub const PB_223: usize = 251075679225905152;
+pub const PB_224: usize = 252201579132747776;
+pub const PB_225: usize = 253327479039590400;
+pub const PB_226: usize = 254453378946433024;
+pub const PB_227: usize = 255579278853275648;
+pub const PB_228: usize = 256705178760118272;
+pub const PB_229: usize = 257831078666960896;
+pub const PB_230: usize = 258956978573803520;
+pub const PB_231: usize = 260082878480646144;
+pub const PB_232: usize = 261208778387488768;
+pub const PB_233: usize = 262334678294331392;
+pub const PB_234: usize = 263460578201174016;
+pub const PB_235: usize = 264586478108016640;
+pub const PB_236: usize = 265712378014859264;
+pub const PB_237: usize = 266838277921701888;
+pub const PB_238: usize = 267964177828544512;
+pub const PB_239: usize = 269090077735387136;
+pub const PB_240: usize = 270215977642229760;
+pub const PB_241: usize = 271341877549072384;
+pub const PB_242: usize = 272467777455915008;
+pub const PB_243: usize = 273593677362757632;
+pub const PB_244: usize = 274719577269600256;
+pub const PB_245: usize = 275845477176442880;
+pub const PB_246: usize = 276971377083285504;
+pub const PB_247: usize = 278097276990128128;
+pub const PB_248: usize = 279223176896970752;
+pub const PB_249: usize = 280349076803813376;
+pub const PB_250: usize = 281474976710656000;
+pub const PB_251: usize = 282600876617498624;
+pub const PB_252: usize = 283726776524341248;
+pub const PB_253: usize = 284852676431183872;
+pub const PB_254: usize = 285978576338026496;
+pub const PB_255: usize = 287104476244869120;
+pub const PB_256: usize = 288230376151711744;
+pub const PB_257: usize = 289356276058554368;
+pub const PB_258: usize = 290482175965396992;
+pub const PB_259: usize = 291608075872239616;
+pub const PB_260: usize = 292733975779082240;
+pub const PB_261: usize = 293859875685924864;
+pub const PB_262: usize = 294985775592767488;
+pub const PB_263: usize = 296111675499610112;
+pub const PB_264: usize = 297237575406452736;
+pub const PB_265: usize = 298363475313295360;
+pub const PB_266: usize = 299489375220137984;
+pub const PB_267: usize = 300615275126980608;
+pub const PB_268: usize = 301741175033823232;
+pub const PB_269: usize = 302867074940665856;
+pub const PB_270: usize = 303992974847508480;
+pub const PB_271: usize = 305118874754351104;
+pub const PB_272: usize = 306244774661193728;
+pub const PB_273: usize = 307370674568036352;
+pub const PB_274: usize = 308496574474878976;
+pub const PB_275: usize = 309622474381721600;
+pub const PB_276: usize = 310748374288564224;
+pub const PB_277: usize = 311874274195406848;
+pub const PB_278: usize = 313000174102249472;
+pub const PB_279: usize = 314126074009092096;
+pub const PB_280: usize = 315251973915934720;
+pub const PB_281: usize = 316377873822777344;
+pub const PB_282: usize = 317503773729619968;
+pub const PB_283: usize = 318629673636462592;
+pub const PB_284: usize = 319755573543305216;
+pub const PB_285: usize = 320881473450147840;
+pub const PB_286: usize = 322007373356990464;
+pub const PB_287: usize = 323133273263833088;
+pub const PB_288: usize = 324259173170675712;
+pub const PB_289: usize = 325385073077518336;
+pub const PB_290: usize = 326510972984360960;
+pub const PB_291: usize = 327636872891203584;
+pub const PB_292: usize = 328762772798046208;
+pub const PB_293: usize = 329888672704888832;
+pub const PB_294: usize = 331014572611731456;
+pub const PB_295: usize = 332140472518574080;
+pub const PB_296: usize = 333266372425416704;
+pub const PB_297: usize = 334392272332259328;
+pub const PB_298: usize = 335518172239101952;
+pub const PB_299: usize = 336644072145944576;
+pub const PB_300: usize = 337769972052787200;
+pub const PB_301: usize = 338895871959629824;
+pub const PB_302: usize = 340021771866472448;
+pub const PB_303: usize = 341147671773315072;
+pub const PB_304: usize = 342273571680157696;
+pub const PB_305: usize = 343399471587000320;
+pub const PB_306: usize = 344525371493842944;
+pub const PB_307: usize = 345651271400685568;
+pub const PB_308: usize = 346777171307528192;
+pub const PB_309: usize = 347903071214370816;
+pub const PB_310: usize = 349028971121213440;
+pub const PB_311: usize = 350154871028056064;
+pub const PB_312: usize = 351280770934898688;
+pub const PB_313: usize = 352406670841741312;
+pub const PB_314: usize = 353532570748583936;
+pub const PB_315: usize = 354658470655426560;
+pub const PB_316: usize = 355784370562269184;
+pub const PB_317: usize = 356910270469111808;
+pub const PB_318: usize = 358036170375954432;
+pub const PB_319: usize = 359162070282797056;
+pub const PB_320: usize = 360287970189639680;
+pub const PB_321: usize = 361413870096482304;
+pub const PB_322: usize = 362539770003324928;
+pub const PB_323: usize = 363665669910167552;
+pub const PB_324: usize = 364791569817010176;
+pub const PB_325: usize = 365917469723852800;
+pub const PB_326: usize = 367043369630695424;
+pub const PB_327: usize = 368169269537538048;
+pub const PB_328: usize = 369295169444380672;
+pub const PB_329: usize = 370421069351223296;
+pub const PB_330: usize = 371546969258065920;
+pub const PB_331: usize = 372672869164908544;
+pub const PB_332: usize = 373798769071751168;
+pub const PB_333: usize = 374924668978593792;
+pub const PB_334: usize = 376050568885436416;
+pub const PB_335: usize = 377176468792279040;
+pub const PB_336: usize = 378302368699121664;
+pub const PB_337: usize = 379428268605964288;
+pub const PB_338: usize = 380554168512806912;
+pub const PB_339: usize = 381680068419649536;
+pub const PB_340: usize = 382805968326492160;
+pub const PB_341: usize = 383931868233334784;
+pub const PB_342: usize = 385057768140177408;
+pub const PB_343: usize = 386183668047020032;
+pub const PB_344: usize = 387309567953862656;
+pub const PB_345: usize = 388435467860705280;
+pub const PB_346: usize = 389561367767547904;
+pub const PB_347: usize = 390687267674390528;
+pub const PB_348: usize = 391813167581233152;
+pub const PB_349: usize = 392939067488075776;
+pub const PB_350: usize = 394064967394918400;
+pub const PB_351: usize = 395190867301761024;
+pub const PB_352: usize = 396316767208603648;
+pub const PB_353: usize = 397442667115446272;
+pub const PB_354: usize = 398568567022288896;
+pub const PB_355: usize = 399694466929131520;
+pub const PB_356: usize = 400820366835974144;
+pub const PB_357: usize = 401946266742816768;
+pub const PB_358: usize = 403072166649659392;
+pub const PB_359: usize = 404198066556502016;
+pub const PB_360: usize = 405323966463344640;
+pub const PB_361: usize = 406449866370187264;
+pub const PB_362: usize = 407575766277029888;
+pub const PB_363: usize = 408701666183872512;
+pub const PB_364: usize = 409827566090715136;
+pub const PB_365: usize = 410953465997557760;
+pub const PB_366: usize = 412079365904400384;
+pub const PB_367: usize = 413205265811243008;
+pub const PB_368: usize = 414331165718085632;
+pub const PB_369: usize = 415457065624928256;
+pub const PB_370: usize = 416582965531770880;
+pub const PB_371: usize = 417708865438613504;
+pub const PB_372: usize = 418834765345456128;
+pub const PB_373: usize = 419960665252298752;
+pub const PB_374: usize = 421086565159141376;
+pub const PB_375: usize = 422212465065984000;
+pub const PB_376: usize = 423338364972826624;
+pub const PB_377: usize = 424464264879669248;
+pub const PB_378: usize = 425590164786511872;
+pub const PB_379: usize = 426716064693354496;
+pub const PB_380: usize = 427841964600197120;
+pub const PB_381: usize = 428967864507039744;
+pub const PB_382: usize = 430093764413882368;
+pub const PB_383: usize = 431219664320724992;
+pub const PB_384: usize = 432345564227567616;
+pub const PB_385: usize = 433471464134410240;
+pub const PB_386: usize = 434597364041252864;
+pub const PB_387: usize = 435723263948095488;
+pub const PB_388: usize = 436849163854938112;
+pub const PB_389: usize = 437975063761780736;
+pub const PB_390: usize = 439100963668623360;
+pub const PB_391: usize = 440226863575465984;
+pub const PB_392: usize = 441352763482308608;
+pub const PB_393: usize = 442478663389151232;
+pub const PB_394: usize = 443604563295993856;
+pub const PB_395: usize = 444730463202836480;
+pub const PB_396: usize = 445856363109679104;
+pub const PB_397: usize = 446982263016521728;
+pub const PB_398: usize = 448108162923364352;
+pub const PB_399: usize = 449234062830206976;
+pub const PB_400: usize = 450359962737049600;
+pub const PB_401: usize = 451485862643892224;
+pub const PB_402: usize = 452611762550734848;
+pub const PB_403: usize = 453737662457577472;
+pub const PB_404: usize = 454863562364420096;
+pub const PB_405: usize = 455989462271262720;
+pub const PB_406: usize = 457115362178105344;
+pub const PB_407: usize = 458241262084947968;
+pub const PB_408: usize = 459367161991790592;
+pub const PB_409: usize = 460493061898633216;
+pub const PB_410: usize = 461618961805475840;
+pub const PB_411: usize = 462744861712318464;
+pub const PB_412: usize = 463870761619161088;
+pub const PB_413: usize = 464996661526003712;
+pub const PB_414: usize = 466122561432846336;
+pub const PB_415: usize = 467248461339688960;
+pub const PB_416: usize = 468374361246531584;
+pub const PB_417: usize = 469500261153374208;
+pub const PB_418: usize = 470626161060216832;
+pub const PB_419: usize = 471752060967059456;
+pub const PB_420: usize = 472877960873902080;
+pub const PB_421: usize = 474003860780744704;
+pub const PB_422: usize = 475129760687587328;
+pub const PB_423: usize = 476255660594429952;
+pub const PB_424: usize = 477381560501272576;
+pub const PB_425: usize = 478507460408115200;
+pub const PB_426: usize = 479633360314957824;
+pub const PB_427: usize = 480759260221800448;
+pub const PB_428: usize = 481885160128643072;
+pub const PB_429: usize = 483011060035485696;
+pub const PB_430: usize = 484136959942328320;
+pub const PB_431: usize = 485262859849170944;
+pub const PB_432: usize = 486388759756013568;
+pub const PB_433: usize = 487514659662856192;
+pub const PB_434: usize = 488640559569698816;
+pub const PB_435: usize = 489766459476541440;
+pub const PB_436: usize = 490892359383384064;
+pub const PB_437: usize = 492018259290226688;
+pub const PB_438: usize = 493144159197069312;
+pub const PB_439: usize = 494270059103911936;
+pub const PB_440: usize = 495395959010754560;
+pub const PB_441: usize = 496521858917597184;
+pub const PB_442: usize = 497647758824439808;
+pub const PB_443: usize = 498773658731282432;
+pub const PB_444: usize = 499899558638125056;
+pub const PB_445: usize = 501025458544967680;
+pub const PB_446: usize = 502151358451810304;
+pub const PB_447: usize = 503277258358652928;
+pub const PB_448: usize = 504403158265495552;
+pub const PB_449: usize = 505529058172338176;
+pub const PB_450: usize = 506654958079180800;
+pub const PB_451: usize = 507780857986023424;
+pub const PB_452: usize = 508906757892866048;
+pub const PB_453: usize = 510032657799708672;
+pub const PB_454: usize = 511158557706551296;
+pub const PB_455: usize = 512284457613393920;
+pub const PB_456: usize = 513410357520236544;
+pub const PB_457: usize = 514536257427079168;
+pub const PB_458: usize = 515662157333921792;
+pub const PB_459: usize = 516788057240764416;
+pub const PB_460: usize = 517913957147607040;
+pub const PB_461: usize = 519039857054449664;
+pub const PB_462: usize = 520165756961292288;
+pub const PB_463: usize = 521291656868134912;
+pub const PB_464: usize = 522417556774977536;
+pub const PB_465: usize = 523543456681820160;
+pub const PB_466: usize = 524669356588662784;
+pub const PB_467: usize = 525795256495505408;
+pub const PB_468: usize = 526921156402348032;
+pub const PB_469: usize = 528047056309190656;
+pub const PB_470: usize = 529172956216033280;
+pub const PB_471: usize = 530298856122875904;
+pub const PB_472: usize = 531424756029718528;
+pub const PB_473: usize = 532550655936561152;
+pub const PB_474: usize = 533676555843403776;
+pub const PB_475: usize = 534802455750246400;
+pub const PB_476: usize = 535928355657089024;
+pub const PB_477: usize = 537054255563931648;
+pub const PB_478: usize = 538180155470774272;
+pub const PB_479: usize = 539306055377616896;
+pub const PB_480: usize = 540431955284459520;
+pub const PB_481: usize = 541557855191302144;
+pub const PB_482: usize = 542683755098144768;
+pub const PB_483: usize = 543809655004987392;
+pub const PB_484: usize = 544935554911830016;
+pub const PB_485: usize = 546061454818672640;
+pub const PB_486: usize = 547187354725515264;
+pub const PB_487: usize = 548313254632357888;
+pub const PB_488: usize = 549439154539200512;
+pub const PB_489: usize = 550565054446043136;
+pub const PB_490: usize = 551690954352885760;
+pub const PB_491: usize = 552816854259728384;
+pub const PB_492: usize = 553942754166571008;
+pub const PB_493: usize = 555068654073413632;
+pub const PB_494: usize = 556194553980256256;
+pub const PB_495: usize = 557320453887098880;
+pub const PB_496: usize = 558446353793941504;
+pub const PB_497: usize = 559572253700784128;
+pub const PB_498: usize = 560698153607626752;
+pub const PB_499: usize = 561824053514469376;
+pub const PB_500: usize = 562949953421312000;
+pub const PB_501: usize = 564075853328154624;
+pub const PB_502: usize = 565201753234997248;
+pub const PB_503: usize = 566327653141839872;
+pub const PB_504: usize = 567453553048682496;
+pub const PB_505: usize = 568579452955525120;
+pub const PB_506: usize = 569705352862367744;
+pub const PB_507: usize = 570831252769210368;
+pub const PB_508: usize = 571957152676052992;
+pub const PB_509: usize = 573083052582895616;
+pub const PB_510: usize = 574208952489738240;
+pub const PB_511: usize = 575334852396580864;
+pub const PB_512: usize = 576460752303423488;
+pub const PB_513: usize = 577586652210266112;
+pub const PB_514: usize = 578712552117108736;
+pub const PB_515: usize = 579838452023951360;
+pub const PB_516: usize = 580964351930793984;
+pub const PB_517: usize = 582090251837636608;
+pub const PB_518: usize = 583216151744479232;
+pub const PB_519: usize = 584342051651321856;
+pub const PB_520: usize = 585467951558164480;
+pub const PB_521: usize = 586593851465007104;
+pub const PB_522: usize = 587719751371849728;
+pub const PB_523: usize = 588845651278692352;
+pub const PB_524: usize = 589971551185534976;
+pub const PB_525: usize = 591097451092377600;
+pub const PB_526: usize = 592223350999220224;
+pub const PB_527: usize = 593349250906062848;
+pub const PB_528: usize = 594475150812905472;
+pub const PB_529: usize = 595601050719748096;
+pub const PB_530: usize = 596726950626590720;
+pub const PB_531: usize = 597852850533433344;
+pub const PB_532: usize = 598978750440275968;
+pub const PB_533: usize = 600104650347118592;
+pub const PB_534: usize = 601230550253961216;
+pub const PB_535: usize = 602356450160803840;
+pub const PB_536: usize = 603482350067646464;
+pub const PB_537: usize = 604608249974489088;
+pub const PB_538: usize = 605734149881331712;
+pub const PB_539: usize = 606860049788174336;
+pub const PB_540: usize = 607985949695016960;
+pub const PB_541: usize = 609111849601859584;
+pub const PB_542: usize = 610237749508702208;
+pub const PB_543: usize = 611363649415544832;
+pub const PB_544: usize = 612489549322387456;
+pub const PB_545: usize = 613615449229230080;
+pub const PB_546: usize = 614741349136072704;
+pub const PB_547: usize = 615867249042915328;
+pub const PB_548: usize = 616993148949757952;
+pub const PB_549: usize = 618119048856600576;
+pub const PB_550: usize = 619244948763443200;
+pub const PB_551: usize = 620370848670285824;
+pub const PB_552: usize = 621496748577128448;
+pub const PB_553: usize = 622622648483971072;
+pub const PB_554: usize = 623748548390813696;
+pub const PB_555: usize = 624874448297656320;
+pub const PB_556: usize = 626000348204498944;
+pub const PB_557: usize = 627126248111341568;
+pub const PB_558: usize = 628252148018184192;
+pub const PB_559: usize = 629378047925026816;
+pub const PB_560: usize = 630503947831869440;
+pub const PB_561: usize = 631629847738712064;
+pub const PB_562: usize = 632755747645554688;
+pub const PB_563: usize = 633881647552397312;
+pub const PB_564: usize = 635007547459239936;
+pub const PB_565: usize = 636133447366082560;
+pub const PB_566: usize = 637259347272925184;
+pub const PB_567: usize = 638385247179767808;
+pub const PB_568: usize = 639511147086610432;
+pub const PB_569: usize = 640637046993453056;
+pub const PB_570: usize = 641762946900295680;
+pub const PB_571: usize = 642888846807138304;
+pub const PB_572: usize = 644014746713980928;
+pub const PB_573: usize = 645140646620823552;
+pub const PB_574: usize = 646266546527666176;
+pub const PB_575: usize = 647392446434508800;
+pub const PB_576: usize = 648518346341351424;
+pub const PB_577: usize = 649644246248194048;
+pub const PB_578: usize = 650770146155036672;
+pub const PB_579: usize = 651896046061879296;
+pub const PB_580: usize = 653021945968721920;
+pub const PB_581: usize = 654147845875564544;
+pub const PB_582: usize = 655273745782407168;
+pub const PB_583: usize = 656399645689249792;
+pub const PB_584: usize = 657525545596092416;
+pub const PB_585: usize = 658651445502935040;
+pub const PB_586: usize = 659777345409777664;
+pub const PB_587: usize = 660903245316620288;
+pub const PB_588: usize = 662029145223462912;
+pub const PB_589: usize = 663155045130305536;
+pub const PB_590: usize = 664280945037148160;
+pub const PB_591: usize = 665406844943990784;
+pub const PB_592: usize = 666532744850833408;
+pub const PB_593: usize = 667658644757676032;
+pub const PB_594: usize = 668784544664518656;
+pub const PB_595: usize = 669910444571361280;
+pub const PB_596: usize = 671036344478203904;
+pub const PB_597: usize = 672162244385046528;
+pub const PB_598: usize = 673288144291889152;
+pub const PB_599: usize = 674414044198731776;
+pub const PB_600: usize = 675539944105574400;
+pub const PB_601: usize = 676665844012417024;
+pub const PB_602: usize = 677791743919259648;
+pub const PB_603: usize = 678917643826102272;
+pub const PB_604: usize = 680043543732944896;
+pub const PB_605: usize = 681169443639787520;
+pub const PB_606: usize = 682295343546630144;
+pub const PB_607: usize = 683421243453472768;
+pub const PB_608: usize = 684547143360315392;
+pub const PB_609: usize = 685673043267158016;
+pub const PB_610: usize = 686798943174000640;
+pub const PB_611: usize = 687924843080843264;
+pub const PB_612: usize = 689050742987685888;
+pub const PB_613: usize = 690176642894528512;
+pub const PB_614: usize = 691302542801371136;
+pub const PB_615: usize = 692428442708213760;
+pub const PB_616: usize = 693554342615056384;
+pub const PB_617: usize = 694680242521899008;
+pub const PB_618: usize = 695806142428741632;
+pub const PB_619: usize = 696932042335584256;
+pub const PB_620: usize = 698057942242426880;
+pub const PB_621: usize = 699183842149269504;
+pub const PB_622: usize = 700309742056112128;
+pub const PB_623: usize = 701435641962954752;
+pub const PB_624: usize = 702561541869797376;
+pub const PB_625: usize = 703687441776640000;
+pub const PB_626: usize = 704813341683482624;
+pub const PB_627: usize = 705939241590325248;
+pub const PB_628: usize = 707065141497167872;
+pub const PB_629: usize = 708191041404010496;
+pub const PB_630: usize = 709316941310853120;
+pub const PB_631: usize = 710442841217695744;
+pub const PB_632: usize = 711568741124538368;
+pub const PB_633: usize = 712694641031380992;
+pub const PB_634: usize = 713820540938223616;
+pub const PB_635: usize = 714946440845066240;
+pub const PB_636: usize = 716072340751908864;
+pub const PB_637: usize = 717198240658751488;
+pub const PB_638: usize = 718324140565594112;
+pub const PB_639: usize = 719450040472436736;
+pub const PB_640: usize = 720575940379279360;
+pub const PB_641: usize = 721701840286121984;
+pub const PB_642: usize = 722827740192964608;
+pub const PB_643: usize = 723953640099807232;
+pub const PB_644: usize = 725079540006649856;
+pub const PB_645: usize = 726205439913492480;
+pub const PB_646: usize = 727331339820335104;
+pub const PB_647: usize = 728457239727177728;
+pub const PB_648: usize = 729583139634020352;
+pub const PB_649: usize = 730709039540862976;
+pub const PB_650: usize = 731834939447705600;
+pub const PB_651: usize = 732960839354548224;
+pub const PB_652: usize = 734086739261390848;
+pub const PB_653: usize = 735212639168233472;
+pub const PB_654: usize = 736338539075076096;
+pub const PB_655: usize = 737464438981918720;
+pub const PB_656: usize = 738590338888761344;
+pub const PB_657: usize = 739716238795603968;
+pub const PB_658: usize = 740842138702446592;
+pub const PB_659: usize = 741968038609289216;
+pub const PB_660: usize = 743093938516131840;
+pub const PB_661: usize = 744219838422974464;
+pub const PB_662: usize = 745345738329817088;
+pub const PB_663: usize = 746471638236659712;
+pub const PB_664: usize = 747597538143502336;
+pub const PB_665: usize = 748723438050344960;
+pub const PB_666: usize = 749849337957187584;
+pub const PB_667: usize = 750975237864030208;
+pub const PB_668: usize = 752101137770872832;
+pub const PB_669: usize = 753227037677715456;
+pub const PB_670: usize = 754352937584558080;
+pub const PB_671: usize = 755478837491400704;
+pub const PB_672: usize = 756604737398243328;
+pub const PB_673: usize = 757730637305085952;
+pub const PB_674: usize = 758856537211928576;
+pub const PB_675: usize = 759982437118771200;
+pub const PB_676: usize = 761108337025613824;
+pub const PB_677: usize = 762234236932456448;
+pub const PB_678: usize = 763360136839299072;
+pub const PB_679: usize = 764486036746141696;
+pub const PB_680: usize = 765611936652984320;
+pub const PB_681: usize = 766737836559826944;
+pub const PB_682: usize = 767863736466669568;
+pub const PB_683: usize = 768989636373512192;
+pub const PB_684: usize = 770115536280354816;
+pub const PB_685: usize = 771241436187197440;
+pub const PB_686: usize = 772367336094040064;
+pub const PB_687: usize = 773493236000882688;
+pub const PB_688: usize = 774619135907725312;
+pub const PB_689: usize = 775745035814567936;
+pub const PB_690: usize = 776870935721410560;
+pub const PB_691: usize = 777996835628253184;
+pub const PB_692: usize = 779122735535095808;
+pub const PB_693: usize = 780248635441938432;
+pub const PB_694: usize = 781374535348781056;
+pub const PB_695: usize = 782500435255623680;
+pub const PB_696: usize = 783626335162466304;
+pub const PB_697: usize = 784752235069308928;
+pub const PB_698: usize = 785878134976151552;
+pub const PB_699: usize = 787004034882994176;
+pub const PB_700: usize = 788129934789836800;
+pub const PB_701: usize = 789255834696679424;
+pub const PB_702: usize = 790381734603522048;
+pub const PB_703: usize = 791507634510364672;
+pub const PB_704: usize = 792633534417207296;
+pub const PB_705: usize = 793759434324049920;
+pub const PB_706: usize = 794885334230892544;
+pub const PB_707: usize = 796011234137735168;
+pub const PB_708: usize = 797137134044577792;
+pub const PB_709: usize = 798263033951420416;
+pub const PB_710: usize = 799388933858263040;
+pub const PB_711: usize = 800514833765105664;
+pub const PB_712: usize = 801640733671948288;
+pub const PB_713: usize = 802766633578790912;
+pub const PB_714: usize = 803892533485633536;
+pub const PB_715: usize = 805018433392476160;
+pub const PB_716: usize = 806144333299318784;
+pub const PB_717: usize = 807270233206161408;
+pub const PB_718: usize = 808396133113004032;
+pub const PB_719: usize = 809522033019846656;
+pub const PB_720: usize = 810647932926689280;
+pub const PB_721: usize = 811773832833531904;
+pub const PB_722: usize = 812899732740374528;
+pub const PB_723: usize = 814025632647217152;
+pub const PB_724: usize = 815151532554059776;
+pub const PB_725: usize = 816277432460902400;
+pub const PB_726: usize = 817403332367745024;
+pub const PB_727: usize = 818529232274587648;
+pub const PB_728: usize = 819655132181430272;
+pub const PB_729: usize = 820781032088272896;
+pub const PB_730: usize = 821906931995115520;
+pub const PB_731: usize = 823032831901958144;
+pub const PB_732: usize = 824158731808800768;
+pub const PB_733: usize = 825284631715643392;
+pub const PB_734: usize = 826410531622486016;
+pub const PB_735: usize = 827536431529328640;
+pub const PB_736: usize = 828662331436171264;
+pub const PB_737: usize = 829788231343013888;
+pub const PB_738: usize = 830914131249856512;
+pub const PB_739: usize = 832040031156699136;
+pub const PB_740: usize = 833165931063541760;
+pub const PB_741: usize = 834291830970384384;
+pub const PB_742: usize = 835417730877227008;
+pub const PB_743: usize = 836543630784069632;
+pub const PB_744: usize = 837669530690912256;
+pub const PB_745: usize = 838795430597754880;
+pub const PB_746: usize = 839921330504597504;
+pub const PB_747: usize = 841047230411440128;
+pub const PB_748: usize = 842173130318282752;
+pub const PB_749: usize = 843299030225125376;
+pub const PB_750: usize = 844424930131968000;
+pub const PB_751: usize = 845550830038810624;
+pub const PB_752: usize = 846676729945653248;
+pub const PB_753: usize = 847802629852495872;
+pub const PB_754: usize = 848928529759338496;
+pub const PB_755: usize = 850054429666181120;
+pub const PB_756: usize = 851180329573023744;
+pub const PB_757: usize = 852306229479866368;
+pub const PB_758: usize = 853432129386708992;
+pub const PB_759: usize = 854558029293551616;
+pub const PB_760: usize = 855683929200394240;
+pub const PB_761: usize = 856809829107236864;
+pub const PB_762: usize = 857935729014079488;
+pub const PB_763: usize = 859061628920922112;
+pub const PB_764: usize = 860187528827764736;
+pub const PB_765: usize = 861313428734607360;
+pub const PB_766: usize = 862439328641449984;
+pub const PB_767: usize = 863565228548292608;
+pub const PB_768: usize = 864691128455135232;
+pub const PB_769: usize = 865817028361977856;
+pub const PB_770: usize = 866942928268820480;
+pub const PB_771: usize = 868068828175663104;
+pub const PB_772: usize = 869194728082505728;
+pub const PB_773: usize = 870320627989348352;
+pub const PB_774: usize = 871446527896190976;
+pub const PB_775: usize = 872572427803033600;
+pub const PB_776: usize = 873698327709876224;
+pub const PB_777: usize = 874824227616718848;
+pub const PB_778: usize = 875950127523561472;
+pub const PB_779: usize = 877076027430404096;
+pub const PB_780: usize = 878201927337246720;
+pub const PB_781: usize = 879327827244089344;
+pub const PB_782: usize = 880453727150931968;
+pub const PB_783: usize = 881579627057774592;
+pub const PB_784: usize = 882705526964617216;
+pub const PB_785: usize = 883831426871459840;
+pub const PB_786: usize = 884957326778302464;
+pub const PB_787: usize = 886083226685145088;
+pub const PB_788: usize = 887209126591987712;
+pub const PB_789: usize = 888335026498830336;
+pub const PB_790: usize = 889460926405672960;
+pub const PB_791: usize = 890586826312515584;
+pub const PB_792: usize = 891712726219358208;
+pub const PB_793: usize = 892838626126200832;
+pub const PB_794: usize = 893964526033043456;
+pub const PB_795: usize = 895090425939886080;
+pub const PB_796: usize = 896216325846728704;
+pub const PB_797: usize = 897342225753571328;
+pub const PB_798: usize = 898468125660413952;
+pub const PB_799: usize = 899594025567256576;
+pub const PB_800: usize = 900719925474099200;
+pub const PB_801: usize = 901845825380941824;
+pub const PB_802: usize = 902971725287784448;
+pub const PB_803: usize = 904097625194627072;
+pub const PB_804: usize = 905223525101469696;
+pub const PB_805: usize = 906349425008312320;
+pub const PB_806: usize = 907475324915154944;
+pub const PB_807: usize = 908601224821997568;
+pub const PB_808: usize = 909727124728840192;
+pub const PB_809: usize = 910853024635682816;
+pub const PB_810: usize = 911978924542525440;
+pub const PB_811: usize = 913104824449368064;
+pub const PB_812: usize = 914230724356210688;
+pub const PB_813: usize = 915356624263053312;
+pub const PB_814: usize = 916482524169895936;
+pub const PB_815: usize = 917608424076738560;
+pub const PB_816: usize = 918734323983581184;
+pub const PB_817: usize = 919860223890423808;
+pub const PB_818: usize = 920986123797266432;
+pub const PB_819: usize = 922112023704109056;
+pub const PB_820: usize = 923237923610951680;
+pub const PB_821: usize = 924363823517794304;
+pub const PB_822: usize = 925489723424636928;
+pub const PB_823: usize = 926615623331479552;
+pub const PB_824: usize = 927741523238322176;
+pub const PB_825: usize = 928867423145164800;
+pub const PB_826: usize = 929993323052007424;
+pub const PB_827: usize = 931119222958850048;
+pub const PB_828: usize = 932245122865692672;
+pub const PB_829: usize = 933371022772535296;
+pub const PB_830: usize = 934496922679377920;
+pub const PB_831: usize = 935622822586220544;
+pub const PB_832: usize = 936748722493063168;
+pub const PB_833: usize = 937874622399905792;
+pub const PB_834: usize = 939000522306748416;
+pub const PB_835: usize = 940126422213591040;
+pub const PB_836: usize = 941252322120433664;
+pub const PB_837: usize = 942378222027276288;
+pub const PB_838: usize = 943504121934118912;
+pub const PB_839: usize = 944630021840961536;
+pub const PB_840: usize = 945755921747804160;
+pub const PB_841: usize = 946881821654646784;
+pub const PB_842: usize = 948007721561489408;
+pub const PB_843: usize = 949133621468332032;
+pub const PB_844: usize = 950259521375174656;
+pub const PB_845: usize = 951385421282017280;
+pub const PB_846: usize = 952511321188859904;
+pub const PB_847: usize = 953637221095702528;
+pub const PB_848: usize = 954763121002545152;
+pub const PB_849: usize = 955889020909387776;
+pub const PB_850: usize = 957014920816230400;
+pub const PB_851: usize = 958140820723073024;
+pub const PB_852: usize = 959266720629915648;
+pub const PB_853: usize = 960392620536758272;
+pub const PB_854: usize = 961518520443600896;
+pub const PB_855: usize = 962644420350443520;
+pub const PB_856: usize = 963770320257286144;
+pub const PB_857: usize = 964896220164128768;
+pub const PB_858: usize = 966022120070971392;
+pub const PB_859: usize = 967148019977814016;
+pub const PB_860: usize = 968273919884656640;
+pub const PB_861: usize = 969399819791499264;
+pub const PB_862: usize = 970525719698341888;
+pub const PB_863: usize = 971651619605184512;
+pub const PB_864: usize = 972777519512027136;
+pub const PB_865: usize = 973903419418869760;
+pub const PB_866: usize = 975029319325712384;
+pub const PB_867: usize = 976155219232555008;
+pub const PB_868: usize = 977281119139397632;
+pub const PB_869: usize = 978407019046240256;
+pub const PB_870: usize = 979532918953082880;
+pub const PB_871: usize = 980658818859925504;
+pub const PB_872: usize = 981784718766768128;
+pub const PB_873: usize = 982910618673610752;
+pub const PB_874: usize = 984036518580453376;
+pub const PB_875: usize = 985162418487296000;
+pub const PB_876: usize = 986288318394138624;
+pub const PB_877: usize = 987414218300981248;
+pub const PB_878: usize = 988540118207823872;
+pub const PB_879: usize = 989666018114666496;
+pub const PB_880: usize = 990791918021509120;
+pub const PB_881: usize = 991917817928351744;
+pub const PB_882: usize = 993043717835194368;
+pub const PB_883: usize = 994169617742036992;
+pub const PB_884: usize = 995295517648879616;
+pub const PB_885: usize = 996421417555722240;
+pub const PB_886: usize = 997547317462564864;
+pub const PB_887: usize = 998673217369407488;
+pub const PB_888: usize = 999799117276250112;
+pub const PB_889: usize = 1000925017183092736;
+pub const PB_890: usize = 1002050917089935360;
+pub const PB_891: usize = 1003176816996777984;
+pub const PB_892: usize = 1004302716903620608;
+pub const PB_893: usize = 1005428616810463232;
+pub const PB_894: usize = 1006554516717305856;
+pub const PB_895: usize = 1007680416624148480;
+pub const PB_896: usize = 1008806316530991104;
+pub const PB_897: usize = 1009932216437833728;
+pub const PB_898: usize = 1011058116344676352;
+pub const PB_899: usize = 1012184016251518976;
+pub const PB_900: usize = 1013309916158361600;
+pub const PB_901: usize = 1014435816065204224;
+pub const PB_902: usize = 1015561715972046848;
+pub const PB_903: usize = 1016687615878889472;
+pub const PB_904: usize = 1017813515785732096;
+pub const PB_905: usize = 1018939415692574720;
+pub const PB_906: usize = 1020065315599417344;
+pub const PB_907: usize = 1021191215506259968;
+pub const PB_908: usize = 1022317115413102592;
+pub const PB_909: usize = 1023443015319945216;
+pub const PB_910: usize = 1024568915226787840;
+pub const PB_911: usize = 1025694815133630464;
+pub const PB_912: usize = 1026820715040473088;
+pub const PB_913: usize = 1027946614947315712;
+pub const PB_914: usize = 1029072514854158336;
+pub const PB_915: usize = 1030198414761000960;
+pub const PB_916: usize = 1031324314667843584;
+pub const PB_917: usize = 1032450214574686208;
+pub const PB_918: usize = 1033576114481528832;
+pub const PB_919: usize = 1034702014388371456;
+pub const PB_920: usize = 1035827914295214080;
+pub const PB_921: usize = 1036953814202056704;
+pub const PB_922: usize = 1038079714108899328;
+pub const PB_923: usize = 1039205614015741952;
+pub const PB_924: usize = 1040331513922584576;
+pub const PB_925: usize = 1041457413829427200;
+pub const PB_926: usize = 1042583313736269824;
+pub const PB_927: usize = 1043709213643112448;
+pub const PB_928: usize = 1044835113549955072;
+pub const PB_929: usize = 1045961013456797696;
+pub const PB_930: usize = 1047086913363640320;
+pub const PB_931: usize = 1048212813270482944;
+pub const PB_932: usize = 1049338713177325568;
+pub const PB_933: usize = 1050464613084168192;
+pub const PB_934: usize = 1051590512991010816;
+pub const PB_935: usize = 1052716412897853440;
+pub const PB_936: usize = 1053842312804696064;
+pub const PB_937: usize = 1054968212711538688;
+pub const PB_938: usize = 1056094112618381312;
+pub const PB_939: usize = 1057220012525223936;
+pub const PB_940: usize = 1058345912432066560;
+pub const PB_941: usize = 1059471812338909184;
+pub const PB_942: usize = 1060597712245751808;
+pub const PB_943: usize = 1061723612152594432;
+pub const PB_944: usize = 1062849512059437056;
+pub const PB_945: usize = 1063975411966279680;
+pub const PB_946: usize = 1065101311873122304;
+pub const PB_947: usize = 1066227211779964928;
+pub const PB_948: usize = 1067353111686807552;
+pub const PB_949: usize = 1068479011593650176;
+pub const PB_950: usize = 1069604911500492800;
+pub const PB_951: usize = 1070730811407335424;
+pub const PB_952: usize = 1071856711314178048;
+pub const PB_953: usize = 1072982611221020672;
+pub const PB_954: usize = 1074108511127863296;
+pub const PB_955: usize = 1075234411034705920;
+pub const PB_956: usize = 1076360310941548544;
+pub const PB_957: usize = 1077486210848391168;
+pub const PB_958: usize = 1078612110755233792;
+pub const PB_959: usize = 1079738010662076416;
+pub const PB_960: usize = 1080863910568919040;
+pub const PB_961: usize = 1081989810475761664;
+pub const PB_962: usize = 1083115710382604288;
+pub const PB_963: usize = 1084241610289446912;
+pub const PB_964: usize = 1085367510196289536;
+pub const PB_965: usize = 1086493410103132160;
+pub const PB_966: usize = 1087619310009974784;
+pub const PB_967: usize = 1088745209916817408;
+pub const PB_968: usize = 1089871109823660032;
+pub const PB_969: usize = 1090997009730502656;
+pub const PB_970: usize = 1092122909637345280;
+pub const PB_971: usize = 1093248809544187904;
+pub const PB_972: usize = 1094374709451030528;
+pub const PB_973: usize = 1095500609357873152;
+pub const PB_974: usize = 1096626509264715776;
+pub const PB_975: usize = 1097752409171558400;
+pub const PB_976: usize = 1098878309078401024;
+pub const PB_977: usize = 1100004208985243648;
+pub const PB_978: usize = 1101130108892086272;
+pub const PB_979: usize = 1102256008798928896;
+pub const PB_980: usize = 1103381908705771520;
+pub const PB_981: usize = 1104507808612614144;
+pub const PB_982: usize = 1105633708519456768;
+pub const PB_983: usize = 1106759608426299392;
+pub const PB_984: usize = 1107885508333142016;
+pub const PB_985: usize = 1109011408239984640;
+pub const PB_986: usize = 1110137308146827264;
+pub const PB_987: usize = 1111263208053669888;
+pub const PB_988: usize = 1112389107960512512;
+pub const PB_989: usize = 1113515007867355136;
+pub const PB_990: usize = 1114640907774197760;
+pub const PB_991: usize = 1115766807681040384;
+pub const PB_992: usize = 1116892707587883008;
+pub const PB_993: usize = 1118018607494725632;
+pub const PB_994: usize = 1119144507401568256;
+pub const PB_995: usize = 1120270407308410880;
+pub const PB_996: usize = 1121396307215253504;
+pub const PB_997: usize = 1122522207122096128;
+pub const PB_998: usize = 1123648107028938752;
+pub const PB_999: usize = 1124774006935781376;
+pub const PB_1000: usize = 1125899906842624000;
+pub const PB_1001: usize = 1127025806749466624;
+pub const PB_1002: usize = 1128151706656309248;
+pub const PB_1003: usize = 1129277606563151872;
+pub const PB_1004: usize = 1130403506469994496;
+pub const PB_1005: usize = 1131529406376837120;
+pub const PB_1006: usize = 1132655306283679744;
+pub const PB_1007: usize = 1133781206190522368;
+pub const PB_1008: usize = 1134907106097364992;
+pub const PB_1009: usize = 1136033006004207616;
+pub const PB_1010: usize = 1137158905911050240;
+pub const PB_1011: usize = 1138284805817892864;
+pub const PB_1012: usize = 1139410705724735488;
+pub const PB_1013: usize = 1140536605631578112;
+pub const PB_1014: usize = 1141662505538420736;
+pub const PB_1015: usize = 1142788405445263360;
+pub const PB_1016: usize = 1143914305352105984;
+pub const PB_1017: usize = 1145040205258948608;
+pub const PB_1018: usize = 1146166105165791232;
+pub const PB_1019: usize = 1147292005072633856;
+pub const PB_1020: usize = 1148417904979476480;
+pub const PB_1021: usize = 1149543804886319104;
+pub const PB_1022: usize = 1150669704793161728;
+pub const PB_1023: usize = 1151795604700004352;
+pub const PB_1024: usize = 1152921504606846976;
+```
+# Path: hyperlane/constant/src/common/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+use super::*;
+```
+# Path: hyperlane/constant/src/session/const.rs
+```rust
+pub const SESSION_COOKIE_NAME: &str = "session_id";
+pub const SESSION_ID_LENGTH: usize = 32;
+pub const SESSION_TIMEOUT_SECONDS: u64 = 1800;
+pub const SESSION_TIMEOUT_MILLISECONDS: u64 = 1800000;
+pub const SESSION: &str = "session";
+pub const SESSION_USER_ID_KEY: &str = "user_id";
+pub const SESSION_USERNAME_KEY: &str = "username";
+pub const SESSION_USER_ROLE_KEY: &str = "user_role";
+pub const SESSION_LOGIN_TIME_KEY: &str = "login_time";
+pub const SESSION_LAST_ACCESS_TIME_KEY: &str = "last_access_time";
+pub const SESSION_IP_ADDRESS_KEY: &str = "ip_address";
+pub const SESSION_USER_AGENT_KEY: &str = "user_agent";
+pub const SESSION_CSRF_TOKEN_KEY: &str = "csrf_token";
+pub const SESSION_LANGUAGE_KEY: &str = "language";
+pub const SESSION_TIMEZONE_KEY: &str = "timezone";
+pub const SESSION_STATE_ACTIVE: &str = "active";
+pub const SESSION_STATE_EXPIRED: &str = "expired";
+pub const SESSION_STATE_INVALID: &str = "invalid";
+pub const SESSION_STATE_DESTROYED: &str = "destroyed";
+pub const SESSION_CLEANUP_INTERVAL_SECONDS: u64 = 300;
+pub const MAX_SESSIONS_PER_USER: usize = 5;
+pub const SESSION_ID_CHARSET: &str =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+pub const SESSION_ID_CHARSET_BYTES: &[u8] = SESSION_ID_CHARSET.as_bytes();
+pub const SESSION_REGENERATION_THRESHOLD_SECONDS: u64 = 900;
+pub const SESSION_FLASH_MESSAGE_PREFIX: &str = "flash:";
+pub const SESSION_FLASH_SUCCESS: &str = "success";
+pub const SESSION_FLASH_ERROR: &str = "error";
+pub const SESSION_FLASH_WARNING: &str = "warning";
+pub const SESSION_FLASH_INFO: &str = "info";
+pub const SESSION_REMEMBER_ME_COOKIE_NAME: &str = "remember_me";
+pub const SESSION_REMEMBER_ME_TOKEN_LENGTH: usize = 64;
+pub const SESSION_REMEMBER_ME_TIMEOUT_SECONDS: u64 = 2592000;
+pub const SESSION_FINGERPRINT_SEPARATOR: &str = "|";
+pub const SESSION_LOCK_TIMEOUT_MILLISECONDS: u64 = 5000;
+pub const SESSION_CONCURRENT_ACCESS_LIMIT: usize = 10;
+```
+# Path: hyperlane/constant/src/session/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/constant/src/protocol/const.rs
+```rust
+pub const HTTP_LOWERCASE: &str = "http";
+pub const HTTP_UPPERCASE: &str = "HTTP";
+pub const HTTPS_LOWERCASE: &str = "https";
+pub const HTTPS_UPPERCASE: &str = "HTTPS";
+pub const FTP_LOWERCASE: &str = "ftp";
+pub const FTP_UPPERCASE: &str = "FTP";
+pub const FTPS_LOWERCASE: &str = "ftps";
+pub const FTPS_UPPERCASE: &str = "FTPS";
+pub const SFTP_LOWERCASE: &str = "sftp";
+pub const SFTP_UPPERCASE: &str = "SFTP";
+pub const SSH_LOWERCASE: &str = "ssh";
+pub const TELNET_LOWERCASE: &str = "telnet";
+pub const SMTP_LOWERCASE: &str = "smtp";
+pub const SMTPS_LOWERCASE: &str = "smtps";
+pub const POP3_LOWERCASE: &str = "pop3";
+pub const POP3S_LOWERCASE: &str = "pop3s";
+pub const IMAP_LOWERCASE: &str = "imap";
+pub const IMAPS_LOWERCASE: &str = "imaps";
+pub const DNS_LOWERCASE: &str = "dns";
+pub const WS_LOWERCASE: &str = "ws";
+pub const WS_UPPERCASE: &str = "WS";
+pub const WSS_LOWERCASE: &str = "wss";
+pub const WSS_UPPERCASE: &str = "WSS";
+pub const FILE_LOWERCASE: &str = "file";
+pub const FILE_UPPERCASE: &str = "FILE";
+```
+# Path: hyperlane/constant/src/protocol/mod.rs
+```rust
+mod r#const;
+pub use r#const::*;
+```
+# Path: hyperlane/request/README.md
+## http-request
+[Api Docs](https://docs.rs/http-request/latest/)
+> A lightweight, efficient library for building, sending, and handling HTTP/HTTPS requests in Rust applications. http-request provides a simple and intuitive API, allowing developers to easily interact with web services, whether they use the "HTTP" or "HTTPS" protocol. The library supports various HTTP methods, custom headers, request bodies, timeout, automatic handling of redirects (including detecting redirect loops), and enhanced response body decoding (both automatic and manual), enabling fast and secure communication. Whether working with secure "HTTPS" connections or standard "HTTP" requests, the library is optimized for performance, minimal resource usage, and easy integration into Rust projects.
+## Features
+- **Support for HTTP/HTTPS**: Supports both HTTP and HTTPS protocols.
+- **WebSocket Support**: Full WebSocket support with both synchronous and asynchronous APIs for real-time communication.
+- **Lightweight Design**: The `http_request` crate provides a simple and efficient API for building, sending, and handling HTTP requests while minimizing resource consumption.
+- **Supports Common HTTP Method**: Supports common HTTP methods such as GET and POST.
+- **Flexible Request Building**: Offers rich configuration options through `RequestBuilder` to set request headers, bodies, and URLs.
+- **Simple Error Handling**: Utilizes the `Result` type to handle errors in requests and responses, making error handling straightforward.
+- **Custom Headers and Request Bodies**: Easily add custom headers and request bodies.
+- **Response Handling**: Provides a simple wrapper around HTTP responses, making it easy to access and process response data.
+- **Optimized Memory Management**: Implements efficient memory management to minimize unnecessary memory allocations and improve performance.
+- **Redirect Handling**: Supports redirect handling, allows setting the maximum number of redirects, and includes redirect loop detection.
+- **timeout**: Supports timeout.
+- **Automatic and Manual Response Body Decoding**: Supports both automatic and manual decoding of response bodies, allowing for seamless interaction with different content types (e.g., JSON, XML, etc.).
+- **Proxy Support**: Comprehensive proxy support including HTTP, HTTPS, and SOCKS5 proxies with authentication for both HTTP requests and WebSocket connections.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add http-request
+```
+## Help
+Ensure that CMake is installed on the system
+## Contact
+# Path: hyperlane/request/tests/mod.rs
+```rust
+mod request_builder;
+use http_request::*;
+use std::{
+    sync::{Arc, Mutex},
+    thread::{JoinHandle, spawn},
+    time::{Duration, Instant},
+};
+```
+# Path: hyperlane/request/tests/request_builder/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_async_http_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .get("https://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!("Async GET ResponseTrait => {:?}", response.text());
+        }
+        Err(e) => println!("Async GET Error => {e}"),
+    }
+}
+#[test]
+fn test_http_post_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("Accept", "*/*");
+    header.insert("Content-Type", "application/json");
+    header.insert("Connection", "keep-alive");
+    header.insert("Accept-Encoding", "gzip, deflate");
+    let body: Value = serde_json::json!({
+        "code": "fn main() {\r\n    println!(\"hello world\");\r\n}",
+        "language": "rust",
+        "testin": ""
+    });
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .post("https://ide.ltpp.vip/?language=rust")
+        .json(body)
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_http_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut body: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    body.insert("body-key", "body-value");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("http://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_https_post_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("Accept", "*/*");
+    header.insert("Content-Type", "application/json");
+    header.insert("Connection", "keep-alive");
+    header.insert("Accept-Encoding", "gzip, deflate");
+    let body: Value = serde_json::json!({
+        "code": "fn main() {\r\n    println!(\"hello world\");\r\n}",
+        "language": "rust",
+        "testin": ""
+    });
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .post("https://code.ltpp.vip/")
+        .json(body)
+        .headers(header)
+        .timeout(4000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_https_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut body: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    body.insert("body-key", "body-value");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("https://code.ltpp.vip/")
+        .headers(header)
+        .timeout(4000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_http_post_text_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("Accept", "*/*");
+    header.insert("Content-Type", "application/json");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .post("http://code.ltpp.vip")
+        .text("hello")
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_http_post_binary_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("Accept", "*/*");
+    header.insert("Content-Type", "application/json");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .post("http://code.ltpp.vip")
+        .body("hello".as_bytes())
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_auto_gzip_get() {
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("https://ide.ltpp.vip/?language=rust")
+        .timeout(4000)
+        .redirect()
+        .max_redirect_times(8)
+        .decode()
+        .buffer(4096)
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_gzip_get() {
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("https://ide.ltpp.vip/?language=rust")
+        .timeout(4000)
+        .redirect()
+        .max_redirect_times(8)
+        .buffer(4096)
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {:?}", response.decode(4096).text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_unredirect_get() {
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .post("https://ide.ltpp.vip/?language=rust")
+        .timeout(4000)
+        .max_redirect_times(8)
+        .buffer(4096)
+        .unredirect()
+        .http1_1_only()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("ResponseTrait => {response:?}");
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_thread_https_get_request() {
+    let header_key: &str = "header-key";
+    let header_value: &str = "header-value";
+    let body_key: &str = "body-key";
+    let body_value: &str = "body-value";
+    let mut body: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    body.insert(body_key, body_value);
+    let num_threads: i32 = 10;
+    let mut handles: Vec<JoinHandle<()>> = Vec::new();
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert(header_key, header_value);
+    let request_builder: Arc<Mutex<BoxRequestTrait>> = Arc::new(Mutex::new(
+        RequestBuilder::new()
+            .get("https://code.ltpp.vip/")
+            .headers(header.clone())
+            .timeout(4000)
+            .redirect()
+            .buffer(4096)
+            .max_redirect_times(8)
+            .http1_1_only()
+            .build_sync(),
+    ));
+    for _ in 0..num_threads {
+        let request_builder: Arc<Mutex<BoxRequestTrait>> = Arc::clone(&request_builder);
+        let handle: JoinHandle<()> = spawn(move || {
+            let start_time: Instant = Instant::now();
+            match request_builder.lock().unwrap().send() {
+                Ok(response) => {
+                    let duration: Duration = start_time.elapsed();
+                    let response_text: HttpResponseText = response.text();
+                    println!("Thread finished in: {duration:?}");
+                    println!("ResponseTrait => {response_text:?}");
+                }
+                Err(e) => {
+                    let duration: Duration = start_time.elapsed();
+                    println!("Thread finished in: {duration:?}");
+                    println!("Error => {e}");
+                }
+            }
+        });
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+#[test]
+fn test_thread_http_get_request() {
+    let num_threads: i32 = 10;
+    let mut handles: Vec<JoinHandle<()>> = Vec::new();
+    let request_builder: Arc<Mutex<BoxRequestTrait>> = Arc::new(Mutex::new(
+        RequestBuilder::new()
+            .get("http://127.0.0.1:7890/")
+            .timeout(10)
+            .redirect()
+            .buffer(100)
+            .max_redirect_times(0)
+            .http2_only()
+            .build_sync(),
+    ));
+    for _ in 0..num_threads {
+        let request_builder: Arc<Mutex<BoxRequestTrait>> = Arc::clone(&request_builder);
+        let handle: JoinHandle<()> = spawn(move || {
+            let start_time: Instant = Instant::now();
+            match request_builder.lock().unwrap().send() {
+                Ok(response) => {
+                    let duration: Duration = start_time.elapsed();
+                    let response_text: HttpResponseText = response.text();
+                    println!("Thread finished in: {duration:?}");
+                    println!("ResponseTrait => {response_text:?}");
+                }
+                Err(e) => {
+                    let duration: Duration = start_time.elapsed();
+                    println!("Thread finished in: {duration:?}");
+                    println!("Error => {e}");
+                }
+            }
+        });
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+#[test]
+fn test_readme_sync_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("https://ltpp.vip/")
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .max_redirect_times(8)
+        .http1_1_only()
+        .buffer(4096)
+        .decode()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("{:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_readme_sync_post_json_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let body: Value = serde_json::json!({
+        "test": 1
+    });
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .post("http://code.ltpp.vip")
+        .json(body)
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .max_redirect_times(8)
+        .http1_1_only()
+        .buffer(4096)
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("{:?}", response.decode(4096).text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_readme_sync_post_text_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .post("http://ide.ltpp.vip/?language=rust")
+        .text("hello")
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .max_redirect_times(8)
+        .http1_1_only()
+        .buffer(4096)
+        .decode()
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("{:?}", response.text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[test]
+fn test_readme_sync_post_binary_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .post("http://ide.ltpp.vip/?language=rust")
+        .body("hello".as_bytes())
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .max_redirect_times(8)
+        .http1_1_only()
+        .buffer(4096)
+        .build_sync();
+    request_builder
+        .send()
+        .map(|response: BoxResponseTrait| {
+            println!("{:?}", response.decode(4096).text());
+        })
+        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+}
+#[tokio::test]
+async fn test_async_websocket_connection() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("Authorization", "Bearer test-token");
+    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
+        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
+        .headers(header)
+        .timeout(10000)
+        .buffer(4096)
+        .protocols(&["chat", "superchat"])
+        .build_async();
+    match websocket_builder.send_text_async("Hello WebSocket!").await {
+        Ok(_) => {
+            println!("Async WebSocket text message sent successfully");
+            match websocket_builder.send_binary_async(b"binary data").await {
+                Ok(_) => {
+                    println!("Async WebSocket binary message sent successfully");
+                    match websocket_builder.receive_async().await {
+                        Ok(message) => match message {
+                            WebSocketMessage::Text(text) => println!("Received text: {text}"),
+                            WebSocketMessage::Binary(data) => {
+                                println!("Received binary: {data:?}")
+                            }
+                            WebSocketMessage::Close => println!("Connection closed"),
+                            _ => println!("Received other message type"),
+                        },
+                        Err(e) => println!("Error receiving message: {e}"),
+                    }
+                }
+                Err(e) => println!("Error sending binary: {e}"),
+            }
+        }
+        Err(e) => println!("Error sending text: {e}"),
+    }
+    websocket_builder
+        .close_async_method()
+        .await
+        .unwrap_or_else(|error: WebSocketError| println!("Error closing: {error}"));
+}
+#[test]
+fn test_sync_websocket_connection() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("Authorization", "Bearer test-token");
+    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
+        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
+        .headers(header)
+        .timeout(10000)
+        .buffer(4096)
+        .protocols(&["chat", "superchat"])
+        .build_sync();
+    websocket_builder
+        .send_text("Hello WebSocket!")
+        .and_then(|_| {
+            println!("Sync WebSocket text message sent successfully");
+            websocket_builder.send_binary(b"binary data")
+        })
+        .map(|_| {
+            println!("Sync WebSocket binary message sent successfully");
+            match websocket_builder.receive() {
+                Ok(message) => match message {
+                    WebSocketMessage::Text(text) => println!("Received text: {text}"),
+                    WebSocketMessage::Binary(data) => println!("Received binary: {data:?}"),
+                    WebSocketMessage::Close => println!("Connection closed"),
+                    _ => println!("Received other message type"),
+                },
+                Err(e) => println!("Error receiving message: {e}"),
+            }
+        })
+        .and_then(|_| websocket_builder.close())
+        .unwrap_or_else(|error: WebSocketError| println!("Error => {error}"));
+}
+#[test]
+fn test_websocket_with_http_proxy() {
+    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
+        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
+        .timeout(10000)
+        .buffer(4096)
+        .http_proxy("127.0.0.1", 7890)
+        .build_sync();
+    match websocket_builder.send_text("Hello WebSocket with HTTP proxy!") {
+        Ok(_) => println!("WebSocket HTTP proxy test unexpectedly succeeded"),
+        Err(e) => {
+            println!("WebSocket HTTP proxy test correctly failed: {e}");
+        }
+    }
+}
+#[test]
+fn test_websocket_with_https_proxy() {
+    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
+        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
+        .timeout(10000)
+        .buffer(4096)
+        .https_proxy("127.0.0.1", 7890)
+        .build_sync();
+    match websocket_builder.send_text("Hello WebSocket with HTTPS proxy!") {
+        Ok(_) => println!("WebSocket HTTPS proxy test unexpectedly succeeded"),
+        Err(e) => {
+            println!("WebSocket HTTPS proxy test correctly failed: {e}");
+        }
+    }
+}
+#[test]
+fn test_websocket_with_socks5_proxy() {
+    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
+        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
+        .timeout(10000)
+        .buffer(4096)
+        .socks5_proxy("127.0.0.1", 1080)
+        .build_sync();
+    match websocket_builder.send_text("Hello WebSocket with SOCKS5 proxy!") {
+        Ok(_) => println!("WebSocket SOCKS5 proxy test unexpectedly succeeded"),
+        Err(e) => {
+            println!("WebSocket SOCKS5 proxy test correctly failed: {e}");
+        }
+    }
+}
+#[test]
+fn test_websocket_with_http_proxy_auth() {
+    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
+        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
+        .timeout(10000)
+        .buffer(4096)
+        .http_proxy_auth("127.0.0.1", 7890, "username", "password")
+        .build_sync();
+    match websocket_builder.send_text("Hello WebSocket with HTTP proxy auth!") {
+        Ok(_) => println!("WebSocket HTTP proxy auth test unexpectedly succeeded"),
+        Err(e) => {
+            println!("WebSocket HTTP proxy auth test correctly failed: {e}");
+        }
+    }
+}
+#[tokio::test]
+async fn test_websocket_with_socks5_proxy_auth_async() {
+    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
+        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
+        .timeout(10000)
+        .buffer(4096)
+        .socks5_proxy_auth("127.0.0.1", 1080, "username", "password")
+        .build_async();
+    match websocket_builder
+        .send_text_async("Hello WebSocket with SOCKS5 proxy auth!")
+        .await
+    {
+        Ok(_) => println!("WebSocket SOCKS5 proxy auth async test unexpectedly succeeded"),
+        Err(e) => {
+            println!("WebSocket SOCKS5 proxy auth async test correctly failed: {e}");
+        }
+    }
+}
+#[tokio::test]
+async fn test_websocket_with_https_proxy_auth_async() {
+    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
+        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
+        .timeout(10000)
+        .buffer(4096)
+        .https_proxy_auth("127.0.0.1", 7890, "username", "password")
+        .build_async();
+    match websocket_builder
+        .send_text_async("Hello WebSocket with HTTPS proxy auth!")
+        .await
+    {
+        Ok(_) => println!("WebSocket HTTPS proxy auth async test unexpectedly succeeded"),
+        Err(e) => {
+            println!("WebSocket HTTPS proxy auth async test correctly failed: {e}");
+        }
+    }
+}
+#[tokio::test]
+async fn test_readme_async_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .get("https://ltpp.vip/")
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .max_redirect_times(8)
+        .http1_1_only()
+        .buffer(4096)
+        .decode()
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!("{:?}", response.text());
+        }
+        Err(e) => println!("Error => {e}"),
+    }
+}
+#[test]
+fn test_case_insensitive_header_matching() {
+    let mut header1: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header1.insert("Content-Type", "application/json");
+    header1.insert("User-Agent", "test-agent");
+    let mut header2: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header2.insert("content-type", "text/html");
+    header2.insert("HOST", "example.com");
+    let _request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("http://ide.ltpp.vip/?language=rust")
+        .headers(header1)
+        .headers(header2)
+        .timeout(6000)
+        .build_sync();
+    println!("Case insensitive header test completed");
+}
+#[test]
+fn test_case_insensitive_required_headers() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("host", "custom-host.com");
+    header.insert("CONTENT-LENGTH", "100");
+    header.insert("Accept", "application/xml");
+    header.insert("user-agent", "custom-agent");
+    let _request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("http://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(6000)
+        .build_sync();
+    println!("Case insensitive required headers test completed");
+}
+#[test]
+fn test_http_proxy_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("http://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .http_proxy("127.0.0.1", 7890)
+        .build_sync();
+    match request_builder.send() {
+        Ok(response) => {
+            println!("HTTP Proxy GET Response => {:?}", response.text());
+        }
+        Err(e) => println!("HTTP Proxy GET Error (expected) => {e}"),
+    }
+}
+#[test]
+fn test_http_proxy_auth_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("http://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .http_proxy_auth("127.0.0.1", 7890, "username", "password")
+        .build_sync();
+    match request_builder.send() {
+        Ok(response) => {
+            println!("HTTP Proxy Auth GET Response => {:?}", response.text());
+        }
+        Err(e) => println!("HTTP Proxy Auth GET Error (expected) => {e}"),
+    }
+}
+#[test]
+fn test_socks5_proxy_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("http://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .socks5_proxy("127.0.0.1", 1080)
+        .build_sync();
+    match request_builder.send() {
+        Ok(response) => {
+            println!("SOCKS5 Proxy GET Response => {:?}", response.text());
+        }
+        Err(e) => println!("SOCKS5 Proxy GET Error (expected) => {e}"),
+    }
+}
+#[tokio::test]
+async fn test_async_http_proxy_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .get("http://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .http_proxy("127.0.0.1", 7890)
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!("Async HTTP Proxy GET Response => {:?}", response.text());
+        }
+        Err(e) => println!("Async HTTP Proxy GET Error (expected) => {e}"),
+    }
+}
+#[tokio::test]
+async fn test_async_socks5_proxy_auth_get_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .get("http://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .redirect()
+        .buffer(4096)
+        .max_redirect_times(8)
+        .http1_1_only()
+        .socks5_proxy_auth("127.0.0.1", 1080, "username", "password")
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!(
+                "Async SOCKS5 Proxy Auth GET Response => {:?}",
+                response.text()
+            );
+        }
+        Err(e) => println!("Async SOCKS5 Proxy Auth GET Error (expected) => {e}"),
+    }
+}
+#[tokio::test]
+async fn test_readme_async_post_json_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let body: Value = serde_json::json!({
+        "test": 1
+    });
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .post("http://code.ltpp.vip")
+        .json(body)
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .max_redirect_times(8)
+        .http1_1_only()
+        .buffer(4096)
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!("{:?}", response.decode(4096).text());
+        }
+        Err(e) => println!("Error => {e}"),
+    }
+}
+#[tokio::test]
+async fn test_readme_async_post_text_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .post("http://ide.ltpp.vip/?language=rust")
+        .text("hello")
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .max_redirect_times(8)
+        .http1_1_only()
+        .buffer(4096)
+        .decode()
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!("{:?}", response.text());
+        }
+        Err(e) => println!("Error => {e}"),
+    }
+}
+#[tokio::test]
+async fn test_readme_async_post_binary_request() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("header-key", "header-value");
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .post("http://ide.ltpp.vip/?language=rust")
+        .body("hello".as_bytes())
+        .headers(header)
+        .timeout(6000)
+        .redirect()
+        .max_redirect_times(8)
+        .http1_1_only()
+        .buffer(4096)
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!("{:?}", response.decode(4096).text());
+        }
+        Err(e) => println!("Error => {e}"),
+    }
+}
+#[tokio::test]
+async fn test_https_over_http_proxy_async() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("User-Agent", "test-agent");
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .get("https://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .http_proxy("127.0.0.1", 7890)
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!(
+                "HTTPS over HTTP proxy test passed: {}",
+                response.binary().get_status_code()
+            );
+        }
+        Err(e) => {
+            println!("HTTPS over HTTP proxy test failed (expected): {e}");
+        }
+    }
+}
+#[tokio::test]
+async fn test_https_over_socks5_proxy_async() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("User-Agent", "test-agent");
+    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+        .get("https://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .socks5_proxy("127.0.0.1", 1080)
+        .build_async();
+    match request_builder.send().await {
+        Ok(response) => {
+            println!(
+                "HTTPS over SOCKS5 proxy test passed: {}",
+                response.binary().get_status_code()
+            );
+        }
+        Err(e) => {
+            println!("HTTPS over SOCKS5 proxy test failed (expected): {e}");
+        }
+    }
+}
+#[test]
+fn test_https_over_http_proxy_sync() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("User-Agent", "test-agent");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("https://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .http_proxy("127.0.0.1", 7890)
+        .build_sync();
+    match request_builder.send() {
+        Ok(response) => {
+            println!(
+                "Sync HTTPS over HTTP proxy test passed: {}",
+                response.binary().get_status_code()
+            );
+        }
+        Err(e) => {
+            println!("Sync HTTPS over HTTP proxy test failed (expected): {e}");
+        }
+    }
+}
+#[test]
+fn test_https_over_socks5_proxy_sync() {
+    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
+    header.insert("User-Agent", "test-agent");
+    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+        .get("https://ide.ltpp.vip/?language=rust")
+        .headers(header)
+        .timeout(10000)
+        .socks5_proxy("127.0.0.1", 1080)
+        .build_sync();
+    match request_builder.send() {
+        Ok(response) => {
+            println!(
+                "Sync HTTPS over SOCKS5 proxy test passed: {}",
+                response.binary().get_status_code()
+            );
+        }
+        Err(e) => {
+            println!("Sync HTTPS over SOCKS5 proxy test failed (expected): {e}");
+        }
+    }
+}
+```
+# Path: hyperlane/request/tests/request_builder/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/request/src/lib.rs
+```rust
+mod common;
+mod request;
+mod response;
+mod utils;
+pub use {request::*, response::*};
+pub use {
+    http_type::{HashMapXxHash3_64, RequestError, hash_map_xx_hash3_64},
+    serde_json::{
+        Deserializer, Error, Map, Number, StreamDeserializer, Value, from_reader, from_slice,
+        from_str, from_value, to_string, to_string_pretty, to_value, to_vec, to_vec_pretty,
+        to_writer, to_writer_pretty, value,
+    },
+};
+use {common::*, utils::*};
+use std::{
+    borrow::Cow,
+    collections::{HashSet, VecDeque},
+    fmt::{self, Debug, Display, Formatter},
+    io::{Read, Write},
+    net::{Ipv4Addr, Ipv6Addr, TcpStream},
+    pin::Pin,
+    str::from_utf8,
+    string::FromUtf8Error,
+    sync::{
+        Arc, RwLock, RwLockReadGuard,
+        atomic::{AtomicBool, Ordering},
+    },
+    task::{Context, Poll},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+    vec::IntoIter,
+};
+use {
+    futures::{Future, Sink, SinkExt, Stream, StreamExt},
+    http_type::{
+        ACCEPT, ACCEPT_ANY, BR_BYTES, COLON_U8, CONNECTION, CONTENT_LENGTH, CONTENT_TYPE, Compress,
+        ContentType, DEFAULT_BUFFER_SIZE, DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS, DEFAULT_HTTP_PATH,
+        DEFAULT_MAX_REDIRECT_TIMES, EMPTY_STR, HOST, HTTP_BR_BYTES, HttpStatus, HttpUrlComponents,
+        HttpVersion, LOCATION, Method, Protocol, QUERY, RequestBody, RequestBodyString,
+        RequestHeaders, ResponseHeaders, ResponseStatusCode, SEC_WEBSOCKET_KEY,
+        SEC_WEBSOCKET_VERSION, SPACE_U8, TAB_U8, UPGRADE, USER_AGENT,
+        tokio::{
+            io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
+            runtime::Runtime,
+            sync::Mutex,
+            time::timeout,
+        },
+    },
+    rustls::{
+        ClientConfig, ClientConnection, RootCertStore, StreamOwned,
+        pki_types::{InvalidDnsNameError, ServerName},
+    },
+    serde::{Serialize, Serializer},
+    tokio_rustls::{TlsConnector, client::TlsStream},
+    tokio_tungstenite::{
+        MaybeTlsStream, WebSocketStream, client_async_with_config, connect_async_with_config,
+        tungstenite::Message, tungstenite::handshake::client::Request,
+    },
+    webpki_roots::TLS_SERVER_ROOTS,
+};
+```
+# Path: hyperlane/request/src/utils/mod.rs
+```rust
+mod encode;
+mod vec;
+pub(crate) use {encode::*, vec::*};
+use super::*;
+```
+# Path: hyperlane/request/src/utils/vec/fn.rs
+```rust
+use super::*;
+pub(crate) fn split_whitespace(input: &[u8]) -> Vec<&[u8]> {
+    let mut parts: Vec<&[u8]> = Vec::new();
+    let mut start: usize = 0;
+    for (i, &byte) in input.iter().enumerate() {
+        if byte == SPACE_U8 || byte == TAB_U8 {
+            if i > start {
+                parts.push(&input[start..i]);
+            }
+            start = i + 1;
+        }
+    }
+    if start < input.len() {
+        parts.push(&input[start..]);
+    }
+    parts
+}
+pub(crate) fn split_multi_byte<'a>(data: &'a [u8], delimiter: &'a [u8]) -> Vec<&'a [u8]> {
+    let mut result: Vec<&[u8]> = Vec::new();
+    let mut start: usize = 0;
+    for i in 0..=data.len() {
+        if data[i..].starts_with(delimiter) {
+            result.push(&data[start..i]);
+            start = i + delimiter.len();
+        }
+    }
+    if start < data.len() {
+        result.push(&data[start..]);
+    }
+    result
+}
+```
+# Path: hyperlane/request/src/utils/vec/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/request/src/utils/encode/const.rs
+```rust
+pub(crate) const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+```
+# Path: hyperlane/request/src/utils/encode/fn.rs
+```rust
+use super::*;
+pub(crate) fn base64_encode(input: &[u8]) -> String {
+    let mut result: String = String::new();
+    for chunk in input.chunks(3) {
+        let mut buf: [u8; 3] = [0u8; 3];
+        for (i, &byte) in chunk.iter().enumerate() {
+            buf[i] = byte;
+        }
+        let bits_value: u32 = ((buf[0] as u32) << 16) | ((buf[1] as u32) << 8) | (buf[2] as u32);
+        result.push(CHARS[((bits_value >> 18) & 63) as usize] as char);
+        result.push(CHARS[((bits_value >> 12) & 63) as usize] as char);
+        result.push(if chunk.len() > 1 {
+            CHARS[((bits_value >> 6) & 63) as usize] as char
+        } else {
+            '='
+        });
+        result.push(if chunk.len() > 2 {
+            CHARS[(bits_value & 63) as usize] as char
+        } else {
+            '='
+        });
+    }
+    result
+}
+```
+# Path: hyperlane/request/src/utils/encode/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+pub(crate) use {r#const::*, r#fn::*};
+```
+# Path: hyperlane/request/src/request/mod.rs
+```rust
+mod config;
+mod http_request;
+mod proxy;
+mod request_builder;
+mod shared;
+mod socket;
+mod tmp;
+pub use {http_request::*, request_builder::*, socket::*};
+pub(crate) use {config::*, proxy::*, shared::*, tmp::*};
+use super::*;
+```
+# Path: hyperlane/request/src/request/proxy/impl.rs
+```rust
+use super::*;
+impl ProxyTunnelStream {
+    pub(crate) fn new(stream: BoxAsyncReadWrite, pre_read_data: Vec<u8>) -> Self {
+        Self {
+            inner: stream,
+            pre_read_data,
+        }
+    }
+}
+impl AsyncRead for ProxyTunnelStream {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        if !self.pre_read_data.is_empty() {
+            let len: usize = std::cmp::min(self.pre_read_data.len(), buf.remaining());
+            buf.put_slice(&self.pre_read_data[..len]);
+            self.pre_read_data.drain(..len);
+            return Poll::Ready(Ok(()));
+        }
+        Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
+}
+impl AsyncWrite for ProxyTunnelStream {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        Pin::new(&mut self.inner).poll_write(cx, buf)
+    }
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+}
+impl Unpin for ProxyTunnelStream {}
+impl SyncProxyTunnelStream {
+    pub(crate) fn new(stream: BoxReadWrite, pre_read_data: Vec<u8>) -> Self {
+        Self {
+            inner: stream,
+            pre_read_data,
+        }
+    }
+}
+impl Read for SyncProxyTunnelStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if !self.pre_read_data.is_empty() {
+            let len: usize = std::cmp::min(self.pre_read_data.len(), buf.len());
+            buf[..len].copy_from_slice(&self.pre_read_data[..len]);
+            self.pre_read_data.drain(..len);
+            return Ok(len);
+        }
+        self.inner.read(buf)
+    }
+}
+impl Write for SyncProxyTunnelStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.inner.write(buf)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+```
+# Path: hyperlane/request/src/request/proxy/struct.rs
+```rust
+use super::*;
+pub struct ProxyTunnelStream {
+    pub(super) inner: BoxAsyncReadWrite,
+    pub(super) pre_read_data: Vec<u8>,
+}
+pub struct SyncProxyTunnelStream {
+    pub(super) inner: BoxReadWrite,
+    pub(super) pre_read_data: Vec<u8>,
+}
+```
+# Path: hyperlane/request/src/request/proxy/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/shared/impl.rs
+```rust
+use super::*;
+impl SharedRequestBuilder {
+    pub(crate) fn build_http_request(
+        method: &str,
+        path: String,
+        header_bytes: Vec<u8>,
+        body_bytes: Option<Vec<u8>>,
+        http_version_str: String,
+    ) -> Vec<u8> {
+        let request_line_size: usize = method.len() + 1 + path.len() + 1 + http_version_str.len();
+        let body_size: usize = body_bytes.as_ref().map_or(0, |b| b.len());
+        let total_size: usize = request_line_size + 2 + header_bytes.len() + 2 + body_size;
+        let mut request: Vec<u8> = Vec::with_capacity(total_size);
+        request.extend_from_slice(method.as_bytes());
+        request.push(b' ');
+        request.extend_from_slice(path.as_bytes());
+        request.push(b' ');
+        request.extend_from_slice(http_version_str.as_bytes());
+        request.extend_from_slice(HTTP_BR_BYTES);
+        request.extend_from_slice(&header_bytes);
+        request.extend_from_slice(HTTP_BR_BYTES);
+        if let Some(body) = body_bytes {
+            request.extend_from_slice(&body);
+        }
+        request
+    }
+    pub(crate) fn build_get_request(
+        path: String,
+        header_bytes: Vec<u8>,
+        http_version_str: String,
+    ) -> Vec<u8> {
+        Self::build_http_request("GET", path, header_bytes, None, http_version_str)
+    }
+    pub(crate) fn build_post_request(
+        path: String,
+        header_bytes: Vec<u8>,
+        body_bytes: Vec<u8>,
+        http_version_str: String,
+    ) -> Vec<u8> {
+        Self::build_http_request(
+            "POST",
+            path,
+            header_bytes,
+            Some(body_bytes),
+            http_version_str,
+        )
+    }
+}
+impl SharedResponseHandler {
+    pub(crate) fn parse_response_headers(
+        headers_bytes: &[u8],
+        http_version_bytes: &[u8],
+        location_sign_key: &[u8],
+        content_length: &mut usize,
+        redirect_url: &mut Option<Vec<u8>>,
+        is_chunked: &mut bool,
+    ) -> Result<(), RequestError> {
+        if let Some(status_pos) =
+            Self::find_pattern_case_insensitive(headers_bytes, http_version_bytes)
+        {
+            let status_code_start: usize = status_pos + http_version_bytes.len() + 1;
+            let status_code_end: usize = status_code_start + 3;
+            if status_code_end <= headers_bytes.len() {
+                let status_code: usize =
+                    Self::parse_status_code(&headers_bytes[status_code_start..status_code_end]);
+                if (300..=399).contains(&status_code)
+                    && let Some(location_pos) =
+                        Self::find_pattern_case_insensitive(headers_bytes, location_sign_key)
+                {
+                    let start: usize = location_pos + location_sign_key.len();
+                    if let Some(end_pos) = Self::find_crlf(headers_bytes, start) {
+                        let mut url_vec = Vec::with_capacity(end_pos - start);
+                        url_vec.extend_from_slice(&headers_bytes[start..end_pos]);
+                        *redirect_url = Some(url_vec);
+                    }
+                }
+            }
+        }
+        *content_length = Self::get_content_length(headers_bytes);
+        *is_chunked = Self::is_chunked_encoding(headers_bytes);
+        Ok(())
+    }
+    pub(crate) fn find_pattern_case_insensitive(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+        if needle.is_empty() || haystack.len() < needle.len() {
+            return None;
+        }
+        let needle_len: usize = needle.len();
+        let search_len: usize = haystack.len() - needle_len + 1;
+        let first_needle_lower: u8 = needle[0].to_ascii_lowercase();
+        'outer: for i in 0..search_len {
+            if haystack[i].to_ascii_lowercase() != first_needle_lower {
+                continue;
+            }
+            for j in 1..needle_len {
+                if !haystack[i + j].eq_ignore_ascii_case(&needle[j]) {
+                    continue 'outer;
+                }
+            }
+            return Some(i);
+        }
+        None
+    }
+    pub(crate) fn find_crlf(data: &[u8], start: usize) -> Option<usize> {
+        let search_data: &[u8] = &data[start..];
+        for i in 0..search_data.len().saturating_sub(1) {
+            if search_data[i] == b'\r' && search_data[i + 1] == b'\n' {
+                return Some(start + i);
+            }
+        }
+        None
+    }
+    pub(crate) fn find_double_crlf(data: &[u8], start: usize) -> Option<usize> {
+        let search_data: &[u8] = &data[start..];
+        for i in 0..search_data.len().saturating_sub(3) {
+            if search_data[i] == b'\r'
+                && search_data[i + 1] == b'\n'
+                && search_data[i + 2] == b'\r'
+                && search_data[i + 3] == b'\n'
+            {
+                return Some(start + i);
+            }
+        }
+        None
+    }
+    pub(crate) fn get_content_length(response_bytes: &[u8]) -> usize {
+        if let Some(pos) =
+            Self::find_pattern_case_insensitive(response_bytes, CONTENT_LENGTH_PATTERN)
+        {
+            let value_start: usize = pos + CONTENT_LENGTH_PATTERN.len();
+            let value_start: usize = if response_bytes.get(value_start) == Some(&b' ') {
+                value_start + 1
+            } else {
+                value_start
+            };
+            if let Some(end_pos) = Self::find_crlf(response_bytes, value_start) {
+                let value_bytes: &[u8] = &response_bytes[value_start..end_pos];
+                return Self::parse_decimal_bytes(value_bytes);
+            }
+        }
+        0
+    }
+    pub(crate) fn is_chunked_encoding(headers_bytes: &[u8]) -> bool {
+        if let Some(pos) =
+            Self::find_pattern_case_insensitive(headers_bytes, TRANSFER_ENCODING_PATTERN)
+        {
+            let value_start: usize = pos + TRANSFER_ENCODING_PATTERN.len();
+            let value_start: usize = if headers_bytes.get(value_start) == Some(&b' ') {
+                value_start + 1
+            } else {
+                value_start
+            };
+            if let Some(end_pos) = Self::find_crlf(headers_bytes, value_start) {
+                let value_bytes: &[u8] = &headers_bytes[value_start..end_pos];
+                return Self::find_pattern_case_insensitive(value_bytes, CHUNKED_PATTERN).is_some();
+            }
+        }
+        false
+    }
+    pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        let mut pos: usize = 0;
+        while pos < body_bytes.len() {
+            let chunk_size_end: usize = match body_bytes[pos..]
+                .windows(2)
+                .position(|window: &[u8]| window == b"\r\n")
+            {
+                Some(p) => pos + p,
+                None => break,
+            };
+            let chunk_size_str: &[u8] = &body_bytes[pos..chunk_size_end];
+            let chunk_size_str: &[u8] = match chunk_size_str.iter().position(|&b| b == b';') {
+                Some(p) => &chunk_size_str[..p],
+                None => chunk_size_str,
+            };
+            let chunk_size: usize = match std::str::from_utf8(chunk_size_str) {
+                Ok(s) => match usize::from_str_radix(s.trim(), 16) {
+                    Ok(n) => n,
+                    Err(_) => break,
+                },
+                Err(_) => break,
+            };
+            if chunk_size == 0 {
+                break;
+            }
+            let chunk_data_start: usize = chunk_size_end + 2;
+            let chunk_data_end: usize = chunk_data_start + chunk_size;
+            if chunk_data_end > body_bytes.len() {
+                break;
+            }
+            result.extend_from_slice(&body_bytes[chunk_data_start..chunk_data_end]);
+            pos = chunk_data_end + 2;
+        }
+        result
+    }
+    pub(crate) fn parse_decimal_bytes(bytes: &[u8]) -> usize {
+        let mut result: usize = 0;
+        let mut started: bool = false;
+        for &byte in bytes {
+            match byte {
+                b'0'..=b'9' => {
+                    started = true;
+                    result = result * 10 + (byte - b'0') as usize;
+                }
+                b' ' | b'\t' if !started => continue,
+                _ => break,
+            }
+        }
+        result
+    }
+    pub(crate) fn parse_status_code(status_bytes: &[u8]) -> usize {
+        if status_bytes.len() != 3 {
+            return 0;
+        }
+        let mut result: usize = 0;
+        for &byte in status_bytes {
+            if byte.is_ascii_digit() {
+                result = result * 10 + (byte - b'0') as usize;
+            } else {
+                return 0;
+            }
+        }
+        result
+    }
+    pub(crate) fn calculate_buffer_capacity(
+        response_bytes: &[u8],
+        n: usize,
+        current_capacity: usize,
+    ) -> usize {
+        if response_bytes.len() + n <= current_capacity {
+            return 0;
+        }
+        let needed_cap: usize = response_bytes.len() + n;
+        if current_capacity == 0 {
+            needed_cap.max(1024)
+        } else if needed_cap <= current_capacity * 2 {
+            current_capacity * 2
+        } else {
+            (needed_cap * 3) / 2
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/request/shared/struct.rs
+```rust
+pub(crate) struct SharedRequestBuilder;
+pub(crate) struct SharedResponseHandler;
+```
+# Path: hyperlane/request/src/request/shared/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/socket/mod.rs
+```rust
+mod config;
+mod message;
+mod proxy;
+mod shared;
+mod websocket;
+mod websocket_builder;
+pub use {message::*, shared::*, websocket::*, websocket_builder::*};
+pub(crate) use {config::*, proxy::*};
+use super::*;
+```
+# Path: hyperlane/request/src/request/socket/proxy/impl.rs
+```rust
+use super::*;
+impl WebSocketProxyTunnelStream {
+    pub(crate) fn new(stream: BoxAsyncReadWrite) -> Self {
+        Self { inner: stream }
+    }
+}
+impl AsyncRead for WebSocketProxyTunnelStream {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
+}
+impl AsyncWrite for WebSocketProxyTunnelStream {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        Pin::new(&mut self.inner).poll_write(cx, buf)
+    }
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+}
+impl Unpin for WebSocketProxyTunnelStream {}
+impl Debug for WebSocketProxyTunnelStream {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WebSocketProxyTunnelStream")
+            .field("inner", &"<BoxAsyncReadWrite>")
+            .finish()
+    }
+}
+impl SyncWebSocketProxyTunnelStream {
+    #[allow(dead_code)]
+    pub(crate) fn new(stream: BoxReadWrite) -> Self {
+        Self { inner: stream }
+    }
+}
+impl Read for SyncWebSocketProxyTunnelStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+impl Write for SyncWebSocketProxyTunnelStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.inner.write(buf)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+```
+# Path: hyperlane/request/src/request/socket/proxy/struct.rs
+```rust
+use super::*;
+pub struct WebSocketProxyTunnelStream {
+    pub(super) inner: BoxAsyncReadWrite,
+}
+pub struct SyncWebSocketProxyTunnelStream {
+    pub(super) inner: BoxReadWrite,
+}
+```
+# Path: hyperlane/request/src/request/socket/proxy/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/socket/shared/impl.rs
+```rust
+use super::*;
+impl std::fmt::Display for WebSocketError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.kind {
+            WebSocketErrorKind::Connection => write!(f, "Connection error: {}", self.message),
+            WebSocketErrorKind::String => write!(f, "String error: {}", self.message),
+            WebSocketErrorKind::Timeout => write!(f, "Timeout error: {}", self.message),
+            WebSocketErrorKind::InvalidUrl => write!(f, "Invalid URL: {}", self.message),
+            WebSocketErrorKind::Io => write!(f, "IO error: {}", self.message),
+            WebSocketErrorKind::Tls => write!(f, "TLS error: {}", self.message),
+        }
+    }
+}
+impl std::error::Error for WebSocketError {}
+impl WebSocketError {
+    pub(crate) fn connection<T: ToString>(message: T) -> Self {
+        Self {
+            kind: WebSocketErrorKind::Connection,
+            message: message.to_string(),
+        }
+    }
+    pub(crate) fn protocol<T: ToString>(message: T) -> Self {
+        Self {
+            kind: WebSocketErrorKind::String,
+            message: message.to_string(),
+        }
+    }
+    pub(crate) fn timeout<T: ToString>(message: T) -> Self {
+        Self {
+            kind: WebSocketErrorKind::Timeout,
+            message: message.to_string(),
+        }
+    }
+    pub(crate) fn invalid_url<T: ToString>(message: T) -> Self {
+        Self {
+            kind: WebSocketErrorKind::InvalidUrl,
+            message: message.to_string(),
+        }
+    }
+    pub(crate) fn io<T: ToString>(message: T) -> Self {
+        Self {
+            kind: WebSocketErrorKind::Io,
+            message: message.to_string(),
+        }
+    }
+    pub(crate) fn tls<T: ToString>(message: T) -> Self {
+        Self {
+            kind: WebSocketErrorKind::Tls,
+            message: message.to_string(),
+        }
+    }
+}
+impl SharedWebSocketBuilder {
+    pub(crate) fn parse_url(url: &str) -> Result<HttpUrlComponents, WebSocketError> {
+        if url.is_empty() {
+            return Err(WebSocketError::invalid_url("URL is empty"));
+        }
+        let mut url_obj: HttpUrlComponents = HttpUrlComponents::default();
+        if url.starts_with("ws://") {
+            url_obj.protocol = HTTP_LOWERCASE.to_string();
+            url_obj.port = Some(80);
+        } else if url.starts_with("wss://") {
+            url_obj.protocol = HTTP_UPPERCASE.to_string();
+            url_obj.port = Some(443);
+        } else {
+            return Err(WebSocketError::invalid_url("Invalid WebSocket URL scheme"));
+        }
+        let without_protocol: &str = if let Some(stripped) = url.strip_prefix("ws://") {
+            stripped
+        } else {
+            &url[6..]
+        };
+        let parts: Vec<&str> = without_protocol.splitn(2, '/').collect();
+        let host_port: &str = parts[0];
+        let path: &str = if parts.len() > 1 { parts[1] } else { "" };
+        if host_port.contains(':') {
+            let host_port_parts: Vec<&str> = host_port.splitn(2, ':').collect();
+            url_obj.host = Some(host_port_parts[0].to_string());
+            if let Ok(port) = host_port_parts[1].parse::<u16>() {
+                url_obj.port = Some(port);
+            }
+        } else {
+            url_obj.host = Some(host_port.to_string());
+        }
+        url_obj.path = Some(if path.is_empty() {
+            "/".to_string()
+        } else {
+            format!("/{path}")
+        });
+        Ok(url_obj)
+    }
+}
+```
+# Path: hyperlane/request/src/request/socket/shared/type.rs
+```rust
+use super::*;
+pub type WebSocketResult = Result<(), WebSocketError>;
+pub type WebSocketMessageResult = Result<WebSocketMessage, WebSocketError>;
+```
+# Path: hyperlane/request/src/request/socket/shared/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug)]
+pub(crate) struct SharedWebSocketBuilder;
+#[derive(Clone, Debug)]
+pub struct WebSocketError {
+    pub(crate) kind: WebSocketErrorKind,
+    pub(crate) message: String,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum WebSocketErrorKind {
+    Connection,
+    String,
+    Timeout,
+    InvalidUrl,
+    Io,
+    Tls,
+}
+```
+# Path: hyperlane/request/src/request/socket/shared/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+mod r#type;
+use http_type::{HTTP_LOWERCASE, HTTP_UPPERCASE};
+pub use {r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/request/src/request/socket/websocket/impl.rs
+```rust
+use super::*;
+impl WebSocket {
+    fn get_url(&self) -> String {
+        self.url.as_ref().clone()
+    }
+    fn generate_websocket_key() -> String {
+        let mut key_bytes: [u8; 16] = [0u8; 16];
+        let now: u64 = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+        let ptr: usize = &key_bytes as *const _ as usize;
+        for (i, byte) in key_bytes.iter_mut().enumerate() {
+            *byte = ((now.wrapping_add(ptr as u64).wrapping_add(i as u64)) % 256) as u8;
+        }
+        base64_encode(&key_bytes)
+    }
+    fn get_headers(&self) -> Vec<(String, String)> {
+        let mut headers: Vec<(String, String)> = Vec::new();
+        for (key, value) in self.header.iter() {
+            if let Some(first_value) = value.front() {
+                headers.push((key.clone(), first_value.clone()));
+            }
+        }
+        headers
+    }
+    async fn connect_async_internal(&self) -> Result<(), WebSocketError> {
+        if self.connected.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        let url: String = self.get_url();
+        if url.is_empty() {
+            return Err(WebSocketError::invalid_url("URL is empty"));
+        }
+        let url_obj: HttpUrlComponents = SharedWebSocketBuilder::parse_url(&url)?;
+        if let Ok(mut config) = self.config.write() {
+            config.url_obj = url_obj;
+        }
+        let timeout_duration: Duration = Duration::from_millis(
+            self.config
+                .read()
+                .map(|config| config.timeout)
+                .unwrap_or(DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS),
+        );
+        let headers: Vec<(String, String)> = self.get_headers();
+        let mut request_builder = Request::builder().uri(&url);
+        for (key, value) in &headers {
+            request_builder = request_builder.header(key, value);
+        }
+        let request: Request = request_builder.body(()).map_err(|error| {
+            WebSocketError::invalid_url(format!("Failed to build request: {error}"))
+        })?;
+        let proxy_config: Option<ProxyConfig> = self
+            .config
+            .read()
+            .ok()
+            .and_then(|config| config.proxy.clone());
+        let ws_stream: WebSocketConnectionType = if let Some(proxy_config) = proxy_config {
+            let url_obj: HttpUrlComponents = self
+                .config
+                .read()
+                .map(|config| config.url_obj.clone())
+                .unwrap_or_default();
+            let target_host: String = url_obj.host.clone().unwrap_or_default();
+            let target_port: u16 = url_obj.port.unwrap_or_default();
+            let proxy_stream: BoxAsyncReadWrite = self
+                .get_proxy_connection_stream_async(target_host.clone(), target_port, &proxy_config)
+                .await?;
+            let proxy_tunnel_stream: WebSocketProxyTunnelStream =
+                WebSocketProxyTunnelStream::new(proxy_stream);
+            let mut proxy_request_builder = Request::builder().uri(&url);
+            proxy_request_builder = proxy_request_builder
+                .header(HOST, format!("{target_host}:{target_port}"))
+                .header(UPGRADE, "websocket")
+                .header(CONNECTION, "Upgrade")
+                .header(SEC_WEBSOCKET_VERSION, "13")
+                .header(SEC_WEBSOCKET_KEY, Self::generate_websocket_key());
+            for (key, value) in &headers {
+                proxy_request_builder = proxy_request_builder.header(key, value);
+            }
+            let protocols: Vec<String> = self
+                .config
+                .read()
+                .map(|config| config.protocols.clone())
+                .unwrap_or_default();
+            if !protocols.is_empty() {
+                proxy_request_builder =
+                    proxy_request_builder.header("Sec-WebSocket-String", protocols.join(", "));
+            }
+            let proxy_request: Request = proxy_request_builder.body(()).map_err(|e| {
+                WebSocketError::invalid_url(format!("Failed to build proxy request: {e}"))
+            })?;
+            let connect_future = client_async_with_config(proxy_request, proxy_tunnel_stream, None);
+            let (ws_stream, _) = timeout(timeout_duration, connect_future)
+                .await
+                .map_err(|_| WebSocketError::timeout("Connection timeout"))?
+                .map_err(|e| {
+                    let error_msg: String = e.to_string();
+                    if error_msg.contains("tls")
+                        || error_msg.contains("TLS")
+                        || error_msg.contains("ssl")
+                        || error_msg.contains("SSL")
+                        || error_msg.contains("certificate")
+                        || error_msg.contains("handshake")
+                    {
+                        WebSocketError::tls(error_msg)
+                    } else {
+                        WebSocketError::connection(error_msg)
+                    }
+                })?;
+            WebSocketConnectionType::Proxy(ws_stream)
+        } else {
+            let connect_future = connect_async_with_config(request, None, false);
+            let (ws_stream, _) = timeout(timeout_duration, connect_future)
+                .await
+                .map_err(|_| WebSocketError::timeout("Connection timeout"))?
+                .map_err(|e| {
+                    let error_msg: String = e.to_string();
+                    if error_msg.contains("tls")
+                        || error_msg.contains("TLS")
+                        || error_msg.contains("ssl")
+                        || error_msg.contains("SSL")
+                        || error_msg.contains("certificate")
+                        || error_msg.contains("handshake")
+                    {
+                        WebSocketError::tls(error_msg)
+                    } else {
+                        WebSocketError::connection(error_msg)
+                    }
+                })?;
+            WebSocketConnectionType::Direct(ws_stream)
+        };
+        let mut connection: http_type::tokio::sync::MutexGuard<
+            '_,
+            Option<WebSocketConnectionType>,
+        > = self.connection.lock().await;
+        *connection = Some(ws_stream);
+        self.connected.store(true, Ordering::Relaxed);
+        Ok(())
+    }
+    async fn send_message_async(&self, message: Message) -> Result<(), WebSocketError> {
+        if !self.connected.load(Ordering::Relaxed) {
+            self.connect_async_internal().await?;
+        }
+        let mut connection: http_type::tokio::sync::MutexGuard<
+            '_,
+            Option<WebSocketConnectionType>,
+        > = self.connection.lock().await;
+        if let Some(ref mut ws_stream) = *connection {
+            ws_stream
+                .send(message)
+                .await
+                .map_err(|error: tungstenite::Error| WebSocketError::protocol(error.to_string()))?;
+        } else {
+            return Err(WebSocketError::connection("Not connected"));
+        }
+        Ok(())
+    }
+    fn send_message_sync(&self, message: Message) -> Result<(), WebSocketError> {
+        let rt: Runtime = Runtime::new()
+            .map_err(|error: std::io::Error| WebSocketError::io(error.to_string()))?;
+        rt.block_on(self.send_message_async(message))
+    }
+    async fn receive_message_async(&self) -> Result<WebSocketMessage, WebSocketError> {
+        if !self.connected.load(Ordering::Relaxed) {
+            return Err(WebSocketError::connection("Not connected"));
+        }
+        let timeout_duration: Duration = Duration::from_millis(
+            self.config
+                .read()
+                .map(|config| config.timeout)
+                .unwrap_or(DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS),
+        );
+        let mut connection: http_type::tokio::sync::MutexGuard<
+            '_,
+            Option<WebSocketConnectionType>,
+        > = self.connection.lock().await;
+        if let Some(ref mut ws_stream) = *connection {
+            let receive_future = ws_stream.next();
+            if let Some(msg_result) = timeout(timeout_duration, receive_future)
+                .await
+                .map_err(|_| WebSocketError::timeout("Receive timeout"))?
+            {
+                let message: Message = msg_result.map_err(|error: tungstenite::Error| {
+                    WebSocketError::protocol(error.to_string())
+                })?;
+                return Ok(self.convert_message(message));
+            }
+        }
+        Err(WebSocketError::connection("Connection closed"))
+    }
+    fn receive_message_sync(&self) -> Result<WebSocketMessage, WebSocketError> {
+        let rt: Runtime = Runtime::new()
+            .map_err(|error: std::io::Error| WebSocketError::io(error.to_string()))?;
+        rt.block_on(self.receive_message_async())
+    }
+    fn convert_message(&self, message: Message) -> WebSocketMessage {
+        match message {
+            Message::Text(text) => WebSocketMessage::Text(text.to_string()),
+            Message::Binary(data) => WebSocketMessage::Binary(data.to_vec()),
+            Message::Ping(data) => WebSocketMessage::Ping(data.to_vec()),
+            Message::Pong(data) => WebSocketMessage::Pong(data.to_vec()),
+            Message::Close(_) => WebSocketMessage::Close,
+            Message::Frame(_) => WebSocketMessage::Close,
+        }
+    }
+    async fn close_async_internal(&self) -> Result<(), WebSocketError> {
+        let mut connection: http_type::tokio::sync::MutexGuard<
+            '_,
+            Option<WebSocketConnectionType>,
+        > = self.connection.lock().await;
+        if let Some(ref mut ws_stream) = *connection {
+            ws_stream
+                .send(Message::Close(None))
+                .await
+                .map_err(|error: tungstenite::Error| WebSocketError::protocol(error.to_string()))?;
+            use futures::SinkExt;
+            ws_stream
+                .close()
+                .await
+                .map_err(|error: tungstenite::Error| WebSocketError::protocol(error.to_string()))?;
+        }
+        *connection = None;
+        self.connected.store(false, Ordering::Relaxed);
+        Ok(())
+    }
+    fn close_sync(&self) -> Result<(), WebSocketError> {
+        let rt: Runtime = Runtime::new()
+            .map_err(|error: std::io::Error| WebSocketError::io(error.to_string()))?;
+        rt.block_on(self.close_async_internal())
+    }
+    async fn get_proxy_connection_stream_async(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+    ) -> Result<BoxAsyncReadWrite, WebSocketError> {
+        match proxy_config.proxy_type {
+            ProxyType::Http | ProxyType::Https => {
+                self.get_http_proxy_connection_async(target_host, target_port, proxy_config)
+                    .await
+            }
+            ProxyType::Socks5 => {
+                self.get_socks5_proxy_connection_async(target_host, target_port, proxy_config)
+                    .await
+            }
+        }
+    }
+    async fn get_http_proxy_connection_async(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+    ) -> Result<BoxAsyncReadWrite, WebSocketError> {
+        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
+        let tcp_stream: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect(proxy_host_port)
+                .await
+                .map_err(|err| WebSocketError::connection(err.to_string()))?;
+        let mut proxy_stream: BoxAsyncReadWrite = if proxy_config.proxy_type == ProxyType::Https {
+            let roots: RootCertStore = RootCertStore {
+                roots: TLS_SERVER_ROOTS.to_vec(),
+            };
+            let tls_config: ClientConfig = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
+            let dns_name: ServerName<'_> = ServerName::try_from(proxy_config.host.clone())
+                .map_err(|err| WebSocketError::tls(err.to_string()))?;
+            let tls_stream: TlsStream<http_type::tokio::net::TcpStream> = connector
+                .connect(dns_name, tcp_stream)
+                .await
+                .map_err(|err| WebSocketError::tls(err.to_string()))?;
+            Box::new(tls_stream)
+        } else {
+            Box::new(tcp_stream)
+        };
+        let connect_request: String = if let (Some(username), Some(password)) =
+            (&proxy_config.username, &proxy_config.password)
+        {
+            let auth: String = format!("{username}:{password}");
+            let auth_encoded: String = base64_encode(auth.as_bytes());
+            format!(
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {auth_encoded}\r\n\r\n"
+            )
+        } else {
+            format!(
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n\r\n"
+            )
+        };
+        proxy_stream
+            .write_all(connect_request.as_bytes())
+            .await
+            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+        proxy_stream
+            .flush()
+            .await
+            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+        let mut response_buffer: [u8; 1024] = [0u8; 1024];
+        let bytes_read: usize = proxy_stream
+            .read(&mut response_buffer)
+            .await
+            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+        let response: Cow<'_, str> = String::from_utf8_lossy(&response_buffer[..bytes_read]);
+        if !response.starts_with("HTTP/1.1 200") && !response.starts_with("HTTP/1.0 200") {
+            return Err(WebSocketError::connection(format!(
+                "Proxy connection failed: {}",
+                response.lines().next().unwrap_or("Unknown error")
+            )));
+        }
+        Ok(proxy_stream)
+    }
+    async fn get_socks5_proxy_connection_async(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+    ) -> Result<BoxAsyncReadWrite, WebSocketError> {
+        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
+        let mut tcp_stream: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect(proxy_host_port)
+                .await
+                .map_err(|err| WebSocketError::connection(err.to_string()))?;
+        let auth_methods: Vec<u8> =
+            if proxy_config.username.is_some() && proxy_config.password.is_some() {
+                vec![0x05, 0x02, 0x00, 0x02]
+            } else {
+                vec![0x05, 0x01, 0x00]
+            };
+        tcp_stream
+            .write_all(&auth_methods)
+            .await
+            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+        let mut response: [u8; 2] = [0u8; 2];
+        tcp_stream
+            .read_exact(&mut response)
+            .await
+            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+        if response[0] != 0x05 {
+            return Err(WebSocketError::protocol("Invalid SOCKS5 response"));
+        }
+        match response[1] {
+            0x00 => {}
+            0x02 => {
+                if let (Some(username), Some(password)) =
+                    (&proxy_config.username, &proxy_config.password)
+                {
+                    let mut auth_request = vec![0x01];
+                    auth_request.push(username.len() as u8);
+                    auth_request.extend_from_slice(username.as_bytes());
+                    auth_request.push(password.len() as u8);
+                    auth_request.extend_from_slice(password.as_bytes());
+                    tcp_stream
+                        .write_all(&auth_request)
+                        .await
+                        .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+                    let mut auth_response = [0u8; 2];
+                    tcp_stream
+                        .read_exact(&mut auth_response)
+                        .await
+                        .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+                    if auth_response[1] != 0x00 {
+                        return Err(WebSocketError::protocol("SOCKS5 authentication failed"));
+                    }
+                } else {
+                    return Err(WebSocketError::protocol(
+                        "SOCKS5 proxy requires authentication",
+                    ));
+                }
+            }
+            0xFF => {
+                return Err(WebSocketError::protocol(
+                    "No acceptable SOCKS5 authentication methods",
+                ));
+            }
+            _ => {
+                return Err(WebSocketError::protocol(
+                    "Unsupported SOCKS5 authentication method",
+                ));
+            }
+        }
+        let mut connect_request: Vec<u8> = vec![0x05, 0x01, 0x00];
+        if target_host.parse::<Ipv4Addr>().is_ok() {
+            connect_request.push(0x01);
+            let ip: Ipv4Addr = target_host.parse().unwrap();
+            connect_request.extend_from_slice(&ip.octets());
+        } else if target_host.parse::<Ipv6Addr>().is_ok() {
+            connect_request.push(0x04);
+            let ip: Ipv6Addr = target_host.parse().unwrap();
+            connect_request.extend_from_slice(&ip.octets());
+        } else {
+            connect_request.push(0x03);
+            connect_request.push(target_host.len() as u8);
+            connect_request.extend_from_slice(target_host.as_bytes());
+        }
+        connect_request.extend_from_slice(&target_port.to_be_bytes());
+        tcp_stream
+            .write_all(&connect_request)
+            .await
+            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+        let mut connect_response: [u8; 4] = [0u8; 4];
+        tcp_stream
+            .read_exact(&mut connect_response)
+            .await
+            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+        if connect_response[0] != 0x05 || connect_response[1] != 0x00 {
+            return Err(WebSocketError::protocol(format!(
+                "SOCKS5 connection failed with code: {}",
+                connect_response[1]
+            )));
+        }
+        match connect_response[3] {
+            0x01 => {
+                let mut skip: [u8; 6] = [0u8; 6];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .await
+                    .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+            }
+            0x03 => {
+                let mut len: [u8; 1] = [0u8; 1];
+                tcp_stream
+                    .read_exact(&mut len)
+                    .await
+                    .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+                let mut skip: Vec<u8> = vec![0u8; len[0] as usize + 2];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .await
+                    .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+            }
+            0x04 => {
+                let mut skip: [u8; 18] = [0u8; 18];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .await
+                    .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
+            }
+            _ => {
+                return Err(WebSocketError::protocol("Invalid SOCKS5 address type"));
+            }
+        }
+        let proxy_stream: BoxAsyncReadWrite = Box::new(tcp_stream);
+        Ok(proxy_stream)
+    }
+    pub fn send_text(&mut self, text: &str) -> WebSocketResult {
+        let message: Message = Message::Text(text.into());
+        self.send_message_sync(message)
+    }
+    pub fn send_binary(&mut self, data: &[u8]) -> WebSocketResult {
+        let message: Message = Message::Binary(data.to_vec().into());
+        self.send_message_sync(message)
+    }
+    pub fn send_ping(&mut self, data: &[u8]) -> WebSocketResult {
+        let message: Message = Message::Ping(data.to_vec().into());
+        self.send_message_sync(message)
+    }
+    pub fn send_pong(&mut self, data: &[u8]) -> WebSocketResult {
+        let message: Message = Message::Pong(data.to_vec().into());
+        self.send_message_sync(message)
+    }
+    pub fn receive(&mut self) -> WebSocketMessageResult {
+        self.receive_message_sync()
+    }
+    pub fn close(&mut self) -> WebSocketResult {
+        self.close_sync()
+    }
+    pub fn is_connected(&self) -> bool {
+        self.connected.load(Ordering::Relaxed)
+    }
+    pub async fn send_text_async(&mut self, text: &str) -> WebSocketResult {
+        let message: Message = Message::Text(text.into());
+        self.send_message_async(message).await
+    }
+    pub async fn send_binary_async(&mut self, data: &[u8]) -> WebSocketResult {
+        let message: Message = Message::Binary(data.to_vec().into());
+        self.send_message_async(message).await
+    }
+    pub async fn send_ping_async(&mut self, data: &[u8]) -> WebSocketResult {
+        let message: Message = Message::Ping(data.to_vec().into());
+        self.send_message_async(message).await
+    }
+    pub async fn send_pong_async(&mut self, data: &[u8]) -> WebSocketResult {
+        let message: Message = Message::Pong(data.to_vec().into());
+        self.send_message_async(message).await
+    }
+    pub async fn receive_async(&mut self) -> WebSocketMessageResult {
+        self.receive_message_async().await
+    }
+    pub async fn close_async_method(&mut self) -> WebSocketResult {
+        self.close_async_internal().await
+    }
+}
+impl WebSocketTrait for WebSocket {
+    fn send_text(&mut self, text: &str) -> WebSocketResult {
+        self.send_text(text)
+    }
+    fn send_binary(&mut self, data: &[u8]) -> WebSocketResult {
+        self.send_binary(data)
+    }
+    fn send_ping(&mut self, data: &[u8]) -> WebSocketResult {
+        self.send_ping(data)
+    }
+    fn send_pong(&mut self, data: &[u8]) -> WebSocketResult {
+        self.send_pong(data)
+    }
+    fn receive(&mut self) -> WebSocketMessageResult {
+        self.receive()
+    }
+    fn close(&mut self) -> WebSocketResult {
+        self.close()
+    }
+    fn is_connected(&self) -> bool {
+        self.is_connected()
+    }
+}
+impl AsyncWebSocketTrait for WebSocket {
+    fn send_text<'a>(
+        &'a mut self,
+        text: &'a str,
+    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>> {
+        Box::pin(self.send_text_async(text))
+    }
+    fn send_binary<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>> {
+        Box::pin(self.send_binary_async(data))
+    }
+    fn send_ping<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>> {
+        Box::pin(self.send_ping_async(data))
+    }
+    fn send_pong<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>> {
+        Box::pin(self.send_pong_async(data))
+    }
+    fn receive(&mut self) -> Pin<Box<dyn Future<Output = WebSocketMessageResult> + Send + '_>> {
+        Box::pin(self.receive_async())
+    }
+    fn close(&mut self) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + '_>> {
+        Box::pin(self.close_async_method())
+    }
+    fn is_connected(&self) -> bool {
+        self.is_connected()
+    }
+}
+```
+# Path: hyperlane/request/src/request/socket/websocket/trait.rs
+```rust
+use super::*;
+pub trait WebSocketTrait: Send + Sync {
+    fn send_text(&mut self, text: &str) -> WebSocketResult;
+    fn send_binary(&mut self, data: &[u8]) -> WebSocketResult;
+    fn send_ping(&mut self, data: &[u8]) -> WebSocketResult;
+    fn send_pong(&mut self, data: &[u8]) -> WebSocketResult;
+    fn receive(&mut self) -> WebSocketMessageResult;
+    fn close(&mut self) -> WebSocketResult;
+    fn is_connected(&self) -> bool;
+}
+pub trait AsyncWebSocketTrait: Send + Sync {
+    fn send_text<'a>(
+        &'a mut self,
+        text: &'a str,
+    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
+    fn send_binary<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
+    fn send_ping<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
+    fn send_pong<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
+    fn receive<'a>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = WebSocketMessageResult> + Send + 'a>>;
+    fn close<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
+    fn is_connected(&self) -> bool;
+}
+```
+# Path: hyperlane/request/src/request/socket/websocket/type.rs
+```rust
+use super::*;
+pub type BoxWebSocketTrait = Box<dyn WebSocketTrait>;
+pub type BoxAsyncWebSocketTrait = Box<dyn AsyncWebSocketTrait>;
+pub(crate) type WebSocketConnection = Arc<Mutex<Option<WebSocketConnectionType>>>;
+```
+# Path: hyperlane/request/src/request/socket/websocket/struct.rs
+```rust
+use super::*;
+#[derive(Debug)]
+pub enum WebSocketConnectionType {
+    Direct(WebSocketStream<MaybeTlsStream<http_type::tokio::net::TcpStream>>),
+    Proxy(WebSocketStream<WebSocketProxyTunnelStream>),
+}
+#[derive(Debug)]
+pub struct WebSocket {
+    pub(crate) url: Arc<String>,
+    pub(crate) header: Arc<RequestHeaders>,
+    pub(crate) config: ArcRwLock<WebSocketConfig>,
+    pub(crate) connected: Arc<AtomicBool>,
+    pub(crate) connection: WebSocketConnection,
+}
+impl Clone for WebSocket {
+    fn clone(&self) -> Self {
+        Self {
+            url: self.url.clone(),
+            header: self.header.clone(),
+            config: self.config.clone(),
+            connected: Arc::new(AtomicBool::new(false)),
+            connection: Arc::new(http_type::tokio::sync::Mutex::new(None)),
+        }
+    }
+}
+impl Default for WebSocket {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            url: Arc::new(String::new()),
+            header: Arc::new(hash_map_xx_hash3_64()),
+            config: Arc::new(RwLock::new(WebSocketConfig::default())),
+            connected: Arc::new(AtomicBool::new(false)),
+            connection: Arc::new(http_type::tokio::sync::Mutex::new(None)),
+        }
+    }
+}
+impl Stream for WebSocketConnectionType {
+    type Item =
+        Result<tokio_tungstenite::tungstenite::Message, tokio_tungstenite::tungstenite::Error>;
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match &mut *self {
+            WebSocketConnectionType::Direct(stream) => Pin::new(stream).poll_next(cx),
+            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).poll_next(cx),
+        }
+    }
+}
+impl Sink<tokio_tungstenite::tungstenite::Message> for WebSocketConnectionType {
+    type Error = tokio_tungstenite::tungstenite::Error;
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match &mut *self {
+            WebSocketConnectionType::Direct(stream) => Pin::new(stream).poll_ready(cx),
+            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).poll_ready(cx),
+        }
+    }
+    fn start_send(
+        mut self: Pin<&mut Self>,
+        item: tokio_tungstenite::tungstenite::Message,
+    ) -> Result<(), Self::Error> {
+        match &mut *self {
+            WebSocketConnectionType::Direct(stream) => Pin::new(stream).start_send(item),
+            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).start_send(item),
+        }
+    }
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match &mut *self {
+            WebSocketConnectionType::Direct(stream) => Pin::new(stream).poll_flush(cx),
+            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).poll_flush(cx),
+        }
+    }
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match &mut *self {
+            WebSocketConnectionType::Direct(stream) => Pin::new(stream).poll_close(cx),
+            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).poll_close(cx),
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/request/socket/websocket/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+mod r#trait;
+mod r#type;
+pub use {r#struct::*, r#trait::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/request/src/request/socket/message/impl.rs
+```rust
+use super::*;
+impl WebSocketMessage {
+    pub fn text<T: ToString>(text: T) -> Self {
+        Self::Text(text.to_string())
+    }
+    pub fn binary<T: Into<Vec<u8>>>(data: T) -> Self {
+        Self::Binary(data.into())
+    }
+    pub fn ping<T: Into<Vec<u8>>>(data: T) -> Self {
+        Self::Ping(data.into())
+    }
+    pub fn pong<T: Into<Vec<u8>>>(data: T) -> Self {
+        Self::Pong(data.into())
+    }
+    pub fn close() -> Self {
+        Self::Close
+    }
+    pub fn is_text(&self) -> bool {
+        matches!(self, Self::Text(_))
+    }
+    pub fn is_binary(&self) -> bool {
+        matches!(self, Self::Binary(_))
+    }
+    pub fn is_ping(&self) -> bool {
+        matches!(self, Self::Ping(_))
+    }
+    pub fn is_pong(&self) -> bool {
+        matches!(self, Self::Pong(_))
+    }
+    pub fn is_close(&self) -> bool {
+        matches!(self, Self::Close)
+    }
+    pub fn as_text(&self) -> Option<&str> {
+        match self {
+            Self::Text(text) => Some(text),
+            _ => None,
+        }
+    }
+    pub fn as_binary(&self) -> Option<&[u8]> {
+        match self {
+            Self::Binary(data) => Some(data),
+            _ => None,
+        }
+    }
+    pub fn into_text(self) -> Option<String> {
+        match self {
+            Self::Text(text) => Some(text),
+            _ => None,
+        }
+    }
+    pub fn into_binary(self) -> Option<Vec<u8>> {
+        match self {
+            Self::Binary(data) => Some(data),
+            _ => None,
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/request/socket/message/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, PartialEq)]
+pub enum WebSocketMessage {
+    Text(String),
+    Binary(Vec<u8>),
+    Ping(Vec<u8>),
+    Pong(Vec<u8>),
+    Close,
+}
+```
+# Path: hyperlane/request/src/request/socket/message/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+pub use r#enum::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/socket/config/impl.rs
+```rust
+use super::*;
+impl Default for WebSocketConfig {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            timeout: DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS,
+            url_obj: HttpUrlComponents::default(),
+            buffer: DEFAULT_BUFFER_SIZE,
+            protocols: Vec::new(),
+            proxy: None,
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/request/socket/config/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct WebSocketConfig {
+    pub(crate) timeout: u64,
+    pub(crate) url_obj: HttpUrlComponents,
+    pub(crate) buffer: usize,
+    pub(crate) protocols: Vec<String>,
+    pub(crate) proxy: Option<ProxyConfig>,
+}
+```
+# Path: hyperlane/request/src/request/socket/config/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/socket/websocket_builder/impl.rs
+```rust
+use super::*;
+impl WebSocketBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn connect(&mut self, url: &str) -> &mut Self {
+        self.websocket.url = Arc::new(url.to_owned());
+        self
+    }
+    pub fn headers<K, V>(&mut self, header: HashMapXxHash3_64<K, V>) -> &mut Self
+    where
+        K: ToString,
+        V: ToString,
+    {
+        if let Some(tmp_header) = Arc::get_mut(&mut self.websocket.header) {
+            for (key, value) in header {
+                let key_str: String = key.to_string();
+                let value_str: String = value.to_string();
+                let mut found_existing: bool = false;
+                let mut existing_key: Option<String> = None;
+                for existing_key_ref in tmp_header.keys() {
+                    if existing_key_ref.eq_ignore_ascii_case(&key_str) {
+                        existing_key = Some(existing_key_ref.clone());
+                        found_existing = true;
+                        break;
+                    }
+                }
+                if found_existing && let Some(existing_key) = existing_key {
+                    tmp_header.remove(&existing_key);
+                }
+                let mut value_deque: VecDeque<String> = VecDeque::new();
+                value_deque.push_front(value_str);
+                tmp_header.insert(key_str, value_deque);
+            }
+        }
+        self
+    }
+    pub fn timeout(&mut self, timeout: u64) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.timeout = timeout;
+        }
+        self
+    }
+    pub fn buffer(&mut self, buffer: usize) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.buffer = buffer;
+        }
+        self
+    }
+    pub fn protocols(&mut self, protocols: &[&str]) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.protocols = protocols
+                .iter()
+                .map(|protocol: &&str| protocol.to_string())
+                .collect();
+        }
+        self
+    }
+    pub fn http_proxy(&mut self, host: &str, port: u16) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.proxy = Some(ProxyConfig {
+                proxy_type: ProxyType::Http,
+                host: host.to_string(),
+                port,
+                username: None,
+                password: None,
+            });
+        }
+        self
+    }
+    pub fn https_proxy(&mut self, host: &str, port: u16) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.proxy = Some(ProxyConfig {
+                proxy_type: ProxyType::Https,
+                host: host.to_string(),
+                port,
+                username: None,
+                password: None,
+            });
+        }
+        self
+    }
+    pub fn socks5_proxy(&mut self, host: &str, port: u16) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.proxy = Some(ProxyConfig {
+                proxy_type: ProxyType::Socks5,
+                host: host.to_string(),
+                port,
+                username: None,
+                password: None,
+            });
+        }
+        self
+    }
+    pub fn http_proxy_auth(
+        &mut self,
+        host: &str,
+        port: u16,
+        username: &str,
+        password: &str,
+    ) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.proxy = Some(ProxyConfig {
+                proxy_type: ProxyType::Http,
+                host: host.to_string(),
+                port,
+                username: Some(username.to_string()),
+                password: Some(password.to_string()),
+            });
+        }
+        self
+    }
+    pub fn https_proxy_auth(
+        &mut self,
+        host: &str,
+        port: u16,
+        username: &str,
+        password: &str,
+    ) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.proxy = Some(ProxyConfig {
+                proxy_type: ProxyType::Https,
+                host: host.to_string(),
+                port,
+                username: Some(username.to_string()),
+                password: Some(password.to_string()),
+            });
+        }
+        self
+    }
+    pub fn socks5_proxy_auth(
+        &mut self,
+        host: &str,
+        port: u16,
+        username: &str,
+        password: &str,
+    ) -> &mut Self {
+        if let Ok(mut config) = self.websocket.config.write() {
+            config.proxy = Some(ProxyConfig {
+                proxy_type: ProxyType::Socks5,
+                host: host.to_string(),
+                port,
+                username: Some(username.to_string()),
+                password: Some(password.to_string()),
+            });
+        }
+        self
+    }
+    pub fn build_sync(&mut self) -> WebSocket {
+        self.builder = self.websocket.clone();
+        self.websocket = WebSocket::default();
+        self.builder.clone()
+    }
+    pub fn build_async(&mut self) -> WebSocket {
+        self.builder = self.websocket.clone();
+        self.websocket = WebSocket::default();
+        self.builder.clone()
+    }
+}
+```
+# Path: hyperlane/request/src/request/socket/websocket_builder/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default)]
+pub struct WebSocketBuilder {
+    pub(crate) websocket: WebSocket,
+    pub(crate) builder: WebSocket,
+}
+```
+# Path: hyperlane/request/src/request/socket/websocket_builder/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/config/impl.rs
+```rust
+use super::*;
+impl Default for Config {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            timeout: DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS,
+            url_obj: HttpUrlComponents::default(),
+            redirect: false,
+            max_redirect_times: DEFAULT_MAX_REDIRECT_TIMES,
+            redirect_times: 0,
+            http_version: HttpVersion::default(),
+            buffer: DEFAULT_BUFFER_SIZE,
+            decode: true,
+            proxy: None,
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/request/config/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Config {
+    pub(crate) timeout: u64,
+    pub(crate) url_obj: HttpUrlComponents,
+    pub(crate) redirect: bool,
+    pub(crate) max_redirect_times: usize,
+    pub(crate) redirect_times: usize,
+    pub(crate) http_version: HttpVersion,
+    pub(crate) buffer: usize,
+    pub(crate) decode: bool,
+    pub(crate) proxy: Option<ProxyConfig>,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ProxyConfig {
+    pub(crate) proxy_type: ProxyType,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) username: Option<String>,
+    pub(crate) password: Option<String>,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ProxyType {
+    Http,
+    Https,
+    Socks5,
+}
+```
+# Path: hyperlane/request/src/request/config/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/tmp/impl.rs
+```rust
+use super::*;
+impl Default for Tmp {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            visit_url: HashSet::new(),
+            root_cert: RootCertStore {
+                roots: TLS_SERVER_ROOTS.to_vec(),
+            },
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/request/tmp/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug)]
+pub struct Tmp {
+    pub visit_url: HashSet<String>,
+    pub root_cert: RootCertStore,
+}
+```
+# Path: hyperlane/request/src/request/tmp/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/request_builder/impl.rs
+```rust
+use super::*;
+impl RequestBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn post(&mut self, url: &str) -> &mut Self {
+        self.http_request.methods = Arc::new(Method::Post);
+        self.url(url);
+        self
+    }
+    pub fn get(&mut self, url: &str) -> &mut Self {
+        self.http_request.methods = Arc::new(Method::Get);
+        self.url(url);
+        self
+    }
+    fn url(&mut self, url: &str) -> &mut Self {
+        self.http_request.url = Arc::new(url.to_owned());
+        self
+    }
+    pub fn http1_1_only(&mut self) -> &mut Self {
+        if let Ok(mut config) = self.http_request.config.write() {
+            config.http_version = HttpVersion::Http1_1;
+        }
+        self
+    }
+    pub fn http2_only(&mut self) -> &mut Self {
+        if let Ok(mut config) = self.http_request.config.write() {
+            config.http_version = HttpVersion::Http2;
+        }
+        self
+    }
+    pub fn headers<K, V>(&mut self, header: HashMapXxHash3_64<K, V>) -> &mut Self
+    where
+        K: ToString,
+        V: ToString,
+    {
+        if let Some(tmp_header) = Arc::get_mut(&mut self.http_request.header) {
+            for (key, value) in header {
+                let key_str: String = key.to_string();
+                let value_str: String = value.to_string();
+                let mut found_existing: bool = false;
+                let mut existing_key: Option<String> = None;
+                for existing_key_ref in tmp_header.keys() {
+                    if existing_key_ref.eq_ignore_ascii_case(&key_str) {
+                        existing_key = Some(existing_key_ref.clone());
+                        found_existing = true;
+                        break;
+                    }
+                }
+                if found_existing && let Some(existing_key) = existing_key {
+                    tmp_header.remove(&existing_key);
+                }
+                let mut value_deque: VecDeque<String> = VecDeque::new();
+                value_deque.push_front(value_str);
+                tmp_header.insert(key_str, value_deque);
+            }
+        }
+        self
+    }
+    pub fn json(&mut self, body: serde_json::Value) -> &mut Self {
+        if let serde_json::Value::Object(map) = body {
+            let mut res_body: HashMapXxHash3_64<String, serde_json::Value> = hash_map_xx_hash3_64();
+            for (k, v) in map.iter() {
+                res_body.insert(k.to_string(), v.clone());
+            }
+            self.http_request.body = Arc::new(Body::Json(res_body));
+        }
+        self
+    }
+    pub fn text<T: ToString>(&mut self, body: T) -> &mut Self {
+        self.http_request.body = Arc::new(Body::Text(body.to_string()));
+        self
+    }
+    pub fn body<T: Into<Vec<u8>>>(&mut self, body: T) -> &mut Self {
+        self.http_request.body = Arc::new(Body::Binary(body.into()));
+        self
+    }
+    pub fn timeout(&mut self, timeout: u64) -> &mut Self {
+        if let Ok(mut config) = self.http_request.config.write() {
+            config.timeout = timeout;
+        }
+        self
+    }
+    pub fn redirect(&mut self) -> &mut Self {
+        if let Ok(mut config) = self.http_request.config.write() {
+            config.redirect = true;
+        }
+        self
+    }
+    pub fn unredirect(&mut self) -> &mut Self {
+        if let Ok(mut config) = self.http_request.config.write() {
+            config.redirect = false;
+        };
+        self
+    }
+```
+# Path: hyperlane/request/src/request/request_builder/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default)]
+pub struct RequestBuilder {
+    pub(crate) http_request: HttpRequest,
+    pub(crate) builder: HttpRequest,
+}
+```
+# Path: hyperlane/request/src/request/request_builder/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/http_request/impl.rs
+```rust
+use super::*;
+impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
+impl<T: Read + Write> ReadWrite for T {}
+impl AsyncRequestTrait for HttpRequest {
+    type RequestResult = RequestResult;
+    fn send(&mut self) -> Pin<Box<dyn Future<Output = Self::RequestResult> + Send + '_>> {
+        Box::pin(self.send_async())
+    }
+}
+impl RequestTrait for HttpRequest {
+    type RequestResult = RequestResult;
+    fn send(&mut self) -> Self::RequestResult {
+        self.send_sync()
+    }
+}
+impl Default for HttpRequest {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            methods: Arc::new(Method::default()),
+            url: Arc::new(String::new()),
+            header: Arc::new(hash_map_xx_hash3_64()),
+            body: Arc::new(Body::default()),
+            config: Arc::new(RwLock::new(Config::default())),
+            tmp: Arc::new(RwLock::new(Tmp::default())),
+            response: Arc::new(RwLock::new(HttpResponseBinary::default())),
+        }
+    }
+}
+impl HttpRequest {
+    #[inline(always)]
+    pub(crate) fn get_protocol(config: &Config) -> String {
+        config.url_obj.protocol.to_lowercase()
+    }
+    #[inline(always)]
+    pub(crate) fn get_methods(&self) -> Method {
+        self.methods.as_ref().clone()
+    }
+    #[inline(always)]
+    fn get_url(&self) -> String {
+        self.url.as_ref().clone()
+    }
+    #[inline(always)]
+    fn get_header(&self) -> RequestHeaders {
+        self.header.as_ref().clone()
+    }
+    #[inline(always)]
+    fn get_body(&self) -> Body {
+        self.body.as_ref().clone()
+    }
+    #[inline(always)]
+    pub(crate) fn url(&mut self, url: String) {
+        self.url = Arc::new(url);
+    }
+    pub(crate) fn parse_url(&self) -> Result<HttpUrlComponents, RequestError> {
+        match HttpUrlComponents::parse(self.get_url()) {
+            Ok(parse_res) => Ok(parse_res),
+            Err(error) => Err(RequestError::Request(error.to_string())),
+        }
+    }
+    fn header_contains_key_case_insensitive(header: &RequestHeaders, target_key: &str) -> bool {
+        header
+            .keys()
+            .any(|key| key.eq_ignore_ascii_case(target_key))
+    }
+    pub(crate) fn get_header_bytes(&self) -> Vec<u8> {
+        let mut header: RequestHeaders = self.get_header();
+        let body_length: usize = if self.get_methods().is_get() {
+            0usize
+        } else {
+            self.get_body_bytes().len()
+        };
+        if let Ok(config) = self.config.read() {
+            let host_value: String = config.url_obj.host.clone().unwrap_or_default();
+            let content_length_value: String = body_length.to_string();
+            if !Self::header_contains_key_case_insensitive(&header, HOST) {
+                let mut host_deque: VecDeque<String> = VecDeque::new();
+                host_deque.push_front(host_value);
+                header.insert(HOST.to_owned(), host_deque);
+            }
+            if !Self::header_contains_key_case_insensitive(&header, CONTENT_LENGTH) {
+                let mut content_length_deque: VecDeque<String> = VecDeque::new();
+                content_length_deque.push_front(content_length_value);
+                header.insert(CONTENT_LENGTH.to_owned(), content_length_deque);
+            }
+            if !Self::header_contains_key_case_insensitive(&header, ACCEPT) {
+                let mut accept_deque: VecDeque<String> = VecDeque::new();
+                accept_deque.push_front(ACCEPT_ANY.to_owned());
+                header.insert(ACCEPT.to_owned(), accept_deque);
+            }
+            if !Self::header_contains_key_case_insensitive(&header, USER_AGENT) {
+                let mut user_agent_deque: VecDeque<String> = VecDeque::new();
+                user_agent_deque.push_front(APP_NAME.to_owned());
+                header.insert(USER_AGENT.to_owned(), user_agent_deque);
+            }
+        }
+        let estimated_size: usize = header
+            .iter()
+            .map(|(k, v)| {
+                k.len()
+                    + v.front()
+                        .map_or(0, |header_value: &String| header_value.len())
+                    + 4
+            })
+            .sum();
+        let mut header_bytes: Vec<u8> = Vec::with_capacity(estimated_size);
+        for (key, value) in &header {
+            header_bytes.extend_from_slice(key.as_bytes());
+            header_bytes.extend_from_slice(b": ");
+            if let Some(header_value) = value.front() {
+                header_bytes.extend_from_slice(header_value.as_bytes());
+            }
+            header_bytes.extend_from_slice(HTTP_BR_BYTES);
+        }
+        header_bytes
+    }
+    pub(crate) fn get_body_bytes(&self) -> Vec<u8> {
+        let header: RequestHeaders = self.get_header();
+        let body: Body = self.get_body();
+        if let Some(content_type_value) = header.get(CONTENT_TYPE)
+            && let Some(first_value) = content_type_value.front()
+        {
+            let res: String = first_value
+                .to_lowercase()
+                .parse::<ContentType>()
+                .unwrap_or_default()
+                .get_body_string(&body);
+            return res.into_bytes();
+        }
+        for (key, value) in &header {
+            if key.eq_ignore_ascii_case(CONTENT_TYPE)
+                && let Some(first_value) = value.front()
+            {
+                let res: String = first_value
+                    .to_lowercase()
+                    .parse::<ContentType>()
+                    .unwrap_or_default()
+                    .get_body_string(&body);
+                return res.into_bytes();
+            }
+        }
+        String::new().into_bytes()
+    }
+    pub(crate) fn get_path(&self) -> String {
+        let path: String = self.config.read().map_or(String::new(), |config| {
+            let query: String = config.url_obj.query.clone().unwrap_or_default();
+            if query.is_empty() {
+                config
+                    .url_obj
+                    .path
+                    .clone()
+                    .unwrap_or(DEFAULT_HTTP_PATH.to_string())
+            } else {
+                format!(
+                    "{}{}{}",
+                    config.url_obj.path.clone().unwrap_or_default(),
+                    QUERY,
+                    query
+                )
+            }
+        });
+        path
+    }
+    fn send_get_request(
+        &mut self,
+        stream: &mut Box<dyn ReadWrite>,
+    ) -> Result<BoxResponseTrait, RequestError> {
+        let path: String = self.get_path();
+        let header_bytes: Vec<u8> = self.get_header_bytes();
+        let http_version_str: String =
+            self.config.read().map_or("HTTP/1.1".to_string(), |config| {
+                config.http_version.to_string()
+            });
+        let request: Vec<u8> =
+            SharedRequestBuilder::build_get_request(path, header_bytes, http_version_str);
+        stream
+            .write_all(&request)
+            .and_then(|_| stream.flush())
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        self.read_response(stream)
+    }
+    fn send_post_request(
+        &mut self,
+        stream: &mut Box<dyn ReadWrite>,
+    ) -> Result<BoxResponseTrait, RequestError> {
+        let path: String = self.get_path();
+        let header_bytes: Vec<u8> = self.get_header_bytes();
+        let body_bytes: Vec<u8> = self.get_body_bytes();
+        let http_version_str: String =
+            self.config.read().map_or("HTTP/1.1".to_string(), |config| {
+                config.http_version.to_string()
+            });
+        let request: Vec<u8> = SharedRequestBuilder::build_post_request(
+            path,
+            header_bytes,
+            body_bytes,
+            http_version_str,
+        );
+        stream
+            .write_all(&request)
+            .and_then(|_| stream.flush())
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        self.read_response(stream)
+    }
+    fn read_response(
+        &mut self,
+        stream: &mut Box<dyn ReadWrite>,
+    ) -> Result<BoxResponseTrait, RequestError> {
+        let buffer_size: usize = self
+            .config
+            .read()
+            .map_or(DEFAULT_BUFFER_SIZE, |config| config.buffer);
+        let mut buffer: Vec<u8> = vec![0; buffer_size];
+        let initial_capacity: usize = buffer_size.max(8192);
+        let mut response_bytes: Vec<u8> = Vec::with_capacity(initial_capacity);
+        let mut headers_done: bool = false;
+        let mut content_length: usize = 0;
+        let mut redirect_url: Option<Vec<u8>> = None;
+        let mut headers_end_pos: usize = 0;
+        let mut is_chunked: bool = false;
+        let http_version: String = self
+            .config
+            .read()
+            .map_or(HttpVersion::default().to_string(), |config| {
+                config.http_version.to_string()
+            });
+        let http_version_bytes: Vec<u8> = http_version.to_lowercase().into_bytes();
+        let location_sign_key: Vec<u8> = format!("{}:", LOCATION.to_lowercase()).into_bytes();
+        'read_loop: while let Ok(n) = stream.read(&mut buffer) {
+            if n == 0 {
+                break;
+            }
+            let new_capacity: usize = SharedResponseHandler::calculate_buffer_capacity(
+                &response_bytes,
+                n,
+                response_bytes.capacity(),
+            );
+            if new_capacity > 0 {
+                response_bytes.reserve(new_capacity - response_bytes.capacity());
+            }
+            let old_len: usize = response_bytes.len();
+            response_bytes.extend_from_slice(&buffer[..n]);
+            if !headers_done {
+                let search_start: usize = old_len.saturating_sub(3);
+                if let Some(pos) =
+                    SharedResponseHandler::find_double_crlf(&response_bytes, search_start)
+                {
+                    headers_done = true;
+                    headers_end_pos = pos + 4;
+                    SharedResponseHandler::parse_response_headers(
+                        &response_bytes[..headers_end_pos],
+                        &http_version_bytes,
+                        &location_sign_key,
+                        &mut content_length,
+                        &mut redirect_url,
+                        &mut is_chunked,
+                    )?;
+                }
+            }
+            if headers_done {
+                if is_chunked {
+                    if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..]) {
+                        break 'read_loop;
+                    }
+                } else {
+                    let total_expected_length: usize = headers_end_pos + content_length;
+                    if response_bytes.len() >= total_expected_length {
+                        response_bytes.truncate(total_expected_length);
+                        break 'read_loop;
+                    }
+                }
+            }
+        }
+        if is_chunked {
+            let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
+            let decoded_body: Vec<u8> = SharedResponseHandler::parse_chunked_body(&body_bytes);
+            response_bytes.truncate(headers_end_pos);
+            response_bytes.extend_from_slice(&decoded_body);
+        }
+        self.response = Arc::new(RwLock::new(<HttpResponseBinary as ResponseTrait>::from(
+            &response_bytes,
+        )));
+        if let Ok(config) = self.config.read()
+            && (!config.redirect || redirect_url.is_none())
+        {
+            if config.decode
+                && let Ok(mut response) = self.response.write()
+            {
+                *response = response.decode(config.buffer);
+            }
+            let response: BoxResponseTrait = Box::new(self.response.read().map_or(
+                HttpResponseBinary::default(),
+                |response: RwLockReadGuard<'_, HttpResponseBinary>| response.clone(),
+            ));
+            return Ok(response);
+        }
+        let url: String = String::from_utf8(redirect_url.unwrap())
+            .map_err(|error: FromUtf8Error| RequestError::Request(error.to_string()))?;
+        self.handle_redirect(url)
+    }
+    fn handle_redirect(&mut self, url: String) -> Result<BoxResponseTrait, RequestError> {
+        if let Ok(mut config) = self.config.write() {
+            if !config.redirect {
+                return Err(RequestError::Request("Redirect Not Enabled".to_string()));
+            }
+            if let Ok(mut tmp) = self.tmp.clone().write() {
+                if tmp.visit_url.contains(&url) {
+                    return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
+                }
+                tmp.visit_url.insert(url.clone());
+                if config.redirect_times >= config.max_redirect_times {
+                    return Err(RequestError::Request(
+                        "Max Redirect Times Exceeded".to_string(),
+                    ));
+                }
+                config.redirect_times += 1;
+            }
+        }
+        self.url(url.clone());
+        self.send_sync()
+    }
+    fn is_chunked_response_complete(body_bytes: &[u8]) -> bool {
+        let mut pos: usize = 0;
+        while pos < body_bytes.len() {
+            let chunk_size_end: usize = match body_bytes[pos..]
+                .windows(2)
+                .position(|window: &[u8]| window == b"\r\n")
+            {
+                Some(p) => pos + p,
+                None => return false,
+            };
+            let chunk_size_str: &[u8] = &body_bytes[pos..chunk_size_end];
+            let chunk_size_str: &[u8] = match chunk_size_str.iter().position(|&b| b == b';') {
+                Some(p) => &chunk_size_str[..p],
+                None => chunk_size_str,
+            };
+            let chunk_size: usize = match std::str::from_utf8(chunk_size_str) {
+                Ok(s) => match usize::from_str_radix(s.trim(), 16) {
+                    Ok(n) => n,
+                    Err(_) => return false,
+                },
+                Err(_) => return false,
+            };
+            if chunk_size == 0 {
+                return true;
+            }
+            let chunk_data_start: usize = chunk_size_end + 2;
+            let chunk_data_end: usize = chunk_data_start + chunk_size;
+            if chunk_data_end + 2 > body_bytes.len() {
+                return false;
+            }
+            pos = chunk_data_end + 2;
+        }
+        false
+    }
+    pub(crate) fn get_port(&self, port: u16, config: &Config) -> u16 {
+        if port != 0 {
+            return port;
+        }
+        let protocol: String = Self::get_protocol(config);
+        Protocol::get_port(&protocol)
+    }
+    fn get_connection_stream(
+        &self,
+        host: String,
+        port: u16,
+    ) -> Result<Box<dyn ReadWrite>, RequestError> {
+        let config: Config = self
+            .config
+            .read()
+            .map_or(Config::default(), |config| config.clone());
+        if let Some(proxy_config) = &config.proxy {
+            return self.get_proxy_connection_stream(host, port, proxy_config);
+        }
+        let host_port: (String, u16) = (host.clone(), port);
+        let timeout: Duration = Duration::from_millis(config.timeout);
+        let tcp_stream: TcpStream = TcpStream::connect(host_port.clone())
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        tcp_stream
+            .set_read_timeout(Some(timeout))
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        tcp_stream
+            .set_write_timeout(Some(timeout))
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let stream: Result<Box<dyn ReadWrite>, RequestError> =
+            if Self::get_protocol(&config) == HTTPS_LOWERCASE {
+                match self.tmp.clone().read() {
+                    Ok(tmp) => {
+                        let roots: RootCertStore = tmp.root_cert.clone();
+                        let tls_config: ClientConfig = ClientConfig::builder()
+                            .with_root_certificates(roots)
+                            .with_no_client_auth();
+                        let client_config: Arc<ClientConfig> = Arc::new(tls_config);
+                        let dns_name: ServerName<'_> = ServerName::try_from(host.clone()).map_err(
+                            |error: InvalidDnsNameError| RequestError::Request(error.to_string()),
+                        )?;
+                        let session: ClientConnection =
+                            ClientConnection::new(Arc::clone(&client_config), dns_name).map_err(
+                                |error: rustls::Error| RequestError::Request(error.to_string()),
+                            )?;
+                        let tls_stream: StreamOwned<ClientConnection, TcpStream> =
+                            StreamOwned::new(session, tcp_stream);
+                        return Ok(Box::new(tls_stream));
+                    }
+                    Err(error) => Err(RequestError::Request(error.to_string())),
+                }
+            } else {
+                Ok(Box::new(tcp_stream))
+            };
+        stream
+    }
+    fn get_proxy_connection_stream(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+    ) -> Result<Box<dyn ReadWrite>, RequestError> {
+        let timeout: Duration = Duration::from_millis(self.config.read().map_or(
+            DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS,
+            |config: RwLockReadGuard<'_, Config>| config.timeout,
+        ));
+        match proxy_config.proxy_type {
+            ProxyType::Http | ProxyType::Https => {
+                self.get_http_proxy_connection(target_host, target_port, proxy_config, timeout)
+            }
+            ProxyType::Socks5 => {
+                self.get_socks5_proxy_connection(target_host, target_port, proxy_config, timeout)
+            }
+        }
+    }
+    fn get_http_proxy_connection(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+        timeout: Duration,
+    ) -> Result<Box<dyn ReadWrite>, RequestError> {
+        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
+        let tcp_stream: TcpStream = TcpStream::connect(proxy_host_port)
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        tcp_stream
+            .set_read_timeout(Some(timeout))
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        tcp_stream
+            .set_write_timeout(Some(timeout))
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let mut proxy_stream: Box<dyn ReadWrite> = if proxy_config.proxy_type == ProxyType::Https {
+            match self.tmp.clone().read() {
+                Ok(tmp) => {
+                    let roots: RootCertStore = tmp.root_cert.clone();
+                    let tls_config: ClientConfig = ClientConfig::builder()
+                        .with_root_certificates(roots)
+                        .with_no_client_auth();
+                    let client_config: Arc<ClientConfig> = Arc::new(tls_config);
+                    let dns_name: ServerName<'_> = ServerName::try_from(proxy_config.host.clone())
+                        .map_err(|error: InvalidDnsNameError| {
+                            RequestError::Request(error.to_string())
+                        })?;
+                    let session: ClientConnection =
+                        ClientConnection::new(Arc::clone(&client_config), dns_name).map_err(
+                            |error: rustls::Error| RequestError::Request(error.to_string()),
+                        )?;
+                    let tls_stream: StreamOwned<ClientConnection, TcpStream> =
+                        StreamOwned::new(session, tcp_stream);
+                    Box::new(tls_stream)
+                }
+                Err(error) => {
+                    return Err(RequestError::Request(error.to_string()));
+                }
+            }
+        } else {
+            Box::new(tcp_stream)
+        };
+        let connect_request: String = if let (Some(username), Some(password)) =
+            (&proxy_config.username, &proxy_config.password)
+        {
+            let auth: String = format!("{username}:{password}");
+            let auth_encoded: String = base64_encode(auth.as_bytes());
+            format!(
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {auth_encoded}\r\n\r\n"
+            )
+        } else {
+            format!(
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n\r\n"
+            )
+        };
+        proxy_stream
+            .write_all(connect_request.as_bytes())
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        proxy_stream
+            .flush()
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let mut response_buffer = [0u8; 1024];
+        let bytes_read: usize = proxy_stream
+            .read(&mut response_buffer)
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let response_str: &str = std::str::from_utf8(&response_buffer[..bytes_read]).unwrap_or("");
+        let headers_end_pos: Option<usize> = response_str.find("\r\n\r\n");
+        let pre_read_data: Vec<u8> = if let Some(pos) = headers_end_pos {
+            let header_part: &str = &response_str[..pos];
+            if !header_part.starts_with("HTTP/1.1 200") && !header_part.starts_with("HTTP/1.0 200")
+            {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+            response_buffer[pos + 4..bytes_read].to_vec()
+        } else {
+            if !response_str.starts_with("HTTP/1.1 200")
+                && !response_str.starts_with("HTTP/1.0 200")
+            {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+            vec![]
+        };
+        let config: Config = self
+            .config
+            .read()
+            .map_or(Config::default(), |config| config.clone());
+        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
+            match self.tmp.clone().read() {
+                Ok(tmp) => {
+                    let roots: RootCertStore = tmp.root_cert.clone();
+                    let tls_config: ClientConfig = ClientConfig::builder()
+                        .with_root_certificates(roots)
+                        .with_no_client_auth();
+                    let client_config: Arc<ClientConfig> = Arc::new(tls_config);
+                    let dns_name: ServerName<'_> = ServerName::try_from(target_host.clone())
+                        .map_err(|error: InvalidDnsNameError| {
+                            RequestError::Request(error.to_string())
+                        })?;
+                    let session: ClientConnection =
+                        ClientConnection::new(Arc::clone(&client_config), dns_name).map_err(
+                            |error: rustls::Error| RequestError::Request(error.to_string()),
+                        )?;
+                    let tunnel_stream = SyncProxyTunnelStream::new(proxy_stream, pre_read_data);
+                    let tls_stream: StreamOwned<ClientConnection, SyncProxyTunnelStream> =
+                        StreamOwned::new(session, tunnel_stream);
+                    return Ok(Box::new(tls_stream));
+                }
+                Err(error) => {
+                    return Err(RequestError::Request(error.to_string()));
+                }
+            }
+        }
+        let tunnel_stream: SyncProxyTunnelStream =
+            SyncProxyTunnelStream::new(proxy_stream, pre_read_data);
+        Ok(Box::new(tunnel_stream))
+    }
+    fn get_socks5_proxy_connection(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+        timeout: Duration,
+    ) -> Result<Box<dyn ReadWrite>, RequestError> {
+        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
+        let mut tcp_stream: TcpStream = TcpStream::connect(proxy_host_port)
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        tcp_stream
+            .set_read_timeout(Some(timeout))
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        tcp_stream
+            .set_write_timeout(Some(timeout))
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let auth_methods: Vec<u8> =
+            if proxy_config.username.is_some() && proxy_config.password.is_some() {
+                vec![0x05, 0x02, 0x00, 0x02]
+            } else {
+                vec![0x05, 0x01, 0x00]
+            };
+        tcp_stream
+            .write_all(&auth_methods)
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let mut response = [0u8; 2];
+        tcp_stream
+            .read_exact(&mut response)
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        if response[0] != 0x05 {
+            return Err(RequestError::Request("Internal Server Error".to_string()));
+        }
+        match response[1] {
+            0x00 => {}
+            0x02 => {
+                if let (Some(username), Some(password)) =
+                    (&proxy_config.username, &proxy_config.password)
+                {
+                    let mut auth_request: Vec<u8> = vec![0x01];
+                    auth_request.push(username.len() as u8);
+                    auth_request.extend_from_slice(username.as_bytes());
+                    auth_request.push(password.len() as u8);
+                    auth_request.extend_from_slice(password.as_bytes());
+                    tcp_stream
+                        .write_all(&auth_request)
+                        .map_err(|error: std::io::Error| {
+                            RequestError::Request(error.to_string())
+                        })?;
+                    let mut auth_response: [u8; 2] = [0u8; 2];
+                    tcp_stream.read_exact(&mut auth_response).map_err(
+                        |error: std::io::Error| RequestError::Request(error.to_string()),
+                    )?;
+                    if auth_response[1] != 0x00 {
+                        return Err(RequestError::Request("Internal Server Error".to_string()));
+                    }
+                } else {
+                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                }
+            }
+            0xFF => {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+            _ => {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+        }
+        let mut connect_request: Vec<u8> = vec![0x05, 0x01, 0x00];
+        if target_host.parse::<Ipv4Addr>().is_ok() {
+            connect_request.push(0x01);
+            let ip: Ipv4Addr = target_host.parse().unwrap();
+            connect_request.extend_from_slice(&ip.octets());
+        } else if target_host.parse::<Ipv6Addr>().is_ok() {
+            connect_request.push(0x04);
+            let ip: Ipv6Addr = target_host.parse().unwrap();
+            connect_request.extend_from_slice(&ip.octets());
+        } else {
+            connect_request.push(0x03);
+            connect_request.push(target_host.len() as u8);
+            connect_request.extend_from_slice(target_host.as_bytes());
+        }
+        connect_request.extend_from_slice(&target_port.to_be_bytes());
+        tcp_stream
+            .write_all(&connect_request)
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let mut connect_response: [u8; 4] = [0u8; 4];
+        tcp_stream
+            .read_exact(&mut connect_response)
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        if connect_response[0] != 0x05 || connect_response[1] != 0x00 {
+            return Err(RequestError::Request("Internal Server Error".to_string()));
+        }
+        match connect_response[3] {
+            0x01 => {
+                let mut skip = [0u8; 6];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            }
+            0x03 => {
+                let mut len = [0u8; 1];
+                tcp_stream
+                    .read_exact(&mut len)
+                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+                let mut skip = vec![0u8; len[0] as usize + 2];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            }
+            0x04 => {
+                let mut skip = [0u8; 18];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            }
+            _ => {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+        }
+        let proxy_stream: Box<dyn ReadWrite> = Box::new(tcp_stream);
+        let config: Config = self
+            .config
+            .read()
+            .map_or(Config::default(), |config| config.clone());
+        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
+            match self.tmp.clone().read() {
+                Ok(tmp) => {
+                    let roots: RootCertStore = tmp.root_cert.clone();
+                    let tls_config: ClientConfig = ClientConfig::builder()
+                        .with_root_certificates(roots)
+                        .with_no_client_auth();
+                    let client_config: Arc<ClientConfig> = Arc::new(tls_config);
+                    let dns_name: ServerName<'_> = ServerName::try_from(target_host.clone())
+                        .map_err(|error: InvalidDnsNameError| {
+                            RequestError::Request(error.to_string())
+                        })?;
+                    let session: ClientConnection =
+                        ClientConnection::new(Arc::clone(&client_config), dns_name).map_err(
+                            |error: rustls::Error| RequestError::Request(error.to_string()),
+                        )?;
+                    let tunnel_stream: SyncProxyTunnelStream =
+                        SyncProxyTunnelStream::new(proxy_stream, vec![]);
+                    let tls_stream: StreamOwned<ClientConnection, SyncProxyTunnelStream> =
+                        StreamOwned::new(session, tunnel_stream);
+                    return Ok(Box::new(tls_stream));
+                }
+                Err(error) => {
+                    return Err(RequestError::Request(error.to_string()));
+                }
+            }
+        }
+        Ok(proxy_stream)
+    }
+}
+impl HttpRequest {
+    pub(crate) fn send_sync(&mut self) -> RequestResult {
+        let methods: Method = self.get_methods();
+        let mut host: String = String::new();
+        let mut port: u16 = u16::default();
+        if let Ok(mut config) = self.config.write() {
+            config.url_obj = self
+                .parse_url()
+                .map_err(|error: RequestError| RequestError::Request(error.to_string()))?;
+            host = config.url_obj.host.clone().unwrap_or_default();
+            port = self.get_port(config.url_obj.port.unwrap_or_default(), &config);
+        }
+        let mut stream: BoxReadWrite = self.get_connection_stream(host, port)?;
+        let res: Result<BoxResponseTrait, RequestError> = match methods {
+            m if m.is_get() => self.send_get_request(&mut stream),
+            m if m.is_post() => self.send_post_request(&mut stream),
+            _err => Err(RequestError::Request("Method Not Allowed".to_string())),
+        };
+        res
+    }
+}
+impl HttpRequest {
+    async fn send_get_request_async(
+        &mut self,
+        stream: &mut BoxAsyncReadWrite,
+    ) -> Result<BoxResponseTrait, RequestError> {
+        let path: String = self.get_path();
+        let header_bytes: Vec<u8> = self.get_header_bytes();
+        let http_version_str: String =
+            self.config.read().map_or("HTTP/1.1".to_string(), |config| {
+                config.http_version.to_string()
+            });
+        let request: Vec<u8> =
+            SharedRequestBuilder::build_get_request(path, header_bytes, http_version_str);
+        stream
+            .write_all(&request)
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        stream
+            .flush()
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        self.read_response_async(stream).await
+    }
+    async fn send_post_request_async(
+        &mut self,
+        stream: &mut BoxAsyncReadWrite,
+    ) -> Result<BoxResponseTrait, RequestError> {
+        let path: String = self.get_path();
+        let header_bytes: Vec<u8> = self.get_header_bytes();
+        let body_bytes: Vec<u8> = self.get_body_bytes();
+        let http_version_str: String =
+            self.config.read().map_or("HTTP/1.1".to_string(), |config| {
+                config.http_version.to_string()
+            });
+        let request: Vec<u8> = SharedRequestBuilder::build_post_request(
+            path,
+            header_bytes,
+            body_bytes,
+            http_version_str,
+        );
+        stream
+            .write_all(&request)
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        stream
+            .flush()
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        self.read_response_async(stream).await
+    }
+    async fn read_response_async(
+        &mut self,
+        stream: &mut BoxAsyncReadWrite,
+    ) -> Result<BoxResponseTrait, RequestError> {
+        let buffer_size: usize = self
+            .config
+            .read()
+            .map_or(DEFAULT_BUFFER_SIZE, |config| config.buffer);
+        let mut buffer: Vec<u8> = vec![0; buffer_size];
+        let initial_capacity: usize = buffer_size.max(8192);
+        let mut response_bytes: Vec<u8> = Vec::with_capacity(initial_capacity);
+        let mut headers_done: bool = false;
+        let mut content_length: usize = 0;
+        let mut redirect_url: Option<Vec<u8>> = None;
+        let mut headers_end_pos: usize = 0;
+        let mut is_chunked: bool = false;
+        let http_version: String = self
+            .config
+            .read()
+            .map_or(HttpVersion::default().to_string(), |config| {
+                config.http_version.to_string()
+            });
+        let http_version_bytes: Vec<u8> = http_version.to_lowercase().into_bytes();
+        let location_sign_key: Vec<u8> = format!("{}:", LOCATION.to_lowercase()).into_bytes();
+        'read_loop: loop {
+            let bytes_read: usize = stream
+                .read(&mut buffer)
+                .await
+                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            if bytes_read == 0 {
+                break;
+            }
+            let new_capacity: usize = SharedResponseHandler::calculate_buffer_capacity(
+                &response_bytes,
+                bytes_read,
+                response_bytes.capacity(),
+            );
+            if new_capacity > 0 {
+                response_bytes.reserve(new_capacity - response_bytes.capacity());
+            }
+            let old_len: usize = response_bytes.len();
+            response_bytes.extend_from_slice(&buffer[..bytes_read]);
+            if !headers_done {
+                let search_start: usize = old_len.saturating_sub(3);
+                if let Some(pos) =
+                    SharedResponseHandler::find_double_crlf(&response_bytes, search_start)
+                {
+                    headers_done = true;
+                    headers_end_pos = pos + 4;
+                    SharedResponseHandler::parse_response_headers(
+                        &response_bytes[..headers_end_pos],
+                        &http_version_bytes,
+                        &location_sign_key,
+                        &mut content_length,
+                        &mut redirect_url,
+                        &mut is_chunked,
+                    )?;
+                }
+            }
+            if headers_done {
+                if is_chunked {
+                    if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..]) {
+                        break 'read_loop;
+                    }
+                } else {
+                    let total_expected_length: usize = headers_end_pos + content_length;
+                    if response_bytes.len() >= total_expected_length {
+                        response_bytes.truncate(total_expected_length);
+                        break 'read_loop;
+                    }
+                }
+            }
+        }
+        if is_chunked {
+            let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
+            let decoded_body: Vec<u8> = SharedResponseHandler::parse_chunked_body(&body_bytes);
+            response_bytes.truncate(headers_end_pos);
+            response_bytes.extend_from_slice(&decoded_body);
+        }
+        self.response = Arc::new(RwLock::new(<HttpResponseBinary as ResponseTrait>::from(
+            &response_bytes,
+        )));
+        let (should_redirect, should_decode, buffer_size) = {
+            if let Ok(config) = self.config.read() {
+                (config.redirect, config.decode, config.buffer)
+            } else {
+                (false, false, DEFAULT_BUFFER_SIZE)
+            }
+        };
+        if !should_redirect || redirect_url.is_none() {
+            if should_decode && let Ok(mut response) = self.response.write() {
+                *response = response.decode(buffer_size);
+            }
+            let response: BoxResponseTrait = Box::new(self.response.read().map_or(
+                HttpResponseBinary::default(),
+                |response: RwLockReadGuard<'_, HttpResponseBinary>| response.clone(),
+            ));
+            return Ok(response);
+        }
+        let url: String = String::from_utf8(redirect_url.unwrap())
+            .map_err(|error: FromUtf8Error| RequestError::Request(error.to_string()))?;
+        self.handle_redirect_async(url).await
+    }
+    fn handle_redirect_async(
+        &mut self,
+        url: String,
+    ) -> Pin<Box<dyn Future<Output = Result<BoxResponseTrait, RequestError>> + Send + '_>> {
+        Box::pin(async move {
+            {
+                if let Ok(mut config) = self.config.write() {
+                    if !config.redirect {
+                        return Err(RequestError::Request("Redirect Not Enabled".to_string()));
+                    }
+                    if let Ok(mut tmp) = self.tmp.clone().write() {
+                        if tmp.visit_url.contains(&url) {
+                            return Err(RequestError::Request(
+                                "Redirect URL Dead Loop".to_string(),
+                            ));
+                        }
+                        tmp.visit_url.insert(url.clone());
+                        if config.redirect_times >= config.max_redirect_times {
+                            return Err(RequestError::Request(
+                                "Max Redirect Times Exceeded".to_string(),
+                            ));
+                        }
+                        config.redirect_times += 1;
+                    }
+                }
+            }
+            self.url(url.clone());
+            self.send_async().await
+        })
+    }
+    async fn get_connection_stream_async(
+        &self,
+        host: String,
+        port: u16,
+    ) -> Result<BoxAsyncReadWrite, RequestError> {
+        let config: Config = self
+            .config
+            .read()
+            .map_or(Config::default(), |config| config.clone());
+        if let Some(proxy_config) = &config.proxy {
+            return self
+                .get_proxy_connection_stream_async(host, port, proxy_config)
+                .await;
+        }
+        let host_port: (String, u16) = (host.clone(), port);
+        let tcp_stream: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect(host_port.clone())
+                .await
+                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
+            let roots: RootCertStore = {
+                match self.tmp.clone().read() {
+                    Ok(tmp) => tmp.root_cert.clone(),
+                    Err(error) => {
+                        return Err(RequestError::Request(error.to_string()));
+                    }
+                }
+            };
+            let tls_config: ClientConfig = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
+            let dns_name: ServerName<'_> = ServerName::try_from(host.clone())
+                .map_err(|error: InvalidDnsNameError| RequestError::Request(error.to_string()))?;
+            let tls_stream: TlsStream<http_type::tokio::net::TcpStream> = connector
+                .connect(dns_name, tcp_stream)
+                .await
+                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            Ok(Box::new(tls_stream))
+        } else {
+            Ok(Box::new(tcp_stream))
+        }
+    }
+    async fn get_proxy_connection_stream_async(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+    ) -> Result<BoxAsyncReadWrite, RequestError> {
+        match proxy_config.proxy_type {
+            ProxyType::Http | ProxyType::Https => {
+                self.get_http_proxy_connection_async(target_host, target_port, proxy_config)
+                    .await
+            }
+            ProxyType::Socks5 => {
+                self.get_socks5_proxy_connection_async(target_host, target_port, proxy_config)
+                    .await
+            }
+        }
+    }
+    async fn get_http_proxy_connection_async(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+    ) -> Result<BoxAsyncReadWrite, RequestError> {
+        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
+        let tcp_stream: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect(proxy_host_port)
+                .await
+                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let mut proxy_stream: BoxAsyncReadWrite = if proxy_config.proxy_type == ProxyType::Https {
+            let roots: RootCertStore = {
+                match self.tmp.clone().read() {
+                    Ok(tmp) => tmp.root_cert.clone(),
+                    Err(error) => {
+                        return Err(RequestError::Request(error.to_string()));
+                    }
+                }
+            };
+            let tls_config: ClientConfig = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
+            let dns_name: ServerName<'_> = ServerName::try_from(proxy_config.host.clone())
+                .map_err(|error: InvalidDnsNameError| RequestError::Request(error.to_string()))?;
+            let tls_stream: TlsStream<http_type::tokio::net::TcpStream> = connector
+                .connect(dns_name, tcp_stream)
+                .await
+                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            Box::new(tls_stream)
+        } else {
+            Box::new(tcp_stream)
+        };
+        let connect_request: String = if let (Some(username), Some(password)) =
+            (&proxy_config.username, &proxy_config.password)
+        {
+            let auth: String = format!("{username}:{password}");
+            let auth_encoded: String = base64_encode(auth.as_bytes());
+            format!(
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {auth_encoded}\r\n\r\n"
+            )
+        } else {
+            format!(
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n\r\n"
+            )
+        };
+        proxy_stream
+            .write_all(connect_request.as_bytes())
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        proxy_stream
+            .flush()
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let mut response_buffer: [u8; 1024] = [0u8; 1024];
+        let bytes_read: usize = proxy_stream
+            .read(&mut response_buffer)
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let response_str: &str = std::str::from_utf8(&response_buffer[..bytes_read]).unwrap_or("");
+        let headers_end_pos: Option<usize> = response_str.find("\r\n\r\n");
+        let pre_read_data: Vec<u8> = if let Some(pos) = headers_end_pos {
+            let header_part: &str = &response_str[..pos];
+            if !header_part.starts_with("HTTP/1.1 200") && !header_part.starts_with("HTTP/1.0 200")
+            {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+            response_buffer[pos + 4..bytes_read].to_vec()
+        } else {
+            if !response_str.starts_with("HTTP/1.1 200")
+                && !response_str.starts_with("HTTP/1.0 200")
+            {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+            vec![]
+        };
+        let config: Config = self
+            .config
+            .read()
+            .map_or(Config::default(), |config| config.clone());
+        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
+            let roots: RootCertStore = {
+                match self.tmp.clone().read() {
+                    Ok(tmp) => tmp.root_cert.clone(),
+                    Err(error) => {
+                        return Err(RequestError::Request(error.to_string()));
+                    }
+                }
+            };
+            let tls_config: ClientConfig = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
+            let dns_name: ServerName<'_> = ServerName::try_from(target_host.clone())
+                .map_err(|error: InvalidDnsNameError| RequestError::Request(error.to_string()))?;
+            let tunnel_stream: ProxyTunnelStream =
+                ProxyTunnelStream::new(proxy_stream, pre_read_data);
+            let tls_stream: TlsStream<ProxyTunnelStream> = connector
+                .connect(dns_name, tunnel_stream)
+                .await
+                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            return Ok(Box::new(tls_stream) as BoxAsyncReadWrite);
+        }
+        let tunnel_stream: ProxyTunnelStream = ProxyTunnelStream::new(proxy_stream, pre_read_data);
+        Ok(Box::new(tunnel_stream) as BoxAsyncReadWrite)
+    }
+    async fn get_socks5_proxy_connection_async(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy_config: &ProxyConfig,
+    ) -> Result<BoxAsyncReadWrite, RequestError> {
+        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
+        let mut tcp_stream: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect(proxy_host_port)
+                .await
+                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let auth_methods: Vec<u8> =
+            if proxy_config.username.is_some() && proxy_config.password.is_some() {
+                vec![0x05, 0x02, 0x00, 0x02]
+            } else {
+                vec![0x05, 0x01, 0x00]
+            };
+        tcp_stream
+            .write_all(&auth_methods)
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let mut response: [u8; 2] = [0u8; 2];
+        tcp_stream
+            .read_exact(&mut response)
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        if response[0] != 0x05 {
+            return Err(RequestError::Request("Internal Server Error".to_string()));
+        }
+        match response[1] {
+            0x00 => {}
+            0x02 => {
+                if let (Some(username), Some(password)) =
+                    (&proxy_config.username, &proxy_config.password)
+                {
+                    let mut auth_request = vec![0x01];
+                    auth_request.push(username.len() as u8);
+                    auth_request.extend_from_slice(username.as_bytes());
+                    auth_request.push(password.len() as u8);
+                    auth_request.extend_from_slice(password.as_bytes());
+                    tcp_stream.write_all(&auth_request).await.map_err(
+                        |error: std::io::Error| RequestError::Request(error.to_string()),
+                    )?;
+                    let mut auth_response = [0u8; 2];
+                    tcp_stream.read_exact(&mut auth_response).await.map_err(
+                        |error: std::io::Error| RequestError::Request(error.to_string()),
+                    )?;
+                    if auth_response[1] != 0x00 {
+                        return Err(RequestError::Request("Internal Server Error".to_string()));
+                    }
+                } else {
+                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                }
+            }
+            0xFF => {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+            _ => {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+        }
+        let mut connect_request: Vec<u8> = vec![0x05, 0x01, 0x00];
+        if target_host.parse::<Ipv4Addr>().is_ok() {
+            connect_request.push(0x01);
+            let ip: Ipv4Addr = target_host.parse().unwrap();
+            connect_request.extend_from_slice(&ip.octets());
+        } else if target_host.parse::<Ipv6Addr>().is_ok() {
+            connect_request.push(0x04);
+            let ip: Ipv6Addr = target_host.parse().unwrap();
+            connect_request.extend_from_slice(&ip.octets());
+        } else {
+            connect_request.push(0x03);
+            connect_request.push(target_host.len() as u8);
+            connect_request.extend_from_slice(target_host.as_bytes());
+        }
+        connect_request.extend_from_slice(&target_port.to_be_bytes());
+        tcp_stream
+            .write_all(&connect_request)
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        let mut connect_response: [u8; 4] = [0u8; 4];
+        tcp_stream
+            .read_exact(&mut connect_response)
+            .await
+            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+        if connect_response[0] != 0x05 || connect_response[1] != 0x00 {
+            return Err(RequestError::Request("Internal Server Error".to_string()));
+        }
+        match connect_response[3] {
+            0x01 => {
+                let mut skip: [u8; 6] = [0u8; 6];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .await
+                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            }
+            0x03 => {
+                let mut len: [u8; 1] = [0u8; 1];
+                tcp_stream
+                    .read_exact(&mut len)
+                    .await
+                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+                let mut skip: Vec<u8> = vec![0u8; len[0] as usize + 2];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .await
+                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            }
+            0x04 => {
+                let mut skip: [u8; 18] = [0u8; 18];
+                tcp_stream
+                    .read_exact(&mut skip)
+                    .await
+                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            }
+            _ => {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+        }
+        let proxy_stream: BoxAsyncReadWrite = Box::new(tcp_stream);
+        let config: Config = self
+            .config
+            .read()
+            .map_or(Config::default(), |config| config.clone());
+        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
+            let roots: RootCertStore = {
+                match self.tmp.clone().read() {
+                    Ok(tmp) => tmp.root_cert.clone(),
+                    Err(error) => {
+                        return Err(RequestError::Request(error.to_string()));
+                    }
+                }
+            };
+            let tls_config: ClientConfig = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
+            let dns_name: ServerName<'_> = ServerName::try_from(target_host.clone())
+                .map_err(|error: InvalidDnsNameError| RequestError::Request(error.to_string()))?;
+            let tunnel_stream: ProxyTunnelStream = ProxyTunnelStream::new(proxy_stream, Vec::new());
+            let tls_stream: TlsStream<ProxyTunnelStream> = connector
+                .connect(dns_name, tunnel_stream)
+                .await
+                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            return Ok(Box::new(tls_stream) as BoxAsyncReadWrite);
+        }
+        Ok(proxy_stream)
+    }
+    pub(crate) async fn send_async(&mut self) -> RequestResult {
+        let methods: Method = self.get_methods();
+        let (host, port) = {
+            if let Ok(mut config) = self.config.write() {
+                config.url_obj = self
+                    .parse_url()
+                    .map_err(|error: RequestError| RequestError::Request(error.to_string()))?;
+                let host: String = config.url_obj.host.clone().unwrap_or_default();
+                let port = self.get_port(config.url_obj.port.unwrap_or_default(), &config);
+                (host, port)
+            } else {
+                (String::new(), 0u16)
+            }
+        };
+        let mut stream: BoxAsyncReadWrite = self.get_connection_stream_async(host, port).await?;
+        let res: Result<BoxResponseTrait, RequestError> = match methods {
+            m if m.is_get() => self.send_get_request_async(&mut stream).await,
+            m if m.is_post() => self.send_post_request_async(&mut stream).await,
+            _err => Err(RequestError::Request("Method Not Allowed".to_string())),
+        };
+        res
+    }
+}
+```
+# Path: hyperlane/request/src/request/http_request/trait.rs
+```rust
+use super::*;
+pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
+pub(crate) trait ReadWrite: Read + Write {}
+pub trait AsyncRequestTrait: Send + Debug {
+    type RequestResult: Sized;
+    fn send(&mut self) -> Pin<Box<dyn Future<Output = Self::RequestResult> + Send + '_>>;
+}
+pub trait RequestTrait: Send + Debug {
+    type RequestResult: Sized;
+    fn send(&mut self) -> Self::RequestResult;
+}
+```
+# Path: hyperlane/request/src/request/http_request/const.rs
+```rust
+pub(crate) const CONTENT_LENGTH_PATTERN: &[u8] = b"content-length:";
+pub(crate) const TRANSFER_ENCODING_PATTERN: &[u8] = b"transfer-encoding:";
+pub(crate) const CHUNKED_PATTERN: &[u8] = b"chunked";
+```
+# Path: hyperlane/request/src/request/http_request/type.rs
+```rust
+use super::*;
+pub type RequestResult = Result<BoxResponseTrait, RequestError>;
+pub type BoxAsyncRequestTrait = Box<dyn AsyncRequestTrait<RequestResult = RequestResult>>;
+pub type BoxRequestTrait = Box<dyn RequestTrait<RequestResult = RequestResult>>;
+pub(crate) type BoxAsyncReadWrite = Box<dyn AsyncReadWrite>;
+pub(crate) type BoxReadWrite = Box<dyn ReadWrite>;
+```
+# Path: hyperlane/request/src/request/http_request/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug)]
+pub(crate) struct HttpRequest {
+    pub(crate) methods: Arc<Method>,
+    pub(crate) url: Arc<String>,
+    pub(crate) header: Arc<RequestHeaders>,
+    pub(crate) body: Arc<Body>,
+    pub(crate) config: ArcRwLock<Config>,
+    pub(crate) tmp: ArcRwLock<Tmp>,
+    pub(crate) response: ArcRwLock<HttpResponseBinary>,
+}
+```
+# Path: hyperlane/request/src/request/http_request/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#struct;
+mod r#trait;
+mod r#type;
+use http_type::HTTPS_LOWERCASE;
+pub use {r#trait::*, r#type::*};
+pub(crate) use {r#const::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/request/src/response/trait.rs
+```rust
+use super::*;
+pub trait ResponseTrait: Send + Debug {
+    type OutputText: Clone + Sized;
+    type OutputBinary: Clone + Sized;
+    fn text(&self) -> Self::OutputText;
+    fn binary(&self) -> Self::OutputBinary;
+    fn from(response: &[u8]) -> Self
+    where
+        Self: Sized;
+    fn decode(&self, buffer_size: usize) -> Self::OutputBinary;
+}
+```
+# Path: hyperlane/request/src/response/type.rs
+```rust
+use super::*;
+pub type BoxResponseTrait =
+    Box<dyn ResponseTrait<OutputText = HttpResponseText, OutputBinary = HttpResponseBinary>>;
+```
+# Path: hyperlane/request/src/response/mod.rs
+```rust
+mod response_binary;
+mod response_text;
+mod r#trait;
+mod r#type;
+pub use response_binary::*;
+pub use response_text::*;
+pub use {r#trait::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/request/src/response/response_binary/impl.rs
+```rust
+use super::*;
+impl ResponseTrait for HttpResponseBinary {
+    type OutputText = HttpResponseText;
+    type OutputBinary = HttpResponseBinary;
+    fn from(response: &[u8]) -> Self
+    where
+        Self: Sized,
+    {
+        let split_lines: Vec<&[u8]> = split_multi_byte(response, HTTP_BR_BYTES);
+        let mut lines: IntoIter<&[u8]> = split_lines.into_iter();
+        let status_line: &[u8] = lines.next().unwrap_or(&[]);
+        let status_parts: Vec<&[u8]> = split_whitespace(status_line);
+        let http_version: HttpVersion = status_parts
+            .first()
+            .and_then(|part: &&[u8]| from_utf8(part).ok())
+            .and_then(|version_str: &str| version_str.parse::<HttpVersion>().ok())
+            .unwrap_or_default();
+        let status_code: ResponseStatusCode = status_parts
+            .get(1)
+            .and_then(|part: &&[u8]| from_utf8(part).ok())
+            .and_then(|code_str: &str| code_str.parse().ok())
+            .unwrap_or(HttpStatus::Unknown.code());
+        let status_text: String = status_parts.get(2..).map_or_else(
+            || HttpStatus::Unknown.to_string(),
+            |parts: &[&[u8]]| {
+                if parts.is_empty() {
+                    HttpStatus::Unknown.to_string()
+                } else if parts.len() == 1 {
+                    String::from_utf8_lossy(parts[0]).into_owned()
+                } else {
+                    let total_len: usize =
+                        parts.iter().map(|p: &&[u8]| p.len()).sum::<usize>() + parts.len() - 1;
+                    let mut result: String = String::with_capacity(total_len);
+                    for (i, part) in parts.iter().enumerate() {
+                        if i > 0 {
+                            result.push(' ');
+                        }
+                        result.push_str(&String::from_utf8_lossy(part));
+                    }
+                    result
+                }
+            },
+        );
+        let mut headers: HashMapXxHash3_64<String, VecDeque<String>> = hash_map_xx_hash3_64();
+        for line in lines.by_ref() {
+            if line.is_empty() {
+                break;
+            }
+            let mut colon_pos: Option<usize> = None;
+            for (i, &byte) in line.iter().enumerate() {
+                if byte == COLON_U8 {
+                    colon_pos = Some(i);
+                    break;
+                }
+            }
+            if let Some(pos) = colon_pos
+                && pos > 0
+                && pos + 1 < line.len()
+            {
+                let key_bytes: &[u8] = &line[..pos];
+                let value_start: usize = if line.get(pos + 1) == Some(&SPACE_U8) {
+                    pos + 2
+                } else {
+                    pos + 1
+                };
+                let value_bytes: &[u8] = &line[value_start..];
+                if let (Ok(key_str), Ok(value_str)) = (from_utf8(key_bytes), from_utf8(value_bytes))
+                {
+                    let mut value_deque: VecDeque<String> = VecDeque::new();
+                    value_deque.push_front(value_str.trim().to_string());
+                    headers.insert(key_str.trim().to_string(), value_deque);
+                }
+            }
+        }
+        let body: Vec<u8> = match lines.len() {
+            0 => Vec::new(),
+            1 => {
+                let line: &[u8] = lines.next().unwrap_or(&[]);
+                let mut body = Vec::with_capacity(line.len());
+                body.extend_from_slice(line);
+                body
+            }
+            _ => {
+                let lines_slice: &[&[u8]] = lines.as_slice();
+                let total_size: usize = lines_slice
+                    .iter()
+                    .map(|line: &&[u8]| line.len())
+                    .sum::<usize>()
+                    + lines_slice.len().saturating_sub(1) * BR_BYTES.len();
+                let mut body: Vec<u8> = Vec::with_capacity(total_size);
+                let mut first: bool = true;
+                for line in lines {
+                    if !first {
+                        body.extend_from_slice(BR_BYTES);
+                    }
+                    body.extend_from_slice(line);
+                    first = false;
+                }
+                body
+            }
+        };
+        HttpResponseBinary {
+            http_version: Arc::new(RwLock::new(http_version)),
+            status_code,
+            status_text: Arc::new(RwLock::new(status_text)),
+            headers: Arc::new(RwLock::new(headers)),
+            body: Arc::new(RwLock::new(body)),
+        }
+    }
+    fn binary(&self) -> Self::OutputBinary {
+        self.clone()
+    }
+    fn text(&self) -> HttpResponseText {
+        let body: String = self.body.read().map_or(String::new(), |body_ref| {
+            String::from_utf8_lossy(&body_ref).into_owned()
+        });
+        HttpResponseText {
+            http_version: Arc::clone(&self.http_version),
+            status_code: self.status_code,
+            status_text: Arc::clone(&self.status_text),
+            headers: Arc::clone(&self.headers),
+            body: Arc::new(RwLock::new(body)),
+        }
+    }
+    fn decode(&self, buffer_size: usize) -> HttpResponseBinary {
+        let decoded_body: Vec<u8> = {
+            let headers_guard = self.headers.read();
+            let body_guard = self.body.read();
+            match (headers_guard, body_guard) {
+                (Ok(headers_ref), Ok(body_ref)) => {
+                    let mut string_headers: HashMapXxHash3_64<String, String> =
+                        hash_map_xx_hash3_64();
+                    for (key, value_deque) in headers_ref.iter() {
+                        if let Some(first_value) = value_deque.front() {
+                            string_headers.insert(key.clone(), first_value.clone());
+                        }
+                    }
+                    Compress::from(&string_headers)
+                        .decode(&body_ref, buffer_size)
+                        .into_owned()
+                }
+                _ => Vec::new(),
+            }
+        };
+        HttpResponseBinary {
+            http_version: Arc::clone(&self.http_version),
+            status_code: self.status_code,
+            status_text: Arc::clone(&self.status_text),
+            headers: Arc::clone(&self.headers),
+            body: Arc::new(RwLock::new(decoded_body)),
+        }
+    }
+}
+impl HttpResponseBinary {
+    pub fn get_http_version(&self) -> HttpVersion {
+        if let Ok(http_version) = self.http_version.read() {
+            return http_version
+                .to_string()
+                .parse::<HttpVersion>()
+                .unwrap_or_default();
+        }
+        HttpVersion::default()
+    }
+    pub fn get_status_code(&self) -> ResponseStatusCode {
+        self.status_code
+    }
+    pub fn get_status_text(&self) -> String {
+        if let Ok(status_text) = self.status_text.read() {
+            return status_text.to_string();
+        }
+        HttpStatus::Unknown.to_string()
+    }
+    pub fn get_headers(&self) -> ResponseHeaders {
+        if let Ok(headers) = self.headers.read() {
+            return headers.clone();
+        }
+        hash_map_xx_hash3_64()
+    }
+    pub fn get_body(&self) -> RequestBody {
+        if let Ok(body) = self.body.read() {
+            return body.clone();
+        }
+        RequestBody::new()
+    }
+}
+impl Default for HttpResponseBinary {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            http_version: Arc::new(RwLock::new(HttpVersion::Unknown(String::new()))),
+            status_code: HttpStatus::Unknown.code(),
+            status_text: Arc::new(RwLock::new(HttpStatus::Unknown.to_string())),
+            headers: Arc::new(RwLock::new(hash_map_xx_hash3_64())),
+            body: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/response/response_binary/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug)]
+pub struct HttpResponseBinary {
+    pub(crate) http_version: ArcRwLock<HttpVersion>,
+    pub(crate) status_code: ResponseStatusCode,
+    pub(crate) status_text: ArcRwLock<String>,
+    pub(crate) headers: ArcRwLock<ResponseHeaders>,
+    pub(crate) body: ArcRwLock<RequestBody>,
+}
+```
+# Path: hyperlane/request/src/response/response_binary/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/response/response_text/impl.rs
+```rust
+use super::*;
+impl ResponseTrait for HttpResponseText {
+    type OutputText = HttpResponseText;
+    type OutputBinary = HttpResponseBinary;
+    fn from(response: &[u8]) -> Self::OutputText
+    where
+        Self: Sized,
+    {
+        <HttpResponseBinary as ResponseTrait>::from(response).text()
+    }
+    fn text(&self) -> Self::OutputText {
+        self.clone()
+    }
+    fn binary(&self) -> HttpResponseBinary {
+        let body: Vec<u8> = self
+            .body
+            .read()
+            .map_or(Vec::new(), |body| body.clone().into_bytes());
+        HttpResponseBinary {
+            http_version: self.http_version.clone(),
+            status_code: self.status_code,
+            status_text: self.status_text.clone(),
+            headers: self.headers.clone(),
+            body: Arc::new(RwLock::new(body)),
+        }
+    }
+    fn decode(&self, buffer_size: usize) -> HttpResponseBinary {
+        let http_response: HttpResponseText = self.clone();
+        let tmp_body: Vec<u8> = self
+            .body
+            .read()
+            .map_or(Vec::new(), |body| body.as_bytes().to_vec())
+            .to_vec();
+        let headers: HashMapXxHash3_64<String, String> =
+            self.headers
+                .read()
+                .map_or(hash_map_xx_hash3_64(), |headers_ref| {
+                    let mut string_headers: HashMapXxHash3_64<String, String> =
+                        hash_map_xx_hash3_64();
+                    for (key, value_deque) in headers_ref.iter() {
+                        if let Some(first_value) = value_deque.front() {
+                            string_headers.insert(key.clone(), first_value.clone());
+                        }
+                    }
+                    string_headers
+                });
+        let body: Vec<u8> = Compress::from(&headers)
+            .decode(&tmp_body, buffer_size)
+            .into_owned();
+        HttpResponseBinary {
+            http_version: http_response.http_version,
+            status_code: http_response.status_code,
+            status_text: http_response.status_text,
+            headers: http_response.headers,
+            body: Arc::new(RwLock::new(body)),
+        }
+    }
+}
+impl HttpResponseText {
+    pub fn get_http_version(&self) -> HttpVersion {
+        if let Ok(http_version) = self.http_version.read() {
+            return http_version
+                .to_string()
+                .parse::<HttpVersion>()
+                .unwrap_or_default();
+        }
+        HttpVersion::default()
+    }
+    pub fn get_status_code(&self) -> ResponseStatusCode {
+        self.status_code
+    }
+    pub fn get_status_text(&self) -> String {
+        if let Ok(status_text) = self.status_text.read() {
+            return status_text.to_string();
+        }
+        HttpStatus::Unknown.to_string()
+    }
+    pub fn get_headers(&self) -> ResponseHeaders {
+        if let Ok(headers) = self.headers.read() {
+            return headers.clone();
+        }
+        hash_map_xx_hash3_64()
+    }
+    pub fn get_body(&self) -> RequestBodyString {
+        if let Ok(body) = self.body.read() {
+            return body.to_string();
+        }
+        RequestBodyString::new()
+    }
+}
+impl Default for HttpResponseText {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            http_version: Arc::new(RwLock::new(HttpVersion::Unknown(String::new()))),
+            status_code: HttpStatus::Unknown.code(),
+            status_text: Arc::new(RwLock::new(HttpStatus::Unknown.to_string())),
+            headers: Arc::new(RwLock::new(hash_map_xx_hash3_64())),
+            body: Arc::new(RwLock::new(String::new())),
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/response/response_text/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug)]
+pub struct HttpResponseText {
+    pub(crate) http_version: ArcRwLock<HttpVersion>,
+    pub(crate) status_code: ResponseStatusCode,
+    pub(crate) status_text: ArcRwLock<String>,
+    pub(crate) headers: ArcRwLock<ResponseHeaders>,
+    pub(crate) body: ArcRwLock<RequestBodyString>,
+}
+```
+# Path: hyperlane/request/src/response/response_text/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/request/src/common/impl.rs
+```rust
+use super::*;
+impl Default for Body {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::Text(EMPTY_STR.to_owned())
+    }
+}
+impl Display for Body {
+    #[inline(always)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Text(text) => write!(f, "{text}"),
+            Self::Json(json) => write!(
+                f,
+                "{}",
+                serde_json::to_string(json).unwrap_or_else(|_| String::from("{}"))
+            ),
+            Self::Binary(binary) => write!(f, "{binary:?}"),
+        }
+    }
+}
+impl Serialize for Body {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Text(text) => text.serialize(serializer),
+            Self::Json(json) => json.serialize(serializer),
+            Self::Binary(binary) => binary.serialize(serializer),
+        }
+    }
+}
+```
+# Path: hyperlane/request/src/common/const.rs
+```rust
+pub const APP_NAME: &str = "http-request";
+```
+# Path: hyperlane/request/src/common/type.rs
+```rust
+use super::*;
+pub(crate) type ArcRwLock<T> = Arc<RwLock<T>>;
+pub(crate) type BodyJson = HashMapXxHash3_64<String, serde_json::Value>;
+pub(crate) type BodyText = String;
+pub(crate) type BodyBinary = Vec<u8>;
+```
+# Path: hyperlane/request/src/common/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum Body {
+    Text(BodyText),
+    Json(BodyJson),
+    Binary(BodyBinary),
+}
+```
+# Path: hyperlane/request/src/common/mod.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#impl;
+mod r#type;
+pub(crate) use {r#const::*, r#enum::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/core/README.md
+## hyperlane
+[Api Docs](https://docs.rs/hyperlane/latest/)
+> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane
+```
+## Quick start
+- [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
+```sh
+git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
+```
+## Contact
+# Path: hyperlane/core/tests/mod.rs
 ```rust
 mod config;
 mod context;
 mod error;
 mod route;
 mod server;
-use hyperlane::*;
+use hyperlane_core::*;
 use std::{
+    net::TcpListener,
     sync::{Arc, OnceLock},
     time::{Duration, Instant},
 };
-use tokio::{spawn, task::JoinHandle, time::sleep};
+use tokio::{io::AsyncWriteExt, net::TcpStream, spawn, task::JoinHandle, time::sleep};
 ```
-# Path: hyperlane/tests/server/impl.rs
+# Path: hyperlane/core/tests/server/impl.rs
 ```rust
 use super::*;
 impl ServerHook for TestSendRoute {
@@ -2942,8 +15120,7 @@ impl ServerHook for RequestErrorHook {
 }
 impl ServerHook for RequestMiddleware {
     async fn new(stream: &mut Stream, _: &mut Context) -> Self {
-        let mut socket_addr: String = String::new();
-        socket_addr = stream
+        let socket_addr: String = stream
             .get_stream()
             .peer_addr()
             .map(|data| data.to_string())
@@ -3120,9 +15297,33 @@ impl ServerHook for GetAllRoutes {
     }
 }
 ```
-# Path: hyperlane/tests/server/fn.rs
+# Path: hyperlane/core/tests/server/fn.rs
 ```rust
 use super::*;
+async fn start_server_with<Register>(register: Register) -> (ServerControlHook, u16)
+where
+    Register: FnOnce(&mut Server),
+{
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port: u16 = listener.local_addr().unwrap().port();
+    drop(listener);
+    let mut server: Server = Server::default();
+    let mut server_config: ServerConfig = ServerConfig::default();
+    server_config.set_address(format!("127.0.0.1:{port}"));
+    server_config.set_nodelay(Some(false));
+    server.server_config(server_config);
+    server.response_middleware::<ResponseMiddleware>();
+    register(&mut server);
+    let leaked: &'static mut Server = Box::leak(Box::new(server));
+    let control_hook: ServerControlHook = leaked.run().await.unwrap_or_default();
+    (control_hook, port)
+}
+async fn client_write_request(port: u16, request: &[u8]) {
+    let mut stream: TcpStream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+    stream.write_all(request).await.unwrap();
+    stream.flush().await.unwrap();
+    drop(stream);
+}
 #[test]
 fn server_partial_eq() {
     let server1: Server = Server::default();
@@ -3288,13 +15489,239 @@ async fn main() {
     });
     server_control_hook_1.wait().await;
 }
+#[tokio::test]
+async fn client_server_config_sync_setter_returns_mut_self() {
+    let mut server: Server = Server::default();
+    let server_config: ServerConfig = ServerConfig::default();
+    {
+        let returned: &mut Server = server.server_config(server_config);
+        assert!(
+            returned
+                .get_server_config()
+                .get_address()
+                .contains("0.0.0.0")
+        );
+    }
+}
+#[tokio::test]
+async fn client_config_from_json_populates_address_field() {
+    let json: &str = r#"{"address":"127.0.0.1:9090","nodelay":false,"ttl":null}"#;
+    let parsed: ServerConfig = ServerConfig::from_json(json).unwrap();
+    let mut server: Server = Server::default();
+    {
+        let returned: &mut Server = server.config_from_json(json);
+        let _ = returned;
+    }
+    assert_eq!(parsed.get_address(), "127.0.0.1:9090");
+    assert_eq!(server.get_server_config().get_address(), "127.0.0.1:9090");
+}
+#[tokio::test]
+async fn client_task_panic_setter_returns_mut_self() {
+    let mut server: Server = Server::default();
+    {
+        let returned: &mut Server = server.task_panic::<TaskPanicHook>();
+        assert!(!returned.get_task_panic().is_empty());
+    }
+    assert_eq!(server.get_task_panic().len(), 1);
+}
+#[tokio::test]
+async fn client_request_error_setter_returns_mut_self() {
+    let mut server: Server = Server::default();
+    {
+        let returned: &mut Server = server.request_error::<RequestErrorHook>();
+        assert!(!returned.get_request_error().is_empty());
+    }
+    assert_eq!(server.get_request_error().len(), 1);
+}
+#[tokio::test]
+async fn client_request_middleware_setter_returns_mut_self() {
+    let mut server: Server = Server::default();
+    {
+        let returned: &mut Server = server.request_middleware::<RequestMiddleware>();
+        assert!(!returned.get_request_middleware().is_empty());
+    }
+    assert_eq!(server.get_request_middleware().len(), 1);
+}
+#[tokio::test]
+async fn client_response_middleware_setter_returns_mut_self() {
+    let mut server: Server = Server::default();
+    {
+        let returned: &mut Server = server.response_middleware::<ResponseMiddleware>();
+        assert!(!returned.get_response_middleware().is_empty());
+    }
+    assert_eq!(server.get_response_middleware().len(), 1);
+}
+#[tokio::test]
+async fn client_format_bind_address_concatenates_host_and_port() {
+    let formatted: String = Server::format_bind_address("127.0.0.1", 8080);
+    assert_eq!(formatted, "127.0.0.1:8080");
+    let formatted_ipv6: String = Server::format_bind_address("::1", 443);
+    assert_eq!(formatted_ipv6, "::1:443");
+}
+#[tokio::test]
+async fn client_try_flush_stdout_returns_ok() {
+    let result: std::io::Result<()> = Server::try_flush_stdout();
+    assert!(result.is_ok());
+}
+#[tokio::test]
+async fn client_flush_stdout_does_not_panic() {
+    Server::flush_stdout();
+}
+#[tokio::test]
+async fn client_try_flush_stderr_returns_ok() {
+    let result: std::io::Result<()> = Server::try_flush_stderr();
+    assert!(result.is_ok());
+}
+#[tokio::test]
+async fn client_flush_stderr_does_not_panic() {
+    Server::flush_stderr();
+}
+#[tokio::test]
+async fn client_try_flush_stdout_and_stderr_returns_ok() {
+    let result: std::io::Result<()> = Server::try_flush_stdout_and_stderr();
+    assert!(result.is_ok());
+}
+#[tokio::test]
+async fn client_flush_stdout_and_stderr_does_not_panic() {
+    Server::flush_stdout_and_stderr();
+}
+#[tokio::test]
+async fn client_handle_hook_dispatches_to_correct_handler_list() {
+    let mut server: Server = Server::default();
+    server.handle_hook(HookType::Route("/", Hook::factory::<TestSendRoute>));
+    let route_keys: usize = server.get_route_matcher().get_static_route().len();
+    assert!(route_keys >= 1);
+    server.handle_hook(HookType::TaskPanic(None, Hook::default_handler));
+    assert_eq!(server.get_task_panic().len(), 1);
+}
+#[tokio::test]
+async fn client_route_basic_serial_e2e() {
+    let (control, port) = start_server_with(|register: &mut Server| {
+        register.route::<RootRoute>("/");
+    })
+    .await;
+    let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port, request).await;
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn client_dynamic_route_serial_e2e() {
+    let (control, port) = start_server_with(|register: &mut Server| {
+        register.route::<DynamicRoute>("/dynamic/:id");
+    })
+    .await;
+    let request: &[u8] =
+        b"GET /dynamic/42 HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port, request).await;
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn client_regex_route_serial_e2e() {
+    let (control, port) = start_server_with(|register: &mut Server| {
+        register.route::<WebsocketRoute>("/ws");
+    })
+    .await;
+    let request: &[u8] = b"GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port, request).await;
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn client_request_error_404_serial_e2e() {
+    let (control, port) = start_server_with(|register: &mut Server| {
+        register.route::<RootRoute>("/");
+        register.request_error::<RequestErrorHook>();
+    })
+    .await;
+    let request: &[u8] = b"GET /missing HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port, request).await;
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn client_request_middleware_serial_e2e() {
+    let (control, port) = start_server_with(|register: &mut Server| {
+        register.route::<RootRoute>("/");
+        register.request_middleware::<RequestMiddleware>();
+    })
+    .await;
+    let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port, request).await;
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn client_response_middleware_serial_e2e() {
+    let (control, port) = start_server_with(|register: &mut Server| {
+        register.route::<RootRoute>("/");
+        register.response_middleware::<ResponseMiddleware>();
+    })
+    .await;
+    let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port, request).await;
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn client_task_panic_handler_serial_e2e() {
+    let (control, port) = start_server_with(|register: &mut Server| {
+        register.route::<DynamicRoute>("/panic/:msg");
+        register.task_panic::<TaskPanicHook>();
+    })
+    .await;
+    let request: &[u8] =
+        b"GET /panic/boom HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port, request).await;
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn client_two_servers_on_distinct_ports_serial_e2e() {
+    let (control_a, port_a) = start_server_with(|register: &mut Server| {
+        register.route::<RootRoute>("/");
+    })
+    .await;
+    let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port_a, request).await;
+    control_a.shutdown().await;
+    control_a.wait().await;
+    let (control_b, port_b) = start_server_with(|register: &mut Server| {
+        register.route::<RootRoute>("/");
+    })
+    .await;
+    assert_ne!(port_a, port_b);
+    client_write_request(port_b, request).await;
+    control_b.shutdown().await;
+    control_b.wait().await;
+}
+#[tokio::test]
+async fn client_concurrent_servers_on_distinct_ports_e2e() {
+    let (control_a, port_a) = start_server_with(|register: &mut Server| {
+        register.route::<RootRoute>("/");
+    })
+    .await;
+    let (control_b, port_b) = start_server_with(|register: &mut Server| {
+        register.route::<RootRoute>("/");
+    })
+    .await;
+    assert_ne!(port_a, port_b);
+    let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    client_write_request(port_a, request).await;
+    client_write_request(port_b, request).await;
+    control_a.shutdown().await;
+    control_b.shutdown().await;
+    control_a.wait().await;
+    control_b.wait().await;
+}
 ```
-# Path: hyperlane/tests/server/static.rs
+# Path: hyperlane/core/tests/server/static.rs
 ```rust
 use super::*;
 pub(crate) static SERVER_REF: OnceLock<Server> = OnceLock::new();
 ```
-# Path: hyperlane/tests/server/struct.rs
+# Path: hyperlane/core/tests/server/struct.rs
 ```rust
 use super::*;
 pub(crate) struct TestSendRoute;
@@ -3323,7 +15750,7 @@ pub(crate) struct DynamicRoute {
 }
 pub(crate) struct GetAllRoutes;
 ```
-# Path: hyperlane/tests/server/mod.rs
+# Path: hyperlane/core/tests/server/mod.rs
 ```rust
 mod r#fn;
 mod r#impl;
@@ -3332,7 +15759,7 @@ mod r#struct;
 pub(crate) use {r#static::*, r#struct::*};
 use super::*;
 ```
-# Path: hyperlane/tests/config/fn.rs
+# Path: hyperlane/core/tests/config/fn.rs
 ```rust
 use super::*;
 #[test]
@@ -3353,12 +15780,12 @@ fn server_config_from_json() {
     assert_eq!(server_config, new_server_config);
 }
 ```
-# Path: hyperlane/tests/config/mod.rs
+# Path: hyperlane/core/tests/config/mod.rs
 ```rust
 mod r#fn;
 use super::*;
 ```
-# Path: hyperlane/tests/context/fn.rs
+# Path: hyperlane/core/tests/context/fn.rs
 ```rust
 use super::*;
 #[test]
@@ -3466,12 +15893,12 @@ fn run_set_func() {
     hyperlane(PARAM);
 }
 ```
-# Path: hyperlane/tests/context/mod.rs
+# Path: hyperlane/core/tests/context/mod.rs
 ```rust
 mod r#fn;
 use super::*;
 ```
-# Path: hyperlane/tests/error/fn.rs
+# Path: hyperlane/core/tests/error/fn.rs
 ```rust
 use super::*;
 #[test]
@@ -3503,12 +15930,12 @@ fn route_error() {
     assert_eq!(invalid_regex_pattern_error, new_invalid_regex_pattern_error);
 }
 ```
-# Path: hyperlane/tests/error/mod.rs
+# Path: hyperlane/core/tests/error/mod.rs
 ```rust
 mod r#fn;
 use super::*;
 ```
-# Path: hyperlane/tests/route/impl.rs
+# Path: hyperlane/core/tests/route/impl.rs
 ```rust
 use super::*;
 impl ServerHook for TestRoute {
@@ -3523,7 +15950,7 @@ impl ServerHook for TestRoute {
     }
 }
 ```
-# Path: hyperlane/tests/route/fn.rs
+# Path: hyperlane/core/tests/route/fn.rs
 ```rust
 use super::*;
 #[tokio::test]
@@ -3714,13 +16141,13 @@ fn large_tail_regex_routes() {
     );
 }
 ```
-# Path: hyperlane/tests/route/struct.rs
+# Path: hyperlane/core/tests/route/struct.rs
 ```rust
 pub(crate) struct TestRoute {
     pub data: String,
 }
 ```
-# Path: hyperlane/tests/route/mod.rs
+# Path: hyperlane/core/tests/route/mod.rs
 ```rust
 mod r#fn;
 mod r#impl;
@@ -3728,7 +16155,7 @@ mod r#struct;
 pub(crate) use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane/src/lib.rs
+# Path: hyperlane/core/src/lib.rs
 ```rust
 mod config;
 mod context;
@@ -3737,7 +16164,7 @@ mod hook;
 mod route;
 mod server;
 pub use {config::*, context::*, error::*, hook::*, route::*, server::*};
-pub use {http_type::*, inventory};
+pub use {hyperlane_type::*, inventory};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -3760,7 +16187,7 @@ use {
     },
 };
 ```
-# Path: hyperlane/src/hook/impl.rs
+# Path: hyperlane/core/src/hook/impl.rs
 ```rust
 use super::*;
 impl<F, R> FnContext<R> for F where F: Fn(&mut Context) -> R + Send + Sync {}
@@ -3921,7 +16348,7 @@ impl ServerHook for DefaultServerHook {
     }
 }
 ```
-# Path: hyperlane/src/hook/trait.rs
+# Path: hyperlane/core/src/hook/trait.rs
 ```rust
 use super::*;
 pub trait FnContext<R>: Fn(&mut Context) -> R + Send + Sync {}
@@ -3932,7 +16359,7 @@ where
 {
 }
 ```
-# Path: hyperlane/src/hook/type.rs
+# Path: hyperlane/core/src/hook/type.rs
 ```rust
 use super::*;
 pub type HookHandler<T> = Arc<dyn FnContextPinBox<T>>;
@@ -3946,7 +16373,7 @@ pub type ServerHookList = Vec<ServerHookHandler>;
 pub type ServerHookMap = HashMapXxHash3_64<String, ServerHookHandler>;
 pub type ServerHookPatternRoute = HashMapXxHash3_64<usize, Vec<(RoutePattern, ServerHookHandler)>>;
 ```
-# Path: hyperlane/src/hook/enum.rs
+# Path: hyperlane/core/src/hook/enum.rs
 ```rust
 use super::*;
 #[derive(Clone, Copy, Debug, DisplayDebug)]
@@ -3958,7 +16385,7 @@ pub enum HookType {
     ResponseMiddleware(Option<isize>, ServerHookHandlerFactory),
 }
 ```
-# Path: hyperlane/src/hook/struct.rs
+# Path: hyperlane/core/src/hook/struct.rs
 ```rust
 use super::*;
 #[derive(
@@ -4001,7 +16428,7 @@ pub struct ServerControlHook {
     pub(super) shutdown_hook: ServerControlHookHandler<()>,
 }
 ```
-# Path: hyperlane/src/hook/mod.rs
+# Path: hyperlane/core/src/hook/mod.rs
 ```rust
 mod r#enum;
 mod r#impl;
@@ -4011,7 +16438,7 @@ mod r#type;
 pub use {r#enum::*, r#struct::*, r#trait::*, r#type::*};
 use super::*;
 ```
-# Path: hyperlane/src/server/impl.rs
+# Path: hyperlane/core/src/server/impl.rs
 ```rust
 use super::*;
 impl Default for Server {
@@ -4416,9 +16843,11 @@ impl Server {
             }
         }
     }
-    pub async fn run(&self) -> Result<ServerControlHook, ServerError> {
+    pub async fn run(&self) -> Result<ServerControlHook, Box<ServerError>> {
         let bind_address: &String = self.get_server_config().get_address();
-        let tcp_listener: TcpListener = TcpListener::bind(&bind_address).await?;
+        let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
+            .await
+            .map_err(|error| Box::new(ServerError::from(error)))?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
@@ -4452,7 +16881,7 @@ impl Server {
     }
 }
 ```
-# Path: hyperlane/src/server/struct.rs
+# Path: hyperlane/core/src/server/struct.rs
 ```rust
 use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
@@ -4475,14 +16904,14 @@ pub struct Server {
     pub(super) response_middleware: ServerHookList,
 }
 ```
-# Path: hyperlane/src/server/mod.rs
+# Path: hyperlane/core/src/server/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane/src/config/impl.rs
+# Path: hyperlane/core/src/config/impl.rs
 ```rust
 use super::*;
 impl Default for ServerConfig {
@@ -4504,7 +16933,7 @@ impl ServerConfig {
     }
 }
 ```
-# Path: hyperlane/src/config/struct.rs
+# Path: hyperlane/core/src/config/struct.rs
 ```rust
 use super::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
@@ -4515,14 +16944,14 @@ pub struct ServerConfig {
     pub(super) ttl: Option<u32>,
 }
 ```
-# Path: hyperlane/src/config/mod.rs
+# Path: hyperlane/core/src/config/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane/src/context/impl.rs
+# Path: hyperlane/core/src/context/impl.rs
 ```rust
 use super::*;
 impl Default for Context {
@@ -4706,7 +17135,7 @@ impl Context {
     }
 }
 ```
-# Path: hyperlane/src/context/struct.rs
+# Path: hyperlane/core/src/context/struct.rs
 ```rust
 use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
@@ -4718,14 +17147,14 @@ pub struct Context {
     pub(super) attributes: ThreadSafeAttributeStore,
 }
 ```
-# Path: hyperlane/src/context/mod.rs
+# Path: hyperlane/core/src/context/mod.rs
 ```rust
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane/src/error/impl.rs
+# Path: hyperlane/core/src/error/impl.rs
 ```rust
 use super::*;
 impl From<std::io::Error> for ServerError {
@@ -4735,7 +17164,7 @@ impl From<std::io::Error> for ServerError {
     }
 }
 ```
-# Path: hyperlane/src/error/enum.rs
+# Path: hyperlane/core/src/error/enum.rs
 ```rust
 use super::*;
 #[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
@@ -4753,14 +17182,14 @@ pub enum RouteError {
     InvalidRegexPattern(String),
 }
 ```
-# Path: hyperlane/src/error/mod.rs
+# Path: hyperlane/core/src/error/mod.rs
 ```rust
 mod r#enum;
 mod r#impl;
 pub use r#enum::*;
 use super::*;
 ```
-# Path: hyperlane/src/route/impl.rs
+# Path: hyperlane/core/src/route/impl.rs
 ```rust
 use super::*;
 collect!(HookType);
@@ -5038,17 +17467,16 @@ impl RoutePattern {
                     let segment_value: String = if idx == route_segments_len - 1 {
                         path_segments[idx..].join(DEFAULT_HTTP_PATH)
                     } else {
-                        match path_segments.get(idx) {
-                            Some(val) => val.to_string(),
-                            None => return None,
+                        {
+                            let val = path_segments.get(idx)?;
+                            val.to_string()
                         }
                     };
-                    if let Some(mat) = regex.find(&segment_value) {
+                    {
+                        let mat = regex.find(&segment_value)?;
                         if mat.start() != 0 || mat.end() != segment_value.len() {
                             return None;
                         }
-                    } else {
-                        return None;
                     }
                     params.insert(param_name.clone(), segment_value);
                     if idx == route_segments_len - 1 {
@@ -5165,14 +17593,14 @@ impl RouteMatcher {
     }
 }
 ```
-# Path: hyperlane/src/route/type.rs
+# Path: hyperlane/core/src/route/type.rs
 ```rust
 use super::*;
 pub type RouteParams = HashMapXxHash3_64<String, String>;
 pub type RouteSegmentList = Vec<RouteSegment>;
 pub(crate) type PathComponentList<'a> = Vec<&'a str>;
 ```
-# Path: hyperlane/src/route/enum.rs
+# Path: hyperlane/core/src/route/enum.rs
 ```rust
 use super::*;
 #[derive(Clone, CustomDebug, DisplayDebug)]
@@ -5182,7 +17610,7 @@ pub enum RouteSegment {
     Regex(String, Regex),
 }
 ```
-# Path: hyperlane/src/route/struct.rs
+# Path: hyperlane/core/src/route/struct.rs
 ```rust
 use super::*;
 #[derive(Clone, Debug, DisplayDebug, Getter)]
@@ -5206,13 +17634,13155 @@ pub struct RouteMatcher {
     pub(super) regex_route: ServerHookPatternRoute,
 }
 ```
-# Path: hyperlane/src/route/mod.rs
+# Path: hyperlane/core/src/route/mod.rs
 ```rust
 mod r#enum;
 mod r#impl;
 mod r#struct;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/src/lib.rs
+```rust
+pub use {hyperlane_core::*, hyperlane_macros::*};
+```
+# Path: hyperlane/cli/README.md
+## hyperlane
+[Api Docs](https://docs.rs/hyperlane/latest/)
+> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane
+```
+## Quick start
+- [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
+```sh
+git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
+```
+## Contact
+# Path: hyperlane/cli/tests/mod.rs
+```rust
+mod bump;
+mod config;
+mod fmt;
+mod new;
+mod publish;
+mod version;
+use hyperlane_cli::*;
+use std::{
+    io::{self, Error},
+    path::PathBuf,
+};
+use tokio::fs::{create_dir_all, read_to_string, write};
+```
+# Path: hyperlane/cli/tests/fmt/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_format_path_integration() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_fmt");
+    let _: Result<(), Error> = create_dir_all(&tmp_dir).await;
+    let test_file: PathBuf = tmp_dir.join("test.rs");
+    write(&test_file, "fn main() {\n    println!(\"hello\");\n}\n")
+        .await
+        .unwrap();
+    let result: Result<(), io::Error> = format_path(&tmp_dir).await;
+    assert!(result.is_ok());
+}
+```
+# Path: hyperlane/cli/tests/fmt/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/tests/publish/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_package_creation() {
+    let package: Package = Package {
+        name: "test-package".to_string(),
+        version: "0.1.0".to_string(),
+        path: PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    assert_eq!(package.name, "test-package");
+    assert_eq!(package.version, "0.1.0");
+    assert!(package.local_dependencies.is_empty());
+}
+#[test]
+fn test_package_clone() {
+    let package: Package = Package {
+        name: "test-package".to_string(),
+        version: "0.1.0".to_string(),
+        path: PathBuf::from("."),
+        local_dependencies: vec!["dep1".to_string()],
+    };
+    let cloned: Package = package.clone();
+    assert_eq!(cloned.name, package.name);
+    assert_eq!(cloned.version, package.version);
+    assert_eq!(cloned.local_dependencies.len(), 1);
+}
+#[test]
+fn test_package_equality() {
+    let package1: Package = Package {
+        name: "test".to_string(),
+        version: "0.1.0".to_string(),
+        path: PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    let package2: Package = Package {
+        name: "test".to_string(),
+        version: "0.1.0".to_string(),
+        path: PathBuf::from("."),
+        local_dependencies: vec![],
+    };
+    assert_eq!(package1, package2);
+}
+#[test]
+fn test_publish_result_success() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: true,
+        error: None,
+        retries: 0,
+    };
+    assert_eq!(result.package_name, "test");
+    assert!(result.success);
+    assert!(result.error.is_none());
+    assert_eq!(result.retries, 0);
+}
+#[test]
+fn test_publish_result_failure() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: false,
+        error: Some("network error".to_string()),
+        retries: 3,
+    };
+    assert!(!result.success);
+    assert_eq!(result.error, Some("network error".to_string()));
+    assert_eq!(result.retries, 3);
+}
+#[test]
+fn test_publish_result_clone() {
+    let result: PublishResult = PublishResult {
+        package_name: "test".to_string(),
+        success: true,
+        error: None,
+        retries: 0,
+    };
+    let cloned: PublishResult = result.clone();
+    assert_eq!(cloned.package_name, result.package_name);
+    assert_eq!(cloned.success, result.success);
+    assert_eq!(cloned.error, result.error);
+    assert_eq!(cloned.retries, result.retries);
+}
+#[test]
+fn test_publish_error_display() {
+    let error1: PublishError = PublishError::ManifestParseError;
+    assert!(error1.to_string().contains("Failed to parse"));
+    let error2: PublishError = PublishError::CircularDependency;
+    assert!(error2.to_string().contains("Circular dependency"));
+}
+#[test]
+fn test_publish_error_from_io() {
+    let io_error: io::Error = io::Error::new(io::ErrorKind::NotFound, "test");
+    let publish_error: PublishError = PublishError::from(io_error);
+    assert!(publish_error.to_string().contains("IO error"));
+}
+```
+# Path: hyperlane/cli/tests/publish/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/tests/config/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_args_default_values() {
+    let args: Args = Args {
+        command: CommandType::Help,
+        check: false,
+        manifest_path: None,
+        bump_type: None,
+        max_retries: 3,
+        project_name: None,
+        template_type: None,
+        model_sub_type: None,
+        component_name: None,
+    };
+    assert!(!args.check);
+    assert_eq!(args.max_retries, 3);
+    assert!(args.manifest_path.is_none());
+    assert!(args.bump_type.is_none());
+    assert!(args.project_name.is_none());
+    assert!(args.template_type.is_none());
+    assert!(args.model_sub_type.is_none());
+    assert!(args.component_name.is_none());
+}
+#[test]
+fn test_args_with_values() {
+    let args: Args = Args {
+        command: CommandType::Bump,
+        check: true,
+        manifest_path: Some("./test/Cargo.toml".to_string()),
+        bump_type: Some(BumpVersionType::Minor),
+        max_retries: 5,
+        project_name: Some("test-project".to_string()),
+        template_type: Some(TemplateType::Controller),
+        model_sub_type: None,
+        component_name: Some("test".to_string()),
+    };
+    assert!(args.check);
+    assert_eq!(args.max_retries, 5);
+    assert_eq!(args.manifest_path, Some("./test/Cargo.toml".to_string()));
+    assert_eq!(args.bump_type, Some(BumpVersionType::Minor));
+    assert_eq!(args.project_name, Some("test-project".to_string()));
+    assert_eq!(args.template_type, Some(TemplateType::Controller));
+    assert_eq!(args.component_name, Some("test".to_string()));
+}
+#[test]
+fn test_args_with_model_subtype() {
+    let args: Args = Args {
+        command: CommandType::Template,
+        check: false,
+        manifest_path: None,
+        bump_type: None,
+        max_retries: 3,
+        project_name: None,
+        template_type: Some(TemplateType::Model),
+        model_sub_type: Some(ModelSubType::Request),
+        component_name: Some("user".to_string()),
+    };
+    assert_eq!(args.template_type, Some(TemplateType::Model));
+    assert_eq!(args.model_sub_type, Some(ModelSubType::Request));
+    assert_eq!(args.component_name, Some("user".to_string()));
+}
+#[test]
+fn test_command_type_enum_values() {
+    let _: CommandType = CommandType::Fmt;
+    let _: CommandType = CommandType::Watch;
+    let _: CommandType = CommandType::Bump;
+    let _: CommandType = CommandType::Publish;
+    let _: CommandType = CommandType::New;
+    let _: CommandType = CommandType::Template;
+    let _: CommandType = CommandType::Help;
+    let _: CommandType = CommandType::Version;
+}
+#[test]
+fn test_args_clone() {
+    let args: Args = Args {
+        command: CommandType::Bump,
+        check: true,
+        manifest_path: Some("./test/Cargo.toml".to_string()),
+        bump_type: Some(BumpVersionType::Minor),
+        max_retries: 5,
+        project_name: Some("test-project".to_string()),
+        template_type: Some(TemplateType::Controller),
+        model_sub_type: None,
+        component_name: Some("test".to_string()),
+    };
+    let cloned: Args = args.clone();
+    assert_eq!(cloned.check, args.check);
+    assert_eq!(cloned.max_retries, args.max_retries);
+    assert_eq!(cloned.manifest_path, args.manifest_path);
+    assert_eq!(cloned.bump_type, args.bump_type);
+    assert_eq!(cloned.project_name, args.project_name);
+    assert_eq!(cloned.template_type, args.template_type);
+    assert_eq!(cloned.component_name, args.component_name);
+}
+```
+# Path: hyperlane/cli/tests/config/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/tests/new/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_new_project_config_creation() {
+    let config: NewProjectConfig = NewProjectConfig::new("test-project".to_string());
+    assert_eq!(config.project_name, "test-project");
+    assert_eq!(
+        config.template_url,
+        "https://github.com/hyperlane-dev/hyperlane-quick-start"
+    );
+}
+#[test]
+fn test_new_error_display() {
+    let error1: NewError = NewError::GitNotFound;
+    assert!(error1.to_string().contains("Git is not installed"));
+    let error2: NewError = NewError::ProjectExists("test".to_string());
+    assert!(error2.to_string().contains("test"));
+    let error3: NewError = NewError::CloneFailed("network error".to_string());
+    assert!(error3.to_string().contains("network error"));
+    let error4: NewError = NewError::InvalidName("bad name".to_string());
+    assert!(error4.to_string().contains("bad name"));
+}
+#[test]
+fn test_new_error_from_io() {
+    let io_error: io::Error = io::Error::new(io::ErrorKind::NotFound, "test");
+    let new_error: NewError = NewError::from(io_error);
+    assert!(new_error.to_string().contains("test"));
+}
+#[test]
+fn test_new_error_debug() {
+    let error: NewError = NewError::GitNotFound;
+    let debug_str: String = format!("{error:?}");
+    assert!(debug_str.contains("GitNotFound"));
+}
+#[test]
+fn test_new_project_config_clone() {
+    let config: NewProjectConfig = NewProjectConfig::new("test".to_string());
+    let cloned: NewProjectConfig = config.clone();
+    assert_eq!(cloned.project_name, config.project_name);
+    assert_eq!(cloned.template_url, config.template_url);
+}
+#[test]
+fn test_new_project_config_debug() {
+    let config: NewProjectConfig = NewProjectConfig::new("test".to_string());
+    let debug_str: String = format!("{config:?}");
+    assert!(debug_str.contains("test"));
+}
+```
+# Path: hyperlane/cli/tests/new/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/tests/version/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_print_version_runs() {
+    print_version();
+}
+```
+# Path: hyperlane/cli/tests/version/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/tests/bump/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_bump_version_type_enum() {
+    assert_eq!(BumpVersionType::Patch, BumpVersionType::Patch);
+    assert_eq!(BumpVersionType::Minor, BumpVersionType::Minor);
+    assert_eq!(BumpVersionType::Major, BumpVersionType::Major);
+    assert_eq!(BumpVersionType::Release, BumpVersionType::Release);
+    assert_eq!(BumpVersionType::Alpha, BumpVersionType::Alpha);
+    assert_eq!(BumpVersionType::Beta, BumpVersionType::Beta);
+    assert_eq!(BumpVersionType::Rc, BumpVersionType::Rc);
+}
+#[test]
+fn test_version_struct_creation() {
+    let version: Version = Version {
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: Some("alpha.1".to_string()),
+    };
+    assert_eq!(version.major, 1);
+    assert_eq!(version.minor, 2);
+    assert_eq!(version.patch, 3);
+    assert_eq!(version.prerelease, Some("alpha.1".to_string()));
+}
+#[test]
+fn test_version_clone() {
+    let version: Version = Version {
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: Some("beta".to_string()),
+    };
+    let cloned: Version = version.clone();
+    assert_eq!(cloned.major, version.major);
+    assert_eq!(cloned.minor, version.minor);
+    assert_eq!(cloned.patch, version.patch);
+    assert_eq!(cloned.prerelease, version.prerelease);
+}
+#[tokio::test]
+async fn test_execute_bump_integration() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.1");
+    let updated_content: String = read_to_string(&manifest_path).await.unwrap();
+    assert!(updated_content.contains("version = \"0.1.1\""));
+}
+#[tokio::test]
+async fn test_execute_bump_minor() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_minor");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Minor).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.2.0");
+}
+#[tokio::test]
+async fn test_execute_bump_major() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_major");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Major).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "1.0.0");
+}
+#[tokio::test]
+async fn test_execute_bump_alpha() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_alpha");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0"
+edition = "2024"
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Alpha).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-alpha");
+}
+#[tokio::test]
+async fn test_execute_bump_beta() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_beta");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-alpha.2"
+edition = "2024"
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Beta).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-beta.1");
+}
+#[tokio::test]
+async fn test_execute_bump_rc() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_rc");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-beta.1"
+edition = "2024"
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Rc).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0-rc.1");
+}
+#[tokio::test]
+async fn test_execute_bump_release() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_release");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+version = "0.1.0-alpha"
+edition = "2024"
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Release).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0.1.0");
+}
+#[tokio::test]
+async fn test_execute_bump_no_version_field() {
+    let tmp_dir: PathBuf = PathBuf::from("./tmp/test_bump_no_version");
+    create_dir_all(&tmp_dir).await.unwrap();
+    let manifest_path: PathBuf = tmp_dir.join("Cargo.toml");
+    let content: &str = r#"[package]
+name = "test-package"
+edition = "2024"
+"#;
+    write(&manifest_path, content).await.unwrap();
+    let result: Result<String, Box<dyn std::error::Error>> =
+        execute_bump(manifest_path.to_str().unwrap(), &BumpVersionType::Patch).await;
+    assert!(result.is_err());
+}
+```
+# Path: hyperlane/cli/tests/bump/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/src/main.rs
+```rust
+use hyperlane_cli::*;
+use std::process::exit;
+#[tokio::main]
+async fn main() {
+    Logger::init(log::LevelFilter::Info);
+    let args: Args = parse_args();
+    match args.command {
+        CommandType::Fmt => {
+            if let Err(error) = execute_fmt(&args).await {
+                log::error!("fmt failed: {error}");
+                exit(1);
+            }
+        }
+        CommandType::Watch => {
+            if let Err(error) = execute_watch().await {
+                log::error!("watch failed: {error}");
+                exit(1);
+            }
+        }
+        CommandType::Bump => {
+            let manifest_path: String = args
+                .manifest_path
+                .unwrap_or_else(|| "Cargo.toml".to_string());
+            let bump_type: BumpVersionType = args.bump_type.unwrap_or(BumpVersionType::Patch);
+            match execute_bump(&manifest_path, &bump_type).await {
+                Ok(new_version) => {
+                    log::info!("Version bumped to {new_version}");
+                }
+                Err(error) => {
+                    log::error!("bump failed: {error}");
+                    exit(1);
+                }
+            }
+        }
+        CommandType::Publish => {
+            let manifest_path: String = args
+                .manifest_path
+                .unwrap_or_else(|| "Cargo.toml".to_string());
+            let max_retries: u32 = args.max_retries;
+            match execute_publish(&manifest_path, max_retries).await {
+                Ok(results) => {
+                    let failed_count: usize = results
+                        .iter()
+                        .filter(|r: &&PublishResult| !r.success)
+                        .count();
+                    if failed_count > 0 {
+                        log::error!("Publish completed with {failed_count} failures");
+                        exit(1);
+                    } else {
+                        log::info!("All packages published successfully");
+                    }
+                }
+                Err(error) => {
+                    log::error!("publish failed: {error}");
+                    exit(1);
+                }
+            }
+        }
+        CommandType::New => {
+            if let Some(project_name) = args.project_name {
+                if let Err(error) = execute_new(&project_name).await {
+                    log::error!("new failed: {error}");
+                    exit(1);
+                }
+            } else {
+                log::error!(
+                    "Error: Project name is required. Usage: hyperlane-cli new <PROJECT_NAME>"
+                );
+                exit(1);
+            }
+        }
+        CommandType::Template => {
+            let template_type: TemplateType = match args.template_type {
+                Some(tt) => tt,
+                None => {
+                    log::error!(
+                        "Error: Template type is required. Usage: hyperlane-cli template <TYPE> [SUBTYPE] <NAME>"
+                    );
+                    exit(1);
+                }
+            };
+            let component_name: String = match args.component_name {
+                Some(cn) => cn,
+                None => {
+                    log::error!(
+                        "Error: Component name is required. Usage: hyperlane-cli template <TYPE> [SUBTYPE] <NAME>"
+                    );
+                    exit(1);
+                }
+            };
+            if template_type == TemplateType::Model && args.model_sub_type.is_none() {
+                log::error!("Error: Model type requires subtype (application|request|response)");
+                exit(1);
+            }
+            if let Err(error) =
+                execute_template(template_type, &component_name, args.model_sub_type).await
+            {
+                log::error!("template failed: {error}");
+                exit(1);
+            }
+        }
+        CommandType::Help => print_help(),
+        CommandType::Version => print_version(),
+    }
+}
+```
+# Path: hyperlane/cli/src/lib.rs
+```rust
+mod bump;
+mod command;
+mod config;
+mod fmt;
+mod help;
+mod logger;
+mod new;
+mod publish;
+mod template;
+mod version;
+mod watch;
+pub use {
+    bump::*, command::*, config::*, fmt::*, help::*, logger::*, new::*, publish::*, template::*,
+    version::*, watch::*,
+};
+pub(crate) use std::{
+    collections::{HashMap, VecDeque},
+    env::args,
+    io,
+    path::{Path, PathBuf},
+    process::Stdio,
+    str::FromStr,
+    sync::{Arc, LazyLock},
+};
+pub(crate) use {
+    notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
+    regex::{Captures, Regex},
+    std::ffi::OsStr,
+    tokio::{
+        fs::{ReadDir, create_dir_all, read_dir, read_to_string, write},
+        process::Command,
+        spawn,
+        sync::{
+            Mutex, MutexGuard,
+            watch::{Receiver, Sender, channel},
+        },
+        task::JoinHandle,
+        time::{Duration, Interval, interval, sleep},
+    },
+    toml::Value,
+    which::which,
+};
+```
+# Path: hyperlane/cli/src/template/impl.rs
+```rust
+use super::*;
+impl FromStr for TemplateType {
+    type Err = TemplateError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "controller" => Ok(Self::Controller),
+            "domain" => Ok(Self::Domain),
+            "exception" => Ok(Self::Exception),
+            "mapper" => Ok(Self::Mapper),
+            "model" => Ok(Self::Model),
+            "repository" => Ok(Self::Repository),
+            "service" => Ok(Self::Service),
+            "utils" => Ok(Self::Utils),
+            "view" => Ok(Self::View),
+            _ => Err(TemplateError::InvalidTemplateType(s.to_string())),
+        }
+    }
+}
+impl TemplateConfig {
+    pub fn new(
+        template_type: TemplateType,
+        component_name: String,
+        model_sub_type: Option<ModelSubType>,
+    ) -> Self {
+        Self {
+            template_type,
+            component_name,
+            model_sub_type,
+            base_directory: "./application".to_string(),
+        }
+    }
+}
+impl FromStr for ModelSubType {
+    type Err = TemplateError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "application" => Ok(Self::Application),
+            "request" => Ok(Self::Request),
+            "response" => Ok(Self::Response),
+            _ => Err(TemplateError::InvalidModelSubType(s.to_string())),
+        }
+    }
+}
+```
+# Path: hyperlane/cli/src/template/fn.rs
+```rust
+use super::*;
+fn get_directory_name(template_type: &TemplateType) -> String {
+    match template_type {
+        TemplateType::Controller => "controller".to_string(),
+        TemplateType::Domain => "domain".to_string(),
+        TemplateType::Exception => "exception".to_string(),
+        TemplateType::Mapper => "mapper".to_string(),
+        TemplateType::Model => "model".to_string(),
+        TemplateType::Repository => "repository".to_string(),
+        TemplateType::Service => "service".to_string(),
+        TemplateType::Utils => "utils".to_string(),
+        TemplateType::View => "view".to_string(),
+    }
+}
+fn get_model_sub_type_name(sub_type: &ModelSubType) -> String {
+    match sub_type {
+        ModelSubType::Application => "application".to_string(),
+        ModelSubType::Request => "request".to_string(),
+        ModelSubType::Response => "response".to_string(),
+    }
+}
+async fn ensure_directory(path: &Path) -> Result<(), TemplateError> {
+    if !path.exists() {
+        create_dir_all(path).await?;
+    }
+    Ok(())
+}
+async fn write_mod_rs(path: &Path, modules: &[&str]) -> Result<(), TemplateError> {
+    let mut content: String = String::new();
+    for module in modules {
+        let mod_name: String = if module.starts_with("r#") {
+            module.to_string()
+        } else {
+            format!("r#{module}")
+        };
+        content.push_str(&format!("mod {mod_name};\n"));
+    }
+    content.push('\n');
+    let mut pub_use_parts: Vec<String> = Vec::new();
+    for module in modules {
+        let raw_name: &str = if let Some(stripped) = module.strip_prefix("r#") {
+            stripped
+        } else {
+            module
+        };
+        let mod_name: String = if module.starts_with("r#") {
+            module.to_string()
+        } else {
+            format!("r#{module}")
+        };
+        if raw_name == "const" || raw_name == "static" {
+            pub_use_parts.push(mod_name);
+        } else if raw_name == "enum" || raw_name == "fn" {
+            pub_use_parts.push(format!("{mod_name}::*"));
+        } else if raw_name == "struct" {
+            pub_use_parts.push(mod_name);
+        }
+    }
+    if !pub_use_parts.is_empty() {
+        content.push_str("pub use {");
+        content.push_str(&pub_use_parts.join(", "));
+        content.push_str("};\n");
+    }
+    content.push('\n');
+    content.push_str("use super::*;\n");
+    write(path, content).await?;
+    Ok(())
+}
+async fn write_empty_mod_rs(path: &Path) -> Result<(), TemplateError> {
+    write(path, "\n").await?;
+    Ok(())
+}
+async fn create_controller_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["fn", "impl", "struct"]).await?;
+    let fn_rs: PathBuf = target_dir.join("fn.rs");
+    write(&fn_rs, "use super::*;\n").await?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n").await?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n").await?;
+    Ok(())
+}
+async fn create_view_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["fn", "impl", "struct"]).await?;
+    let fn_rs: PathBuf = target_dir.join("fn.rs");
+    write(&fn_rs, "use super::*;\n").await?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n").await?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n").await?;
+    Ok(())
+}
+async fn create_service_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n").await?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n").await?;
+    Ok(())
+}
+async fn create_domain_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n").await?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n").await?;
+    Ok(())
+}
+async fn create_mapper_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(
+        &mod_rs,
+        &["const", "enum", "fn", "impl", "static", "struct"],
+    )
+    .await?;
+    let const_rs: PathBuf = target_dir.join("const.rs");
+    write(&const_rs, "use super::*;\n").await?;
+    let enum_rs: PathBuf = target_dir.join("enum.rs");
+    write(&enum_rs, "use super::*;\n").await?;
+    let fn_rs: PathBuf = target_dir.join("fn.rs");
+    write(&fn_rs, "use super::*;\n").await?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n").await?;
+    let static_rs: PathBuf = target_dir.join("static.rs");
+    write(&static_rs, "use super::*;\n").await?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n").await?;
+    Ok(())
+}
+async fn create_utils_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["fn"]).await?;
+    let fn_rs: PathBuf = target_dir.join("fn.rs");
+    write(&fn_rs, "use super::*;\n").await?;
+    Ok(())
+}
+async fn create_exception_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_empty_mod_rs(&mod_rs).await?;
+    Ok(())
+}
+async fn create_repository_template(
+    target_dir: &Path,
+    _component_name: &str,
+) -> Result<(), TemplateError> {
+    ensure_directory(target_dir).await?;
+    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
+    let impl_rs: PathBuf = target_dir.join("impl.rs");
+    write(&impl_rs, "use super::*;\n").await?;
+    let struct_rs: PathBuf = target_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n").await?;
+    Ok(())
+}
+async fn create_model_template(
+    target_dir: &Path,
+    _component_name: &str,
+    sub_type: &ModelSubType,
+) -> Result<(), TemplateError> {
+    let sub_type_name: String = get_model_sub_type_name(sub_type);
+    let model_dir: PathBuf = target_dir.join(&sub_type_name);
+    ensure_directory(&model_dir).await?;
+    let mod_rs: PathBuf = model_dir.join("mod.rs");
+    write_mod_rs(&mod_rs, &["struct"]).await?;
+    let struct_rs: PathBuf = model_dir.join("struct.rs");
+    write(&struct_rs, "use super::*;\n").await?;
+    Ok(())
+}
+pub async fn execute_template(
+    template_type: TemplateType,
+    component_name: &str,
+    model_sub_type: Option<ModelSubType>,
+) -> Result<(), TemplateError> {
+    let config: TemplateConfig =
+        TemplateConfig::new(template_type, component_name.to_string(), model_sub_type);
+    let base_path: PathBuf = PathBuf::from(&config.base_directory);
+    let dir_name: String = get_directory_name(&config.template_type);
+    let type_dir: PathBuf = base_path.join(&dir_name);
+    let target_dir: PathBuf = type_dir.join(&config.component_name);
+    if target_dir.exists() {
+        return Err(TemplateError::DirectoryExists(
+            target_dir.to_string_lossy().to_string(),
+        ));
+    }
+    ensure_directory(&type_dir).await?;
+    match config.template_type {
+        TemplateType::Controller => {
+            create_controller_template(&target_dir, &config.component_name).await?
+        }
+        TemplateType::View => create_view_template(&target_dir, &config.component_name).await?,
+        TemplateType::Service => {
+            create_service_template(&target_dir, &config.component_name).await?
+        }
+        TemplateType::Domain => create_domain_template(&target_dir, &config.component_name).await?,
+        TemplateType::Mapper => create_mapper_template(&target_dir, &config.component_name).await?,
+        TemplateType::Utils => create_utils_template(&target_dir, &config.component_name).await?,
+        TemplateType::Exception => {
+            create_exception_template(&target_dir, &config.component_name).await?
+        }
+        TemplateType::Repository => {
+            create_repository_template(&target_dir, &config.component_name).await?
+        }
+        TemplateType::Model => {
+            let sub_type: ModelSubType = config.model_sub_type.ok_or_else(|| {
+                TemplateError::InvalidModelSubType("Missing model subtype".to_string())
+            })?;
+            create_model_template(&target_dir, &config.component_name, &sub_type).await?;
+        }
+    }
+    let _: Result<(), io::Error> = crate::fmt::format_path(&target_dir).await;
+    log::info!(
+        "Created {dir_name} '{}' at {}",
+        config.component_name,
+        target_dir.display()
+    );
+    Ok(())
+}
+```
+# Path: hyperlane/cli/src/template/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TemplateType {
+    Controller,
+    Domain,
+    Exception,
+    Mapper,
+    Model,
+    Repository,
+    Service,
+    Utils,
+    View,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModelSubType {
+    Application,
+    Request,
+    Response,
+}
+#[derive(Debug, thiserror::Error)]
+pub enum TemplateError {
+    #[error("IO error: {0}")]
+    IoError(#[from] io::Error),
+    #[error("Invalid template type: {0}")]
+    InvalidTemplateType(String),
+    #[error("Invalid model subtype: {0}")]
+    InvalidModelSubType(String),
+    #[error("Directory '{0}' already exists")]
+    DirectoryExists(String),
+}
+```
+# Path: hyperlane/cli/src/template/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug)]
+pub struct TemplateConfig {
+    pub template_type: TemplateType,
+    pub component_name: String,
+    pub model_sub_type: Option<ModelSubType>,
+    pub base_directory: String,
+}
+```
+# Path: hyperlane/cli/src/template/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/cli/src/fmt/fn.rs
+```rust
+use super::*;
+fn sort_derive_in_line(line: &str) -> Option<String> {
+    let captures: Captures<'_> = DERIVE_REGEX.captures(line)?;
+    let derive_content: &str = captures.get(1)?.as_str();
+    let mut traits: Vec<String> = derive_content
+        .split(',')
+        .map(|s: &str| s.trim().to_string())
+        .filter(|s: &String| !s.is_empty())
+        .collect();
+    traits.sort_by_key(|a: &String| a.to_lowercase());
+    let sorted_traits: String = traits.join(", ");
+    let result: String = line.replace(derive_content, &sorted_traits);
+    Some(result)
+}
+async fn format_derive_in_file(file_path: &Path) -> Result<bool, io::Error> {
+    let content: String = read_to_string(file_path).await?;
+    let lines: std::str::Lines<'_> = content.lines();
+    let mut modified: bool = false;
+    let mut new_content: String = String::new();
+    for line in lines {
+        let trimmed: &str = line.trim();
+        let new_line: String = if trimmed.starts_with("#[derive(") {
+            if let Some(sorted) = sort_derive_in_line(line) {
+                if sorted != line {
+                    modified = true;
+                }
+                sorted
+            } else {
+                line.to_string()
+            }
+        } else {
+            line.to_string()
+        };
+        new_content.push_str(&new_line);
+        new_content.push('\n');
+    }
+    if modified {
+        write(file_path, new_content).await?;
+    }
+    Ok(modified)
+}
+async fn find_rust_files(manifest_path: &Path) -> Result<Vec<PathBuf>, io::Error> {
+    let mut files: Vec<PathBuf> = Vec::new();
+    let workspace_root: &Path = manifest_path.parent().unwrap_or(Path::new("."));
+    let src_dir: PathBuf = workspace_root.join("src");
+    if src_dir.exists() {
+        find_rust_files_in_dir(&src_dir, &mut files).await?;
+    }
+    let content: String = read_to_string(manifest_path).await?;
+    if let Ok(doc) = toml::from_str::<Value>(&content)
+        && let Some(workspace) = doc.get("workspace")
+        && let Some(members) = workspace.get("members").and_then(|m: &Value| m.as_array())
+    {
+        for member in members {
+            if let Some(pattern) = member.as_str() {
+                let member_src: PathBuf = workspace_root.join(pattern).join("src");
+                if member_src.exists() {
+                    find_rust_files_in_dir(&member_src, &mut files).await?;
+                }
+            }
+        }
+    }
+    Ok(files)
+}
+async fn find_rust_files_in_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), io::Error> {
+    let mut entries: ReadDir = read_dir(dir).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let path: PathBuf = entry.path();
+        if path.is_file() && path.extension().is_some_and(|ext: &OsStr| ext == "rs") {
+            files.push(path);
+        } else if path.is_dir() {
+            Box::pin(find_rust_files_in_dir(&path, files)).await?;
+        }
+    }
+    Ok(())
+}
+async fn format_derive_attributes(manifest_path: &str) -> Result<(), io::Error> {
+    let path: &Path = Path::new(manifest_path);
+    let files: Vec<PathBuf> = find_rust_files(path).await?;
+    let modified_count: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
+    let mut handles: Vec<JoinHandle<Result<(), io::Error>>> = Vec::new();
+    for file in files {
+        let counter: Arc<Mutex<usize>> = Arc::clone(&modified_count);
+        let handle: JoinHandle<Result<(), io::Error>> = spawn(async move {
+            if format_derive_in_file(&file).await? {
+                let mut count: MutexGuard<'_, usize> = counter.lock().await;
+                *count += 1;
+            }
+            Ok(())
+        });
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.await??;
+    }
+    let count: usize = *modified_count.lock().await;
+    if count > 0 {
+        log::info!("Sorted derive attributes in {count} files");
+    }
+    Ok(())
+}
+fn is_cargo_clippy_installed() -> bool {
+    which("cargo-clippy").is_ok()
+}
+async fn install_cargo_clippy() -> Result<(), io::Error> {
+    log::warn!("cargo-clippy not found, installing...");
+    let output: std::process::Output = Command::new("rustup")
+        .arg("component")
+        .arg("add")
+        .arg("clippy")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await?;
+    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stdout.is_empty() {
+        for line in stdout.lines() {
+            log::info!("{line}");
+        }
+    }
+    if !stderr.is_empty() {
+        if output.status.success() {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::info!("{line}");
+            }
+        } else {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::error!("{line}");
+            }
+        }
+    }
+    if !output.status.success() {
+        return Err(io::Error::other("failed to install cargo-clippy"));
+    }
+    Ok(())
+}
+async fn execute_clippy_fix(args: &Args) -> Result<(), io::Error> {
+    if !is_cargo_clippy_installed() {
+        install_cargo_clippy().await?;
+    }
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("clippy")
+        .arg("--fix")
+        .arg("--workspace")
+        .arg("--all-targets")
+        .arg("--allow-dirty");
+    if let Some(ref manifest_path) = args.manifest_path {
+        cmd.arg("--manifest-path").arg(manifest_path);
+    }
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output: std::process::Output = cmd.output().await?;
+    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stdout.is_empty() {
+        for line in stdout.lines() {
+            log::info!("{line}");
+        }
+    }
+    if !stderr.is_empty() {
+        if output.status.success() {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::info!("{line}");
+            }
+        } else {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::error!("{line}");
+            }
+        }
+    }
+    if !output.status.success() {
+        return Err(io::Error::other("cargo clippy --fix failed"));
+    }
+    Ok(())
+}
+pub async fn execute_fmt(args: &Args) -> Result<(), io::Error> {
+    let manifest_path: String = args
+        .manifest_path
+        .clone()
+        .unwrap_or_else(|| "Cargo.toml".to_string());
+    if !args.check {
+        format_derive_attributes(&manifest_path).await?;
+    }
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("fmt");
+    if args.check {
+        cmd.arg("--check");
+    }
+    if let Some(ref manifest_path) = args.manifest_path {
+        cmd.arg("--manifest-path").arg(manifest_path);
+    }
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output: std::process::Output = cmd.output().await?;
+    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stdout.is_empty() {
+        for line in stdout.lines() {
+            log::info!("{line}");
+        }
+    }
+    if !stderr.is_empty() {
+        if output.status.success() {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::info!("{line}");
+            }
+        } else {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::error!("{line}");
+            }
+        }
+    }
+    if !output.status.success() {
+        return Err(io::Error::other("cargo fmt failed"));
+    }
+    if !args.check {
+        execute_clippy_fix(args).await?;
+    }
+    Ok(())
+}
+pub async fn format_path(path: &Path) -> Result<(), io::Error> {
+    let mut cmd: Command = Command::new("cargo");
+    cmd.arg("fmt").arg("--").arg(path);
+    cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    cmd.status().await?;
+    Ok(())
+}
+```
+# Path: hyperlane/cli/src/fmt/static.rs
+```rust
+use super::*;
+pub static DERIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"#\[derive\s*\(([^)]+)\)\]").expect("Invalid regex pattern")
+});
+```
+# Path: hyperlane/cli/src/fmt/mod.rs
+```rust
+mod r#fn;
+mod r#static;
+pub use {r#fn::*, r#static::*};
+use super::*;
+```
+# Path: hyperlane/cli/src/publish/fn.rs
+```rust
+use super::*;
+async fn discover_packages(workspace_root: &Path) -> Result<Vec<Package>, PublishError> {
+    let content: String = read_to_string(workspace_root).await?;
+    let doc: Value = toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
+    let mut packages: Vec<Package> = Vec::new();
+    if let Some(workspace) = doc.get("workspace")
+        && let Some(members) = workspace
+            .get("members")
+            .and_then(|members_value: &Value| members_value.as_array())
+    {
+        for member in members {
+            if let Some(pattern) = member.as_str() {
+                let base_path: &Path = workspace_root.parent().unwrap_or(workspace_root);
+                expand_pattern(base_path, pattern, &mut packages).await?;
+            }
+        }
+    }
+    if packages.is_empty() {
+        let package: Package = read_single_package(workspace_root).await?;
+        packages.push(package);
+    }
+    Ok(packages)
+}
+async fn expand_pattern(
+    base_path: &Path,
+    pattern: &str,
+    packages: &mut Vec<Package>,
+) -> Result<(), PublishError> {
+    if pattern.contains('*') {
+        let parent: &Path = Path::new(pattern).parent().unwrap_or(Path::new("."));
+        let full_parent: PathBuf = base_path.join(parent);
+        if full_parent.is_dir() {
+            let mut entries: ReadDir = read_dir(&full_parent).await?;
+            while let Some(entry) = entries.next_entry().await? {
+                let path: PathBuf = entry.path();
+                if path.is_dir() {
+                    let cargo_toml: PathBuf = path.join("Cargo.toml");
+                    if cargo_toml.exists() {
+                        let package: Package = read_package_manifest(&cargo_toml).await?;
+                        packages.push(package);
+                    }
+                }
+            }
+        }
+    } else {
+        let cargo_toml: PathBuf = base_path.join(pattern).join("Cargo.toml");
+        if cargo_toml.exists() {
+            let package: Package = read_package_manifest(&cargo_toml).await?;
+            packages.push(package);
+        }
+    }
+    Ok(())
+}
+async fn read_single_package(manifest_path: &Path) -> Result<Package, PublishError> {
+    read_package_manifest(manifest_path).await
+}
+async fn read_package_manifest(manifest_path: &Path) -> Result<Package, PublishError> {
+    let content: String = read_to_string(manifest_path).await?;
+    let doc: Value = toml::from_str(&content).map_err(|_| PublishError::ManifestParseError)?;
+    let package_table: &Value = doc.get("package").ok_or(PublishError::ManifestParseError)?;
+    let name: String = package_table
+        .get("name")
+        .and_then(|n: &Value| n.as_str())
+        .ok_or(PublishError::ManifestParseError)?
+        .to_string();
+    let version: String = package_table
+        .get("version")
+        .and_then(|v: &Value| v.as_str())
+        .ok_or(PublishError::ManifestParseError)?
+        .to_string();
+    let path: PathBuf = manifest_path
+        .parent()
+        .filter(|p: &&Path| !p.as_os_str().is_empty())
+        .map_or_else(|| PathBuf::from("."), |p: &Path| p.to_path_buf());
+    let local_dependencies: Vec<String> = extract_local_dependencies(&doc, manifest_path)?;
+    Ok(Package {
+        name,
+        version,
+        path,
+        local_dependencies,
+    })
+}
+fn extract_local_dependencies(
+    doc: &Value,
+    _manifest_path: &Path,
+) -> Result<Vec<String>, PublishError> {
+    let mut deps: Vec<String> = Vec::new();
+    let dep_sections: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+    for section in &dep_sections {
+        if let Some(table) = doc
+            .get(section)
+            .and_then(|section_value: &Value| section_value.as_table())
+        {
+            for (dep_name, dep_value) in table {
+                let is_local: bool = match dep_value {
+                    Value::Table(t) => {
+                        t.get("path").is_some()
+                            || t.get("workspace")
+                                .and_then(|workspace_value: &Value| workspace_value.as_bool())
+                                .unwrap_or(false)
+                    }
+                    _ => false,
+                };
+                if is_local {
+                    deps.push(dep_name.clone());
+                }
+            }
+        }
+    }
+    Ok(deps)
+}
+fn topological_sort(packages: &[Package]) -> Result<Vec<Package>, PublishError> {
+    let mut in_degree: HashMap<String, usize> = HashMap::new();
+    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
+    let package_map: HashMap<String, Package> = packages
+        .iter()
+        .map(|package: &Package| (package.name.clone(), package.clone()))
+        .collect();
+    for package in packages {
+        in_degree.entry(package.name.clone()).or_insert(0);
+        for dep in &package.local_dependencies {
+            if package_map.contains_key(dep) {
+                graph
+                    .entry(dep.clone())
+                    .or_default()
+                    .push(package.name.clone());
+                *in_degree.entry(package.name.clone()).or_insert(0) += 1;
+            }
+        }
+    }
+    let mut queue: VecDeque<String> = VecDeque::new();
+    for (name, degree) in &in_degree {
+        if *degree == 0 {
+            queue.push_back(name.clone());
+        }
+    }
+    let mut result: Vec<Package> = Vec::new();
+    while let Some(name) = queue.pop_front() {
+        if let Some(package) = package_map.get(&name) {
+            result.push(package.clone());
+        }
+        if let Some(dependents) = graph.get(&name) {
+            for dependent in dependents {
+                if let Some(degree) = in_degree.get_mut(dependent) {
+                    *degree -= 1;
+                    if *degree == 0 {
+                        queue.push_back(dependent.clone());
+                    }
+                }
+            }
+        }
+    }
+    if result.len() != packages.len() {
+        return Err(PublishError::CircularDependency);
+    }
+    Ok(result)
+}
+async fn publish_package_with_retry(package: &Package, max_retries: u32) -> PublishResult {
+    let mut attempt: u32 = 0;
+    let mut last_error: Option<String> = None;
+    while attempt <= max_retries {
+        match publish_single_package(package).await {
+            Ok(()) => {
+                return PublishResult {
+                    package_name: package.name.clone(),
+                    success: true,
+                    error: None,
+                    retries: attempt,
+                };
+            }
+            Err(error) => {
+                last_error = Some(error.to_string());
+                attempt += 1;
+                if attempt <= max_retries {
+                    sleep(Duration::from_secs(2_u64.pow(attempt))).await;
+                }
+            }
+        }
+    }
+    PublishResult {
+        package_name: package.name.clone(),
+        success: false,
+        error: last_error,
+        retries: attempt - 1,
+    }
+}
+async fn publish_single_package(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
+    let output: std::process::Output = Command::new("cargo")
+        .arg("publish")
+        .arg("--allow-dirty")
+        .current_dir(&package.path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr: String = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(stderr.into())
+    }
+}
+pub async fn execute_publish(
+    manifest_path: &str,
+    max_retries: u32,
+) -> Result<Vec<PublishResult>, PublishError> {
+    let path: &Path = Path::new(manifest_path);
+    let packages: Vec<Package> = discover_packages(path).await?;
+    if packages.is_empty() {
+        return Ok(Vec::new());
+    }
+    let sorted_packages: Vec<Package> = topological_sort(&packages)?;
+    let mut results: Vec<PublishResult> = Vec::new();
+    for package in sorted_packages {
+        log::info!("Publishing {} v{}...", package.name, package.version);
+        let result: PublishResult = publish_package_with_retry(&package, max_retries).await;
+        if result.success {
+            if result.retries == 0 {
+                log::info!("Successfully published {}", result.package_name,);
+            } else {
+                log::info!(
+                    "Successfully published {} (retried {} times)",
+                    result.package_name,
+                    result.retries
+                );
+            }
+        } else if let Some(error) = &result.error {
+            log::error!("Failed to publish {}: {error}", result.package_name);
+        } else {
+            log::error!("Failed to publish {}", result.package_name);
+        }
+        results.push(result);
+    }
+    Ok(results)
+}
+```
+# Path: hyperlane/cli/src/publish/enum.rs
+```rust
+use super::*;
+#[derive(Debug, thiserror::Error)]
+pub enum PublishError {
+    #[error("Failed to parse Cargo.toml")]
+    ManifestParseError,
+    #[error("Circular dependency detected")]
+    CircularDependency,
+    #[error("IO error: {0}")]
+    IoError(#[from] io::Error),
+}
+```
+# Path: hyperlane/cli/src/publish/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Package {
+    pub name: String,
+    pub version: String,
+    pub path: PathBuf,
+    pub local_dependencies: Vec<String>,
+}
+#[derive(Clone, Debug)]
+pub struct PublishResult {
+    pub package_name: String,
+    pub success: bool,
+    pub error: Option<String>,
+    pub retries: u32,
+}
+```
+# Path: hyperlane/cli/src/publish/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#struct;
+pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/cli/src/logger/impl.rs
+```rust
+use super::*;
+impl log::Log for Logger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= log::max_level()
+    }
+    fn log(&self, record: &log::Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let now_time: String = color_output::time();
+        let level: log::Level = record.level();
+        let args: &std::fmt::Arguments<'_> = record.args();
+        let file: Option<&str> = record.file();
+        let module_path: Option<&str> = record.module_path();
+        let target: &str = record.target();
+        let line: u32 = record.line().unwrap_or_default();
+        let location: &str = file.unwrap_or(module_path.unwrap_or(target));
+        let time_text: String = format!("{LOG_SPACE}{now_time}{LOG_SPACE}");
+        let level_text: String = format!("{LOG_SPACE}{level}{LOG_SPACE}");
+        let args_text: String = format!("{args}{LOG_SPACE}");
+        let location_text: String = format!("{LOG_SPACE}{location}{LOG_COLON}{line}{LOG_SPACE}");
+        let color: ColorType = match record.level() {
+            log::Level::Trace => ColorType::Use(Color::Magenta),
+            log::Level::Debug => ColorType::Use(Color::Cyan),
+            log::Level::Info => ColorType::Use(Color::Green),
+            log::Level::Warn => ColorType::Use(Color::Yellow),
+            log::Level::Error => ColorType::Use(Color::Red),
+        };
+        let mut time_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut level_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut location_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let mut args_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
+        let time_output: ColorOutput<'_> = time_output_builder
+            .text(&time_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(ColorType::Use(Color::Black))
+            .build();
+        let level_output: ColorOutput<'_> = level_output_builder
+            .text(&level_text)
+            .bold(true)
+            .color(ColorType::Use(Color::White))
+            .bg_color(color)
+            .build();
+        let location_output: ColorOutput<'_> = location_output_builder
+            .text(&location_text)
+            .bold(true)
+            .color(color)
+            .build();
+        let args_output: ColorOutput<'_> = args_output_builder
+            .text(&args_text)
+            .bold(true)
+            .color(color)
+            .endl(true)
+            .build();
+        ColorOutputListBuilder::new()
+            .add(time_output)
+            .add(level_output)
+            .add(location_output)
+            .add(args_output)
+            .run();
+    }
+    fn flush(&self) {}
+}
+impl Logger {
+    pub fn init(level_filter: log::LevelFilter) {
+        let _: Result<(), SetLoggerError> = log::set_logger(&LOGGER);
+        log::set_max_level(level_filter);
+    }
+}
+```
+# Path: hyperlane/cli/src/logger/const.rs
+```rust
+pub(crate) const LOG_SPACE: &str = " ";
+pub(crate) const LOG_COLON: &str = ":";
+```
+# Path: hyperlane/cli/src/logger/static.rs
+```rust
+use super::*;
+pub(crate) static LOGGER: Logger = Logger;
+```
+# Path: hyperlane/cli/src/logger/struct.rs
+```rust
+use lombok_macros::{Data, New};
+#[derive(Data, New)]
+pub struct Logger;
+```
+# Path: hyperlane/cli/src/logger/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub use r#struct::*;
+pub use {::log, color_output::*};
+pub(crate) use {r#const::*, r#static::*};
+pub(crate) use log::SetLoggerError;
+```
+# Path: hyperlane/cli/src/help/fn.rs
+```rust
+pub fn print_help() {
+    log::info!("hyperlane-cli [COMMAND] [OPTIONS]");
+    log::info!("");
+    log::info!("Commands:");
+    log::info!("  bump      Bump version in Cargo.toml");
+    log::info!("  fmt       Format Rust code using cargo fmt");
+    log::info!("  watch     Watch files and run cargo run using cargo-watch");
+    log::info!("  publish   Publish packages in monorepo with topological ordering");
+    log::info!("  new       Create a new project from template");
+    log::info!(
+        "  template  Generate template components (controller|domain|exception|mapper|model|repository|service|utils|view)"
+    );
+    log::info!("  -h, --help      Print this help message");
+    log::info!("  -v, --version   Print version information");
+    log::info!("");
+    log::info!("New Options:");
+    log::info!("  <PROJECT_NAME>  Name of the project to create");
+    log::info!("");
+    log::info!("Bump Options:");
+    log::info!("  --patch         Bump patch version (0.1.0 -> 0.1.1) [default]");
+    log::info!("  --minor         Bump minor version (0.1.0 -> 0.2.0)");
+    log::info!("  --major         Bump major version (0.1.0 -> 1.0.0)");
+    log::info!(
+        "  --alpha         Add or bump alpha version (0.1.0 -> 0.1.0-alpha, 0.1.0-alpha -> 0.1.0-alpha.1)"
+    );
+    log::info!(
+        "  --beta          Add or bump beta version (0.1.0 -> 0.1.0-beta, 0.1.0-alpha.2 -> 0.1.0-beta.1)"
+    );
+    log::info!(
+        "  --rc            Add or bump rc version (0.1.0 -> 0.1.0-rc, 0.1.0-beta.1 -> 0.1.0-rc.1)"
+    );
+    log::info!("  --release       Remove pre-release identifier (0.1.0-alpha -> 0.1.0)");
+    log::info!("  --manifest-path <PATH>  Path to Cargo.toml [default: Cargo.toml]");
+    log::info!("");
+    log::info!("Fmt Options:");
+    log::info!("  --check         Check formatting without making changes");
+    log::info!("  --manifest-path <PATH>  Path to Cargo.toml");
+    log::info!("");
+    log::info!("Publish Options:");
+    log::info!("  --manifest-path <PATH>  Path to workspace Cargo.toml [default: Cargo.toml]");
+    log::info!("  --max-retries <N>       Maximum retry attempts per package [default: 3]");
+}
+```
+# Path: hyperlane/cli/src/help/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+```
+# Path: hyperlane/cli/src/config/fn.rs
+```rust
+use super::*;
+pub fn parse_args() -> Args {
+    let raw_args: Vec<String> = args().collect();
+    let mut command: CommandType = CommandType::Help;
+    let mut check: bool = false;
+    let mut manifest_path: Option<String> = None;
+    let mut bump_type: Option<BumpVersionType> = None;
+    let mut max_retries: u32 = 8;
+    let mut project_name: Option<String> = None;
+    let mut template_type: Option<TemplateType> = None;
+    let mut model_sub_type: Option<ModelSubType> = None;
+    let mut component_name: Option<String> = None;
+    let mut i: usize = 1;
+    while i < raw_args.len() {
+        let arg: &str = raw_args[i].as_str();
+        match arg {
+            "-h" | "--help" => {
+                command = CommandType::Help;
+            }
+            "-v" | "--version" => {
+                command = CommandType::Version;
+            }
+            "fmt" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Fmt;
+            }
+            "watch" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Watch;
+            }
+            "bump" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Bump;
+            }
+            "publish" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Publish;
+            }
+            "new" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::New;
+                i += 1;
+                if i < raw_args.len()
+                    && !raw_args[i].starts_with("--")
+                    && !raw_args[i].starts_with("-")
+                {
+                    project_name = Some(raw_args[i].clone());
+                } else {
+                    i -= 1;
+                }
+            }
+            "template" if (command == CommandType::Help || command == CommandType::Version) => {
+                command = CommandType::Template;
+                i += 1;
+                if i < raw_args.len()
+                    && !raw_args[i].starts_with("--")
+                    && !raw_args[i].starts_with("-")
+                {
+                    let type_str: &str = &raw_args[i];
+                    template_type = TemplateType::from_str(type_str).ok();
+                    i += 1;
+                    if template_type == Some(TemplateType::Model)
+                        && i < raw_args.len()
+                        && !raw_args[i].starts_with("--")
+                        && !raw_args[i].starts_with("-")
+                    {
+                        let sub_type_str: &str = &raw_args[i];
+                        model_sub_type = ModelSubType::from_str(sub_type_str).ok();
+                        i += 1;
+                    }
+                    if i < raw_args.len()
+                        && !raw_args[i].starts_with("--")
+                        && !raw_args[i].starts_with("-")
+                    {
+                        component_name = Some(raw_args[i].clone());
+                        i += 1;
+                    }
+                    i -= 1;
+                }
+            }
+            "--patch" => {
+                bump_type = Some(BumpVersionType::Patch);
+            }
+            "--minor" => {
+                bump_type = Some(BumpVersionType::Minor);
+            }
+            "--major" => {
+                bump_type = Some(BumpVersionType::Major);
+            }
+            "--release" => {
+                bump_type = Some(BumpVersionType::Release);
+            }
+            "--alpha" => {
+                bump_type = Some(BumpVersionType::Alpha);
+            }
+            "--beta" => {
+                bump_type = Some(BumpVersionType::Beta);
+            }
+            "--rc" => {
+                bump_type = Some(BumpVersionType::Rc);
+            }
+            "--check" => {
+                check = true;
+            }
+            "--manifest-path" => {
+                i += 1;
+                if i < raw_args.len() {
+                    manifest_path = Some(raw_args[i].clone());
+                }
+            }
+            "--max-retries" => {
+                i += 1;
+                if i < raw_args.len()
+                    && let Ok(n) = raw_args[i].parse::<u32>()
+                {
+                    max_retries = n;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Args {
+        command,
+        check,
+        manifest_path,
+        bump_type,
+        max_retries,
+        project_name,
+        template_type,
+        model_sub_type,
+        component_name,
+    }
+}
+```
+# Path: hyperlane/cli/src/config/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug)]
+pub struct Args {
+    pub command: CommandType,
+    pub check: bool,
+    pub manifest_path: Option<String>,
+    pub bump_type: Option<BumpVersionType>,
+    pub max_retries: u32,
+    pub project_name: Option<String>,
+    pub template_type: Option<TemplateType>,
+    pub model_sub_type: Option<ModelSubType>,
+    pub component_name: Option<String>,
+}
+```
+# Path: hyperlane/cli/src/config/mod.rs
+```rust
+mod r#fn;
+mod r#struct;
+pub use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/cli/src/new/impl.rs
+```rust
+use super::*;
+impl NewProjectConfig {
+    pub fn new(project_name: String) -> Self {
+        Self {
+            project_name,
+            template_url: "https://github.com/hyperlane-dev/hyperlane-quick-start".to_string(),
+        }
+    }
+}
+```
+# Path: hyperlane/cli/src/new/fn.rs
+```rust
+use super::*;
+fn validate_project_name(name: &str) -> Result<(), NewError> {
+    if name.is_empty() {
+        return Err(NewError::InvalidName(
+            "Project name cannot be empty".to_string(),
+        ));
+    }
+    if name.contains('/') || name.contains('\\') || name.contains(':') {
+        return Err(NewError::InvalidName(
+            "Project name contains invalid characters".to_string(),
+        ));
+    }
+    if name.starts_with('.') || name.starts_with('-') {
+        return Err(NewError::InvalidName(
+            "Project name cannot start with '.' or '-'".to_string(),
+        ));
+    }
+    Ok(())
+}
+async fn check_git_available() -> Result<(), NewError> {
+    let output: std::process::Output = Command::new("git")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .await
+        .map_err(|_| NewError::GitNotFound)?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(NewError::GitNotFound)
+    }
+}
+async fn git_clone(config: &NewProjectConfig) -> Result<(), NewError> {
+    let project_path: PathBuf = PathBuf::from(&config.project_name);
+    if project_path.exists() {
+        return Err(NewError::ProjectExists(config.project_name.clone()));
+    }
+    let output: std::process::Output = Command::new("git")
+        .arg("clone")
+        .arg(&config.template_url)
+        .arg(&config.project_name)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await
+        .map_err(NewError::IoError)?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr: String = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(NewError::CloneFailed(stderr))
+    }
+}
+pub async fn execute_new(project_name: &str) -> Result<(), NewError> {
+    validate_project_name(project_name)?;
+    check_git_available().await?;
+    let config: NewProjectConfig = NewProjectConfig::new(project_name.to_string());
+    log::info!(
+        "Creating new project '{}' from template...",
+        config.project_name
+    );
+    git_clone(&config).await?;
+    log::info!("Successfully created project '{}'", config.project_name);
+    log::info!("  cd {}", config.project_name);
+    log::info!("  cargo build");
+    Ok(())
+}
+```
+# Path: hyperlane/cli/src/new/enum.rs
+```rust
+use super::*;
+#[derive(Debug, thiserror::Error)]
+pub enum NewError {
+    #[error("IO error: {0}")]
+    IoError(#[from] io::Error),
+    #[error("Git is not installed or not found in PATH")]
+    GitNotFound,
+    #[error("Project directory '{0}' already exists")]
+    ProjectExists(String),
+    #[error("Git clone failed: {0}")]
+    CloneFailed(String),
+    #[error("Invalid project name: {0}")]
+    InvalidName(String),
+}
+```
+# Path: hyperlane/cli/src/new/struct.rs
+```rust
+#[derive(Clone, Debug)]
+pub struct NewProjectConfig {
+    pub project_name: String,
+    pub template_url: String,
+}
+```
+# Path: hyperlane/cli/src/new/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/cli/src/version/fn.rs
+```rust
+pub fn print_version() {
+    log::info!("hyperlane-cli {}", env!("CARGO_PKG_VERSION"));
+}
+```
+# Path: hyperlane/cli/src/version/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+```
+# Path: hyperlane/cli/src/bump/fn.rs
+```rust
+use super::*;
+fn parse_version(version_str: &str) -> Option<Version> {
+    let parts: Vec<&str> = version_str.split('-').collect();
+    let version_part: &str = parts.first()?;
+    let prerelease: Option<String> = parts.get(1).map(|s: &&str| s.to_string());
+    let nums: Vec<&str> = version_part.split('.').collect();
+    if nums.len() != 3 {
+        return None;
+    }
+    let major: u64 = nums.first()?.parse().ok()?;
+    let minor: u64 = nums.get(1)?.parse().ok()?;
+    let patch: u64 = nums.get(2)?.parse().ok()?;
+    Some(Version {
+        major,
+        minor,
+        patch,
+        prerelease,
+    })
+}
+fn parse_prerelease(prerelease: &str) -> Option<(&str, u64)> {
+    let parts: Vec<&str> = prerelease.split('.').collect();
+    let pre_type: &str = parts.first()?;
+    let number: u64 = parts
+        .get(1)
+        .and_then(|s: &&str| s.parse().ok())
+        .unwrap_or(0);
+    Some((pre_type, number))
+}
+fn get_next_prerelease(current: Option<&String>, target_type: &str) -> String {
+    match current {
+        Some(pre) => {
+            if let Some((pre_type, number)) = parse_prerelease(pre)
+                && pre_type == target_type
+                && number > 0
+            {
+                return format!("{}.{}", target_type, number + 1);
+            }
+            format!("{target_type}.1")
+        }
+        None => target_type.to_string(),
+    }
+}
+fn version_to_string(version: &Version) -> String {
+    let base: String = format!("{}.{}.{}", version.major, version.minor, version.patch);
+    match &version.prerelease {
+        Some(pre) => format!("{base}-{pre}"),
+        None => base,
+    }
+}
+fn bump_version(version: &Version, bump_type: &BumpVersionType) -> Version {
+    match bump_type {
+        BumpVersionType::Patch => Version {
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch + 1,
+            prerelease: None,
+        },
+        BumpVersionType::Minor => Version {
+            major: version.major,
+            minor: version.minor + 1,
+            patch: 0,
+            prerelease: None,
+        },
+        BumpVersionType::Major => Version {
+            major: version.major + 1,
+            minor: 0,
+            patch: 0,
+            prerelease: None,
+        },
+        BumpVersionType::Release => Version {
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+            prerelease: None,
+        },
+        BumpVersionType::Alpha => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "alpha");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+        BumpVersionType::Beta => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "beta");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+        BumpVersionType::Rc => {
+            let prerelease: String = get_next_prerelease(version.prerelease.as_ref(), "rc");
+            Version {
+                major: version.major,
+                minor: version.minor,
+                patch: version.patch,
+                prerelease: Some(prerelease),
+            }
+        }
+    }
+}
+fn find_version_position(line: &str) -> Option<(usize, usize)> {
+    let trimmed: &str = line.trim();
+    if !trimmed.starts_with("version") || !trimmed.contains('=') {
+        return None;
+    }
+    let eq_pos: usize = line.find('=')?;
+    let after_eq: &str = &line[eq_pos + 1..];
+    let quote_start: usize = after_eq.find('"')?;
+    let after_first_quote: &str = &after_eq[quote_start + 1..];
+    let quote_end: usize = after_first_quote.find('"')?;
+    let version_start: usize = eq_pos + 1 + quote_start + 1;
+    let version_end: usize = version_start + quote_end;
+    Some((version_start, version_end))
+}
+pub async fn execute_bump(
+    manifest_path: &str,
+    bump_type: &BumpVersionType,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let path: &Path = Path::new(manifest_path);
+    let content: String = read_to_string(path).await?;
+    let mut new_version: Option<String> = None;
+    let mut found_version: bool = false;
+    let mut updated_content: String = content.clone();
+    for line in content.lines() {
+        if found_version {
+            break;
+        }
+        if let Some((version_start, version_end)) = find_version_position(line) {
+            let version_str: &str = &line[version_start..version_end];
+            if let Some(version) = parse_version(version_str) {
+                let bumped: Version = bump_version(&version, bump_type);
+                let version_string: String = version_to_string(&bumped);
+                new_version = Some(version_string.clone());
+                let new_line: String = format!(
+                    "{}{version_string}{}",
+                    &line[..version_start],
+                    &line[version_end..]
+                );
+                updated_content = updated_content.replacen(line, &new_line, 1);
+                found_version = true;
+            }
+        }
+    }
+    if !found_version {
+        return Err("version field not found in Cargo.toml".into());
+    }
+    write(path, updated_content).await?;
+    match new_version {
+        Some(v) => Ok(v),
+        None => Err("failed to bump version".into()),
+    }
+}
+```
+# Path: hyperlane/cli/src/bump/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BumpVersionType {
+    Patch,
+    Minor,
+    Major,
+    Release,
+    Alpha,
+    Beta,
+    Rc,
+}
+```
+# Path: hyperlane/cli/src/bump/struct.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Version {
+    pub major: u64,
+    pub minor: u64,
+    pub patch: u64,
+    pub prerelease: Option<String>,
+}
+```
+# Path: hyperlane/cli/src/bump/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#struct;
+pub use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/cli/src/command/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CommandType {
+    Fmt,
+    Watch,
+    Bump,
+    Publish,
+    New,
+    Template,
+    Help,
+    Version,
+}
+```
+# Path: hyperlane/cli/src/command/mod.rs
+```rust
+mod r#enum;
+pub use r#enum::*;
+```
+# Path: hyperlane/cli/src/watch/fn.rs
+```rust
+use super::*;
+async fn run_cargo_run() -> Result<(), io::Error> {
+    let output: std::process::Output = Command::new("cargo")
+        .arg("run")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await?;
+    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stdout.is_empty() {
+        for line in stdout.lines() {
+            log::info!("{line}");
+        }
+    }
+    if !stderr.is_empty() {
+        if output.status.success() {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::info!("{line}");
+            }
+        } else {
+            for line in stderr.lines() {
+                if line.is_empty() {
+                    continue;
+                }
+                log::error!("{line}");
+            }
+            log::error!("cargo run failed");
+        }
+    }
+    Ok(())
+}
+pub async fn execute_watch() -> Result<(), io::Error> {
+    let src_path: PathBuf = PathBuf::from("src");
+    if !src_path.exists() {
+        return Err(io::Error::other(
+            "src directory not found in current directory",
+        ));
+    }
+    run_cargo_run().await?;
+    let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));
+    let mut watcher: RecommendedWatcher =
+        recommended_watcher(move |result: Result<Event, notify::Error>| {
+            if let Ok(event) = result {
+                let _: Result<(), tokio::sync::watch::error::SendError<Event>> = tx.send(event);
+            }
+        })
+        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
+    watcher
+        .watch(&src_path, RecursiveMode::Recursive)
+        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
+    log::info!("Watching src/ for changes...");
+    let mut debounce: Interval = interval(Duration::from_millis(500));
+    debounce.tick().await;
+    while rx.changed().await.is_ok() {
+        let event: Event = rx.borrow().clone();
+        let has_rust_change: bool = event
+            .paths
+            .iter()
+            .any(|path: &PathBuf| path.extension().is_some_and(|ext: &OsStr| ext == "rs"));
+        if !has_rust_change {
+            continue;
+        }
+        log::warn!("File change detected: {}", event.paths[0].display());
+        debounce.reset();
+        sleep(Duration::from_millis(300)).await;
+        run_cargo_run().await?;
+    }
+    Ok(())
+}
+```
+# Path: hyperlane/cli/src/watch/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/compress/README.md
+## http-compress
+[Api Docs](https://docs.rs/http-compress/latest/)
+> A high-performance async library for HTTP compression/decompression, supporting Brotli, Deflate, and Gzip algorithms. Provides both compression and decompression capabilities with optimized memory usage, ideal for HTTP clients/servers and network programming.
+## Features
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add http-compress
+```
+## Contact
+# Path: hyperlane/compress/tests/mod.rs
+```rust
+mod compress;
+use http_compress::*;
+use std::{borrow::Cow, collections::HashMap};
+use {core::hash::BuildHasherDefault, twox_hash::XxHash3_64};
+```
+# Path: hyperlane/compress/tests/compress/fn.rs
+```rust
+use super::*;
+#[test]
+fn test() {
+    let headers: HashMap<_, _, BuildHasherDefault<XxHash3_64>> =
+        HashMap::with_hasher(BuildHasherDefault::default());
+    let data: Vec<u8> = vec![];
+    let body: Cow<'_, [u8]> = Compress::from(&headers).decode(&data, 1_024_000);
+    assert_eq!(*body, data);
+    let _: Cow<'_, [u8]> = Compress::Gzip.encode(&[], 1_024_000);
+    let _: Cow<'_, [u8]> = Compress::Deflate.encode(&[], 1_024_000);
+    let _: Cow<'_, [u8]> = Compress::Br.encode(&[], 1_024_000);
+    let _: Cow<'_, [u8]> = Compress::Gzip.decode(&[], 1_024_000);
+    let _: Cow<'_, [u8]> = Compress::Deflate.decode(&[], 1_024_000);
+    let _: Cow<'_, [u8]> = Compress::Br.decode(&[], 1_024_000);
+}
+```
+# Path: hyperlane/compress/tests/compress/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/compress/src/lib.rs
+```rust
+mod brotli;
+mod compress;
+mod deflate;
+mod gzip;
+pub use compress::*;
+pub use twox_hash::XxHash3_64;
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    fmt,
+    io::{BufReader, BufWriter, Read, prelude::*},
+    str::FromStr,
+};
+use {
+    ::brotli::Decompressor,
+    core::hash::BuildHasherDefault,
+    flate2::{
+        Compression,
+        read::{DeflateDecoder, GzDecoder},
+        write::{DeflateEncoder, GzEncoder},
+    },
+};
+```
+# Path: hyperlane/compress/src/brotli/fn.rs
+```rust
+use super::*;
+pub fn encode(data: &'_ [u8]) -> Cow<'_, [u8]> {
+    let mut encoder: GzEncoder<Vec<u8>> = GzEncoder::new(Vec::new(), Compression::default());
+    if encoder.write_all(data).is_err() {
+        return Cow::Owned(Vec::new());
+    }
+    Cow::Owned(encoder.finish().unwrap_or_else(|_| Vec::new()))
+}
+pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
+    let mut decompressor: Decompressor<&[u8]> = Decompressor::new(data, buffer_size);
+    let mut decompressed_data: Vec<u8> = Vec::new();
+    match decompressor.read_to_end(&mut decompressed_data) {
+        Ok(_) => Cow::Owned(decompressed_data),
+        _ => Cow::Owned(Vec::new()),
+    }
+}
+```
+# Path: hyperlane/compress/src/brotli/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/compress/src/deflate/fn.rs
+```rust
+use super::*;
+pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
+    let encoder: DeflateEncoder<Vec<u8>> = DeflateEncoder::new(Vec::new(), Compression::default());
+    let mut buffered_writer: BufWriter<DeflateEncoder<Vec<u8>>> =
+        BufWriter::with_capacity(buffer_size, encoder);
+    if buffered_writer.write_all(data).is_err() {
+        return Cow::Owned(Vec::new());
+    }
+    match buffered_writer.into_inner() {
+        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_| Vec::new())),
+        Err(_) => Cow::Owned(Vec::new()),
+    }
+}
+pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
+    let decoder: DeflateDecoder<&[u8]> = DeflateDecoder::new(data);
+    let mut buffered_reader: BufReader<DeflateDecoder<&[u8]>> =
+        BufReader::with_capacity(buffer_size, decoder);
+    let mut decompressed_data: Vec<u8> = Vec::new();
+    match buffered_reader.read_to_end(&mut decompressed_data) {
+        Ok(_) => Cow::Owned(decompressed_data),
+        _ => Cow::Owned(Vec::new()),
+    }
+}
+```
+# Path: hyperlane/compress/src/deflate/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/compress/src/gzip/fn.rs
+```rust
+use super::*;
+pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
+    let encoder: GzEncoder<Vec<u8>> = GzEncoder::new(Vec::new(), Compression::default());
+    let mut buffered_writer: BufWriter<GzEncoder<Vec<u8>>> =
+        BufWriter::with_capacity(buffer_size, encoder);
+    if buffered_writer.write_all(data).is_err() {
+        return Cow::Owned(Vec::new());
+    }
+    match buffered_writer.into_inner() {
+        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_| Vec::new())),
+        Err(_) => Cow::Owned(Vec::new()),
+    }
+}
+pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
+    let decoder: GzDecoder<&[u8]> = GzDecoder::new(data);
+    let mut buffered_reader: BufReader<GzDecoder<&[u8]>> =
+        BufReader::with_capacity(buffer_size, decoder);
+    let mut decompressed_data: Vec<u8> = Vec::new();
+    match buffered_reader.read_to_end(&mut decompressed_data) {
+        Ok(_) => Cow::Owned(decompressed_data),
+        _ => Cow::Owned(Vec::new()),
+    }
+}
+```
+# Path: hyperlane/compress/src/gzip/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/compress/src/compress/impl.rs
+```rust
+use super::*;
+impl FromStr for Compress {
+    type Err = ();
+    #[inline(always)]
+    fn from_str(data: &str) -> Result<Self, Self::Err> {
+        match data.to_lowercase().as_str() {
+            _data if _data == CONTENT_ENCODING_GZIP => Ok(Self::Gzip),
+            _data if _data == CONTENT_ENCODING_DEFLATE => Ok(Self::Deflate),
+            _data if _data == CONTENT_ENCODING_BROTLI => Ok(Self::Br),
+            _ => Ok(Self::Unknown),
+        }
+    }
+}
+impl fmt::Display for Compress {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_str: &str = match *self {
+            Compress::Gzip => CONTENT_ENCODING_GZIP,
+            Compress::Deflate => CONTENT_ENCODING_DEFLATE,
+            Compress::Br => CONTENT_ENCODING_BROTLI,
+            Compress::Unknown => EMPTY_STR,
+        };
+        write!(f, "{display_str}")
+    }
+}
+impl Compress {
+    #[inline(always)]
+    pub fn is_unknown(&self) -> bool {
+        *self == Self::Unknown
+    }
+    #[inline(always)]
+    pub fn from(header: &HashMap<String, String, BuildHasherDefault<XxHash3_64>>) -> Self {
+        header
+            .get(CONTENT_ENCODING)
+            .map(|value| value.parse::<Compress>().unwrap_or_default())
+            .unwrap_or_default()
+    }
+    pub fn decode<'a>(&self, data: &'a [u8], buffer_size: usize) -> Cow<'a, [u8]> {
+        match self {
+            Self::Gzip => gzip::decode(data, buffer_size),
+            Self::Deflate => deflate::decode(data, buffer_size),
+            Self::Br => brotli::decode(data, buffer_size),
+            Self::Unknown => Cow::Owned(data.to_vec()),
+        }
+    }
+    pub fn encode<'a>(&self, data: &'a [u8], buffer_size: usize) -> Cow<'a, [u8]> {
+        match self {
+            Self::Gzip => gzip::encode(data, buffer_size),
+            Self::Deflate => deflate::encode(data, buffer_size),
+            Self::Br => brotli::encode(data),
+            Self::Unknown => Cow::Owned(data.to_vec()),
+        }
+    }
+}
+```
+# Path: hyperlane/compress/src/compress/const.rs
+```rust
+pub const CONTENT_ENCODING: &str = "content-encoding";
+pub const CONTENT_ENCODING_GZIP: &str = "gzip";
+pub const CONTENT_ENCODING_DEFLATE: &str = "deflate";
+pub const CONTENT_ENCODING_BROTLI: &str = "br";
+pub const EMPTY_STR: &str = "";
+```
+# Path: hyperlane/compress/src/compress/type.rs
+```rust
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Compress {
+    Gzip,
+    Deflate,
+    Br,
+    #[default]
+    Unknown,
+}
+```
+# Path: hyperlane/compress/src/compress/mod.rs
+```rust
+mod r#const;
+mod r#impl;
+mod r#type;
+pub use r#type::*;
+pub(crate) use r#const::*;
+use super::*;
+```
+# Path: hyperlane/macros/README.md
+## hyperlane
+[Api Docs](https://docs.rs/hyperlane/latest/)
+> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane
+```
+## Quick start
+- [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
+```sh
+git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
+```
+## Contact
+# Path: hyperlane/macros/src/lib.rs
+```rust
+mod closed;
+mod common;
+mod context;
+mod filter;
+mod flush;
+mod from_stream;
+mod hook;
+mod host;
+mod hyperlane;
+mod inject;
+mod method;
+mod referer;
+mod reject;
+mod request;
+mod request_middleware;
+mod response;
+mod response_middleware;
+mod route;
+mod send;
+mod stream;
+mod upgrade;
+mod version;
+use {
+    closed::*, common::*, context::*, filter::*, flush::*, from_stream::*, hook::*, host::*,
+    hyperlane::*, inject::*, method::*, referer::*, reject::*, request::*, request_middleware::*,
+    response::*, response_middleware::*, route::*, send::*, stream::*, upgrade::*, version::*,
+};
+use {
+    proc_macro::TokenStream,
+    proc_macro2::Span,
+    quote::quote,
+    syn::{
+        Ident, Token,
+        parse::{Parse, ParseStream, Parser, Result},
+        punctuated::Punctuated,
+        token::Comma,
+        *,
+    },
+};
+#[proc_macro_attribute]
+pub fn try_get_websocket_request(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_websocket_request_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn try_get_http_request(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_http_request_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn is_get_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_get_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_post_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_post_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_put_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_put_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_delete_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_delete_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_patch_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_patch_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_head_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_head_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_options_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_options_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_connect_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_connect_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_trace_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_trace_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_unknown_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_unknown_method_handler(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn methods(attr: TokenStream, item: TokenStream) -> TokenStream {
+    methods_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_http0_9_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_http0_9_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_http1_0_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_http1_0_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_http1_1_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_http1_1_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_http2_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_http2_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_http3_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_http3_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_http1_1_or_higher_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_http1_1_or_higher_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_http_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_http_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_unknown_version(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_unknown_version_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_ws_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_ws_upgrade_type_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_h2c_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_h2c_upgrade_type_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_tls_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_tls_upgrade_type_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn is_unknown_upgrade_type(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    is_unknown_upgrade_type_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn response_status_code(attr: TokenStream, item: TokenStream) -> TokenStream {
+    response_status_code_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn response_reason_phrase(attr: TokenStream, item: TokenStream) -> TokenStream {
+    response_reason_phrase_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn response_header(attr: TokenStream, item: TokenStream) -> TokenStream {
+    response_header_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn response_body(attr: TokenStream, item: TokenStream) -> TokenStream {
+    response_body_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn clear_response_headers(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    clear_response_headers_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn response_version(attr: TokenStream, item: TokenStream) -> TokenStream {
+    response_version_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn closed(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    closed_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn filter(attr: TokenStream, item: TokenStream) -> TokenStream {
+    filter_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn reject(attr: TokenStream, item: TokenStream) -> TokenStream {
+    reject_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn host(attr: TokenStream, item: TokenStream) -> TokenStream {
+    host_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn reject_host(attr: TokenStream, item: TokenStream) -> TokenStream {
+    reject_host_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn referer(attr: TokenStream, item: TokenStream) -> TokenStream {
+    referer_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn reject_referer(attr: TokenStream, item: TokenStream) -> TokenStream {
+    reject_referer_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn prologue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
+    prologue_hooks_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn epilogue_hooks(attr: TokenStream, item: TokenStream) -> TokenStream {
+    epilogue_hooks_macro(attr, item, Position::Epilogue)
+}
+#[proc_macro_attribute]
+pub fn request_body(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_body_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_body_json_result(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_body_json_result_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_body_json(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_body_json_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn try_get_attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_attribute_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn attribute(attr: TokenStream, item: TokenStream) -> TokenStream {
+    attribute_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn attributes(attr: TokenStream, item: TokenStream) -> TokenStream {
+    attributes_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn try_get_task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_task_panic_data_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn task_panic_data(attr: TokenStream, item: TokenStream) -> TokenStream {
+    task_panic_data_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn try_get_request_error_data(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_request_error_data_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_error_data(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_error_data_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn try_get_route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_route_param_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn route_param(attr: TokenStream, item: TokenStream) -> TokenStream {
+    route_param_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn route_params(attr: TokenStream, item: TokenStream) -> TokenStream {
+    route_params_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn try_get_request_query(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_request_query_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_query(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_query_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_querys(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_querys_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn try_get_request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_request_header_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_header(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_header_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_headers(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_headers_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn try_get_request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_get_request_cookie_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_cookie(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_cookie_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_cookies(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_cookies_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_version(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_version_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn request_path(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_path_macro(attr, item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn hyperlane(attr: TokenStream, item: TokenStream) -> TokenStream {
+    hyperlane_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
+    route_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn request_middleware(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_middleware_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn response_middleware(attr: TokenStream, item: TokenStream) -> TokenStream {
+    response_middleware_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn task_panic(attr: TokenStream, item: TokenStream) -> TokenStream {
+    task_panic_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn request_error(attr: TokenStream, item: TokenStream) -> TokenStream {
+    request_error_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn prologue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
+    prologue_macros_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn epilogue_macros(attr: TokenStream, item: TokenStream) -> TokenStream {
+    epilogue_macros_macro(attr, item)
+}
+#[proc_macro_attribute]
+pub fn try_send(attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_send_macro(attr, item, Position::Epilogue)
+}
+#[proc_macro_attribute]
+pub fn send(attr: TokenStream, item: TokenStream) -> TokenStream {
+    send_macro(attr, item, Position::Epilogue)
+}
+#[proc_macro_attribute]
+pub fn try_flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    try_flush_macro(item, Position::Prologue)
+}
+#[proc_macro_attribute]
+pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    flush_macro(item, Position::Prologue)
+}
+#[proc_macro]
+pub fn context(input: TokenStream) -> TokenStream {
+    context_macro(input)
+}
+```
+# Path: hyperlane/macros/src/upgrade/fn.rs
+```rust
+use super::*;
+pub(crate) fn create_protocol_check(
+    upgrade_type: &proc_macro2::Ident,
+) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
+    let upgrade_type_str: String = upgrade_type.to_string();
+    move |context: &Ident, _: &Ident| {
+        let check_fn: proc_macro2::Ident =
+            Ident::new(&format!("is_{upgrade_type_str}"), context.span());
+        quote! {
+            if !#context.get_request().get_upgrade_type().#check_fn() {
+                return ::hyperlane_core::Status::Continue;
+            }
+        }
+    }
+}
+macro_rules! impl_protocol_check_macro {
+    ($name:ident, $submit_name:ident, $upgrade_type:ident) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_protocol_check(&proc_macro2::Ident::new(
+                    stringify!($upgrade_type),
+                    Span::call_site(),
+                )),
+            )
+        }
+    };
+}
+impl_protocol_check_macro!(is_ws_upgrade_type_macro, is_ws_upgrade_type, ws);
+impl_protocol_check_macro!(is_h2c_upgrade_type_macro, is_h2c_upgrade_type, h2c);
+impl_protocol_check_macro!(is_tls_upgrade_type_macro, is_tls_upgrade_type, tls);
+impl_protocol_check_macro!(
+    is_unknown_upgrade_type_macro,
+    is_unknown_upgrade_type,
+    unknown
+);
+```
+# Path: hyperlane/macros/src/upgrade/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/hook/fn.rs
+```rust
+use super::*;
+pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
+    let order: proc_macro2::TokenStream = expr_to_isize(&attr_args.order);
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: proc_macro2::TokenStream = quote! {
+        #input_struct
+        ::hyperlane_core::inventory::submit! {
+            ::hyperlane_core::HookType::TaskPanic(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+pub(crate) fn request_error_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
+    let order: proc_macro2::TokenStream = expr_to_isize(&attr_args.order);
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: proc_macro2::TokenStream = quote! {
+        #input_struct
+        ::hyperlane_core::inventory::submit! {
+            ::hyperlane_core::HookType::RequestError(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+pub(crate) fn prologue_hooks_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let functions: Punctuated<Expr, Token![,]> =
+        parse_macro_input!(attr with Punctuated::parse_terminated);
+    inject(position, item, |context, stream| {
+        let hook_calls = functions.iter().map(|function_expr| {
+            quote! {
+                let _ = #function_expr(#stream, #context).await;
+            }
+        });
+        quote! {
+            #(#hook_calls)*
+        }
+    })
+}
+pub(crate) fn epilogue_hooks_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let functions: Punctuated<Expr, Token![,]> =
+        parse_macro_input!(attr with Punctuated::parse_terminated);
+    inject(position, item, |context, stream| {
+        let hook_calls = functions.iter().map(|function_expr| {
+            quote! {
+                let _ = #function_expr(#stream, #context).await;
+            }
+        });
+        quote! {
+            #(#hook_calls)*
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/hook/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/hyperlane/impl.rs
+```rust
+use super::*;
+impl Parse for MultiHyperlaneAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut params: Vec<(Ident, Ident)> = Vec::new();
+        loop {
+            let var_name: Ident = input.parse()?;
+            input.parse::<Token![:]>()?;
+            let type_name: Ident = input.parse()?;
+            params.push((var_name, type_name));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiHyperlaneAttr { params })
+    }
+}
+```
+# Path: hyperlane/macros/src/hyperlane/fn.rs
+```rust
+use super::*;
+pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let multi_hyperlane: MultiHyperlaneAttr = parse_macro_input!(attr as MultiHyperlaneAttr);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    let stmts: &Vec<Stmt> = &block.stmts;
+    let mut init_statements: Vec<proc_macro2::TokenStream> = Vec::new();
+    for (var_name, type_name) in &multi_hyperlane.params {
+        init_statements.push(quote! {
+            let mut #var_name: #type_name = #type_name::default();
+        });
+        if type_name == SERVER_TYPE_KEY {
+            init_statements.push(quote! {
+                let mut hooks: Vec<::hyperlane_core::HookType> = ::hyperlane_core::inventory::iter().cloned().collect();
+                ::hyperlane_core::HookType::assert_unique_order(hooks.clone());
+                hooks.sort_by_key(|hook| hook.try_get_order());
+                for hook in hooks {
+                    #var_name.handle_hook(hook.clone());
+                }
+            });
+        }
+    }
+    let gen_code: proc_macro2::TokenStream = quote! {
+        #(#attrs)*
+        #vis #sig {
+            #(#init_statements)*
+            #(#stmts)*
+        }
+    };
+    gen_code.into()
+}
+```
+# Path: hyperlane/macros/src/hyperlane/struct.rs
+```rust
+use super::*;
+pub(crate) struct MultiHyperlaneAttr {
+    pub(crate) params: Vec<(Ident, Ident)>,
+}
+```
+# Path: hyperlane/macros/src/hyperlane/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/from_stream/impl.rs
+```rust
+use super::*;
+impl Parse for FromStreamData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let variable_name: Option<Expr> = if input.is_empty() {
+            None
+        } else {
+            let expr: Expr = input.parse()?;
+            if !input.is_empty() {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "expected at most one parameter",
+                ));
+            }
+            Some(expr)
+        };
+        Ok(FromStreamData { variable_name })
+    }
+}
+```
+# Path: hyperlane/macros/src/from_stream/struct.rs
+```rust
+use super::*;
+pub(crate) struct FromStreamData {
+    pub(crate) variable_name: Option<Expr>,
+}
+```
+# Path: hyperlane/macros/src/from_stream/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/filter/fn.rs
+```rust
+use super::*;
+pub(crate) fn filter_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let condition: Expr = parse_macro_input!(attr as Expr);
+    inject(position, item, |_: &Ident, _: &Ident| {
+        quote! {
+            if !(#condition) {
+                return ::hyperlane_core::Status::Continue;
+            }
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/filter/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/referer/impl.rs
+```rust
+use super::*;
+impl Parse for MultiRefererData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut referer_values: Vec<Expr> = Vec::new();
+        loop {
+            let referer_value: Expr = input.parse()?;
+            referer_values.push(referer_value);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRefererData { referer_values })
+    }
+}
+```
+# Path: hyperlane/macros/src/referer/fn.rs
+```rust
+use super::*;
+pub(crate) fn referer_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+            quote! {
+                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(true, |referer_header| referer_header != #referer_value) {
+                    return ::hyperlane_core::Status::Continue;
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn reject_referer_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+            quote! {
+                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(false, |referer_header| referer_header == #referer_value) {
+                    return ::hyperlane_core::Status::Continue;
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/referer/struct.rs
+```rust
+use super::*;
+pub(crate) struct MultiRefererData {
+    pub(crate) referer_values: Vec<Expr>,
+}
+```
+# Path: hyperlane/macros/src/referer/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/request/impl.rs
+```rust
+use super::*;
+impl Parse for RequestMethods {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(RequestMethods {
+            methods: Punctuated::parse_separated_nonempty(input)?,
+        })
+    }
+}
+impl Parse for MultiRequestBodyData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRequestBodyData { variables })
+    }
+}
+impl Parse for MultiRequestBodyJsonData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut params: Vec<(Ident, Type)> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            input.parse::<Token![:]>()?;
+            let type_name: Type = input.parse()?;
+            params.push((variable, type_name));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRequestBodyJsonData { params })
+    }
+}
+impl Parse for MultiAttributeData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut params: Vec<(Expr, Ident, Type)> = Vec::new();
+        loop {
+            let key_name: Expr = input.parse()?;
+            input.parse::<Token![=>]>()?;
+            let variable: Ident = input.parse()?;
+            input.parse::<Token![:]>()?;
+            let type_name: Type = input.parse()?;
+            params.push((key_name, variable, type_name));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiAttributeData { params })
+    }
+}
+impl Parse for MultiAttributesData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiAttributesData { variables })
+    }
+}
+impl Parse for MultiRouteParamData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut params: Vec<(Expr, Ident)> = Vec::new();
+        loop {
+            let key_name: Expr = input.parse()?;
+            input.parse::<Token![=>]>()?;
+            let variable: Ident = input.parse()?;
+            params.push((key_name, variable));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRouteParamData { params })
+    }
+}
+impl Parse for MultiRouteParamsData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRouteParamsData { variables })
+    }
+}
+impl Parse for MultiQueryData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut params: Vec<(Expr, Ident)> = Vec::new();
+        loop {
+            let key_name: Expr = input.parse()?;
+            input.parse::<Token![=>]>()?;
+            let variable: Ident = input.parse()?;
+            params.push((key_name, variable));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiQueryData { params })
+    }
+}
+impl Parse for MultiQuerysData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiQuerysData { variables })
+    }
+}
+impl Parse for MultiHeaderData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut params: Vec<(Expr, Ident)> = Vec::new();
+        loop {
+            let key_name: Expr = input.parse()?;
+            input.parse::<Token![=>]>()?;
+            let variable: Ident = input.parse()?;
+            params.push((key_name, variable));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiHeaderData { params })
+    }
+}
+impl Parse for MultiHeadersData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiHeadersData { variables })
+    }
+}
+impl Parse for MultiCookieData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut params: Vec<(Expr, Ident)> = Vec::new();
+        loop {
+            let key_name: Expr = input.parse()?;
+            input.parse::<Token![=>]>()?;
+            let variable: Ident = input.parse()?;
+            params.push((key_name, variable));
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiCookieData { params })
+    }
+}
+impl Parse for MultiCookiesData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiCookiesData { variables })
+    }
+}
+impl Parse for MultiRequestVersionData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRequestVersionData { variables })
+    }
+}
+impl Parse for MultiRequestPathData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRequestPathData { variables })
+    }
+}
+impl Parse for MultiPanicData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiPanicData { variables })
+    }
+}
+impl Parse for MultiRequestErrorData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut variables: Vec<Ident> = Vec::new();
+        loop {
+            let variable: Ident = input.parse()?;
+            variables.push(variable);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiRequestErrorData { variables })
+    }
+}
+```
+# Path: hyperlane/macros/src/request/fn.rs
+```rust
+use super::*;
+pub(crate) fn request_body_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
+        let statements = multi_body.variables.iter().map(|variable| {
+            quote! {
+                let #variable: &::hyperlane_core::RequestBody = #new_context.get_request().get_body();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_body_json_result_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_body_json: MultiRequestBodyJsonData =
+        parse_macro_input!(attr as MultiRequestBodyJsonData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_body_json.params.iter().map(|(variable, type_name)| {
+            quote! {
+                let #variable: Result<#type_name, ::hyperlane_core::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_body_json_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_body_json: MultiRequestBodyJsonData =
+        parse_macro_input!(attr as MultiRequestBodyJsonData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_body_json.params.iter().map(|(variable, type_name)| {
+            quote! {
+                let #variable: #type_name = #context.get_request().get_body_json::<#type_name>();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn try_get_attribute_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_attr
+            .params
+            .iter()
+            .map(|(key_name, variable, type_name)| {
+                quote! {
+                    let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name);
+                }
+            });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn attribute_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_attr
+            .params
+            .iter()
+            .map(|(key_name, variable, type_name)| {
+                quote! {
+                    let #variable: #type_name = #context.get_attribute(&#key_name);
+                }
+            });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn attributes_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
+        let statements = multi_attrs.variables.iter().map(|variable| {
+            quote! {
+                let #variable: &::hyperlane_core::ThreadSafeAttributeStore = #new_context.get_attributes();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn try_get_task_panic_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_task_panic_data.variables.iter().map(|variable| {
+            quote! {
+                let #variable: Option<::hyperlane_core::PanicData> = #context.try_get_task_panic_data();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn task_panic_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_task_panic_data.variables.iter().map(|variable| {
+            quote! {
+                let #variable: ::hyperlane_core::PanicData = #context.get_task_panic_data();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn try_get_request_error_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_error_data.variables.iter().map(|variable| {
+            quote! {
+                let #variable: Option<::hyperlane_core::RequestError> = #context.try_get_request_error_data();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_error_data_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_error_data.variables.iter().map(|variable| {
+            quote! {
+                let #variable: ::hyperlane_core::RequestError = #context.get_request_error_data();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn try_get_route_param_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_param.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: Option<std::string::String> = #context.try_get_route_param(#key_name);
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn route_param_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_param.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: std::string::String = #context.get_route_param(#key_name);
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn route_params_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
+        let statements = multi_route_params.variables.iter().map(|variable| {
+            quote! {
+                let #variable: &::hyperlane_core::RouteParams = #new_context.get_route_params();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn try_get_request_query_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_query.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: Option<::hyperlane_core::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_query_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_query.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: ::hyperlane_core::RequestQuerysValue = #context.get_request().get_query(#key_name);
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_querys_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
+        let statements = multi_querys.variables.iter().map(|variable| {
+            quote! {
+                let #variable: &::hyperlane_core::RequestQuerys = #new_context.get_request().get_querys();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn try_get_request_header_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_header.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: Option<::hyperlane_core::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_header_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_header.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: ::hyperlane_core::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_headers_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
+        let statements = multi_headers.variables.iter().map(|variable| {
+            quote! {
+                let #variable: &::hyperlane_core::RequestHeaders = #new_context.get_request().get_headers();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn try_get_request_cookie_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_cookie.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: Option<::hyperlane_core::CookieValue> = #context.get_request().try_get_cookie(#key_name);
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_cookie_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_cookie.params.iter().map(|(key_name, variable)| {
+            quote! {
+                let #variable: ::hyperlane_core::CookieValue = #context.get_request().get_cookie(#key_name);
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_cookies_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_cookies: MultiCookiesData = parse_macro_input!(attr as MultiCookiesData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_cookies.variables.iter().map(|variable| {
+            quote! {
+                let #variable: ::hyperlane_core::Cookies = #context.get_request().get_cookies();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_version_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_version: MultiRequestVersionData =
+        parse_macro_input!(attr as MultiRequestVersionData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
+        let statements = multi_version.variables.iter().map(|variable| {
+            quote! {
+                let #variable: &::hyperlane_core::RequestVersion = #new_context.get_request().get_version();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn request_path_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_context(false, context);
+        let statements = multi_path.variables.iter().map(|variable| {
+            quote! {
+                let #variable: &::hyperlane_core::RequestPath = #new_context.get_request().get_path();
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/request/struct.rs
+```rust
+use super::*;
+pub(crate) struct RequestMethods {
+    pub(crate) methods: Punctuated<Ident, Token![,]>,
+}
+pub(crate) struct MultiRequestBodyData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestBodyJsonData {
+    pub(crate) params: Vec<(Ident, Type)>,
+}
+pub(crate) struct MultiAttributeData {
+    pub(crate) params: Vec<(Expr, Ident, Type)>,
+}
+pub(crate) struct MultiAttributesData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRouteParamData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiRouteParamsData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiQueryData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiQuerysData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiHeaderData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiHeadersData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiCookieData {
+    pub(crate) params: Vec<(Expr, Ident)>,
+}
+pub(crate) struct MultiCookiesData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestVersionData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestPathData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiPanicData {
+    pub(crate) variables: Vec<Ident>,
+}
+pub(crate) struct MultiRequestErrorData {
+    pub(crate) variables: Vec<Ident>,
+}
+```
+# Path: hyperlane/macros/src/request/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/context/impl.rs
+```rust
+use super::*;
+impl Parse for ContextInput {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let source_ctx: Ident = input.parse()?;
+        let ty: Option<Type> = if input.peek(Token![:]) {
+            input.parse::<Token![:]>()?;
+            Some(input.parse()?)
+        } else {
+            None
+        };
+        Ok(ContextInput { source_ctx, ty })
+    }
+}
+```
+# Path: hyperlane/macros/src/context/fn.rs
+```rust
+use super::*;
+pub(crate) fn is_mutable_reference_type(ty: &Type) -> bool {
+    if let Type::Reference(type_ref) = ty {
+        type_ref.mutability.is_some()
+    } else {
+        false
+    }
+}
+pub(crate) fn context_macro(input: TokenStream) -> TokenStream {
+    let context_input: ContextInput = match parse(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    let source_ctx: Ident = context_input.source_ctx;
+    let is_mut: bool = context_input
+        .ty
+        .as_ref()
+        .is_some_and(is_mutable_reference_type);
+    if is_mut {
+        leak_mut_context(true, &source_ctx).into()
+    } else {
+        leak_context(true, &source_ctx).into()
+    }
+}
+```
+# Path: hyperlane/macros/src/context/struct.rs
+```rust
+use super::*;
+pub(crate) struct ContextInput {
+    pub(crate) source_ctx: Ident,
+    pub(crate) ty: Option<Type>,
+}
+```
+# Path: hyperlane/macros/src/context/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/stream/fn.rs
+```rust
+use super::*;
+pub(crate) fn generate_http_stream(
+    stream: &Ident,
+    context: &Ident,
+    data: &FromStreamData,
+    stmts: &[Stmt],
+) -> proc_macro2::TokenStream {
+    let method_ident: Ident = Ident::new("try_get_http_request", Span::call_site());
+    match data.variable_name.clone() {
+        Some(variable_name) => {
+            quote! {
+                while let Ok(#variable_name) = #stream.#method_ident().await {
+                    #context.set_request(#variable_name.clone());
+                    #(#stmts)*
+                }
+                ::hyperlane_core::Status::Continue
+            }
+        }
+        None => {
+            quote! {
+                while let Ok(_request) = #stream.#method_ident().await {
+                    #context.set_request(_request);
+                    #(#stmts)*
+                }
+                ::hyperlane_core::Status::Continue
+            }
+        }
+    }
+}
+pub(crate) fn generate_websocket_stream(
+    stream: &Ident,
+    context: &Ident,
+    data: &FromStreamData,
+    stmts: &[Stmt],
+) -> proc_macro2::TokenStream {
+    let method_ident: Ident = Ident::new("try_get_websocket_request", Span::call_site());
+    match data.variable_name.clone() {
+        Some(variable_name) => {
+            quote! {
+                while let Ok(#variable_name) = #stream.#method_ident().await {
+                    #context.get_mut_request().set_body(#variable_name.clone());
+                    #(#stmts)*
+                }
+                ::hyperlane_core::Status::Continue
+            }
+        }
+        None => {
+            quote! {
+                while let Ok(_body) = #stream.#method_ident().await {
+                    #context.get_mut_request().set_body(_body);
+                    #(#stmts)*
+                }
+                ::hyperlane_core::Status::Continue
+            }
+        }
+    }
+}
+pub(crate) fn try_get_http_request_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_stream_from_signature(sig) {
+        Ok(stream) => match parse_context_from_signature(sig) {
+            Ok(context) => {
+                let stmts: &Vec<Stmt> = &block.stmts;
+                let loop_stream: proc_macro2::TokenStream =
+                    generate_http_stream(&stream, &context, &data, stmts);
+                quote! {
+                    #(#attrs)*
+                    #vis #sig {
+                        #loop_stream
+                    }
+                }
+                .into()
+            }
+            Err(err) => err.to_compile_error().into(),
+        },
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+pub(crate) fn try_get_websocket_request_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let data: FromStreamData = parse_macro_input!(attr as FromStreamData);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_stream_from_signature(sig) {
+        Ok(stream) => match parse_context_from_signature(sig) {
+            Ok(context) => {
+                let stmts: &Vec<Stmt> = &block.stmts;
+                let loop_stream: proc_macro2::TokenStream =
+                    generate_websocket_stream(&stream, &context, &data, stmts);
+                quote! {
+                    #(#attrs)*
+                    #vis #sig {
+                        #loop_stream
+                    }
+                }
+                .into()
+            }
+            Err(err) => err.to_compile_error().into(),
+        },
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+```
+# Path: hyperlane/macros/src/stream/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/send/impl.rs
+```rust
+use super::*;
+impl Parse for SendData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let data: Expr = input.parse()?;
+        Ok(SendData { data })
+    }
+}
+```
+# Path: hyperlane/macros/src/send/fn.rs
+```rust
+use super::*;
+pub(crate) fn try_send_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let data_expr: Option<Expr> = if attr.is_empty() {
+        None
+    } else {
+        let data: SendData = parse_macro_input!(attr as SendData);
+        Some(data.data)
+    };
+    inject(position, item, |context, stream| match data_expr {
+        Some(expr) => {
+            quote! {
+                let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#expr).await;
+            }
+        }
+        None => {
+            quote! {
+                let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
+            }
+        }
+    })
+}
+pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
+    let data_expr: Option<Expr> = if attr.is_empty() {
+        None
+    } else {
+        let data: SendData = parse_macro_input!(attr as SendData);
+        Some(data.data)
+    };
+    inject(position, item, |context, stream| match data_expr {
+        Some(expr) => {
+            quote! {
+                #stream.send(#expr).await;
+            }
+        }
+        None => {
+            quote! {
+                #stream.send(#context.get_mut_response().build()).await;
+            }
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/send/struct.rs
+```rust
+use super::*;
+pub(crate) struct ResponseHeaderData {
+    pub(crate) key: Expr,
+    pub(crate) value: Expr,
+    pub(crate) operation: HeaderOperation,
+}
+pub(crate) struct ResponseBodyData {
+    pub(crate) body: Expr,
+}
+```
+# Path: hyperlane/macros/src/send/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/reject/fn.rs
+```rust
+use super::*;
+pub(crate) fn reject_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let condition: Expr = parse_macro_input!(attr as Expr);
+    inject(position, item, |_: &Ident, _: &Ident| {
+        quote! {
+            if #condition {
+                return ::hyperlane_core::Status::Continue;
+            }
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/reject/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/response_middleware/fn.rs
+```rust
+use super::*;
+pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
+    let order: proc_macro2::TokenStream = expr_to_isize(&attr_args.order);
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: proc_macro2::TokenStream = quote! {
+        #input_struct
+        ::hyperlane_core::inventory::submit! {
+            ::hyperlane_core::HookType::ResponseMiddleware(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+```
+# Path: hyperlane/macros/src/response_middleware/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/request_middleware/fn.rs
+```rust
+use super::*;
+pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_args: OrderAttr = parse_macro_input!(attr as OrderAttr);
+    let order: proc_macro2::TokenStream = expr_to_isize(&attr_args.order);
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: proc_macro2::TokenStream = quote! {
+        #input_struct
+        ::hyperlane_core::inventory::submit! {
+            ::hyperlane_core::HookType::RequestMiddleware(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+```
+# Path: hyperlane/macros/src/request_middleware/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/version/fn.rs
+```rust
+use super::*;
+pub(crate) fn create_version_check(
+    version: &proc_macro2::Ident,
+) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
+    let version_str: String = version.to_string();
+    move |context: &Ident, _: &Ident| {
+        let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{version_str}"), context.span());
+        quote! {
+            if !#context.get_request().get_version().#check_fn() {
+                return ::hyperlane_core::Status::Continue;
+            }
+        }
+    }
+}
+macro_rules! impl_version_check_macro {
+    ($name:ident, $submit_name:ident, $version:ident) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_version_check(&proc_macro2::Ident::new(
+                    stringify!($version),
+                    Span::call_site(),
+                )),
+            )
+        }
+    };
+}
+impl_version_check_macro!(is_http0_9_version_macro, is_http0_9_version, http0_9);
+impl_version_check_macro!(is_http1_0_version_macro, is_http1_0_version, http1_0);
+impl_version_check_macro!(is_http1_1_version_macro, is_http1_1_version, http1_1);
+impl_version_check_macro!(is_http2_version_macro, is_http2_version, http2);
+impl_version_check_macro!(is_http3_version_macro, is_http3_version, http3);
+impl_version_check_macro!(
+    is_http1_1_or_higher_version_macro,
+    is_http1_1_or_higher_version,
+    http1_1_or_higher
+);
+impl_version_check_macro!(is_http_version_macro, is_http_version, http);
+impl_version_check_macro!(is_unknown_version_macro, is_unknown_version, unknown);
+```
+# Path: hyperlane/macros/src/version/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/inject/fn.rs
+```rust
+use super::*;
+fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) -> TokenStream {
+    let (macro_name, macro_attr) = match macro_meta {
+        Meta::Path(path) => (
+            path.get_ident()
+                .expect("Macro path should have an identifier")
+                .to_string(),
+            TokenStream::new(),
+        ),
+        Meta::List(meta_list) => (
+            meta_list
+                .path
+                .get_ident()
+                .expect("Macro path should have an identifier")
+                .to_string(),
+            meta_list.tokens.clone().into(),
+        ),
+        _ => panic!("Unsupported macro format in inject macro"),
+    };
+    for injectable_macro in INJECTABLE_MACROS {
+        if injectable_macro.name == macro_name {
+            return match injectable_macro.handler {
+                Handler::WithAttr(handler) => handler(macro_attr, item_stream),
+                Handler::NoAttrPosition(handler) => {
+                    if !macro_attr.is_empty() {
+                        panic!("Macro {macro_name} does not take attributes");
+                    }
+                    handler(item_stream, position)
+                }
+                Handler::WithAttrPosition(handler) => handler(macro_attr, item_stream, position),
+            };
+        }
+    }
+    panic!("Unsupported macro: {macro_name}");
+}
+pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse(attr)
+        .expect("Failed to parse macro attributes");
+    let mut current_stream: TokenStream = item;
+    for meta in metas.iter().rev() {
+        current_stream = apply_macro(meta, current_stream, Position::Prologue);
+    }
+    current_stream
+}
+pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse(attr)
+        .expect("Failed to parse macro attributes");
+    let mut current_stream: TokenStream = item;
+    for meta in metas.iter() {
+        current_stream = apply_macro(meta, current_stream, Position::Epilogue);
+    }
+    current_stream
+}
+```
+# Path: hyperlane/macros/src/inject/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/response/impl.rs
+```rust
+use super::*;
+impl Parse for ResponseHeaderData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let key: Expr = input.parse()?;
+        let operation: HeaderOperation = if input.peek(Token![=>]) {
+            input.parse::<Token![=>]>()?;
+            HeaderOperation::Set
+        } else if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            HeaderOperation::Add
+        } else {
+            return Err(syn::Error::new(
+                input.span(),
+                "Expected either ',' for add operation or '=>' for set operation",
+            ));
+        };
+        let value: Expr = input.parse()?;
+        Ok(ResponseHeaderData {
+            key,
+            value,
+            operation,
+        })
+    }
+}
+impl Parse for ResponseBodyData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let body: Expr = input.parse()?;
+        Ok(ResponseBodyData { body })
+    }
+}
+```
+# Path: hyperlane/macros/src/response/fn.rs
+```rust
+use super::*;
+pub(crate) fn response_status_code_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
+        quote! {
+            #new_context.get_mut_response().set_status_code(::hyperlane_core::ResponseStatusCode::from(#value as usize));
+        }
+    })
+}
+pub(crate) fn response_reason_phrase_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
+        quote! {
+            #new_context.get_mut_response().set_reason_phrase(&#value);
+        }
+    })
+}
+pub(crate) fn response_header_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let header_data: ResponseHeaderData = parse_macro_input!(attr as ResponseHeaderData);
+    let key: Expr = header_data.key;
+    let value: Expr = header_data.value;
+    let operation: HeaderOperation = header_data.operation;
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
+        match operation {
+            HeaderOperation::Add => {
+                quote! {
+                    #new_context.get_mut_response().add_header(&#key, &#value);
+                }
+            }
+            HeaderOperation::Set => {
+                quote! {
+                    #new_context.get_mut_response().set_header(&#key, &#value);
+                }
+            }
+        }
+    })
+}
+pub(crate) fn response_body_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let body_data: ResponseBodyData = parse_macro_input!(attr as ResponseBodyData);
+    let body: Expr = body_data.body;
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
+        quote! {
+            #new_context.get_mut_response().set_body(&#body);
+        }
+    })
+}
+pub(crate) fn clear_response_headers_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
+        quote! {
+            #new_context.get_mut_response().clear_headers();
+        }
+    })
+}
+pub(crate) fn response_version_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let value: Expr = match parse(attr) {
+        Ok(v) => v,
+        Err(err) => return err.to_compile_error().into(),
+    };
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
+        quote! {
+            #new_context.get_mut_response().set_version(#value);
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/response/enum.rs
+```rust
+pub(crate) enum HeaderOperation {
+    Set,
+    Add,
+}
+```
+# Path: hyperlane/macros/src/response/struct.rs
+```rust
+use super::*;
+pub(crate) struct SendData {
+    pub(crate) data: Expr,
+}
+```
+# Path: hyperlane/macros/src/response/mod.rs
+```rust
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/method/fn.rs
+```rust
+use super::*;
+pub(crate) fn create_method_check(
+    method: &proc_macro2::Ident,
+) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
+    let method_str: String = method.to_string();
+    move |context: &Ident, _: &Ident| {
+        let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{method_str}"), context.span());
+        quote! {
+            if !#context.get_request().get_method().#check_fn() {
+                return ::hyperlane_core::Status::Continue;
+            }
+        }
+    }
+}
+pub(crate) fn methods_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let methods: RequestMethods = parse_macro_input!(attr as RequestMethods);
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let sig: &Signature = &input_fn.sig;
+    match parse_context_from_signature(sig) {
+        Ok(context) => {
+            let method_checks = methods.methods.iter().map(|method| {
+                let method_str: String = method.to_string();
+                let check_fn: proc_macro2::Ident =
+                    Ident::new(&format!("is_{method_str}"), method.span());
+                quote! {
+                    #context.get_request().get_method().#check_fn()
+                }
+            });
+            inject(
+                position,
+                TokenStream::from(quote! { #input_fn }),
+                |_: &Ident, _: &Ident| {
+                    quote! {
+                        if !(#(#method_checks)||*) {
+                            return ::hyperlane_core::Status::Continue;
+                        }
+                    }
+                },
+            )
+        }
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+macro_rules! impl_http_method_macro {
+    ($name:ident, $submit_name:ident, $method:ident) => {
+        pub(crate) fn $name(item: TokenStream, position: Position) -> TokenStream {
+            inject(
+                position,
+                item,
+                create_method_check(&proc_macro2::Ident::new(
+                    stringify!($method),
+                    Span::call_site(),
+                )),
+            )
+        }
+    };
+}
+impl_http_method_macro!(is_get_method_handler, is_get_method, get);
+impl_http_method_macro!(is_post_method_handler, is_post_method, post);
+impl_http_method_macro!(is_put_method_handler, is_put_method, put);
+impl_http_method_macro!(is_delete_method_handler, is_delete_method, delete);
+impl_http_method_macro!(is_patch_method_handler, is_patch_method, patch);
+impl_http_method_macro!(is_head_method_handler, is_head_method, head);
+impl_http_method_macro!(is_options_method_handler, is_options_method, options);
+impl_http_method_macro!(is_connect_method_handler, is_connect_method, connect);
+impl_http_method_macro!(is_trace_method_handler, is_trace_method, trace);
+impl_http_method_macro!(is_unknown_method_handler, is_unknown_method, unknown);
+```
+# Path: hyperlane/macros/src/method/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/common/impl.rs
+```rust
+use super::*;
+impl Parse for OrderAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.is_empty() {
+            return Ok(OrderAttr { order: None });
+        }
+        let expr: Expr = input.parse()?;
+        Ok(OrderAttr { order: Some(expr) })
+    }
+}
+```
+# Path: hyperlane/macros/src/common/const.rs
+```rust
+pub(crate) const SERVER_TYPE_KEY: &str = "Server";
+```
+# Path: hyperlane/macros/src/common/fn.rs
+```rust
+use super::*;
+fn inject_at_start(
+    input: TokenStream,
+    before_fn: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+) -> TokenStream {
+    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_context_from_signature(sig) {
+        Ok(context) => match parse_stream_from_signature(sig) {
+            Ok(stream) => {
+                let before_code: proc_macro2::TokenStream = before_fn(&context, &stream);
+                let stmts: &Vec<Stmt> = &block.stmts;
+                let gen_code: proc_macro2::TokenStream = quote! {
+                    #(#attrs)*
+                    #vis #sig {
+                        #before_code
+                        #(#stmts)*
+                    }
+                };
+                gen_code.into()
+            }
+            Err(err) => err.to_compile_error().into(),
+        },
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+fn inject_at_end(
+    input: TokenStream,
+    after_fn: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+) -> TokenStream {
+    let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let block: &Block = &input_fn.block;
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    match parse_context_from_signature(sig) {
+        Ok(context) => match parse_stream_from_signature(sig) {
+            Ok(stream) => {
+                let after_code: proc_macro2::TokenStream = after_fn(&context, &stream);
+                let stmts: &Vec<Stmt> = &block.stmts;
+                let (leading_stmts, tail_expr) = if let Some((last, leading)) = stmts.split_last() {
+                    match last {
+                        Stmt::Expr(expr, None) => (leading, Some(quote! { #expr })),
+                        _ => (stmts.as_slice(), None),
+                    }
+                } else {
+                    (stmts.as_slice(), None)
+                };
+                let normalized_leading: Vec<proc_macro2::TokenStream> = leading_stmts
+                    .iter()
+                    .map(|stmt| match stmt {
+                        Stmt::Expr(expr, None) => quote! { #expr; },
+                        _ => quote! { #stmt },
+                    })
+                    .collect();
+                let gen_code: proc_macro2::TokenStream = match tail_expr {
+                    Some(expr) => quote! {
+                        #(#attrs)*
+                        #vis #sig {
+                            #(#normalized_leading)*
+                            #after_code
+                            #expr
+                        }
+                    },
+                    None => quote! {
+                        #(#attrs)*
+                        #vis #sig {
+                            #(#normalized_leading)*
+                            #after_code
+                        }
+                    },
+                };
+                gen_code.into()
+            }
+            Err(err) => err.to_compile_error().into(),
+        },
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+pub(crate) fn inject(
+    position: Position,
+    input: TokenStream,
+    hook: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+) -> TokenStream {
+    match position {
+        Position::Prologue => inject_at_start(input, hook),
+        Position::Epilogue => inject_at_end(input, hook),
+    }
+}
+fn is_context_type(ty: &Type) -> bool {
+    if let Type::Reference(type_ref) = ty
+        && let Type::Path(type_path) = &*type_ref.elem
+    {
+        let path: &Path = &type_path.path;
+        if path.segments.len() >= 2 {
+            let segments: Vec<_> = path.segments.iter().collect();
+            if segments.len() >= 2 {
+                let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
+                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
+                    return true;
+                }
+            }
+        }
+        if path.segments.len() == 1 && path.segments[0].ident == "Context" {
+            return true;
+        }
+    }
+    false
+}
+fn is_stream_type(ty: &Type) -> bool {
+    if let Type::Reference(type_ref) = ty
+        && let Type::Path(type_path) = &*type_ref.elem
+    {
+        let path: &Path = &type_path.path;
+        if path.segments.len() >= 2 {
+            let segments: Vec<_> = path.segments.iter().collect();
+            if segments.len() >= 2 {
+                let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
+                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Stream" {
+                    return true;
+                }
+            }
+        }
+        if path.segments.len() == 1 && path.segments[0].ident == "Stream" {
+            return true;
+        }
+    }
+    false
+}
+pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident> {
+    for arg in sig.inputs.iter() {
+        if let FnArg::Typed(pat_type) = arg
+            && is_context_type(&pat_type.ty)
+        {
+            let ident: Ident = match &*pat_type.pat {
+                Pat::Ident(pat_ident) => pat_ident.ident.clone(),
+                Pat::Wild(_) => Ident::new("_", Span::call_site()),
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        &pat_type.pat,
+                        "expected identifier for context parameter",
+                    ));
+                }
+            };
+            return Ok(ident);
+        }
+    }
+    Err(syn::Error::new_spanned(
+        &sig.inputs,
+        "expected at least one parameter of type &::hyperlane_core::Context",
+    ))
+}
+pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident> {
+    for arg in sig.inputs.iter() {
+        if let FnArg::Typed(pat_type) = arg
+            && is_stream_type(&pat_type.ty)
+        {
+            let ident: Ident = match &*pat_type.pat {
+                Pat::Ident(pat_ident) => pat_ident.ident.clone(),
+                Pat::Wild(_) => Ident::new("_", Span::call_site()),
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        &pat_type.pat,
+                        "expected identifier for stream parameter",
+                    ));
+                }
+            };
+            return Ok(ident);
+        }
+    }
+    Err(syn::Error::new_spanned(
+        &sig.inputs,
+        "expected at least one parameter of type &::hyperlane_core::Stream",
+    ))
+}
+pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream {
+    match opt_expr {
+        Some(expr) => match expr {
+            Expr::Lit(ExprLit {
+                lit: Lit::Int(lit_int),
+                ..
+            }) => {
+                let value: isize = lit_int.base10_parse::<isize>().unwrap();
+                quote! { Some(#value) }
+            }
+            Expr::Lit(ExprLit {
+                lit: Lit::Str(lit_str),
+                ..
+            }) => {
+                let value: isize = lit_str.value().parse().expect("Cannot parse to isize");
+                quote! { Some(#value) }
+            }
+            _ => quote! { None },
+        },
+        None => quote! { None },
+    }
+}
+pub(crate) fn leak_mut_context(is_unsafe_error: bool, context: &Ident) -> proc_macro2::TokenStream {
+    if is_unsafe_error {
+        quote! {
+          #context.leak_mut()
+        }
+    } else {
+        quote! {
+            unsafe { #context.leak_mut() }
+        }
+    }
+}
+pub(crate) fn leak_context(is_unsafe_error: bool, context: &Ident) -> proc_macro2::TokenStream {
+    if is_unsafe_error {
+        quote! {
+          #context.leak()
+        }
+    } else {
+        quote! {
+            unsafe { #context.leak() }
+        }
+    }
+}
+```
+# Path: hyperlane/macros/src/common/type.rs
+```rust
+use super::*;
+pub(crate) type MacroHandlerPosition = fn(TokenStream, Position) -> TokenStream;
+pub(crate) type MacroHandlerWithAttr = fn(TokenStream, TokenStream) -> TokenStream;
+pub(crate) type MacroHandlerWithAttrPosition =
+    fn(TokenStream, TokenStream, Position) -> TokenStream;
+```
+# Path: hyperlane/macros/src/common/static.rs
+```rust
+use super::*;
+pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
+    InjectableMacro {
+        name: "closed",
+        handler: Handler::NoAttrPosition(closed_macro),
+    },
+    InjectableMacro {
+        name: "filter",
+        handler: Handler::WithAttrPosition(filter_macro),
+    },
+    InjectableMacro {
+        name: "try_flush",
+        handler: Handler::NoAttrPosition(try_flush_macro),
+    },
+    InjectableMacro {
+        name: "flush",
+        handler: Handler::NoAttrPosition(flush_macro),
+    },
+    InjectableMacro {
+        name: "task_panic",
+        handler: Handler::WithAttr(task_panic_macro),
+    },
+    InjectableMacro {
+        name: "request_error",
+        handler: Handler::WithAttr(request_error_macro),
+    },
+    InjectableMacro {
+        name: "prologue_hooks",
+        handler: Handler::WithAttrPosition(prologue_hooks_macro),
+    },
+    InjectableMacro {
+        name: "epilogue_hooks",
+        handler: Handler::WithAttrPosition(epilogue_hooks_macro),
+    },
+    InjectableMacro {
+        name: "host",
+        handler: Handler::WithAttrPosition(host_macro),
+    },
+    InjectableMacro {
+        name: "reject_host",
+        handler: Handler::WithAttrPosition(reject_host_macro),
+    },
+    InjectableMacro {
+        name: "hyperlane",
+        handler: Handler::WithAttr(hyperlane_macro),
+    },
+    InjectableMacro {
+        name: "methods",
+        handler: Handler::WithAttrPosition(methods_macro),
+    },
+    InjectableMacro {
+        name: "is_get_method",
+        handler: Handler::NoAttrPosition(is_get_method_handler),
+    },
+    InjectableMacro {
+        name: "is_post_method",
+        handler: Handler::NoAttrPosition(is_post_method_handler),
+    },
+    InjectableMacro {
+        name: "is_put_method",
+        handler: Handler::NoAttrPosition(is_put_method_handler),
+    },
+    InjectableMacro {
+        name: "is_delete_method",
+        handler: Handler::NoAttrPosition(is_delete_method_handler),
+    },
+    InjectableMacro {
+        name: "is_patch_method",
+        handler: Handler::NoAttrPosition(is_patch_method_handler),
+    },
+    InjectableMacro {
+        name: "is_head_method",
+        handler: Handler::NoAttrPosition(is_head_method_handler),
+    },
+    InjectableMacro {
+        name: "is_options_method",
+        handler: Handler::NoAttrPosition(is_options_method_handler),
+    },
+    InjectableMacro {
+        name: "is_connect_method",
+        handler: Handler::NoAttrPosition(is_connect_method_handler),
+    },
+    InjectableMacro {
+        name: "is_trace_method",
+        handler: Handler::NoAttrPosition(is_trace_method_handler),
+    },
+    InjectableMacro {
+        name: "is_unknown_method",
+        handler: Handler::NoAttrPosition(is_unknown_method_handler),
+    },
+    InjectableMacro {
+        name: "referer",
+        handler: Handler::WithAttrPosition(referer_macro),
+    },
+    InjectableMacro {
+        name: "reject_referer",
+        handler: Handler::WithAttrPosition(reject_referer_macro),
+    },
+    InjectableMacro {
+        name: "reject",
+        handler: Handler::WithAttrPosition(reject_macro),
+    },
+    InjectableMacro {
+        name: "request_body",
+        handler: Handler::WithAttrPosition(request_body_macro),
+    },
+    InjectableMacro {
+        name: "request_body_json_result",
+        handler: Handler::WithAttrPosition(request_body_json_result_macro),
+    },
+    InjectableMacro {
+        name: "request_body_json",
+        handler: Handler::WithAttrPosition(request_body_json_macro),
+    },
+    InjectableMacro {
+        name: "try_get_attribute",
+        handler: Handler::WithAttrPosition(try_get_attribute_macro),
+    },
+    InjectableMacro {
+        name: "attribute",
+        handler: Handler::WithAttrPosition(attribute_macro),
+    },
+    InjectableMacro {
+        name: "attributes",
+        handler: Handler::WithAttrPosition(attributes_macro),
+    },
+    InjectableMacro {
+        name: "try_get_task_panic_data",
+        handler: Handler::WithAttrPosition(try_get_task_panic_data_macro),
+    },
+    InjectableMacro {
+        name: "task_panic_data",
+        handler: Handler::WithAttrPosition(task_panic_data_macro),
+    },
+    InjectableMacro {
+        name: "try_get_request_error_data",
+        handler: Handler::WithAttrPosition(try_get_request_error_data_macro),
+    },
+    InjectableMacro {
+        name: "request_error_data",
+        handler: Handler::WithAttrPosition(request_error_data_macro),
+    },
+    InjectableMacro {
+        name: "try_get_route_param",
+        handler: Handler::WithAttrPosition(try_get_route_param_macro),
+    },
+    InjectableMacro {
+        name: "route_param",
+        handler: Handler::WithAttrPosition(route_param_macro),
+    },
+    InjectableMacro {
+        name: "route_params",
+        handler: Handler::WithAttrPosition(route_params_macro),
+    },
+    InjectableMacro {
+        name: "try_get_request_query",
+        handler: Handler::WithAttrPosition(try_get_request_query_macro),
+    },
+    InjectableMacro {
+        name: "request_query",
+        handler: Handler::WithAttrPosition(request_query_macro),
+    },
+    InjectableMacro {
+        name: "request_querys",
+        handler: Handler::WithAttrPosition(request_querys_macro),
+    },
+    InjectableMacro {
+        name: "try_get_request_header",
+        handler: Handler::WithAttrPosition(try_get_request_header_macro),
+    },
+    InjectableMacro {
+        name: "request_header",
+        handler: Handler::WithAttrPosition(request_header_macro),
+    },
+    InjectableMacro {
+        name: "request_headers",
+        handler: Handler::WithAttrPosition(request_headers_macro),
+    },
+    InjectableMacro {
+        name: "try_get_request_cookie",
+        handler: Handler::WithAttrPosition(try_get_request_cookie_macro),
+    },
+    InjectableMacro {
+        name: "request_cookie",
+        handler: Handler::WithAttrPosition(request_cookie_macro),
+    },
+    InjectableMacro {
+        name: "request_cookies",
+        handler: Handler::WithAttrPosition(request_cookies_macro),
+    },
+    InjectableMacro {
+        name: "request_version",
+        handler: Handler::WithAttrPosition(request_version_macro),
+    },
+    InjectableMacro {
+        name: "request_path",
+        handler: Handler::WithAttrPosition(request_path_macro),
+    },
+    InjectableMacro {
+        name: "request_middleware",
+        handler: Handler::WithAttr(request_middleware_macro),
+    },
+    InjectableMacro {
+        name: "response_status_code",
+        handler: Handler::WithAttrPosition(response_status_code_macro),
+    },
+    InjectableMacro {
+        name: "response_reason_phrase",
+        handler: Handler::WithAttrPosition(response_reason_phrase_macro),
+    },
+    InjectableMacro {
+        name: "response_header",
+        handler: Handler::WithAttrPosition(response_header_macro),
+    },
+    InjectableMacro {
+        name: "response_body",
+        handler: Handler::WithAttrPosition(response_body_macro),
+    },
+    InjectableMacro {
+        name: "clear_response_headers",
+        handler: Handler::NoAttrPosition(clear_response_headers_macro),
+    },
+    InjectableMacro {
+        name: "response_version",
+        handler: Handler::WithAttrPosition(response_version_macro),
+    },
+    InjectableMacro {
+        name: "response_middleware",
+        handler: Handler::WithAttr(response_middleware_macro),
+    },
+    InjectableMacro {
+        name: "route",
+        handler: Handler::WithAttr(route_macro),
+    },
+    InjectableMacro {
+        name: "try_send",
+        handler: Handler::WithAttrPosition(try_send_macro),
+    },
+    InjectableMacro {
+        name: "send",
+        handler: Handler::WithAttrPosition(send_macro),
+    },
+    InjectableMacro {
+        name: "try_get_http_request",
+        handler: Handler::WithAttr(try_get_http_request_macro),
+    },
+    InjectableMacro {
+        name: "try_get_websocket_request",
+        handler: Handler::WithAttr(try_get_websocket_request_macro),
+    },
+    InjectableMacro {
+        name: "is_ws_upgrade_type",
+        handler: Handler::NoAttrPosition(is_ws_upgrade_type_macro),
+    },
+    InjectableMacro {
+        name: "is_h2c_upgrade_type",
+        handler: Handler::NoAttrPosition(is_h2c_upgrade_type_macro),
+    },
+    InjectableMacro {
+        name: "is_tls_upgrade_type",
+        handler: Handler::NoAttrPosition(is_tls_upgrade_type_macro),
+    },
+    InjectableMacro {
+        name: "is_unknown_upgrade_type",
+        handler: Handler::NoAttrPosition(is_unknown_upgrade_type_macro),
+    },
+    InjectableMacro {
+        name: "is_http0_9_version",
+        handler: Handler::NoAttrPosition(is_http0_9_version_macro),
+    },
+    InjectableMacro {
+        name: "is_http1_0_version",
+        handler: Handler::NoAttrPosition(is_http1_0_version_macro),
+    },
+    InjectableMacro {
+        name: "is_http1_1_version",
+        handler: Handler::NoAttrPosition(is_http1_1_version_macro),
+    },
+    InjectableMacro {
+        name: "is_http2_version",
+        handler: Handler::NoAttrPosition(is_http2_version_macro),
+    },
+    InjectableMacro {
+        name: "is_http3_version",
+        handler: Handler::NoAttrPosition(is_http3_version_macro),
+    },
+    InjectableMacro {
+        name: "is_http1_1_or_higher_version",
+        handler: Handler::NoAttrPosition(is_http1_1_or_higher_version_macro),
+    },
+    InjectableMacro {
+        name: "is_http_version",
+        handler: Handler::NoAttrPosition(is_http_version_macro),
+    },
+    InjectableMacro {
+        name: "is_unknown_version",
+        handler: Handler::NoAttrPosition(is_unknown_version_macro),
+    },
+];
+```
+# Path: hyperlane/macros/src/common/enum.rs
+```rust
+use super::*;
+pub(crate) enum Handler {
+    WithAttr(MacroHandlerWithAttr),
+    NoAttrPosition(MacroHandlerPosition),
+    WithAttrPosition(MacroHandlerWithAttrPosition),
+}
+pub(crate) enum Position {
+    Prologue,
+    Epilogue,
+}
+```
+# Path: hyperlane/macros/src/common/struct.rs
+```rust
+use super::*;
+#[derive(Clone)]
+pub(crate) struct OrderAttr {
+    pub(crate) order: Option<Expr>,
+}
+pub(crate) struct InjectableMacro {
+    pub(crate) name: &'static str,
+    pub(crate) handler: Handler,
+}
+```
+# Path: hyperlane/macros/src/common/mod.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+mod r#type;
+pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#static::*, r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/route/impl.rs
+```rust
+use super::*;
+impl Parse for RouteAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let first_expr: Expr = input.parse()?;
+        Ok(RouteAttr { path: first_expr })
+    }
+}
+```
+# Path: hyperlane/macros/src/route/fn.rs
+```rust
+use super::*;
+pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let route_attr: RouteAttr = parse_macro_input!(attr as RouteAttr);
+    let path: &Expr = &route_attr.path;
+    let input_struct: ItemStruct = parse_macro_input!(item as ItemStruct);
+    let struct_name: &Ident = &input_struct.ident;
+    let gen_code: proc_macro2::TokenStream = quote! {
+        #input_struct
+        ::hyperlane_core::inventory::submit! {
+            ::hyperlane_core::HookType::Route(#path, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        }
+    };
+    gen_code.into()
+}
+```
+# Path: hyperlane/macros/src/route/struct.rs
+```rust
+use super::*;
+pub(crate) struct RouteAttr {
+    pub(crate) path: Expr,
+}
+```
+# Path: hyperlane/macros/src/route/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/host/impl.rs
+```rust
+use super::*;
+impl Parse for MultiHostData {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut host_values: Vec<Expr> = Vec::new();
+        loop {
+            let host_value: Expr = input.parse()?;
+            host_values.push(host_value);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+        }
+        Ok(MultiHostData { host_values })
+    }
+}
+```
+# Path: hyperlane/macros/src/host/fn.rs
+```rust
+use super::*;
+pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
+    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_host.host_values.iter().map(|host_value| {
+            quote! {
+                if #context.get_request().get_host() != #host_value {
+                    return ::hyperlane_core::Status::Continue;
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+pub(crate) fn reject_host_macro(
+    attr: TokenStream,
+    item: TokenStream,
+    position: Position,
+) -> TokenStream {
+    let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
+    inject(position, item, |context: &Ident, _: &Ident| {
+        let statements = multi_host.host_values.iter().map(|host_value| {
+            quote! {
+                if #context.get_request().get_host() == #host_value {
+                    return ::hyperlane_core::Status::Continue;
+                }
+            }
+        });
+        quote! {
+            #(#statements)*
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/host/struct.rs
+```rust
+use super::*;
+pub(crate) struct MultiHostData {
+    pub(crate) host_values: Vec<Expr>,
+}
+```
+# Path: hyperlane/macros/src/host/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/flush/fn.rs
+```rust
+use super::*;
+pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |_: &Ident, stream: &Ident| {
+        quote! {
+            let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_flush().await;
+        }
+    })
+}
+pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |_: &Ident, stream: &Ident| {
+        quote! {
+            #stream.flush().await;
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/flush/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/macros/src/closed/fn.rs
+```rust
+use super::*;
+pub(crate) fn closed_macro(item: TokenStream, position: Position) -> TokenStream {
+    inject(position, item, |_: &Ident, stream: &Ident| {
+        quote! {
+            #stream.set_closed(true);
+        }
+    })
+}
+```
+# Path: hyperlane/macros/src/closed/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/type/README.md
+## hyperlane
+[Api Docs](https://docs.rs/hyperlane/latest/)
+> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane
+```
+## Quick start
+- [hyperlane-quick-start git](https://github.com/hyperlane-dev/hyperlane-quick-start)
+```sh
+git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
+```
+## Contact
+# Path: hyperlane/type/tests/mod.rs
+```rust
+mod any;
+mod arc_mutex;
+mod arc_rwlock;
+mod attribute;
+mod box_leak;
+mod box_rwlock;
+mod content_type;
+mod cookie;
+mod file_extension;
+mod hash_map_xx_hash3_64;
+mod hash_set_xx_hash3_64;
+mod http_status;
+mod http_url;
+mod http_version;
+mod lifetime;
+mod methods;
+mod panic;
+mod protocol;
+mod rc_rwlock;
+mod request;
+mod response;
+mod status;
+mod stream;
+mod task;
+mod upgrade_type;
+mod websocket_frame;
+use hyperlane_type::*;
+use std::{
+    collections::VecDeque,
+    io::ErrorKind,
+    num::ParseIntError,
+    rc::Rc,
+    sync::{
+        Arc,
+        atomic::{self, AtomicBool, AtomicUsize},
+    },
+};
+use {
+    serde::Deserialize,
+    tokio::{
+        runtime::Handle,
+        spawn,
+        sync::{RwLockReadGuard, RwLockWriteGuard},
+        task::{JoinError, JoinHandle},
+        time::{Duration, error::Elapsed},
+    },
+    url::{ParseError, Url},
+};
+```
+# Path: hyperlane/type/tests/http_url/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_http_url_components_parse_http() {
+    let result: Result<HttpUrlComponents, HttpUrlError> =
+        HttpUrlComponents::parse("http://example.com/path?query=1#frag");
+    assert!(result.is_ok());
+    let components: HttpUrlComponents = result.unwrap();
+    assert_eq!(components.protocol, "http");
+    assert_eq!(components.host, Some("example.com".to_string()));
+    assert_eq!(components.port, None);
+    assert_eq!(components.path, Some("/path".to_string()));
+    assert_eq!(components.query, Some("query=1".to_string()));
+    assert_eq!(components.fragment, Some("frag".to_string()));
+}
+#[test]
+fn test_http_url_components_parse_https_with_port() {
+    let result: Result<HttpUrlComponents, HttpUrlError> =
+        HttpUrlComponents::parse("https://example.com:8443/");
+    assert!(result.is_ok());
+    let components: HttpUrlComponents = result.unwrap();
+    assert_eq!(components.protocol, "https");
+    assert_eq!(components.host, Some("example.com".to_string()));
+    assert_eq!(components.port, Some(8443));
+    assert_eq!(components.path, Some("/".to_string()));
+}
+#[test]
+fn test_http_url_components_default() {
+    let components: HttpUrlComponents = HttpUrlComponents::default();
+    assert_eq!(components.protocol, "");
+    assert_eq!(components.host, None);
+    assert_eq!(components.port, None);
+    assert_eq!(components.path, None);
+    assert_eq!(components.query, None);
+    assert_eq!(components.fragment, None);
+}
+#[test]
+fn test_http_url_components_clone() {
+    let components: HttpUrlComponents = HttpUrlComponents {
+        protocol: "https".to_string(),
+        host: Some("example.com".to_string()),
+        ..Default::default()
+    };
+    let cloned: HttpUrlComponents = components.clone();
+    assert_eq!(cloned.protocol, "https");
+    assert_eq!(cloned.host, Some("example.com".to_string()));
+}
+#[test]
+fn test_http_url_components_eq() {
+    let left: HttpUrlComponents = HttpUrlComponents {
+        protocol: "http".to_string(),
+        ..Default::default()
+    };
+    let right: HttpUrlComponents = HttpUrlComponents {
+        protocol: "http".to_string(),
+        ..Default::default()
+    };
+    assert_eq!(left, right);
+}
+#[test]
+fn test_http_url_error_display_invalid_url() {
+    let error: HttpUrlError = HttpUrlError::InvalidUrl;
+    assert_eq!(format!("{error}"), "Invalid URL");
+}
+#[test]
+fn test_http_url_error_display_unknown() {
+    let error: HttpUrlError = HttpUrlError::Unknown;
+    assert_eq!(format!("{error}"), "Unknown error");
+}
+#[test]
+fn test_http_url_error_default() {
+    let error: HttpUrlError = HttpUrlError::default();
+    assert_eq!(error, HttpUrlError::Unknown);
+}
+#[test]
+fn test_http_url_error_from_parse_error() {
+    let parse_error: ParseError = "not a url".parse::<Url>().unwrap_err();
+    let error: HttpUrlError = HttpUrlError::from(parse_error);
+    assert_eq!(error, HttpUrlError::InvalidUrl);
+}
+```
+# Path: hyperlane/type/tests/http_url/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/box_rwlock/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_box_rwlock_type() {
+    let data: BoxRwLock<i32> = box_rwlock(42);
+    let guard: RwLockReadGuard<'_, i32> = data.read().await;
+    assert_eq!(*guard, 42);
+}
+#[tokio::test]
+async fn test_box_rwlock_write() {
+    let data: BoxRwLock<i32> = box_rwlock(42);
+    {
+        let mut guard: RwLockWriteGuard<'_, i32> = data.write().await;
+        *guard = 100;
+    }
+    let guard: RwLockReadGuard<'_, i32> = data.read().await;
+    assert_eq!(*guard, 100);
+}
+#[tokio::test]
+async fn test_box_rwlock_with_string() {
+    let data: BoxRwLock<String> = box_rwlock("hello".to_string());
+    {
+        let mut guard: RwLockWriteGuard<'_, String> = data.write().await;
+        guard.push_str(" world");
+    }
+    let guard: RwLockReadGuard<'_, String> = data.read().await;
+    assert_eq!(*guard, "hello world");
+}
+#[test]
+fn test_box_rwlock_is_send() {
+    fn assert_send<T: Send>() {}
+    assert_send::<BoxRwLock<i32>>();
+    assert_send::<BoxRwLock<String>>();
+}
+```
+# Path: hyperlane/type/tests/box_rwlock/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/hash_map_xx_hash3_64/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_hash_map_xx_hash3_64_new() {
+    let map: HashMapXxHash3_64<String, i32> = hash_map_xx_hash3_64();
+    assert!(map.is_empty());
+    assert_eq!(map.len(), 0);
+}
+#[test]
+fn test_hash_map_xx_hash3_64_insert_and_get() {
+    let mut map: HashMapXxHash3_64<String, i32> = hash_map_xx_hash3_64();
+    map.insert("key1".to_string(), 100);
+    map.insert("key2".to_string(), 200);
+    assert_eq!(map.get("key1"), Some(&100));
+    assert_eq!(map.get("key2"), Some(&200));
+    assert_eq!(map.get("key3"), None);
+}
+#[test]
+fn test_hash_map_xx_hash3_64_remove() {
+    let mut map: HashMapXxHash3_64<String, i32> = hash_map_xx_hash3_64();
+    map.insert("key1".to_string(), 100);
+    assert_eq!(map.remove("key1"), Some(100));
+    assert_eq!(map.get("key1"), None);
+}
+#[test]
+fn test_hash_map_xx_hash3_64_with_integer_keys() {
+    let mut map: HashMapXxHash3_64<i32, String> = hash_map_xx_hash3_64();
+    map.insert(1, "one".to_string());
+    map.insert(2, "two".to_string());
+    assert_eq!(map.get(&1), Some(&"one".to_string()));
+    assert_eq!(map.get(&2), Some(&"two".to_string()));
+}
+#[test]
+fn test_hash_map_xx_hash3_64_iter() {
+    let mut map: HashMapXxHash3_64<String, i32> = hash_map_xx_hash3_64();
+    map.insert("a".to_string(), 1);
+    map.insert("b".to_string(), 2);
+    let mut count: usize = 0;
+    for _value in map.values() {
+        count += 1;
+    }
+    assert_eq!(count, 2);
+}
+```
+# Path: hyperlane/type/tests/hash_map_xx_hash3_64/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/content_type/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_content_type_from_str() {
+    assert_eq!(
+        APPLICATION_JSON.parse::<ContentType>().unwrap(),
+        ContentType::ApplicationJson
+    );
+    assert_eq!(
+        APPLICATION_XML.parse::<ContentType>().unwrap(),
+        ContentType::ApplicationXml
+    );
+    assert_eq!(
+        TEXT_PLAIN.parse::<ContentType>().unwrap(),
+        ContentType::TextPlain
+    );
+    assert_eq!(
+        TEXT_HTML.parse::<ContentType>().unwrap(),
+        ContentType::TextHtml
+    );
+    assert_eq!(
+        FORM_URLENCODED.parse::<ContentType>().unwrap(),
+        ContentType::FormUrlEncoded
+    );
+    assert_eq!(
+        "unknown/type".parse::<ContentType>().unwrap(),
+        ContentType::Unknown
+    );
+    assert_eq!("".parse::<ContentType>().unwrap(), ContentType::Unknown);
+}
+#[test]
+fn test_content_type_from_str_case_insensitive() {
+    assert_eq!(
+        "APPLICATION/JSON".parse::<ContentType>().unwrap(),
+        ContentType::ApplicationJson
+    );
+    assert_eq!(
+        "Application/Json".parse::<ContentType>().unwrap(),
+        ContentType::ApplicationJson
+    );
+    assert_eq!(
+        "TEXT/PLAIN".parse::<ContentType>().unwrap(),
+        ContentType::TextPlain
+    );
+    assert_eq!(
+        "Text/Plain".parse::<ContentType>().unwrap(),
+        ContentType::TextPlain
+    );
+    assert_eq!(
+        "text/HTML".parse::<ContentType>().unwrap(),
+        ContentType::TextHtml
+    );
+}
+#[test]
+fn test_content_type_default() {
+    assert_eq!(ContentType::default(), ContentType::Unknown);
+}
+#[test]
+fn test_content_type_clone() {
+    let content_type: ContentType = ContentType::ApplicationJson;
+    let cloned_content_type: ContentType = content_type;
+    assert_eq!(content_type, cloned_content_type);
+}
+#[test]
+fn test_content_type_debug() {
+    let content_type: ContentType = ContentType::ApplicationJson;
+    let debug_str: String = format!("{content_type:?}");
+    assert_eq!(debug_str, "ApplicationJson");
+}
+#[test]
+fn test_content_type_equality() {
+    assert_eq!(ContentType::ApplicationJson, ContentType::ApplicationJson);
+    assert_ne!(ContentType::ApplicationJson, ContentType::ApplicationXml);
+    assert_eq!(ContentType::Unknown, ContentType::Unknown);
+    assert_ne!(ContentType::TextPlain, ContentType::TextHtml);
+}
+#[test]
+fn test_content_type_get_body_string_with_simple_string() {
+    let data: String = "Hello, World!".to_string();
+    let json_result: String = ContentType::ApplicationJson.get_body_string(&data);
+    assert_eq!(json_result, "\"Hello, World!\"");
+    let plain_result: String = ContentType::TextPlain.get_body_string(&data);
+    assert_eq!(plain_result, "Hello, World!");
+    let html_result: String = ContentType::TextHtml.get_body_string(&data);
+    assert!(html_result.contains("Hello, World!"));
+    assert!(html_result.starts_with("<table><tr><td>"));
+}
+#[test]
+fn test_content_type_get_body_string_with_number() {
+    let data: i32 = 42;
+    let json_result: String = ContentType::ApplicationJson.get_body_string(&data);
+    assert_eq!(json_result, "42");
+    let plain_result: String = ContentType::TextPlain.get_body_string(&data);
+    assert_eq!(plain_result, "42");
+    let html_result: String = ContentType::TextHtml.get_body_string(&data);
+    assert!(html_result.contains("42"));
+}
+#[test]
+fn test_content_type_format_content_type_with_charset() {
+    let result: String = ContentType::format_content_type_with_charset("text/html", "utf-8");
+    assert_eq!(result, "text/html; charset=utf-8");
+    let result2: String =
+        ContentType::format_content_type_with_charset("application/json", "iso-8859-1");
+    assert_eq!(result2, "application/json; charset=iso-8859-1");
+}
+#[test]
+fn test_content_type_format_content_type_with_charset_declaration() {
+    let result: String =
+        ContentType::format_content_type_with_charset_declaration("text/html", "charset=utf-8");
+    assert_eq!(result, "text/html; charset=utf-8");
+    let result2: String = ContentType::format_content_type_with_charset_declaration(
+        "application/json",
+        "charset=iso-8859-1",
+    );
+    assert_eq!(result2, "application/json; charset=iso-8859-1");
+}
+#[test]
+fn test_content_type_all_variants() {
+    let content_types: Vec<ContentType> = vec![
+        ContentType::ApplicationJson,
+        ContentType::ApplicationXml,
+        ContentType::TextPlain,
+        ContentType::TextHtml,
+        ContentType::FormUrlEncoded,
+        ContentType::Unknown,
+    ];
+    for content_type in content_types {
+        let debug_str: String = format!("{content_type:?}");
+        assert!(!debug_str.is_empty());
+    }
+}
+#[test]
+fn test_content_type_pattern_matching() {
+    let content_type: ContentType = ContentType::ApplicationJson;
+    match content_type {
+        ContentType::ApplicationJson => {}
+        ContentType::ApplicationXml => panic!("Should not match ApplicationXml"),
+        ContentType::TextPlain => panic!("Should not match TextPlain"),
+        ContentType::TextHtml => panic!("Should not match TextHtml"),
+        ContentType::FormUrlEncoded => panic!("Should not match FormUrlEncoded"),
+        ContentType::Unknown => panic!("Should not match Unknown"),
+    }
+}
+#[test]
+fn test_content_type_charset_formatting_edge_cases() {
+    let result_empty: String = ContentType::format_content_type_with_charset("", "");
+    assert_eq!(result_empty, "; charset=");
+    let result_spaces: String =
+        ContentType::format_content_type_with_charset("text/html", "utf-8 ");
+    assert_eq!(result_spaces, "text/html; charset=utf-8 ");
+    let result_special: String = ContentType::format_content_type_with_charset(
+        "application/json",
+        "utf-8;boundary=something",
+    );
+    assert_eq!(
+        result_special,
+        "application/json; charset=utf-8;boundary=something"
+    );
+}
+#[test]
+fn test_content_type_memory_size() {
+    use std::mem;
+    let size: usize = mem::size_of::<ContentType>();
+    assert!(size > 0);
+    let json_size: usize = mem::size_of_val(&ContentType::ApplicationJson);
+    let unknown_size: usize = mem::size_of_val(&ContentType::Unknown);
+    assert_eq!(json_size, unknown_size);
+}
+#[test]
+fn test_content_type_get_body_string_unknown() {
+    let data: String = "test_data".to_string();
+    let content_type: ContentType = ContentType::Unknown;
+    let result: String = content_type.get_body_string(&data);
+    assert!(!result.is_empty());
+}
+#[test]
+fn test_content_type_get_body_string_xml() {
+    let data: String = "test_data".to_string();
+    let content_type: ContentType = ContentType::ApplicationXml;
+    let result: String = content_type.get_body_string(&data);
+    assert!(result.is_empty());
+}
+#[test]
+fn test_content_type_get_body_string_form_url_encoded() {
+    let data: String = "test_data".to_string();
+    let content_type: ContentType = ContentType::FormUrlEncoded;
+    let result: String = content_type.get_body_string(&data);
+    assert_eq!(result, "");
+}
+#[test]
+fn test_content_type_from_str_with_parameters() {
+    assert_eq!(
+        "application/json; charset=utf-8"
+            .parse::<ContentType>()
+            .unwrap(),
+        ContentType::Unknown
+    );
+    assert_eq!(
+        "text/html; charset=utf-8".parse::<ContentType>().unwrap(),
+        ContentType::Unknown
+    );
+}
+#[test]
+fn test_content_type_case_variations() {
+    assert_eq!(
+        "application/JSON".parse::<ContentType>().unwrap(),
+        ContentType::ApplicationJson
+    );
+    assert_eq!(
+        "APPLICATION/json".parse::<ContentType>().unwrap(),
+        ContentType::ApplicationJson
+    );
+    assert_eq!(
+        "text/PLAIN".parse::<ContentType>().unwrap(),
+        ContentType::TextPlain
+    );
+    assert_eq!(
+        "TEXT/plain".parse::<ContentType>().unwrap(),
+        ContentType::TextPlain
+    );
+}
+```
+# Path: hyperlane/type/tests/content_type/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/file_extension/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_enum_to_string() {
+    assert_eq!(
+        FileExtension::FileExtension123.to_string(),
+        FILE_EXTENSION_123
+    )
+}
+#[test]
+fn test_get_content_type() {
+    assert_eq!(
+        FileExtension::FileExtension123.get_content_type(),
+        APPLICATION_VND_LOTUS_1_2_3
+    )
+}
+#[test]
+fn test_parse() {
+    assert_eq!(
+        FileExtension::parse(FILE_EXTENSION_123),
+        FileExtension::FileExtension123,
+    )
+}
+```
+# Path: hyperlane/type/tests/file_extension/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/lifetime/impl.rs
+```rust
+use super::*;
+impl Lifetime for TestLifetimeStruct {
+    unsafe fn leak(&self) -> &'static Self {
+        let boxed: Box<Self> = Box::new(Self { value: self.value });
+        Box::leak(boxed)
+    }
+    unsafe fn leak_mut(&self) -> &'static mut Self {
+        let mut boxed: Box<Self> = Box::new(Self { value: self.value });
+        let reference: *mut Self = std::ptr::addr_of_mut!(*boxed);
+        std::mem::forget(boxed);
+        unsafe { &mut *reference }
+    }
+}
+```
+# Path: hyperlane/type/tests/lifetime/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_lifetime_trait_leak() {
+    let data: TestLifetimeStruct = TestLifetimeStruct { value: 42 };
+    let leaked: &'static TestLifetimeStruct = unsafe { data.leak() };
+    assert_eq!(leaked.value, 42);
+}
+#[test]
+fn test_lifetime_trait_leak_mut() {
+    let data: TestLifetimeStruct = TestLifetimeStruct { value: 10 };
+    let leaked: &'static mut TestLifetimeStruct = unsafe { data.leak_mut() };
+    assert_eq!(leaked.value, 10);
+    leaked.value = 99;
+    assert_eq!(leaked.value, 99);
+}
+#[test]
+fn test_lifetime_trait_leak_preserves_value() {
+    let data: TestLifetimeStruct = TestLifetimeStruct { value: 100 };
+    let leaked: &'static TestLifetimeStruct = unsafe { data.leak() };
+    assert_eq!(leaked.value, 100);
+}
+```
+# Path: hyperlane/type/tests/lifetime/struct.rs
+```rust
+pub(crate) struct TestLifetimeStruct {
+    pub(crate) value: i32,
+}
+```
+# Path: hyperlane/type/tests/lifetime/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/type/tests/cookie/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_cookie_builder_new() {
+    let cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_default() {
+    let cookie: CookieBuilder = CookieBuilder::default();
+    assert_eq!(cookie.get_name(), "");
+    assert_eq!(cookie.get_value(), "");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_basic() {
+    let cookie: CookieBuilder = CookieBuilder::parse("session_id=abc123");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_with_expires() {
+    let cookie: CookieBuilder =
+        CookieBuilder::parse("session_id=abc123; expires=Wed, 21 Oct 2015 07:28:00 GMT");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(
+        *cookie.try_get_expires(),
+        Some("Wed, 21 Oct 2015 07:28:00 GMT".to_string())
+    );
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_with_max_age() {
+    let cookie: CookieBuilder = CookieBuilder::parse("session_id=abc123; max-age=3600");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), Some(3600));
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_with_domain() {
+    let cookie: CookieBuilder = CookieBuilder::parse("session_id=abc123; domain=example.com");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_with_path() {
+    let cookie: CookieBuilder = CookieBuilder::parse("session_id=abc123; path=/admin");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), Some("/admin".to_string()));
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_with_secure() {
+    let cookie: CookieBuilder = CookieBuilder::parse("session_id=abc123; secure");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert_eq!(*cookie.try_get_secure(), Some(true));
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_with_http_only() {
+    let cookie: CookieBuilder = CookieBuilder::parse("session_id=abc123; httponly");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_with_same_site() {
+    let cookie: CookieBuilder = CookieBuilder::parse("session_id=abc123; samesite=strict");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), Some("strict".to_string()));
+}
+#[test]
+fn test_cookie_builder_parse_complex() {
+    let cookie: CookieBuilder = CookieBuilder::parse(
+        "session_id=abc123; expires=Wed, 21 Oct 2015 07:28:00 GMT; max-age=3600; domain=example.com; path=/admin; secure; httponly; samesite=lax",
+    );
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(
+        *cookie.try_get_expires(),
+        Some("Wed, 21 Oct 2015 07:28:00 GMT".to_string())
+    );
+    assert_eq!(*cookie.try_get_max_age(), Some(3600));
+    assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
+    assert_eq!(*cookie.try_get_path(), Some("/admin".to_string()));
+    assert_eq!(*cookie.try_get_secure(), Some(true));
+    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(*cookie.try_get_same_site(), Some("lax".to_string()));
+}
+#[test]
+fn test_cookie_builder_parse_empty_string() {
+    let cookie: CookieBuilder = CookieBuilder::parse("");
+    assert_eq!(cookie.get_name(), "");
+    assert_eq!(cookie.get_value(), "");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), None);
+    assert_eq!(*cookie.try_get_path(), None);
+    assert!(cookie.try_get_secure().is_none());
+    assert!(cookie.try_get_http_only().is_none());
+    assert_eq!(*cookie.try_get_same_site(), None);
+}
+#[test]
+fn test_cookie_builder_parse_case_insensitive() {
+    let cookie: CookieBuilder = CookieBuilder::parse(
+        "session_id=abc123; DOMAIN=example.com; SECURE; HTTPONLY; SAMESITE=Strict",
+    );
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(*cookie.try_get_expires(), None);
+    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
+    assert_eq!(*cookie.try_get_path(), None);
+    assert_eq!(*cookie.try_get_secure(), Some(true));
+    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(*cookie.try_get_same_site(), Some("Strict".to_string()));
+}
+#[test]
+fn test_cookie_builder_expires() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
+    cookie.set_expires("Wed, 21 Oct 2015 07:28:00 GMT");
+    assert_eq!(
+        *cookie.try_get_expires(),
+        Some("Wed, 21 Oct 2015 07:28:00 GMT".to_string())
+    );
+}
+#[test]
+fn test_cookie_builder_max_age() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
+    cookie.set_max_age(3600);
+    assert_eq!(*cookie.try_get_max_age(), Some(3600));
+}
+#[test]
+fn test_cookie_builder_domain() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
+    cookie.set_domain("example.com");
+    assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
+}
+#[test]
+fn test_cookie_builder_path() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
+    cookie.set_path("/admin");
+    assert_eq!(*cookie.try_get_path(), Some("/admin".to_string()));
+}
+#[test]
+fn test_cookie_builder_secure() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
+    cookie.secure();
+    assert_eq!(*cookie.try_get_secure(), Some(true));
+}
+#[test]
+fn test_cookie_builder_http_only() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
+    cookie.http_only();
+    assert_eq!(*cookie.try_get_http_only(), Some(true));
+}
+#[test]
+fn test_cookie_builder_same_site() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
+    cookie.set_same_site("Strict");
+    assert_eq!(*cookie.try_get_same_site(), Some("Strict".to_string()));
+}
+#[test]
+fn test_cookie_builder_chaining() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie
+        .set_expires("Wed, 21 Oct 2015 07:28:00 GMT")
+        .set_max_age(3600)
+        .set_domain("example.com")
+        .set_path("/admin")
+        .secure()
+        .http_only()
+        .set_same_site("Strict");
+    assert_eq!(cookie.get_name(), "session_id");
+    assert_eq!(cookie.get_value(), "abc123");
+    assert_eq!(
+        *cookie.try_get_expires(),
+        Some("Wed, 21 Oct 2015 07:28:00 GMT".to_string())
+    );
+    assert_eq!(*cookie.try_get_max_age(), Some(3600));
+    assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
+    assert_eq!(*cookie.try_get_path(), Some("/admin".to_string()));
+    assert_eq!(*cookie.try_get_secure(), Some(true));
+    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(*cookie.try_get_same_site(), Some("Strict".to_string()));
+}
+#[test]
+fn test_cookie_builder_build_basic() {
+    let cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    let result: String = cookie.build();
+    assert_eq!(result, "session_id=abc123");
+}
+#[test]
+fn test_cookie_builder_build_empty_name() {
+    let cookie: CookieBuilder = CookieBuilder::new("", "abc123");
+    let result: String = cookie.build();
+    assert_eq!(result, "");
+}
+#[test]
+fn test_cookie_builder_build_with_expires() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie.set_expires("Wed, 21 Oct 2015 07:28:00 GMT");
+    let result: String = cookie.build();
+    assert_eq!(
+        result,
+        "session_id=abc123; expires=Wed, 21 Oct 2015 07:28:00 GMT"
+    );
+}
+#[test]
+fn test_cookie_builder_build_with_max_age() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie.set_max_age(3600);
+    let result: String = cookie.build();
+    assert_eq!(result, "session_id=abc123; max-age=3600");
+}
+#[test]
+fn test_cookie_builder_build_with_domain() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie.set_domain("example.com");
+    let result: String = cookie.build();
+    assert_eq!(result, "session_id=abc123; domain=example.com");
+}
+#[test]
+fn test_cookie_builder_build_with_path() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie.set_path("/admin");
+    let result: String = cookie.build();
+    assert_eq!(result, "session_id=abc123; path=/admin");
+}
+#[test]
+fn test_cookie_builder_build_with_secure() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie.secure();
+    let result: String = cookie.build();
+    assert_eq!(result, "session_id=abc123; secure");
+}
+#[test]
+fn test_cookie_builder_build_with_http_only() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie.http_only();
+    let result: String = cookie.build();
+    assert_eq!(result, "session_id=abc123; httponly");
+}
+#[test]
+fn test_cookie_builder_build_with_same_site() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie.set_same_site("strict");
+    let result: String = cookie.build();
+    assert_eq!(result, "session_id=abc123; samesite=strict");
+}
+#[test]
+fn test_cookie_builder_build_all_attributes() {
+    let mut cookie: CookieBuilder = CookieBuilder::new("session_id", "abc123");
+    cookie
+        .set_expires("Wed, 21 Oct 2015 07:28:00 GMT")
+        .set_max_age(3600)
+        .set_domain("example.com")
+        .set_path("/admin")
+        .secure()
+        .http_only()
+        .set_same_site("lax");
+    let result: String = cookie.build();
+    assert_eq!(
+        result,
+        "session_id=abc123; expires=Wed, 21 Oct 2015 07:28:00 GMT; max-age=3600; domain=example.com; path=/admin; secure; httponly; samesite=lax"
+    );
+}
+```
+# Path: hyperlane/type/tests/cookie/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/methods/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_method_display() {
+    assert_eq!(Method::Get.to_string(), GET);
+    assert_eq!(Method::Post.to_string(), POST);
+    assert_eq!(Method::Put.to_string(), PUT);
+    assert_eq!(Method::Delete.to_string(), DELETE);
+    assert_eq!(Method::Patch.to_string(), PATCH);
+    assert_eq!(Method::Head.to_string(), HEAD);
+    assert_eq!(Method::Options.to_string(), OPTIONS);
+    assert_eq!(Method::Connect.to_string(), CONNECT);
+    assert_eq!(Method::Trace.to_string(), TRACE);
+    assert_eq!(Method::Unknown("CUSTOM".to_string()).to_string(), "CUSTOM");
+}
+#[test]
+fn test_method_from_str() {
+    assert_eq!(GET.parse::<Method>().unwrap(), Method::Get);
+    assert_eq!(POST.parse::<Method>().unwrap(), Method::Post);
+    assert_eq!(PUT.parse::<Method>().unwrap(), Method::Put);
+    assert_eq!(DELETE.parse::<Method>().unwrap(), Method::Delete);
+    assert_eq!(PATCH.parse::<Method>().unwrap(), Method::Patch);
+    assert_eq!(HEAD.parse::<Method>().unwrap(), Method::Head);
+    assert_eq!(OPTIONS.parse::<Method>().unwrap(), Method::Options);
+    assert_eq!(CONNECT.parse::<Method>().unwrap(), Method::Connect);
+    assert_eq!(TRACE.parse::<Method>().unwrap(), Method::Trace);
+    assert_eq!(
+        "CUSTOM".parse::<Method>().unwrap(),
+        Method::Unknown("CUSTOM".to_string())
+    );
+    assert_eq!(
+        "".parse::<Method>().unwrap(),
+        Method::Unknown("".to_string())
+    );
+}
+#[test]
+fn test_method_default() {
+    assert_eq!(Method::default(), Method::Unknown(String::new()));
+}
+#[test]
+fn test_method_is_get() {
+    assert!(Method::Get.is_get());
+    assert!(!Method::Post.is_get());
+    assert!(!Method::Put.is_get());
+    assert!(!Method::Delete.is_get());
+    assert!(!Method::Patch.is_get());
+    assert!(!Method::Head.is_get());
+    assert!(!Method::Options.is_get());
+    assert!(!Method::Connect.is_get());
+    assert!(!Method::Trace.is_get());
+    assert!(!Method::Unknown("GET".to_string()).is_get());
+}
+#[test]
+fn test_method_is_post() {
+    assert!(!Method::Get.is_post());
+    assert!(Method::Post.is_post());
+    assert!(!Method::Put.is_post());
+    assert!(!Method::Delete.is_post());
+    assert!(!Method::Patch.is_post());
+    assert!(!Method::Head.is_post());
+    assert!(!Method::Options.is_post());
+    assert!(!Method::Connect.is_post());
+    assert!(!Method::Trace.is_post());
+    assert!(!Method::Unknown("POST".to_string()).is_post());
+}
+#[test]
+fn test_method_is_put() {
+    assert!(!Method::Get.is_put());
+    assert!(!Method::Post.is_put());
+    assert!(Method::Put.is_put());
+    assert!(!Method::Delete.is_put());
+    assert!(!Method::Patch.is_put());
+    assert!(!Method::Head.is_put());
+    assert!(!Method::Options.is_put());
+    assert!(!Method::Connect.is_put());
+    assert!(!Method::Trace.is_put());
+    assert!(!Method::Unknown("PUT".to_string()).is_put());
+}
+#[test]
+fn test_method_is_delete() {
+    assert!(!Method::Get.is_delete());
+    assert!(!Method::Post.is_delete());
+    assert!(!Method::Put.is_delete());
+    assert!(Method::Delete.is_delete());
+    assert!(!Method::Patch.is_delete());
+    assert!(!Method::Head.is_delete());
+    assert!(!Method::Options.is_delete());
+    assert!(!Method::Connect.is_delete());
+    assert!(!Method::Trace.is_delete());
+    assert!(!Method::Unknown("DELETE".to_string()).is_delete());
+}
+#[test]
+fn test_method_is_patch() {
+    assert!(!Method::Get.is_patch());
+    assert!(!Method::Post.is_patch());
+    assert!(!Method::Put.is_patch());
+    assert!(!Method::Delete.is_patch());
+    assert!(Method::Patch.is_patch());
+    assert!(!Method::Head.is_patch());
+    assert!(!Method::Options.is_patch());
+    assert!(!Method::Connect.is_patch());
+    assert!(!Method::Trace.is_patch());
+    assert!(!Method::Unknown("PATCH".to_string()).is_patch());
+}
+#[test]
+fn test_method_is_head() {
+    assert!(!Method::Get.is_head());
+    assert!(!Method::Post.is_head());
+    assert!(!Method::Put.is_head());
+    assert!(!Method::Delete.is_head());
+    assert!(!Method::Patch.is_head());
+    assert!(Method::Head.is_head());
+    assert!(!Method::Options.is_head());
+    assert!(!Method::Connect.is_head());
+    assert!(!Method::Trace.is_head());
+    assert!(!Method::Unknown("HEAD".to_string()).is_head());
+}
+#[test]
+fn test_method_is_options() {
+    assert!(!Method::Get.is_options());
+    assert!(!Method::Post.is_options());
+    assert!(!Method::Put.is_options());
+    assert!(!Method::Delete.is_options());
+    assert!(!Method::Patch.is_options());
+    assert!(!Method::Head.is_options());
+    assert!(Method::Options.is_options());
+    assert!(!Method::Connect.is_options());
+    assert!(!Method::Trace.is_options());
+    assert!(!Method::Unknown("OPTIONS".to_string()).is_options());
+}
+#[test]
+fn test_method_is_connect() {
+    assert!(!Method::Get.is_connect());
+    assert!(!Method::Post.is_connect());
+    assert!(!Method::Put.is_connect());
+    assert!(!Method::Delete.is_connect());
+    assert!(!Method::Patch.is_connect());
+    assert!(!Method::Head.is_connect());
+    assert!(!Method::Options.is_connect());
+    assert!(Method::Connect.is_connect());
+    assert!(!Method::Trace.is_connect());
+    assert!(!Method::Unknown("CONNECT".to_string()).is_connect());
+}
+#[test]
+fn test_method_is_trace() {
+    assert!(!Method::Get.is_trace());
+    assert!(!Method::Post.is_trace());
+    assert!(!Method::Put.is_trace());
+    assert!(!Method::Delete.is_trace());
+    assert!(!Method::Patch.is_trace());
+    assert!(!Method::Head.is_trace());
+    assert!(!Method::Options.is_trace());
+    assert!(!Method::Connect.is_trace());
+    assert!(Method::Trace.is_trace());
+    assert!(!Method::Unknown("TRACE".to_string()).is_trace());
+}
+#[test]
+fn test_method_is_unknown() {
+    assert!(!Method::Get.is_unknown());
+    assert!(!Method::Post.is_unknown());
+    assert!(!Method::Put.is_unknown());
+    assert!(!Method::Delete.is_unknown());
+    assert!(!Method::Patch.is_unknown());
+    assert!(!Method::Head.is_unknown());
+    assert!(!Method::Options.is_unknown());
+    assert!(!Method::Connect.is_unknown());
+    assert!(!Method::Trace.is_unknown());
+    assert!(Method::Unknown("CUSTOM".to_string()).is_unknown());
+    assert!(Method::Unknown("".to_string()).is_unknown());
+}
+#[test]
+fn test_method_clone() {
+    let method: Method = Method::Get;
+    let cloned_method: Method = method.clone();
+    assert_eq!(method, cloned_method);
+    let unknown_method: Method = Method::Unknown("CUSTOM".to_string());
+    let cloned_unknown: Method = unknown_method.clone();
+    assert_eq!(unknown_method, cloned_unknown);
+}
+#[test]
+fn test_method_debug() {
+    let method: Method = Method::Get;
+    let debug_str: String = format!("{method:?}");
+    assert_eq!(debug_str, "Get");
+    let unknown_method: Method = Method::Unknown("CUSTOM".to_string());
+    let unknown_debug_str: String = format!("{unknown_method:?}");
+    assert_eq!(unknown_debug_str, "Unknown(\"CUSTOM\")");
+}
+#[test]
+fn test_method_equality() {
+    assert_eq!(Method::Get, Method::Get);
+    assert_ne!(Method::Get, Method::Post);
+    assert_eq!(
+        Method::Unknown("CUSTOM".to_string()),
+        Method::Unknown("CUSTOM".to_string())
+    );
+    assert_ne!(
+        Method::Unknown("CUSTOM1".to_string()),
+        Method::Unknown("CUSTOM2".to_string())
+    );
+    assert_ne!(Method::Get, Method::Unknown("GET".to_string()));
+}
+#[test]
+fn test_method_case_sensitivity() {
+    assert_eq!(
+        "get".parse::<Method>().unwrap(),
+        Method::Unknown("get".to_string())
+    );
+    assert_eq!(
+        "Get".parse::<Method>().unwrap(),
+        Method::Unknown("Get".to_string())
+    );
+    assert_eq!("POST".parse::<Method>().unwrap(), Method::Post);
+    assert_eq!(
+        "post".parse::<Method>().unwrap(),
+        Method::Unknown("post".to_string())
+    );
+}
+#[test]
+fn test_method_all_variants() {
+    let methods: Vec<Method> = vec![
+        Method::Get,
+        Method::Post,
+        Method::Put,
+        Method::Delete,
+        Method::Patch,
+        Method::Head,
+        Method::Options,
+        Method::Connect,
+        Method::Trace,
+        Method::Unknown("CUSTOM".to_string()),
+    ];
+    for method in methods {
+        let display_str: String = method.to_string();
+        assert!(!display_str.is_empty());
+        let debug_str: String = format!("{method:?}");
+        assert!(!debug_str.is_empty());
+    }
+}
+#[test]
+fn test_method_unknown_with_empty_string() {
+    let method: Method = Method::Unknown("".to_string());
+    assert_eq!(method.to_string(), "");
+    assert!(method.is_unknown());
+    assert_eq!(format!("{method:?}"), "Unknown(\"\")");
+}
+#[test]
+fn test_method_unknown_with_special_characters() {
+    let method: Method = Method::Unknown("CUSTOM-METHOD".to_string());
+    assert_eq!(method.to_string(), "CUSTOM-METHOD");
+    assert!(method.is_unknown());
+    assert_eq!(format!("{method:?}"), "Unknown(\"CUSTOM-METHOD\")");
+}
+```
+# Path: hyperlane/type/tests/methods/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/arc_rwlock/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_arc_rwlock_type() {
+    let data: ArcRwLock<i32> = arc_rwlock(42);
+    let guard: RwLockReadGuard<'_, i32> = data.read().await;
+    assert_eq!(*guard, 42);
+}
+#[tokio::test]
+async fn test_arc_rwlock_write() {
+    let data: ArcRwLock<i32> = arc_rwlock(42);
+    {
+        let mut guard: RwLockWriteGuard<'_, i32> = data.write().await;
+        *guard = 100;
+    }
+    let guard: RwLockReadGuard<'_, i32> = data.read().await;
+    assert_eq!(*guard, 100);
+}
+#[tokio::test]
+async fn test_arc_rwlock_with_string() {
+    let data: ArcRwLock<String> = arc_rwlock("hello".to_string());
+    {
+        let mut guard: RwLockWriteGuard<'_, String> = data.write().await;
+        guard.push_str(" world");
+    }
+    let guard: RwLockReadGuard<'_, String> = data.read().await;
+    assert_eq!(*guard, "hello world");
+}
+#[tokio::test]
+async fn test_arc_rwlock_clone() {
+    let data: ArcRwLock<i32> = arc_rwlock(10);
+    let cloned_data: ArcRwLock<i32> = Arc::clone(&data);
+    {
+        let mut guard: RwLockWriteGuard<'_, i32> = data.write().await;
+        *guard = 20;
+    }
+    let guard: RwLockReadGuard<'_, i32> = cloned_data.read().await;
+    assert_eq!(*guard, 20);
+}
+#[test]
+fn test_arc_rwlock_is_send_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<ArcRwLock<i32>>();
+    assert_send_sync::<ArcRwLock<String>>();
+}
+```
+# Path: hyperlane/type/tests/arc_rwlock/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/request/fn.rs
+```rust
+use super::*;
+#[test]
+fn request_config_from_json() {
+    let request_config_json: &'static str = r#"
+    {
+        "buffer_size": 8192,
+        "max_path_size": 8192,
+        "max_header_count": 100,
+        "max_header_key_size": 8192,
+        "max_header_value_size": 8192,
+        "max_body_size": 2097152,
+        "read_timeout_ms": 6000
+    }
+    "#;
+    let request_config: RequestConfig = RequestConfig::from_json(request_config_json).unwrap();
+    let mut new_request_config: RequestConfig = RequestConfig::default();
+    new_request_config
+        .set_buffer_size(8192)
+        .set_max_path_size(8192)
+        .set_max_header_count(100)
+        .set_max_header_key_size(8192)
+        .set_max_header_value_size(8192)
+        .set_max_body_size(2097152)
+        .set_read_timeout_ms(6000);
+    assert_eq!(request_config, new_request_config);
+}
+#[test]
+fn request_config_security_levels() {
+    let default_config: RequestConfig = RequestConfig::default();
+    let low_config: RequestConfig = RequestConfig::low_security();
+    let high_config: RequestConfig = RequestConfig::high_security();
+    assert!(low_config.get_max_body_size() > default_config.get_max_body_size());
+    assert!(high_config.get_max_body_size() < default_config.get_max_body_size());
+    assert!(low_config.get_read_timeout_ms() > default_config.get_read_timeout_ms());
+    assert!(high_config.get_read_timeout_ms() < default_config.get_read_timeout_ms());
+}
+#[test]
+fn request_default() {
+    let request: Request = Request::default();
+    assert!(request.get_method().is_unknown());
+    assert!(request.get_host().is_empty());
+    assert!(request.get_path().is_empty());
+    assert!(request.get_querys().is_empty());
+    assert!(request.get_headers().is_empty());
+    assert!(request.get_body().is_empty());
+}
+#[test]
+fn request_query_operations() {
+    let mut request: Request = Request::default();
+    request
+        .querys
+        .insert("key1".to_string(), "value1".to_string());
+    request
+        .querys
+        .insert("key2".to_string(), "value2".to_string());
+    assert_eq!(request.try_get_query("key1"), Some("value1".to_string()));
+    assert_eq!(request.try_get_query("key2"), Some("value2".to_string()));
+    assert_eq!(request.try_get_query("key3"), None);
+    assert_eq!(request.get_query("key1"), "value1".to_string());
+}
+#[test]
+fn request_header_operations() {
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("value1".to_string());
+    values.push_back("value2".to_string());
+    request.headers.insert("content-type".to_string(), values);
+    assert!(request.has_header("content-type"));
+    assert!(!request.has_header("authorization"));
+    assert_eq!(request.get_header_size("content-type"), 2);
+    assert_eq!(
+        request.try_get_header_front("content-type"),
+        Some("value1".to_string())
+    );
+    assert_eq!(
+        request.try_get_header_back("content-type"),
+        Some("value2".to_string())
+    );
+    assert_eq!(request.get_headers_size(), 1);
+    assert_eq!(request.get_headers_values_size(), 2);
+}
+#[test]
+fn request_has_header_value() {
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("application/json".to_string());
+    values.push_back("text/html".to_string());
+    request.headers.insert("accept".to_string(), values);
+    assert!(request.has_header_value("accept", "application/json"));
+    assert!(request.has_header_value("accept", "text/html"));
+    assert!(!request.has_header_value("accept", "text/xml"));
+    assert!(!request.has_header_value("content-type", "application/json"));
+}
+#[test]
+fn request_body_operations() {
+    let request: Request = Request {
+        body: b"hello world".to_vec(),
+        ..Default::default()
+    };
+    assert_eq!(request.get_body(), b"hello world");
+    assert_eq!(request.get_body_string(), "hello world");
+}
+#[test]
+fn request_body_string_utf8() {
+    let body: Vec<u8> = "你好世界".as_bytes().to_vec();
+    let request: Request = Request {
+        body: body.clone(),
+        ..Default::default()
+    };
+    assert_eq!(request.get_body_string(), "你好世界");
+}
+#[test]
+fn request_body_json() {
+    let json: &'static str = r#"{"name":"test","value":123}"#;
+    let request: Request = Request {
+        body: json.as_bytes().to_vec(),
+        ..Default::default()
+    };
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct TestData {
+        name: String,
+        value: i32,
+    }
+    let result: TestData = request.try_get_body_json().unwrap();
+    assert_eq!(result.name, "test");
+    assert_eq!(result.value, 123);
+}
+#[test]
+fn request_method_checks() {
+    let request: Request = Request {
+        method: Method::Get,
+        ..Default::default()
+    };
+    assert!(request.get_method().is_get());
+    assert!(!request.get_method().is_post());
+    assert!(!request.get_method().is_put());
+    assert!(!request.get_method().is_delete());
+    assert!(!request.get_method().is_patch());
+    assert!(!request.get_method().is_head());
+    assert!(!request.get_method().is_options());
+    assert!(!request.get_method().is_connect());
+    assert!(!request.get_method().is_trace());
+    assert!(!request.get_method().is_unknown());
+}
+#[test]
+fn request_version_checks() {
+    let request: Request = Request {
+        version: HttpVersion::Http1_1,
+        ..Default::default()
+    };
+    assert!(request.get_version().is_http1_1());
+    assert!(request.get_version().is_http1_1_or_higher());
+    assert!(request.get_version().is_http());
+    assert!(!request.get_version().is_http0_9());
+    assert!(!request.get_version().is_http1_0());
+    assert!(!request.get_version().is_http2());
+    assert!(!request.get_version().is_http3());
+    assert!(!request.get_version().is_unknown());
+}
+#[test]
+fn request_upgrade_type_checks() {
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("websocket".to_string());
+    request.headers.insert("upgrade".to_string(), values);
+    assert!(request.is_ws_upgrade_type());
+    assert!(!request.is_h2c_upgrade_type());
+    assert!(!request.is_tls_upgrade_type());
+    assert!(!request.is_unknown_upgrade_type());
+}
+#[test]
+fn request_keep_alive_checks() {
+    let mut request: Request = Request {
+        version: HttpVersion::Http1_1,
+        ..Default::default()
+    };
+    assert!(request.is_enable_keep_alive());
+    assert!(!request.is_disable_keep_alive());
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("close".to_string());
+    request.headers.insert("connection".to_string(), values);
+    assert!(!request.is_enable_keep_alive());
+    assert!(request.is_disable_keep_alive());
+}
+#[test]
+fn request_error_http_status() {
+    let error: RequestError = RequestError::RequestTooLong(HttpStatus::BadRequest);
+    assert_eq!(error.get_http_status(), HttpStatus::BadRequest);
+    assert_eq!(error.get_http_status_code(), 400);
+    let error: RequestError = RequestError::ReadTimeout(HttpStatus::RequestTimeout);
+    assert_eq!(error.get_http_status(), HttpStatus::RequestTimeout);
+    assert_eq!(error.get_http_status_code(), 408);
+}
+#[test]
+fn request_error_default() {
+    let error: RequestError = RequestError::default();
+    assert_eq!(error.get_http_status(), HttpStatus::InternalServerError);
+}
+#[test]
+fn request_error_from_io_error() {
+    let io_error: std::io::Error = std::io::Error::new(ErrorKind::ConnectionReset, "reset");
+    let request_error: RequestError = RequestError::from(io_error);
+    assert!(matches!(request_error, RequestError::ClientDisconnected(_)));
+    let io_error: std::io::Error = std::io::Error::other("other");
+    let request_error: RequestError = RequestError::from(io_error);
+    assert!(matches!(request_error, RequestError::ReadConnection(_)));
+}
+#[tokio::test]
+async fn request_error_from_elapsed() {
+    let elapsed: Elapsed = tokio::time::timeout(Duration::from_millis(0), async {
+        tokio::time::sleep(Duration::from_secs(10)).await;
+    })
+    .await
+    .unwrap_err();
+    let request_error: RequestError = RequestError::from(elapsed);
+    assert!(matches!(request_error, RequestError::ReadTimeout(_)));
+}
+#[test]
+fn request_error_from_parse_int_error() {
+    let parse_error: ParseIntError = "abc".parse::<usize>().unwrap_err();
+    let request_error: RequestError = RequestError::from(parse_error);
+    assert!(matches!(
+        request_error,
+        RequestError::InvalidContentLength(_)
+    ));
+}
+#[test]
+fn request_config_default() {
+    let config: RequestConfig = RequestConfig::default();
+    assert!(config.get_buffer_size() > 0);
+    assert!(config.get_max_body_size() > 0);
+    assert!(config.get_read_timeout_ms() > 0);
+}
+#[test]
+fn request_config_security_presets() {
+    let low: RequestConfig = RequestConfig::low_security();
+    let high: RequestConfig = RequestConfig::high_security();
+    let default: RequestConfig = RequestConfig::default();
+    assert!(low.get_max_body_size() > default.get_max_body_size());
+    assert!(high.get_max_body_size() < default.get_max_body_size());
+}
+#[test]
+fn request_cookie_operations() {
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("session_id=abc123; user_id=xyz789".to_string());
+    request.headers.insert("cookie".to_string(), values);
+    let cookies: Cookies = request.get_cookies();
+    assert_eq!(cookies.len(), 2);
+    assert_eq!(cookies.get("session_id"), Some(&"abc123".to_string()));
+    assert_eq!(cookies.get("user_id"), Some(&"xyz789".to_string()));
+}
+#[test]
+fn request_try_get_cookies() {
+    let request: Request = Request::default();
+    assert!(request.try_get_cookies().is_none());
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("theme=dark".to_string());
+    request.headers.insert("cookie".to_string(), values);
+    let cookies_opt: Option<Cookies> = request.try_get_cookies();
+    assert!(cookies_opt.is_some());
+    let cookies: Cookies = cookies_opt.unwrap();
+    assert_eq!(cookies.get("theme"), Some(&"dark".to_string()));
+}
+#[test]
+fn request_try_get_cookie() {
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("token=secret123; lang=en".to_string());
+    request.headers.insert("cookie".to_string(), values);
+    assert_eq!(
+        request.try_get_cookie("token"),
+        Some("secret123".to_string())
+    );
+    assert_eq!(request.try_get_cookie("lang"), Some("en".to_string()));
+    assert_eq!(request.try_get_cookie("not_exist"), None);
+}
+#[test]
+fn request_get_cookie() {
+    let mut request: Request = Request::default();
+    let mut values: VecDeque<String> = VecDeque::new();
+    values.push_back("session=value123".to_string());
+    request.headers.insert("cookie".to_string(), values);
+    assert_eq!(request.get_cookie("session"), "value123".to_string());
+}
+#[test]
+#[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
+fn request_get_cookie_panic() {
+    let request: Request = Request::default();
+    let _: CookieValue = request.get_cookie("not_exist");
+}
+#[test]
+#[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
+fn request_get_cookies_panic() {
+    let request: Request = Request::default();
+    let _: Cookies = request.get_cookies();
+}
+```
+# Path: hyperlane/type/tests/request/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/status/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_status_is_continue() {
+    let status: Status = Status::Continue;
+    assert!(status.is_continue());
+    assert!(!status.is_reject());
+}
+#[test]
+fn test_status_is_reject() {
+    let status: Status = Status::Reject;
+    assert!(status.is_reject());
+    assert!(!status.is_continue());
+}
+#[test]
+fn test_status_default_is_reject() {
+    let status: Status = Status::default();
+    assert!(status.is_reject());
+    assert_eq!(status, Status::Reject);
+}
+#[test]
+fn test_status_equality() {
+    assert_eq!(Status::Continue, Status::Continue);
+    assert_eq!(Status::Reject, Status::Reject);
+    assert_ne!(Status::Continue, Status::Reject);
+}
+#[test]
+fn test_status_clone() {
+    let status: Status = Status::Continue;
+    let new_status: Status = status;
+    assert_eq!(status, new_status);
+}
+#[test]
+fn test_status_copy() {
+    let status: Status = Status::Reject;
+    let copied: Status = status;
+    assert_eq!(status, copied);
+}
+#[test]
+fn test_status_serialize_deserialize() {
+    let status: Status = Status::Continue;
+    let json: String = serde_json::to_string(&status).unwrap();
+    let deserialized: Status = serde_json::from_str(&json).unwrap();
+    assert_eq!(status, deserialized);
+}
+#[test]
+fn test_status_serialize_deserialize_reject() {
+    let status: Status = Status::Reject;
+    let json: String = serde_json::to_string(&status).unwrap();
+    let deserialized: Status = serde_json::from_str(&json).unwrap();
+    assert_eq!(status, deserialized);
+}
+#[test]
+fn test_status_debug_format() {
+    let status: Status = Status::Continue;
+    let debug_str: String = format!("{:?}", status);
+    assert_eq!(debug_str, "Continue");
+    let status: Status = Status::Reject;
+    let debug_str: String = format!("{:?}", status);
+    assert_eq!(debug_str, "Reject");
+}
+```
+# Path: hyperlane/type/tests/status/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/stream/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_socket_host_type_alias() {
+    let socket_host: SocketHost = "127.0.0.1".parse().unwrap();
+    assert!(socket_host.is_ipv4());
+    let socket_host_v6: SocketHost = "::1".parse().unwrap();
+    assert!(socket_host_v6.is_ipv6());
+}
+#[test]
+fn test_socket_port_type_alias() {
+    let socket_port: SocketPort = 8080;
+    assert_eq!(socket_port, 8080_u16);
+}
+```
+# Path: hyperlane/type/tests/stream/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/http_version/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_http_version_display() {
+    assert_eq!(HttpVersion::Http0_9.to_string(), HTTP_VERSION_0_9);
+    assert_eq!(HttpVersion::Http1_0.to_string(), HTTP_VERSION_1_0);
+    assert_eq!(HttpVersion::Http1_1.to_string(), HTTP_VERSION_1_1);
+    assert_eq!(HttpVersion::Http2.to_string(), HTTP_VERSION_2);
+    assert_eq!(HttpVersion::Http3.to_string(), HTTP_VERSION_3);
+    assert_eq!(
+        HttpVersion::Unknown("HTTP/4.0".to_string()).to_string(),
+        "HTTP/4.0"
+    );
+}
+#[test]
+fn test_http_version_default() {
+    assert_eq!(HttpVersion::default(), HttpVersion::Http1_1);
+}
+#[test]
+fn test_http_version_clone() {
+    let version: HttpVersion = HttpVersion::Http1_1;
+    let cloned_version: HttpVersion = version.clone();
+    assert_eq!(version, cloned_version);
+}
+#[test]
+fn test_http_version_debug() {
+    let version: HttpVersion = HttpVersion::Http1_1;
+    let debug_str: String = format!("{version:?}");
+    assert_eq!(debug_str, "Http1_1");
+}
+#[test]
+fn test_http_version_equality() {
+    assert_eq!(HttpVersion::Http1_1, HttpVersion::Http1_1);
+    assert_ne!(HttpVersion::Http1_1, HttpVersion::Http2);
+    assert_eq!(HttpVersion::Http0_9, HttpVersion::Http0_9);
+    assert_ne!(HttpVersion::Http1_0, HttpVersion::Http1_1);
+    assert_eq!(
+        HttpVersion::Unknown("test".to_string()),
+        HttpVersion::Unknown("test".to_string())
+    );
+    assert_ne!(
+        HttpVersion::Unknown("test1".to_string()),
+        HttpVersion::Unknown("test2".to_string())
+    );
+}
+#[test]
+fn test_http_version_all_variants() {
+    let versions: Vec<HttpVersion> = vec![
+        HttpVersion::Http0_9,
+        HttpVersion::Http1_0,
+        HttpVersion::Http1_1,
+        HttpVersion::Http2,
+        HttpVersion::Http3,
+        HttpVersion::Unknown("HTTP/4.0".to_string()),
+    ];
+    for version in versions {
+        let display_str: String = version.to_string();
+        assert!(!display_str.is_empty());
+        let debug_str: String = format!("{version:?}");
+        assert!(!debug_str.is_empty());
+    }
+}
+#[test]
+fn test_http_version_unknown_with_empty_string() {
+    let version: HttpVersion = HttpVersion::Unknown("".to_string());
+    assert_eq!(version.to_string(), "");
+    assert_eq!(format!("{version:?}"), "Unknown(\"\")");
+}
+#[test]
+fn test_http_version_unknown_with_special_characters() {
+    let version: HttpVersion = HttpVersion::Unknown("HTTP/1.1-custom".to_string());
+    assert_eq!(version.to_string(), "HTTP/1.1-custom");
+    assert_eq!(format!("{version:?}"), "Unknown(\"HTTP/1.1-custom\")");
+}
+#[test]
+fn test_http_version_pattern_matching() {
+    let version: HttpVersion = HttpVersion::Http1_1;
+    match version {
+        HttpVersion::Http0_9 => panic!("Should not match HTTP0_9"),
+        HttpVersion::Http1_0 => panic!("Should not match HTTP1_0"),
+        HttpVersion::Http1_1 => {}
+        HttpVersion::Http2 => panic!("Should not match HTTP2"),
+        HttpVersion::Http3 => panic!("Should not match HTTP3"),
+        HttpVersion::Unknown(_) => panic!("Should not match Unknown"),
+    }
+}
+#[test]
+fn test_http_version_unknown_pattern_matching() {
+    let version: HttpVersion = HttpVersion::Unknown("custom".to_string());
+    match version {
+        HttpVersion::Http0_9 => panic!("Should not match HTTP0_9"),
+        HttpVersion::Http1_0 => panic!("Should not match HTTP1_0"),
+        HttpVersion::Http1_1 => panic!("Should not match HTTP1_1"),
+        HttpVersion::Http2 => panic!("Should not match HTTP2"),
+        HttpVersion::Http3 => panic!("Should not match HTTP3"),
+        HttpVersion::Unknown(ref custom_version) => {
+            assert_eq!(custom_version, "custom");
+        }
+    }
+}
+#[test]
+fn test_http_version_is_http1() {
+    assert!(matches!(HttpVersion::Http1_0, HttpVersion::Http1_0));
+    assert!(matches!(HttpVersion::Http1_1, HttpVersion::Http1_1));
+    assert!(!matches!(
+        HttpVersion::Http0_9,
+        HttpVersion::Http1_0 | HttpVersion::Http1_1
+    ));
+    assert!(!matches!(
+        HttpVersion::Http2,
+        HttpVersion::Http1_0 | HttpVersion::Http1_1
+    ));
+    assert!(!matches!(
+        HttpVersion::Http3,
+        HttpVersion::Http1_0 | HttpVersion::Http1_1
+    ));
+}
+#[test]
+fn test_http_version_is_modern() {
+    assert!(matches!(
+        HttpVersion::Http2,
+        HttpVersion::Http2 | HttpVersion::Http3
+    ));
+    assert!(matches!(
+        HttpVersion::Http3,
+        HttpVersion::Http2 | HttpVersion::Http3
+    ));
+    assert!(!matches!(
+        HttpVersion::Http0_9,
+        HttpVersion::Http2 | HttpVersion::Http3
+    ));
+    assert!(!matches!(
+        HttpVersion::Http1_0,
+        HttpVersion::Http2 | HttpVersion::Http3
+    ));
+    assert!(!matches!(
+        HttpVersion::Http1_1,
+        HttpVersion::Http2 | HttpVersion::Http3
+    ));
+}
+#[test]
+fn test_http_version_ordering() {
+    let mut versions: Vec<HttpVersion> = vec![
+        HttpVersion::Http3,
+        HttpVersion::Http1_0,
+        HttpVersion::Http2,
+        HttpVersion::Http0_9,
+        HttpVersion::Http1_1,
+    ];
+    versions.sort_by(|a, b| {
+        let order_a: u8 = match a {
+            HttpVersion::Http0_9 => 0,
+            HttpVersion::Http1_0 => 1,
+            HttpVersion::Http1_1 => 2,
+            HttpVersion::Http2 => 3,
+            HttpVersion::Http3 => 4,
+            HttpVersion::Unknown(_) => 255,
+        };
+        let order_b: u8 = match b {
+            HttpVersion::Http0_9 => 0,
+            HttpVersion::Http1_0 => 1,
+            HttpVersion::Http1_1 => 2,
+            HttpVersion::Http2 => 3,
+            HttpVersion::Http3 => 4,
+            HttpVersion::Unknown(_) => 255,
+        };
+        order_a.cmp(&order_b)
+    });
+    assert_eq!(versions[0], HttpVersion::Http0_9);
+    assert_eq!(versions[1], HttpVersion::Http1_0);
+    assert_eq!(versions[2], HttpVersion::Http1_1);
+    assert_eq!(versions[3], HttpVersion::Http2);
+    assert_eq!(versions[4], HttpVersion::Http3);
+}
+#[test]
+fn test_http_version_memory_size() {
+    use std::mem;
+    let size: usize = mem::size_of::<HttpVersion>();
+    assert!(size > 0);
+    let http11_size: usize = mem::size_of_val(&HttpVersion::Http1_1);
+    let unknown_size: usize = mem::size_of_val(&HttpVersion::Unknown("test".to_string()));
+    assert_eq!(http11_size, unknown_size);
+}
+```
+# Path: hyperlane/type/tests/http_version/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/http_status/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_http_status_code() {
+    assert_eq!(HttpStatus::Continue.code(), 100);
+    assert_eq!(HttpStatus::SwitchingProtocols.code(), 101);
+    assert_eq!(HttpStatus::Processing.code(), 102);
+    assert_eq!(HttpStatus::EarlyHints.code(), 103);
+    assert_eq!(HttpStatus::Ok.code(), 200);
+    assert_eq!(HttpStatus::Created.code(), 201);
+    assert_eq!(HttpStatus::Accepted.code(), 202);
+    assert_eq!(HttpStatus::NonAuthoritativeInformation.code(), 203);
+    assert_eq!(HttpStatus::NoContent.code(), 204);
+    assert_eq!(HttpStatus::ResetContent.code(), 205);
+    assert_eq!(HttpStatus::PartialContent.code(), 206);
+    assert_eq!(HttpStatus::MultiStatus.code(), 207);
+    assert_eq!(HttpStatus::AlreadyReported.code(), 208);
+    assert_eq!(HttpStatus::IMUsed.code(), 226);
+    assert_eq!(HttpStatus::MultipleChoices.code(), 300);
+    assert_eq!(HttpStatus::MovedPermanently.code(), 301);
+    assert_eq!(HttpStatus::Found.code(), 302);
+    assert_eq!(HttpStatus::SeeOther.code(), 303);
+    assert_eq!(HttpStatus::NotModified.code(), 304);
+    assert_eq!(HttpStatus::UseProxy.code(), 305);
+    assert_eq!(HttpStatus::TemporaryRedirect.code(), 307);
+    assert_eq!(HttpStatus::PermanentRedirect.code(), 308);
+    assert_eq!(HttpStatus::BadRequest.code(), 400);
+    assert_eq!(HttpStatus::Unauthorized.code(), 401);
+    assert_eq!(HttpStatus::PaymentRequired.code(), 402);
+    assert_eq!(HttpStatus::Forbidden.code(), 403);
+    assert_eq!(HttpStatus::NotFound.code(), 404);
+    assert_eq!(HttpStatus::MethodNotAllowed.code(), 405);
+    assert_eq!(HttpStatus::NotAcceptable.code(), 406);
+    assert_eq!(HttpStatus::ProxyAuthenticationRequired.code(), 407);
+    assert_eq!(HttpStatus::RequestTimeout.code(), 408);
+    assert_eq!(HttpStatus::Conflict.code(), 409);
+    assert_eq!(HttpStatus::Gone.code(), 410);
+    assert_eq!(HttpStatus::LengthRequired.code(), 411);
+    assert_eq!(HttpStatus::PreconditionFailed.code(), 412);
+    assert_eq!(HttpStatus::PayloadTooLarge.code(), 413);
+    assert_eq!(HttpStatus::URITooLong.code(), 414);
+    assert_eq!(HttpStatus::UnsupportedMediaType.code(), 415);
+    assert_eq!(HttpStatus::RangeNotSatisfiable.code(), 416);
+    assert_eq!(HttpStatus::ExpectationFailed.code(), 417);
+    assert_eq!(HttpStatus::ImATeapot.code(), 418);
+    assert_eq!(HttpStatus::MisdirectedRequest.code(), 421);
+    assert_eq!(HttpStatus::UnprocessableEntity.code(), 422);
+    assert_eq!(HttpStatus::Locked.code(), 423);
+    assert_eq!(HttpStatus::FailedDependency.code(), 424);
+    assert_eq!(HttpStatus::TooEarly.code(), 425);
+    assert_eq!(HttpStatus::UpgradeRequired.code(), 426);
+    assert_eq!(HttpStatus::PreconditionRequired.code(), 428);
+    assert_eq!(HttpStatus::TooManyRequests.code(), 429);
+    assert_eq!(HttpStatus::RequestHeaderFieldsTooLarge.code(), 431);
+    assert_eq!(HttpStatus::UnavailableForLegalReasons.code(), 451);
+    assert_eq!(HttpStatus::InternalServerError.code(), 500);
+    assert_eq!(HttpStatus::NotImplemented.code(), 501);
+    assert_eq!(HttpStatus::BadGateway.code(), 502);
+    assert_eq!(HttpStatus::ServiceUnavailable.code(), 503);
+    assert_eq!(HttpStatus::GatewayTimeout.code(), 504);
+    assert_eq!(HttpStatus::HTTPVersionNotSupported.code(), 505);
+    assert_eq!(HttpStatus::VariantAlsoNegotiates.code(), 506);
+    assert_eq!(HttpStatus::InsufficientStorage.code(), 507);
+    assert_eq!(HttpStatus::LoopDetected.code(), 508);
+    assert_eq!(HttpStatus::NotExtended.code(), 510);
+    assert_eq!(HttpStatus::NetworkAuthenticationRequired.code(), 511);
+    assert_eq!(HttpStatus::Unknown.code(), 0);
+}
+#[test]
+fn test_http_status_phrase() {
+    assert_eq!(HttpStatus::phrase(100), "Continue");
+    assert_eq!(HttpStatus::phrase(101), "Switching Protocols");
+    assert_eq!(HttpStatus::phrase(102), "Processing");
+    assert_eq!(HttpStatus::phrase(103), "Early Hints");
+    assert_eq!(HttpStatus::phrase(200), "OK");
+    assert_eq!(HttpStatus::phrase(201), "Created");
+    assert_eq!(HttpStatus::phrase(202), "Accepted");
+    assert_eq!(HttpStatus::phrase(203), "Non-Authoritative Information");
+    assert_eq!(HttpStatus::phrase(204), "No Content");
+    assert_eq!(HttpStatus::phrase(205), "Reset Content");
+    assert_eq!(HttpStatus::phrase(206), "Partial Content");
+    assert_eq!(HttpStatus::phrase(207), "Multi-Status");
+    assert_eq!(HttpStatus::phrase(208), "Already Reported");
+    assert_eq!(HttpStatus::phrase(226), "IM Used");
+    assert_eq!(HttpStatus::phrase(300), "Multiple Choices");
+    assert_eq!(HttpStatus::phrase(301), "Moved Permanently");
+    assert_eq!(HttpStatus::phrase(302), "Found");
+    assert_eq!(HttpStatus::phrase(303), "See Other");
+    assert_eq!(HttpStatus::phrase(304), "Not Modified");
+    assert_eq!(HttpStatus::phrase(305), "Use Proxy");
+    assert_eq!(HttpStatus::phrase(307), "Temporary Redirect");
+    assert_eq!(HttpStatus::phrase(308), "Permanent Redirect");
+    assert_eq!(HttpStatus::phrase(400), "Bad Request");
+    assert_eq!(HttpStatus::phrase(401), "Unauthorized");
+    assert_eq!(HttpStatus::phrase(402), "Payment Required");
+    assert_eq!(HttpStatus::phrase(403), "Forbidden");
+    assert_eq!(HttpStatus::phrase(404), "Not Found");
+    assert_eq!(HttpStatus::phrase(405), "Method Not Allowed");
+    assert_eq!(HttpStatus::phrase(406), "Not Acceptable");
+    assert_eq!(HttpStatus::phrase(407), "Proxy Authentication Required");
+    assert_eq!(HttpStatus::phrase(408), "Request Timeout");
+    assert_eq!(HttpStatus::phrase(409), "Conflict");
+    assert_eq!(HttpStatus::phrase(410), "Gone");
+    assert_eq!(HttpStatus::phrase(411), "Length Required");
+    assert_eq!(HttpStatus::phrase(412), "Precondition Failed");
+    assert_eq!(HttpStatus::phrase(413), "Payload Too Large");
+    assert_eq!(HttpStatus::phrase(414), "URI Too Long");
+    assert_eq!(HttpStatus::phrase(415), "Unsupported Media Type");
+    assert_eq!(HttpStatus::phrase(416), "Range Not Satisfiable");
+    assert_eq!(HttpStatus::phrase(417), "Expectation Failed");
+    assert_eq!(HttpStatus::phrase(418), "I'm a teapot");
+    assert_eq!(HttpStatus::phrase(421), "Misdirected Request");
+    assert_eq!(HttpStatus::phrase(422), "Unprocessable Entity");
+    assert_eq!(HttpStatus::phrase(423), "Locked");
+    assert_eq!(HttpStatus::phrase(424), "Failed Dependency");
+    assert_eq!(HttpStatus::phrase(425), "Too Early");
+    assert_eq!(HttpStatus::phrase(426), "Upgrade Required");
+    assert_eq!(HttpStatus::phrase(428), "Precondition Required");
+    assert_eq!(HttpStatus::phrase(429), "Too Many Requests");
+    assert_eq!(HttpStatus::phrase(431), "Request Header Fields Too Large");
+    assert_eq!(HttpStatus::phrase(451), "Unavailable For Legal Reasons");
+    assert_eq!(HttpStatus::phrase(500), "Internal Server Error");
+    assert_eq!(HttpStatus::phrase(501), "Not Implemented");
+    assert_eq!(HttpStatus::phrase(502), "Bad Gateway");
+    assert_eq!(HttpStatus::phrase(503), "Service Unavailable");
+    assert_eq!(HttpStatus::phrase(504), "Gateway Timeout");
+    assert_eq!(HttpStatus::phrase(505), "HTTP Version Not Supported");
+    assert_eq!(HttpStatus::phrase(506), "Variant Also Negotiates");
+    assert_eq!(HttpStatus::phrase(507), "Insufficient Storage");
+    assert_eq!(HttpStatus::phrase(508), "Loop Detected");
+    assert_eq!(HttpStatus::phrase(510), "Not Extended");
+    assert_eq!(HttpStatus::phrase(511), "Network Authentication Required");
+    assert_eq!(HttpStatus::phrase(999), "Unknown");
+}
+#[test]
+fn test_http_status_display() {
+    assert_eq!(HttpStatus::Ok.to_string(), "OK");
+    assert_eq!(HttpStatus::NotFound.to_string(), "Not Found");
+    assert_eq!(
+        HttpStatus::InternalServerError.to_string(),
+        "Internal Server Error"
+    );
+    assert_eq!(HttpStatus::Continue.to_string(), "Continue");
+    assert_eq!(HttpStatus::BadRequest.to_string(), "Bad Request");
+    assert_eq!(HttpStatus::Unknown.to_string(), "Unknown");
+}
+#[test]
+fn test_http_status_same() {
+    assert!(HttpStatus::Ok.same("OK"));
+    assert!(HttpStatus::Ok.same("ok"));
+    assert!(HttpStatus::Ok.same("Ok"));
+    assert!(HttpStatus::NotFound.same("Not Found"));
+    assert!(HttpStatus::NotFound.same("not found"));
+    assert!(HttpStatus::NotFound.same("NOT FOUND"));
+    assert!(!HttpStatus::Ok.same("Bad Request"));
+    assert!(!HttpStatus::NotFound.same("OK"));
+}
+#[test]
+fn test_http_status_from_str() {
+    assert_eq!("100".parse::<HttpStatus>().unwrap(), HttpStatus::Continue);
+    assert_eq!("200".parse::<HttpStatus>().unwrap(), HttpStatus::Ok);
+    assert_eq!("404".parse::<HttpStatus>().unwrap(), HttpStatus::NotFound);
+    assert_eq!(
+        "500".parse::<HttpStatus>().unwrap(),
+        HttpStatus::InternalServerError
+    );
+    assert_eq!("400".parse::<HttpStatus>().unwrap(), HttpStatus::BadRequest);
+    assert_eq!("666".parse::<HttpStatus>().unwrap(), HttpStatus::Unknown);
+    assert_eq!("".parse::<HttpStatus>().unwrap(), HttpStatus::Unknown);
+}
+#[test]
+fn test_http_status_default() {
+    assert_eq!(HttpStatus::default(), HttpStatus::Ok);
+}
+#[test]
+fn test_http_status_clone() {
+    let status: HttpStatus = HttpStatus::Ok;
+    let cloned_status: HttpStatus = status;
+    assert_eq!(status, cloned_status);
+}
+#[test]
+fn test_http_status_debug() {
+    let status: HttpStatus = HttpStatus::Ok;
+    let debug_str: String = format!("{status:?}");
+    assert_eq!(debug_str, "Ok");
+}
+#[test]
+fn test_http_status_equality() {
+    assert_eq!(HttpStatus::Ok, HttpStatus::Ok);
+    assert_ne!(HttpStatus::Ok, HttpStatus::NotFound);
+    assert_eq!(
+        HttpStatus::InternalServerError,
+        HttpStatus::InternalServerError
+    );
+    assert_ne!(HttpStatus::BadRequest, HttpStatus::Unauthorized);
+}
+#[test]
+fn test_http_status_informational() {
+    assert_eq!(HttpStatus::Continue.code(), 100);
+    assert_eq!(HttpStatus::SwitchingProtocols.code(), 101);
+    assert_eq!(HttpStatus::Processing.code(), 102);
+    assert_eq!(HttpStatus::EarlyHints.code(), 103);
+}
+#[test]
+fn test_http_status_success() {
+    assert_eq!(HttpStatus::Ok.code(), 200);
+    assert_eq!(HttpStatus::Created.code(), 201);
+    assert_eq!(HttpStatus::Accepted.code(), 202);
+    assert_eq!(HttpStatus::NoContent.code(), 204);
+}
+#[test]
+fn test_http_status_redirection() {
+    assert_eq!(HttpStatus::MultipleChoices.code(), 300);
+    assert_eq!(HttpStatus::MovedPermanently.code(), 301);
+    assert_eq!(HttpStatus::Found.code(), 302);
+    assert_eq!(HttpStatus::NotModified.code(), 304);
+}
+#[test]
+fn test_http_status_client_error() {
+    assert_eq!(HttpStatus::BadRequest.code(), 400);
+    assert_eq!(HttpStatus::Unauthorized.code(), 401);
+    assert_eq!(HttpStatus::Forbidden.code(), 403);
+    assert_eq!(HttpStatus::NotFound.code(), 404);
+    assert_eq!(HttpStatus::MethodNotAllowed.code(), 405);
+}
+#[test]
+fn test_http_status_server_error() {
+    assert_eq!(HttpStatus::InternalServerError.code(), 500);
+    assert_eq!(HttpStatus::NotImplemented.code(), 501);
+    assert_eq!(HttpStatus::BadGateway.code(), 502);
+    assert_eq!(HttpStatus::ServiceUnavailable.code(), 503);
+    assert_eq!(HttpStatus::GatewayTimeout.code(), 504);
+}
+#[test]
+fn test_http_status_special_codes() {
+    assert_eq!(HttpStatus::ImATeapot.code(), 418);
+    assert_eq!(HttpStatus::ImATeapot.to_string(), "I'm a teapot");
+    assert_eq!(HttpStatus::Unknown.code(), 0);
+    assert_eq!(HttpStatus::Unknown.to_string(), "Unknown");
+}
+```
+# Path: hyperlane/type/tests/http_status/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/upgrade_type/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_upgrade_type_default() {
+    let upgrade: UpgradeType = UpgradeType::default();
+    assert!(upgrade.is_unknown());
+    assert_eq!(upgrade.to_string(), "");
+}
+#[test]
+fn test_upgrade_type_websocket() {
+    let upgrade: UpgradeType = UpgradeType::WebSocket;
+    assert!(upgrade.is_ws());
+    assert!(!upgrade.is_h2c());
+    assert!(!upgrade.is_tls());
+    assert!(!upgrade.is_unknown());
+    assert_eq!(upgrade.to_string(), "websocket");
+}
+#[test]
+fn test_upgrade_type_h2c() {
+    let upgrade: UpgradeType = UpgradeType::H2c;
+    assert!(!upgrade.is_ws());
+    assert!(upgrade.is_h2c());
+    assert!(!upgrade.is_tls());
+    assert!(!upgrade.is_unknown());
+    assert_eq!(upgrade.to_string(), "h2c");
+}
+#[test]
+fn test_upgrade_type_tls() {
+    let upgrade: UpgradeType = UpgradeType::Tls("tls1.3".to_string());
+    assert!(!upgrade.is_ws());
+    assert!(!upgrade.is_h2c());
+    assert!(upgrade.is_tls());
+    assert!(!upgrade.is_unknown());
+    assert_eq!(upgrade.to_string(), "tls1.3");
+}
+#[test]
+fn test_upgrade_type_unknown() {
+    let upgrade: UpgradeType = UpgradeType::Unknown("custom".to_string());
+    assert!(!upgrade.is_ws());
+    assert!(!upgrade.is_h2c());
+    assert!(!upgrade.is_tls());
+    assert!(upgrade.is_unknown());
+    assert_eq!(upgrade.to_string(), "custom");
+}
+#[test]
+fn test_upgrade_type_from_str_websocket() {
+    let upgrade: UpgradeType = "websocket".parse().unwrap();
+    assert_eq!(upgrade, UpgradeType::WebSocket);
+}
+#[test]
+fn test_upgrade_type_from_str_h2c() {
+    let upgrade: UpgradeType = "h2c".parse().unwrap();
+    assert_eq!(upgrade, UpgradeType::H2c);
+}
+#[test]
+fn test_upgrade_type_from_str_tls() {
+    let upgrade: UpgradeType = "tls1.2".parse().unwrap();
+    assert_eq!(upgrade, UpgradeType::Tls("tls1.2".to_string()));
+}
+#[test]
+fn test_upgrade_type_from_str_unknown() {
+    let upgrade: UpgradeType = "custom".parse().unwrap();
+    assert_eq!(upgrade, UpgradeType::Unknown("custom".to_string()));
+}
+#[test]
+fn test_upgrade_type_from_str_case_insensitive() {
+    let upgrade1: UpgradeType = "WebSocket".parse().unwrap();
+    let upgrade2: UpgradeType = "WEBSOCKET".parse().unwrap();
+    let upgrade3: UpgradeType = "H2C".parse().unwrap();
+    assert_eq!(upgrade1, UpgradeType::WebSocket);
+    assert_eq!(upgrade2, UpgradeType::WebSocket);
+    assert_eq!(upgrade3, UpgradeType::H2c);
+}
+#[test]
+fn test_upgrade_type_clone() {
+    let upgrade: UpgradeType = UpgradeType::WebSocket;
+    let cloned: UpgradeType = upgrade.clone();
+    assert_eq!(upgrade, cloned);
+}
+#[test]
+fn test_upgrade_type_eq() {
+    assert_eq!(UpgradeType::WebSocket, UpgradeType::WebSocket);
+    assert_ne!(UpgradeType::WebSocket, UpgradeType::H2c);
+    assert_eq!(
+        UpgradeType::Unknown("a".to_string()),
+        UpgradeType::Unknown("a".to_string())
+    );
+    assert_ne!(
+        UpgradeType::Unknown("a".to_string()),
+        UpgradeType::Unknown("b".to_string())
+    );
+}
+```
+# Path: hyperlane/type/tests/upgrade_type/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/panic/fn.rs
+```rust
+use super::*;
+#[test]
+fn panic_new() {
+    let panic: PanicData = PanicData::new(
+        Some("message".to_string()),
+        Some("location".to_string()),
+        Some("payload".to_string()),
+    );
+    assert_eq!(panic.try_get_message(), &Some("message".to_string()));
+    assert_eq!(panic.try_get_location(), &Some("location".to_string()));
+    assert_eq!(panic.try_get_payload(), &Some("payload".to_string()));
+}
+#[tokio::test]
+async fn from_join_error() {
+    let handle: JoinHandle<()> = spawn(async {
+        panic!("test panic");
+    });
+    let result: Result<(), JoinError> = handle.await;
+    assert!(result.is_err());
+    if let Err(join_error) = result {
+        let is_panic: bool = PanicData::from_join_error(join_error)
+            .try_get_message()
+            .clone()
+            .unwrap_or_default()
+            .contains("test panic");
+        assert!(is_panic);
+    }
+}
+```
+# Path: hyperlane/type/tests/panic/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/box_leak/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_box_leak_new_with_integer() {
+    let leaked: &'static mut i32 = box_leak_new(42);
+    assert_eq!(*leaked, 42);
+    *leaked = 100;
+    assert_eq!(*leaked, 100);
+}
+#[test]
+fn test_box_leak_new_with_string() {
+    let leaked: &'static mut String = box_leak_new("hello".to_string());
+    assert_eq!(*leaked, "hello");
+    leaked.push_str(" world");
+    assert_eq!(*leaked, "hello world");
+}
+#[test]
+fn test_box_leak_new_with_vec() {
+    let leaked: &'static mut Vec<i32> = box_leak_new(vec![1, 2, 3]);
+    assert_eq!(*leaked, vec![1, 2, 3]);
+    leaked.push(4);
+    assert_eq!(*leaked, vec![1, 2, 3, 4]);
+}
+#[test]
+fn test_box_leak_new_static_lifetime() {
+    fn assert_static<T: 'static>(_: T) {}
+    let leaked: &'static mut i32 = box_leak_new(42);
+    assert_static(*leaked);
+}
+```
+# Path: hyperlane/type/tests/box_leak/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/arc_mutex/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_arc_mutex_creation() {
+    let mutex: ArcMutex<i32> = arc_mutex(42);
+    let guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+    assert_eq!(*guard, 42);
+}
+#[tokio::test]
+async fn test_arc_mutex_with_string() {
+    let mutex: ArcMutex<String> = arc_mutex("hello".to_string());
+    let guard: tokio::sync::MutexGuard<'_, String> = mutex.lock().await;
+    assert_eq!(*guard, "hello");
+}
+#[tokio::test]
+async fn test_arc_mutex_mutation() {
+    let mutex: ArcMutex<i32> = arc_mutex(0);
+    {
+        let mut guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+        *guard = 100;
+    }
+    let guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+    assert_eq!(*guard, 100);
+}
+#[tokio::test]
+async fn test_arc_mutex_clone_shares_data() {
+    let mutex1: ArcMutex<i32> = arc_mutex(42);
+    let mutex2: ArcMutex<i32> = Arc::clone(&mutex1);
+    {
+        let mut guard: tokio::sync::MutexGuard<'_, i32> = mutex2.lock().await;
+        *guard = 99;
+    }
+    let guard: tokio::sync::MutexGuard<'_, i32> = mutex1.lock().await;
+    assert_eq!(*guard, 99);
+}
+#[tokio::test]
+async fn test_arc_mutex_with_vec() {
+    let mutex: ArcMutex<Vec<i32>> = arc_mutex(vec![1, 2, 3]);
+    {
+        let mut guard: tokio::sync::MutexGuard<'_, Vec<i32>> = mutex.lock().await;
+        guard.push(4);
+    }
+    let guard: tokio::sync::MutexGuard<'_, Vec<i32>> = mutex.lock().await;
+    assert_eq!(*guard, vec![1, 2, 3, 4]);
+}
+#[test]
+fn test_arc_mutex_reference_count() {
+    let mutex: ArcMutex<i32> = arc_mutex(42);
+    assert_eq!(Arc::strong_count(&mutex), 1);
+    let mutex2: ArcMutex<i32> = Arc::clone(&mutex);
+    assert_eq!(Arc::strong_count(&mutex), 2);
+    assert_eq!(Arc::strong_count(&mutex2), 2);
+}
+```
+# Path: hyperlane/type/tests/arc_mutex/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/response/fn.rs
+```rust
+use super::*;
+#[test]
+fn response_default() {
+    let response: Response = Response::default();
+    assert_eq!(response.get_status_code(), 200);
+    assert_eq!(response.get_reason_phrase(), "OK");
+    assert!(response.get_headers().is_empty());
+    assert!(response.get_body().is_empty());
+}
+#[test]
+fn response_header_operations() {
+    let mut response: Response = Response::default();
+    response.set_header("content-type", "application/json");
+    assert!(response.has_header("content-type"));
+    assert!(!response.has_header("authorization"));
+    assert_eq!(response.get_header_size("content-type"), 1);
+    assert_eq!(
+        response.try_get_header_front("content-type"),
+        Some("application/json".to_string())
+    );
+    assert_eq!(
+        response.try_get_header_back("content-type"),
+        Some("application/json".to_string())
+    );
+    assert_eq!(response.get_headers_size(), 1);
+}
+#[test]
+fn response_add_header() {
+    let mut response: Response = Response::default();
+    response.add_header("x-custom", "value1");
+    response.add_header("x-custom", "value2");
+    assert_eq!(response.get_header_size("x-custom"), 2);
+    assert!(response.has_header_value("x-custom", "value1"));
+    assert!(response.has_header_value("x-custom", "value2"));
+}
+#[test]
+fn response_remove_header() {
+    let mut response: Response = Response::default();
+    response.set_header("x-custom", "value");
+    assert!(response.has_header("x-custom"));
+    response.remove_header("x-custom");
+    assert!(!response.has_header("x-custom"));
+}
+#[test]
+fn response_remove_header_value() {
+    let mut response: Response = Response::default();
+    response.add_header("x-custom", "value1");
+    response.add_header("x-custom", "value2");
+    response.remove_header_value("x-custom", "value1");
+    assert!(response.has_header("x-custom"));
+    assert!(!response.has_header_value("x-custom", "value1"));
+    assert!(response.has_header_value("x-custom", "value2"));
+}
+#[test]
+fn response_clear_headers() {
+    let mut response: Response = Response::default();
+    response.set_header("header1", "value1");
+    response.set_header("header2", "value2");
+    assert_eq!(response.get_headers_size(), 2);
+    response.clear_headers();
+    assert_eq!(response.get_headers_size(), 0);
+}
+#[test]
+fn response_body_operations() {
+    let mut response: Response = Response::default();
+    response.set_body(b"hello world");
+    assert_eq!(response.get_body(), b"hello world");
+    assert_eq!(response.get_body_string(), "hello world");
+}
+#[test]
+fn response_body_json() {
+    let json: &'static str = r#"{"name":"test","value":123}"#;
+    let mut response: Response = Response::default();
+    response.set_body(json.as_bytes());
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct TestData {
+        name: String,
+        value: i32,
+    }
+    let result: TestData = response.try_get_body_json().unwrap();
+    assert_eq!(result.name, "test");
+    assert_eq!(result.value, 123);
+}
+#[test]
+fn response_cookie_operations() {
+    let mut response: Response = Response::default();
+    response.set_header("set-cookie", "session_id=abc123");
+    let cookies: Cookies = response.get_cookies();
+    assert_eq!(cookies.len(), 1);
+    assert_eq!(cookies.get("session_id"), Some(&"abc123".to_string()));
+}
+#[test]
+fn response_try_get_cookies() {
+    let response: Response = Response::default();
+    assert!(response.try_get_cookies().is_none());
+    let mut response: Response = Response::default();
+    response.set_header("set-cookie", "user_id=xyz789");
+    let cookies_opt: Option<Cookies> = response.try_get_cookies();
+    assert!(cookies_opt.is_some());
+    let cookies: Cookies = cookies_opt.unwrap();
+    assert_eq!(cookies.get("user_id"), Some(&"xyz789".to_string()));
+}
+#[test]
+fn response_try_get_cookie() {
+    let mut response: Response = Response::default();
+    response.set_header("set-cookie", "token=secret123; secure");
+    assert_eq!(
+        response.try_get_cookie("token"),
+        Some("secret123".to_string())
+    );
+    assert_eq!(response.try_get_cookie("not_exist"), None);
+}
+#[test]
+fn response_get_cookie() {
+    let mut response: Response = Response::default();
+    response.set_header("set-cookie", "theme=dark; path=/");
+    assert_eq!(response.get_cookie("theme"), "dark".to_string());
+}
+#[test]
+#[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
+fn response_get_cookie_panic() {
+    let response: Response = Response::default();
+    let _: CookieValue = response.get_cookie("not_exist");
+}
+#[test]
+#[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
+fn response_get_cookies_panic() {
+    let response: Response = Response::default();
+    let _: Cookies = response.get_cookies();
+}
+#[test]
+fn response_error_display() {
+    let error: ResponseError = ResponseError::NotFoundStream;
+    assert_eq!(format!("{error}"), "Not found stream");
+    let error: ResponseError = ResponseError::ConnectionClosed;
+    assert_eq!(format!("{error}"), "Connection has been closed");
+    let error: ResponseError = ResponseError::Terminated;
+    assert_eq!(format!("{error}"), "Current processing has been terminated");
+    let error: ResponseError = ResponseError::Send("network error".to_string());
+    assert_eq!(format!("{error}"), "Send error: network error");
+}
+#[test]
+fn response_error_from_io() {
+    let io_error: std::io::Error = std::io::Error::other("test error");
+    let response_error: ResponseError = ResponseError::from(io_error);
+    assert!(matches!(response_error, ResponseError::Send(_)));
+}
+```
+# Path: hyperlane/type/tests/response/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/websocket_frame/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_websocket_opcode_from_u8() {
+    assert_eq!(WebSocketOpcode::from_u8(0x0), WebSocketOpcode::Continuation);
+    assert_eq!(WebSocketOpcode::from_u8(0x1), WebSocketOpcode::Text);
+    assert_eq!(WebSocketOpcode::from_u8(0x2), WebSocketOpcode::Binary);
+    assert_eq!(WebSocketOpcode::from_u8(0x8), WebSocketOpcode::Close);
+    assert_eq!(WebSocketOpcode::from_u8(0x9), WebSocketOpcode::Ping);
+    assert_eq!(WebSocketOpcode::from_u8(0xA), WebSocketOpcode::Pong);
+    assert_eq!(
+        WebSocketOpcode::from_u8(0x3),
+        WebSocketOpcode::Reserved(0x3)
+    );
+    assert_eq!(
+        WebSocketOpcode::from_u8(0xF),
+        WebSocketOpcode::Reserved(0xF)
+    );
+}
+#[test]
+fn test_websocket_opcode_to_u8() {
+    assert_eq!(WebSocketOpcode::Continuation.to_u8(), 0x0);
+    assert_eq!(WebSocketOpcode::Text.to_u8(), 0x1);
+    assert_eq!(WebSocketOpcode::Binary.to_u8(), 0x2);
+    assert_eq!(WebSocketOpcode::Close.to_u8(), 0x8);
+    assert_eq!(WebSocketOpcode::Ping.to_u8(), 0x9);
+    assert_eq!(WebSocketOpcode::Pong.to_u8(), 0xA);
+    assert_eq!(WebSocketOpcode::Reserved(0x3).to_u8(), 0x3);
+}
+#[test]
+fn test_websocket_opcode_is_control() {
+    assert!(!WebSocketOpcode::Continuation.is_control());
+    assert!(!WebSocketOpcode::Text.is_control());
+    assert!(!WebSocketOpcode::Binary.is_control());
+    assert!(WebSocketOpcode::Close.is_control());
+    assert!(WebSocketOpcode::Ping.is_control());
+    assert!(WebSocketOpcode::Pong.is_control());
+    assert!(!WebSocketOpcode::Reserved(0x3).is_control());
+}
+#[test]
+fn test_websocket_opcode_is_data() {
+    assert!(WebSocketOpcode::Continuation.is_data());
+    assert!(WebSocketOpcode::Text.is_data());
+    assert!(WebSocketOpcode::Binary.is_data());
+    assert!(!WebSocketOpcode::Close.is_data());
+    assert!(!WebSocketOpcode::Ping.is_data());
+    assert!(!WebSocketOpcode::Pong.is_data());
+}
+#[test]
+fn test_websocket_opcode_is_continuation() {
+    assert!(WebSocketOpcode::Continuation.is_continuation());
+    assert!(!WebSocketOpcode::Text.is_continuation());
+}
+#[test]
+fn test_websocket_opcode_is_text() {
+    assert!(WebSocketOpcode::Text.is_text());
+    assert!(!WebSocketOpcode::Binary.is_text());
+}
+#[test]
+fn test_websocket_opcode_is_binary() {
+    assert!(WebSocketOpcode::Binary.is_binary());
+    assert!(!WebSocketOpcode::Text.is_binary());
+}
+#[test]
+fn test_websocket_opcode_is_close() {
+    assert!(WebSocketOpcode::Close.is_close());
+    assert!(!WebSocketOpcode::Ping.is_close());
+}
+#[test]
+fn test_websocket_opcode_is_ping() {
+    assert!(WebSocketOpcode::Ping.is_ping());
+    assert!(!WebSocketOpcode::Pong.is_ping());
+}
+#[test]
+fn test_websocket_opcode_is_pong() {
+    assert!(WebSocketOpcode::Pong.is_pong());
+    assert!(!WebSocketOpcode::Ping.is_pong());
+}
+#[test]
+fn test_websocket_opcode_is_reserved() {
+    assert!(WebSocketOpcode::Reserved(0x3).is_reserved());
+    assert!(!WebSocketOpcode::Text.is_reserved());
+}
+#[test]
+fn test_websocket_frame_default() {
+    let frame: WebSocketFrame = WebSocketFrame::default();
+    assert!(!frame.get_fin());
+    assert_eq!(frame.get_opcode(), &WebSocketOpcode::Text);
+    assert!(!frame.get_mask());
+    assert!(frame.get_payload_data().is_empty());
+}
+#[test]
+fn test_websocket_frame_decode_text_unmasked() {
+    let data: [u8; 7] = [0x81, 0x05, 0x48, 0x65, 0x6C, 0x6C, 0x6F];
+    let result: Option<(WebSocketFrame, usize)> = WebSocketFrame::decode_ws_frame(data);
+    assert!(result.is_some());
+    let (frame, consumed): (WebSocketFrame, usize) = result.unwrap();
+    assert!(frame.get_fin());
+    assert_eq!(frame.get_opcode(), &WebSocketOpcode::Text);
+    assert!(!frame.get_mask());
+    assert_eq!(frame.get_payload_data(), b"Hello");
+    assert_eq!(consumed, 7);
+}
+#[test]
+fn test_websocket_frame_decode_binary_masked() {
+    let mask_key: [u8; 4] = [0x37, 0xFA, 0x21, 0x3D];
+    let payload: [u8; 5] = [0x7F, 0x9F, 0x4D, 0x51, 0x58];
+    let mut data: Vec<u8> = vec![0x82, 0x85];
+    data.extend_from_slice(&mask_key);
+    data.extend_from_slice(&payload);
+    let result: Option<(WebSocketFrame, usize)> = WebSocketFrame::decode_ws_frame(data);
+    assert!(result.is_some());
+    let (frame, consumed): (WebSocketFrame, usize) = result.unwrap();
+    assert!(frame.get_fin());
+    assert_eq!(frame.get_opcode(), &WebSocketOpcode::Binary);
+    assert!(frame.get_mask());
+    assert_eq!(frame.get_payload_data(), b"Hello");
+    assert_eq!(consumed, 11);
+}
+#[test]
+fn test_websocket_frame_decode_incomplete() {
+    let data: [u8; 1] = [0x81];
+    let result: Option<(WebSocketFrame, usize)> = WebSocketFrame::decode_ws_frame(data);
+    assert!(result.is_none());
+}
+#[test]
+fn test_websocket_frame_decode_extended_payload_16() {
+    let payload: Vec<u8> = vec![0x42; 200];
+    let mut data: Vec<u8> = vec![0x82, 0x7E];
+    data.extend_from_slice(&(200u16).to_be_bytes());
+    data.extend_from_slice(&payload);
+    let result: Option<(WebSocketFrame, usize)> = WebSocketFrame::decode_ws_frame(data);
+    assert!(result.is_some());
+    let (frame, consumed): (WebSocketFrame, usize) = result.unwrap();
+    assert_eq!(frame.get_payload_data().len(), 200);
+    assert_eq!(consumed, 204);
+}
+#[test]
+fn test_websocket_frame_decode_close() {
+    let data: [u8; 6] = [0x88, 0x02, 0x03, 0xE8, 0x48, 0x65];
+    let result: Option<(WebSocketFrame, usize)> = WebSocketFrame::decode_ws_frame(data);
+    assert!(result.is_some());
+    let (frame, _consumed): (WebSocketFrame, usize) = result.unwrap();
+    assert_eq!(frame.get_opcode(), &WebSocketOpcode::Close);
+}
+#[test]
+fn test_websocket_frame_create_frame_list_text() {
+    let frames: Vec<ResponseBody> = WebSocketFrame::create_frame_list("Hello");
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0][0], 0x81);
+    assert_eq!(frames[0][1], 0x05);
+    assert_eq!(&frames[0][2..], b"Hello");
+}
+#[test]
+fn test_websocket_frame_create_frame_list_binary() {
+    let binary_data: Vec<u8> = vec![0x00, 0x01, 0x02, 0x03];
+    let frames: Vec<ResponseBody> = WebSocketFrame::create_frame_list(&binary_data);
+    assert!(!frames.is_empty());
+    assert_eq!(&frames[0][2..], &[0x00, 0x01, 0x02, 0x03]);
+}
+#[test]
+fn test_websocket_frame_sha1() {
+    let hash: [u8; 20] = WebSocketFrame::sha1("abc");
+    let expected: [u8; 20] = [
+        0xA9, 0x99, 0x3E, 0x36, 0x47, 0x06, 0x81, 0x6A, 0xBA, 0x3E, 0x25, 0x71, 0x78, 0x50, 0xC2,
+        0x6C, 0x9C, 0xD0, 0xD8, 0x9D,
+    ];
+    assert_eq!(hash, expected);
+}
+#[test]
+fn test_websocket_frame_try_generate_accept_key() {
+    let key: &str = "dGhlIHNhbXBsZSBub25jZQ==";
+    let accept_key: Option<String> = WebSocketFrame::try_generate_accept_key(key);
+    assert_eq!(accept_key, Some("s3pPLMBiTxaQ9kYGzzhZRbK+xOo=".to_string()));
+}
+#[test]
+fn test_websocket_frame_try_base64_encode() {
+    let encoded: Option<String> = WebSocketFrame::try_base64_encode("Hello");
+    assert_eq!(encoded, Some("SGVsbG8=".to_string()));
+}
+#[test]
+fn test_websocket_frame_base64_encode() {
+    let encoded: String = WebSocketFrame::base64_encode("Hello");
+    assert_eq!(encoded, "SGVsbG8=");
+}
+#[test]
+fn test_websocket_frame_is_text_opcode() {
+    let frame: WebSocketFrame = WebSocketFrame {
+        fin: true,
+        opcode: WebSocketOpcode::Text,
+        mask: false,
+        payload_data: vec![],
+    };
+    assert!(frame.is_text_opcode());
+    assert!(!frame.is_binary_opcode());
+    assert!(!frame.is_close_opcode());
+}
+#[test]
+fn test_websocket_frame_is_binary_opcode() {
+    let frame: WebSocketFrame = WebSocketFrame {
+        fin: true,
+        opcode: WebSocketOpcode::Binary,
+        mask: false,
+        payload_data: vec![],
+    };
+    assert!(!frame.is_text_opcode());
+    assert!(frame.is_binary_opcode());
+}
+#[test]
+fn test_websocket_frame_is_close_opcode() {
+    let frame: WebSocketFrame = WebSocketFrame {
+        fin: true,
+        opcode: WebSocketOpcode::Close,
+        mask: false,
+        payload_data: vec![],
+    };
+    assert!(frame.is_close_opcode());
+    assert!(!frame.is_text_opcode());
+}
+#[test]
+fn test_websocket_frame_is_ping_opcode() {
+    let frame: WebSocketFrame = WebSocketFrame {
+        fin: true,
+        opcode: WebSocketOpcode::Ping,
+        mask: false,
+        payload_data: vec![],
+    };
+    assert!(frame.is_ping_opcode());
+    assert!(!frame.is_pong_opcode());
+}
+#[test]
+fn test_websocket_frame_is_pong_opcode() {
+    let frame: WebSocketFrame = WebSocketFrame {
+        fin: true,
+        opcode: WebSocketOpcode::Pong,
+        mask: false,
+        payload_data: vec![],
+    };
+    assert!(frame.is_pong_opcode());
+    assert!(!frame.is_ping_opcode());
+}
+#[test]
+fn test_websocket_frame_is_continuation_opcode() {
+    let frame: WebSocketFrame = WebSocketFrame {
+        fin: false,
+        opcode: WebSocketOpcode::Continuation,
+        mask: false,
+        payload_data: vec![],
+    };
+    assert!(frame.is_continuation_opcode());
+}
+#[test]
+fn test_websocket_frame_is_reserved_opcode() {
+    let frame: WebSocketFrame = WebSocketFrame {
+        fin: true,
+        opcode: WebSocketOpcode::Reserved(0x3),
+        mask: false,
+        payload_data: vec![],
+    };
+    assert!(frame.is_reserved_opcode());
+}
+```
+# Path: hyperlane/type/tests/websocket_frame/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/attribute/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn get_panic_from_join_error() {
+    let message: &'static str = "Test panic message";
+    let join_handle: JoinHandle<()> = spawn(async {
+        panic!("{}", message.to_string());
+    });
+    let join_error: JoinError = join_handle.await.unwrap_err();
+    let panic_struct: PanicData = PanicData::from_join_error(join_error);
+    assert!(!panic_struct.try_get_message().is_none());
+    assert!(
+        panic_struct
+            .try_get_message()
+            .clone()
+            .unwrap_or_default()
+            .contains(message)
+    );
+}
+```
+# Path: hyperlane/type/tests/attribute/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/any/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_any_send_impl_for_i32() {
+    fn assert_any_send<T: AnySend>() {}
+    assert_any_send::<i32>();
+}
+#[test]
+fn test_any_send_impl_for_string() {
+    fn assert_any_send<T: AnySend>() {}
+    assert_any_send::<String>();
+}
+#[test]
+fn test_any_send_clone_impl_for_i32() {
+    fn assert_any_send_clone<T: AnySendClone>() {}
+    assert_any_send_clone::<i32>();
+}
+#[test]
+fn test_any_send_clone_impl_for_string() {
+    fn assert_any_send_clone<T: AnySendClone>() {}
+    assert_any_send_clone::<String>();
+}
+#[test]
+fn test_any_sync_impl_for_i32() {
+    fn assert_any_sync<T: AnySync>() {}
+    assert_any_sync::<i32>();
+}
+#[test]
+fn test_any_sync_impl_for_string() {
+    fn assert_any_sync<T: AnySync>() {}
+    assert_any_sync::<String>();
+}
+#[test]
+fn test_any_sync_clone_impl_for_i32() {
+    fn assert_any_sync_clone<T: AnySyncClone>() {}
+    assert_any_sync_clone::<i32>();
+}
+#[test]
+fn test_any_sync_clone_impl_for_string() {
+    fn assert_any_sync_clone<T: AnySyncClone>() {}
+    assert_any_sync_clone::<String>();
+}
+#[test]
+fn test_any_send_sync_impl_for_i32() {
+    fn assert_any_send_sync<T: AnySendSync>() {}
+    assert_any_send_sync::<i32>();
+}
+#[test]
+fn test_any_send_sync_impl_for_string() {
+    fn assert_any_send_sync<T: AnySendSync>() {}
+    assert_any_send_sync::<String>();
+}
+#[test]
+fn test_any_send_sync_clone_impl_for_i32() {
+    fn assert_any_send_sync_clone<T: AnySendSyncClone>() {}
+    assert_any_send_sync_clone::<i32>();
+}
+#[test]
+fn test_any_send_sync_clone_impl_for_string() {
+    fn assert_any_send_sync_clone<T: AnySendSyncClone>() {}
+    assert_any_send_sync_clone::<String>();
+}
+#[test]
+fn test_box_any_downcast() {
+    let boxed: BoxAny = Box::new(42_i32);
+    let result: Option<&i32> = boxed.downcast_ref::<i32>();
+    assert_eq!(result, Some(&42));
+}
+#[test]
+fn test_box_any_send_downcast() {
+    let boxed: BoxAnySend = Box::new(42_i32);
+    let result: Option<&i32> = boxed.downcast_ref::<i32>();
+    assert_eq!(result, Some(&42));
+}
+#[test]
+fn test_box_any_send_sync_downcast() {
+    let boxed: BoxAnySendSync = Box::new(42_i32);
+    let result: Option<&i32> = boxed.downcast_ref::<i32>();
+    assert_eq!(result, Some(&42));
+}
+#[test]
+fn test_rc_any_downcast() {
+    let rc: RcAny = Rc::new(42_i32);
+    let result: Option<&i32> = rc.downcast_ref::<i32>();
+    assert_eq!(result, Some(&42));
+}
+#[test]
+fn test_arc_any_downcast() {
+    let arc: ArcAny = Arc::new(42_i32);
+    let result: Option<&i32> = arc.downcast_ref::<i32>();
+    assert_eq!(result, Some(&42));
+}
+#[test]
+fn test_arc_any_send_downcast() {
+    let arc: ArcAnySend = Arc::new(42_i32);
+    let result: Option<&i32> = arc.downcast_ref::<i32>();
+    assert_eq!(result, Some(&42));
+}
+#[test]
+fn test_arc_any_send_sync_downcast() {
+    let arc: ArcAnySendSync = Arc::new(42_i32);
+    let result: Option<&i32> = arc.downcast_ref::<i32>();
+    assert_eq!(result, Some(&42));
+}
+#[test]
+fn test_box_any_downcast_wrong_type() {
+    let boxed: BoxAny = Box::new(42_i32);
+    let result: Option<&String> = boxed.downcast_ref::<String>();
+    assert!(result.is_none());
+}
+#[test]
+fn test_rc_any_downcast_wrong_type() {
+    let rc: RcAny = Rc::new(42_i32);
+    let result: Option<&String> = rc.downcast_ref::<String>();
+    assert!(result.is_none());
+}
+#[test]
+fn test_arc_any_downcast_wrong_type() {
+    let arc: ArcAny = Arc::new(42_i32);
+    let result: Option<&String> = arc.downcast_ref::<String>();
+    assert!(result.is_none());
+}
+#[test]
+fn test_box_any_with_string() {
+    let boxed: BoxAny = Box::new("hello".to_string());
+    let result: Option<&String> = boxed.downcast_ref::<String>();
+    assert_eq!(result, Some(&"hello".to_string()));
+}
+#[test]
+fn test_arc_any_send_with_string() {
+    let arc: ArcAnySend = Arc::new("hello".to_string());
+    let result: Option<&String> = arc.downcast_ref::<String>();
+    assert_eq!(result, Some(&"hello".to_string()));
+}
+```
+# Path: hyperlane/type/tests/any/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/task/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn task_clone() {
+    let task1: Task = Task::default();
+    let task2: Task = task1.clone();
+    assert_eq!(task1.get_pool().len(), task2.get_pool().len());
+    assert_eq!(
+        task1.get_counter().load(atomic::Ordering::Relaxed),
+        task2.get_counter().load(atomic::Ordering::Relaxed)
+    );
+    assert_eq!(
+        task1.get_shutdown().load(atomic::Ordering::Relaxed),
+        task2.get_shutdown().load(atomic::Ordering::Relaxed)
+    );
+}
+#[tokio::test]
+async fn task_default() {
+    let task: Task = Task::default();
+    let worker_count: usize = Handle::current().metrics().num_workers();
+    if worker_count > 0 {
+        assert_eq!(task.get_pool().len(), worker_count);
+    }
+    assert_eq!(task.get_counter().load(atomic::Ordering::Relaxed), 0);
+    assert!(!task.get_shutdown().load(atomic::Ordering::Relaxed));
+}
+#[tokio::test]
+async fn task_try_spawn_local_with_index() {
+    let task: Task = Task::default();
+    if task.get_pool().is_empty() {
+        return;
+    }
+    let result: bool = task.try_spawn_local(Some(0), async move {});
+    assert!(result);
+}
+#[tokio::test]
+async fn task_try_spawn_local_round_robin() {
+    let task: Task = Task::default();
+    if task.get_pool().is_empty() {
+        return;
+    }
+    let result: bool = task.try_spawn_local(None, async move {});
+    assert!(result);
+}
+#[tokio::test]
+async fn task_try_spawn_local_empty_pool() {
+    let task: Task = Task {
+        pool: Vec::new(),
+        counter: Arc::new(AtomicUsize::new(0)),
+        shutdown: Arc::new(AtomicBool::new(false)),
+        notifies: Vec::new(),
+    };
+    let result: bool = task.try_spawn_local(None, async move {});
+    assert!(!result);
+}
+#[tokio::test]
+async fn task_try_spawn_local_with_large_index() {
+    let task: Task = Task::default();
+    if task.get_pool().is_empty() {
+        return;
+    }
+    let large_index: usize = task.get_pool().len() + 100;
+    let result: bool = task.try_spawn_local(Some(large_index), async move {});
+    assert!(result);
+}
+#[tokio::test]
+async fn task_shutdown() {
+    let task: Task = Task::default();
+    assert!(!task.get_shutdown().load(atomic::Ordering::Relaxed));
+    task.shutdown();
+    assert!(task.get_shutdown().load(atomic::Ordering::Relaxed));
+}
+```
+# Path: hyperlane/type/tests/task/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/hash_set_xx_hash3_64/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_hash_set_xx_hash3_64_new() {
+    let set: HashSetXxHash3_64<String> = hash_set_xx_hash3_64();
+    assert!(set.is_empty());
+    assert_eq!(set.len(), 0);
+}
+#[test]
+fn test_hash_set_xx_hash3_64_insert_and_contains() {
+    let mut set: HashSetXxHash3_64<String> = hash_set_xx_hash3_64();
+    set.insert("item1".to_string());
+    set.insert("item2".to_string());
+    assert!(set.contains("item1"));
+    assert!(set.contains("item2"));
+    assert!(!set.contains("item3"));
+}
+#[test]
+fn test_hash_set_xx_hash3_64_remove() {
+    let mut set: HashSetXxHash3_64<String> = hash_set_xx_hash3_64();
+    set.insert("item1".to_string());
+    assert!(set.remove("item1"));
+    assert!(!set.contains("item1"));
+}
+#[test]
+fn test_hash_set_xx_hash3_64_with_integer_elements() {
+    let mut set: HashSetXxHash3_64<i32> = hash_set_xx_hash3_64();
+    set.insert(1);
+    set.insert(2);
+    set.insert(3);
+    assert!(set.contains(&1));
+    assert!(set.contains(&2));
+    assert!(set.contains(&3));
+    assert!(!set.contains(&4));
+}
+#[test]
+fn test_hash_set_xx_hash3_64_iter() {
+    let mut set: HashSetXxHash3_64<String> = hash_set_xx_hash3_64();
+    set.insert("a".to_string());
+    set.insert("b".to_string());
+    let mut count: usize = 0;
+    for _item in &set {
+        count += 1;
+    }
+    assert_eq!(count, 2);
+}
+```
+# Path: hyperlane/type/tests/hash_set_xx_hash3_64/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/protocol/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_is_http_with_lowercase() {
+    assert!(Protocol::is_http("http"));
+}
+#[test]
+fn test_is_http_with_uppercase() {
+    assert!(Protocol::is_http("HTTP"));
+}
+#[test]
+fn test_is_http_with_mixed_case() {
+    assert!(Protocol::is_http("Http"));
+    assert!(Protocol::is_http("hTtP"));
+}
+#[test]
+fn test_is_http_with_non_http_protocol() {
+    assert!(!Protocol::is_http("https"));
+    assert!(!Protocol::is_http("ftp"));
+    assert!(!Protocol::is_http(""));
+}
+#[test]
+fn test_is_https_with_lowercase() {
+    assert!(Protocol::is_https("https"));
+}
+#[test]
+fn test_is_https_with_uppercase() {
+    assert!(Protocol::is_https("HTTPS"));
+}
+#[test]
+fn test_is_https_with_mixed_case() {
+    assert!(Protocol::is_https("Https"));
+    assert!(Protocol::is_https("hTtPs"));
+}
+#[test]
+fn test_is_https_with_non_https_protocol() {
+    assert!(!Protocol::is_https("http"));
+    assert!(!Protocol::is_https("ftp"));
+    assert!(!Protocol::is_https(""));
+}
+#[test]
+fn test_get_port_for_http() {
+    assert_eq!(Protocol::get_port("http"), 80);
+    assert_eq!(Protocol::get_port("HTTP"), 80);
+    assert_eq!(Protocol::get_port("Http"), 80);
+}
+#[test]
+fn test_get_port_for_https() {
+    assert_eq!(Protocol::get_port("https"), 443);
+    assert_eq!(Protocol::get_port("HTTPS"), 443);
+    assert_eq!(Protocol::get_port("Https"), 443);
+}
+#[test]
+fn test_get_port_for_ftp() {
+    assert_eq!(Protocol::get_port("ftp"), 21);
+    assert_eq!(Protocol::get_port("FTP"), 21);
+    assert_eq!(Protocol::get_port("Ftp"), 21);
+}
+#[test]
+fn test_get_port_for_ftps() {
+    assert_eq!(Protocol::get_port("ftps"), 990);
+    assert_eq!(Protocol::get_port("FTPS"), 990);
+    assert_eq!(Protocol::get_port("Ftps"), 990);
+}
+#[test]
+fn test_get_port_for_ssh() {
+    assert_eq!(Protocol::get_port("ssh"), 22);
+    assert_eq!(Protocol::get_port("SSH"), 22);
+    assert_eq!(Protocol::get_port("Ssh"), 22);
+}
+#[test]
+fn test_get_port_for_sftp() {
+    assert_eq!(Protocol::get_port("sftp"), 22);
+    assert_eq!(Protocol::get_port("SFTP"), 22);
+    assert_eq!(Protocol::get_port("Sftp"), 22);
+}
+#[test]
+fn test_get_port_for_telnet() {
+    assert_eq!(Protocol::get_port("telnet"), 23);
+    assert_eq!(Protocol::get_port("TELNET"), 23);
+    assert_eq!(Protocol::get_port("Telnet"), 23);
+}
+#[test]
+fn test_get_port_for_smtp() {
+    assert_eq!(Protocol::get_port("smtp"), 25);
+    assert_eq!(Protocol::get_port("SMTP"), 25);
+    assert_eq!(Protocol::get_port("Smtp"), 25);
+}
+#[test]
+fn test_get_port_for_smtps() {
+    assert_eq!(Protocol::get_port("smtps"), 465);
+    assert_eq!(Protocol::get_port("SMTPS"), 465);
+    assert_eq!(Protocol::get_port("Smtps"), 465);
+}
+#[test]
+fn test_get_port_for_pop3() {
+    assert_eq!(Protocol::get_port("pop3"), 110);
+    assert_eq!(Protocol::get_port("POP3"), 110);
+    assert_eq!(Protocol::get_port("Pop3"), 110);
+}
+#[test]
+fn test_get_port_for_pop3s() {
+    assert_eq!(Protocol::get_port("pop3s"), 995);
+    assert_eq!(Protocol::get_port("POP3S"), 995);
+    assert_eq!(Protocol::get_port("Pop3s"), 995);
+}
+#[test]
+fn test_get_port_for_imap() {
+    assert_eq!(Protocol::get_port("imap"), 143);
+    assert_eq!(Protocol::get_port("IMAP"), 143);
+    assert_eq!(Protocol::get_port("Imap"), 143);
+}
+#[test]
+fn test_get_port_for_imaps() {
+    assert_eq!(Protocol::get_port("imaps"), 993);
+    assert_eq!(Protocol::get_port("IMAPS"), 993);
+    assert_eq!(Protocol::get_port("Imaps"), 993);
+}
+#[test]
+fn test_get_port_for_dns() {
+    assert_eq!(Protocol::get_port("dns"), 53);
+    assert_eq!(Protocol::get_port("DNS"), 53);
+    assert_eq!(Protocol::get_port("Dns"), 53);
+}
+#[test]
+fn test_get_port_for_ws() {
+    assert_eq!(Protocol::get_port("ws"), 80);
+    assert_eq!(Protocol::get_port("WS"), 80);
+    assert_eq!(Protocol::get_port("Ws"), 80);
+}
+#[test]
+fn test_get_port_for_wss() {
+    assert_eq!(Protocol::get_port("wss"), 443);
+    assert_eq!(Protocol::get_port("WSS"), 443);
+    assert_eq!(Protocol::get_port("Wss"), 443);
+}
+#[test]
+fn test_get_port_for_unknown_protocol() {
+    assert_eq!(Protocol::get_port("unknown"), 80);
+    assert_eq!(Protocol::get_port(""), 80);
+    assert_eq!(Protocol::get_port("custom"), 80);
+}
+#[test]
+fn test_protocol_struct_creation() {
+    let protocol: Protocol = Protocol::new();
+    let _protocol_copy: Protocol = protocol;
+}
+#[test]
+fn test_protocol_default() {
+    let _protocol: Protocol = Protocol;
+}
+```
+# Path: hyperlane/type/tests/protocol/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/rc_rwlock/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_rc_rwlock_type() {
+    let data: RcRwLock<i32> = rc_rwlock(42);
+    let guard: RwLockReadGuard<'_, i32> = data.read().await;
+    assert_eq!(*guard, 42);
+}
+#[tokio::test]
+async fn test_rc_rwlock_write() {
+    let data: RcRwLock<i32> = rc_rwlock(42);
+    {
+        let mut guard: RwLockWriteGuard<'_, i32> = data.write().await;
+        *guard = 100;
+    }
+    let guard: RwLockReadGuard<'_, i32> = data.read().await;
+    assert_eq!(*guard, 100);
+}
+#[tokio::test]
+async fn test_rc_rwlock_with_string() {
+    let data: RcRwLock<String> = rc_rwlock("hello".to_string());
+    {
+        let mut guard: RwLockWriteGuard<'_, String> = data.write().await;
+        guard.push_str(" world");
+    }
+    let guard: RwLockReadGuard<'_, String> = data.read().await;
+    assert_eq!(*guard, "hello world");
+}
+#[test]
+fn test_rc_rwlock_clone() {
+    let data: RcRwLock<i32> = rc_rwlock(10);
+    let cloned_data: RcRwLock<i32> = Rc::clone(&data);
+    assert_eq!(Rc::strong_count(&data), 2);
+    assert_eq!(Rc::strong_count(&cloned_data), 2);
+}
+#[test]
+fn test_rc_rwlock_not_send() {
+    fn assert_not_send<T>() {}
+    assert_not_send::<RcRwLock<i32>>();
+}
+```
+# Path: hyperlane/type/tests/rc_rwlock/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/src/lib.rs
+```rust
+mod any;
+mod arc_mutex;
+mod arc_rwlock;
+mod attribute;
+mod box_leak;
+mod box_rwlock;
+mod content_type;
+mod cookie;
+mod file_extension;
+mod hash_map_xx_hash3_64;
+mod hash_set_xx_hash3_64;
+mod http_status;
+mod http_url;
+mod http_version;
+mod lifetime;
+mod methods;
+mod panic;
+mod protocol;
+mod rc_rwlock;
+mod request;
+mod response;
+mod status;
+mod stream;
+mod task;
+mod upgrade_type;
+mod websocket_frame;
+pub use {
+    any::*, arc_mutex::*, arc_rwlock::*, attribute::*, box_leak::*, box_rwlock::*, content_type::*,
+    cookie::*, file_extension::*, hash_map_xx_hash3_64::*, hash_set_xx_hash3_64::*, http_status::*,
+    http_url::*, http_version::*, lifetime::*, methods::*, panic::*, protocol::*, rc_rwlock::*,
+    request::*, response::*, status::*, stream::*, task::*, upgrade_type::*, websocket_frame::*,
+};
+pub use {http_compress::*, http_constant::*, serde_json, tokio};
+use std::{
+    any::Any,
+    collections::{HashMap, HashSet, VecDeque},
+    fmt::{self, Debug, Display, Formatter},
+    hash::Hash,
+    io::ErrorKind,
+    net::IpAddr,
+    num::ParseIntError,
+    pin::Pin,
+    rc::Rc,
+    result::Result,
+    str::{FromStr, SplitWhitespace},
+    sync::{
+        Arc,
+        atomic::{self, AtomicBool, AtomicUsize},
+    },
+    time::Duration,
+};
+use {
+    core::hash::BuildHasherDefault,
+    lombok_macros::*,
+    serde::{Deserialize, Serialize, de::DeserializeOwned},
+    tokio::{
+        io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+        net::TcpStream,
+        runtime::Handle,
+        sync::{
+            Mutex, Notify, RwLock, RwLockReadGuard, RwLockWriteGuard,
+            mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
+        },
+        task::{JoinError, LocalSet, spawn_blocking, spawn_local},
+        time::{error::Elapsed, timeout},
+    },
+    url::{ParseError, Url},
+};
+```
+# Path: hyperlane/type/src/http_url/impl.rs
+```rust
+use super::*;
+impl std::error::Error for HttpUrlError {}
+impl Display for HttpUrlError {
+    #[inline(always)]
+    fn fmt(&self, data: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            HttpUrlError::InvalidUrl => write!(data, "Invalid URL"),
+            HttpUrlError::Unknown => write!(data, "Unknown error"),
+        }
+    }
+}
+impl From<ParseError> for HttpUrlError {
+    #[inline(always)]
+    fn from(_: ParseError) -> Self {
+        HttpUrlError::InvalidUrl
+    }
+}
+impl HttpUrlComponents {
+    #[inline]
+    pub fn parse<U>(url: U) -> Result<Self, HttpUrlError>
+    where
+        U: AsRef<str>,
+    {
+        let parsed_url: Url = Url::parse(url.as_ref())?;
+        let protocol: String = parsed_url.scheme().to_string();
+        let res: Self = Self {
+            protocol,
+            host: parsed_url.host_str().map(|data: &str| data.to_string()),
+            port: parsed_url.port(),
+            path: Some(parsed_url.path().to_string()),
+            query: parsed_url.query().map(|data: &str| data.to_string()),
+            fragment: parsed_url.fragment().map(|data: &str| data.to_string()),
+        };
+        Ok(res)
+    }
+}
+```
+# Path: hyperlane/type/src/http_url/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum HttpUrlError {
+    InvalidUrl,
+    #[default]
+    Unknown,
+}
+```
+# Path: hyperlane/type/src/http_url/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct HttpUrlComponents {
+    pub protocol: String,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub path: Option<String>,
+    pub query: Option<String>,
+    pub fragment: Option<String>,
+}
+```
+# Path: hyperlane/type/src/http_url/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+mod r#struct;
+pub use {r#enum::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/type/src/box_rwlock/fn.rs
+```rust
+use super::*;
+#[inline(always)]
+pub fn box_rwlock<T>(data: T) -> BoxRwLock<T> {
+    Box::new(RwLock::new(data))
+}
+```
+# Path: hyperlane/type/src/box_rwlock/type.rs
+```rust
+use super::*;
+pub type BoxRwLock<T> = Box<RwLock<T>>;
+```
+# Path: hyperlane/type/src/box_rwlock/mod.rs
+```rust
+mod r#fn;
+mod r#type;
+pub use {r#fn::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/hash_map_xx_hash3_64/fn.rs
+```rust
+use super::*;
+#[inline(always)]
+pub fn hash_map_xx_hash3_64<K: Eq + Hash, V>() -> HashMapXxHash3_64<K, V> {
+    HashMap::with_hasher(BuildHasherDefault::default())
+}
+```
+# Path: hyperlane/type/src/hash_map_xx_hash3_64/type.rs
+```rust
+use super::*;
+pub type HashMapXxHash3_64<K, V> = HashMap<K, V, BuildHasherDefault<XxHash3_64>>;
+```
+# Path: hyperlane/type/src/hash_map_xx_hash3_64/mod.rs
+```rust
+mod r#fn;
+mod r#type;
+pub use {r#fn::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/content_type/impl.rs
+```rust
+use super::*;
+impl ContentType {
+    fn get_application_json<T>(data: &T) -> String
+    where
+        T: Serialize + Display,
+    {
+        serde_json::to_string(data).unwrap_or_default()
+    }
+    fn get_application_xml<T>(data: &T) -> String
+    where
+        T: Serialize + Display,
+    {
+        serde_xml_rs::to_string(data).unwrap_or_default()
+    }
+    fn get_text_plain<T>(data: &T) -> String
+    where
+        T: Serialize + Debug + Clone + Default + Display,
+    {
+        data.to_string()
+    }
+    fn get_text_html<T>(data: &T) -> String
+    where
+        T: Serialize + Debug + Clone + Default,
+    {
+        let mut html: String = String::with_capacity(64);
+        html.push_str("<table><tr><td>");
+        html.push_str(&format!("{data:?}"));
+        html.push_str("</td></tr></table>");
+        html
+    }
+    fn get_form_url_encoded<T>(data: &T) -> String
+    where
+        T: Serialize + Display,
+    {
+        serde_urlencoded::to_string(data).unwrap_or_default()
+    }
+    fn get_binary<T>(data: &T) -> String
+    where
+        T: Serialize + Debug + Clone + Default + Display,
+    {
+        hex::encode(data.to_string())
+    }
+    pub fn get_body_string<T>(&self, data: &T) -> String
+    where
+        T: Serialize + Debug + Clone + Default + Display,
+    {
+        match self {
+            Self::ApplicationJson => Self::get_application_json(data),
+            Self::ApplicationXml => Self::get_application_xml(data),
+            Self::TextPlain => Self::get_text_plain(data),
+            Self::TextHtml => Self::get_text_html(data),
+            Self::FormUrlEncoded => Self::get_form_url_encoded(data),
+            Self::Unknown => Self::get_binary(data),
+        }
+    }
+    pub fn format_content_type_with_charset<T, S>(content_type: T, charset: S) -> String
+    where
+        T: AsRef<str>,
+        S: AsRef<str>,
+    {
+        let content_type_ref: &str = content_type.as_ref();
+        let charset_ref: &str = charset.as_ref();
+        let mut result: String = String::with_capacity(
+            content_type_ref.len()
+                + SEMICOLON_SPACE.len()
+                + CHARSET_EQUAL.len()
+                + charset_ref.len(),
+        );
+        result.push_str(content_type_ref);
+        result.push_str(SEMICOLON_SPACE);
+        result.push_str(CHARSET_EQUAL);
+        result.push_str(charset_ref);
+        result
+    }
+    pub fn format_content_type_with_charset_declaration<T, S>(
+        content_type: T,
+        charset_with_key: S,
+    ) -> String
+    where
+        T: AsRef<str>,
+        S: AsRef<str>,
+    {
+        let content_type_ref: &str = content_type.as_ref();
+        let charset_with_key_ref: &str = charset_with_key.as_ref();
+        let mut result: String = String::with_capacity(
+            content_type_ref.len() + SEMICOLON_SPACE.len() + charset_with_key_ref.len(),
+        );
+        result.push_str(content_type_ref);
+        result.push_str(SEMICOLON_SPACE);
+        result.push_str(charset_with_key_ref);
+        result
+    }
+}
+impl FromStr for ContentType {
+    type Err = ();
+    fn from_str(data: &str) -> Result<Self, Self::Err> {
+        match data.to_ascii_lowercase().as_str() {
+            APPLICATION_JSON => Ok(Self::ApplicationJson),
+            APPLICATION_XML => Ok(Self::ApplicationXml),
+            TEXT_PLAIN => Ok(Self::TextPlain),
+            TEXT_HTML => Ok(Self::TextHtml),
+            FORM_URLENCODED => Ok(Self::FormUrlEncoded),
+            _ => Ok(Self::Unknown),
+        }
+    }
+}
+```
+# Path: hyperlane/type/src/content_type/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ContentType {
+    ApplicationJson,
+    ApplicationXml,
+    TextPlain,
+    TextHtml,
+    FormUrlEncoded,
+    #[default]
+    Unknown,
+}
+```
+# Path: hyperlane/type/src/content_type/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+pub use r#enum::*;
+use super::*;
+```
+# Path: hyperlane/type/src/file_extension/impl.rs
+```rust
+use super::*;
+impl FileExtension {
+    #[inline(always)]
+    pub fn parse<F>(file_extension: F) -> Self
+    where
+        F: AsRef<str>,
+    {
+        file_extension.as_ref().parse::<Self>().unwrap_or_default()
+    }
+    #[inline(always)]
+    pub fn get_extension_name<F>(full_path: F) -> String
+    where
+        F: AsRef<str>,
+    {
+        let full_path_ref: &str = full_path.as_ref();
+        full_path_ref
+            .rfind(POINT)
+            .map(|index: usize| full_path_ref[index + 1..].to_string())
+            .unwrap_or_default()
+    }
+    pub fn get_content_type(&self) -> &'static str {
+        match self {
+            Self::FileExtension123 => APPLICATION_VND_LOTUS_1_2_3,
+            Self::FileExtension3dml => TEXT_VND_IN3D_3DML,
+            Self::FileExtension3ds => IMAGE_X_3DS,
+            Self::FileExtension3g2 => VIDEO_3GPP2,
+            Self::FileExtension3gp => VIDEO_3GPP,
+            Self::FileExtension7z => APPLICATION_X_7Z_COMPRESSED,
+            Self::FileExtensionAab => APPLICATION_X_AUTHORWARE_BIN,
+            Self::FileExtensionAac => AUDIO_X_AAC,
+            Self::FileExtensionAam => APPLICATION_X_AUTHORWARE_MAP,
+            Self::FileExtensionAas => APPLICATION_X_AUTHORWARE_SEG,
+            Self::FileExtensionAbs => AUDIO_X_MPEG,
+            Self::FileExtensionAbw => APPLICATION_X_ABIWORD,
+            Self::FileExtensionAc => APPLICATION_PKIX_ATTR_CERT,
+            Self::FileExtensionAcc => APPLICATION_VND_AMERICANDYNAMICS_ACC,
+            Self::FileExtensionAce => APPLICATION_X_ACE_COMPRESSED,
+            Self::FileExtensionAcu => APPLICATION_VND_ACUCOBOL,
+            Self::FileExtensionAcutc => APPLICATION_VND_ACUCORP,
+            Self::FileExtensionAdp => AUDIO_ADPCM,
+            Self::FileExtensionAep => APPLICATION_VND_AUDIOGRAPH,
+            Self::FileExtensionAfm => APPLICATION_X_FONT_TYPE1,
+            Self::FileExtensionAfp => APPLICATION_VND_IBM_MODCAP,
+            Self::FileExtensionAhead => APPLICATION_VND_AHEAD_SPACE,
+            Self::FileExtensionAi => APPLICATION_POSTSCRIPT,
+            Self::FileExtensionAif => AUDIO_X_AIFF,
+            Self::FileExtensionAifc => AUDIO_X_AIFF,
+            Self::FileExtensionAiff => AUDIO_X_AIFF,
+            Self::FileExtensionAim => APPLICATION_X_AIM,
+            Self::FileExtensionAir => APPLICATION_VND_ADOBE_AIR_APPLICATION_INSTALLER_PACKAGE_ZIP,
+            Self::FileExtensionAit => APPLICATION_VND_DVB_AIT,
+            Self::FileExtensionAmi => APPLICATION_VND_AMIGA_AMI,
+            Self::FileExtensionAnx => APPLICATION_ANNODEX,
+            Self::FileExtensionApk => APPLICATION_VND_ANDROID_PACKAGE_ARCHIVE,
+            Self::FileExtensionAppcache => TEXT_CACHE_MANIFEST,
+            Self::FileExtensionApplication => APPLICATION_X_MS_APPLICATION,
+            Self::FileExtensionApr => APPLICATION_VND_LOTUS_APPROACH,
+            Self::FileExtensionArc => APPLICATION_X_FREEARC,
+            Self::FileExtensionArt => IMAGE_X_JG,
+            Self::FileExtensionAsc => APPLICATION_PGP_SIGNATURE,
+            Self::FileExtensionAsf => VIDEO_X_MS_ASF,
+            Self::FileExtensionAsm => TEXT_X_ASM,
+            Self::FileExtensionAso => APPLICATION_VND_ACCPAC_SIMPLY_ASO,
+            Self::FileExtensionAsx => VIDEO_X_MS_ASF,
+            Self::FileExtensionAtc => APPLICATION_VND_ACUCORP,
+            Self::FileExtensionAtom => APPLICATION_ATOM_XML,
+            Self::FileExtensionAtomcat => APPLICATION_ATOMCAT_XML,
+            Self::FileExtensionAtomsvc => APPLICATION_ATOMSVC_XML,
+            Self::FileExtensionAtx => APPLICATION_VND_ANTIX_GAME_COMPONENT,
+            Self::FileExtensionAu => AUDIO_BASIC,
+            Self::FileExtensionAvi => VIDEO_X_MSVIDEO,
+            Self::FileExtensionAvx => VIDEO_X_RAD_SCREENPLAY,
+            Self::FileExtensionAw => APPLICATION_APPLIXWARE,
+            Self::FileExtensionAxa => AUDIO_ANNODEX,
+            Self::FileExtensionAxv => VIDEO_ANNODEX,
+            Self::FileExtensionAzf => APPLICATION_VND_AIRZIP_FILESECURE_AZF,
+            Self::FileExtensionAzs => APPLICATION_VND_AIRZIP_FILESECURE_AZS,
+            Self::FileExtensionAzw => APPLICATION_VND_AMAZON_EBOOK,
+            Self::FileExtensionBat => APPLICATION_X_MSDOWNLOAD,
+            Self::FileExtensionBcpio => APPLICATION_X_BCPIO,
+            Self::FileExtensionBdf => APPLICATION_X_FONT_BDF,
+            Self::FileExtensionBdm => APPLICATION_VND_SYNCML_DM_WBXML,
+            Self::FileExtensionBed => APPLICATION_VND_REALVNC_BED,
+            Self::FileExtensionBh2 => APPLICATION_VND_FUJITSU_OASYSPRS,
+            Self::FileExtensionBin => APPLICATION_OCTET_STREAM,
+            Self::FileExtensionBlb => APPLICATION_X_BLORB,
+            Self::FileExtensionBlorb => APPLICATION_X_BLORB,
+            Self::FileExtensionBmi => APPLICATION_VND_BMI,
+            Self::FileExtensionBmp => IMAGE_BMP,
+            Self::FileExtensionBody => TEXT_HTML,
+            Self::FileExtensionBook => APPLICATION_VND_FRAMEMAKER,
+            Self::FileExtensionBox => APPLICATION_VND_PREVIEWSYSTEMS_BOX,
+            Self::FileExtensionBoz => APPLICATION_X_BZIP2,
+            Self::FileExtensionBpk => APPLICATION_OCTET_STREAM,
+            Self::FileExtensionBtif => IMAGE_PRS_BTIF,
+            Self::FileExtensionBz => APPLICATION_X_BZIP,
+            Self::FileExtensionBz2 => APPLICATION_X_BZIP2,
+            Self::FileExtensionC => TEXT_X_C,
+            Self::FileExtensionC11amc => APPLICATION_VND_CLUETRUST_CARTOMOBILE_CONFIG,
+            Self::FileExtensionC11amz => APPLICATION_VND_CLUETRUST_CARTOMOBILE_CONFIG_PKG,
+            Self::FileExtensionC4d => APPLICATION_VND_CLONK_C4GROUP,
+            Self::FileExtensionC4f => APPLICATION_VND_CLONK_C4GROUP,
+            Self::FileExtensionC4g => APPLICATION_VND_CLONK_C4GROUP,
+            Self::FileExtensionC4p => APPLICATION_VND_CLONK_C4GROUP,
+            Self::FileExtensionC4u => APPLICATION_VND_CLONK_C4GROUP,
+            Self::FileExtensionCab => APPLICATION_VND_MS_CAB_COMPRESSED,
+            Self::FileExtensionCaf => AUDIO_X_CAF,
+            Self::FileExtensionCap => APPLICATION_VND_TCPDUMP_PCAP,
+            Self::FileExtensionCar => APPLICATION_VND_CURL_CAR,
+            Self::FileExtensionCat => APPLICATION_VND_MS_PKI_SECCAT,
+            Self::FileExtensionCb7 => APPLICATION_X_CBR,
+            Self::FileExtensionCba => APPLICATION_X_CBR,
+            Self::FileExtensionCbr => APPLICATION_X_CBR,
+            Self::FileExtensionCbt => APPLICATION_X_CBR,
+            Self::FileExtensionCbz => APPLICATION_X_CBR,
+            Self::FileExtensionCc => TEXT_X_C,
+            Self::FileExtensionCct => APPLICATION_X_DIRECTOR,
+            Self::FileExtensionCcxml => APPLICATION_CCXML_XML,
+            Self::FileExtensionCdbcmsg => APPLICATION_VND_CONTACT_CMSG,
+            Self::FileExtensionCdf => APPLICATION_X_CDF,
+            Self::FileExtensionCdkey => APPLICATION_VND_MEDIASTATION_CDKEY,
+            Self::FileExtensionCdmia => APPLICATION_CDMI_CAPABILITY,
+            Self::FileExtensionCdmic => APPLICATION_CDMI_CONTAINER,
+            Self::FileExtensionCdmid => APPLICATION_CDMI_DOMAIN,
+            Self::FileExtensionCdmio => APPLICATION_CDMI_OBJECT,
+            Self::FileExtensionCdmiq => APPLICATION_CDMI_QUEUE,
+            Self::FileExtensionCdx => CHEMICAL_X_CDX,
+            Self::FileExtensionCdxml => APPLICATION_VND_CHEMDRAW_XML,
+            Self::FileExtensionCdy => APPLICATION_VND_CINDERELLA,
+            Self::FileExtensionCer => APPLICATION_PKIX_CERT,
+            Self::FileExtensionCfs => APPLICATION_X_CFS_COMPRESSED,
+            Self::FileExtensionCgm => IMAGE_CGM,
+            Self::FileExtensionChat => APPLICATION_X_CHAT,
+            Self::FileExtensionChm => APPLICATION_VND_MS_HTMLHELP,
+            Self::FileExtensionChrt => APPLICATION_VND_KDE_KCHART,
+            Self::FileExtensionCif => CHEMICAL_X_CIF,
+```
+# Path: hyperlane/type/src/file_extension/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum FileExtension {
+    FileExtension123,
+    FileExtension3dml,
+    FileExtension3ds,
+    FileExtension3g2,
+    FileExtension3gp,
+    FileExtension7z,
+    FileExtensionAab,
+    FileExtensionAac,
+    FileExtensionAam,
+    FileExtensionAas,
+    FileExtensionAbs,
+    FileExtensionAbw,
+    FileExtensionAc,
+    FileExtensionAcc,
+    FileExtensionAce,
+    FileExtensionAcu,
+    FileExtensionAcutc,
+    FileExtensionAdp,
+    FileExtensionAep,
+    FileExtensionAfm,
+    FileExtensionAfp,
+    FileExtensionAhead,
+    FileExtensionAi,
+    FileExtensionAif,
+    FileExtensionAifc,
+    FileExtensionAiff,
+    FileExtensionAim,
+    FileExtensionAir,
+    FileExtensionAit,
+    FileExtensionAmi,
+    FileExtensionAnx,
+    FileExtensionApk,
+    FileExtensionAppcache,
+    FileExtensionApplication,
+    FileExtensionApr,
+    FileExtensionArc,
+    FileExtensionArt,
+    FileExtensionAsc,
+    FileExtensionAsf,
+    FileExtensionAsm,
+    FileExtensionAso,
+    FileExtensionAsx,
+    FileExtensionAtc,
+    FileExtensionAtom,
+    FileExtensionAtomcat,
+    FileExtensionAtomsvc,
+    FileExtensionAtx,
+    FileExtensionAu,
+    FileExtensionAvi,
+    FileExtensionAvx,
+    FileExtensionAw,
+    FileExtensionAxa,
+    FileExtensionAxv,
+    FileExtensionAzf,
+    FileExtensionAzs,
+    FileExtensionAzw,
+    FileExtensionBat,
+    FileExtensionBcpio,
+    FileExtensionBdf,
+    FileExtensionBdm,
+    FileExtensionBed,
+    FileExtensionBh2,
+    FileExtensionBin,
+    FileExtensionBlb,
+    FileExtensionBlorb,
+    FileExtensionBmi,
+    FileExtensionBmp,
+    FileExtensionBody,
+    FileExtensionBook,
+    FileExtensionBox,
+    FileExtensionBoz,
+    FileExtensionBpk,
+    FileExtensionBtif,
+    FileExtensionBz,
+    FileExtensionBz2,
+    FileExtensionC,
+    FileExtensionC11amc,
+    FileExtensionC11amz,
+    FileExtensionC4d,
+    FileExtensionC4f,
+    FileExtensionC4g,
+    FileExtensionC4p,
+    FileExtensionC4u,
+    FileExtensionCab,
+    FileExtensionCaf,
+    FileExtensionCap,
+    FileExtensionCar,
+    FileExtensionCat,
+    FileExtensionCb7,
+    FileExtensionCba,
+    FileExtensionCbr,
+    FileExtensionCbt,
+    FileExtensionCbz,
+    FileExtensionCc,
+    FileExtensionCct,
+    FileExtensionCcxml,
+    FileExtensionCdbcmsg,
+    FileExtensionCdf,
+    FileExtensionCdkey,
+    FileExtensionCdmia,
+    FileExtensionCdmic,
+    FileExtensionCdmid,
+    FileExtensionCdmio,
+    FileExtensionCdmiq,
+    FileExtensionCdx,
+    FileExtensionCdxml,
+    FileExtensionCdy,
+    FileExtensionCer,
+    FileExtensionCfs,
+    FileExtensionCgm,
+    FileExtensionChat,
+    FileExtensionChm,
+    FileExtensionChrt,
+    FileExtensionCif,
+    FileExtensionCii,
+    FileExtensionCil,
+    FileExtensionCla,
+    FileExtensionClass,
+    FileExtensionClkk,
+    FileExtensionClkp,
+    FileExtensionClkt,
+    FileExtensionClkw,
+    FileExtensionClkx,
+    FileExtensionClp,
+    FileExtensionCmc,
+    FileExtensionCmdf,
+    FileExtensionCml,
+    FileExtensionCmp,
+    FileExtensionCmx,
+    FileExtensionCod,
+    FileExtensionCom,
+    FileExtensionConf,
+    FileExtensionCpio,
+    FileExtensionCpp,
+    FileExtensionCpt,
+    FileExtensionCrd,
+    FileExtensionCrl,
+    FileExtensionCrt,
+    FileExtensionCryptonote,
+    FileExtensionCsh,
+    FileExtensionCsml,
+    FileExtensionCsp,
+    FileExtensionCss,
+    FileExtensionCst,
+    FileExtensionCsv,
+    FileExtensionCu,
+    FileExtensionCurl,
+    FileExtensionCww,
+    FileExtensionCxt,
+    FileExtensionCxx,
+    FileExtensionDae,
+    FileExtensionDaf,
+    FileExtensionDart,
+    FileExtensionDataless,
+    FileExtensionDavmount,
+    FileExtensionDbk,
+    FileExtensionDcr,
+    FileExtensionDcurl,
+    FileExtensionDd2,
+    FileExtensionDdd,
+    FileExtensionDeb,
+    FileExtensionDef,
+    FileExtensionDeploy,
+    FileExtensionDer,
+    FileExtensionDfac,
+    FileExtensionDgc,
+    FileExtensionDib,
+    FileExtensionDic,
+    FileExtensionDir,
+    FileExtensionDis,
+    FileExtensionDist,
+    FileExtensionDistz,
+    FileExtensionDjv,
+    FileExtensionDjvu,
+    FileExtensionDll,
+    FileExtensionDmg,
+    FileExtensionDmp,
+    FileExtensionDms,
+    FileExtensionDna,
+    FileExtensionDoc,
+    FileExtensionDocm,
+    FileExtensionDocx,
+    FileExtensionDot,
+    FileExtensionDotm,
+    FileExtensionDotx,
+    FileExtensionDp,
+    FileExtensionDpg,
+    FileExtensionDra,
+    FileExtensionDsc,
+    FileExtensionDssc,
+    FileExtensionDtb,
+    FileExtensionDtd,
+    FileExtensionDts,
+    FileExtensionDtshd,
+    FileExtensionDump,
+    FileExtensionDv,
+    FileExtensionDvb,
+    FileExtensionDvi,
+    FileExtensionDwf,
+    FileExtensionDwg,
+    FileExtensionDxf,
+    FileExtensionDxp,
+    FileExtensionDxr,
+    FileExtensionEcelp4800,
+    FileExtensionEcelp7470,
+    FileExtensionEcelp9600,
+    FileExtensionEcma,
+    FileExtensionEdm,
+    FileExtensionEdx,
+    FileExtensionEfif,
+    FileExtensionEi6,
+    FileExtensionElc,
+    FileExtensionEmf,
+    FileExtensionEml,
+    FileExtensionEmma,
+    FileExtensionEmz,
+    FileExtensionEol,
+    FileExtensionEot,
+    FileExtensionEps,
+    FileExtensionEpub,
+    FileExtensionEs3,
+    FileExtensionEsa,
+    FileExtensionEsf,
+    FileExtensionEt3,
+    FileExtensionEtx,
+    FileExtensionEva,
+    FileExtensionEvy,
+    FileExtensionExe,
+    FileExtensionExi,
+    FileExtensionExt,
+    FileExtensionEz,
+    FileExtensionEz2,
+    FileExtensionEz3,
+    FileExtensionF,
+    FileExtensionF4v,
+    FileExtensionF77,
+    FileExtensionF90,
+    FileExtensionFbs,
+    FileExtensionFcdt,
+    FileExtensionFcs,
+    FileExtensionFdf,
+    FileExtensionFeLaunch,
+    FileExtensionFg5,
+    FileExtensionFgd,
+    FileExtensionFh,
+    FileExtensionFh4,
+    FileExtensionFh5,
+    FileExtensionFh7,
+    FileExtensionFhc,
+    FileExtensionFig,
+    FileExtensionFlac,
+    FileExtensionFli,
+    FileExtensionFlo,
+    FileExtensionFlv,
+    FileExtensionFlw,
+    FileExtensionFlx,
+    FileExtensionFly,
+    FileExtensionFm,
+    FileExtensionFnc,
+    FileExtensionFor,
+    FileExtensionFpx,
+    FileExtensionFrame,
+    FileExtensionFsc,
+    FileExtensionFst,
+    FileExtensionFtc,
+    FileExtensionFti,
+    FileExtensionFvt,
+    FileExtensionFxp,
+    FileExtensionFxpl,
+    FileExtensionFzs,
+    FileExtensionG2w,
+    FileExtensionG3,
+    FileExtensionG3w,
+    FileExtensionGac,
+    FileExtensionGam,
+    FileExtensionGbr,
+    FileExtensionGca,
+    FileExtensionGdl,
+    FileExtensionGeo,
+    FileExtensionGex,
+    FileExtensionGgb,
+    FileExtensionGgt,
+    FileExtensionGhf,
+    FileExtensionGif,
+    FileExtensionGim,
+    FileExtensionGml,
+    FileExtensionGmx,
+    FileExtensionGnumeric,
+    FileExtensionGph,
+    FileExtensionGpx,
+    FileExtensionGqf,
+    FileExtensionGqs,
+    FileExtensionGram,
+    FileExtensionGramps,
+    FileExtensionGre,
+    FileExtensionGrv,
+    FileExtensionGrxml,
+    FileExtensionGsf,
+    FileExtensionGtar,
+    FileExtensionGtm,
+    FileExtensionGtw,
+    FileExtensionGv,
+    FileExtensionGxf,
+    FileExtensionGxt,
+    FileExtensionGz,
+    FileExtensionH,
+    FileExtensionH261,
+    FileExtensionH263,
+    FileExtensionH264,
+    FileExtensionHal,
+    FileExtensionHbci,
+    FileExtensionHdf,
+    FileExtensionHh,
+    FileExtensionHlp,
+    FileExtensionHpgl,
+    FileExtensionHpid,
+    FileExtensionHps,
+    FileExtensionHqx,
+    FileExtensionHtc,
+    FileExtensionHtke,
+    FileExtensionHtm,
+    FileExtensionHtml,
+    FileExtensionHvd,
+    FileExtensionHvp,
+    FileExtensionHvs,
+    FileExtensionI2g,
+    FileExtensionIcc,
+    FileExtensionIce,
+    FileExtensionIcm,
+    FileExtensionIco,
+    FileExtensionIcs,
+    FileExtensionIef,
+    FileExtensionIfb,
+    FileExtensionIfm,
+    FileExtensionIges,
+    FileExtensionIgl,
+    FileExtensionIgm,
+    FileExtensionIgs,
+    FileExtensionIgx,
+    FileExtensionIif,
+    FileExtensionImp,
+    FileExtensionIms,
+    FileExtensionIn,
+    FileExtensionInk,
+    FileExtensionInkml,
+    FileExtensionInstall,
+    FileExtensionIota,
+    FileExtensionIpfix,
+    FileExtensionIpk,
+    FileExtensionIrm,
+    FileExtensionIrp,
+    FileExtensionIso,
+    FileExtensionItp,
+    FileExtensionIvp,
+    FileExtensionIvu,
+    FileExtensionJad,
+    FileExtensionJam,
+    FileExtensionJar,
+    FileExtensionJava,
+    FileExtensionJisp,
+    FileExtensionJlt,
+    FileExtensionJnlp,
+    FileExtensionJoda,
+    FileExtensionJpe,
+    FileExtensionJpeg,
+    FileExtensionJpg,
+    FileExtensionJpgm,
+    FileExtensionJpgv,
+    FileExtensionJpm,
+    FileExtensionJs,
+    FileExtensionJsf,
+    FileExtensionJson,
+    FileExtensionJsonml,
+    FileExtensionJspf,
+    FileExtensionKar,
+    FileExtensionKarbon,
+    FileExtensionKfo,
+    FileExtensionKia,
+    FileExtensionKml,
+    FileExtensionKmz,
+    FileExtensionKne,
+    FileExtensionKnp,
+    FileExtensionKon,
+    FileExtensionKpr,
+    FileExtensionKpt,
+    FileExtensionKpxx,
+    FileExtensionKsp,
+    FileExtensionKtr,
+    FileExtensionKtx,
+    FileExtensionKtz,
+    FileExtensionKwd,
+    FileExtensionKwt,
+    FileExtensionLasxml,
+    FileExtensionLatex,
+    FileExtensionLbd,
+    FileExtensionLbe,
+    FileExtensionLes,
+    FileExtensionLha,
+    FileExtensionLink66,
+    FileExtensionList,
+    FileExtensionList3820,
+    FileExtensionListafp,
+    FileExtensionLnk,
+    FileExtensionLog,
+    FileExtensionLostxml,
+    FileExtensionLrf,
+    FileExtensionLrm,
+    FileExtensionLtf,
+    FileExtensionLvp,
+    FileExtensionLwp,
+    FileExtensionLzh,
+    FileExtensionM13,
+    FileExtensionM14,
+    FileExtensionM1v,
+    FileExtensionM21,
+    FileExtensionM2a,
+    FileExtensionM2v,
+    FileExtensionM3a,
+    FileExtensionM3u,
+    FileExtensionM3u8,
+    FileExtensionM4a,
+    FileExtensionM4b,
+    FileExtensionM4r,
+    FileExtensionM4u,
+    FileExtensionM4v,
+    FileExtensionMarkdown,
+    FileExtensionToml,
+    FileExtensionYaml,
+    FileExtensionYml,
+    FileExtensionIni,
+    FileExtensionCfg,
+    FileExtensionPython,
+    FileExtensionGo,
+    FileExtensionTypeScript,
+    FileExtensionCSharp,
+    FileExtensionPhp,
+    FileExtensionRuby,
+    FileExtensionSwift,
+    FileExtensionKotlin,
+    FileExtensionKotlinScript,
+    FileExtensionScala,
+    FileExtensionIbmScOrScalaScript,
+    FileExtensionPerl,
+    FileExtensionPerlModule,
+    FileExtensionLua,
+    FileExtensionPowerShell,
+    FileExtensionCppHeader,
+    FileExtensionObjectiveC,
+    FileExtensionObjectiveCpp,
+    FileExtensionGroovy,
+    FileExtensionR,
+    FileExtensionScss,
+    FileExtensionSass,
+    FileExtensionLess,
+    FileExtensionVue,
+    FileExtensionJsx,
+    FileExtensionTsx,
+    FileExtensionDockerfile,
+    FileExtensionMakefile,
+    FileExtensionRs,
+    FileExtensionHaskell,
+    FileExtensionErlang,
+    FileExtensionElixir,
+    FileExtensionElixirScript,
+    FileExtensionClojure,
+    FileExtensionClojureScript,
+    FileExtensionClojureCommon,
+    FileExtensionFSharp,
+    FileExtensionFSharpScript,
+    FileExtensionOCaml,
+    FileExtensionOCamlInterface,
+    FileExtensionBash,
+    FileExtensionZsh,
+    FileExtensionEnv,
+    FileExtensionCj,
+    FileExtensionGitignore,
+    FileExtensionMa,
+    FileExtensionMac,
+    FileExtensionMads,
+    FileExtensionMag,
+    FileExtensionMaker,
+    FileExtensionMan,
+    FileExtensionMar,
+    FileExtensionMathml,
+    FileExtensionMb,
+    FileExtensionMbk,
+    FileExtensionMbox,
+    FileExtensionMc1,
+    FileExtensionMcd,
+    FileExtensionMcurl,
+    FileExtensionMdb,
+    FileExtensionMdi,
+    FileExtensionMe,
+    FileExtensionMesh,
+    FileExtensionMeta4,
+    FileExtensionMetalink,
+    FileExtensionMets,
+    FileExtensionMfm,
+    FileExtensionMft,
+    FileExtensionMgp,
+    FileExtensionMgz,
+    FileExtensionMid,
+    FileExtensionMidi,
+    FileExtensionMie,
+    FileExtensionMif,
+    FileExtensionMime,
+    FileExtensionMj2,
+    FileExtensionMjp2,
+    FileExtensionMk3d,
+    FileExtensionMka,
+    FileExtensionMks,
+    FileExtensionMkv,
+    FileExtensionMlp,
+    FileExtensionMmd,
+    FileExtensionMmf,
+    FileExtensionMmr,
+    FileExtensionMng,
+    FileExtensionMny,
+    FileExtensionMobi,
+    FileExtensionMods,
+    FileExtensionMov,
+    FileExtensionMovie,
+    FileExtensionMp1,
+    FileExtensionMp2,
+    FileExtensionMp21,
+    FileExtensionMp2a,
+    FileExtensionMp3,
+    FileExtensionMp4,
+    FileExtensionMp4a,
+    FileExtensionMp4s,
+    FileExtensionMp4v,
+    FileExtensionMpa,
+    FileExtensionMpc,
+    FileExtensionMpe,
+    FileExtensionMpeg,
+    FileExtensionMpega,
+    FileExtensionMpg,
+    FileExtensionMpg4,
+    FileExtensionMpga,
+    FileExtensionMpkg,
+    FileExtensionMpm,
+    FileExtensionMpn,
+    FileExtensionMpp,
+    FileExtensionMpt,
+    FileExtensionMpv2,
+    FileExtensionMpy,
+    FileExtensionMqy,
+    FileExtensionMrc,
+    FileExtensionMrcx,
+    FileExtensionMs,
+    FileExtensionMscml,
+    FileExtensionMseed,
+    FileExtensionMseq,
+    FileExtensionMsf,
+    FileExtensionMsh,
+    FileExtensionMsi,
+    FileExtensionMsl,
+    FileExtensionMsty,
+    FileExtensionMts,
+    FileExtensionMus,
+    FileExtensionMusicxml,
+    FileExtensionMvb,
+    FileExtensionMwf,
+    FileExtensionMxf,
+    FileExtensionMxl,
+    FileExtensionMxml,
+    FileExtensionMxs,
+    FileExtensionMxu,
+    FileExtensionNGage,
+    FileExtensionN3,
+    FileExtensionNb,
+    FileExtensionNbp,
+    FileExtensionNc,
+    FileExtensionNcx,
+    FileExtensionNfo,
+    FileExtensionNgdat,
+    FileExtensionNitf,
+    FileExtensionNlu,
+    FileExtensionNml,
+    FileExtensionNnd,
+    FileExtensionNns,
+    FileExtensionNnw,
+    FileExtensionNpx,
+    FileExtensionNsc,
+    FileExtensionNsf,
+    FileExtensionNtf,
+    FileExtensionNzb,
+    FileExtensionOa2,
+    FileExtensionOa3,
+    FileExtensionOas,
+    FileExtensionObd,
+    FileExtensionObj,
+    FileExtensionOda,
+    FileExtensionOdb,
+    FileExtensionOdc,
+    FileExtensionOdf,
+    FileExtensionOdft,
+    FileExtensionOdg,
+    FileExtensionOdi,
+    FileExtensionOdm,
+    FileExtensionOdp,
+    FileExtensionOds,
+    FileExtensionOdt,
+    FileExtensionOga,
+    FileExtensionOgg,
+    FileExtensionOgv,
+    FileExtensionOgx,
+    FileExtensionOmdoc,
+    FileExtensionOnepkg,
+    FileExtensionOnetmp,
+    FileExtensionOnetoc,
+    FileExtensionOnetoc2,
+    FileExtensionOpf,
+    FileExtensionOpml,
+    FileExtensionOprc,
+    FileExtensionOrg,
+    FileExtensionOsf,
+    FileExtensionOsfpvg,
+    FileExtensionOtc,
+    FileExtensionOtf,
+    FileExtensionOtg,
+    FileExtensionOth,
+    FileExtensionOti,
+    FileExtensionOtp,
+    FileExtensionOts,
+    FileExtensionOtt,
+    FileExtensionOxps,
+    FileExtensionOxt,
+    FileExtensionP,
+    FileExtensionP10,
+    FileExtensionP12,
+    FileExtensionP7b,
+    FileExtensionP7c,
+    FileExtensionP7m,
+    FileExtensionP7r,
+    FileExtensionP7s,
+    FileExtensionP8,
+    FileExtensionPas,
+    FileExtensionPaw,
+    FileExtensionPbd,
+    FileExtensionPbm,
+    FileExtensionPcap,
+    FileExtensionPcf,
+    FileExtensionPcl,
+    FileExtensionPclxl,
+    FileExtensionPct,
+    FileExtensionPcurl,
+    FileExtensionPcx,
+    FileExtensionPdb,
+    FileExtensionPdf,
+    FileExtensionPfa,
+    FileExtensionPfb,
+    FileExtensionPfm,
+    FileExtensionPfr,
+    FileExtensionPfx,
+    FileExtensionPgm,
+    FileExtensionPgn,
+    FileExtensionPgp,
+    FileExtensionPic,
+    FileExtensionPict,
+    FileExtensionPkg,
+    FileExtensionPki,
+    FileExtensionPkipath,
+    FileExtensionPlb,
+    FileExtensionPlc,
+    FileExtensionPlf,
+    FileExtensionPls,
+    FileExtensionPml,
+    FileExtensionPng,
+    FileExtensionPnm,
+    FileExtensionPnt,
+    FileExtensionPortpkg,
+    FileExtensionPot,
+    FileExtensionPotm,
+    FileExtensionPotx,
+    FileExtensionPpam,
+    FileExtensionPpd,
+    FileExtensionPpm,
+    FileExtensionPps,
+    FileExtensionPpsm,
+    FileExtensionPpsx,
+    FileExtensionPpt,
+    FileExtensionPptm,
+    FileExtensionPptx,
+    FileExtensionPqa,
+    FileExtensionPrc,
+    FileExtensionPre,
+    FileExtensionPrf,
+    FileExtensionPs,
+    FileExtensionPsb,
+    FileExtensionPsd,
+    FileExtensionPsf,
+    FileExtensionPskcxml,
+    FileExtensionPtid,
+    FileExtensionPub,
+    FileExtensionPvb,
+    FileExtensionPwn,
+    FileExtensionPya,
+    FileExtensionPyv,
+    FileExtensionQam,
+    FileExtensionQbo,
+    FileExtensionQfx,
+    FileExtensionQps,
+    FileExtensionQt,
+    FileExtensionQti,
+    FileExtensionQtif,
+    FileExtensionQwd,
+    FileExtensionQwt,
+    FileExtensionQxb,
+    FileExtensionQxd,
+    FileExtensionQxl,
+    FileExtensionQxt,
+    FileExtensionRa,
+    FileExtensionRam,
+    FileExtensionRar,
+    FileExtensionRas,
+    FileExtensionRcprofile,
+    FileExtensionRdf,
+    FileExtensionRdz,
+    FileExtensionRep,
+    FileExtensionRes,
+    FileExtensionRgb,
+    FileExtensionRif,
+    FileExtensionRip,
+    FileExtensionRis,
+    FileExtensionRl,
+    FileExtensionRlc,
+    FileExtensionRld,
+    FileExtensionRm,
+    FileExtensionRmi,
+    FileExtensionRmp,
+    FileExtensionRms,
+    FileExtensionRmvb,
+    FileExtensionRnc,
+    FileExtensionRoa,
+    FileExtensionRoff,
+    FileExtensionRp9,
+    FileExtensionRpss,
+    FileExtensionRpst,
+    FileExtensionRq,
+    FileExtensionRsd,
+    FileExtensionRss,
+    FileExtensionRtf,
+    FileExtensionRtx,
+    FileExtensionS,
+    FileExtensionS3m,
+    FileExtensionSaf,
+    FileExtensionSbml,
+    FileExtensionSc,
+    FileExtensionScd,
+    FileExtensionScm,
+    FileExtensionScq,
+    FileExtensionScs,
+    FileExtensionScurl,
+    FileExtensionSda,
+    FileExtensionSdc,
+    FileExtensionSdd,
+    FileExtensionSdkd,
+    FileExtensionSdkm,
+    FileExtensionSdp,
+    FileExtensionSdw,
+    FileExtensionSee,
+    FileExtensionSeed,
+    FileExtensionSema,
+    FileExtensionSemd,
+    FileExtensionSemf,
+    FileExtensionSer,
+    FileExtensionSetpay,
+    FileExtensionSetreg,
+    FileExtensionSfdHdstx,
+    FileExtensionSfs,
+    FileExtensionSfv,
+    FileExtensionSgi,
+    FileExtensionSgl,
+    FileExtensionSgm,
+    FileExtensionSgml,
+    FileExtensionSh,
+    FileExtensionShar,
+    FileExtensionShf,
+    FileExtensionSid,
+    FileExtensionSig,
+    FileExtensionSil,
+    FileExtensionSilo,
+    FileExtensionSis,
+    FileExtensionSisx,
+    FileExtensionSit,
+    FileExtensionSitx,
+    FileExtensionSkd,
+    FileExtensionSkm,
+    FileExtensionSkp,
+    FileExtensionSkt,
+    FileExtensionSldm,
+    FileExtensionSldx,
+    FileExtensionSlt,
+    FileExtensionSm,
+    FileExtensionSmf,
+    FileExtensionSmi,
+    FileExtensionSmil,
+    FileExtensionSmv,
+    FileExtensionSmzip,
+    FileExtensionSnd,
+    FileExtensionSnf,
+    FileExtensionSo,
+    FileExtensionSpc,
+    FileExtensionSpf,
+    FileExtensionSpl,
+    FileExtensionSpot,
+    FileExtensionSpp,
+    FileExtensionSpq,
+    FileExtensionSpx,
+    FileExtensionSql,
+    FileExtensionSrc,
+    FileExtensionSrt,
+    FileExtensionSru,
+    FileExtensionSrx,
+    FileExtensionSsdl,
+    FileExtensionSse,
+    FileExtensionSsf,
+    FileExtensionSsml,
+    FileExtensionSt,
+    FileExtensionStc,
+    FileExtensionStd,
+    FileExtensionStf,
+    FileExtensionSti,
+    FileExtensionStk,
+    FileExtensionStl,
+    FileExtensionStr,
+    FileExtensionStw,
+    FileExtensionSub,
+    FileExtensionSus,
+    FileExtensionSusp,
+    FileExtensionSv4cpio,
+    FileExtensionSv4crc,
+    FileExtensionSvc,
+    FileExtensionSvd,
+    FileExtensionSvg,
+    FileExtensionSvgz,
+    FileExtensionSwa,
+    FileExtensionSwf,
+    FileExtensionSwi,
+    FileExtensionSxc,
+    FileExtensionSxd,
+    FileExtensionSxg,
+    FileExtensionSxi,
+    FileExtensionSxm,
+    FileExtensionSxw,
+    FileExtensionT,
+    FileExtensionT3,
+    FileExtensionTaglet,
+    FileExtensionTao,
+    FileExtensionTar,
+    FileExtensionTcap,
+    FileExtensionTcl,
+    FileExtensionTeacher,
+    FileExtensionTei,
+    FileExtensionTeicorpus,
+    FileExtensionTex,
+    FileExtensionTexi,
+    FileExtensionTexinfo,
+    FileExtensionText,
+    FileExtensionTfi,
+    FileExtensionTfm,
+    FileExtensionTga,
+    FileExtensionThmx,
+    FileExtensionTif,
+    FileExtensionTiff,
+    FileExtensionTmo,
+    FileExtensionTorrent,
+    FileExtensionTpl,
+    FileExtensionTpt,
+    FileExtensionTr,
+    FileExtensionTra,
+    FileExtensionTrm,
+    FileExtensionTsd,
+    FileExtensionTsv,
+    FileExtensionTtc,
+    FileExtensionTtf,
+    FileExtensionTtl,
+    FileExtensionTwd,
+    FileExtensionTwds,
+    FileExtensionTxd,
+    FileExtensionTxf,
+    FileExtensionTxt,
+    FileExtensionU32,
+    FileExtensionUdeb,
+    FileExtensionUfd,
+    FileExtensionUfdl,
+    FileExtensionUlw,
+    FileExtensionUlx,
+    FileExtensionUmj,
+    FileExtensionUnityweb,
+    FileExtensionUoml,
+    FileExtensionUri,
+    FileExtensionUris,
+    FileExtensionUrls,
+    FileExtensionUstar,
+    FileExtensionUtz,
+    FileExtensionUu,
+    FileExtensionUva,
+    FileExtensionUvd,
+    FileExtensionUvf,
+    FileExtensionUvg,
+    FileExtensionUvh,
+    FileExtensionUvi,
+    FileExtensionUvm,
+    FileExtensionUvp,
+    FileExtensionUvs,
+    FileExtensionUvt,
+    FileExtensionUvu,
+    FileExtensionUvv,
+    FileExtensionUvva,
+    FileExtensionUvvd,
+    FileExtensionUvvf,
+    FileExtensionUvvg,
+    FileExtensionUvvh,
+    FileExtensionUvvi,
+    FileExtensionUvvm,
+    FileExtensionUvvp,
+    FileExtensionUvvs,
+    FileExtensionUvvt,
+    FileExtensionUvvu,
+    FileExtensionUvvv,
+    FileExtensionUvvx,
+    FileExtensionUvvz,
+    FileExtensionUvx,
+    FileExtensionUvz,
+    FileExtensionVcard,
+    FileExtensionVcd,
+    FileExtensionVcf,
+    FileExtensionVcg,
+    FileExtensionVcs,
+    FileExtensionVcx,
+    FileExtensionVis,
+    FileExtensionViv,
+    FileExtensionVob,
+    FileExtensionVor,
+    FileExtensionVox,
+    FileExtensionVrml,
+    FileExtensionVsd,
+    FileExtensionVsf,
+    FileExtensionVss,
+    FileExtensionVst,
+    FileExtensionVsw,
+    FileExtensionVtu,
+    FileExtensionVxml,
+    FileExtensionW3d,
+    FileExtensionWad,
+    FileExtensionWav,
+    FileExtensionWax,
+    FileExtensionWbmp,
+    FileExtensionWbs,
+    FileExtensionWbxml,
+    FileExtensionWcm,
+    FileExtensionWdb,
+    FileExtensionWdp,
+    FileExtensionWeba,
+    FileExtensionWebm,
+    FileExtensionWebp,
+    FileExtensionWasm,
+    FileExtensionWg,
+    FileExtensionWgt,
+    FileExtensionWks,
+    FileExtensionWm,
+    FileExtensionWma,
+    FileExtensionWmd,
+    FileExtensionWmf,
+    FileExtensionWml,
+    FileExtensionWmlc,
+    FileExtensionWmls,
+    FileExtensionWmlsc,
+    FileExtensionWmv,
+    FileExtensionWmx,
+    FileExtensionWmz,
+    FileExtensionWoff,
+    FileExtensionWoff2,
+    FileExtensionWpd,
+    FileExtensionWpl,
+    FileExtensionWps,
+    FileExtensionWqd,
+    FileExtensionWri,
+    FileExtensionWrl,
+    FileExtensionWsdl,
+    FileExtensionWspolicy,
+    FileExtensionWtb,
+    FileExtensionWvx,
+    FileExtensionX32,
+    FileExtensionX3d,
+    FileExtensionX3db,
+    FileExtensionX3dbz,
+    FileExtensionX3dv,
+    FileExtensionX3dvz,
+    FileExtensionX3dz,
+    FileExtensionXaml,
+    FileExtensionXap,
+    FileExtensionXar,
+    FileExtensionXbap,
+    FileExtensionXbd,
+    FileExtensionXbm,
+    FileExtensionXdf,
+    FileExtensionXdm,
+    FileExtensionXdp,
+    FileExtensionXdssc,
+    FileExtensionXdw,
+    FileExtensionXenc,
+    FileExtensionXer,
+    FileExtensionXfdf,
+    FileExtensionXfdl,
+    FileExtensionXht,
+    FileExtensionXhtml,
+    FileExtensionXhvml,
+    FileExtensionXif,
+    FileExtensionXla,
+    FileExtensionXlam,
+    FileExtensionXlc,
+    FileExtensionXlf,
+    FileExtensionXlm,
+    FileExtensionXls,
+    FileExtensionXlsb,
+    FileExtensionXlsm,
+    FileExtensionXlsx,
+    FileExtensionXlt,
+    FileExtensionXltm,
+    FileExtensionXltx,
+    FileExtensionXlw,
+    FileExtensionXm,
+    FileExtensionXml,
+    FileExtensionXo,
+    FileExtensionXop,
+    FileExtensionXpi,
+    FileExtensionXpl,
+    FileExtensionXpm,
+    FileExtensionXpr,
+    FileExtensionXps,
+    FileExtensionXpw,
+    FileExtensionXpx,
+    FileExtensionXsl,
+    FileExtensionXslt,
+    FileExtensionXsm,
+    FileExtensionXspf,
+    FileExtensionXul,
+    FileExtensionXvm,
+    FileExtensionXvml,
+    FileExtensionXwd,
+    FileExtensionXyz,
+    FileExtensionXz,
+    FileExtensionYang,
+    FileExtensionYin,
+    FileExtensionZ,
+    FileExtensionZUppercasee,
+    FileExtensionZ1,
+    FileExtensionZ2,
+    FileExtensionZ3,
+    FileExtensionZ4,
+    FileExtensionZ5,
+    FileExtensionZ6,
+    FileExtensionZ7,
+    FileExtensionZ8,
+    FileExtensionZaz,
+    FileExtensionZip,
+    FileExtensionZir,
+    FileExtensionZirz,
+    FileExtensionZmm,
+    #[default]
+    Unknown,
+}
+```
+# Path: hyperlane/type/src/file_extension/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+pub use r#enum::*;
+use super::*;
+```
+# Path: hyperlane/type/src/lifetime/trait.rs
+```rust
+pub trait Lifetime {
+    unsafe fn leak(&self) -> &'static Self;
+    unsafe fn leak_mut(&self) -> &'static mut Self;
+}
+```
+# Path: hyperlane/type/src/lifetime/mod.rs
+```rust
+mod r#trait;
+pub use r#trait::*;
+```
+# Path: hyperlane/type/src/cookie/impl.rs
+```rust
+use super::*;
+impl CookieBuilder {
+    #[inline(always)]
+    pub fn new<N, V>(name: N, value: V) -> Self
+    where
+        N: AsRef<str>,
+        V: AsRef<str>,
+    {
+        Self {
+            name: name.as_ref().to_owned(),
+            value: value.as_ref().to_owned(),
+            expires: None,
+            max_age: None,
+            domain: None,
+            path: None,
+            secure: None,
+            http_only: None,
+            same_site: None,
+        }
+    }
+    pub fn parse<C>(cookie: C) -> Self
+    where
+        C: AsRef<str>,
+    {
+        let mut cookie_builder: Self = Self::default();
+        let parts: Vec<&str> = cookie.as_ref().split(SEMICOLON).collect();
+        if parts.is_empty() {
+            return cookie_builder;
+        }
+        if let Some(name_value_pair) = parts.first() {
+            let name_value_pair: &str = name_value_pair.trim();
+            if let Some((name, value)) = name_value_pair.split_once(EQUAL) {
+                cookie_builder.name = name.trim().to_string();
+                cookie_builder.value = value.trim().to_string();
+            } else if !name_value_pair.is_empty() {
+                cookie_builder.name = name_value_pair.to_string();
+                cookie_builder.value = String::new();
+            }
+        }
+        for part in parts.iter().skip(1) {
+            let part: &str = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            if let Some((key, value)) = part.split_once(EQUAL) {
+                let key_lowercase: String = key.trim().to_lowercase();
+                let value: String = value.trim().to_string();
+                match key_lowercase.as_str() {
+                    COOKIE_EXPIRES_LOWERCASE => {
+                        cookie_builder.set_expires(value);
+                    }
+                    COOKIE_MAX_AGE_LOWERCASE => {
+                        if let Ok(max_age_value) = value.parse::<i64>() {
+                            cookie_builder.set_max_age(max_age_value);
+                        }
+                    }
+                    COOKIE_DOMAIN_LOWERCASE => {
+                        cookie_builder.set_domain(value);
+                    }
+                    COOKIE_PATH_LOWERCASE => {
+                        cookie_builder.set_path(value);
+                    }
+                    COOKIE_SAME_SITE_LOWERCASE => {
+                        cookie_builder.set_same_site(value);
+                    }
+                    _ => {}
+                }
+            } else {
+                let attribute_lowercase: String = part.to_lowercase();
+                match attribute_lowercase.as_str() {
+                    COOKIE_SECURE_LOWERCASE => {
+                        cookie_builder.secure = Some(true);
+                    }
+                    COOKIE_HTTP_ONLY_LOWERCASE => {
+                        cookie_builder.http_only = Some(true);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        cookie_builder
+    }
+    #[inline(always)]
+    pub fn set_expires<E>(&mut self, expires: E) -> &mut Self
+    where
+        E: AsRef<str>,
+    {
+        self.expires = Some(expires.as_ref().to_owned());
+        self
+    }
+    #[inline(always)]
+    pub fn set_max_age<M>(&mut self, max_age: M) -> &mut Self
+    where
+        M: Into<i64>,
+    {
+        self.max_age = Some(max_age.into());
+        self
+    }
+    #[inline(always)]
+    pub fn set_domain<D>(&mut self, domain: D) -> &mut Self
+    where
+        D: AsRef<str>,
+    {
+        self.domain = Some(domain.as_ref().to_owned());
+        self
+    }
+    #[inline(always)]
+    pub fn set_path<T>(&mut self, path: T) -> &mut Self
+    where
+        T: AsRef<str>,
+    {
+        self.path = Some(path.as_ref().to_owned());
+        self
+    }
+    #[inline(always)]
+    pub fn secure(&mut self) -> &mut Self {
+        self.secure = Some(true);
+        self
+    }
+    #[inline(always)]
+    pub fn http_only(&mut self) -> &mut Self {
+        self.http_only = Some(true);
+        self
+    }
+    #[inline(always)]
+    pub fn disable_secure(&mut self) -> &mut Self {
+        self.secure = Some(false);
+        self
+    }
+    #[inline(always)]
+    pub fn disable_http_only(&mut self) -> &mut Self {
+        self.http_only = Some(false);
+        self
+    }
+    #[inline(always)]
+    pub fn set_same_site<T>(&mut self, same_site: T) -> &mut Self
+    where
+        T: AsRef<str>,
+    {
+        self.same_site = Some(same_site.as_ref().to_owned());
+        self
+    }
+    pub fn build(&self) -> String {
+        if self.get_name().is_empty() {
+            return String::new();
+        }
+        let mut cookie_string: String = format!("{}={}", self.get_name(), self.get_value());
+        if let Some(expires_value) = self.try_get_expires() {
+            cookie_string.push_str(COOKIE_EXPIRES_ATTRIBUTE_LOWERCASE);
+            cookie_string.push_str(expires_value);
+        }
+        if let Some(max_age_value) = self.try_get_max_age() {
+            cookie_string.push_str(COOKIE_MAX_AGE_ATTRIBUTE_LOWERCASE);
+            cookie_string.push_str(&max_age_value.to_string());
+        }
+        if let Some(domain_value) = self.try_get_domain() {
+            cookie_string.push_str(COOKIE_DOMAIN_ATTRIBUTE_LOWERCASE);
+            cookie_string.push_str(domain_value);
+        }
+        if let Some(path_value) = self.try_get_path() {
+            cookie_string.push_str(COOKIE_PATH_ATTRIBUTE_LOWERCASE);
+            cookie_string.push_str(path_value);
+        }
+        if let Some(true) = self.try_get_secure() {
+            cookie_string.push_str(COOKIE_SECURE_ATTRIBUTE_LOWERCASE);
+        }
+        if let Some(true) = self.try_get_http_only() {
+            cookie_string.push_str(COOKIE_HTTP_ONLY_ATTRIBUTE_LOWERCASE);
+        }
+        if let Some(same_site_value) = self.try_get_same_site() {
+            cookie_string.push_str(COOKIE_SAME_SITE_ATTRIBUTE_LOWERCASE);
+            cookie_string.push_str(same_site_value);
+        }
+        cookie_string
+    }
+}
+impl Cookie {
+    pub fn parse<C>(cookie: C) -> Cookies
+    where
+        C: AsRef<str>,
+    {
+        let cookie_ref: &str = cookie.as_ref();
+        let mut cookies: Cookies = hash_map_xx_hash3_64();
+        if cookie_ref.trim().is_empty() {
+            return cookies;
+        }
+        let parts: Vec<&str> = cookie_ref.split(SEMICOLON).collect();
+        for part in parts {
+            let part: &str = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            if let Some((name, value)) = part.split_once(EQUAL) {
+                let name: String = name.trim().to_string();
+                let value: String = value.trim().to_string();
+                if !name.is_empty() {
+                    cookies.insert(name, value);
+                }
+            } else if !part.is_empty() {
+                cookies.insert(part.to_string(), String::new());
+            }
+        }
+        cookies
+    }
+}
+```
+# Path: hyperlane/type/src/cookie/type.rs
+```rust
+use super::*;
+pub type CookieString = String;
+pub type CookieKey = String;
+pub type CookieValue = String;
+pub type Cookies = HashMapXxHash3_64<CookieKey, CookieValue>;
+```
+# Path: hyperlane/type/src/cookie/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CookieBuilder {
+    #[set(type(AsRef<str>))]
+    pub(super) name: CookieKey,
+    #[set(type(AsRef<str>))]
+    pub(super) value: CookieValue,
+    #[set(skip)]
+    pub(super) expires: Option<String>,
+    #[set(skip)]
+    pub(super) max_age: Option<i64>,
+    #[set(skip)]
+    pub(super) domain: Option<String>,
+    #[set(skip)]
+    pub(super) path: Option<String>,
+    #[set(skip)]
+    pub(super) secure: Option<bool>,
+    #[set(skip)]
+    pub(super) http_only: Option<bool>,
+    #[set(skip)]
+    pub(super) same_site: Option<String>,
+}
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Cookie;
+```
+# Path: hyperlane/type/src/cookie/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+mod r#type;
+pub use {r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/methods/impl.rs
+```rust
+use super::*;
+impl Default for Method {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::Unknown(String::new())
+    }
+}
+impl Display for Method {
+    #[inline(always)]
+    fn fmt(&self, data: &mut Formatter<'_>) -> fmt::Result {
+        let res: &str = match self {
+            Self::Get => GET,
+            Self::Post => POST,
+            Self::Connect => CONNECT,
+            Self::Delete => DELETE,
+            Self::Head => HEAD,
+            Self::Patch => PATCH,
+            Self::Trace => TRACE,
+            Self::Put => PUT,
+            Self::Options => OPTIONS,
+            Self::Unknown(methods) => methods,
+        };
+        write!(data, "{res}")
+    }
+}
+impl FromStr for Method {
+    type Err = ();
+    #[inline(always)]
+    fn from_str(methods_str: &str) -> Result<Self, Self::Err> {
+        match methods_str {
+            GET => Ok(Self::Get),
+            POST => Ok(Self::Post),
+            PUT => Ok(Self::Put),
+            DELETE => Ok(Self::Delete),
+            PATCH => Ok(Self::Patch),
+            HEAD => Ok(Self::Head),
+            OPTIONS => Ok(Self::Options),
+            CONNECT => Ok(Self::Connect),
+            TRACE => Ok(Self::Trace),
+            _ => Ok(Self::Unknown(methods_str.to_string())),
+        }
+    }
+}
+impl Method {
+    #[inline(always)]
+    pub fn is_get(&self) -> bool {
+        matches!(self, Self::Get)
+    }
+    #[inline(always)]
+    pub fn is_post(&self) -> bool {
+        matches!(self, Self::Post)
+    }
+    #[inline(always)]
+    pub fn is_put(&self) -> bool {
+        matches!(self, Self::Put)
+    }
+    #[inline(always)]
+    pub fn is_delete(&self) -> bool {
+        matches!(self, Self::Delete)
+    }
+    #[inline(always)]
+    pub fn is_patch(&self) -> bool {
+        matches!(self, Self::Patch)
+    }
+    #[inline(always)]
+    pub fn is_head(&self) -> bool {
+        matches!(self, Self::Head)
+    }
+    #[inline(always)]
+    pub fn is_options(&self) -> bool {
+        matches!(self, Self::Options)
+    }
+    #[inline(always)]
+    pub fn is_connect(&self) -> bool {
+        matches!(self, Self::Connect)
+    }
+    #[inline(always)]
+    pub fn is_trace(&self) -> bool {
+        matches!(self, Self::Trace)
+    }
+    #[inline(always)]
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown(_))
+    }
+}
+```
+# Path: hyperlane/type/src/methods/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum Method {
+    Get,
+    Post,
+    Put,
+    Delete,
+    Patch,
+    Head,
+    Options,
+    Connect,
+    Trace,
+    Unknown(String),
+}
+```
+# Path: hyperlane/type/src/methods/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+pub use r#enum::*;
+use super::*;
+```
+# Path: hyperlane/type/src/arc_rwlock/fn.rs
+```rust
+use super::*;
+#[inline(always)]
+pub fn arc_rwlock<T>(data: T) -> ArcRwLock<T> {
+    Arc::new(RwLock::new(data))
+}
+```
+# Path: hyperlane/type/src/arc_rwlock/type.rs
+```rust
+use super::*;
+pub type ArcRwLock<T> = Arc<RwLock<T>>;
+```
+# Path: hyperlane/type/src/arc_rwlock/mod.rs
+```rust
+mod r#fn;
+mod r#type;
+pub use {r#fn::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/request/impl.rs
+```rust
+use super::*;
+impl std::error::Error for RequestError {}
+impl Default for RequestError {
+    #[inline(always)]
+    fn default() -> Self {
+        RequestError::Unknown(HttpStatus::InternalServerError)
+    }
+}
+impl From<std::io::Error> for RequestError {
+    #[inline(always)]
+    fn from(error: std::io::Error) -> Self {
+        let kind: ErrorKind = error.kind();
+        if kind == ErrorKind::ConnectionReset || kind == ErrorKind::ConnectionAborted {
+            return RequestError::ClientDisconnected(HttpStatus::BadRequest);
+        }
+        RequestError::ReadConnection(HttpStatus::BadRequest)
+    }
+}
+impl From<Elapsed> for RequestError {
+    #[inline(always)]
+    fn from(_: Elapsed) -> Self {
+        RequestError::ReadTimeout(HttpStatus::RequestTimeout)
+    }
+}
+impl From<ParseIntError> for RequestError {
+    #[inline(always)]
+    fn from(_: ParseIntError) -> Self {
+        RequestError::InvalidContentLength(HttpStatus::BadRequest)
+    }
+}
+impl From<ResponseError> for RequestError {
+    #[inline(always)]
+    fn from(_: ResponseError) -> Self {
+        RequestError::WriteTimeout(HttpStatus::InternalServerError)
+    }
+}
+impl RequestError {
+    pub fn get_http_status(&self) -> HttpStatus {
+        match self {
+            Self::HttpRead(status) => *status,
+            Self::GetTcpStream(status) => *status,
+            Self::GetTlsStream(status) => *status,
+            Self::ReadConnection(status) => *status,
+            Self::RequestAborted(status) => *status,
+            Self::TlsStreamConnect(status) => *status,
+            Self::NeedOpenRedirect(status) => *status,
+            Self::MaxRedirectTimes(status) => *status,
+            Self::MethodsNotSupport(status) => *status,
+            Self::RedirectInvalidUrl(status) => *status,
+            Self::ClientDisconnected(status) => *status,
+            Self::RedirectUrlDeadLoop(status) => *status,
+            Self::ClientClosedConnection(status) => *status,
+            Self::ServerClosedConnection(status) => *status,
+            Self::IncompleteWebSocketFrame(status) => *status,
+            Self::RequestTooLong(status) => *status,
+            Self::PathTooLong(status) => *status,
+            Self::QueryTooLong(status) => *status,
+            Self::HeaderLineTooLong(status) => *status,
+            Self::TooManyHeaders(status) => *status,
+            Self::HeaderKeyTooLong(status) => *status,
+            Self::HeaderValueTooLong(status) => *status,
+            Self::ContentLengthTooLarge(status) => *status,
+            Self::InvalidContentLength(status) => *status,
+            Self::InvalidUrlScheme(status) => *status,
+            Self::InvalidUrlHost(status) => *status,
+            Self::InvalidUrlPort(status) => *status,
+            Self::InvalidUrlPath(status) => *status,
+            Self::InvalidUrlQuery(status) => *status,
+            Self::InvalidUrlFragment(status) => *status,
+            Self::ReadTimeout(status) => *status,
+            Self::WriteTimeout(status) => *status,
+            Self::TcpConnectionFailed(status) => *status,
+            Self::TlsHandshakeFailed(status) => *status,
+            Self::TlsCertificateInvalid(status) => *status,
+            Self::WebSocketFrameTooLarge(status) => *status,
+            Self::WebSocketOpcodeUnsupported(status) => *status,
+            Self::WebSocketMaskMissing(status) => *status,
+            Self::WebSocketPayloadCorrupted(status) => *status,
+            Self::WebSocketInvalidUtf8(status) => *status,
+            Self::WebSocketInvalidCloseCode(status) => *status,
+            Self::WebSocketInvalidExtension(status) => *status,
+            Self::HttpRequestPartsInsufficient(status) => *status,
+            Self::TcpStreamConnect(status) => *status,
+            Self::TlsConnectorBuild(status) => *status,
+            Self::InvalidUrl(status) => *status,
+            Self::ConfigReadError(status) => *status,
+            Self::TcpStreamConnectString(status) => *status,
+            Self::TlsConnectorBuildString(status) => *status,
+            Self::Request(_) => HttpStatus::BadRequest,
+            Self::Unknown(status) => *status,
+        }
+    }
+    pub fn get_http_status_code(&self) -> ResponseStatusCode {
+        self.get_http_status().code()
+    }
+}
+impl Default for RequestConfig {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            buffer_size: DEFAULT_BUFFER_SIZE,
+            max_path_size: DEFAULT_MAX_PATH_SIZE,
+            max_header_count: DEFAULT_MAX_HEADER_COUNT,
+            max_header_key_size: DEFAULT_MAX_HEADER_KEY_SIZE,
+            max_header_value_size: DEFAULT_MAX_HEADER_VALUE_SIZE,
+            max_body_size: DEFAULT_MAX_BODY_SIZE,
+            read_timeout_ms: DEFAULT_READ_TIMEOUT_MS,
+        }
+    }
+}
+impl RequestConfig {
+    pub fn from_json<C>(json: C) -> Result<RequestConfig, serde_json::Error>
+    where
+        C: AsRef<str>,
+    {
+        serde_json::from_str(json.as_ref())
+    }
+    #[inline(always)]
+    pub fn low_security() -> Self {
+        Self {
+            buffer_size: DEFAULT_LOW_SECURITY_BUFFER_SIZE,
+            max_path_size: DEFAULT_LOW_SECURITY_MAX_PATH_SIZE,
+            max_header_count: DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT,
+            max_header_key_size: DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE,
+            max_header_value_size: DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE,
+            max_body_size: DEFAULT_LOW_SECURITY_MAX_BODY_SIZE,
+            read_timeout_ms: DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS,
+        }
+    }
+    #[inline(always)]
+    pub fn high_security() -> Self {
+        Self {
+            buffer_size: DEFAULT_HIGH_SECURITY_BUFFER_SIZE,
+            max_path_size: DEFAULT_HIGH_SECURITY_MAX_PATH_SIZE,
+            max_header_count: DEFAULT_HIGH_SECURITY_MAX_HEADER_COUNT,
+            max_header_key_size: DEFAULT_HIGH_SECURITY_MAX_HEADER_KEY_SIZE,
+            max_header_value_size: DEFAULT_HIGH_SECURITY_MAX_HEADER_VALUE_SIZE,
+            max_body_size: DEFAULT_HIGH_SECURITY_MAX_BODY_SIZE,
+            read_timeout_ms: DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS,
+        }
+    }
+}
+impl Default for Request {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            method: Method::default(),
+            host: String::new(),
+            version: HttpVersion::default(),
+            path: String::new(),
+            querys: hash_map_xx_hash3_64(),
+            headers: hash_map_xx_hash3_64(),
+            body: Vec::new(),
+        }
+    }
+}
+impl Request {
+    #[inline(always)]
+    pub(crate) fn get_http_first_line(
+        line: &str,
+    ) -> Result<(RequestMethod, &str, RequestVersion), RequestError> {
+        let mut parts: SplitWhitespace<'_> = line.split_whitespace();
+        let method_str: &str = parts
+            .next()
+            .ok_or(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ))?;
+        let full_path: &str = parts
+            .next()
+            .ok_or(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ))?;
+        let version_str: &str = parts
+            .next()
+            .ok_or(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ))?;
+        let method: RequestMethod = method_str
+            .parse::<RequestMethod>()
+            .unwrap_or(Method::Unknown(method_str.to_string()));
+        let version: RequestVersion = version_str
+            .parse::<RequestVersion>()
+            .unwrap_or(RequestVersion::Unknown(version_str.to_string()));
+        Ok((method, full_path, version))
+    }
+    #[inline(always)]
+    pub(crate) fn check_http_path_size(path: &str, max_size: usize) -> Result<(), RequestError> {
+        if path.len() > max_size && max_size != DEFAULT_LOW_SECURITY_MAX_PATH_SIZE {
+            return Err(RequestError::PathTooLong(HttpStatus::URITooLong));
+        }
+        Ok(())
+    }
+    #[inline(always)]
+    pub(crate) fn get_http_query(
+        path: &str,
+        query_index: Option<usize>,
+        hash_index: Option<usize>,
+    ) -> &str {
+        query_index.map_or(EMPTY_STR, |query_index: usize| {
+            let temp: &str = &path[query_index + 1..];
+            match hash_index {
+                None => temp,
+                Some(hash_index) if hash_index <= query_index => temp,
+                Some(hash_index) => &temp[..hash_index - query_index - 1],
+            }
+        })
+    }
+    #[inline(always)]
+    pub(crate) fn get_http_path(
+        path: &str,
+        query_index: Option<usize>,
+        hash_index: Option<usize>,
+    ) -> RequestPath {
+        match query_index.or(hash_index) {
+            Some(separator_index) => path[..separator_index].to_owned(),
+            None => path.to_owned(),
+        }
+    }
+    #[inline(always)]
+    pub(crate) fn get_http_querys(query: &str) -> RequestQuerys {
+        let estimated_capacity: usize = query.matches(AND).count() + 1;
+        let mut query_map: RequestQuerys = HashMapXxHash3_64::with_capacity_and_hasher(
+            estimated_capacity,
+            BuildHasherDefault::default(),
+        );
+        for pair in query.split(AND) {
+            if let Some((key, value)) = pair.split_once(EQUAL) {
+                if !key.is_empty() {
+                    query_map.insert(key.to_string(), value.to_string());
+                }
+            } else if !pair.is_empty() {
+                query_map.insert(pair.to_string(), String::new());
+            }
+        }
+        query_map
+    }
+    #[inline(always)]
+    pub(crate) fn check_http_header_count(
+        count: usize,
+        max_count: usize,
+    ) -> Result<(), RequestError> {
+        if count > max_count && max_count != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT {
+            return Err(RequestError::TooManyHeaders(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        Ok(())
+    }
+    #[inline(always)]
+    pub(crate) fn check_http_header_key_size(
+        key: &str,
+        max_size: usize,
+    ) -> Result<(), RequestError> {
+        if key.len() > max_size && max_size != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE {
+            return Err(RequestError::HeaderKeyTooLong(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        Ok(())
+    }
+    #[inline(always)]
+    pub(crate) fn check_http_header_value_size(
+        value: &str,
+        max_size: usize,
+    ) -> Result<(), RequestError> {
+        if value.len() > max_size && max_size != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE {
+            return Err(RequestError::HeaderValueTooLong(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        Ok(())
+    }
+    #[inline(always)]
+    pub(crate) fn check_http_body_size(
+        value: &str,
+        max_size: usize,
+    ) -> Result<usize, RequestError> {
+        let length: usize = value.parse::<usize>()?;
+        if length > max_size && max_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
+            return Err(RequestError::ContentLengthTooLarge(
+                HttpStatus::PayloadTooLarge,
+            ));
+        }
+        Ok(length)
+    }
+    pub(crate) async fn get_http_headers<R>(
+        reader: &mut R,
+        config: &RequestConfig,
+    ) -> Result<(RequestHeaders, RequestHost, usize), RequestError>
+    where
+        R: AsyncBufReadExt + Unpin,
+    {
+        let buffer_size: usize = config.get_buffer_size();
+        let max_header_count: usize = config.get_max_header_count();
+        let max_header_key_size: usize = config.get_max_header_key_size();
+        let max_header_value_size: usize = config.get_max_header_value_size();
+        let max_body_size: usize = config.get_max_body_size();
+        let mut headers: RequestHeaders =
+            HashMapXxHash3_64::with_capacity_and_hasher(B_16, BuildHasherDefault::default());
+        let mut host: RequestHost = String::new();
+        let mut content_size: usize = 0;
+        let mut header_count: usize = 0;
+        let mut header_line_buffer: String = String::with_capacity(buffer_size);
+        loop {
+            header_line_buffer.clear();
+            AsyncBufReadExt::read_line(reader, &mut header_line_buffer).await?;
+            let header_line: &str = header_line_buffer.trim();
+            if header_line.is_empty() {
+                break;
+            }
+            header_count += 1;
+            Self::check_http_header_count(header_count, max_header_count)?;
+            let (key_part, value_part): (&str, &str) = match header_line.split_once(COLON) {
+                Some(parts) => parts,
+                None => continue,
+            };
+            let key_trimmed: &str = key_part.trim();
+            if key_trimmed.is_empty() {
+                continue;
+            }
+            let key: String = key_trimmed.to_ascii_lowercase();
+            Self::check_http_header_key_size(&key, max_header_key_size)?;
+            let value: String = value_part.trim().to_string();
+            Self::check_http_header_value_size(&value, max_header_value_size)?;
+            match key.as_str() {
+                HOST => host = value.clone(),
+                CONTENT_LENGTH => {
+                    content_size = Self::check_http_body_size(&value, max_body_size)?;
+                }
+                _ => {}
+            }
+            headers.entry(key).or_default().push_back(value);
+        }
+        Ok((headers, host, content_size))
+    }
+    #[inline(always)]
+    pub(crate) async fn get_http_body(
+        reader: &mut BufReader<&mut TcpStream>,
+        content_size: usize,
+    ) -> Result<RequestBody, RequestError> {
+        let mut body: RequestBody = Vec::with_capacity(content_size);
+        if content_size > 0 {
+            body.resize(content_size, 0);
+            AsyncReadExt::read_exact(reader, &mut body).await?;
+        }
+        Ok(body)
+    }
+    #[inline(always)]
+    pub fn try_get_query<K>(&self, key: K) -> Option<RequestQuerysValue>
+    where
+        K: AsRef<str>,
+    {
+        self.querys.get(key.as_ref()).cloned()
+    }
+    #[inline(always)]
+    pub fn get_query<K>(&self, key: K) -> RequestQuerysValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_query(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_header<K>(&self, key: K) -> Option<RequestHeadersValue>
+    where
+        K: AsRef<str>,
+    {
+        self.headers.get(key.as_ref()).cloned()
+    }
+    #[inline(always)]
+    pub fn get_header<K>(&self, key: K) -> RequestHeadersValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_header(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_header_front<K>(&self, key: K) -> Option<RequestHeadersValueItem>
+    where
+        K: AsRef<str>,
+    {
+        self.headers
+            .get(key.as_ref())
+            .and_then(|header_values: &VecDeque<String>| header_values.front().cloned())
+    }
+    #[inline(always)]
+    pub fn get_header_front<K>(&self, key: K) -> RequestHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_header_front(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_header_back<K>(&self, key: K) -> Option<RequestHeadersValueItem>
+    where
+        K: AsRef<str>,
+    {
+        self.headers
+            .get(key.as_ref())
+            .and_then(|header_values: &VecDeque<String>| header_values.back().cloned())
+    }
+    #[inline(always)]
+    pub fn get_header_back<K>(&self, key: K) -> RequestHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_header_back(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_header_size<K>(&self, key: K) -> Option<usize>
+    where
+        K: AsRef<str>,
+    {
+        self.headers
+            .get(key.as_ref())
+            .map(|header_values: &VecDeque<String>| header_values.len())
+    }
+    #[inline(always)]
+    pub fn get_header_size<K>(&self, key: K) -> usize
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_header_size(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn get_headers_values_size(&self) -> usize {
+        self.headers
+            .values()
+            .map(|header_values: &VecDeque<String>| header_values.len())
+            .sum()
+    }
+    #[inline(always)]
+    pub fn get_headers_size(&self) -> usize {
+        self.headers.len()
+    }
+    #[inline(always)]
+    pub fn has_header<K>(&self, key: K) -> bool
+    where
+        K: AsRef<str>,
+    {
+        self.headers.contains_key(key.as_ref())
+    }
+    #[inline(always)]
+    pub fn has_header_value<K, V>(&self, key: K, value: V) -> bool
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        if let Some(values) = self.headers.get(key.as_ref()) {
+            values.iter().any(|data: &String| data == value.as_ref())
+        } else {
+            false
+        }
+    }
+    #[inline(always)]
+    pub fn try_get_cookies(&self) -> Option<Cookies> {
+        self.try_get_header_back(COOKIE)
+            .map(|cookie_header: String| Cookie::parse(cookie_header))
+    }
+    #[inline(always)]
+    pub fn get_cookies(&self) -> Cookies {
+        self.try_get_cookies().unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_cookie<K>(&self, key: K) -> Option<CookieValue>
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_cookies()
+            .and_then(|cookies: Cookies| cookies.get(key.as_ref()).cloned())
+    }
+    #[inline(always)]
+    pub fn get_cookie<K>(&self, key: K) -> CookieValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_cookie(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn get_upgrade_type(&self) -> UpgradeType {
+        self.try_get_header_back(UPGRADE)
+            .and_then(|data: String| data.parse::<UpgradeType>().ok())
+            .unwrap_or_default()
+    }
+    #[inline(always)]
+    pub fn get_body_string(&self) -> String {
+        String::from_utf8_lossy(self.get_body()).into_owned()
+    }
+    #[inline(always)]
+    pub fn try_get_body_json<T>(&self) -> Result<T, serde_json::Error>
+    where
+        T: DeserializeOwned,
+    {
+        serde_json::from_slice(self.get_body())
+    }
+    #[inline(always)]
+    pub fn get_body_json<T>(&self) -> T
+    where
+        T: DeserializeOwned,
+    {
+        self.try_get_body_json().unwrap()
+    }
+    #[inline(always)]
+    pub fn is_ws_upgrade_type(&self) -> bool {
+        self.get_upgrade_type().is_ws()
+    }
+    #[inline(always)]
+    pub fn is_h2c_upgrade_type(&self) -> bool {
+        self.get_upgrade_type().is_h2c()
+    }
+    #[inline(always)]
+    pub fn is_tls_upgrade_type(&self) -> bool {
+        self.get_upgrade_type().is_tls()
+    }
+    #[inline(always)]
+    pub fn is_unknown_upgrade_type(&self) -> bool {
+        self.get_upgrade_type().is_unknown()
+    }
+    #[inline(always)]
+    pub fn is_enable_keep_alive(&self) -> bool {
+        if let Some(connection_value) = self.try_get_header_back(CONNECTION) {
+            if connection_value.eq_ignore_ascii_case(KEEP_ALIVE) {
+                return true;
+            } else if connection_value.eq_ignore_ascii_case(CLOSE) {
+                return self.is_ws_upgrade_type();
+            }
+        }
+        self.get_version().is_http1_1_or_higher() || self.is_ws_upgrade_type()
+    }
+    #[inline(always)]
+    pub fn is_disable_keep_alive(&self) -> bool {
+        !self.is_enable_keep_alive()
+    }
+}
+```
+# Path: hyperlane/type/src/request/type.rs
+```rust
+use super::*;
+pub type RequestMethod = Method;
+pub type RequestHost = String;
+pub type RequestVersion = HttpVersion;
+pub type RequestPath = String;
+pub type RequestQuerysKey = String;
+pub type RequestQuerysValue = String;
+pub type RequestQuerys = HashMapXxHash3_64<RequestQuerysKey, RequestQuerysValue>;
+pub type RequestBody = Vec<u8>;
+pub type RequestBodyString = String;
+pub type RequestHeadersKey = String;
+pub type RequestHeadersValueItem = String;
+pub type RequestHeadersValue = VecDeque<RequestHeadersValueItem>;
+pub type RequestHeaders = HashMapXxHash3_64<RequestHeadersKey, RequestHeadersValue>;
+pub type RwLockReadGuardRequest<'a> = RwLockReadGuard<'a, Request>;
+pub type RwLockWriteGuardRequest<'a> = RwLockWriteGuard<'a, Request>;
+```
+# Path: hyperlane/type/src/request/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
+pub enum RequestError {
+    HttpRead(HttpStatus),
+    GetTcpStream(HttpStatus),
+    GetTlsStream(HttpStatus),
+    ReadConnection(HttpStatus),
+    RequestAborted(HttpStatus),
+    TlsStreamConnect(HttpStatus),
+    NeedOpenRedirect(HttpStatus),
+    MaxRedirectTimes(HttpStatus),
+    MethodsNotSupport(HttpStatus),
+    RedirectInvalidUrl(HttpStatus),
+    ClientDisconnected(HttpStatus),
+    RedirectUrlDeadLoop(HttpStatus),
+    ClientClosedConnection(HttpStatus),
+    ServerClosedConnection(HttpStatus),
+    IncompleteWebSocketFrame(HttpStatus),
+    RequestTooLong(HttpStatus),
+    PathTooLong(HttpStatus),
+    QueryTooLong(HttpStatus),
+    HeaderLineTooLong(HttpStatus),
+    TooManyHeaders(HttpStatus),
+    HeaderKeyTooLong(HttpStatus),
+    HeaderValueTooLong(HttpStatus),
+    ContentLengthTooLarge(HttpStatus),
+    InvalidContentLength(HttpStatus),
+    InvalidUrlScheme(HttpStatus),
+    InvalidUrlHost(HttpStatus),
+    InvalidUrlPort(HttpStatus),
+    InvalidUrlPath(HttpStatus),
+    InvalidUrlQuery(HttpStatus),
+    InvalidUrlFragment(HttpStatus),
+    ReadTimeout(HttpStatus),
+    WriteTimeout(HttpStatus),
+    TcpConnectionFailed(HttpStatus),
+    TlsHandshakeFailed(HttpStatus),
+    TlsCertificateInvalid(HttpStatus),
+    WebSocketFrameTooLarge(HttpStatus),
+    WebSocketOpcodeUnsupported(HttpStatus),
+    WebSocketMaskMissing(HttpStatus),
+    WebSocketPayloadCorrupted(HttpStatus),
+    WebSocketInvalidUtf8(HttpStatus),
+    WebSocketInvalidCloseCode(HttpStatus),
+    WebSocketInvalidExtension(HttpStatus),
+    HttpRequestPartsInsufficient(HttpStatus),
+    TcpStreamConnect(HttpStatus),
+    TlsConnectorBuild(HttpStatus),
+    InvalidUrl(HttpStatus),
+    ConfigReadError(HttpStatus),
+    TcpStreamConnectString(HttpStatus),
+    TlsConnectorBuildString(HttpStatus),
+    Request(String),
+    Unknown(HttpStatus),
+}
+```
+# Path: hyperlane/type/src/request/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
+pub struct RequestConfig {
+    #[get(type(copy))]
+    #[set]
+    pub buffer_size: usize,
+    #[get(type(copy))]
+    #[set]
+    pub max_path_size: usize,
+    #[get(type(copy))]
+    #[set]
+    pub max_header_count: usize,
+    #[get(type(copy))]
+    #[set]
+    pub max_header_key_size: usize,
+    #[get(type(copy))]
+    #[set]
+    pub max_header_value_size: usize,
+    #[get(type(copy))]
+    #[set]
+    pub max_body_size: usize,
+    #[get(type(copy))]
+    #[set]
+    pub read_timeout_ms: u64,
+}
+#[derive(
+    Clone, Debug, Deserialize, DisplayDebug, Eq, Getter, GetterMut, PartialEq, Serialize, Setter,
+)]
+pub struct Request {
+    pub method: RequestMethod,
+    pub host: RequestHost,
+    pub version: RequestVersion,
+    pub path: RequestPath,
+    pub querys: RequestQuerys,
+    pub headers: RequestHeaders,
+    pub body: RequestBody,
+}
+```
+# Path: hyperlane/type/src/request/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+mod r#struct;
+mod r#type;
+pub use {r#enum::*, r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/status/impl.rs
+```rust
+use super::*;
+impl Status {
+    #[inline(always)]
+    pub fn is_continue(&self) -> bool {
+        matches!(self, Status::Continue)
+    }
+    #[inline(always)]
+    pub fn is_reject(&self) -> bool {
+        matches!(self, Status::Reject)
+    }
+}
+```
+# Path: hyperlane/type/src/status/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum Status {
+    Continue,
+    #[default]
+    Reject,
+}
+```
+# Path: hyperlane/type/src/status/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+pub use r#enum::*;
+use super::*;
+```
+# Path: hyperlane/type/src/stream/impl.rs
+```rust
+use super::*;
+impl From<usize> for &'static Stream {
+    #[inline(always)]
+    fn from(address: usize) -> &'static Stream {
+        unsafe { &*(address as *const Stream) }
+    }
+}
+impl<'a> From<usize> for &'a mut Stream {
+    #[inline(always)]
+    fn from(address: usize) -> &'a mut Stream {
+        unsafe { &mut *(address as *mut Stream) }
+    }
+}
+impl From<&Stream> for usize {
+    #[inline(always)]
+    fn from(stream: &Stream) -> Self {
+        stream as *const Stream as usize
+    }
+}
+impl From<&mut Stream> for usize {
+    #[inline(always)]
+    fn from(stream: &mut Stream) -> Self {
+        stream as *mut Stream as usize
+    }
+}
+impl AsRef<Stream> for Stream {
+    #[inline(always)]
+    fn as_ref(&self) -> &Self {
+        let address: usize = self.into();
+        address.into()
+    }
+}
+impl AsMut<Stream> for Stream {
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut Self {
+        let address: usize = self.into();
+        address.into()
+    }
+}
+impl Lifetime for Stream {
+    #[inline(always)]
+    unsafe fn leak(&self) -> &'static Self {
+        let address: usize = self.into();
+        address.into()
+    }
+    #[inline(always)]
+    unsafe fn leak_mut(&self) -> &'static mut Self {
+        let address: usize = self.into();
+        address.into()
+    }
+}
+impl Stream {
+    #[inline(always)]
+    pub fn is_keep_alive(&self, keep_alive: bool) -> bool {
+        !self.get_closed() && keep_alive
+    }
+    async fn get_http_from_stream(&mut self) -> Result<Request, RequestError> {
+        let config: RequestConfig = *self.get_request_config();
+        let buffer_size: usize = config.get_buffer_size();
+        let max_path_size: usize = config.get_max_path_size();
+        let reader: &mut BufReader<&mut TcpStream> =
+            &mut BufReader::with_capacity(buffer_size, self.get_mut_stream());
+        let mut line: String = String::with_capacity(buffer_size);
+        AsyncBufReadExt::read_line(reader, &mut line).await?;
+        let (method, path, version): (RequestMethod, &str, RequestVersion) =
+            Request::get_http_first_line(&line)?;
+        Request::check_http_path_size(path, max_path_size)?;
+        let hash_index: Option<usize> = path.find(HASH);
+        let query_index: Option<usize> = path.find(QUERY);
+        let query: &str = Request::get_http_query(path, query_index, hash_index);
+        let querys: RequestQuerys = Request::get_http_querys(query);
+        let path: RequestPath = Request::get_http_path(path, query_index, hash_index);
+        let (headers, host, content_size): (RequestHeaders, RequestHost, usize) =
+            Request::get_http_headers(reader, &config).await?;
+        let body: RequestBody = Request::get_http_body(reader, content_size).await?;
+        Ok(Request {
+            method,
+            host,
+            version,
+            path,
+            querys,
+            headers,
+            body,
+        })
+    }
+    pub async fn try_get_http_request(&mut self) -> Result<Request, RequestError> {
+        if self.get_closed() {
+            return Err(RequestError::ServerClosedConnection(HttpStatus::BadRequest));
+        }
+        let timeout_ms: u64 = self.get_request_config().get_read_timeout_ms();
+        if timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+            return self.get_http_from_stream().await;
+        }
+        let duration: Duration = Duration::from_millis(timeout_ms);
+        timeout(duration, self.get_http_from_stream()).await?
+    }
+    pub async fn try_get_websocket_request(&mut self) -> Result<RequestBody, RequestError> {
+        if self.get_closed() {
+            return Err(RequestError::ServerClosedConnection(HttpStatus::BadRequest));
+        }
+        let config: RequestConfig = *self.get_request_config();
+        let buffer_size: usize = config.get_buffer_size();
+        let read_timeout_ms: u64 = config.get_read_timeout_ms();
+        let mut dynamic_buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+        let mut temp_buffer: Vec<u8> = vec![0; buffer_size];
+        let mut full_frame: Vec<u8> = Vec::new();
+        let mut is_client_response: bool = false;
+        let duration_opt: Option<Duration> =
+            if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+                None
+            } else {
+                let adjusted_timeout_ms: u64 = (read_timeout_ms >> 1) + (read_timeout_ms & 1);
+                Some(Duration::from_millis(adjusted_timeout_ms))
+            };
+        loop {
+            let len: usize = match self
+                .get_websocket_from_stream(&mut temp_buffer, duration_opt, &mut is_client_response)
+                .await
+            {
+                Ok(Some(len)) => len,
+                Ok(None) => continue,
+                Err(error) => return Err(error),
+            };
+            if len == 0 {
+                return Err(RequestError::IncompleteWebSocketFrame(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            dynamic_buffer.extend_from_slice(&temp_buffer[..len]);
+            while let Some((frame, consumed)) = WebSocketFrame::decode_ws_frame(&dynamic_buffer) {
+                is_client_response = true;
+                dynamic_buffer.drain(0..consumed);
+                match frame.get_opcode() {
+                    WebSocketOpcode::Close => {
+                        return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
+                    }
+                    WebSocketOpcode::Ping | WebSocketOpcode::Pong => continue,
+                    WebSocketOpcode::Text | WebSocketOpcode::Binary => {
+                        match frame.build_full_frame(&mut full_frame) {
+                            Ok(Some(result)) => return Ok(result),
+                            Ok(None) => continue,
+                            Err(error) => return Err(error),
+                        }
+                    }
+                    _ => {
+                        return Err(RequestError::WebSocketOpcodeUnsupported(
+                            HttpStatus::NotImplemented,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    pub(crate) async fn get_websocket_from_stream(
+        &mut self,
+        buffer: &mut [u8],
+        duration_opt: Option<Duration>,
+        is_client_response: &mut bool,
+    ) -> Result<Option<usize>, RequestError> {
+        let stream: &mut TcpStream = self.get_mut_stream();
+        if let Some(duration) = duration_opt {
+            return match timeout(duration, stream.read(buffer)).await {
+                Ok(result) => match result {
+                    Ok(len) => Ok(Some(len)),
+                    Err(error) => Err(error.into()),
+                },
+                Err(error) => {
+                    if !*is_client_response {
+                        return Err(error.into());
+                    }
+                    *is_client_response = false;
+                    self.try_send(&PING_FRAME).await?;
+                    Ok(None)
+                }
+            };
+        }
+        match stream.read(buffer).await {
+            Ok(len) => Ok(Some(len)),
+            Err(error) => Err(error.into()),
+        }
+    }
+    pub async fn try_send<D>(&mut self, data: D) -> Result<(), ResponseError>
+    where
+        D: AsRef<[u8]>,
+    {
+        if self.get_closed() {
+            return Err(ResponseError::ConnectionClosed);
+        }
+        Ok(self.get_mut_stream().write_all(data.as_ref()).await?)
+    }
+    pub async fn send<D>(&mut self, data: D)
+    where
+        D: AsRef<[u8]>,
+    {
+        self.try_send(data).await.unwrap();
+    }
+    pub async fn try_send_list<I, D>(&mut self, data_iter: I) -> Result<(), ResponseError>
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        if self.get_closed() {
+            return Err(ResponseError::ConnectionClosed);
+        }
+        let stream: &mut TcpStream = self.get_mut_stream();
+        for data in data_iter {
+            stream.write_all(data.as_ref()).await?;
+        }
+        Ok(())
+    }
+    pub async fn send_list<I, D>(&mut self, data_iter: I)
+    where
+        I: IntoIterator<Item = D>,
+        D: AsRef<[u8]>,
+    {
+        self.try_send_list(data_iter).await.unwrap();
+    }
+    pub async fn try_flush(&mut self) -> Result<(), ResponseError> {
+        if self.get_closed() {
+            return Err(ResponseError::ConnectionClosed);
+        }
+        Ok(self.get_mut_stream().flush().await?)
+    }
+    pub async fn flush(&mut self) {
+        self.try_flush().await.unwrap();
+    }
+}
+```
+# Path: hyperlane/type/src/stream/type.rs
+```rust
+use super::*;
+pub type ArcStream = Arc<TcpStream>;
+pub type SocketHost = IpAddr;
+pub type SocketPort = u16;
+```
+# Path: hyperlane/type/src/stream/struct.rs
+```rust
+use super::*;
+#[derive(CustomDebug, Data, DisplayDebug, New)]
+pub struct Stream {
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) stream: TcpStream,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) request_config: RequestConfig,
+    #[get(type(copy))]
+    #[get_mut(pub(super))]
+    pub(super) closed: bool,
+}
+```
+# Path: hyperlane/type/src/stream/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+mod r#type;
+pub use {r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/http_version/impl.rs
+```rust
+use super::*;
+impl fmt::Display for HttpVersion {
+    fn fmt(&self, data: &mut Formatter<'_>) -> fmt::Result {
+        let version_str: &str = match self {
+            Self::Http0_9 => HTTP_VERSION_0_9,
+            Self::Http1_0 => HTTP_VERSION_1_0,
+            Self::Http1_1 => HTTP_VERSION_1_1,
+            Self::Http2 => HTTP_VERSION_2,
+            Self::Http3 => HTTP_VERSION_3,
+            Self::Unknown(version) => version,
+        };
+        write!(data, "{version_str}")
+    }
+}
+impl FromStr for HttpVersion {
+    type Err = String;
+    fn from_str(version_str: &str) -> Result<Self, Self::Err> {
+        match version_str {
+            HTTP_VERSION_0_9 => Ok(Self::Http0_9),
+            HTTP_VERSION_1_0 => Ok(Self::Http1_0),
+            HTTP_VERSION_1_1 => Ok(Self::Http1_1),
+            HTTP_VERSION_2 => Ok(Self::Http2),
+            HTTP_VERSION_3 => Ok(Self::Http3),
+            _ => Ok(Self::Unknown(version_str.to_string())),
+        }
+    }
+}
+impl HttpVersion {
+    #[inline(always)]
+    pub fn is_http0_9(&self) -> bool {
+        matches!(self, Self::Http0_9)
+    }
+    #[inline(always)]
+    pub fn is_http1_0(&self) -> bool {
+        matches!(self, Self::Http1_0)
+    }
+    #[inline(always)]
+    pub fn is_http1_1(&self) -> bool {
+        matches!(self, Self::Http1_1)
+    }
+    #[inline(always)]
+    pub fn is_http2(&self) -> bool {
+        matches!(self, Self::Http2)
+    }
+    #[inline(always)]
+    pub fn is_http3(&self) -> bool {
+        matches!(self, Self::Http3)
+    }
+    #[inline(always)]
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown(_))
+    }
+    #[inline(always)]
+    pub fn is_http1_1_or_higher(&self) -> bool {
+        matches!(self, Self::Http1_1 | Self::Http2 | Self::Http3)
+    }
+    #[inline(always)]
+    pub fn is_http(&self) -> bool {
+        !self.is_unknown()
+    }
+}
+```
+# Path: hyperlane/type/src/http_version/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum HttpVersion {
+    Http0_9,
+    Http1_0,
+    #[default]
+    Http1_1,
+    Http2,
+    Http3,
+    Unknown(String),
+}
+```
+# Path: hyperlane/type/src/http_version/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+pub use r#enum::*;
+use super::*;
+```
+# Path: hyperlane/type/src/http_status/impl.rs
+```rust
+use super::*;
+impl HttpStatus {
+    pub fn code(&self) -> ResponseStatusCode {
+        match self {
+            Self::Continue => 100,
+            Self::SwitchingProtocols => 101,
+            Self::Processing => 102,
+            Self::EarlyHints => 103,
+            Self::Ok => 200,
+            Self::Created => 201,
+            Self::Accepted => 202,
+            Self::NonAuthoritativeInformation => 203,
+            Self::NoContent => 204,
+            Self::ResetContent => 205,
+            Self::PartialContent => 206,
+            Self::MultiStatus => 207,
+            Self::AlreadyReported => 208,
+            Self::IMUsed => 226,
+            Self::MultipleChoices => 300,
+            Self::MovedPermanently => 301,
+            Self::Found => 302,
+            Self::SeeOther => 303,
+            Self::NotModified => 304,
+            Self::UseProxy => 305,
+            Self::TemporaryRedirect => 307,
+            Self::PermanentRedirect => 308,
+            Self::BadRequest => 400,
+            Self::Unauthorized => 401,
+            Self::PaymentRequired => 402,
+            Self::Forbidden => 403,
+            Self::NotFound => 404,
+            Self::MethodNotAllowed => 405,
+            Self::NotAcceptable => 406,
+            Self::ProxyAuthenticationRequired => 407,
+            Self::RequestTimeout => 408,
+            Self::Conflict => 409,
+            Self::Gone => 410,
+            Self::LengthRequired => 411,
+            Self::PreconditionFailed => 412,
+            Self::PayloadTooLarge => 413,
+            Self::URITooLong => 414,
+            Self::UnsupportedMediaType => 415,
+            Self::RangeNotSatisfiable => 416,
+            Self::ExpectationFailed => 417,
+            Self::ImATeapot => 418,
+            Self::MisdirectedRequest => 421,
+            Self::UnprocessableEntity => 422,
+            Self::Locked => 423,
+            Self::FailedDependency => 424,
+            Self::TooEarly => 425,
+            Self::UpgradeRequired => 426,
+            Self::PreconditionRequired => 428,
+            Self::TooManyRequests => 429,
+            Self::RequestHeaderFieldsTooLarge => 431,
+            Self::UnavailableForLegalReasons => 451,
+            Self::InternalServerError => 500,
+            Self::NotImplemented => 501,
+            Self::BadGateway => 502,
+            Self::ServiceUnavailable => 503,
+            Self::GatewayTimeout => 504,
+            Self::HTTPVersionNotSupported => 505,
+            Self::VariantAlsoNegotiates => 506,
+            Self::InsufficientStorage => 507,
+            Self::LoopDetected => 508,
+            Self::NotExtended => 510,
+            Self::NetworkAuthenticationRequired => 511,
+            Self::Unknown => 0,
+        }
+    }
+    pub fn phrase(code: ResponseStatusCode) -> String {
+        match code {
+            100 => Self::Continue.to_string(),
+            101 => Self::SwitchingProtocols.to_string(),
+            102 => Self::Processing.to_string(),
+            103 => Self::EarlyHints.to_string(),
+            200 => Self::Ok.to_string(),
+            201 => Self::Created.to_string(),
+            202 => Self::Accepted.to_string(),
+            203 => Self::NonAuthoritativeInformation.to_string(),
+            204 => Self::NoContent.to_string(),
+            205 => Self::ResetContent.to_string(),
+            206 => Self::PartialContent.to_string(),
+            207 => Self::MultiStatus.to_string(),
+            208 => Self::AlreadyReported.to_string(),
+            226 => Self::IMUsed.to_string(),
+            300 => Self::MultipleChoices.to_string(),
+            301 => Self::MovedPermanently.to_string(),
+            302 => Self::Found.to_string(),
+            303 => Self::SeeOther.to_string(),
+            304 => Self::NotModified.to_string(),
+            305 => Self::UseProxy.to_string(),
+            307 => Self::TemporaryRedirect.to_string(),
+            308 => Self::PermanentRedirect.to_string(),
+            400 => Self::BadRequest.to_string(),
+            401 => Self::Unauthorized.to_string(),
+            402 => Self::PaymentRequired.to_string(),
+            403 => Self::Forbidden.to_string(),
+            404 => Self::NotFound.to_string(),
+            405 => Self::MethodNotAllowed.to_string(),
+            406 => Self::NotAcceptable.to_string(),
+            407 => Self::ProxyAuthenticationRequired.to_string(),
+            408 => Self::RequestTimeout.to_string(),
+            409 => Self::Conflict.to_string(),
+            410 => Self::Gone.to_string(),
+            411 => Self::LengthRequired.to_string(),
+            412 => Self::PreconditionFailed.to_string(),
+            413 => Self::PayloadTooLarge.to_string(),
+            414 => Self::URITooLong.to_string(),
+            415 => Self::UnsupportedMediaType.to_string(),
+            416 => Self::RangeNotSatisfiable.to_string(),
+            417 => Self::ExpectationFailed.to_string(),
+            418 => Self::ImATeapot.to_string(),
+            421 => Self::MisdirectedRequest.to_string(),
+            422 => Self::UnprocessableEntity.to_string(),
+            423 => Self::Locked.to_string(),
+            424 => Self::FailedDependency.to_string(),
+            425 => Self::TooEarly.to_string(),
+            426 => Self::UpgradeRequired.to_string(),
+            428 => Self::PreconditionRequired.to_string(),
+            429 => Self::TooManyRequests.to_string(),
+            431 => Self::RequestHeaderFieldsTooLarge.to_string(),
+            451 => Self::UnavailableForLegalReasons.to_string(),
+            500 => Self::InternalServerError.to_string(),
+            501 => Self::NotImplemented.to_string(),
+            502 => Self::BadGateway.to_string(),
+            503 => Self::ServiceUnavailable.to_string(),
+            504 => Self::GatewayTimeout.to_string(),
+            505 => Self::HTTPVersionNotSupported.to_string(),
+            506 => Self::VariantAlsoNegotiates.to_string(),
+            507 => Self::InsufficientStorage.to_string(),
+            508 => Self::LoopDetected.to_string(),
+            510 => Self::NotExtended.to_string(),
+            511 => Self::NetworkAuthenticationRequired.to_string(),
+            _ => Self::Unknown.to_string(),
+        }
+    }
+    pub fn same<C>(&self, code_str: C) -> bool
+    where
+        C: AsRef<str>,
+    {
+        self.to_string().eq_ignore_ascii_case(code_str.as_ref())
+    }
+}
+impl Display for HttpStatus {
+    fn fmt(&self, data: &mut Formatter<'_>) -> fmt::Result {
+        let res: &str = match self {
+            Self::Continue => CONTINUE,
+            Self::SwitchingProtocols => SWITCHING_PROTOCOLS,
+            Self::Processing => PROCESSING,
+            Self::EarlyHints => EARLY_HINTS,
+            Self::Ok => OK,
+            Self::Created => CREATED,
+            Self::Accepted => ACCEPTED,
+            Self::NonAuthoritativeInformation => NON_AUTHORITATIVE_INFORMATION,
+            Self::NoContent => NO_CONTENT,
+            Self::ResetContent => RESET_CONTENT,
+            Self::PartialContent => PARTIAL_CONTENT,
+            Self::MultiStatus => MULTI_STATUS,
+            Self::AlreadyReported => ALREADY_REPORTED,
+            Self::IMUsed => IM_USED,
+            Self::MultipleChoices => MULTIPLE_CHOICES,
+            Self::MovedPermanently => MOVED_PERMANENTLY,
+            Self::Found => FOUND,
+            Self::SeeOther => SEE_OTHER,
+            Self::NotModified => NOT_MODIFIED,
+            Self::UseProxy => USE_PROXY,
+            Self::TemporaryRedirect => TEMPORARY_REDIRECT,
+            Self::PermanentRedirect => PERMANENT_REDIRECT,
+            Self::BadRequest => BAD_REQUEST,
+            Self::Unauthorized => UNAUTHORIZED,
+            Self::PaymentRequired => PAYMENT_REQUIRED,
+            Self::Forbidden => FORBIDDEN,
+            Self::NotFound => NOT_FOUND,
+            Self::MethodNotAllowed => METHOD_NOT_ALLOWED,
+            Self::NotAcceptable => NOT_ACCEPTABLE,
+            Self::ProxyAuthenticationRequired => PROXY_AUTHENTICATION_REQUIRED,
+            Self::RequestTimeout => REQUEST_TIMEOUT,
+            Self::Conflict => CONFLICT,
+            Self::Gone => GONE,
+            Self::LengthRequired => LENGTH_REQUIRED,
+            Self::PreconditionFailed => PRECONDITION_FAILED,
+            Self::PayloadTooLarge => PAYLOAD_TOO_LARGE,
+            Self::URITooLong => URI_TOO_LONG,
+            Self::UnsupportedMediaType => UNSUPPORTED_MEDIA_TYPE,
+            Self::RangeNotSatisfiable => RANGE_NOT_SATISFIABLE,
+            Self::ExpectationFailed => EXPECTATION_FAILED,
+            Self::ImATeapot => IM_A_TEAPOT,
+            Self::MisdirectedRequest => MISDIRECTED_REQUEST,
+            Self::UnprocessableEntity => UNPROCESSABLE_ENTITY,
+            Self::Locked => LOCKED,
+            Self::FailedDependency => FAILED_DEPENDENCY,
+            Self::TooEarly => TOO_EARLY,
+            Self::UpgradeRequired => UPGRADE_REQUIRED,
+            Self::PreconditionRequired => PRECONDITION_REQUIRED,
+            Self::TooManyRequests => TOO_MANY_REQUESTS,
+            Self::RequestHeaderFieldsTooLarge => REQUEST_HEADER_FIELDS_TOO_LARGE,
+            Self::UnavailableForLegalReasons => UNAVAILABLE_FOR_LEGAL_REASONS,
+            Self::InternalServerError => INTERNAL_SERVER_ERROR,
+            Self::NotImplemented => NOT_IMPLEMENTED,
+            Self::BadGateway => BAD_GATEWAY,
+            Self::ServiceUnavailable => SERVICE_UNAVAILABLE,
+            Self::GatewayTimeout => GATEWAY_TIMEOUT,
+            Self::HTTPVersionNotSupported => HTTP_VERSION_NOT_SUPPORTED,
+            Self::VariantAlsoNegotiates => VARIANT_ALSO_NEGOTIATES,
+            Self::InsufficientStorage => INSUFFICIENT_STORAGE,
+            Self::LoopDetected => LOOP_DETECTED,
+            Self::NotExtended => NOT_EXTENDED,
+            Self::NetworkAuthenticationRequired => NETWORK_AUTHENTICATION_REQUIRED,
+            Self::Unknown => UNKNOWN,
+        };
+        write!(data, "{res}")
+    }
+}
+impl FromStr for HttpStatus {
+    type Err = ();
+    fn from_str(code_str: &str) -> Result<Self, Self::Err> {
+        if let Ok(code) = code_str.parse::<ResponseStatusCode>() {
+            match code {
+                100 => Ok(Self::Continue),
+                101 => Ok(Self::SwitchingProtocols),
+                102 => Ok(Self::Processing),
+                103 => Ok(Self::EarlyHints),
+                200 => Ok(Self::Ok),
+                201 => Ok(Self::Created),
+                202 => Ok(Self::Accepted),
+                203 => Ok(Self::NonAuthoritativeInformation),
+                204 => Ok(Self::NoContent),
+                205 => Ok(Self::ResetContent),
+                206 => Ok(Self::PartialContent),
+                207 => Ok(Self::MultiStatus),
+                208 => Ok(Self::AlreadyReported),
+                226 => Ok(Self::IMUsed),
+                300 => Ok(Self::MultipleChoices),
+                301 => Ok(Self::MovedPermanently),
+                302 => Ok(Self::Found),
+                303 => Ok(Self::SeeOther),
+                304 => Ok(Self::NotModified),
+                305 => Ok(Self::UseProxy),
+                307 => Ok(Self::TemporaryRedirect),
+                308 => Ok(Self::PermanentRedirect),
+                400 => Ok(Self::BadRequest),
+                401 => Ok(Self::Unauthorized),
+                402 => Ok(Self::PaymentRequired),
+                403 => Ok(Self::Forbidden),
+                404 => Ok(Self::NotFound),
+                405 => Ok(Self::MethodNotAllowed),
+                406 => Ok(Self::NotAcceptable),
+                407 => Ok(Self::ProxyAuthenticationRequired),
+                408 => Ok(Self::RequestTimeout),
+                409 => Ok(Self::Conflict),
+                410 => Ok(Self::Gone),
+                411 => Ok(Self::LengthRequired),
+                412 => Ok(Self::PreconditionFailed),
+                413 => Ok(Self::PayloadTooLarge),
+                414 => Ok(Self::URITooLong),
+                415 => Ok(Self::UnsupportedMediaType),
+                416 => Ok(Self::RangeNotSatisfiable),
+                417 => Ok(Self::ExpectationFailed),
+                418 => Ok(Self::ImATeapot),
+                421 => Ok(Self::MisdirectedRequest),
+                422 => Ok(Self::UnprocessableEntity),
+                423 => Ok(Self::Locked),
+                424 => Ok(Self::FailedDependency),
+                425 => Ok(Self::TooEarly),
+                426 => Ok(Self::UpgradeRequired),
+                428 => Ok(Self::PreconditionRequired),
+                429 => Ok(Self::TooManyRequests),
+                431 => Ok(Self::RequestHeaderFieldsTooLarge),
+                451 => Ok(Self::UnavailableForLegalReasons),
+                500 => Ok(Self::InternalServerError),
+                501 => Ok(Self::NotImplemented),
+                502 => Ok(Self::BadGateway),
+                503 => Ok(Self::ServiceUnavailable),
+                504 => Ok(Self::GatewayTimeout),
+                505 => Ok(Self::HTTPVersionNotSupported),
+                506 => Ok(Self::VariantAlsoNegotiates),
+                507 => Ok(Self::InsufficientStorage),
+                508 => Ok(Self::LoopDetected),
+                510 => Ok(Self::NotExtended),
+                511 => Ok(Self::NetworkAuthenticationRequired),
+                _ => Ok(Self::Unknown),
+            }
+        } else {
+            Ok(Self::Unknown)
+        }
+    }
+}
+```
+# Path: hyperlane/type/src/http_status/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum HttpStatus {
+    Continue,
+    SwitchingProtocols,
+    Processing,
+    EarlyHints,
+    #[default]
+    Ok,
+    Created,
+    Accepted,
+    NonAuthoritativeInformation,
+    NoContent,
+    ResetContent,
+    PartialContent,
+    MultiStatus,
+    AlreadyReported,
+    IMUsed,
+    MultipleChoices,
+    MovedPermanently,
+    Found,
+    SeeOther,
+    NotModified,
+    UseProxy,
+    TemporaryRedirect,
+    PermanentRedirect,
+    BadRequest,
+    Unauthorized,
+    PaymentRequired,
+    Forbidden,
+    NotFound,
+    MethodNotAllowed,
+    NotAcceptable,
+    ProxyAuthenticationRequired,
+    RequestTimeout,
+    Conflict,
+    Gone,
+    LengthRequired,
+    PreconditionFailed,
+    PayloadTooLarge,
+    URITooLong,
+    UnsupportedMediaType,
+    RangeNotSatisfiable,
+    ExpectationFailed,
+    ImATeapot,
+    MisdirectedRequest,
+    UnprocessableEntity,
+    Locked,
+    FailedDependency,
+    TooEarly,
+    UpgradeRequired,
+    PreconditionRequired,
+    TooManyRequests,
+    RequestHeaderFieldsTooLarge,
+    UnavailableForLegalReasons,
+    InternalServerError,
+    NotImplemented,
+    BadGateway,
+    ServiceUnavailable,
+    GatewayTimeout,
+    HTTPVersionNotSupported,
+    VariantAlsoNegotiates,
+    InsufficientStorage,
+    LoopDetected,
+    NotExtended,
+    NetworkAuthenticationRequired,
+    Unknown,
+}
+```
+# Path: hyperlane/type/src/http_status/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+pub use r#enum::*;
+use super::*;
+```
+# Path: hyperlane/type/src/upgrade_type/impl.rs
+```rust
+use super::*;
+impl Default for UpgradeType {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::Unknown(String::new())
+    }
+}
+impl Display for UpgradeType {
+    #[inline(always)]
+    fn fmt(&self, data: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::WebSocket => write!(data, "{WEBSOCKET}"),
+            Self::H2c => write!(data, "{H2C_LOWERCASE}"),
+            Self::Tls(version) => write!(data, "{version}"),
+            Self::Unknown(tmp_str) => write!(data, "{tmp_str}"),
+        }
+    }
+}
+impl FromStr for UpgradeType {
+    type Err = ();
+    #[inline(always)]
+    fn from_str(from_str: &str) -> Result<Self, Self::Err> {
+        match from_str.to_ascii_lowercase().as_str() {
+            WEBSOCKET => Ok(Self::WebSocket),
+            H2C_LOWERCASE => Ok(Self::H2c),
+            val if val.starts_with(TLS_LOWERCASE) => Ok(Self::Tls(val.to_string())),
+            other => Ok(Self::Unknown(other.to_string())),
+        }
+    }
+}
+impl UpgradeType {
+    #[inline(always)]
+    pub fn is_ws(&self) -> bool {
+        matches!(self, &Self::WebSocket)
+    }
+    #[inline(always)]
+    pub fn is_h2c(&self) -> bool {
+        matches!(self, &Self::H2c)
+    }
+    #[inline(always)]
+    pub fn is_tls(&self) -> bool {
+        matches!(self, Self::Tls(_))
+    }
+    #[inline(always)]
+    pub fn is_unknown(&self) -> bool {
+        !self.is_ws() && !self.is_h2c() && !self.is_tls()
+    }
+}
+```
+# Path: hyperlane/type/src/upgrade_type/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum UpgradeType {
+    WebSocket,
+    H2c,
+    Tls(String),
+    Unknown(String),
+}
+```
+# Path: hyperlane/type/src/upgrade_type/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+pub use r#enum::*;
+use super::*;
+```
+# Path: hyperlane/type/src/panic/impl.rs
+```rust
+use super::*;
+impl PanicData {
+    #[inline(always)]
+    fn try_extract_panic_message(panic_payload: &dyn Any) -> Option<String> {
+        if let Some(s) = panic_payload.downcast_ref::<&str>() {
+            Some(s.to_string())
+        } else {
+            panic_payload.downcast_ref::<String>().cloned()
+        }
+    }
+    pub fn from_join_error(join_error: JoinError) -> Self {
+        let default_message: String = join_error.to_string();
+        let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
+        {
+            Self::try_extract_panic_message(&panic_join_error)
+        } else {
+            None
+        };
+        if (message.is_none() || message.clone().unwrap_or_default().is_empty())
+            && !default_message.is_empty()
+        {
+            message = Some(default_message);
+        }
+        let panic: PanicData = PanicData::new(message, None, None);
+        panic
+    }
+}
+```
+# Path: hyperlane/type/src/panic/struct.rs
+```rust
+use super::*;
+#[derive(
+    Clone, CustomDebug, Default, Deserialize, DisplayDebug, Eq, Getter, PartialEq, Serialize, New,
+)]
+pub struct PanicData {
+    pub(super) message: Option<String>,
+    pub(super) location: Option<String>,
+    pub(super) payload: Option<String>,
+}
+```
+# Path: hyperlane/type/src/panic/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/type/src/box_leak/fn.rs
+```rust
+#[inline(always)]
+pub fn box_leak_new<T>(data: T) -> &'static mut T {
+    Box::leak(Box::new(data))
+}
+```
+# Path: hyperlane/type/src/box_leak/mod.rs
+```rust
+mod r#fn;
+pub use r#fn::*;
+```
+# Path: hyperlane/type/src/arc_mutex/fn.rs
+```rust
+use super::*;
+#[inline(always)]
+pub fn arc_mutex<T>(data: T) -> ArcMutex<T> {
+    Arc::new(Mutex::new(data))
+}
+```
+# Path: hyperlane/type/src/arc_mutex/type.rs
+```rust
+use super::*;
+pub type ArcMutex<T> = Arc<Mutex<T>>;
+```
+# Path: hyperlane/type/src/arc_mutex/mod.rs
+```rust
+mod r#fn;
+mod r#type;
+pub use {r#fn::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/response/impl.rs
+```rust
+use super::*;
+impl std::error::Error for ResponseError {}
+impl From<std::io::Error> for ResponseError {
+    #[inline(always)]
+    fn from(error: std::io::Error) -> Self {
+        ResponseError::Send(error.to_string())
+    }
+}
+impl Display for ResponseError {
+    #[inline(always)]
+    fn fmt(&self, data: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotFoundStream => {
+                write!(data, "Not found stream")
+            }
+            Self::ConnectionClosed => {
+                write!(data, "Connection has been closed")
+            }
+            Self::Terminated => {
+                write!(data, "Current processing has been terminated")
+            }
+            Self::Send(error) => write!(data, "Send error{COLON_SPACE}{error}"),
+            Self::FlushError(error) => write!(data, "Flush error{COLON_SPACE}{error}"),
+            Self::Unknown => write!(data, "Unknown error"),
+        }
+    }
+}
+impl Default for Response {
+    #[inline(always)]
+    fn default() -> Self {
+        let http_status: HttpStatus = HttpStatus::default();
+        Self {
+            version: HttpVersion::Http1_1,
+            status_code: http_status.code(),
+            reason_phrase: http_status.to_string(),
+            headers: hash_map_xx_hash3_64(),
+            body: Vec::new(),
+        }
+    }
+}
+impl Response {
+    #[inline(always)]
+    fn push_header(response_string: &mut String, key: &str, value: &str) {
+        response_string.push_str(key);
+        response_string.push_str(COLON);
+        response_string.push_str(value);
+        response_string.push_str(HTTP_BR);
+    }
+    #[inline(always)]
+    fn push_http_first_line(&self, response_string: &mut String) {
+        response_string.push_str(&self.get_version().to_string());
+        response_string.push_str(SPACE);
+        response_string.push_str(&self.get_status_code().to_string());
+        response_string.push_str(SPACE);
+        response_string.push_str(self.get_reason_phrase());
+        response_string.push_str(HTTP_BR);
+    }
+    #[inline(always)]
+    pub fn try_get_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
+    where
+        K: AsRef<str>,
+    {
+        self.headers.get(key.as_ref()).cloned()
+    }
+    #[inline(always)]
+    pub fn get_header<K>(&self, key: K) -> ResponseHeadersValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_header(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_header_front<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
+    where
+        K: AsRef<str>,
+    {
+        self.headers
+            .get(key.as_ref())
+            .and_then(|data: &VecDeque<String>| data.front().cloned())
+    }
+    #[inline(always)]
+    pub fn get_header_front<K>(&self, key: K) -> ResponseHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_header_front(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_header_back<K>(&self, key: K) -> Option<ResponseHeadersValueItem>
+    where
+        K: AsRef<str>,
+    {
+        self.headers
+            .get(key.as_ref())
+            .and_then(|data: &VecDeque<String>| data.back().cloned())
+    }
+    #[inline(always)]
+    pub fn get_header_back<K>(&self, key: K) -> ResponseHeadersValueItem
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_header_back(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn has_header<K>(&self, key: K) -> bool
+    where
+        K: AsRef<str>,
+    {
+        self.headers.contains_key(key.as_ref())
+    }
+    #[inline(always)]
+    pub fn has_header_value<K, V>(&self, key: K, value: V) -> bool
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        if let Some(values) = self.headers.get(key.as_ref()) {
+            values.contains(&value.as_ref().to_owned())
+        } else {
+            false
+        }
+    }
+    #[inline(always)]
+    pub fn get_headers_size(&self) -> usize {
+        self.headers.len()
+    }
+    #[inline(always)]
+    pub fn try_get_header_size<K>(&self, key: K) -> Option<usize>
+    where
+        K: AsRef<str>,
+    {
+        self.headers
+            .get(key.as_ref())
+            .map(|data: &VecDeque<String>| data.len())
+    }
+    #[inline(always)]
+    pub fn get_header_size<K>(&self, key: K) -> usize
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_header_size(key).unwrap()
+    }
+    #[inline(always)]
+    pub fn get_headers_values_size(&self) -> usize {
+        self.headers
+            .values()
+            .map(|data: &VecDeque<String>| data.len())
+            .sum()
+    }
+    #[inline(always)]
+    pub fn get_body_string(&self) -> String {
+        String::from_utf8_lossy(self.get_body()).into_owned()
+    }
+    pub fn try_get_body_json<T>(&self) -> Result<T, serde_json::Error>
+    where
+        T: DeserializeOwned,
+    {
+        serde_json::from_slice(self.get_body())
+    }
+    pub fn get_body_json<T>(&self) -> T
+    where
+        T: DeserializeOwned,
+    {
+        self.try_get_body_json().unwrap()
+    }
+    #[inline(always)]
+    fn should_skip_header(&self, key: &ResponseHeadersKey) -> bool {
+        key.trim().is_empty() || key == CONTENT_LENGTH
+    }
+    #[inline(always)]
+    fn set_header_without_check<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let mut deque: VecDeque<String> = VecDeque::with_capacity(1);
+        deque.push_back(value.as_ref().to_owned());
+        self.headers.insert(key.as_ref().to_owned(), deque);
+        self
+    }
+    #[inline(always)]
+    pub fn set_header<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let key: ResponseHeadersKey = key.as_ref().to_owned();
+        if self.should_skip_header(&key) {
+            return self;
+        }
+        let mut deque: VecDeque<String> = VecDeque::with_capacity(1);
+        deque.push_back(value.as_ref().to_owned());
+        self.headers.insert(key, deque);
+        self
+    }
+    #[inline(always)]
+    pub fn add_header<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let key: ResponseHeadersKey = key.as_ref().to_owned();
+        if self.should_skip_header(&key) {
+            return self;
+        }
+        self.headers
+            .entry(key)
+            .or_default()
+            .push_back(value.as_ref().to_owned());
+        self
+    }
+    #[inline(always)]
+    pub fn remove_header<K>(&mut self, key: K) -> &mut Self
+    where
+        K: AsRef<str>,
+    {
+        let _: bool = self.headers.remove(key.as_ref()).is_some();
+        self
+    }
+    #[inline(always)]
+    pub fn remove_header_value<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let key: ResponseHeadersKey = key.as_ref().to_owned();
+        if let Some(values) = self.headers.get_mut(&key) {
+            values.retain(|data: &String| data != &value.as_ref().to_owned());
+            if values.is_empty() {
+                self.headers.remove(&key);
+            }
+        }
+        self
+    }
+    #[inline(always)]
+    pub fn clear_headers(&mut self) -> &mut Self {
+        self.headers.clear();
+        self
+    }
+    #[inline(always)]
+    pub fn try_get_cookies(&self) -> Option<Cookies> {
+        self.try_get_header_back(SET_COOKIE)
+            .map(|cookie_header: String| Cookie::parse(cookie_header))
+    }
+    #[inline(always)]
+    pub fn get_cookies(&self) -> Cookies {
+        self.try_get_cookies().unwrap()
+    }
+    #[inline(always)]
+    pub fn try_get_cookie<K>(&self, key: K) -> Option<CookieValue>
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_cookies()
+            .and_then(|cookies: Cookies| cookies.get(key.as_ref()).cloned())
+    }
+    #[inline(always)]
+    pub fn get_cookie<K>(&self, key: K) -> CookieValue
+    where
+        K: AsRef<str>,
+    {
+        self.try_get_cookie(key).unwrap()
+    }
+    pub fn build(&mut self) -> ResponseData {
+        if self.reason_phrase.is_empty() {
+            self.set_reason_phrase(HttpStatus::phrase(self.get_status_code()));
+        }
+        let mut response_string: String = String::with_capacity(DEFAULT_BUFFER_SIZE);
+        self.push_http_first_line(&mut response_string);
+        let compress_type_opt: Option<Compress> = self
+            .try_get_header_back(CONTENT_ENCODING)
+            .map(|data: String| data.parse::<Compress>().unwrap_or_default());
+        if self.try_get_header_back(CONNECTION).is_none() {
+            self.set_header_without_check(CONNECTION, KEEP_ALIVE);
+        }
+        let content_type: ResponseHeadersValueItem =
+            self.try_get_header_back(CONTENT_TYPE).unwrap_or_else(|| {
+                let mut content_type: String = String::with_capacity(
+                    TEXT_HTML.len() + SEMICOLON_SPACE.len() + CHARSET_UTF_8.len(),
+                );
+                content_type.push_str(TEXT_HTML);
+                content_type.push_str(SEMICOLON_SPACE);
+                content_type.push_str(CHARSET_UTF_8);
+                self.set_header_without_check(CONTENT_TYPE, &content_type);
+                content_type
+            });
+        let mut body: ResponseBody = self.get_body().clone();
+        if let Some(compress_type) = compress_type_opt
+            && !compress_type.is_unknown()
+        {
+            body = compress_type
+                .encode(&body, DEFAULT_BUFFER_SIZE)
+                .into_owned();
+        }
+        if !content_type.eq_ignore_ascii_case(TEXT_EVENT_STREAM) {
+            self.set_header_without_check(CONTENT_LENGTH, body.len().to_string());
+        }
+        self.get_headers()
+            .iter()
+            .for_each(|header_entry: (&String, &VecDeque<String>)| {
+                let (header_key, header_values): (&String, &VecDeque<String>) = header_entry;
+                for header_value in header_values.iter() {
+                    Self::push_header(&mut response_string, header_key, header_value);
+                }
+            });
+        response_string.push_str(HTTP_BR);
+        let mut response_bytes: Vec<u8> = response_string.into_bytes();
+        response_bytes.extend_from_slice(&body);
+        response_bytes
+    }
+}
+```
+# Path: hyperlane/type/src/response/type.rs
+```rust
+use super::*;
+pub type ResponseBody = Vec<u8>;
+pub type ResponseBodyString = String;
+pub type ResponseHeadersKey = String;
+pub type ResponseHeadersValueItem = String;
+pub type ResponseHeadersValue = VecDeque<ResponseHeadersValueItem>;
+pub type ResponseHeaders = HashMapXxHash3_64<ResponseHeadersKey, ResponseHeadersValue>;
+pub type ResponseVersion = HttpVersion;
+pub type ResponseStatusCode = usize;
+pub type ResponseReasonPhrase = String;
+pub type ResponseData = Vec<u8>;
+pub type ResponseDataString = String;
+pub type RwLockReadGuardResponse<'a> = RwLockReadGuard<'a, Response>;
+pub type RwLockWriteGuardResponse<'a> = RwLockWriteGuard<'a, Response>;
+```
+# Path: hyperlane/type/src/response/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ResponseError {
+    #[default]
+    Unknown,
+    NotFoundStream,
+    ConnectionClosed,
+    Terminated,
+    Send(String),
+    FlushError(String),
+}
+```
+# Path: hyperlane/type/src/response/struct.rs
+```rust
+use super::*;
+#[derive(
+    Clone, Debug, Deserialize, DisplayDebug, Eq, Getter, GetterMut, PartialEq, Serialize, Setter,
+)]
+pub struct Response {
+    pub version: ResponseVersion,
+    #[get(type(copy))]
+    pub status_code: ResponseStatusCode,
+    #[set(type(AsRef<str>))]
+    pub reason_phrase: ResponseReasonPhrase,
+    pub headers: ResponseHeaders,
+    #[set(type(AsRef<[u8]>))]
+    pub body: ResponseBody,
+}
+```
+# Path: hyperlane/type/src/response/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+mod r#struct;
+mod r#type;
+pub use {r#enum::*, r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/websocket_frame/impl.rs
+```rust
+use super::*;
+impl Default for WebSocketFrame {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            fin: false,
+            opcode: WebSocketOpcode::Text,
+            mask: false,
+            payload_data: Vec::new(),
+        }
+    }
+}
+impl WebSocketOpcode {
+    #[inline(always)]
+    pub fn from_u8(opcode: u8) -> Self {
+        match opcode {
+            0x0 => Self::Continuation,
+            0x1 => Self::Text,
+            0x2 => Self::Binary,
+            0x8 => Self::Close,
+            0x9 => Self::Ping,
+            0xA => Self::Pong,
+            _ => Self::Reserved(opcode),
+        }
+    }
+    #[inline(always)]
+    pub fn to_u8(&self) -> u8 {
+        match self {
+            Self::Continuation => 0x0,
+            Self::Text => 0x1,
+            Self::Binary => 0x2,
+            Self::Close => 0x8,
+            Self::Ping => 0x9,
+            Self::Pong => 0xA,
+            Self::Reserved(code) => *code,
+        }
+    }
+    #[inline(always)]
+    pub fn is_control(&self) -> bool {
+        matches!(self, Self::Close | Self::Ping | Self::Pong)
+    }
+    #[inline(always)]
+    pub fn is_data(&self) -> bool {
+        matches!(self, Self::Text | Self::Binary | Self::Continuation)
+    }
+    #[inline(always)]
+    pub fn is_continuation(&self) -> bool {
+        matches!(self, Self::Continuation)
+    }
+    #[inline(always)]
+    pub fn is_text(&self) -> bool {
+        matches!(self, Self::Text)
+    }
+    #[inline(always)]
+    pub fn is_binary(&self) -> bool {
+        matches!(self, Self::Binary)
+    }
+    #[inline(always)]
+    pub fn is_close(&self) -> bool {
+        matches!(self, Self::Close)
+    }
+    #[inline(always)]
+    pub fn is_ping(&self) -> bool {
+        matches!(self, Self::Ping)
+    }
+    #[inline(always)]
+    pub fn is_pong(&self) -> bool {
+        matches!(self, Self::Pong)
+    }
+    #[inline(always)]
+    pub fn is_reserved(&self) -> bool {
+        matches!(self, Self::Reserved(_))
+    }
+}
+impl WebSocketFrame {
+    pub fn decode_ws_frame<D>(data: D) -> Option<(WebSocketFrame, usize)>
+    where
+        D: AsRef<[u8]>,
+    {
+        let data_ref: &[u8] = data.as_ref();
+        if data_ref.len() < 2 {
+            return None;
+        }
+        let mut index: usize = 0;
+        let fin: bool = (data_ref[index] & 0b1000_0000) != 0;
+        let opcode: WebSocketOpcode = WebSocketOpcode::from_u8(data_ref[index] & 0b0000_1111);
+        index += 1;
+        let mask: bool = (data_ref[index] & 0b1000_0000) != 0;
+        let mut payload_len: usize = (data_ref[index] & 0b0111_1111) as usize;
+        index += 1;
+        if payload_len == 126 {
+            if data_ref.len() < index + 2 {
+                return None;
+            }
+            payload_len = u16::from_be_bytes(data_ref[index..index + 2].try_into().ok()?) as usize;
+            index += 2;
+        } else if payload_len == 127 {
+            if data_ref.len() < index + 8 {
+                return None;
+            }
+            payload_len = u64::from_be_bytes(data_ref[index..index + 8].try_into().ok()?) as usize;
+            index += 8;
+        }
+        let mask_key: Option<[u8; 4]> = if mask {
+            if data_ref.len() < index + 4 {
+                return None;
+            }
+            let key: [u8; 4] = data_ref[index..index + 4].try_into().ok()?;
+            index += 4;
+            Some(key)
+        } else {
+            None
+        };
+        if data_ref.len() < index + payload_len {
+            return None;
+        }
+        let mut payload: Vec<u8> = data_ref[index..index + payload_len].to_vec();
+        if let Some(mask_key) = mask_key {
+            for (byte_index, payload_byte) in payload.iter_mut().enumerate() {
+                *payload_byte ^= mask_key[byte_index % 4];
+            }
+        }
+        index += payload_len;
+        let frame: WebSocketFrame = WebSocketFrame {
+            fin,
+            opcode,
+            mask,
+            payload_data: payload,
+        };
+        Some((frame, index))
+    }
+    pub fn create_frame_list<D>(data: D) -> Vec<ResponseBody>
+    where
+        D: AsRef<[u8]>,
+    {
+        let data_ref: &[u8] = data.as_ref();
+        let total_len: usize = data_ref.len();
+        let mut offset: usize = 0;
+        let mut frames_list: Vec<ResponseBody> =
+            Vec::with_capacity((total_len / MAX_FRAME_SIZE) + 1);
+        let mut is_first_frame: bool = true;
+        let is_valid_utf8: bool = std::str::from_utf8(data_ref).is_ok();
+        let base_opcode: WebSocketOpcode = if is_valid_utf8 {
+            WebSocketOpcode::Text
+        } else {
+            WebSocketOpcode::Binary
+        };
+        while offset < total_len {
+            let remaining: usize = total_len - offset;
+            let mut frame_size: usize = remaining.min(MAX_FRAME_SIZE);
+            if is_valid_utf8 && frame_size < remaining {
+                while frame_size > 0 && (data_ref[offset + frame_size] & 0xC0) == 0x80 {
+                    frame_size -= 1;
+                }
+                if frame_size == 0 {
+                    frame_size = remaining.min(MAX_FRAME_SIZE);
+                }
+            }
+            let mut frame: ResponseBody = Vec::with_capacity(frame_size + 10);
+            let opcode: WebSocketOpcode = if is_first_frame {
+                base_opcode
+            } else {
+                WebSocketOpcode::Continuation
+            };
+            let fin: u8 = if remaining > frame_size { 0x00 } else { 0x80 };
+            let opcode_byte: u8 = opcode.to_u8() & 0x0F;
+            frame.push(fin | opcode_byte);
+            if frame_size < 126 {
+                frame.push(frame_size as u8);
+            } else if frame_size <= MAX_FRAME_SIZE {
+                frame.push(126);
+                frame.extend_from_slice(&(frame_size as u16).to_be_bytes());
+            } else {
+                frame.push(127);
+                frame.extend_from_slice(&(frame_size as u16).to_be_bytes());
+            }
+            let end: usize = offset + frame_size;
+            frame.extend_from_slice(&data_ref[offset..end]);
+            frames_list.push(frame);
+            offset = end;
+            is_first_frame = false;
+        }
+        frames_list
+    }
+    pub fn sha1<D>(data: D) -> [u8; 20]
+    where
+        D: AsRef<[u8]>,
+    {
+        let data_ref: &[u8] = data.as_ref();
+        let mut hash_state: [u32; 5] = HASH_STATE;
+        let mut padded_data: Vec<u8> = Vec::from(data_ref);
+        let original_size_bits: u64 = (padded_data.len() * 8) as u64;
+        padded_data.push(0x80);
+        while !(padded_data.len() + 8).is_multiple_of(64) {
+            padded_data.push(0);
+        }
+        padded_data.extend_from_slice(&original_size_bits.to_be_bytes());
+        for block in padded_data.as_chunks::<64>().0 {
+            let mut message_schedule: [u32; 80] = [0u32; 80];
+            for (chunk_index, block_chunk) in block.as_chunks::<4>().0.iter().enumerate().take(16) {
+                message_schedule[chunk_index] = u32::from_be_bytes([
+                    block_chunk[0],
+                    block_chunk[1],
+                    block_chunk[2],
+                    block_chunk[3],
+                ]);
+            }
+            for schedule_index in 16..80 {
+                message_schedule[schedule_index] = (message_schedule[schedule_index - 3]
+                    ^ message_schedule[schedule_index - 8]
+                    ^ message_schedule[schedule_index - 14]
+                    ^ message_schedule[schedule_index - 16])
+                    .rotate_left(1);
+            }
+            let [mut hash_a, mut hash_b, mut hash_c, mut hash_d, mut hash_e] = hash_state;
+            for (round_index, &schedule_word) in message_schedule.iter().enumerate() {
+                let (round_function, round_constant): (u32, u32) = match round_index {
+                    0..=19 => ((hash_b & hash_c) | (!hash_b & hash_d), 0x5A827999),
+                    20..=39 => (hash_b ^ hash_c ^ hash_d, 0x6ED9EBA1),
+                    40..=59 => (
+                        (hash_b & hash_c) | (hash_b & hash_d) | (hash_c & hash_d),
+                        0x8F1BBCDC,
+                    ),
+                    _ => (hash_b ^ hash_c ^ hash_d, 0xCA62C1D6),
+                };
+                let temp: u32 = hash_a
+                    .rotate_left(5)
+                    .wrapping_add(round_function)
+                    .wrapping_add(hash_e)
+                    .wrapping_add(round_constant)
+                    .wrapping_add(schedule_word);
+                hash_e = hash_d;
+                hash_d = hash_c;
+                hash_c = hash_b.rotate_left(30);
+                hash_b = hash_a;
+                hash_a = temp;
+            }
+            hash_state[0] = hash_state[0].wrapping_add(hash_a);
+            hash_state[1] = hash_state[1].wrapping_add(hash_b);
+            hash_state[2] = hash_state[2].wrapping_add(hash_c);
+            hash_state[3] = hash_state[3].wrapping_add(hash_d);
+            hash_state[4] = hash_state[4].wrapping_add(hash_e);
+        }
+        let mut result: [u8; 20] = [0u8; 20];
+        for (state_index, &state_value) in hash_state.iter().enumerate() {
+            result[state_index * 4..(state_index + 1) * 4]
+                .copy_from_slice(&state_value.to_be_bytes());
+        }
+        result
+    }
+    #[inline(always)]
+    pub fn try_generate_accept_key<K>(key: K) -> Option<String>
+    where
+        K: AsRef<str>,
+    {
+        let key_ref: &str = key.as_ref();
+        let mut data: [u8; 60] = [0u8; 60];
+        data[..24].copy_from_slice(&key_ref.as_bytes()[..24.min(key_ref.len())]);
+        data[24..].copy_from_slice(GUID);
+        let hash: [u8; 20] = Self::sha1(data);
+        Self::try_base64_encode(hash)
+    }
+    #[inline(always)]
+    pub fn generate_accept_key<K>(key: K) -> String
+    where
+        K: AsRef<str>,
+    {
+        let key_ref: &str = key.as_ref();
+        let mut data: [u8; 60] = [0u8; 60];
+        data[..24].copy_from_slice(&key_ref.as_bytes()[..24.min(key_ref.len())]);
+        data[24..].copy_from_slice(GUID);
+        let hash: [u8; 20] = Self::sha1(data);
+        Self::base64_encode(hash)
+    }
+    pub fn try_base64_encode<D>(data: D) -> Option<String>
+    where
+        D: AsRef<[u8]>,
+    {
+        let data_ref: &[u8] = data.as_ref();
+        let mut encoded_data: Vec<u8> = Vec::with_capacity(data_ref.len().div_ceil(3) * 4);
+        for chunk in data_ref.chunks(3) {
+            let mut buffer: [u8; 3] = [0u8; 3];
+            buffer[..chunk.len()].copy_from_slice(chunk);
+            let indices: [u8; 4] = [
+                buffer[0] >> 2,
+                ((buffer[0] & 0b11) << 4) | (buffer[1] >> 4),
+                ((buffer[1] & 0b1111) << 2) | (buffer[2] >> 6),
+                buffer[2] & 0b111111,
+            ];
+            for &idx in &indices[..chunk.len() + 1] {
+                encoded_data.push(BASE64_CHARSET_TABLE[idx as usize]);
+            }
+            while !encoded_data.len().is_multiple_of(4) {
+                encoded_data.push(EQUAL_BYTES[0]);
+            }
+        }
+        String::from_utf8(encoded_data).ok()
+    }
+    #[inline(always)]
+    pub fn base64_encode<D>(data: D) -> String
+    where
+        D: AsRef<[u8]>,
+    {
+        Self::try_base64_encode(data).unwrap()
+    }
+    #[inline(always)]
+    pub fn is_continuation_opcode(&self) -> bool {
+        self.opcode.is_continuation()
+    }
+    #[inline(always)]
+    pub fn is_text_opcode(&self) -> bool {
+        self.opcode.is_text()
+    }
+    #[inline(always)]
+    pub fn is_binary_opcode(&self) -> bool {
+        self.opcode.is_binary()
+    }
+    #[inline(always)]
+    pub fn is_close_opcode(&self) -> bool {
+        self.opcode.is_close()
+    }
+    #[inline(always)]
+    pub fn is_ping_opcode(&self) -> bool {
+        self.opcode.is_ping()
+    }
+    #[inline(always)]
+    pub fn is_pong_opcode(&self) -> bool {
+        self.opcode.is_pong()
+    }
+    #[inline(always)]
+    pub fn is_reserved_opcode(&self) -> bool {
+        self.opcode.is_reserved()
+    }
+    #[inline(always)]
+    pub(crate) fn build_full_frame(
+        &self,
+        full_frame: &mut Vec<u8>,
+    ) -> Result<Option<RequestBody>, RequestError> {
+        let payload_data: &[u8] = self.get_payload_data();
+        full_frame.extend_from_slice(payload_data);
+        if *self.get_fin() {
+            return Ok(Some(full_frame.clone()));
+        }
+        Ok(None)
+    }
+}
+```
+# Path: hyperlane/type/src/websocket_frame/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[repr(u8)]
+pub enum WebSocketOpcode {
+    Continuation = 0x0,
+    Text = 0x1,
+    Binary = 0x2,
+    Close = 0x8,
+    Ping = 0x9,
+    Pong = 0xA,
+    Reserved(u8),
+}
+```
+# Path: hyperlane/type/src/websocket_frame/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, DisplayDebug, Eq, Getter, PartialEq)]
+pub struct WebSocketFrame {
+    pub fin: bool,
+    pub opcode: WebSocketOpcode,
+    pub mask: bool,
+    pub payload_data: Vec<u8>,
+}
+```
+# Path: hyperlane/type/src/websocket_frame/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+mod r#struct;
+pub use {r#enum::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/type/src/attribute/impl.rs
+```rust
+use super::*;
+impl From<&str> for Attribute {
+    #[inline(always)]
+    fn from(key: &str) -> Self {
+        Attribute::External(key.to_string())
+    }
+}
+impl From<String> for Attribute {
+    #[inline(always)]
+    fn from(key: String) -> Self {
+        Attribute::External(key)
+    }
+}
+impl From<InternalAttribute> for Attribute {
+    #[inline(always)]
+    fn from(key: InternalAttribute) -> Self {
+        Attribute::Internal(key)
+    }
+}
+```
+# Path: hyperlane/type/src/attribute/type.rs
+```rust
+use super::*;
+pub type ThreadSafeAttributeStore = HashMap<String, ArcAnySendSync>;
+```
+# Path: hyperlane/type/src/attribute/enum.rs
+```rust
+use super::*;
+#[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
+pub enum Attribute {
+    External(String),
+    Internal(InternalAttribute),
+}
+#[derive(Clone, Copy, CustomDebug, Deserialize, DisplayDebug, Eq, Hash, PartialEq, Serialize)]
+pub enum InternalAttribute {
+    TaskPanicData,
+    RequestErrorData,
+}
+```
+# Path: hyperlane/type/src/attribute/mod.rs
+```rust
+mod r#enum;
+mod r#impl;
+mod r#type;
+pub use {r#enum::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/any/impl.rs
+```rust
+use super::*;
+impl<T: Any + Send> AnySend for T {}
+impl<T: Any + Send + Clone> AnySendClone for T {}
+impl<T: Any + Sync> AnySync for T {}
+impl<T: Any + Sync + Clone> AnySyncClone for T {}
+impl<T: Any + Send + Sync> AnySendSync for T {}
+impl<T: Any + Send + Sync + Clone> AnySendSyncClone for T {}
+```
+# Path: hyperlane/type/src/any/trait.rs
+```rust
+use super::*;
+pub trait AnySend: Any + Send {}
+pub trait AnySendClone: Any + Send + Clone {}
+pub trait AnySync: Any + Sync {}
+pub trait AnySyncClone: Any + Sync + Clone {}
+pub trait AnySendSync: Any + Send + Sync {}
+pub trait AnySendSyncClone: Any + Send + Sync + Clone {}
+```
+# Path: hyperlane/type/src/any/type.rs
+```rust
+use super::*;
+pub type BoxAny = Box<dyn Any>;
+pub type RcAny = Rc<dyn Any>;
+pub type ArcAny = Arc<dyn Any>;
+pub type BoxAnySend = Box<dyn Any + Send>;
+pub type RcAnySend = Rc<dyn Any + Send>;
+pub type ArcAnySend = Arc<dyn Any + Send>;
+pub type BoxAnySync = Box<dyn Any + Sync>;
+pub type RcAnySync = Rc<dyn Any + Sync>;
+pub type ArcAnySync = Arc<dyn Any + Sync>;
+pub type BoxAnySendSync = Box<dyn Any + Send + Sync>;
+pub type RcAnySendSync = Rc<dyn Any + Send + Sync>;
+pub type ArcAnySendSync = Arc<dyn Any + Send + Sync>;
+```
+# Path: hyperlane/type/src/any/mod.rs
+```rust
+mod r#impl;
+mod r#trait;
+mod r#type;
+pub use {r#trait::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/task/impl.rs
+```rust
+use super::*;
+impl Default for Task {
+    #[inline(always)]
+    fn default() -> Self {
+        let worker_count: usize = Handle::try_current()
+            .map(|handle: Handle| handle.metrics().num_workers())
+            .unwrap_or_default()
+            .max(1);
+        Self::new(worker_count)
+    }
+}
+impl Drop for Task {
+    #[inline(always)]
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+impl Task {
+    pub fn new(worker_count: usize) -> Self {
+        let mut pool: Vec<UnboundedSender<AsyncTask>> = Vec::with_capacity(worker_count);
+        let counter: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+        let shutdown: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+        let notifies: Vec<Arc<Notify>> = (0..worker_count)
+            .map(|_: usize| Arc::new(Notify::new()))
+            .collect();
+        for notify in notifies.iter().take(worker_count) {
+            let (sender, mut receiver): (UnboundedSender<AsyncTask>, UnboundedReceiver<AsyncTask>) =
+                unbounded_channel();
+            pool.push(sender);
+            let shutdown_clone: Arc<AtomicBool> = shutdown.clone();
+            let notify_clone: Arc<Notify> = notify.clone();
+            spawn_blocking(move || {
+                Handle::current().block_on(LocalSet::new().run_until(async move {
+                    loop {
+                        if shutdown_clone.load(atomic::Ordering::Relaxed) {
+                            break;
+                        }
+                        match receiver.try_recv() {
+                            Ok(task) => {
+                                spawn_local(task);
+                            }
+                            Err(_) => {
+                                notify_clone.notified().await;
+                            }
+                        }
+                    }
+                }));
+            });
+        }
+        Self {
+            pool,
+            counter,
+            shutdown,
+            notifies,
+        }
+    }
+    pub fn try_spawn_local<F>(&self, index_opt: Option<usize>, hook: F) -> bool
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        if self.get_pool().is_empty() {
+            return false;
+        }
+        let index: usize = index_opt
+            .unwrap_or(self.get_counter().fetch_add(1, atomic::Ordering::Relaxed))
+            .wrapping_rem(self.get_pool().len());
+        if let Some(sender) = self.get_pool().get(index) {
+            let result: bool = sender.send(Box::pin(hook)).is_ok();
+            if result && let Some(notify) = self.get_notifies().get(index) {
+                notify.notify_one()
+            }
+            return result;
+        }
+        false
+    }
+    #[inline(always)]
+    pub fn shutdown(&self) {
+        self.get_shutdown().store(true, atomic::Ordering::Relaxed);
+        self.get_notifies()
+            .iter()
+            .for_each(|notify: &Arc<Notify>| notify.notify_one());
+    }
+}
+```
+# Path: hyperlane/type/src/task/type.rs
+```rust
+use super::*;
+pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+```
+# Path: hyperlane/type/src/task/struct.rs
+```rust
+use super::*;
+#[derive(Clone, CustomDebug, Data, DisplayDebug)]
+pub struct Task {
+    #[get(pub)]
+    #[get_mut(pub)]
+    #[set(pub)]
+    pub pool: Vec<UnboundedSender<AsyncTask>>,
+    #[get(pub)]
+    #[get_mut(pub)]
+    #[set(pub)]
+    pub counter: Arc<AtomicUsize>,
+    #[get(pub)]
+    #[get_mut(pub)]
+    #[set(pub)]
+    pub shutdown: Arc<AtomicBool>,
+    #[get(pub)]
+    #[get_mut(pub)]
+    #[set(pub)]
+    pub notifies: Vec<Arc<Notify>>,
+}
+```
+# Path: hyperlane/type/src/task/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+mod r#type;
+pub use {r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/hash_set_xx_hash3_64/fn.rs
+```rust
+use super::*;
+#[inline(always)]
+pub fn hash_set_xx_hash3_64<K: Eq + Hash>() -> HashSetXxHash3_64<K> {
+    HashSet::with_hasher(BuildHasherDefault::default())
+}
+```
+# Path: hyperlane/type/src/hash_set_xx_hash3_64/type.rs
+```rust
+use super::*;
+pub type HashSetXxHash3_64<K> = HashSet<K, BuildHasherDefault<XxHash3_64>>;
+```
+# Path: hyperlane/type/src/hash_set_xx_hash3_64/mod.rs
+```rust
+mod r#fn;
+mod r#type;
+pub use {r#fn::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/type/src/protocol/impl.rs
+```rust
+use super::*;
+impl Protocol {
+    #[inline(always)]
+    pub fn is_http(protocol: &str) -> bool {
+        matches!(protocol.to_lowercase().as_str(), HTTP_LOWERCASE)
+    }
+    #[inline(always)]
+    pub fn is_https(protocol: &str) -> bool {
+        matches!(protocol.to_lowercase().as_str(), HTTPS_LOWERCASE)
+    }
+    #[inline(always)]
+    pub fn get_port(protocol: &str) -> u16 {
+        match protocol.to_lowercase().as_str() {
+            HTTP_LOWERCASE => 80,
+            HTTPS_LOWERCASE => 443,
+            FTP_LOWERCASE => 21,
+            FTPS_LOWERCASE => 990,
+            SFTP_LOWERCASE => 22,
+            SSH_LOWERCASE => 22,
+            TELNET_LOWERCASE => 23,
+            SMTP_LOWERCASE => 25,
+            SMTPS_LOWERCASE => 465,
+            POP3_LOWERCASE => 110,
+            POP3S_LOWERCASE => 995,
+            IMAP_LOWERCASE => 143,
+            IMAPS_LOWERCASE => 993,
+            DNS_LOWERCASE => 53,
+            WS_LOWERCASE => 80,
+            WSS_LOWERCASE => 443,
+            _ => 80,
+        }
+    }
+}
+```
+# Path: hyperlane/type/src/protocol/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, New, PartialEq, Serialize)]
+pub struct Protocol;
+```
+# Path: hyperlane/type/src/protocol/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/type/src/rc_rwlock/fn.rs
+```rust
+use super::*;
+#[inline(always)]
+pub fn rc_rwlock<T>(data: T) -> RcRwLock<T> {
+    Rc::new(RwLock::new(data))
+}
+```
+# Path: hyperlane/type/src/rc_rwlock/type.rs
+```rust
+use super::*;
+pub type RcRwLock<T> = Rc<RwLock<T>>;
+```
+# Path: hyperlane/type/src/rc_rwlock/mod.rs
+```rust
+mod r#fn;
+mod r#type;
+pub use {r#fn::*, r#type::*};
 use super::*;
 ```
 # Path: hyperlane-mcp-upload/README.md
