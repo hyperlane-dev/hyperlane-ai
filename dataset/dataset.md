@@ -1,4 +1,4 @@
-<!--2026-09-26 12:36:43-->
+<!--2026-09-26 13:08:59-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -8945,6 +8945,17 @@ pub struct Tmp {
     pub(crate) visit_url: HashSet<String>,
     pub(crate) root_cert: RootCertStore,
 }
+impl Tmp {
+    pub(crate) fn visit_url_ref(&self) -> &HashSet<String> {
+        &self.visit_url
+    }
+    pub(crate) fn visit_url_mut(&mut self) -> &mut HashSet<String> {
+        &mut self.visit_url
+    }
+    pub(crate) fn root_cert_clone(&self) -> RootCertStore {
+        self.root_cert.clone()
+    }
+}
 impl Default for Tmp {
     #[inline(always)]
     fn default() -> Self {
@@ -9030,47 +9041,47 @@ impl RequestBuilder {
         self
     }
     pub fn timeout(&mut self, ms: u64) -> &mut Self {
-        self.request.config.set_timeout(ms);
+        self.request.get_config_mut().set_timeout(ms);
         self
     }
     pub fn buffer_size(&mut self, n: usize) -> &mut Self {
-        self.request.config.set_buffer_size(n);
+        self.request.get_config_mut().set_buffer_size(n);
         self
     }
     pub fn http1_1_only(&mut self) -> &mut Self {
-        self.request.config.http_version = HttpVersion::Http1_1;
+        self.request.get_config_mut().http_version = HttpVersion::Http1_1;
         self
     }
     pub fn http2_only(&mut self) -> &mut Self {
-        self.request.config.http_version = HttpVersion::Http2;
+        self.request.get_config_mut().http_version = HttpVersion::Http2;
         self
     }
     pub fn redirect(&mut self) -> &mut Self {
-        self.request.config.set_redirect(true);
+        self.request.get_config_mut().set_redirect(true);
         self
     }
     pub fn no_redirect(&mut self) -> &mut Self {
-        self.request.config.set_redirect(false);
+        self.request.get_config_mut().set_redirect(false);
         self
     }
     pub fn max_redirect_times(&mut self, n: usize) -> &mut Self {
-        self.request.config.set_max_redirect_times(n);
+        self.request.get_config_mut().set_max_redirect_times(n);
         self
     }
     pub fn decode(&mut self) -> &mut Self {
-        self.request.config.set_decode(true);
+        self.request.get_config_mut().set_decode(true);
         self
     }
     pub fn no_decode(&mut self) -> &mut Self {
-        self.request.config.set_decode(false);
+        self.request.get_config_mut().set_decode(false);
         self
     }
     pub fn proxy(&mut self, proxy: Proxy) -> &mut Self {
-        self.request.config.set_proxy(Some(proxy));
+        self.request.get_config_mut().set_proxy(Some(proxy));
         self
     }
     pub fn no_proxy(&mut self) -> &mut Self {
-        self.request.config.set_proxy(None);
+        self.request.get_config_mut().set_proxy(None);
         self
     }
     pub fn build(&mut self) -> HttpRequest {
@@ -9101,7 +9112,7 @@ impl HttpRequest {
         self.send_async_impl().await
     }
     pub(crate) fn parse_url(&self) -> Result<HttpUrlComponents, RequestError> {
-        HttpUrlComponents::parse(&self.url)
+        HttpUrlComponents::parse(self.get_url_ref())
             .map_err(|e: ::http_type::HttpUrlError| RequestError::Request(e.to_string()))
     }
     pub(crate) fn full_path(&self) -> String {
@@ -9118,7 +9129,7 @@ impl HttpRequest {
         config.http_version.to_string().to_ascii_lowercase()
     }
     pub(crate) fn header_bytes(&self, body_length: usize) -> Vec<u8> {
-        let mut header: HashMap<String, String> = self.headers.clone();
+        let mut header: HashMap<String, String> = self.get_headers();
         let host_value: String = self
             .parse_url()
             .ok()
@@ -9165,7 +9176,7 @@ impl HttpRequest {
                 .to_lowercase()
                 .parse::<ContentType>()
                 .unwrap_or_default()
-                .get_body_string(&String::from_utf8_lossy(&self.body.bytes))
+                .get_body_string(&String::from_utf8_lossy(self.get_body_ref().as_slice()))
                 .into_bytes(),
             None => Vec::new(),
         }
@@ -9175,7 +9186,7 @@ impl HttpRequest {
         let host: String = url_obj.host.clone().unwrap_or_default();
         let port: u16 = self.resolve_port(url_obj.port.unwrap_or_default());
         let mut stream: BoxReadWrite = self.open_sync_stream(host, port)?;
-        let method = self.method.clone();
+        let method = self.get_method();
         if method.is_get() {
             self.send_get_request_sync(&mut stream)
         } else if method.is_post() {
@@ -9189,7 +9200,7 @@ impl HttpRequest {
         let host: String = url_obj.host.clone().unwrap_or_default();
         let port: u16 = self.resolve_port(url_obj.port.unwrap_or_default());
         let mut stream: BoxAsyncReadWrite = self.open_async_stream(host, port).await?;
-        let method = self.method.clone();
+        let method = self.get_method();
         if method.is_get() {
             self.send_get_request_async(&mut stream).await
         } else if method.is_post() {
@@ -9202,17 +9213,17 @@ impl HttpRequest {
         if port != 0 {
             return port;
         }
-        let protocol = Self::protocol_lower(&self.config);
+        let protocol = Self::protocol_lower(self.get_config_ref());
         Protocol::get_port(&protocol)
     }
     fn is_https(&self) -> bool {
-        Self::protocol_lower(&self.config) == HTTPS_LOWERCASE
+        Self::protocol_lower(self.get_config_ref()) == HTTPS_LOWERCASE
     }
     fn open_sync_stream(&self, host: String, port: u16) -> Result<BoxReadWrite, RequestError> {
-        if let Some(proxy) = &self.config.proxy {
+        if let Some(proxy) = &self.get_config_ref().proxy {
             return self.open_sync_proxy_stream(host, port, proxy);
         }
-        let timeout = Duration::from_millis(self.config.timeout);
+        let timeout = Duration::from_millis(self.get_config_ref().timeout);
         let tcp = TcpStream::connect((host.clone(), port))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
@@ -9220,7 +9231,7 @@ impl HttpRequest {
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
-            let roots = self.tmp.root_cert.clone();
+            let roots = self.get_tmp_ref().root_cert_clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9239,7 +9250,7 @@ impl HttpRequest {
     ) -> Result<HttpResponse, RequestError> {
         let path = self.full_path();
         let header_bytes = self.header_bytes(0);
-        let version = self.config.http_version.to_string();
+        let version = self.get_config_ref().http_version.to_string();
         let request = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
@@ -9254,7 +9265,7 @@ impl HttpRequest {
         let body_bytes = self.body_bytes();
         let path = self.full_path();
         let header_bytes = self.header_bytes(body_bytes.len());
-        let version = self.config.http_version.to_string();
+        let version = self.get_config_ref().http_version.to_string();
         let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
         stream
             .write_all(&request)
@@ -9266,7 +9277,7 @@ impl HttpRequest {
         &mut self,
         stream: &mut BoxReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let buffer_size = self.config.buffer_size;
+        let buffer_size = self.get_config_ref().buffer_size;
         let mut buffer = vec![0u8; buffer_size];
         let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
         let mut headers_done = false;
@@ -9327,9 +9338,9 @@ impl HttpRequest {
             response_bytes.extend_from_slice(&decoded);
         }
         let mut response = HttpResponse::from_bytes(&response_bytes);
-        if !self.config.redirect || redirect_url.is_none() {
-            if self.config.decode {
-                response = response.decode(self.config.buffer_size);
+        if !self.get_config_ref().redirect || redirect_url.is_none() {
+            if self.get_config_ref().decode {
+                response = response.decode(self.get_config_ref().buffer_size);
             }
             return Ok(response);
         }
@@ -9341,20 +9352,20 @@ impl HttpRequest {
         self.handle_redirect(url)
     }
     fn handle_redirect(&mut self, url: String) -> Result<HttpResponse, RequestError> {
-        if !self.config.redirect {
+        if !self.get_config_ref().redirect {
             return Err(RequestError::Request("Redirect Not Enabled".to_string()));
         }
-        if self.tmp.visit_url.contains(&url) {
+        if self.get_tmp_ref().visit_url_ref().contains(&url) {
             return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
         }
-        self.tmp.visit_url.insert(url.clone());
-        if self.config.max_redirect_times == 0 {
+        self.get_tmp_mut().visit_url_mut().insert(url.clone());
+        if self.get_config_ref().max_redirect_times == 0 {
             return Err(RequestError::Request(
                 "Max Redirect Times Exceeded".to_string(),
             ));
         }
-        self.config.max_redirect_times -= 1;
-        self.url = url;
+        self.get_config_mut().max_redirect_times -= 1;
+        self.set_url(url);
         self.send_sync()
     }
     fn is_chunked_response_complete(body_bytes: &[u8]) -> bool {
@@ -9396,14 +9407,14 @@ impl HttpRequest {
         host: String,
         port: u16,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        if let Some(proxy) = &self.config.proxy {
+        if let Some(proxy) = &self.get_config_ref().proxy {
             return self.open_async_proxy_stream(host, port, proxy).await;
         }
         let tcp = http_type::tokio::net::TcpStream::connect((host.clone(), port))
             .await
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
-            let roots = self.tmp.root_cert.clone();
+            let roots = self.get_tmp_ref().root_cert_clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9425,7 +9436,7 @@ impl HttpRequest {
     ) -> Result<HttpResponse, RequestError> {
         let path = self.full_path();
         let header_bytes = self.header_bytes(0);
-        let version = self.config.http_version.to_string();
+        let version = self.get_config_ref().http_version.to_string();
         let request = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
@@ -9444,7 +9455,7 @@ impl HttpRequest {
         let body_bytes = self.body_bytes();
         let path = self.full_path();
         let header_bytes = self.header_bytes(body_bytes.len());
-        let version = self.config.http_version.to_string();
+        let version = self.get_config_ref().http_version.to_string();
         let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
         stream
             .write_all(&request)
@@ -9460,7 +9471,7 @@ impl HttpRequest {
         &mut self,
         stream: &mut BoxAsyncReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let buffer_size = self.config.buffer_size;
+        let buffer_size = self.get_config_ref().buffer_size;
         let mut buffer = vec![0u8; buffer_size];
         let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
         let mut headers_done = false;
@@ -9522,9 +9533,9 @@ impl HttpRequest {
             response_bytes.extend_from_slice(&decoded);
         }
         let mut response = HttpResponse::from_bytes(&response_bytes);
-        if !self.config.redirect || redirect_url.is_none() {
-            if self.config.decode {
-                response = response.decode(self.config.buffer_size);
+        if !self.get_config_ref().redirect || redirect_url.is_none() {
+            if self.get_config_ref().decode {
+                response = response.decode(self.get_config_ref().buffer_size);
             }
             return Ok(response);
         }
@@ -9536,20 +9547,20 @@ impl HttpRequest {
         self.handle_redirect_async(url).await
     }
     async fn handle_redirect_async(&mut self, url: String) -> Result<HttpResponse, RequestError> {
-        if !self.config.redirect {
+        if !self.get_config_ref().redirect {
             return Err(RequestError::Request("Redirect Not Enabled".to_string()));
         }
-        if self.tmp.visit_url.contains(&url) {
+        if self.get_tmp_ref().visit_url_ref().contains(&url) {
             return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
         }
-        self.tmp.visit_url.insert(url.clone());
-        if self.config.max_redirect_times == 0 {
+        self.get_tmp_mut().visit_url_mut().insert(url.clone());
+        if self.get_config_ref().max_redirect_times == 0 {
             return Err(RequestError::Request(
                 "Max Redirect Times Exceeded".to_string(),
             ));
         }
-        self.config.max_redirect_times -= 1;
-        self.url = url;
+        self.get_config_mut().max_redirect_times -= 1;
+        self.set_url(url);
         Box::pin(self.send_async()).await
     }
     fn open_sync_proxy_stream(
@@ -9571,7 +9582,7 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        let timeout = Duration::from_millis(self.config.timeout);
+        let timeout = Duration::from_millis(self.get_config_ref().timeout);
         let tcp = TcpStream::connect((proxy.host.clone(), proxy.port))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
@@ -9579,7 +9590,7 @@ impl HttpRequest {
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxReadWrite = if proxy.proxy_type == ProxyType::Https {
-            let roots = self.tmp.root_cert.clone();
+            let roots = self.get_tmp_ref().root_cert_clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9628,7 +9639,7 @@ impl HttpRequest {
             Vec::new()
         };
         if self.is_https() {
-            let roots = self.tmp.root_cert.clone();
+            let roots = self.get_tmp_ref().root_cert_clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9647,7 +9658,7 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        let timeout = Duration::from_millis(self.config.timeout);
+        let timeout = Duration::from_millis(self.get_config_ref().timeout);
         let mut tcp = TcpStream::connect((proxy.host.clone(), proxy.port))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
@@ -9732,7 +9743,7 @@ impl HttpRequest {
             _ => return Err(RequestError::Request("Internal Server Error".to_string())),
         }
         if self.is_https() {
-            let roots = self.tmp.root_cert.clone();
+            let roots = self.get_tmp_ref().root_cert_clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9773,7 +9784,7 @@ impl HttpRequest {
             .await
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxAsyncReadWrite = if proxy.proxy_type == ProxyType::Https {
-            let roots = self.tmp.root_cert.clone();
+            let roots = self.get_tmp_ref().root_cert_clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9828,7 +9839,7 @@ impl HttpRequest {
             Vec::new()
         };
         if self.is_https() {
-            let roots = self.tmp.root_cert.clone();
+            let roots = self.get_tmp_ref().root_cert_clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9942,7 +9953,7 @@ impl HttpRequest {
             _ => return Err(RequestError::Request("Internal Server Error".to_string())),
         }
         if self.is_https() {
-            let roots = self.tmp.root_cert.clone();
+            let roots = self.get_tmp_ref().root_cert_clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -10052,6 +10063,42 @@ impl HttpRequest {
     pub fn set_config(&mut self, config: RequestConfig) -> &mut Self {
         self.config = config;
         self
+    }
+    pub fn get_method(&self) -> Method {
+        self.method.clone()
+    }
+    pub fn get_url(&self) -> String {
+        self.url.clone()
+    }
+    pub fn get_url_ref(&self) -> &str {
+        self.url.as_str()
+    }
+    pub fn get_headers(&self) -> HashMap<String, String> {
+        self.headers.clone()
+    }
+    pub fn get_headers_ref(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+    pub fn get_body(&self) -> Body {
+        self.body.clone()
+    }
+    pub fn get_body_ref(&self) -> &Body {
+        &self.body
+    }
+    pub fn get_config(&self) -> RequestConfig {
+        self.config.clone()
+    }
+    pub fn get_config_ref(&self) -> &RequestConfig {
+        &self.config
+    }
+    pub fn get_config_mut(&mut self) -> &mut RequestConfig {
+        &mut self.config
+    }
+    pub(crate) fn get_tmp_ref(&self) -> &Tmp {
+        &self.tmp
+    }
+    pub(crate) fn get_tmp_mut(&mut self) -> &mut Tmp {
+        &mut self.tmp
     }
     fn normalize_header_key(key: &str) -> String {
         key.to_ascii_lowercase()
