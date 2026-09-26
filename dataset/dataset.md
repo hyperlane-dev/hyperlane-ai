@@ -1,4 +1,4 @@
-<!--2026-09-26 11:04:31-->
+<!--2026-09-26 11:47:38-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -8228,885 +8228,160 @@ Ensure that CMake is installed on the system
 ```rust
 mod request_builder;
 use http_request::*;
-use std::{
-    sync::{Arc, Mutex},
-    thread::{JoinHandle, spawn},
-    time::{Duration, Instant},
-};
+use serde_json::json;
 ```
 # Path: hyperlane/request/tests/request_builder/fn.rs
 ```rust
 use super::*;
-#[tokio::test]
-async fn test_async_http_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
-        .get("https://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(10000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!("Async GET ResponseTrait => {:?}", response.text());
-        }
-        Err(e) => println!("Async GET Error => {e}"),
+#[test]
+fn test_sync_http_get_request() {
+    let mut request = RequestBuilder::new()
+        .get("http://code.ltpp.vip/")
+        .timeout(6000)
+        .build();
+    match request.send() {
+        Ok(response) => println!("HTTP GET => status={}", response.status_code),
+        Err(e) => println!("HTTP GET Error => {e}"),
     }
 }
 #[test]
-fn test_http_post_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("Accept", "*/*");
-    header.insert("Content-Type", "application/json");
-    header.insert("Connection", "keep-alive");
-    header.insert("Accept-Encoding", "gzip, deflate");
-    let body: Value = serde_json::json!({
-        "code": "fn main() {\r\n    println!(\"hello world\");\r\n}",
-        "language": "rust",
-        "testin": ""
-    });
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .post("https://ide.ltpp.vip/?language=rust")
-        .json(body)
-        .headers(header)
-        .timeout(6000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_http_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut body: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    body.insert("body-key", "body-value");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .get("http://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(6000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_https_post_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("Accept", "*/*");
-    header.insert("Content-Type", "application/json");
-    header.insert("Connection", "keep-alive");
-    header.insert("Accept-Encoding", "gzip, deflate");
-    let body: Value = serde_json::json!({
-        "code": "fn main() {\r\n    println!(\"hello world\");\r\n}",
-        "language": "rust",
-        "testin": ""
-    });
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .post("https://code.ltpp.vip/")
-        .json(body)
-        .headers(header)
-        .timeout(4000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_https_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut body: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    body.insert("body-key", "body-value");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+fn test_sync_https_get_request() {
+    let mut request = RequestBuilder::new()
         .get("https://code.ltpp.vip/")
-        .headers(header)
-        .timeout(4000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_http_post_text_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("Accept", "*/*");
-    header.insert("Content-Type", "application/json");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .post("http://code.ltpp.vip")
-        .text("hello")
-        .headers(header)
         .timeout(6000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_http_post_binary_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("Accept", "*/*");
-    header.insert("Content-Type", "application/json");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .post("http://code.ltpp.vip")
-        .body("hello".as_bytes())
-        .headers(header)
-        .timeout(6000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_auto_gzip_get() {
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .get("https://ide.ltpp.vip/?language=rust")
-        .timeout(4000)
-        .redirect()
-        .max_redirect_times(8)
-        .decode()
-        .buffer(4096)
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_gzip_get() {
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .get("https://ide.ltpp.vip/?language=rust")
-        .timeout(4000)
-        .redirect()
-        .max_redirect_times(8)
-        .buffer(4096)
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {:?}", response.decode(4096).text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_unredirect_get() {
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .post("https://ide.ltpp.vip/?language=rust")
-        .timeout(4000)
-        .max_redirect_times(8)
-        .buffer(4096)
-        .unredirect()
-        .http1_1_only()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("ResponseTrait => {response:?}");
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_thread_https_get_request() {
-    let header_key: &str = "header-key";
-    let header_value: &str = "header-value";
-    let body_key: &str = "body-key";
-    let body_value: &str = "body-value";
-    let mut body: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    body.insert(body_key, body_value);
-    let num_threads: i32 = 10;
-    let mut handles: Vec<JoinHandle<()>> = Vec::new();
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert(header_key, header_value);
-    let request_builder: Arc<Mutex<BoxRequestTrait>> = Arc::new(Mutex::new(
-        RequestBuilder::new()
-            .get("https://code.ltpp.vip/")
-            .headers(header.clone())
-            .timeout(4000)
-            .redirect()
-            .buffer(4096)
-            .max_redirect_times(8)
-            .http1_1_only()
-            .build_sync(),
-    ));
-    for _ in 0..num_threads {
-        let request_builder: Arc<Mutex<BoxRequestTrait>> = Arc::clone(&request_builder);
-        let handle: JoinHandle<()> = spawn(move || {
-            let start_time: Instant = Instant::now();
-            match request_builder.lock().unwrap().send() {
-                Ok(response) => {
-                    let duration: Duration = start_time.elapsed();
-                    let response_text: HttpResponseText = response.text();
-                    println!("Thread finished in: {duration:?}");
-                    println!("ResponseTrait => {response_text:?}");
-                }
-                Err(e) => {
-                    let duration: Duration = start_time.elapsed();
-                    println!("Thread finished in: {duration:?}");
-                    println!("Error => {e}");
-                }
-            }
-        });
-        handles.push(handle);
+        .build();
+    match request.send() {
+        Ok(response) => println!("HTTPS GET => status={}", response.status_code),
+        Err(e) => println!("HTTPS GET Error => {e}"),
     }
-    for handle in handles {
-        handle.join().unwrap();
+}
+#[tokio::test]
+async fn test_async_https_get_request() {
+    let mut request = RequestBuilder::new()
+        .get("https://code.ltpp.vip/")
+        .timeout(10000)
+        .build();
+    match request.send_async().await {
+        Ok(response) => println!("Async HTTPS GET => status={}", response.status_code),
+        Err(e) => println!("Async HTTPS GET Error => {e}"),
     }
 }
 #[test]
-fn test_thread_http_get_request() {
-    let num_threads: i32 = 10;
-    let mut handles: Vec<JoinHandle<()>> = Vec::new();
-    let request_builder: Arc<Mutex<BoxRequestTrait>> = Arc::new(Mutex::new(
-        RequestBuilder::new()
-            .get("http://127.0.0.1:7890/")
-            .timeout(10)
-            .redirect()
-            .buffer(100)
-            .max_redirect_times(0)
-            .http2_only()
-            .build_sync(),
-    ));
-    for _ in 0..num_threads {
-        let request_builder: Arc<Mutex<BoxRequestTrait>> = Arc::clone(&request_builder);
-        let handle: JoinHandle<()> = spawn(move || {
-            let start_time: Instant = Instant::now();
-            match request_builder.lock().unwrap().send() {
-                Ok(response) => {
-                    let duration: Duration = start_time.elapsed();
-                    let response_text: HttpResponseText = response.text();
-                    println!("Thread finished in: {duration:?}");
-                    println!("ResponseTrait => {response_text:?}");
-                }
-                Err(e) => {
-                    let duration: Duration = start_time.elapsed();
-                    println!("Thread finished in: {duration:?}");
-                    println!("Error => {e}");
-                }
-            }
-        });
-        handles.push(handle);
-    }
-    for handle in handles {
-        handle.join().unwrap();
-    }
-}
-#[test]
-fn test_readme_sync_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .get("https://ltpp.vip/")
-        .headers(header)
-        .timeout(6000)
-        .redirect()
-        .max_redirect_times(8)
-        .http1_1_only()
-        .buffer(4096)
-        .decode()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("{:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[test]
-fn test_readme_sync_post_json_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let body: Value = serde_json::json!({
-        "test": 1
+fn test_sync_post_json_request() {
+    let body = serde_json::json!({
+        "code": "fn main() {\r\n    println!(\"hello world\");\r\n}",
+        "language": "rust",
     });
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .post("http://code.ltpp.vip")
-        .json(body)
-        .headers(header)
+    let mut request = RequestBuilder::new()
+        .post("https://ide.ltpp.vip/?language=rust")
+        .body_json(&body)
         .timeout(6000)
-        .redirect()
-        .max_redirect_times(8)
-        .http1_1_only()
-        .buffer(4096)
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("{:?}", response.decode(4096).text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+        .build();
+    match request.send() {
+        Ok(response) => println!("POST JSON => body_len={}", response.body.len()),
+        Err(e) => println!("POST JSON Error => {e}"),
+    }
 }
 #[test]
-fn test_readme_sync_post_text_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+fn test_sync_post_text_request() {
+    let mut request = RequestBuilder::new()
         .post("http://ide.ltpp.vip/?language=rust")
-        .text("hello")
-        .headers(header)
+        .body_text("hello")
         .timeout(6000)
-        .redirect()
-        .max_redirect_times(8)
-        .http1_1_only()
-        .buffer(4096)
-        .decode()
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("{:?}", response.text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
+        .build();
+    match request.send() {
+        Ok(response) => println!("POST text => status={}", response.status_code),
+        Err(e) => println!("POST text Error => {e}"),
+    }
 }
 #[test]
-fn test_readme_sync_post_binary_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+fn test_sync_post_binary_request() {
+    let mut request = RequestBuilder::new()
         .post("http://ide.ltpp.vip/?language=rust")
-        .body("hello".as_bytes())
-        .headers(header)
+        .body_text("hello")
         .timeout(6000)
-        .redirect()
-        .max_redirect_times(8)
-        .http1_1_only()
-        .buffer(4096)
-        .build_sync();
-    request_builder
-        .send()
-        .map(|response: BoxResponseTrait| {
-            println!("{:?}", response.decode(4096).text());
-        })
-        .unwrap_or_else(|error: RequestError| println!("Error => {error}"));
-}
-#[tokio::test]
-async fn test_async_websocket_connection() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("Authorization", "Bearer test-token");
-    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
-        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
-        .headers(header)
-        .timeout(10000)
-        .buffer(4096)
-        .protocols(&["chat", "superchat"])
-        .build_async();
-    match websocket_builder.send_text_async("Hello WebSocket!").await {
-        Ok(_) => {
-            println!("Async WebSocket text message sent successfully");
-            match websocket_builder.send_binary_async(b"binary data").await {
-                Ok(_) => {
-                    println!("Async WebSocket binary message sent successfully");
-                    match websocket_builder.receive_async().await {
-                        Ok(message) => match message {
-                            WebSocketMessage::Text(text) => println!("Received text: {text}"),
-                            WebSocketMessage::Binary(data) => {
-                                println!("Received binary: {data:?}")
-                            }
-                            WebSocketMessage::Close => println!("Connection closed"),
-                            _ => println!("Received other message type"),
-                        },
-                        Err(e) => println!("Error receiving message: {e}"),
-                    }
-                }
-                Err(e) => println!("Error sending binary: {e}"),
-            }
-        }
-        Err(e) => println!("Error sending text: {e}"),
-    }
-    websocket_builder
-        .close_async_method()
-        .await
-        .unwrap_or_else(|error: WebSocketError| println!("Error closing: {error}"));
-}
-#[test]
-fn test_sync_websocket_connection() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("Authorization", "Bearer test-token");
-    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
-        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
-        .headers(header)
-        .timeout(10000)
-        .buffer(4096)
-        .protocols(&["chat", "superchat"])
-        .build_sync();
-    websocket_builder
-        .send_text("Hello WebSocket!")
-        .and_then(|_| {
-            println!("Sync WebSocket text message sent successfully");
-            websocket_builder.send_binary(b"binary data")
-        })
-        .map(|_| {
-            println!("Sync WebSocket binary message sent successfully");
-            match websocket_builder.receive() {
-                Ok(message) => match message {
-                    WebSocketMessage::Text(text) => println!("Received text: {text}"),
-                    WebSocketMessage::Binary(data) => println!("Received binary: {data:?}"),
-                    WebSocketMessage::Close => println!("Connection closed"),
-                    _ => println!("Received other message type"),
-                },
-                Err(e) => println!("Error receiving message: {e}"),
-            }
-        })
-        .and_then(|_| websocket_builder.close())
-        .unwrap_or_else(|error: WebSocketError| println!("Error => {error}"));
-}
-#[test]
-fn test_websocket_with_http_proxy() {
-    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
-        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
-        .timeout(10000)
-        .buffer(4096)
-        .http_proxy("127.0.0.1", 7890)
-        .build_sync();
-    match websocket_builder.send_text("Hello WebSocket with HTTP proxy!") {
-        Ok(_) => println!("WebSocket HTTP proxy test unexpectedly succeeded"),
-        Err(e) => {
-            println!("WebSocket HTTP proxy test correctly failed: {e}");
-        }
-    }
-}
-#[test]
-fn test_websocket_with_https_proxy() {
-    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
-        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
-        .timeout(10000)
-        .buffer(4096)
-        .https_proxy("127.0.0.1", 7890)
-        .build_sync();
-    match websocket_builder.send_text("Hello WebSocket with HTTPS proxy!") {
-        Ok(_) => println!("WebSocket HTTPS proxy test unexpectedly succeeded"),
-        Err(e) => {
-            println!("WebSocket HTTPS proxy test correctly failed: {e}");
-        }
-    }
-}
-#[test]
-fn test_websocket_with_socks5_proxy() {
-    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
-        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
-        .timeout(10000)
-        .buffer(4096)
-        .socks5_proxy("127.0.0.1", 1080)
-        .build_sync();
-    match websocket_builder.send_text("Hello WebSocket with SOCKS5 proxy!") {
-        Ok(_) => println!("WebSocket SOCKS5 proxy test unexpectedly succeeded"),
-        Err(e) => {
-            println!("WebSocket SOCKS5 proxy test correctly failed: {e}");
-        }
-    }
-}
-#[test]
-fn test_websocket_with_http_proxy_auth() {
-    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
-        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
-        .timeout(10000)
-        .buffer(4096)
-        .http_proxy_auth("127.0.0.1", 7890, "username", "password")
-        .build_sync();
-    match websocket_builder.send_text("Hello WebSocket with HTTP proxy auth!") {
-        Ok(_) => println!("WebSocket HTTP proxy auth test unexpectedly succeeded"),
-        Err(e) => {
-            println!("WebSocket HTTP proxy auth test correctly failed: {e}");
-        }
-    }
-}
-#[tokio::test]
-async fn test_websocket_with_socks5_proxy_auth_async() {
-    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
-        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
-        .timeout(10000)
-        .buffer(4096)
-        .socks5_proxy_auth("127.0.0.1", 1080, "username", "password")
-        .build_async();
-    match websocket_builder
-        .send_text_async("Hello WebSocket with SOCKS5 proxy auth!")
-        .await
-    {
-        Ok(_) => println!("WebSocket SOCKS5 proxy auth async test unexpectedly succeeded"),
-        Err(e) => {
-            println!("WebSocket SOCKS5 proxy auth async test correctly failed: {e}");
-        }
-    }
-}
-#[tokio::test]
-async fn test_websocket_with_https_proxy_auth_async() {
-    let mut websocket_builder: WebSocket = WebSocketBuilder::new()
-        .connect("ws://127.0.0.1:60006/api/ws?uuid=1")
-        .timeout(10000)
-        .buffer(4096)
-        .https_proxy_auth("127.0.0.1", 7890, "username", "password")
-        .build_async();
-    match websocket_builder
-        .send_text_async("Hello WebSocket with HTTPS proxy auth!")
-        .await
-    {
-        Ok(_) => println!("WebSocket HTTPS proxy auth async test unexpectedly succeeded"),
-        Err(e) => {
-            println!("WebSocket HTTPS proxy auth async test correctly failed: {e}");
-        }
-    }
-}
-#[tokio::test]
-async fn test_readme_async_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
-        .get("https://ltpp.vip/")
-        .headers(header)
-        .timeout(6000)
-        .redirect()
-        .max_redirect_times(8)
-        .http1_1_only()
-        .buffer(4096)
-        .decode()
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!("{:?}", response.text());
-        }
-        Err(e) => println!("Error => {e}"),
+        .build();
+    match request.send() {
+        Ok(response) => println!("POST binary => status={}", response.status_code),
+        Err(e) => println!("POST binary Error => {e}"),
     }
 }
 #[test]
 fn test_case_insensitive_header_matching() {
-    let mut header1: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header1.insert("Content-Type", "application/json");
-    header1.insert("User-Agent", "test-agent");
-    let mut header2: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header2.insert("content-type", "text/html");
-    header2.insert("HOST", "example.com");
-    let _request_builder: BoxRequestTrait = RequestBuilder::new()
+    let mut headers: HashMap<String, String> = HashMap::new();
+    headers.insert("Content-Type".to_string(), "application/json".to_string());
+    headers.insert("User-Agent".to_string(), "test-agent".to_string());
+    let _request = RequestBuilder::new()
         .get("http://ide.ltpp.vip/?language=rust")
-        .headers(header1)
-        .headers(header2)
+        .headers(headers)
         .timeout(6000)
-        .build_sync();
-    println!("Case insensitive header test completed");
+        .build();
+    println!("Case-insensitive header test completed");
 }
 #[test]
 fn test_case_insensitive_required_headers() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("host", "custom-host.com");
-    header.insert("CONTENT-LENGTH", "100");
-    header.insert("Accept", "application/xml");
-    header.insert("user-agent", "custom-agent");
-    let _request_builder: BoxRequestTrait = RequestBuilder::new()
+    let mut headers: HashMap<String, String> = HashMap::new();
+    headers.insert("host".to_string(), "custom-host.com".to_string());
+    headers.insert("accept".to_string(), "application/xml".to_string());
+    let _request = RequestBuilder::new()
         .get("http://ide.ltpp.vip/?language=rust")
-        .headers(header)
+        .headers(headers)
         .timeout(6000)
-        .build_sync();
-    println!("Case insensitive required headers test completed");
+        .build();
+    println!("Case-insensitive required headers test completed");
 }
 #[test]
 fn test_http_proxy_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+    let mut request = RequestBuilder::new()
         .get("http://ide.ltpp.vip/?language=rust")
-        .headers(header)
+        .proxy(Proxy::http("127.0.0.1", 7890))
         .timeout(10000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .http_proxy("127.0.0.1", 7890)
-        .build_sync();
-    match request_builder.send() {
-        Ok(response) => {
-            println!("HTTP Proxy GET Response => {:?}", response.text());
-        }
+        .build();
+    match request.send() {
+        Ok(response) => println!("HTTP Proxy GET => status={}", response.status_code),
         Err(e) => println!("HTTP Proxy GET Error (expected) => {e}"),
     }
 }
 #[test]
-fn test_http_proxy_auth_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .get("http://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(10000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .http_proxy_auth("127.0.0.1", 7890, "username", "password")
-        .build_sync();
-    match request_builder.send() {
-        Ok(response) => {
-            println!("HTTP Proxy Auth GET Response => {:?}", response.text());
-        }
-        Err(e) => println!("HTTP Proxy Auth GET Error (expected) => {e}"),
-    }
-}
-#[test]
 fn test_socks5_proxy_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
+    let mut request = RequestBuilder::new()
         .get("http://ide.ltpp.vip/?language=rust")
-        .headers(header)
+        .proxy(Proxy::socks5("127.0.0.1", 1080))
         .timeout(10000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .socks5_proxy("127.0.0.1", 1080)
-        .build_sync();
-    match request_builder.send() {
-        Ok(response) => {
-            println!("SOCKS5 Proxy GET Response => {:?}", response.text());
-        }
+        .build();
+    match request.send() {
+        Ok(response) => println!("SOCKS5 Proxy GET => status={}", response.status_code),
         Err(e) => println!("SOCKS5 Proxy GET Error (expected) => {e}"),
     }
 }
-#[tokio::test]
-async fn test_async_http_proxy_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
-        .get("http://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(10000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .http_proxy("127.0.0.1", 7890)
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!("Async HTTP Proxy GET Response => {:?}", response.text());
-        }
-        Err(e) => println!("Async HTTP Proxy GET Error (expected) => {e}"),
+#[test]
+fn test_readme_sync_get_request() {
+    let mut headers: HashMap<String, String> = HashMap::new();
+    headers.insert("header-key".to_string(), "header-value".to_string());
+    let mut request = RequestBuilder::new()
+        .get("https://ltpp.vip/")
+        .headers(headers)
+        .timeout(6000)
+        .build();
+    match request.send() {
+        Ok(response) => println!("README GET => body_len={}", response.body.len()),
+        Err(e) => println!("README GET Error => {e}"),
     }
 }
-#[tokio::test]
-async fn test_async_socks5_proxy_auth_get_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
-        .get("http://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(10000)
-        .redirect()
-        .buffer(4096)
-        .max_redirect_times(8)
-        .http1_1_only()
-        .socks5_proxy_auth("127.0.0.1", 1080, "username", "password")
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!(
-                "Async SOCKS5 Proxy Auth GET Response => {:?}",
-                response.text()
-            );
-        }
-        Err(e) => println!("Async SOCKS5 Proxy Auth GET Error (expected) => {e}"),
-    }
-}
-#[tokio::test]
-async fn test_readme_async_post_json_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let body: Value = serde_json::json!({
-        "test": 1
-    });
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
+#[test]
+fn test_readme_sync_post_json_request() {
+    let body = json!({ "test": 1 });
+    let mut headers: HashMap<String, String> = HashMap::new();
+    headers.insert("header-key".to_string(), "header-value".to_string());
+    let mut request = RequestBuilder::new()
         .post("http://code.ltpp.vip")
-        .json(body)
-        .headers(header)
+        .body_json(&body)
+        .headers(headers)
         .timeout(6000)
-        .redirect()
-        .max_redirect_times(8)
-        .http1_1_only()
-        .buffer(4096)
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!("{:?}", response.decode(4096).text());
-        }
-        Err(e) => println!("Error => {e}"),
-    }
-}
-#[tokio::test]
-async fn test_readme_async_post_text_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
-        .post("http://ide.ltpp.vip/?language=rust")
-        .text("hello")
-        .headers(header)
-        .timeout(6000)
-        .redirect()
-        .max_redirect_times(8)
-        .http1_1_only()
-        .buffer(4096)
-        .decode()
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!("{:?}", response.text());
-        }
-        Err(e) => println!("Error => {e}"),
-    }
-}
-#[tokio::test]
-async fn test_readme_async_post_binary_request() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("header-key", "header-value");
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
-        .post("http://ide.ltpp.vip/?language=rust")
-        .body("hello".as_bytes())
-        .headers(header)
-        .timeout(6000)
-        .redirect()
-        .max_redirect_times(8)
-        .http1_1_only()
-        .buffer(4096)
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!("{:?}", response.decode(4096).text());
-        }
-        Err(e) => println!("Error => {e}"),
-    }
-}
-#[tokio::test]
-async fn test_https_over_http_proxy_async() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("User-Agent", "test-agent");
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
-        .get("https://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(10000)
-        .http_proxy("127.0.0.1", 7890)
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!(
-                "HTTPS over HTTP proxy test passed: {}",
-                response.binary().get_status_code()
-            );
-        }
-        Err(e) => {
-            println!("HTTPS over HTTP proxy test failed (expected): {e}");
-        }
-    }
-}
-#[tokio::test]
-async fn test_https_over_socks5_proxy_async() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("User-Agent", "test-agent");
-    let mut request_builder: BoxAsyncRequestTrait = RequestBuilder::new()
-        .get("https://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(10000)
-        .socks5_proxy("127.0.0.1", 1080)
-        .build_async();
-    match request_builder.send().await {
-        Ok(response) => {
-            println!(
-                "HTTPS over SOCKS5 proxy test passed: {}",
-                response.binary().get_status_code()
-            );
-        }
-        Err(e) => {
-            println!("HTTPS over SOCKS5 proxy test failed (expected): {e}");
-        }
-    }
-}
-#[test]
-fn test_https_over_http_proxy_sync() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("User-Agent", "test-agent");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .get("https://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(10000)
-        .http_proxy("127.0.0.1", 7890)
-        .build_sync();
-    match request_builder.send() {
-        Ok(response) => {
-            println!(
-                "Sync HTTPS over HTTP proxy test passed: {}",
-                response.binary().get_status_code()
-            );
-        }
-        Err(e) => {
-            println!("Sync HTTPS over HTTP proxy test failed (expected): {e}");
-        }
-    }
-}
-#[test]
-fn test_https_over_socks5_proxy_sync() {
-    let mut header: HashMapXxHash3_64<&str, &str> = hash_map_xx_hash3_64();
-    header.insert("User-Agent", "test-agent");
-    let mut request_builder: BoxRequestTrait = RequestBuilder::new()
-        .get("https://ide.ltpp.vip/?language=rust")
-        .headers(header)
-        .timeout(10000)
-        .socks5_proxy("127.0.0.1", 1080)
-        .build_sync();
-    match request_builder.send() {
-        Ok(response) => {
-            println!(
-                "Sync HTTPS over SOCKS5 proxy test passed: {}",
-                response.binary().get_status_code()
-            );
-        }
-        Err(e) => {
-            println!("Sync HTTPS over SOCKS5 proxy test failed (expected): {e}");
-        }
+        .build();
+    match request.send() {
+        Ok(response) => println!("README POST JSON => status={}", response.status_code),
+        Err(e) => println!("README POST JSON Error => {e}"),
     }
 }
 ```
@@ -9122,107 +8397,42 @@ mod request;
 mod response;
 mod utils;
 pub use {request::*, response::*};
-pub use {
-    http_type::{HashMapXxHash3_64, RequestError, hash_map_xx_hash3_64},
-    serde_json::{
-        Deserializer, Error, Map, Number, StreamDeserializer, Value, from_reader, from_slice,
-        from_str, from_value, to_string, to_string_pretty, to_value, to_vec, to_vec_pretty,
-        to_writer, to_writer_pretty, value,
-    },
+pub use http_type::{
+    ACCEPT, ACCEPT_ANY, BR_BYTES, COLON_U8, CONTENT_LENGTH, CONTENT_TYPE, Compress, ContentType,
+    HOST, HTTP_BR_BYTES, HTTPS_LOWERCASE, HashMapXxHash3_64, HttpStatus, HttpUrlComponents,
+    HttpVersion, LOCATION, Method, Protocol, QUERY, RequestError, RequestHeadersKey,
+    RequestHeadersValue, ResponseStatusCode, SPACE_U8, TAB_U8, USER_AGENT, hash_map_xx_hash3_64,
 };
-use {common::*, utils::*};
-use std::{
-    borrow::Cow,
-    collections::{HashSet, VecDeque},
-    fmt::{self, Debug, Display, Formatter},
+pub use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    fmt::{self, Display, Formatter},
     io::{Read, Write},
     net::{Ipv4Addr, Ipv6Addr, TcpStream},
     pin::Pin,
     str::from_utf8,
     string::FromUtf8Error,
-    sync::{
-        Arc, RwLock, RwLockReadGuard,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::Arc,
     task::{Context, Poll},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
     vec::IntoIter,
 };
-use {
-    futures::{Future, Sink, SinkExt, Stream, StreamExt},
-    http_type::{
-        ACCEPT, ACCEPT_ANY, BR_BYTES, COLON_U8, CONNECTION, CONTENT_LENGTH, CONTENT_TYPE, Compress,
-        ContentType, DEFAULT_BUFFER_SIZE, DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS, DEFAULT_HTTP_PATH,
-        DEFAULT_MAX_REDIRECT_TIMES, EMPTY_STR, HOST, HTTP_BR_BYTES, HttpStatus, HttpUrlComponents,
-        HttpVersion, LOCATION, Method, Protocol, QUERY, RequestBody, RequestBodyString,
-        RequestHeaders, ResponseHeaders, ResponseStatusCode, SEC_WEBSOCKET_KEY,
-        SEC_WEBSOCKET_VERSION, SPACE_U8, TAB_U8, UPGRADE, USER_AGENT,
-        tokio::{
-            io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
-            runtime::Runtime,
-            sync::Mutex,
-            time::timeout,
-        },
-    },
+pub use {
+    http_type::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
     rustls::{
         ClientConfig, ClientConnection, RootCertStore, StreamOwned,
         pki_types::{InvalidDnsNameError, ServerName},
     },
-    serde::{Serialize, Serializer},
-    tokio_rustls::{TlsConnector, client::TlsStream},
-    tokio_tungstenite::{
-        MaybeTlsStream, WebSocketStream, client_async_with_config, connect_async_with_config,
-        tungstenite::Message, tungstenite::handshake::client::Request,
-    },
+    serde::Serialize,
+    tokio_rustls::TlsConnector,
     webpki_roots::TLS_SERVER_ROOTS,
 };
+use common::*;
+use lombok_macros::*;
 ```
 # Path: hyperlane/request/src/utils/mod.rs
 ```rust
 mod encode;
-mod vec;
-pub(crate) use {encode::*, vec::*};
-use super::*;
-```
-# Path: hyperlane/request/src/utils/vec/fn.rs
-```rust
-use super::*;
-pub(crate) fn split_whitespace(input: &[u8]) -> Vec<&[u8]> {
-    let mut parts: Vec<&[u8]> = Vec::new();
-    let mut start: usize = 0;
-    for (i, &byte) in input.iter().enumerate() {
-        if byte == SPACE_U8 || byte == TAB_U8 {
-            if i > start {
-                parts.push(&input[start..i]);
-            }
-            start = i + 1;
-        }
-    }
-    if start < input.len() {
-        parts.push(&input[start..]);
-    }
-    parts
-}
-pub(crate) fn split_multi_byte<'a>(data: &'a [u8], delimiter: &'a [u8]) -> Vec<&'a [u8]> {
-    let mut result: Vec<&[u8]> = Vec::new();
-    let mut start: usize = 0;
-    for i in 0..=data.len() {
-        if data[i..].starts_with(delimiter) {
-            result.push(&data[start..i]);
-            start = i + delimiter.len();
-        }
-    }
-    if start < data.len() {
-        result.push(&data[start..]);
-    }
-    result
-}
-```
-# Path: hyperlane/request/src/utils/vec/mod.rs
-```rust
-mod r#fn;
-pub(crate) use r#fn::*;
-use super::*;
+pub(crate) use encode::*;
 ```
 # Path: hyperlane/request/src/utils/encode/const.rs
 ```rust
@@ -9265,13 +8475,12 @@ pub(crate) use {r#const::*, r#fn::*};
 ```rust
 mod config;
 mod http_request;
+mod parser;
 mod proxy;
 mod request_builder;
-mod shared;
-mod socket;
 mod tmp;
-pub use {http_request::*, request_builder::*, socket::*};
-pub(crate) use {config::*, proxy::*, shared::*, tmp::*};
+pub use {http_request::*, proxy::*, request_builder::*};
+pub(crate) use {config::*, parser::*, tmp::*};
 use super::*;
 ```
 # Path: hyperlane/request/src/request/proxy/impl.rs
@@ -9353,6 +8562,45 @@ impl Write for SyncProxyTunnelStream {
 # Path: hyperlane/request/src/request/proxy/struct.rs
 ```rust
 use super::*;
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProxyType {
+    Http,
+    Https,
+    Socks5,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Proxy {
+    pub proxy_type: ProxyType,
+    pub host: String,
+    pub port: u16,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+impl Proxy {
+    pub fn http<H: AsRef<str>>(host: H, port: u16) -> Self {
+        Self::new(ProxyType::Http, host, port)
+    }
+    pub fn https<H: AsRef<str>>(host: H, port: u16) -> Self {
+        Self::new(ProxyType::Https, host, port)
+    }
+    pub fn socks5<H: AsRef<str>>(host: H, port: u16) -> Self {
+        Self::new(ProxyType::Socks5, host, port)
+    }
+    pub fn auth<U: AsRef<str>, P: AsRef<str>>(mut self, username: U, password: P) -> Self {
+        self.username = Some(username.as_ref().to_owned());
+        self.password = Some(password.as_ref().to_owned());
+        self
+    }
+    fn new<H: AsRef<str>>(proxy_type: ProxyType, host: H, port: u16) -> Self {
+        Self {
+            proxy_type,
+            host: host.as_ref().to_owned(),
+            port,
+            username: None,
+            password: None,
+        }
+    }
+}
 pub struct ProxyTunnelStream {
     pub(super) inner: BoxAsyncReadWrite,
     pub(super) pre_read_data: Vec<u8>,
@@ -9366,1528 +8614,337 @@ pub struct SyncProxyTunnelStream {
 ```rust
 mod r#impl;
 mod r#struct;
-pub(crate) use r#struct::*;
-use super::*;
-```
-# Path: hyperlane/request/src/request/shared/impl.rs
-```rust
-use super::*;
-impl SharedRequestBuilder {
-    pub(crate) fn build_http_request(
-        method: &str,
-        path: String,
-        header_bytes: Vec<u8>,
-        body_bytes: Option<Vec<u8>>,
-        http_version_str: String,
-    ) -> Vec<u8> {
-        let request_line_size: usize = method.len() + 1 + path.len() + 1 + http_version_str.len();
-        let body_size: usize = body_bytes.as_ref().map_or(0, |b| b.len());
-        let total_size: usize = request_line_size + 2 + header_bytes.len() + 2 + body_size;
-        let mut request: Vec<u8> = Vec::with_capacity(total_size);
-        request.extend_from_slice(method.as_bytes());
-        request.push(b' ');
-        request.extend_from_slice(path.as_bytes());
-        request.push(b' ');
-        request.extend_from_slice(http_version_str.as_bytes());
-        request.extend_from_slice(HTTP_BR_BYTES);
-        request.extend_from_slice(&header_bytes);
-        request.extend_from_slice(HTTP_BR_BYTES);
-        if let Some(body) = body_bytes {
-            request.extend_from_slice(&body);
-        }
-        request
-    }
-    pub(crate) fn build_get_request(
-        path: String,
-        header_bytes: Vec<u8>,
-        http_version_str: String,
-    ) -> Vec<u8> {
-        Self::build_http_request("GET", path, header_bytes, None, http_version_str)
-    }
-    pub(crate) fn build_post_request(
-        path: String,
-        header_bytes: Vec<u8>,
-        body_bytes: Vec<u8>,
-        http_version_str: String,
-    ) -> Vec<u8> {
-        Self::build_http_request(
-            "POST",
-            path,
-            header_bytes,
-            Some(body_bytes),
-            http_version_str,
-        )
-    }
-}
-impl SharedResponseHandler {
-    pub(crate) fn parse_response_headers(
-        headers_bytes: &[u8],
-        http_version_bytes: &[u8],
-        location_sign_key: &[u8],
-        content_length: &mut usize,
-        redirect_url: &mut Option<Vec<u8>>,
-        is_chunked: &mut bool,
-    ) -> Result<(), RequestError> {
-        if let Some(status_pos) =
-            Self::find_pattern_case_insensitive(headers_bytes, http_version_bytes)
-        {
-            let status_code_start: usize = status_pos + http_version_bytes.len() + 1;
-            let status_code_end: usize = status_code_start + 3;
-            if status_code_end <= headers_bytes.len() {
-                let status_code: usize =
-                    Self::parse_status_code(&headers_bytes[status_code_start..status_code_end]);
-                if (300..=399).contains(&status_code)
-                    && let Some(location_pos) =
-                        Self::find_pattern_case_insensitive(headers_bytes, location_sign_key)
-                {
-                    let start: usize = location_pos + location_sign_key.len();
-                    if let Some(end_pos) = Self::find_crlf(headers_bytes, start) {
-                        let mut url_vec = Vec::with_capacity(end_pos - start);
-                        url_vec.extend_from_slice(&headers_bytes[start..end_pos]);
-                        *redirect_url = Some(url_vec);
-                    }
-                }
-            }
-        }
-        *content_length = Self::get_content_length(headers_bytes);
-        *is_chunked = Self::is_chunked_encoding(headers_bytes);
-        Ok(())
-    }
-    pub(crate) fn find_pattern_case_insensitive(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-        if needle.is_empty() || haystack.len() < needle.len() {
-            return None;
-        }
-        let needle_len: usize = needle.len();
-        let search_len: usize = haystack.len() - needle_len + 1;
-        let first_needle_lower: u8 = needle[0].to_ascii_lowercase();
-        'outer: for i in 0..search_len {
-            if haystack[i].to_ascii_lowercase() != first_needle_lower {
-                continue;
-            }
-            for j in 1..needle_len {
-                if !haystack[i + j].eq_ignore_ascii_case(&needle[j]) {
-                    continue 'outer;
-                }
-            }
-            return Some(i);
-        }
-        None
-    }
-    pub(crate) fn find_crlf(data: &[u8], start: usize) -> Option<usize> {
-        let search_data: &[u8] = &data[start..];
-        for i in 0..search_data.len().saturating_sub(1) {
-            if search_data[i] == b'\r' && search_data[i + 1] == b'\n' {
-                return Some(start + i);
-            }
-        }
-        None
-    }
-    pub(crate) fn find_double_crlf(data: &[u8], start: usize) -> Option<usize> {
-        let search_data: &[u8] = &data[start..];
-        for i in 0..search_data.len().saturating_sub(3) {
-            if search_data[i] == b'\r'
-                && search_data[i + 1] == b'\n'
-                && search_data[i + 2] == b'\r'
-                && search_data[i + 3] == b'\n'
-            {
-                return Some(start + i);
-            }
-        }
-        None
-    }
-    pub(crate) fn get_content_length(response_bytes: &[u8]) -> usize {
-        if let Some(pos) =
-            Self::find_pattern_case_insensitive(response_bytes, CONTENT_LENGTH_PATTERN)
-        {
-            let value_start: usize = pos + CONTENT_LENGTH_PATTERN.len();
-            let value_start: usize = if response_bytes.get(value_start) == Some(&b' ') {
-                value_start + 1
-            } else {
-                value_start
-            };
-            if let Some(end_pos) = Self::find_crlf(response_bytes, value_start) {
-                let value_bytes: &[u8] = &response_bytes[value_start..end_pos];
-                return Self::parse_decimal_bytes(value_bytes);
-            }
-        }
-        0
-    }
-    pub(crate) fn is_chunked_encoding(headers_bytes: &[u8]) -> bool {
-        if let Some(pos) =
-            Self::find_pattern_case_insensitive(headers_bytes, TRANSFER_ENCODING_PATTERN)
-        {
-            let value_start: usize = pos + TRANSFER_ENCODING_PATTERN.len();
-            let value_start: usize = if headers_bytes.get(value_start) == Some(&b' ') {
-                value_start + 1
-            } else {
-                value_start
-            };
-            if let Some(end_pos) = Self::find_crlf(headers_bytes, value_start) {
-                let value_bytes: &[u8] = &headers_bytes[value_start..end_pos];
-                return Self::find_pattern_case_insensitive(value_bytes, CHUNKED_PATTERN).is_some();
-            }
-        }
-        false
-    }
-    pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
-        let mut result: Vec<u8> = Vec::new();
-        let mut pos: usize = 0;
-        while pos < body_bytes.len() {
-            let chunk_size_end: usize = match body_bytes[pos..]
-                .windows(2)
-                .position(|window: &[u8]| window == b"\r\n")
-            {
-                Some(p) => pos + p,
-                None => break,
-            };
-            let chunk_size_str: &[u8] = &body_bytes[pos..chunk_size_end];
-            let chunk_size_str: &[u8] = match chunk_size_str.iter().position(|&b| b == b';') {
-                Some(p) => &chunk_size_str[..p],
-                None => chunk_size_str,
-            };
-            let chunk_size: usize = match std::str::from_utf8(chunk_size_str) {
-                Ok(s) => match usize::from_str_radix(s.trim(), 16) {
-                    Ok(n) => n,
-                    Err(_) => break,
-                },
-                Err(_) => break,
-            };
-            if chunk_size == 0 {
-                break;
-            }
-            let chunk_data_start: usize = chunk_size_end + 2;
-            let chunk_data_end: usize = chunk_data_start + chunk_size;
-            if chunk_data_end > body_bytes.len() {
-                break;
-            }
-            result.extend_from_slice(&body_bytes[chunk_data_start..chunk_data_end]);
-            pos = chunk_data_end + 2;
-        }
-        result
-    }
-    pub(crate) fn parse_decimal_bytes(bytes: &[u8]) -> usize {
-        let mut result: usize = 0;
-        let mut started: bool = false;
-        for &byte in bytes {
-            match byte {
-                b'0'..=b'9' => {
-                    started = true;
-                    result = result * 10 + (byte - b'0') as usize;
-                }
-                b' ' | b'\t' if !started => continue,
-                _ => break,
-            }
-        }
-        result
-    }
-    pub(crate) fn parse_status_code(status_bytes: &[u8]) -> usize {
-        if status_bytes.len() != 3 {
-            return 0;
-        }
-        let mut result: usize = 0;
-        for &byte in status_bytes {
-            if byte.is_ascii_digit() {
-                result = result * 10 + (byte - b'0') as usize;
-            } else {
-                return 0;
-            }
-        }
-        result
-    }
-    pub(crate) fn calculate_buffer_capacity(
-        response_bytes: &[u8],
-        n: usize,
-        current_capacity: usize,
-    ) -> usize {
-        if response_bytes.len() + n <= current_capacity {
-            return 0;
-        }
-        let needed_cap: usize = response_bytes.len() + n;
-        if current_capacity == 0 {
-            needed_cap.max(1024)
-        } else if needed_cap <= current_capacity * 2 {
-            current_capacity * 2
-        } else {
-            (needed_cap * 3) / 2
-        }
-    }
-}
-```
-# Path: hyperlane/request/src/request/shared/struct.rs
-```rust
-pub(crate) struct SharedRequestBuilder;
-pub(crate) struct SharedResponseHandler;
-```
-# Path: hyperlane/request/src/request/shared/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub(crate) use r#struct::*;
-use super::*;
-```
-# Path: hyperlane/request/src/request/socket/mod.rs
-```rust
-mod config;
-mod message;
-mod proxy;
-mod shared;
-mod websocket;
-mod websocket_builder;
-pub use {message::*, shared::*, websocket::*, websocket_builder::*};
-pub(crate) use {config::*, proxy::*};
-use super::*;
-```
-# Path: hyperlane/request/src/request/socket/proxy/impl.rs
-```rust
-use super::*;
-impl WebSocketProxyTunnelStream {
-    pub(crate) fn new(stream: BoxAsyncReadWrite) -> Self {
-        Self { inner: stream }
-    }
-}
-impl AsyncRead for WebSocketProxyTunnelStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buf)
-    }
-}
-impl AsyncWrite for WebSocketProxyTunnelStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, std::io::Error>> {
-        Pin::new(&mut self.inner).poll_write(cx, buf)
-    }
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
-    }
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
-    }
-}
-impl Unpin for WebSocketProxyTunnelStream {}
-impl Debug for WebSocketProxyTunnelStream {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WebSocketProxyTunnelStream")
-            .field("inner", &"<BoxAsyncReadWrite>")
-            .finish()
-    }
-}
-impl SyncWebSocketProxyTunnelStream {
-    #[allow(dead_code)]
-    pub(crate) fn new(stream: BoxReadWrite) -> Self {
-        Self { inner: stream }
-    }
-}
-impl Read for SyncWebSocketProxyTunnelStream {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.inner.read(buf)
-    }
-}
-impl Write for SyncWebSocketProxyTunnelStream {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.inner.write(buf)
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
-    }
-}
-```
-# Path: hyperlane/request/src/request/socket/proxy/struct.rs
-```rust
-use super::*;
-pub struct WebSocketProxyTunnelStream {
-    pub(super) inner: BoxAsyncReadWrite,
-}
-pub struct SyncWebSocketProxyTunnelStream {
-    pub(super) inner: BoxReadWrite,
-}
-```
-# Path: hyperlane/request/src/request/socket/proxy/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub(crate) use r#struct::*;
-use super::*;
-```
-# Path: hyperlane/request/src/request/socket/shared/impl.rs
-```rust
-use super::*;
-impl std::fmt::Display for WebSocketError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
-            WebSocketErrorKind::Connection => write!(f, "Connection error: {}", self.message),
-            WebSocketErrorKind::String => write!(f, "String error: {}", self.message),
-            WebSocketErrorKind::Timeout => write!(f, "Timeout error: {}", self.message),
-            WebSocketErrorKind::InvalidUrl => write!(f, "Invalid URL: {}", self.message),
-            WebSocketErrorKind::Io => write!(f, "IO error: {}", self.message),
-            WebSocketErrorKind::Tls => write!(f, "TLS error: {}", self.message),
-        }
-    }
-}
-impl std::error::Error for WebSocketError {}
-impl WebSocketError {
-    pub(crate) fn connection<T: ToString>(message: T) -> Self {
-        Self {
-            kind: WebSocketErrorKind::Connection,
-            message: message.to_string(),
-        }
-    }
-    pub(crate) fn protocol<T: ToString>(message: T) -> Self {
-        Self {
-            kind: WebSocketErrorKind::String,
-            message: message.to_string(),
-        }
-    }
-    pub(crate) fn timeout<T: ToString>(message: T) -> Self {
-        Self {
-            kind: WebSocketErrorKind::Timeout,
-            message: message.to_string(),
-        }
-    }
-    pub(crate) fn invalid_url<T: ToString>(message: T) -> Self {
-        Self {
-            kind: WebSocketErrorKind::InvalidUrl,
-            message: message.to_string(),
-        }
-    }
-    pub(crate) fn io<T: ToString>(message: T) -> Self {
-        Self {
-            kind: WebSocketErrorKind::Io,
-            message: message.to_string(),
-        }
-    }
-    pub(crate) fn tls<T: ToString>(message: T) -> Self {
-        Self {
-            kind: WebSocketErrorKind::Tls,
-            message: message.to_string(),
-        }
-    }
-}
-impl SharedWebSocketBuilder {
-    pub(crate) fn parse_url(url: &str) -> Result<HttpUrlComponents, WebSocketError> {
-        if url.is_empty() {
-            return Err(WebSocketError::invalid_url("URL is empty"));
-        }
-        let mut url_obj: HttpUrlComponents = HttpUrlComponents::default();
-        if url.starts_with("ws://") {
-            url_obj.protocol = HTTP_LOWERCASE.to_string();
-            url_obj.port = Some(80);
-        } else if url.starts_with("wss://") {
-            url_obj.protocol = HTTP_UPPERCASE.to_string();
-            url_obj.port = Some(443);
-        } else {
-            return Err(WebSocketError::invalid_url("Invalid WebSocket URL scheme"));
-        }
-        let without_protocol: &str = if let Some(stripped) = url.strip_prefix("ws://") {
-            stripped
-        } else {
-            &url[6..]
-        };
-        let parts: Vec<&str> = without_protocol.splitn(2, '/').collect();
-        let host_port: &str = parts[0];
-        let path: &str = if parts.len() > 1 { parts[1] } else { "" };
-        if host_port.contains(':') {
-            let host_port_parts: Vec<&str> = host_port.splitn(2, ':').collect();
-            url_obj.host = Some(host_port_parts[0].to_string());
-            if let Ok(port) = host_port_parts[1].parse::<u16>() {
-                url_obj.port = Some(port);
-            }
-        } else {
-            url_obj.host = Some(host_port.to_string());
-        }
-        url_obj.path = Some(if path.is_empty() {
-            "/".to_string()
-        } else {
-            format!("/{path}")
-        });
-        Ok(url_obj)
-    }
-}
-```
-# Path: hyperlane/request/src/request/socket/shared/type.rs
-```rust
-use super::*;
-pub type WebSocketResult = Result<(), WebSocketError>;
-pub type WebSocketMessageResult = Result<WebSocketMessage, WebSocketError>;
-```
-# Path: hyperlane/request/src/request/socket/shared/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Debug)]
-pub(crate) struct SharedWebSocketBuilder;
-#[derive(Clone, Debug)]
-pub struct WebSocketError {
-    pub(crate) kind: WebSocketErrorKind,
-    pub(crate) message: String,
-}
-#[derive(Clone, Debug, PartialEq)]
-pub enum WebSocketErrorKind {
-    Connection,
-    String,
-    Timeout,
-    InvalidUrl,
-    Io,
-    Tls,
-}
-```
-# Path: hyperlane/request/src/request/socket/shared/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-mod r#type;
-use http_type::{HTTP_LOWERCASE, HTTP_UPPERCASE};
-pub use {r#struct::*, r#type::*};
-use super::*;
-```
-# Path: hyperlane/request/src/request/socket/websocket/impl.rs
-```rust
-use super::*;
-impl WebSocket {
-    fn get_url(&self) -> String {
-        self.url.as_ref().clone()
-    }
-    fn generate_websocket_key() -> String {
-        let mut key_bytes: [u8; 16] = [0u8; 16];
-        let now: u64 = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
-        let ptr: usize = &key_bytes as *const _ as usize;
-        for (i, byte) in key_bytes.iter_mut().enumerate() {
-            *byte = ((now.wrapping_add(ptr as u64).wrapping_add(i as u64)) % 256) as u8;
-        }
-        base64_encode(&key_bytes)
-    }
-    fn get_headers(&self) -> Vec<(String, String)> {
-        let mut headers: Vec<(String, String)> = Vec::new();
-        for (key, value) in self.header.iter() {
-            if let Some(first_value) = value.front() {
-                headers.push((key.clone(), first_value.clone()));
-            }
-        }
-        headers
-    }
-    async fn connect_async_internal(&self) -> Result<(), WebSocketError> {
-        if self.connected.load(Ordering::Relaxed) {
-            return Ok(());
-        }
-        let url: String = self.get_url();
-        if url.is_empty() {
-            return Err(WebSocketError::invalid_url("URL is empty"));
-        }
-        let url_obj: HttpUrlComponents = SharedWebSocketBuilder::parse_url(&url)?;
-        if let Ok(mut config) = self.config.write() {
-            config.url_obj = url_obj;
-        }
-        let timeout_duration: Duration = Duration::from_millis(
-            self.config
-                .read()
-                .map(|config| config.timeout)
-                .unwrap_or(DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS),
-        );
-        let headers: Vec<(String, String)> = self.get_headers();
-        let mut request_builder = Request::builder().uri(&url);
-        for (key, value) in &headers {
-            request_builder = request_builder.header(key, value);
-        }
-        let request: Request = request_builder.body(()).map_err(|error| {
-            WebSocketError::invalid_url(format!("Failed to build request: {error}"))
-        })?;
-        let proxy_config: Option<ProxyConfig> = self
-            .config
-            .read()
-            .ok()
-            .and_then(|config| config.proxy.clone());
-        let ws_stream: WebSocketConnectionType = if let Some(proxy_config) = proxy_config {
-            let url_obj: HttpUrlComponents = self
-                .config
-                .read()
-                .map(|config| config.url_obj.clone())
-                .unwrap_or_default();
-            let target_host: String = url_obj.host.clone().unwrap_or_default();
-            let target_port: u16 = url_obj.port.unwrap_or_default();
-            let proxy_stream: BoxAsyncReadWrite = self
-                .get_proxy_connection_stream_async(target_host.clone(), target_port, &proxy_config)
-                .await?;
-            let proxy_tunnel_stream: WebSocketProxyTunnelStream =
-                WebSocketProxyTunnelStream::new(proxy_stream);
-            let mut proxy_request_builder = Request::builder().uri(&url);
-            proxy_request_builder = proxy_request_builder
-                .header(HOST, format!("{target_host}:{target_port}"))
-                .header(UPGRADE, "websocket")
-                .header(CONNECTION, "Upgrade")
-                .header(SEC_WEBSOCKET_VERSION, "13")
-                .header(SEC_WEBSOCKET_KEY, Self::generate_websocket_key());
-            for (key, value) in &headers {
-                proxy_request_builder = proxy_request_builder.header(key, value);
-            }
-            let protocols: Vec<String> = self
-                .config
-                .read()
-                .map(|config| config.protocols.clone())
-                .unwrap_or_default();
-            if !protocols.is_empty() {
-                proxy_request_builder =
-                    proxy_request_builder.header("Sec-WebSocket-String", protocols.join(", "));
-            }
-            let proxy_request: Request = proxy_request_builder.body(()).map_err(|e| {
-                WebSocketError::invalid_url(format!("Failed to build proxy request: {e}"))
-            })?;
-            let connect_future = client_async_with_config(proxy_request, proxy_tunnel_stream, None);
-            let (ws_stream, _) = timeout(timeout_duration, connect_future)
-                .await
-                .map_err(|_| WebSocketError::timeout("Connection timeout"))?
-                .map_err(|e| {
-                    let error_msg: String = e.to_string();
-                    if error_msg.contains("tls")
-                        || error_msg.contains("TLS")
-                        || error_msg.contains("ssl")
-                        || error_msg.contains("SSL")
-                        || error_msg.contains("certificate")
-                        || error_msg.contains("handshake")
-                    {
-                        WebSocketError::tls(error_msg)
-                    } else {
-                        WebSocketError::connection(error_msg)
-                    }
-                })?;
-            WebSocketConnectionType::Proxy(ws_stream)
-        } else {
-            let connect_future = connect_async_with_config(request, None, false);
-            let (ws_stream, _) = timeout(timeout_duration, connect_future)
-                .await
-                .map_err(|_| WebSocketError::timeout("Connection timeout"))?
-                .map_err(|e| {
-                    let error_msg: String = e.to_string();
-                    if error_msg.contains("tls")
-                        || error_msg.contains("TLS")
-                        || error_msg.contains("ssl")
-                        || error_msg.contains("SSL")
-                        || error_msg.contains("certificate")
-                        || error_msg.contains("handshake")
-                    {
-                        WebSocketError::tls(error_msg)
-                    } else {
-                        WebSocketError::connection(error_msg)
-                    }
-                })?;
-            WebSocketConnectionType::Direct(ws_stream)
-        };
-        let mut connection: http_type::tokio::sync::MutexGuard<
-            '_,
-            Option<WebSocketConnectionType>,
-        > = self.connection.lock().await;
-        *connection = Some(ws_stream);
-        self.connected.store(true, Ordering::Relaxed);
-        Ok(())
-    }
-    async fn send_message_async(&self, message: Message) -> Result<(), WebSocketError> {
-        if !self.connected.load(Ordering::Relaxed) {
-            self.connect_async_internal().await?;
-        }
-        let mut connection: http_type::tokio::sync::MutexGuard<
-            '_,
-            Option<WebSocketConnectionType>,
-        > = self.connection.lock().await;
-        if let Some(ref mut ws_stream) = *connection {
-            ws_stream
-                .send(message)
-                .await
-                .map_err(|error: tungstenite::Error| WebSocketError::protocol(error.to_string()))?;
-        } else {
-            return Err(WebSocketError::connection("Not connected"));
-        }
-        Ok(())
-    }
-    fn send_message_sync(&self, message: Message) -> Result<(), WebSocketError> {
-        let rt: Runtime = Runtime::new()
-            .map_err(|error: std::io::Error| WebSocketError::io(error.to_string()))?;
-        rt.block_on(self.send_message_async(message))
-    }
-    async fn receive_message_async(&self) -> Result<WebSocketMessage, WebSocketError> {
-        if !self.connected.load(Ordering::Relaxed) {
-            return Err(WebSocketError::connection("Not connected"));
-        }
-        let timeout_duration: Duration = Duration::from_millis(
-            self.config
-                .read()
-                .map(|config| config.timeout)
-                .unwrap_or(DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS),
-        );
-        let mut connection: http_type::tokio::sync::MutexGuard<
-            '_,
-            Option<WebSocketConnectionType>,
-        > = self.connection.lock().await;
-        if let Some(ref mut ws_stream) = *connection {
-            let receive_future = ws_stream.next();
-            if let Some(msg_result) = timeout(timeout_duration, receive_future)
-                .await
-                .map_err(|_| WebSocketError::timeout("Receive timeout"))?
-            {
-                let message: Message = msg_result.map_err(|error: tungstenite::Error| {
-                    WebSocketError::protocol(error.to_string())
-                })?;
-                return Ok(self.convert_message(message));
-            }
-        }
-        Err(WebSocketError::connection("Connection closed"))
-    }
-    fn receive_message_sync(&self) -> Result<WebSocketMessage, WebSocketError> {
-        let rt: Runtime = Runtime::new()
-            .map_err(|error: std::io::Error| WebSocketError::io(error.to_string()))?;
-        rt.block_on(self.receive_message_async())
-    }
-    fn convert_message(&self, message: Message) -> WebSocketMessage {
-        match message {
-            Message::Text(text) => WebSocketMessage::Text(text.to_string()),
-            Message::Binary(data) => WebSocketMessage::Binary(data.to_vec()),
-            Message::Ping(data) => WebSocketMessage::Ping(data.to_vec()),
-            Message::Pong(data) => WebSocketMessage::Pong(data.to_vec()),
-            Message::Close(_) => WebSocketMessage::Close,
-            Message::Frame(_) => WebSocketMessage::Close,
-        }
-    }
-    async fn close_async_internal(&self) -> Result<(), WebSocketError> {
-        let mut connection: http_type::tokio::sync::MutexGuard<
-            '_,
-            Option<WebSocketConnectionType>,
-        > = self.connection.lock().await;
-        if let Some(ref mut ws_stream) = *connection {
-            ws_stream
-                .send(Message::Close(None))
-                .await
-                .map_err(|error: tungstenite::Error| WebSocketError::protocol(error.to_string()))?;
-            use futures::SinkExt;
-            ws_stream
-                .close()
-                .await
-                .map_err(|error: tungstenite::Error| WebSocketError::protocol(error.to_string()))?;
-        }
-        *connection = None;
-        self.connected.store(false, Ordering::Relaxed);
-        Ok(())
-    }
-    fn close_sync(&self) -> Result<(), WebSocketError> {
-        let rt: Runtime = Runtime::new()
-            .map_err(|error: std::io::Error| WebSocketError::io(error.to_string()))?;
-        rt.block_on(self.close_async_internal())
-    }
-    async fn get_proxy_connection_stream_async(
-        &self,
-        target_host: String,
-        target_port: u16,
-        proxy_config: &ProxyConfig,
-    ) -> Result<BoxAsyncReadWrite, WebSocketError> {
-        match proxy_config.proxy_type {
-            ProxyType::Http | ProxyType::Https => {
-                self.get_http_proxy_connection_async(target_host, target_port, proxy_config)
-                    .await
-            }
-            ProxyType::Socks5 => {
-                self.get_socks5_proxy_connection_async(target_host, target_port, proxy_config)
-                    .await
-            }
-        }
-    }
-    async fn get_http_proxy_connection_async(
-        &self,
-        target_host: String,
-        target_port: u16,
-        proxy_config: &ProxyConfig,
-    ) -> Result<BoxAsyncReadWrite, WebSocketError> {
-        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
-        let tcp_stream: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect(proxy_host_port)
-                .await
-                .map_err(|err| WebSocketError::connection(err.to_string()))?;
-        let mut proxy_stream: BoxAsyncReadWrite = if proxy_config.proxy_type == ProxyType::Https {
-            let roots: RootCertStore = RootCertStore {
-                roots: TLS_SERVER_ROOTS.to_vec(),
-            };
-            let tls_config: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
-            let dns_name: ServerName<'_> = ServerName::try_from(proxy_config.host.clone())
-                .map_err(|err| WebSocketError::tls(err.to_string()))?;
-            let tls_stream: TlsStream<http_type::tokio::net::TcpStream> = connector
-                .connect(dns_name, tcp_stream)
-                .await
-                .map_err(|err| WebSocketError::tls(err.to_string()))?;
-            Box::new(tls_stream)
-        } else {
-            Box::new(tcp_stream)
-        };
-        let connect_request: String = if let (Some(username), Some(password)) =
-            (&proxy_config.username, &proxy_config.password)
-        {
-            let auth: String = format!("{username}:{password}");
-            let auth_encoded: String = base64_encode(auth.as_bytes());
-            format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {auth_encoded}\r\n\r\n"
-            )
-        } else {
-            format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n\r\n"
-            )
-        };
-        proxy_stream
-            .write_all(connect_request.as_bytes())
-            .await
-            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-        proxy_stream
-            .flush()
-            .await
-            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-        let mut response_buffer: [u8; 1024] = [0u8; 1024];
-        let bytes_read: usize = proxy_stream
-            .read(&mut response_buffer)
-            .await
-            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-        let response: Cow<'_, str> = String::from_utf8_lossy(&response_buffer[..bytes_read]);
-        if !response.starts_with("HTTP/1.1 200") && !response.starts_with("HTTP/1.0 200") {
-            return Err(WebSocketError::connection(format!(
-                "Proxy connection failed: {}",
-                response.lines().next().unwrap_or("Unknown error")
-            )));
-        }
-        Ok(proxy_stream)
-    }
-    async fn get_socks5_proxy_connection_async(
-        &self,
-        target_host: String,
-        target_port: u16,
-        proxy_config: &ProxyConfig,
-    ) -> Result<BoxAsyncReadWrite, WebSocketError> {
-        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
-        let mut tcp_stream: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect(proxy_host_port)
-                .await
-                .map_err(|err| WebSocketError::connection(err.to_string()))?;
-        let auth_methods: Vec<u8> =
-            if proxy_config.username.is_some() && proxy_config.password.is_some() {
-                vec![0x05, 0x02, 0x00, 0x02]
-            } else {
-                vec![0x05, 0x01, 0x00]
-            };
-        tcp_stream
-            .write_all(&auth_methods)
-            .await
-            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-        let mut response: [u8; 2] = [0u8; 2];
-        tcp_stream
-            .read_exact(&mut response)
-            .await
-            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-        if response[0] != 0x05 {
-            return Err(WebSocketError::protocol("Invalid SOCKS5 response"));
-        }
-        match response[1] {
-            0x00 => {}
-            0x02 => {
-                if let (Some(username), Some(password)) =
-                    (&proxy_config.username, &proxy_config.password)
-                {
-                    let mut auth_request = vec![0x01];
-                    auth_request.push(username.len() as u8);
-                    auth_request.extend_from_slice(username.as_bytes());
-                    auth_request.push(password.len() as u8);
-                    auth_request.extend_from_slice(password.as_bytes());
-                    tcp_stream
-                        .write_all(&auth_request)
-                        .await
-                        .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-                    let mut auth_response = [0u8; 2];
-                    tcp_stream
-                        .read_exact(&mut auth_response)
-                        .await
-                        .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-                    if auth_response[1] != 0x00 {
-                        return Err(WebSocketError::protocol("SOCKS5 authentication failed"));
-                    }
-                } else {
-                    return Err(WebSocketError::protocol(
-                        "SOCKS5 proxy requires authentication",
-                    ));
-                }
-            }
-            0xFF => {
-                return Err(WebSocketError::protocol(
-                    "No acceptable SOCKS5 authentication methods",
-                ));
-            }
-            _ => {
-                return Err(WebSocketError::protocol(
-                    "Unsupported SOCKS5 authentication method",
-                ));
-            }
-        }
-        let mut connect_request: Vec<u8> = vec![0x05, 0x01, 0x00];
-        if target_host.parse::<Ipv4Addr>().is_ok() {
-            connect_request.push(0x01);
-            let ip: Ipv4Addr = target_host.parse().unwrap();
-            connect_request.extend_from_slice(&ip.octets());
-        } else if target_host.parse::<Ipv6Addr>().is_ok() {
-            connect_request.push(0x04);
-            let ip: Ipv6Addr = target_host.parse().unwrap();
-            connect_request.extend_from_slice(&ip.octets());
-        } else {
-            connect_request.push(0x03);
-            connect_request.push(target_host.len() as u8);
-            connect_request.extend_from_slice(target_host.as_bytes());
-        }
-        connect_request.extend_from_slice(&target_port.to_be_bytes());
-        tcp_stream
-            .write_all(&connect_request)
-            .await
-            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-        let mut connect_response: [u8; 4] = [0u8; 4];
-        tcp_stream
-            .read_exact(&mut connect_response)
-            .await
-            .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-        if connect_response[0] != 0x05 || connect_response[1] != 0x00 {
-            return Err(WebSocketError::protocol(format!(
-                "SOCKS5 connection failed with code: {}",
-                connect_response[1]
-            )));
-        }
-        match connect_response[3] {
-            0x01 => {
-                let mut skip: [u8; 6] = [0u8; 6];
-                tcp_stream
-                    .read_exact(&mut skip)
-                    .await
-                    .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-            }
-            0x03 => {
-                let mut len: [u8; 1] = [0u8; 1];
-                tcp_stream
-                    .read_exact(&mut len)
-                    .await
-                    .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-                let mut skip: Vec<u8> = vec![0u8; len[0] as usize + 2];
-                tcp_stream
-                    .read_exact(&mut skip)
-                    .await
-                    .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-            }
-            0x04 => {
-                let mut skip: [u8; 18] = [0u8; 18];
-                tcp_stream
-                    .read_exact(&mut skip)
-                    .await
-                    .map_err(|err: std::io::Error| WebSocketError::protocol(err.to_string()))?;
-            }
-            _ => {
-                return Err(WebSocketError::protocol("Invalid SOCKS5 address type"));
-            }
-        }
-        let proxy_stream: BoxAsyncReadWrite = Box::new(tcp_stream);
-        Ok(proxy_stream)
-    }
-    pub fn send_text(&mut self, text: &str) -> WebSocketResult {
-        let message: Message = Message::Text(text.into());
-        self.send_message_sync(message)
-    }
-    pub fn send_binary(&mut self, data: &[u8]) -> WebSocketResult {
-        let message: Message = Message::Binary(data.to_vec().into());
-        self.send_message_sync(message)
-    }
-    pub fn send_ping(&mut self, data: &[u8]) -> WebSocketResult {
-        let message: Message = Message::Ping(data.to_vec().into());
-        self.send_message_sync(message)
-    }
-    pub fn send_pong(&mut self, data: &[u8]) -> WebSocketResult {
-        let message: Message = Message::Pong(data.to_vec().into());
-        self.send_message_sync(message)
-    }
-    pub fn receive(&mut self) -> WebSocketMessageResult {
-        self.receive_message_sync()
-    }
-    pub fn close(&mut self) -> WebSocketResult {
-        self.close_sync()
-    }
-    pub fn is_connected(&self) -> bool {
-        self.connected.load(Ordering::Relaxed)
-    }
-    pub async fn send_text_async(&mut self, text: &str) -> WebSocketResult {
-        let message: Message = Message::Text(text.into());
-        self.send_message_async(message).await
-    }
-    pub async fn send_binary_async(&mut self, data: &[u8]) -> WebSocketResult {
-        let message: Message = Message::Binary(data.to_vec().into());
-        self.send_message_async(message).await
-    }
-    pub async fn send_ping_async(&mut self, data: &[u8]) -> WebSocketResult {
-        let message: Message = Message::Ping(data.to_vec().into());
-        self.send_message_async(message).await
-    }
-    pub async fn send_pong_async(&mut self, data: &[u8]) -> WebSocketResult {
-        let message: Message = Message::Pong(data.to_vec().into());
-        self.send_message_async(message).await
-    }
-    pub async fn receive_async(&mut self) -> WebSocketMessageResult {
-        self.receive_message_async().await
-    }
-    pub async fn close_async_method(&mut self) -> WebSocketResult {
-        self.close_async_internal().await
-    }
-}
-impl WebSocketTrait for WebSocket {
-    fn send_text(&mut self, text: &str) -> WebSocketResult {
-        self.send_text(text)
-    }
-    fn send_binary(&mut self, data: &[u8]) -> WebSocketResult {
-        self.send_binary(data)
-    }
-    fn send_ping(&mut self, data: &[u8]) -> WebSocketResult {
-        self.send_ping(data)
-    }
-    fn send_pong(&mut self, data: &[u8]) -> WebSocketResult {
-        self.send_pong(data)
-    }
-    fn receive(&mut self) -> WebSocketMessageResult {
-        self.receive()
-    }
-    fn close(&mut self) -> WebSocketResult {
-        self.close()
-    }
-    fn is_connected(&self) -> bool {
-        self.is_connected()
-    }
-}
-impl AsyncWebSocketTrait for WebSocket {
-    fn send_text<'a>(
-        &'a mut self,
-        text: &'a str,
-    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>> {
-        Box::pin(self.send_text_async(text))
-    }
-    fn send_binary<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>> {
-        Box::pin(self.send_binary_async(data))
-    }
-    fn send_ping<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>> {
-        Box::pin(self.send_ping_async(data))
-    }
-    fn send_pong<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>> {
-        Box::pin(self.send_pong_async(data))
-    }
-    fn receive(&mut self) -> Pin<Box<dyn Future<Output = WebSocketMessageResult> + Send + '_>> {
-        Box::pin(self.receive_async())
-    }
-    fn close(&mut self) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + '_>> {
-        Box::pin(self.close_async_method())
-    }
-    fn is_connected(&self) -> bool {
-        self.is_connected()
-    }
-}
-```
-# Path: hyperlane/request/src/request/socket/websocket/trait.rs
-```rust
-use super::*;
-pub trait WebSocketTrait: Send + Sync {
-    fn send_text(&mut self, text: &str) -> WebSocketResult;
-    fn send_binary(&mut self, data: &[u8]) -> WebSocketResult;
-    fn send_ping(&mut self, data: &[u8]) -> WebSocketResult;
-    fn send_pong(&mut self, data: &[u8]) -> WebSocketResult;
-    fn receive(&mut self) -> WebSocketMessageResult;
-    fn close(&mut self) -> WebSocketResult;
-    fn is_connected(&self) -> bool;
-}
-pub trait AsyncWebSocketTrait: Send + Sync {
-    fn send_text<'a>(
-        &'a mut self,
-        text: &'a str,
-    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
-    fn send_binary<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
-    fn send_ping<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
-    fn send_pong<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
-    fn receive<'a>(
-        &'a mut self,
-    ) -> Pin<Box<dyn Future<Output = WebSocketMessageResult> + Send + 'a>>;
-    fn close<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = WebSocketResult> + Send + 'a>>;
-    fn is_connected(&self) -> bool;
-}
-```
-# Path: hyperlane/request/src/request/socket/websocket/type.rs
-```rust
-use super::*;
-pub type BoxWebSocketTrait = Box<dyn WebSocketTrait>;
-pub type BoxAsyncWebSocketTrait = Box<dyn AsyncWebSocketTrait>;
-pub(crate) type WebSocketConnection = Arc<Mutex<Option<WebSocketConnectionType>>>;
-```
-# Path: hyperlane/request/src/request/socket/websocket/struct.rs
-```rust
-use super::*;
-#[derive(Debug)]
-pub enum WebSocketConnectionType {
-    Direct(WebSocketStream<MaybeTlsStream<http_type::tokio::net::TcpStream>>),
-    Proxy(WebSocketStream<WebSocketProxyTunnelStream>),
-}
-#[derive(Debug)]
-pub struct WebSocket {
-    pub(crate) url: Arc<String>,
-    pub(crate) header: Arc<RequestHeaders>,
-    pub(crate) config: ArcRwLock<WebSocketConfig>,
-    pub(crate) connected: Arc<AtomicBool>,
-    pub(crate) connection: WebSocketConnection,
-}
-impl Clone for WebSocket {
-    fn clone(&self) -> Self {
-        Self {
-            url: self.url.clone(),
-            header: self.header.clone(),
-            config: self.config.clone(),
-            connected: Arc::new(AtomicBool::new(false)),
-            connection: Arc::new(http_type::tokio::sync::Mutex::new(None)),
-        }
-    }
-}
-impl Default for WebSocket {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            url: Arc::new(String::new()),
-            header: Arc::new(hash_map_xx_hash3_64()),
-            config: Arc::new(RwLock::new(WebSocketConfig::default())),
-            connected: Arc::new(AtomicBool::new(false)),
-            connection: Arc::new(http_type::tokio::sync::Mutex::new(None)),
-        }
-    }
-}
-impl Stream for WebSocketConnectionType {
-    type Item =
-        Result<tokio_tungstenite::tungstenite::Message, tokio_tungstenite::tungstenite::Error>;
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match &mut *self {
-            WebSocketConnectionType::Direct(stream) => Pin::new(stream).poll_next(cx),
-            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).poll_next(cx),
-        }
-    }
-}
-impl Sink<tokio_tungstenite::tungstenite::Message> for WebSocketConnectionType {
-    type Error = tokio_tungstenite::tungstenite::Error;
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match &mut *self {
-            WebSocketConnectionType::Direct(stream) => Pin::new(stream).poll_ready(cx),
-            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).poll_ready(cx),
-        }
-    }
-    fn start_send(
-        mut self: Pin<&mut Self>,
-        item: tokio_tungstenite::tungstenite::Message,
-    ) -> Result<(), Self::Error> {
-        match &mut *self {
-            WebSocketConnectionType::Direct(stream) => Pin::new(stream).start_send(item),
-            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).start_send(item),
-        }
-    }
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match &mut *self {
-            WebSocketConnectionType::Direct(stream) => Pin::new(stream).poll_flush(cx),
-            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).poll_flush(cx),
-        }
-    }
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match &mut *self {
-            WebSocketConnectionType::Direct(stream) => Pin::new(stream).poll_close(cx),
-            WebSocketConnectionType::Proxy(stream) => Pin::new(stream).poll_close(cx),
-        }
-    }
-}
-```
-# Path: hyperlane/request/src/request/socket/websocket/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-mod r#trait;
-mod r#type;
-pub use {r#struct::*, r#trait::*, r#type::*};
-use super::*;
-```
-# Path: hyperlane/request/src/request/socket/message/impl.rs
-```rust
-use super::*;
-impl WebSocketMessage {
-    pub fn text<T: ToString>(text: T) -> Self {
-        Self::Text(text.to_string())
-    }
-    pub fn binary<T: Into<Vec<u8>>>(data: T) -> Self {
-        Self::Binary(data.into())
-    }
-    pub fn ping<T: Into<Vec<u8>>>(data: T) -> Self {
-        Self::Ping(data.into())
-    }
-    pub fn pong<T: Into<Vec<u8>>>(data: T) -> Self {
-        Self::Pong(data.into())
-    }
-    pub fn close() -> Self {
-        Self::Close
-    }
-    pub fn is_text(&self) -> bool {
-        matches!(self, Self::Text(_))
-    }
-    pub fn is_binary(&self) -> bool {
-        matches!(self, Self::Binary(_))
-    }
-    pub fn is_ping(&self) -> bool {
-        matches!(self, Self::Ping(_))
-    }
-    pub fn is_pong(&self) -> bool {
-        matches!(self, Self::Pong(_))
-    }
-    pub fn is_close(&self) -> bool {
-        matches!(self, Self::Close)
-    }
-    pub fn as_text(&self) -> Option<&str> {
-        match self {
-            Self::Text(text) => Some(text),
-            _ => None,
-        }
-    }
-    pub fn as_binary(&self) -> Option<&[u8]> {
-        match self {
-            Self::Binary(data) => Some(data),
-            _ => None,
-        }
-    }
-    pub fn into_text(self) -> Option<String> {
-        match self {
-            Self::Text(text) => Some(text),
-            _ => None,
-        }
-    }
-    pub fn into_binary(self) -> Option<Vec<u8>> {
-        match self {
-            Self::Binary(data) => Some(data),
-            _ => None,
-        }
-    }
-}
-```
-# Path: hyperlane/request/src/request/socket/message/enum.rs
-```rust
-use super::*;
-#[derive(Clone, Debug, PartialEq)]
-pub enum WebSocketMessage {
-    Text(String),
-    Binary(Vec<u8>),
-    Ping(Vec<u8>),
-    Pong(Vec<u8>),
-    Close,
-}
-```
-# Path: hyperlane/request/src/request/socket/message/mod.rs
-```rust
-mod r#enum;
-mod r#impl;
-pub use r#enum::*;
-use super::*;
-```
-# Path: hyperlane/request/src/request/socket/config/impl.rs
-```rust
-use super::*;
-impl Default for WebSocketConfig {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            timeout: DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS,
-            url_obj: HttpUrlComponents::default(),
-            buffer: DEFAULT_BUFFER_SIZE,
-            protocols: Vec::new(),
-            proxy: None,
-        }
-    }
-}
-```
-# Path: hyperlane/request/src/request/socket/config/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct WebSocketConfig {
-    pub(crate) timeout: u64,
-    pub(crate) url_obj: HttpUrlComponents,
-    pub(crate) buffer: usize,
-    pub(crate) protocols: Vec<String>,
-    pub(crate) proxy: Option<ProxyConfig>,
-}
-```
-# Path: hyperlane/request/src/request/socket/config/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub(crate) use r#struct::*;
-use super::*;
-```
-# Path: hyperlane/request/src/request/socket/websocket_builder/impl.rs
-```rust
-use super::*;
-impl WebSocketBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn connect(&mut self, url: &str) -> &mut Self {
-        self.websocket.url = Arc::new(url.to_owned());
-        self
-    }
-    pub fn headers<K, V>(&mut self, header: HashMapXxHash3_64<K, V>) -> &mut Self
-    where
-        K: ToString,
-        V: ToString,
-    {
-        if let Some(tmp_header) = Arc::get_mut(&mut self.websocket.header) {
-            for (key, value) in header {
-                let key_str: String = key.to_string();
-                let value_str: String = value.to_string();
-                let mut found_existing: bool = false;
-                let mut existing_key: Option<String> = None;
-                for existing_key_ref in tmp_header.keys() {
-                    if existing_key_ref.eq_ignore_ascii_case(&key_str) {
-                        existing_key = Some(existing_key_ref.clone());
-                        found_existing = true;
-                        break;
-                    }
-                }
-                if found_existing && let Some(existing_key) = existing_key {
-                    tmp_header.remove(&existing_key);
-                }
-                let mut value_deque: VecDeque<String> = VecDeque::new();
-                value_deque.push_front(value_str);
-                tmp_header.insert(key_str, value_deque);
-            }
-        }
-        self
-    }
-    pub fn timeout(&mut self, timeout: u64) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.timeout = timeout;
-        }
-        self
-    }
-    pub fn buffer(&mut self, buffer: usize) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.buffer = buffer;
-        }
-        self
-    }
-    pub fn protocols(&mut self, protocols: &[&str]) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.protocols = protocols
-                .iter()
-                .map(|protocol: &&str| protocol.to_string())
-                .collect();
-        }
-        self
-    }
-    pub fn http_proxy(&mut self, host: &str, port: u16) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.proxy = Some(ProxyConfig {
-                proxy_type: ProxyType::Http,
-                host: host.to_string(),
-                port,
-                username: None,
-                password: None,
-            });
-        }
-        self
-    }
-    pub fn https_proxy(&mut self, host: &str, port: u16) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.proxy = Some(ProxyConfig {
-                proxy_type: ProxyType::Https,
-                host: host.to_string(),
-                port,
-                username: None,
-                password: None,
-            });
-        }
-        self
-    }
-    pub fn socks5_proxy(&mut self, host: &str, port: u16) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.proxy = Some(ProxyConfig {
-                proxy_type: ProxyType::Socks5,
-                host: host.to_string(),
-                port,
-                username: None,
-                password: None,
-            });
-        }
-        self
-    }
-    pub fn http_proxy_auth(
-        &mut self,
-        host: &str,
-        port: u16,
-        username: &str,
-        password: &str,
-    ) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.proxy = Some(ProxyConfig {
-                proxy_type: ProxyType::Http,
-                host: host.to_string(),
-                port,
-                username: Some(username.to_string()),
-                password: Some(password.to_string()),
-            });
-        }
-        self
-    }
-    pub fn https_proxy_auth(
-        &mut self,
-        host: &str,
-        port: u16,
-        username: &str,
-        password: &str,
-    ) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.proxy = Some(ProxyConfig {
-                proxy_type: ProxyType::Https,
-                host: host.to_string(),
-                port,
-                username: Some(username.to_string()),
-                password: Some(password.to_string()),
-            });
-        }
-        self
-    }
-    pub fn socks5_proxy_auth(
-        &mut self,
-        host: &str,
-        port: u16,
-        username: &str,
-        password: &str,
-    ) -> &mut Self {
-        if let Ok(mut config) = self.websocket.config.write() {
-            config.proxy = Some(ProxyConfig {
-                proxy_type: ProxyType::Socks5,
-                host: host.to_string(),
-                port,
-                username: Some(username.to_string()),
-                password: Some(password.to_string()),
-            });
-        }
-        self
-    }
-    pub fn build_sync(&mut self) -> WebSocket {
-        self.builder = self.websocket.clone();
-        self.websocket = WebSocket::default();
-        self.builder.clone()
-    }
-    pub fn build_async(&mut self) -> WebSocket {
-        self.builder = self.websocket.clone();
-        self.websocket = WebSocket::default();
-        self.builder.clone()
-    }
-}
-```
-# Path: hyperlane/request/src/request/socket/websocket_builder/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Debug, Default)]
-pub struct WebSocketBuilder {
-    pub(crate) websocket: WebSocket,
-    pub(crate) builder: WebSocket,
-}
-```
-# Path: hyperlane/request/src/request/socket/websocket_builder/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
 pub use r#struct::*;
 use super::*;
-```
-# Path: hyperlane/request/src/request/config/impl.rs
-```rust
-use super::*;
-impl Default for Config {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            timeout: DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS,
-            url_obj: HttpUrlComponents::default(),
-            redirect: false,
-            max_redirect_times: DEFAULT_MAX_REDIRECT_TIMES,
-            redirect_times: 0,
-            http_version: HttpVersion::default(),
-            buffer: DEFAULT_BUFFER_SIZE,
-            decode: true,
-            proxy: None,
-        }
-    }
-}
 ```
 # Path: hyperlane/request/src/request/config/struct.rs
 ```rust
 use super::*;
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Config {
-    pub(crate) timeout: u64,
-    pub(crate) url_obj: HttpUrlComponents,
-    pub(crate) redirect: bool,
-    pub(crate) max_redirect_times: usize,
-    pub(crate) redirect_times: usize,
-    pub(crate) http_version: HttpVersion,
-    pub(crate) buffer: usize,
-    pub(crate) decode: bool,
-    pub(crate) proxy: Option<ProxyConfig>,
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RequestConfig {
+    pub buffer_size: usize,
+    pub timeout: u64,
+    pub max_redirect_times: usize,
+    pub http_version: HttpVersion,
+    pub redirect: bool,
+    pub decode: bool,
+    pub proxy: Option<Proxy>,
 }
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ProxyConfig {
-    pub(crate) proxy_type: ProxyType,
-    pub(crate) host: String,
-    pub(crate) port: u16,
-    pub(crate) username: Option<String>,
-    pub(crate) password: Option<String>,
-}
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum ProxyType {
-    Http,
-    Https,
-    Socks5,
+impl RequestConfig {
+    pub fn set_buffer_size(&mut self, v: usize) -> &mut Self {
+        self.buffer_size = v;
+        self
+    }
+    pub fn get_buffer_size(&self) -> usize {
+        self.buffer_size
+    }
+    pub fn set_timeout(&mut self, v: u64) -> &mut Self {
+        self.timeout = v;
+        self
+    }
+    pub fn get_timeout(&self) -> u64 {
+        self.timeout
+    }
+    pub fn set_max_redirect_times(&mut self, v: usize) -> &mut Self {
+        self.max_redirect_times = v;
+        self
+    }
+    pub fn get_max_redirect_times(&self) -> usize {
+        self.max_redirect_times
+    }
+    pub fn set_http_version(&mut self, v: HttpVersion) -> &mut Self {
+        self.http_version = v;
+        self
+    }
+    pub fn get_http_version(&self) -> &HttpVersion {
+        &self.http_version
+    }
+    pub fn set_redirect(&mut self, v: bool) -> &mut Self {
+        self.redirect = v;
+        self
+    }
+    pub fn get_redirect(&self) -> bool {
+        self.redirect
+    }
+    pub fn set_decode(&mut self, v: bool) -> &mut Self {
+        self.decode = v;
+        self
+    }
+    pub fn get_decode(&self) -> bool {
+        self.decode
+    }
+    pub fn set_proxy(&mut self, v: Option<Proxy>) -> &mut Self {
+        self.proxy = v;
+        self
+    }
+    pub fn get_proxy(&self) -> &Option<Proxy> {
+        &self.proxy
+    }
 }
 ```
 # Path: hyperlane/request/src/request/config/mod.rs
 ```rust
-mod r#impl;
 mod r#struct;
-pub(crate) use r#struct::*;
+pub use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane/request/src/request/tmp/impl.rs
+# Path: hyperlane/request/src/request/parser/fn.rs
 ```rust
 use super::*;
+pub(crate) fn split_multi_byte<'a>(data: &'a [u8], delimiter: &'a [u8]) -> Vec<&'a [u8]> {
+    let mut result: Vec<&[u8]> = Vec::new();
+    let mut start: usize = 0;
+    for i in 0..=data.len() {
+        if data[i..].starts_with(delimiter) {
+            result.push(&data[start..i]);
+            start = i + delimiter.len();
+        }
+    }
+    if start < data.len() {
+        result.push(&data[start..]);
+    }
+    result
+}
+pub(crate) fn split_whitespace(input: &[u8]) -> Vec<&[u8]> {
+    let mut parts: Vec<&[u8]> = Vec::new();
+    let mut start: usize = 0;
+    for (i, &byte) in input.iter().enumerate() {
+        if byte == SPACE_U8 || byte == TAB_U8 {
+            if i > start {
+                parts.push(&input[start..i]);
+            }
+            start = i + 1;
+        }
+    }
+    if start < input.len() {
+        parts.push(&input[start..]);
+    }
+    parts
+}
+pub(crate) fn build_http_request(
+    method: &str,
+    path: String,
+    header_bytes: Vec<u8>,
+    body_bytes: Option<Vec<u8>>,
+    http_version_str: String,
+) -> Vec<u8> {
+    let request_line_size: usize = method.len() + 1 + path.len() + 1 + http_version_str.len();
+    let body_size: usize = body_bytes.as_ref().map_or(0, |b: &Vec<u8>| b.len());
+    let total_size: usize = request_line_size + 2 + header_bytes.len() + 2 + body_size;
+    let mut request: Vec<u8> = Vec::with_capacity(total_size);
+    request.extend_from_slice(method.as_bytes());
+    request.push(b' ');
+    request.extend_from_slice(path.as_bytes());
+    request.push(b' ');
+    request.extend_from_slice(http_version_str.as_bytes());
+    request.extend_from_slice(HTTP_BR_BYTES);
+    request.extend_from_slice(&header_bytes);
+    request.extend_from_slice(HTTP_BR_BYTES);
+    if let Some(body) = body_bytes {
+        request.extend_from_slice(&body);
+    }
+    request
+}
+pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
+    let mut result: Vec<u8> = Vec::new();
+    let mut pos: usize = 0;
+    while pos < body_bytes.len() {
+        let chunk_size_end: usize = match body_bytes[pos..]
+            .windows(2)
+            .position(|window: &[u8]| window == b"\r\n")
+        {
+            Some(p) => pos + p,
+            None => break,
+        };
+        let chunk_size_str: &[u8] = &body_bytes[pos..chunk_size_end];
+        let chunk_size_str: &[u8] = match chunk_size_str.iter().position(|&b: &u8| b == b';') {
+            Some(p) => &chunk_size_str[..p],
+            None => chunk_size_str,
+        };
+        let chunk_size: usize = match std::str::from_utf8(chunk_size_str) {
+            Ok(s) => match usize::from_str_radix(s.trim(), 16) {
+                Ok(n) => n,
+                Err(_) => break,
+            },
+            Err(_) => break,
+        };
+        if chunk_size == 0 {
+            break;
+        }
+        let chunk_data_start: usize = chunk_size_end + 2;
+        let chunk_data_end: usize = chunk_data_start + chunk_size;
+        if chunk_data_end > body_bytes.len() {
+            break;
+        }
+        result.extend_from_slice(&body_bytes[chunk_data_start..chunk_data_end]);
+        pos = chunk_data_end + 2;
+    }
+    result
+}
+pub(crate) fn find_double_crlf(data: &[u8], start: usize) -> Option<usize> {
+    let search_data: &[u8] = &data[start..];
+    for i in 0..search_data.len().saturating_sub(3) {
+        if search_data[i] == b'\r'
+            && search_data[i + 1] == b'\n'
+            && search_data[i + 2] == b'\r'
+            && search_data[i + 3] == b'\n'
+        {
+            return Some(start + i);
+        }
+    }
+    None
+}
+pub(crate) fn find_pattern_case_insensitive(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || haystack.len() < needle.len() {
+        return None;
+    }
+    let needle_len: usize = needle.len();
+    let search_len: usize = haystack.len() - needle_len + 1;
+    let first_needle_lower: u8 = needle[0].to_ascii_lowercase();
+    'outer: for i in 0..search_len {
+        if haystack[i].to_ascii_lowercase() != first_needle_lower {
+            continue;
+        }
+        for j in 1..needle_len {
+            if !haystack[i + j].eq_ignore_ascii_case(&needle[j]) {
+                continue 'outer;
+            }
+        }
+        return Some(i);
+    }
+    None
+}
+pub(crate) fn find_crlf(data: &[u8], start: usize) -> Option<usize> {
+    let search_data: &[u8] = &data[start..];
+    for i in 0..search_data.len().saturating_sub(1) {
+        if search_data[i] == b'\r' && search_data[i + 1] == b'\n' {
+            return Some(start + i);
+        }
+    }
+    None
+}
+pub(crate) fn get_content_length(response_bytes: &[u8]) -> usize {
+    if let Some(pos) = find_pattern_case_insensitive(response_bytes, CONTENT_LENGTH_PATTERN) {
+        let value_start: usize = pos + CONTENT_LENGTH_PATTERN.len();
+        let value_start: usize = if response_bytes.get(value_start) == Some(&b' ') {
+            value_start + 1
+        } else {
+            value_start
+        };
+        if let Some(end_pos) = find_crlf(response_bytes, value_start) {
+            let value_bytes: &[u8] = &response_bytes[value_start..end_pos];
+            return parse_decimal_bytes(value_bytes);
+        }
+    }
+    0
+}
+pub(crate) fn is_chunked_encoding(headers_bytes: &[u8]) -> bool {
+    if let Some(pos) = find_pattern_case_insensitive(headers_bytes, TRANSFER_ENCODING_PATTERN) {
+        let value_start: usize = pos + TRANSFER_ENCODING_PATTERN.len();
+        let value_start: usize = if headers_bytes.get(value_start) == Some(&b' ') {
+            value_start + 1
+        } else {
+            value_start
+        };
+        if let Some(end_pos) = find_crlf(headers_bytes, value_start) {
+            let value_bytes: &[u8] = &headers_bytes[value_start..end_pos];
+            return find_pattern_case_insensitive(value_bytes, CHUNKED_PATTERN).is_some();
+        }
+    }
+    false
+}
+pub(crate) fn parse_decimal_bytes(bytes: &[u8]) -> usize {
+    let mut result: usize = 0;
+    let mut started: bool = false;
+    for &byte in bytes {
+        match byte {
+            b'0'..=b'9' => {
+                started = true;
+                result = result * 10 + (byte - b'0') as usize;
+            }
+            b' ' | b'\t' if !started => continue,
+            _ => break,
+        }
+    }
+    result
+}
+pub(crate) fn parse_status_code(status_bytes: &[u8]) -> usize {
+    if status_bytes.len() != 3 {
+        return 0;
+    }
+    let mut result: usize = 0;
+    for &byte in status_bytes {
+        if byte.is_ascii_digit() {
+            result = result * 10 + (byte - b'0') as usize;
+        } else {
+            return 0;
+        }
+    }
+    result
+}
+pub(crate) fn calculate_buffer_capacity(
+    response_bytes: &[u8],
+    n: usize,
+    current_capacity: usize,
+) -> usize {
+    if response_bytes.len() + n <= current_capacity {
+        return 0;
+    }
+    let needed_cap: usize = response_bytes.len() + n;
+    if current_capacity == 0 {
+        needed_cap.max(1024)
+    } else if needed_cap <= current_capacity * 2 {
+        current_capacity * 2
+    } else {
+        (needed_cap * 3) / 2
+    }
+}
+pub(crate) fn parse_response_headers(
+    headers_bytes: &[u8],
+    http_version_bytes: &[u8],
+    location_sign_key: &[u8],
+    content_length: &mut usize,
+    redirect_url: &mut Option<Vec<u8>>,
+    is_chunked: &mut bool,
+) -> Result<(), RequestError> {
+    if let Some(status_pos) = find_pattern_case_insensitive(headers_bytes, http_version_bytes) {
+        let status_code_start: usize = status_pos + http_version_bytes.len() + 1;
+        let status_code_end: usize = status_code_start + 3;
+        if status_code_end <= headers_bytes.len() {
+            let status_code: usize =
+                parse_status_code(&headers_bytes[status_code_start..status_code_end]);
+            if (300..=399).contains(&status_code)
+                && let Some(location_pos) =
+                    find_pattern_case_insensitive(headers_bytes, location_sign_key)
+            {
+                let start: usize = location_pos + location_sign_key.len();
+                if let Some(end_pos) = find_crlf(headers_bytes, start) {
+                    let mut url_vec = Vec::with_capacity(end_pos - start);
+                    url_vec.extend_from_slice(&headers_bytes[start..end_pos]);
+                    *redirect_url = Some(url_vec);
+                }
+            }
+        }
+    }
+    *content_length = get_content_length(headers_bytes);
+    *is_chunked = is_chunked_encoding(headers_bytes);
+    Ok(())
+}
+```
+# Path: hyperlane/request/src/request/parser/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/request/src/request/tmp/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug)]
+pub struct Tmp {
+    pub(crate) visit_url: HashSet<String>,
+    pub(crate) root_cert: RootCertStore,
+}
 impl Default for Tmp {
     #[inline(always)]
     fn default() -> Self {
@@ -10900,132 +8957,129 @@ impl Default for Tmp {
     }
 }
 ```
-# Path: hyperlane/request/src/request/tmp/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Debug)]
-pub struct Tmp {
-    pub visit_url: HashSet<String>,
-    pub root_cert: RootCertStore,
-}
-```
 # Path: hyperlane/request/src/request/tmp/mod.rs
 ```rust
-mod r#impl;
 mod r#struct;
 pub(crate) use r#struct::*;
 use super::*;
-```
-# Path: hyperlane/request/src/request/request_builder/impl.rs
-```rust
-use super::*;
-impl RequestBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn post(&mut self, url: &str) -> &mut Self {
-        self.http_request.methods = Arc::new(Method::Post);
-        self.url(url);
-        self
-    }
-    pub fn get(&mut self, url: &str) -> &mut Self {
-        self.http_request.methods = Arc::new(Method::Get);
-        self.url(url);
-        self
-    }
-    fn url(&mut self, url: &str) -> &mut Self {
-        self.http_request.url = Arc::new(url.to_owned());
-        self
-    }
-    pub fn http1_1_only(&mut self) -> &mut Self {
-        if let Ok(mut config) = self.http_request.config.write() {
-            config.http_version = HttpVersion::Http1_1;
-        }
-        self
-    }
-    pub fn http2_only(&mut self) -> &mut Self {
-        if let Ok(mut config) = self.http_request.config.write() {
-            config.http_version = HttpVersion::Http2;
-        }
-        self
-    }
-    pub fn headers<K, V>(&mut self, header: HashMapXxHash3_64<K, V>) -> &mut Self
-    where
-        K: ToString,
-        V: ToString,
-    {
-        if let Some(tmp_header) = Arc::get_mut(&mut self.http_request.header) {
-            for (key, value) in header {
-                let key_str: String = key.to_string();
-                let value_str: String = value.to_string();
-                let mut found_existing: bool = false;
-                let mut existing_key: Option<String> = None;
-                for existing_key_ref in tmp_header.keys() {
-                    if existing_key_ref.eq_ignore_ascii_case(&key_str) {
-                        existing_key = Some(existing_key_ref.clone());
-                        found_existing = true;
-                        break;
-                    }
-                }
-                if found_existing && let Some(existing_key) = existing_key {
-                    tmp_header.remove(&existing_key);
-                }
-                let mut value_deque: VecDeque<String> = VecDeque::new();
-                value_deque.push_front(value_str);
-                tmp_header.insert(key_str, value_deque);
-            }
-        }
-        self
-    }
-    pub fn json(&mut self, body: serde_json::Value) -> &mut Self {
-        if let serde_json::Value::Object(map) = body {
-            let mut res_body: HashMapXxHash3_64<String, serde_json::Value> = hash_map_xx_hash3_64();
-            for (k, v) in map.iter() {
-                res_body.insert(k.to_string(), v.clone());
-            }
-            self.http_request.body = Arc::new(Body::Json(res_body));
-        }
-        self
-    }
-    pub fn text<T: ToString>(&mut self, body: T) -> &mut Self {
-        self.http_request.body = Arc::new(Body::Text(body.to_string()));
-        self
-    }
-    pub fn body<T: Into<Vec<u8>>>(&mut self, body: T) -> &mut Self {
-        self.http_request.body = Arc::new(Body::Binary(body.into()));
-        self
-    }
-    pub fn timeout(&mut self, timeout: u64) -> &mut Self {
-        if let Ok(mut config) = self.http_request.config.write() {
-            config.timeout = timeout;
-        }
-        self
-    }
-    pub fn redirect(&mut self) -> &mut Self {
-        if let Ok(mut config) = self.http_request.config.write() {
-            config.redirect = true;
-        }
-        self
-    }
-    pub fn unredirect(&mut self) -> &mut Self {
-        if let Ok(mut config) = self.http_request.config.write() {
-            config.redirect = false;
-        };
-        self
-    }
 ```
 # Path: hyperlane/request/src/request/request_builder/struct.rs
 ```rust
 use super::*;
 #[derive(Clone, Debug, Default)]
 pub struct RequestBuilder {
-    pub(crate) http_request: HttpRequest,
-    pub(crate) builder: HttpRequest,
+    request: HttpRequest,
+}
+impl RequestBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn get(&mut self, url: impl Into<String>) -> &mut Self {
+        self.request.set_method(Method::Get);
+        self.request.set_url(url);
+        self
+    }
+    pub fn post(&mut self, url: impl Into<String>) -> &mut Self {
+        self.request.set_method(Method::Post);
+        self.request.set_url(url);
+        self
+    }
+    pub fn method(&mut self, method: Method) -> &mut Self {
+        self.request.set_method(method);
+        self
+    }
+    pub fn url(&mut self, url: impl Into<String>) -> &mut Self {
+        self.request.set_url(url);
+        self
+    }
+    pub fn header<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) -> &mut Self {
+        self.request.set_header(key, value);
+        self
+    }
+    pub fn headers<K, V>(&mut self, headers: HashMap<K, V>) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        for (k, v) in headers {
+            self.request.set_header(k, v);
+        }
+        self
+    }
+    pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
+        self.request.remove_header(key);
+        self
+    }
+    pub fn clear_headers(&mut self) -> &mut Self {
+        self.request.clear_headers();
+        self
+    }
+    pub fn body<B: Into<Vec<u8>>>(&mut self, bytes: B) -> &mut Self {
+        self.request.set_body(Body::from_bytes(bytes));
+        self
+    }
+    pub fn body_text<T: Into<String>>(&mut self, text: T) -> &mut Self {
+        self.request
+            .set_body(Body::from_bytes(text.into().into_bytes()));
+        self
+    }
+    pub fn body_json<V: serde::Serialize>(&mut self, value: &V) -> &mut Self {
+        if let Ok(bytes) = serde_json::to_vec(value) {
+            self.request.set_body(Body::from_bytes(bytes));
+        }
+        self
+    }
+    pub fn timeout(&mut self, ms: u64) -> &mut Self {
+        self.request.config.set_timeout(ms);
+        self
+    }
+    pub fn buffer_size(&mut self, n: usize) -> &mut Self {
+        self.request.config.set_buffer_size(n);
+        self
+    }
+    pub fn http1_1_only(&mut self) -> &mut Self {
+        self.request.config.http_version = HttpVersion::Http1_1;
+        self
+    }
+    pub fn http2_only(&mut self) -> &mut Self {
+        self.request.config.http_version = HttpVersion::Http2;
+        self
+    }
+    pub fn redirect(&mut self) -> &mut Self {
+        self.request.config.set_redirect(true);
+        self
+    }
+    pub fn no_redirect(&mut self) -> &mut Self {
+        self.request.config.set_redirect(false);
+        self
+    }
+    pub fn max_redirect_times(&mut self, n: usize) -> &mut Self {
+        self.request.config.set_max_redirect_times(n);
+        self
+    }
+    pub fn decode(&mut self) -> &mut Self {
+        self.request.config.set_decode(true);
+        self
+    }
+    pub fn no_decode(&mut self) -> &mut Self {
+        self.request.config.set_decode(false);
+        self
+    }
+    pub fn proxy(&mut self, proxy: Proxy) -> &mut Self {
+        self.request.config.set_proxy(Some(proxy));
+        self
+    }
+    pub fn no_proxy(&mut self) -> &mut Self {
+        self.request.config.set_proxy(None);
+        self
+    }
+    pub fn build(&mut self) -> HttpRequest {
+        std::mem::take(&mut self.request)
+    }
 }
 ```
 # Path: hyperlane/request/src/request/request_builder/mod.rs
 ```rust
-mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
@@ -11033,258 +9087,222 @@ use super::*;
 # Path: hyperlane/request/src/request/http_request/impl.rs
 ```rust
 use super::*;
+pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
+pub(crate) trait ReadWrite: Read + Write {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
 impl<T: Read + Write> ReadWrite for T {}
-impl AsyncRequestTrait for HttpRequest {
-    type RequestResult = RequestResult;
-    fn send(&mut self) -> Pin<Box<dyn Future<Output = Self::RequestResult> + Send + '_>> {
-        Box::pin(self.send_async())
-    }
-}
-impl RequestTrait for HttpRequest {
-    type RequestResult = RequestResult;
-    fn send(&mut self) -> Self::RequestResult {
+pub(crate) type BoxAsyncReadWrite = Box<dyn AsyncReadWrite>;
+pub(crate) type BoxReadWrite = Box<dyn ReadWrite>;
+impl HttpRequest {
+    pub fn send(&mut self) -> RequestResult {
         self.send_sync()
     }
-}
-impl Default for HttpRequest {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            methods: Arc::new(Method::default()),
-            url: Arc::new(String::new()),
-            header: Arc::new(hash_map_xx_hash3_64()),
-            body: Arc::new(Body::default()),
-            config: Arc::new(RwLock::new(Config::default())),
-            tmp: Arc::new(RwLock::new(Tmp::default())),
-            response: Arc::new(RwLock::new(HttpResponseBinary::default())),
-        }
-    }
-}
-impl HttpRequest {
-    #[inline(always)]
-    pub(crate) fn get_protocol(config: &Config) -> String {
-        config.url_obj.protocol.to_lowercase()
-    }
-    #[inline(always)]
-    pub(crate) fn get_methods(&self) -> Method {
-        self.methods.as_ref().clone()
-    }
-    #[inline(always)]
-    fn get_url(&self) -> String {
-        self.url.as_ref().clone()
-    }
-    #[inline(always)]
-    fn get_header(&self) -> RequestHeaders {
-        self.header.as_ref().clone()
-    }
-    #[inline(always)]
-    fn get_body(&self) -> Body {
-        self.body.as_ref().clone()
-    }
-    #[inline(always)]
-    pub(crate) fn url(&mut self, url: String) {
-        self.url = Arc::new(url);
+    pub async fn send_async(&mut self) -> RequestResult {
+        self.send_async_impl().await
     }
     pub(crate) fn parse_url(&self) -> Result<HttpUrlComponents, RequestError> {
-        match HttpUrlComponents::parse(self.get_url()) {
-            Ok(parse_res) => Ok(parse_res),
-            Err(error) => Err(RequestError::Request(error.to_string())),
+        HttpUrlComponents::parse(&self.url)
+            .map_err(|e: ::http_type::HttpUrlError| RequestError::Request(e.to_string()))
+    }
+    pub(crate) fn full_path(&self) -> String {
+        let url_obj = self.parse_url().unwrap_or_default();
+        let query = url_obj.query.unwrap_or_default();
+        let path = url_obj.path.unwrap_or_default();
+        if query.is_empty() {
+            path
+        } else {
+            format!("{}{}{}", path, QUERY, query)
         }
     }
-    fn header_contains_key_case_insensitive(header: &RequestHeaders, target_key: &str) -> bool {
-        header
-            .keys()
-            .any(|key| key.eq_ignore_ascii_case(target_key))
+    pub(crate) fn protocol_lower(config: &RequestConfig) -> String {
+        config.http_version.to_string().to_ascii_lowercase()
     }
-    pub(crate) fn get_header_bytes(&self) -> Vec<u8> {
-        let mut header: RequestHeaders = self.get_header();
-        let body_length: usize = if self.get_methods().is_get() {
-            0usize
-        } else {
-            self.get_body_bytes().len()
-        };
-        if let Ok(config) = self.config.read() {
-            let host_value: String = config.url_obj.host.clone().unwrap_or_default();
-            let content_length_value: String = body_length.to_string();
-            if !Self::header_contains_key_case_insensitive(&header, HOST) {
-                let mut host_deque: VecDeque<String> = VecDeque::new();
-                host_deque.push_front(host_value);
-                header.insert(HOST.to_owned(), host_deque);
-            }
-            if !Self::header_contains_key_case_insensitive(&header, CONTENT_LENGTH) {
-                let mut content_length_deque: VecDeque<String> = VecDeque::new();
-                content_length_deque.push_front(content_length_value);
-                header.insert(CONTENT_LENGTH.to_owned(), content_length_deque);
-            }
-            if !Self::header_contains_key_case_insensitive(&header, ACCEPT) {
-                let mut accept_deque: VecDeque<String> = VecDeque::new();
-                accept_deque.push_front(ACCEPT_ANY.to_owned());
-                header.insert(ACCEPT.to_owned(), accept_deque);
-            }
-            if !Self::header_contains_key_case_insensitive(&header, USER_AGENT) {
-                let mut user_agent_deque: VecDeque<String> = VecDeque::new();
-                user_agent_deque.push_front(APP_NAME.to_owned());
-                header.insert(USER_AGENT.to_owned(), user_agent_deque);
-            }
+    pub(crate) fn header_bytes(&self, body_length: usize) -> Vec<u8> {
+        let mut header: HashMap<String, String> = self.headers.clone();
+        let host_value: String = self
+            .parse_url()
+            .ok()
+            .and_then(|u: ::http_type::HttpUrlComponents| u.host.clone())
+            .unwrap_or_default();
+        let content_length_value: String = body_length.to_string();
+        if !Self::header_has_key(&header, HOST) {
+            header.insert(HOST.to_ascii_lowercase(), host_value);
+        }
+        if !Self::header_has_key(&header, CONTENT_LENGTH) {
+            header.insert(CONTENT_LENGTH.to_ascii_lowercase(), content_length_value);
+        }
+        if !Self::header_has_key(&header, ACCEPT) {
+            header.insert(ACCEPT.to_ascii_lowercase(), ACCEPT_ANY.to_owned());
+        }
+        if !Self::header_has_key(&header, USER_AGENT) {
+            header.insert(USER_AGENT.to_ascii_lowercase(), APP_NAME.to_owned());
         }
         let estimated_size: usize = header
             .iter()
-            .map(|(k, v)| {
-                k.len()
-                    + v.front()
-                        .map_or(0, |header_value: &String| header_value.len())
-                    + 4
-            })
+            .map(|(k, v): (&String, &String)| k.len() + v.len() + 4)
             .sum();
-        let mut header_bytes: Vec<u8> = Vec::with_capacity(estimated_size);
+        let mut out: Vec<u8> = Vec::with_capacity(estimated_size);
         for (key, value) in &header {
-            header_bytes.extend_from_slice(key.as_bytes());
-            header_bytes.extend_from_slice(b": ");
-            if let Some(header_value) = value.front() {
-                header_bytes.extend_from_slice(header_value.as_bytes());
-            }
-            header_bytes.extend_from_slice(HTTP_BR_BYTES);
+            out.extend_from_slice(key.as_bytes());
+            out.extend_from_slice(b": ");
+            out.extend_from_slice(value.as_bytes());
+            out.extend_from_slice(HTTP_BR_BYTES);
         }
-        header_bytes
+        out
     }
-    pub(crate) fn get_body_bytes(&self) -> Vec<u8> {
-        let header: RequestHeaders = self.get_header();
-        let body: Body = self.get_body();
-        if let Some(content_type_value) = header.get(CONTENT_TYPE)
-            && let Some(first_value) = content_type_value.front()
-        {
-            let res: String = first_value
+    fn header_has_key(header: &HashMap<String, String>, target_key: &str) -> bool {
+        let target = target_key.to_ascii_lowercase();
+        header.keys().any(|k: &String| k == &target)
+    }
+    pub(crate) fn body_bytes(&self) -> Vec<u8> {
+        let ct = self
+            .headers
+            .iter()
+            .find(|(k, _): &(&String, &String)| k.eq_ignore_ascii_case(CONTENT_TYPE))
+            .map(|(_, v): (&String, &String)| v.clone());
+        match ct {
+            Some(value) => value
                 .to_lowercase()
                 .parse::<ContentType>()
                 .unwrap_or_default()
-                .get_body_string(&body);
-            return res.into_bytes();
+                .get_body_string(&String::from_utf8_lossy(&self.body.bytes))
+                .into_bytes(),
+            None => Vec::new(),
         }
-        for (key, value) in &header {
-            if key.eq_ignore_ascii_case(CONTENT_TYPE)
-                && let Some(first_value) = value.front()
-            {
-                let res: String = first_value
-                    .to_lowercase()
-                    .parse::<ContentType>()
-                    .unwrap_or_default()
-                    .get_body_string(&body);
-                return res.into_bytes();
-            }
+    }
+    pub(crate) fn send_sync(&mut self) -> RequestResult {
+        let url_obj = self.parse_url()?;
+        let host: String = url_obj.host.clone().unwrap_or_default();
+        let port: u16 = self.resolve_port(url_obj.port.unwrap_or_default());
+        let mut stream: BoxReadWrite = self.open_sync_stream(host, port)?;
+        let method = self.method.clone();
+        if method.is_get() {
+            self.send_get_request_sync(&mut stream)
+        } else if method.is_post() {
+            self.send_post_request_sync(&mut stream)
+        } else {
+            Err(RequestError::Request("Method Not Allowed".to_string()))
         }
-        String::new().into_bytes()
     }
-    pub(crate) fn get_path(&self) -> String {
-        let path: String = self.config.read().map_or(String::new(), |config| {
-            let query: String = config.url_obj.query.clone().unwrap_or_default();
-            if query.is_empty() {
-                config
-                    .url_obj
-                    .path
-                    .clone()
-                    .unwrap_or(DEFAULT_HTTP_PATH.to_string())
-            } else {
-                format!(
-                    "{}{}{}",
-                    config.url_obj.path.clone().unwrap_or_default(),
-                    QUERY,
-                    query
-                )
-            }
-        });
-        path
+    async fn send_async_impl(&mut self) -> RequestResult {
+        let url_obj = self.parse_url()?;
+        let host: String = url_obj.host.clone().unwrap_or_default();
+        let port: u16 = self.resolve_port(url_obj.port.unwrap_or_default());
+        let mut stream: BoxAsyncReadWrite = self.open_async_stream(host, port).await?;
+        let method = self.method.clone();
+        if method.is_get() {
+            self.send_get_request_async(&mut stream).await
+        } else if method.is_post() {
+            self.send_post_request_async(&mut stream).await
+        } else {
+            Err(RequestError::Request("Method Not Allowed".to_string()))
+        }
     }
-    fn send_get_request(
+    fn resolve_port(&self, port: u16) -> u16 {
+        if port != 0 {
+            return port;
+        }
+        let protocol = Self::protocol_lower(&self.config);
+        Protocol::get_port(&protocol)
+    }
+    fn is_https(&self) -> bool {
+        Self::protocol_lower(&self.config) == HTTPS_LOWERCASE
+    }
+    fn open_sync_stream(&self, host: String, port: u16) -> Result<BoxReadWrite, RequestError> {
+        if let Some(proxy) = &self.config.proxy {
+            return self.open_sync_proxy_stream(host, port, proxy);
+        }
+        let timeout = Duration::from_millis(self.config.timeout);
+        let tcp = TcpStream::connect((host.clone(), port))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        tcp.set_read_timeout(Some(timeout))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        tcp.set_write_timeout(Some(timeout))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        if self.is_https() {
+            let roots = self.tmp.root_cert.clone();
+            let tls_cfg = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let dns = ServerName::try_from(host.clone())
+                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+            let session = ClientConnection::new(Arc::new(tls_cfg), dns)
+                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+            Ok(Box::new(StreamOwned::new(session, tcp)))
+        } else {
+            Ok(Box::new(tcp))
+        }
+    }
+    fn send_get_request_sync(
         &mut self,
-        stream: &mut Box<dyn ReadWrite>,
-    ) -> Result<BoxResponseTrait, RequestError> {
-        let path: String = self.get_path();
-        let header_bytes: Vec<u8> = self.get_header_bytes();
-        let http_version_str: String =
-            self.config.read().map_or("HTTP/1.1".to_string(), |config| {
-                config.http_version.to_string()
-            });
-        let request: Vec<u8> =
-            SharedRequestBuilder::build_get_request(path, header_bytes, http_version_str);
+        stream: &mut BoxReadWrite,
+    ) -> Result<HttpResponse, RequestError> {
+        let path = self.full_path();
+        let header_bytes = self.header_bytes(0);
+        let version = self.config.http_version.to_string();
+        let request = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
-            .and_then(|_| stream.flush())
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        self.read_response(stream)
+            .and_then(|_: ()| stream.flush())
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        self.read_response_sync(stream)
     }
-    fn send_post_request(
+    fn send_post_request_sync(
         &mut self,
-        stream: &mut Box<dyn ReadWrite>,
-    ) -> Result<BoxResponseTrait, RequestError> {
-        let path: String = self.get_path();
-        let header_bytes: Vec<u8> = self.get_header_bytes();
-        let body_bytes: Vec<u8> = self.get_body_bytes();
-        let http_version_str: String =
-            self.config.read().map_or("HTTP/1.1".to_string(), |config| {
-                config.http_version.to_string()
-            });
-        let request: Vec<u8> = SharedRequestBuilder::build_post_request(
-            path,
-            header_bytes,
-            body_bytes,
-            http_version_str,
-        );
+        stream: &mut BoxReadWrite,
+    ) -> Result<HttpResponse, RequestError> {
+        let body_bytes = self.body_bytes();
+        let path = self.full_path();
+        let header_bytes = self.header_bytes(body_bytes.len());
+        let version = self.config.http_version.to_string();
+        let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
         stream
             .write_all(&request)
-            .and_then(|_| stream.flush())
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        self.read_response(stream)
+            .and_then(|_: ()| stream.flush())
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        self.read_response_sync(stream)
     }
-    fn read_response(
+    fn read_response_sync(
         &mut self,
-        stream: &mut Box<dyn ReadWrite>,
-    ) -> Result<BoxResponseTrait, RequestError> {
-        let buffer_size: usize = self
-            .config
-            .read()
-            .map_or(DEFAULT_BUFFER_SIZE, |config| config.buffer);
-        let mut buffer: Vec<u8> = vec![0; buffer_size];
-        let initial_capacity: usize = buffer_size.max(8192);
-        let mut response_bytes: Vec<u8> = Vec::with_capacity(initial_capacity);
-        let mut headers_done: bool = false;
-        let mut content_length: usize = 0;
+        stream: &mut BoxReadWrite,
+    ) -> Result<HttpResponse, RequestError> {
+        let buffer_size = self.config.buffer_size;
+        let mut buffer = vec![0u8; buffer_size];
+        let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
+        let mut headers_done = false;
+        let mut content_length = 0usize;
         let mut redirect_url: Option<Vec<u8>> = None;
-        let mut headers_end_pos: usize = 0;
-        let mut is_chunked: bool = false;
-        let http_version: String = self
+        let mut headers_end_pos = 0usize;
+        let mut is_chunked = false;
+        let version_bytes = self
             .config
-            .read()
-            .map_or(HttpVersion::default().to_string(), |config| {
-                config.http_version.to_string()
-            });
-        let http_version_bytes: Vec<u8> = http_version.to_lowercase().into_bytes();
-        let location_sign_key: Vec<u8> = format!("{}:", LOCATION.to_lowercase()).into_bytes();
-        'read_loop: while let Ok(n) = stream.read(&mut buffer) {
+            .http_version
+            .to_string()
+            .to_ascii_lowercase()
+            .into_bytes();
+        let location_key = format!("{}:", LOCATION.to_ascii_lowercase()).into_bytes();
+        loop {
+            let n = stream
+                .read(&mut buffer)
+                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
             if n == 0 {
                 break;
             }
-            let new_capacity: usize = SharedResponseHandler::calculate_buffer_capacity(
-                &response_bytes,
-                n,
-                response_bytes.capacity(),
-            );
-            if new_capacity > 0 {
-                response_bytes.reserve(new_capacity - response_bytes.capacity());
+            let new_cap = calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
+            if new_cap > 0 {
+                response_bytes.reserve(new_cap - response_bytes.capacity());
             }
-            let old_len: usize = response_bytes.len();
+            let old_len = response_bytes.len();
             response_bytes.extend_from_slice(&buffer[..n]);
             if !headers_done {
-                let search_start: usize = old_len.saturating_sub(3);
-                if let Some(pos) =
-                    SharedResponseHandler::find_double_crlf(&response_bytes, search_start)
-                {
+                let search_start = old_len.saturating_sub(3);
+                if let Some(pos) = find_double_crlf(&response_bytes, search_start) {
                     headers_done = true;
                     headers_end_pos = pos + 4;
-                    SharedResponseHandler::parse_response_headers(
+                    parse_response_headers(
                         &response_bytes[..headers_end_pos],
-                        &http_version_bytes,
-                        &location_sign_key,
+                        &version_bytes,
+                        &location_key,
                         &mut content_length,
                         &mut redirect_url,
                         &mut is_chunked,
@@ -11294,79 +9312,65 @@ impl HttpRequest {
             if headers_done {
                 if is_chunked {
                     if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..]) {
-                        break 'read_loop;
+                        break;
                     }
-                } else {
-                    let total_expected_length: usize = headers_end_pos + content_length;
-                    if response_bytes.len() >= total_expected_length {
-                        response_bytes.truncate(total_expected_length);
-                        break 'read_loop;
-                    }
+                } else if response_bytes.len() >= headers_end_pos + content_length {
+                    response_bytes.truncate(headers_end_pos + content_length);
+                    break;
                 }
             }
         }
         if is_chunked {
-            let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
-            let decoded_body: Vec<u8> = SharedResponseHandler::parse_chunked_body(&body_bytes);
+            let body_bytes = response_bytes[headers_end_pos..].to_vec();
+            let decoded = parse_chunked_body(&body_bytes);
             response_bytes.truncate(headers_end_pos);
-            response_bytes.extend_from_slice(&decoded_body);
+            response_bytes.extend_from_slice(&decoded);
         }
-        self.response = Arc::new(RwLock::new(<HttpResponseBinary as ResponseTrait>::from(
-            &response_bytes,
-        )));
-        if let Ok(config) = self.config.read()
-            && (!config.redirect || redirect_url.is_none())
-        {
-            if config.decode
-                && let Ok(mut response) = self.response.write()
-            {
-                *response = response.decode(config.buffer);
+        let mut response = HttpResponse::from_bytes(&response_bytes);
+        if !self.config.redirect || redirect_url.is_none() {
+            if self.config.decode {
+                response = response.decode(self.config.buffer_size);
             }
-            let response: BoxResponseTrait = Box::new(self.response.read().map_or(
-                HttpResponseBinary::default(),
-                |response: RwLockReadGuard<'_, HttpResponseBinary>| response.clone(),
-            ));
             return Ok(response);
         }
-        let url: String = String::from_utf8(redirect_url.unwrap())
-            .map_err(|error: FromUtf8Error| RequestError::Request(error.to_string()))?;
+        let url_bytes: Vec<u8> = redirect_url
+            .take()
+            .ok_or_else(|| RequestError::Request("Missing Redirect URL".to_string()))?;
+        let url = String::from_utf8(url_bytes)
+            .map_err(|e: FromUtf8Error| RequestError::Request(e.to_string()))?;
         self.handle_redirect(url)
     }
-    fn handle_redirect(&mut self, url: String) -> Result<BoxResponseTrait, RequestError> {
-        if let Ok(mut config) = self.config.write() {
-            if !config.redirect {
-                return Err(RequestError::Request("Redirect Not Enabled".to_string()));
-            }
-            if let Ok(mut tmp) = self.tmp.clone().write() {
-                if tmp.visit_url.contains(&url) {
-                    return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
-                }
-                tmp.visit_url.insert(url.clone());
-                if config.redirect_times >= config.max_redirect_times {
-                    return Err(RequestError::Request(
-                        "Max Redirect Times Exceeded".to_string(),
-                    ));
-                }
-                config.redirect_times += 1;
-            }
+    fn handle_redirect(&mut self, url: String) -> Result<HttpResponse, RequestError> {
+        if !self.config.redirect {
+            return Err(RequestError::Request("Redirect Not Enabled".to_string()));
         }
-        self.url(url.clone());
+        if self.tmp.visit_url.contains(&url) {
+            return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
+        }
+        self.tmp.visit_url.insert(url.clone());
+        if self.config.max_redirect_times == 0 {
+            return Err(RequestError::Request(
+                "Max Redirect Times Exceeded".to_string(),
+            ));
+        }
+        self.config.max_redirect_times -= 1;
+        self.url = url;
         self.send_sync()
     }
     fn is_chunked_response_complete(body_bytes: &[u8]) -> bool {
-        let mut pos: usize = 0;
+        let mut pos = 0;
         while pos < body_bytes.len() {
-            let chunk_size_end: usize = match body_bytes[pos..]
+            let chunk_size_end = match body_bytes[pos..]
                 .windows(2)
-                .position(|window: &[u8]| window == b"\r\n")
+                .position(|w: &[u8]| w == b"\r\n")
             {
                 Some(p) => pos + p,
                 None => return false,
             };
-            let chunk_size_str: &[u8] = &body_bytes[pos..chunk_size_end];
-            let chunk_size_str: &[u8] = match chunk_size_str.iter().position(|&b| b == b';') {
-                Some(p) => &chunk_size_str[..p],
-                None => chunk_size_str,
+            let raw = &body_bytes[pos..chunk_size_end];
+            let chunk_size_str: &[u8] = match raw.iter().position(|&b: &u8| b == b';') {
+                Some(p) => &raw[..p],
+                None => raw,
             };
             let chunk_size: usize = match std::str::from_utf8(chunk_size_str) {
                 Ok(s) => match usize::from_str_radix(s.trim(), 16) {
@@ -11378,484 +9382,122 @@ impl HttpRequest {
             if chunk_size == 0 {
                 return true;
             }
-            let chunk_data_start: usize = chunk_size_end + 2;
-            let chunk_data_end: usize = chunk_data_start + chunk_size;
-            if chunk_data_end + 2 > body_bytes.len() {
+            let start = chunk_size_end + 2;
+            let end = start + chunk_size;
+            if end + 2 > body_bytes.len() {
                 return false;
             }
-            pos = chunk_data_end + 2;
+            pos = end + 2;
         }
         false
     }
-    pub(crate) fn get_port(&self, port: u16, config: &Config) -> u16 {
-        if port != 0 {
-            return port;
-        }
-        let protocol: String = Self::get_protocol(config);
-        Protocol::get_port(&protocol)
-    }
-    fn get_connection_stream(
+    async fn open_async_stream(
         &self,
         host: String,
         port: u16,
-    ) -> Result<Box<dyn ReadWrite>, RequestError> {
-        let config: Config = self
-            .config
-            .read()
-            .map_or(Config::default(), |config| config.clone());
-        if let Some(proxy_config) = &config.proxy {
-            return self.get_proxy_connection_stream(host, port, proxy_config);
+    ) -> Result<BoxAsyncReadWrite, RequestError> {
+        if let Some(proxy) = &self.config.proxy {
+            return self.open_async_proxy_stream(host, port, proxy).await;
         }
-        let host_port: (String, u16) = (host.clone(), port);
-        let timeout: Duration = Duration::from_millis(config.timeout);
-        let tcp_stream: TcpStream = TcpStream::connect(host_port.clone())
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        tcp_stream
-            .set_read_timeout(Some(timeout))
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        tcp_stream
-            .set_write_timeout(Some(timeout))
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let stream: Result<Box<dyn ReadWrite>, RequestError> =
-            if Self::get_protocol(&config) == HTTPS_LOWERCASE {
-                match self.tmp.clone().read() {
-                    Ok(tmp) => {
-                        let roots: RootCertStore = tmp.root_cert.clone();
-                        let tls_config: ClientConfig = ClientConfig::builder()
-                            .with_root_certificates(roots)
-                            .with_no_client_auth();
-                        let client_config: Arc<ClientConfig> = Arc::new(tls_config);
-                        let dns_name: ServerName<'_> = ServerName::try_from(host.clone()).map_err(
-                            |error: InvalidDnsNameError| RequestError::Request(error.to_string()),
-                        )?;
-                        let session: ClientConnection =
-                            ClientConnection::new(Arc::clone(&client_config), dns_name).map_err(
-                                |error: rustls::Error| RequestError::Request(error.to_string()),
-                            )?;
-                        let tls_stream: StreamOwned<ClientConnection, TcpStream> =
-                            StreamOwned::new(session, tcp_stream);
-                        return Ok(Box::new(tls_stream));
-                    }
-                    Err(error) => Err(RequestError::Request(error.to_string())),
-                }
-            } else {
-                Ok(Box::new(tcp_stream))
-            };
-        stream
-    }
-    fn get_proxy_connection_stream(
-        &self,
-        target_host: String,
-        target_port: u16,
-        proxy_config: &ProxyConfig,
-    ) -> Result<Box<dyn ReadWrite>, RequestError> {
-        let timeout: Duration = Duration::from_millis(self.config.read().map_or(
-            DEFAULT_HIGH_SECURITY_READ_TIMEOUT_MS,
-            |config: RwLockReadGuard<'_, Config>| config.timeout,
-        ));
-        match proxy_config.proxy_type {
-            ProxyType::Http | ProxyType::Https => {
-                self.get_http_proxy_connection(target_host, target_port, proxy_config, timeout)
-            }
-            ProxyType::Socks5 => {
-                self.get_socks5_proxy_connection(target_host, target_port, proxy_config, timeout)
-            }
-        }
-    }
-    fn get_http_proxy_connection(
-        &self,
-        target_host: String,
-        target_port: u16,
-        proxy_config: &ProxyConfig,
-        timeout: Duration,
-    ) -> Result<Box<dyn ReadWrite>, RequestError> {
-        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
-        let tcp_stream: TcpStream = TcpStream::connect(proxy_host_port)
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        tcp_stream
-            .set_read_timeout(Some(timeout))
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        tcp_stream
-            .set_write_timeout(Some(timeout))
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let mut proxy_stream: Box<dyn ReadWrite> = if proxy_config.proxy_type == ProxyType::Https {
-            match self.tmp.clone().read() {
-                Ok(tmp) => {
-                    let roots: RootCertStore = tmp.root_cert.clone();
-                    let tls_config: ClientConfig = ClientConfig::builder()
-                        .with_root_certificates(roots)
-                        .with_no_client_auth();
-                    let client_config: Arc<ClientConfig> = Arc::new(tls_config);
-                    let dns_name: ServerName<'_> = ServerName::try_from(proxy_config.host.clone())
-                        .map_err(|error: InvalidDnsNameError| {
-                            RequestError::Request(error.to_string())
-                        })?;
-                    let session: ClientConnection =
-                        ClientConnection::new(Arc::clone(&client_config), dns_name).map_err(
-                            |error: rustls::Error| RequestError::Request(error.to_string()),
-                        )?;
-                    let tls_stream: StreamOwned<ClientConnection, TcpStream> =
-                        StreamOwned::new(session, tcp_stream);
-                    Box::new(tls_stream)
-                }
-                Err(error) => {
-                    return Err(RequestError::Request(error.to_string()));
-                }
-            }
+        let tcp = http_type::tokio::net::TcpStream::connect((host.clone(), port))
+            .await
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        if self.is_https() {
+            let roots = self.tmp.root_cert.clone();
+            let tls_cfg = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let connector = TlsConnector::from(Arc::new(tls_cfg));
+            let dns = ServerName::try_from(host.clone())
+                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+            let tls = connector
+                .connect(dns, tcp)
+                .await
+                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            Ok(Box::new(tls))
         } else {
-            Box::new(tcp_stream)
-        };
-        let connect_request: String = if let (Some(username), Some(password)) =
-            (&proxy_config.username, &proxy_config.password)
-        {
-            let auth: String = format!("{username}:{password}");
-            let auth_encoded: String = base64_encode(auth.as_bytes());
-            format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {auth_encoded}\r\n\r\n"
-            )
-        } else {
-            format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n\r\n"
-            )
-        };
-        proxy_stream
-            .write_all(connect_request.as_bytes())
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        proxy_stream
-            .flush()
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let mut response_buffer = [0u8; 1024];
-        let bytes_read: usize = proxy_stream
-            .read(&mut response_buffer)
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let response_str: &str = std::str::from_utf8(&response_buffer[..bytes_read]).unwrap_or("");
-        let headers_end_pos: Option<usize> = response_str.find("\r\n\r\n");
-        let pre_read_data: Vec<u8> = if let Some(pos) = headers_end_pos {
-            let header_part: &str = &response_str[..pos];
-            if !header_part.starts_with("HTTP/1.1 200") && !header_part.starts_with("HTTP/1.0 200")
-            {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
-            }
-            response_buffer[pos + 4..bytes_read].to_vec()
-        } else {
-            if !response_str.starts_with("HTTP/1.1 200")
-                && !response_str.starts_with("HTTP/1.0 200")
-            {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
-            }
-            vec![]
-        };
-        let config: Config = self
-            .config
-            .read()
-            .map_or(Config::default(), |config| config.clone());
-        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
-            match self.tmp.clone().read() {
-                Ok(tmp) => {
-                    let roots: RootCertStore = tmp.root_cert.clone();
-                    let tls_config: ClientConfig = ClientConfig::builder()
-                        .with_root_certificates(roots)
-                        .with_no_client_auth();
-                    let client_config: Arc<ClientConfig> = Arc::new(tls_config);
-                    let dns_name: ServerName<'_> = ServerName::try_from(target_host.clone())
-                        .map_err(|error: InvalidDnsNameError| {
-                            RequestError::Request(error.to_string())
-                        })?;
-                    let session: ClientConnection =
-                        ClientConnection::new(Arc::clone(&client_config), dns_name).map_err(
-                            |error: rustls::Error| RequestError::Request(error.to_string()),
-                        )?;
-                    let tunnel_stream = SyncProxyTunnelStream::new(proxy_stream, pre_read_data);
-                    let tls_stream: StreamOwned<ClientConnection, SyncProxyTunnelStream> =
-                        StreamOwned::new(session, tunnel_stream);
-                    return Ok(Box::new(tls_stream));
-                }
-                Err(error) => {
-                    return Err(RequestError::Request(error.to_string()));
-                }
-            }
+            Ok(Box::new(tcp))
         }
-        let tunnel_stream: SyncProxyTunnelStream =
-            SyncProxyTunnelStream::new(proxy_stream, pre_read_data);
-        Ok(Box::new(tunnel_stream))
     }
-    fn get_socks5_proxy_connection(
-        &self,
-        target_host: String,
-        target_port: u16,
-        proxy_config: &ProxyConfig,
-        timeout: Duration,
-    ) -> Result<Box<dyn ReadWrite>, RequestError> {
-        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
-        let mut tcp_stream: TcpStream = TcpStream::connect(proxy_host_port)
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        tcp_stream
-            .set_read_timeout(Some(timeout))
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        tcp_stream
-            .set_write_timeout(Some(timeout))
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let auth_methods: Vec<u8> =
-            if proxy_config.username.is_some() && proxy_config.password.is_some() {
-                vec![0x05, 0x02, 0x00, 0x02]
-            } else {
-                vec![0x05, 0x01, 0x00]
-            };
-        tcp_stream
-            .write_all(&auth_methods)
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let mut response = [0u8; 2];
-        tcp_stream
-            .read_exact(&mut response)
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        if response[0] != 0x05 {
-            return Err(RequestError::Request("Internal Server Error".to_string()));
-        }
-        match response[1] {
-            0x00 => {}
-            0x02 => {
-                if let (Some(username), Some(password)) =
-                    (&proxy_config.username, &proxy_config.password)
-                {
-                    let mut auth_request: Vec<u8> = vec![0x01];
-                    auth_request.push(username.len() as u8);
-                    auth_request.extend_from_slice(username.as_bytes());
-                    auth_request.push(password.len() as u8);
-                    auth_request.extend_from_slice(password.as_bytes());
-                    tcp_stream
-                        .write_all(&auth_request)
-                        .map_err(|error: std::io::Error| {
-                            RequestError::Request(error.to_string())
-                        })?;
-                    let mut auth_response: [u8; 2] = [0u8; 2];
-                    tcp_stream.read_exact(&mut auth_response).map_err(
-                        |error: std::io::Error| RequestError::Request(error.to_string()),
-                    )?;
-                    if auth_response[1] != 0x00 {
-                        return Err(RequestError::Request("Internal Server Error".to_string()));
-                    }
-                } else {
-                    return Err(RequestError::Request("Internal Server Error".to_string()));
-                }
-            }
-            0xFF => {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
-            }
-            _ => {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
-            }
-        }
-        let mut connect_request: Vec<u8> = vec![0x05, 0x01, 0x00];
-        if target_host.parse::<Ipv4Addr>().is_ok() {
-            connect_request.push(0x01);
-            let ip: Ipv4Addr = target_host.parse().unwrap();
-            connect_request.extend_from_slice(&ip.octets());
-        } else if target_host.parse::<Ipv6Addr>().is_ok() {
-            connect_request.push(0x04);
-            let ip: Ipv6Addr = target_host.parse().unwrap();
-            connect_request.extend_from_slice(&ip.octets());
-        } else {
-            connect_request.push(0x03);
-            connect_request.push(target_host.len() as u8);
-            connect_request.extend_from_slice(target_host.as_bytes());
-        }
-        connect_request.extend_from_slice(&target_port.to_be_bytes());
-        tcp_stream
-            .write_all(&connect_request)
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let mut connect_response: [u8; 4] = [0u8; 4];
-        tcp_stream
-            .read_exact(&mut connect_response)
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        if connect_response[0] != 0x05 || connect_response[1] != 0x00 {
-            return Err(RequestError::Request("Internal Server Error".to_string()));
-        }
-        match connect_response[3] {
-            0x01 => {
-                let mut skip = [0u8; 6];
-                tcp_stream
-                    .read_exact(&mut skip)
-                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-            }
-            0x03 => {
-                let mut len = [0u8; 1];
-                tcp_stream
-                    .read_exact(&mut len)
-                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-                let mut skip = vec![0u8; len[0] as usize + 2];
-                tcp_stream
-                    .read_exact(&mut skip)
-                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-            }
-            0x04 => {
-                let mut skip = [0u8; 18];
-                tcp_stream
-                    .read_exact(&mut skip)
-                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-            }
-            _ => {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
-            }
-        }
-        let proxy_stream: Box<dyn ReadWrite> = Box::new(tcp_stream);
-        let config: Config = self
-            .config
-            .read()
-            .map_or(Config::default(), |config| config.clone());
-        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
-            match self.tmp.clone().read() {
-                Ok(tmp) => {
-                    let roots: RootCertStore = tmp.root_cert.clone();
-                    let tls_config: ClientConfig = ClientConfig::builder()
-                        .with_root_certificates(roots)
-                        .with_no_client_auth();
-                    let client_config: Arc<ClientConfig> = Arc::new(tls_config);
-                    let dns_name: ServerName<'_> = ServerName::try_from(target_host.clone())
-                        .map_err(|error: InvalidDnsNameError| {
-                            RequestError::Request(error.to_string())
-                        })?;
-                    let session: ClientConnection =
-                        ClientConnection::new(Arc::clone(&client_config), dns_name).map_err(
-                            |error: rustls::Error| RequestError::Request(error.to_string()),
-                        )?;
-                    let tunnel_stream: SyncProxyTunnelStream =
-                        SyncProxyTunnelStream::new(proxy_stream, vec![]);
-                    let tls_stream: StreamOwned<ClientConnection, SyncProxyTunnelStream> =
-                        StreamOwned::new(session, tunnel_stream);
-                    return Ok(Box::new(tls_stream));
-                }
-                Err(error) => {
-                    return Err(RequestError::Request(error.to_string()));
-                }
-            }
-        }
-        Ok(proxy_stream)
-    }
-}
-impl HttpRequest {
-    pub(crate) fn send_sync(&mut self) -> RequestResult {
-        let methods: Method = self.get_methods();
-        let mut host: String = String::new();
-        let mut port: u16 = u16::default();
-        if let Ok(mut config) = self.config.write() {
-            config.url_obj = self
-                .parse_url()
-                .map_err(|error: RequestError| RequestError::Request(error.to_string()))?;
-            host = config.url_obj.host.clone().unwrap_or_default();
-            port = self.get_port(config.url_obj.port.unwrap_or_default(), &config);
-        }
-        let mut stream: BoxReadWrite = self.get_connection_stream(host, port)?;
-        let res: Result<BoxResponseTrait, RequestError> = match methods {
-            m if m.is_get() => self.send_get_request(&mut stream),
-            m if m.is_post() => self.send_post_request(&mut stream),
-            _err => Err(RequestError::Request("Method Not Allowed".to_string())),
-        };
-        res
-    }
-}
-impl HttpRequest {
     async fn send_get_request_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
-    ) -> Result<BoxResponseTrait, RequestError> {
-        let path: String = self.get_path();
-        let header_bytes: Vec<u8> = self.get_header_bytes();
-        let http_version_str: String =
-            self.config.read().map_or("HTTP/1.1".to_string(), |config| {
-                config.http_version.to_string()
-            });
-        let request: Vec<u8> =
-            SharedRequestBuilder::build_get_request(path, header_bytes, http_version_str);
+    ) -> Result<HttpResponse, RequestError> {
+        let path = self.full_path();
+        let header_bytes = self.header_bytes(0);
+        let version = self.config.http_version.to_string();
+        let request = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         stream
             .flush()
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         self.read_response_async(stream).await
     }
     async fn send_post_request_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
-    ) -> Result<BoxResponseTrait, RequestError> {
-        let path: String = self.get_path();
-        let header_bytes: Vec<u8> = self.get_header_bytes();
-        let body_bytes: Vec<u8> = self.get_body_bytes();
-        let http_version_str: String =
-            self.config.read().map_or("HTTP/1.1".to_string(), |config| {
-                config.http_version.to_string()
-            });
-        let request: Vec<u8> = SharedRequestBuilder::build_post_request(
-            path,
-            header_bytes,
-            body_bytes,
-            http_version_str,
-        );
+    ) -> Result<HttpResponse, RequestError> {
+        let body_bytes = self.body_bytes();
+        let path = self.full_path();
+        let header_bytes = self.header_bytes(body_bytes.len());
+        let version = self.config.http_version.to_string();
+        let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
         stream
             .write_all(&request)
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         stream
             .flush()
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         self.read_response_async(stream).await
     }
     async fn read_response_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
-    ) -> Result<BoxResponseTrait, RequestError> {
-        let buffer_size: usize = self
-            .config
-            .read()
-            .map_or(DEFAULT_BUFFER_SIZE, |config| config.buffer);
-        let mut buffer: Vec<u8> = vec![0; buffer_size];
-        let initial_capacity: usize = buffer_size.max(8192);
-        let mut response_bytes: Vec<u8> = Vec::with_capacity(initial_capacity);
-        let mut headers_done: bool = false;
-        let mut content_length: usize = 0;
+    ) -> Result<HttpResponse, RequestError> {
+        let buffer_size = self.config.buffer_size;
+        let mut buffer = vec![0u8; buffer_size];
+        let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
+        let mut headers_done = false;
+        let mut content_length = 0usize;
         let mut redirect_url: Option<Vec<u8>> = None;
-        let mut headers_end_pos: usize = 0;
-        let mut is_chunked: bool = false;
-        let http_version: String = self
+        let mut headers_end_pos = 0usize;
+        let mut is_chunked = false;
+        let version_bytes = self
             .config
-            .read()
-            .map_or(HttpVersion::default().to_string(), |config| {
-                config.http_version.to_string()
-            });
-        let http_version_bytes: Vec<u8> = http_version.to_lowercase().into_bytes();
-        let location_sign_key: Vec<u8> = format!("{}:", LOCATION.to_lowercase()).into_bytes();
-        'read_loop: loop {
-            let bytes_read: usize = stream
+            .http_version
+            .to_string()
+            .to_ascii_lowercase()
+            .into_bytes();
+        let location_key = format!("{}:", LOCATION.to_ascii_lowercase()).into_bytes();
+        loop {
+            let n = stream
                 .read(&mut buffer)
                 .await
-                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-            if bytes_read == 0 {
+                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            if n == 0 {
                 break;
             }
-            let new_capacity: usize = SharedResponseHandler::calculate_buffer_capacity(
-                &response_bytes,
-                bytes_read,
-                response_bytes.capacity(),
-            );
-            if new_capacity > 0 {
-                response_bytes.reserve(new_capacity - response_bytes.capacity());
+            let new_cap = calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
+            if new_cap > 0 {
+                response_bytes.reserve(new_cap - response_bytes.capacity());
             }
-            let old_len: usize = response_bytes.len();
-            response_bytes.extend_from_slice(&buffer[..bytes_read]);
+            let old_len = response_bytes.len();
+            response_bytes.extend_from_slice(&buffer[..n]);
             if !headers_done {
-                let search_start: usize = old_len.saturating_sub(3);
-                if let Some(pos) =
-                    SharedResponseHandler::find_double_crlf(&response_bytes, search_start)
-                {
+                let search_start = old_len.saturating_sub(3);
+                if let Some(pos) = find_double_crlf(&response_bytes, search_start) {
                     headers_done = true;
                     headers_end_pos = pos + 4;
-                    SharedResponseHandler::parse_response_headers(
+                    parse_response_headers(
                         &response_bytes[..headers_end_pos],
-                        &http_version_bytes,
-                        &location_sign_key,
+                        &version_bytes,
+                        &location_key,
                         &mut content_length,
                         &mut redirect_url,
                         &mut is_chunked,
@@ -11865,178 +9507,293 @@ impl HttpRequest {
             if headers_done {
                 if is_chunked {
                     if Self::is_chunked_response_complete(&response_bytes[headers_end_pos..]) {
-                        break 'read_loop;
+                        break;
                     }
-                } else {
-                    let total_expected_length: usize = headers_end_pos + content_length;
-                    if response_bytes.len() >= total_expected_length {
-                        response_bytes.truncate(total_expected_length);
-                        break 'read_loop;
-                    }
+                } else if response_bytes.len() >= headers_end_pos + content_length {
+                    response_bytes.truncate(headers_end_pos + content_length);
+                    break;
                 }
             }
         }
         if is_chunked {
-            let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
-            let decoded_body: Vec<u8> = SharedResponseHandler::parse_chunked_body(&body_bytes);
+            let body_bytes = response_bytes[headers_end_pos..].to_vec();
+            let decoded = parse_chunked_body(&body_bytes);
             response_bytes.truncate(headers_end_pos);
-            response_bytes.extend_from_slice(&decoded_body);
+            response_bytes.extend_from_slice(&decoded);
         }
-        self.response = Arc::new(RwLock::new(<HttpResponseBinary as ResponseTrait>::from(
-            &response_bytes,
-        )));
-        let (should_redirect, should_decode, buffer_size) = {
-            if let Ok(config) = self.config.read() {
-                (config.redirect, config.decode, config.buffer)
-            } else {
-                (false, false, DEFAULT_BUFFER_SIZE)
+        let mut response = HttpResponse::from_bytes(&response_bytes);
+        if !self.config.redirect || redirect_url.is_none() {
+            if self.config.decode {
+                response = response.decode(self.config.buffer_size);
             }
-        };
-        if !should_redirect || redirect_url.is_none() {
-            if should_decode && let Ok(mut response) = self.response.write() {
-                *response = response.decode(buffer_size);
-            }
-            let response: BoxResponseTrait = Box::new(self.response.read().map_or(
-                HttpResponseBinary::default(),
-                |response: RwLockReadGuard<'_, HttpResponseBinary>| response.clone(),
-            ));
             return Ok(response);
         }
-        let url: String = String::from_utf8(redirect_url.unwrap())
-            .map_err(|error: FromUtf8Error| RequestError::Request(error.to_string()))?;
+        let url_bytes: Vec<u8> = redirect_url
+            .take()
+            .ok_or_else(|| RequestError::Request("Missing Redirect URL".to_string()))?;
+        let url = String::from_utf8(url_bytes)
+            .map_err(|e: FromUtf8Error| RequestError::Request(e.to_string()))?;
         self.handle_redirect_async(url).await
     }
-    fn handle_redirect_async(
-        &mut self,
-        url: String,
-    ) -> Pin<Box<dyn Future<Output = Result<BoxResponseTrait, RequestError>> + Send + '_>> {
-        Box::pin(async move {
-            {
-                if let Ok(mut config) = self.config.write() {
-                    if !config.redirect {
-                        return Err(RequestError::Request("Redirect Not Enabled".to_string()));
-                    }
-                    if let Ok(mut tmp) = self.tmp.clone().write() {
-                        if tmp.visit_url.contains(&url) {
-                            return Err(RequestError::Request(
-                                "Redirect URL Dead Loop".to_string(),
-                            ));
-                        }
-                        tmp.visit_url.insert(url.clone());
-                        if config.redirect_times >= config.max_redirect_times {
-                            return Err(RequestError::Request(
-                                "Max Redirect Times Exceeded".to_string(),
-                            ));
-                        }
-                        config.redirect_times += 1;
-                    }
-                }
-            }
-            self.url(url.clone());
-            self.send_async().await
-        })
-    }
-    async fn get_connection_stream_async(
-        &self,
-        host: String,
-        port: u16,
-    ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let config: Config = self
-            .config
-            .read()
-            .map_or(Config::default(), |config| config.clone());
-        if let Some(proxy_config) = &config.proxy {
-            return self
-                .get_proxy_connection_stream_async(host, port, proxy_config)
-                .await;
+    async fn handle_redirect_async(&mut self, url: String) -> Result<HttpResponse, RequestError> {
+        if !self.config.redirect {
+            return Err(RequestError::Request("Redirect Not Enabled".to_string()));
         }
-        let host_port: (String, u16) = (host.clone(), port);
-        let tcp_stream: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect(host_port.clone())
-                .await
-                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
-            let roots: RootCertStore = {
-                match self.tmp.clone().read() {
-                    Ok(tmp) => tmp.root_cert.clone(),
-                    Err(error) => {
-                        return Err(RequestError::Request(error.to_string()));
-                    }
-                }
-            };
-            let tls_config: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
-            let dns_name: ServerName<'_> = ServerName::try_from(host.clone())
-                .map_err(|error: InvalidDnsNameError| RequestError::Request(error.to_string()))?;
-            let tls_stream: TlsStream<http_type::tokio::net::TcpStream> = connector
-                .connect(dns_name, tcp_stream)
-                .await
-                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-            Ok(Box::new(tls_stream))
-        } else {
-            Ok(Box::new(tcp_stream))
+        if self.tmp.visit_url.contains(&url) {
+            return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
         }
+        self.tmp.visit_url.insert(url.clone());
+        if self.config.max_redirect_times == 0 {
+            return Err(RequestError::Request(
+                "Max Redirect Times Exceeded".to_string(),
+            ));
+        }
+        self.config.max_redirect_times -= 1;
+        self.url = url;
+        Box::pin(self.send_async()).await
     }
-    async fn get_proxy_connection_stream_async(
+    fn open_sync_proxy_stream(
         &self,
         target_host: String,
         target_port: u16,
-        proxy_config: &ProxyConfig,
-    ) -> Result<BoxAsyncReadWrite, RequestError> {
-        match proxy_config.proxy_type {
+        proxy: &Proxy,
+    ) -> Result<BoxReadWrite, RequestError> {
+        match proxy.proxy_type {
             ProxyType::Http | ProxyType::Https => {
-                self.get_http_proxy_connection_async(target_host, target_port, proxy_config)
+                self.open_sync_http_proxy(target_host, target_port, proxy)
+            }
+            ProxyType::Socks5 => self.open_sync_socks5_proxy(target_host, target_port, proxy),
+        }
+    }
+    fn open_sync_http_proxy(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy: &Proxy,
+    ) -> Result<BoxReadWrite, RequestError> {
+        let timeout = Duration::from_millis(self.config.timeout);
+        let tcp = TcpStream::connect((proxy.host.clone(), proxy.port))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        tcp.set_read_timeout(Some(timeout))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        tcp.set_write_timeout(Some(timeout))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut proxy_stream: BoxReadWrite = if proxy.proxy_type == ProxyType::Https {
+            let roots = self.tmp.root_cert.clone();
+            let tls_cfg = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let dns = ServerName::try_from(proxy.host.clone())
+                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+            let session = ClientConnection::new(Arc::new(tls_cfg), dns)
+                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+            Box::new(StreamOwned::new(session, tcp))
+        } else {
+            Box::new(tcp)
+        };
+        let connect_request: String = if let (Some(u), Some(p)) = (&proxy.username, &proxy.password)
+        {
+            let auth = format!("{u}:{p}");
+            let encoded = crate::utils::base64_encode(auth.as_bytes());
+            format!(
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {encoded}\r\n\r\n"
+            )
+        } else {
+            format!(
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n\r\n"
+            )
+        };
+        proxy_stream
+            .write_all(connect_request.as_bytes())
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        proxy_stream
+            .flush()
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut buf = [0u8; 1024];
+        let n = proxy_stream
+            .read(&mut buf)
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let s = std::str::from_utf8(&buf[..n]).unwrap_or("");
+        let pre_read = if let Some(pos) = s.find("\r\n\r\n") {
+            let header_part = &s[..pos];
+            if !header_part.starts_with("HTTP/1.1 200") && !header_part.starts_with("HTTP/1.0 200")
+            {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+            buf[pos + 4..n].to_vec()
+        } else {
+            if !s.starts_with("HTTP/1.1 200") && !s.starts_with("HTTP/1.0 200") {
+                return Err(RequestError::Request("Internal Server Error".to_string()));
+            }
+            Vec::new()
+        };
+        if self.is_https() {
+            let roots = self.tmp.root_cert.clone();
+            let tls_cfg = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let dns = ServerName::try_from(target_host.clone())
+                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+            let session = ClientConnection::new(Arc::new(tls_cfg), dns)
+                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+            let tunnel = SyncProxyTunnelStream::new(proxy_stream, pre_read);
+            return Ok(Box::new(StreamOwned::new(session, tunnel)));
+        }
+        Ok(Box::new(SyncProxyTunnelStream::new(proxy_stream, pre_read)))
+    }
+    fn open_sync_socks5_proxy(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy: &Proxy,
+    ) -> Result<BoxReadWrite, RequestError> {
+        let timeout = Duration::from_millis(self.config.timeout);
+        let mut tcp = TcpStream::connect((proxy.host.clone(), proxy.port))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        tcp.set_read_timeout(Some(timeout))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        tcp.set_write_timeout(Some(timeout))
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let auth_methods: Vec<u8> = if proxy.username.is_some() && proxy.password.is_some() {
+            vec![0x05, 0x02, 0x00, 0x02]
+        } else {
+            vec![0x05, 0x01, 0x00]
+        };
+        tcp.write_all(&auth_methods)
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut resp = [0u8; 2];
+        tcp.read_exact(&mut resp)
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        if resp[0] != 0x05 {
+            return Err(RequestError::Request("Internal Server Error".to_string()));
+        }
+        match resp[1] {
+            0x00 => {}
+            0x02 => {
+                let (Some(u), Some(p)) = (&proxy.username, &proxy.password) else {
+                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                };
+                let mut auth_req = vec![0x01];
+                auth_req.push(u.len() as u8);
+                auth_req.extend_from_slice(u.as_bytes());
+                auth_req.push(p.len() as u8);
+                auth_req.extend_from_slice(p.as_bytes());
+                tcp.write_all(&auth_req)
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                let mut auth_resp = [0u8; 2];
+                tcp.read_exact(&mut auth_resp)
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                if auth_resp[1] != 0x00 {
+                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                }
+            }
+            _ => return Err(RequestError::Request("Internal Server Error".to_string())),
+        }
+        let mut connect_req: Vec<u8> = vec![0x05, 0x01, 0x00];
+        if let Ok(ip) = target_host.parse::<Ipv4Addr>() {
+            connect_req.push(0x01);
+            connect_req.extend_from_slice(&ip.octets());
+        } else if let Ok(ip) = target_host.parse::<Ipv6Addr>() {
+            connect_req.push(0x04);
+            connect_req.extend_from_slice(&ip.octets());
+        } else {
+            connect_req.push(0x03);
+            connect_req.push(target_host.len() as u8);
+            connect_req.extend_from_slice(target_host.as_bytes());
+        }
+        connect_req.extend_from_slice(&target_port.to_be_bytes());
+        tcp.write_all(&connect_req)
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut connect_resp = [0u8; 4];
+        tcp.read_exact(&mut connect_resp)
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        if connect_resp[0] != 0x05 || connect_resp[1] != 0x00 {
+            return Err(RequestError::Request("Internal Server Error".to_string()));
+        }
+        match connect_resp[3] {
+            0x01 => {
+                let mut skip = [0u8; 6];
+                tcp.read_exact(&mut skip)
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            }
+            0x03 => {
+                let mut len = [0u8; 1];
+                tcp.read_exact(&mut len)
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                let mut skip = vec![0u8; len[0] as usize + 2];
+                tcp.read_exact(&mut skip)
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            }
+            0x04 => {
+                let mut skip = [0u8; 18];
+                tcp.read_exact(&mut skip)
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            }
+            _ => return Err(RequestError::Request("Internal Server Error".to_string())),
+        }
+        if self.is_https() {
+            let roots = self.tmp.root_cert.clone();
+            let tls_cfg = ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            let dns = ServerName::try_from(target_host)
+                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+            let session = ClientConnection::new(Arc::new(tls_cfg), dns)
+                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+            let proxy_box: BoxReadWrite = Box::new(tcp);
+            let tunnel = SyncProxyTunnelStream::new(proxy_box, Vec::new());
+            return Ok(Box::new(StreamOwned::new(session, tunnel)));
+        }
+        Ok(Box::new(tcp))
+    }
+    async fn open_async_proxy_stream(
+        &self,
+        target_host: String,
+        target_port: u16,
+        proxy: &Proxy,
+    ) -> Result<BoxAsyncReadWrite, RequestError> {
+        match proxy.proxy_type {
+            ProxyType::Http | ProxyType::Https => {
+                self.open_async_http_proxy(target_host, target_port, proxy)
                     .await
             }
             ProxyType::Socks5 => {
-                self.get_socks5_proxy_connection_async(target_host, target_port, proxy_config)
+                self.open_async_socks5_proxy(target_host, target_port, proxy)
                     .await
             }
         }
     }
-    async fn get_http_proxy_connection_async(
+    async fn open_async_http_proxy(
         &self,
         target_host: String,
         target_port: u16,
-        proxy_config: &ProxyConfig,
+        proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
-        let tcp_stream: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect(proxy_host_port)
-                .await
-                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let mut proxy_stream: BoxAsyncReadWrite = if proxy_config.proxy_type == ProxyType::Https {
-            let roots: RootCertStore = {
-                match self.tmp.clone().read() {
-                    Ok(tmp) => tmp.root_cert.clone(),
-                    Err(error) => {
-                        return Err(RequestError::Request(error.to_string()));
-                    }
-                }
-            };
-            let tls_config: ClientConfig = ClientConfig::builder()
+        let tcp = http_type::tokio::net::TcpStream::connect((proxy.host.clone(), proxy.port))
+            .await
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut proxy_stream: BoxAsyncReadWrite = if proxy.proxy_type == ProxyType::Https {
+            let roots = self.tmp.root_cert.clone();
+            let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
-            let dns_name: ServerName<'_> = ServerName::try_from(proxy_config.host.clone())
-                .map_err(|error: InvalidDnsNameError| RequestError::Request(error.to_string()))?;
-            let tls_stream: TlsStream<http_type::tokio::net::TcpStream> = connector
-                .connect(dns_name, tcp_stream)
+            let connector = TlsConnector::from(Arc::new(tls_cfg));
+            let dns = ServerName::try_from(proxy.host.clone())
+                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+            let tls = connector
+                .connect(dns, tcp)
                 .await
-                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-            Box::new(tls_stream)
+                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            Box::new(tls)
         } else {
-            Box::new(tcp_stream)
+            Box::new(tcp)
         };
-        let connect_request: String = if let (Some(username), Some(password)) =
-            (&proxy_config.username, &proxy_config.password)
+        let connect_request: String = if let (Some(u), Some(p)) = (&proxy.username, &proxy.password)
         {
-            let auth: String = format!("{username}:{password}");
-            let auth_encoded: String = base64_encode(auth.as_bytes());
+            let auth = format!("{u}:{p}");
+            let encoded = crate::utils::base64_encode(auth.as_bytes());
             format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {auth_encoded}\r\n\r\n"
+                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {encoded}\r\n\r\n"
             )
         } else {
             format!(
@@ -12046,232 +9803,162 @@ impl HttpRequest {
         proxy_stream
             .write_all(connect_request.as_bytes())
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         proxy_stream
             .flush()
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let mut response_buffer: [u8; 1024] = [0u8; 1024];
-        let bytes_read: usize = proxy_stream
-            .read(&mut response_buffer)
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut buf = [0u8; 1024];
+        let n = proxy_stream
+            .read(&mut buf)
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let response_str: &str = std::str::from_utf8(&response_buffer[..bytes_read]).unwrap_or("");
-        let headers_end_pos: Option<usize> = response_str.find("\r\n\r\n");
-        let pre_read_data: Vec<u8> = if let Some(pos) = headers_end_pos {
-            let header_part: &str = &response_str[..pos];
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let s = std::str::from_utf8(&buf[..n]).unwrap_or("");
+        let pre_read = if let Some(pos) = s.find("\r\n\r\n") {
+            let header_part = &s[..pos];
             if !header_part.starts_with("HTTP/1.1 200") && !header_part.starts_with("HTTP/1.0 200")
             {
                 return Err(RequestError::Request("Internal Server Error".to_string()));
             }
-            response_buffer[pos + 4..bytes_read].to_vec()
+            buf[pos + 4..n].to_vec()
         } else {
-            if !response_str.starts_with("HTTP/1.1 200")
-                && !response_str.starts_with("HTTP/1.0 200")
-            {
+            if !s.starts_with("HTTP/1.1 200") && !s.starts_with("HTTP/1.0 200") {
                 return Err(RequestError::Request("Internal Server Error".to_string()));
             }
-            vec![]
+            Vec::new()
         };
-        let config: Config = self
-            .config
-            .read()
-            .map_or(Config::default(), |config| config.clone());
-        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
-            let roots: RootCertStore = {
-                match self.tmp.clone().read() {
-                    Ok(tmp) => tmp.root_cert.clone(),
-                    Err(error) => {
-                        return Err(RequestError::Request(error.to_string()));
-                    }
-                }
-            };
-            let tls_config: ClientConfig = ClientConfig::builder()
+        if self.is_https() {
+            let roots = self.tmp.root_cert.clone();
+            let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
-            let dns_name: ServerName<'_> = ServerName::try_from(target_host.clone())
-                .map_err(|error: InvalidDnsNameError| RequestError::Request(error.to_string()))?;
-            let tunnel_stream: ProxyTunnelStream =
-                ProxyTunnelStream::new(proxy_stream, pre_read_data);
-            let tls_stream: TlsStream<ProxyTunnelStream> = connector
-                .connect(dns_name, tunnel_stream)
+            let connector = TlsConnector::from(Arc::new(tls_cfg));
+            let dns = ServerName::try_from(target_host.clone())
+                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+            let tunnel = ProxyTunnelStream::new(proxy_stream, pre_read);
+            let tls = connector
+                .connect(dns, tunnel)
                 .await
-                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-            return Ok(Box::new(tls_stream) as BoxAsyncReadWrite);
+                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            Ok(Box::new(tls))
+        } else {
+            Ok(Box::new(ProxyTunnelStream::new(proxy_stream, pre_read)))
         }
-        let tunnel_stream: ProxyTunnelStream = ProxyTunnelStream::new(proxy_stream, pre_read_data);
-        Ok(Box::new(tunnel_stream) as BoxAsyncReadWrite)
     }
-    async fn get_socks5_proxy_connection_async(
+    async fn open_async_socks5_proxy(
         &self,
         target_host: String,
         target_port: u16,
-        proxy_config: &ProxyConfig,
+        proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let proxy_host_port: (String, u16) = (proxy_config.host.clone(), proxy_config.port);
-        let mut tcp_stream: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect(proxy_host_port)
-                .await
-                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let auth_methods: Vec<u8> =
-            if proxy_config.username.is_some() && proxy_config.password.is_some() {
-                vec![0x05, 0x02, 0x00, 0x02]
-            } else {
-                vec![0x05, 0x01, 0x00]
-            };
-        tcp_stream
-            .write_all(&auth_methods)
+        let mut tcp = http_type::tokio::net::TcpStream::connect((proxy.host.clone(), proxy.port))
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let mut response: [u8; 2] = [0u8; 2];
-        tcp_stream
-            .read_exact(&mut response)
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let auth_methods: Vec<u8> = if proxy.username.is_some() && proxy.password.is_some() {
+            vec![0x05, 0x02, 0x00, 0x02]
+        } else {
+            vec![0x05, 0x01, 0x00]
+        };
+        tcp.write_all(&auth_methods)
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        if response[0] != 0x05 {
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut resp = [0u8; 2];
+        tcp.read_exact(&mut resp)
+            .await
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        if resp[0] != 0x05 {
             return Err(RequestError::Request("Internal Server Error".to_string()));
         }
-        match response[1] {
+        match resp[1] {
             0x00 => {}
             0x02 => {
-                if let (Some(username), Some(password)) =
-                    (&proxy_config.username, &proxy_config.password)
-                {
-                    let mut auth_request = vec![0x01];
-                    auth_request.push(username.len() as u8);
-                    auth_request.extend_from_slice(username.as_bytes());
-                    auth_request.push(password.len() as u8);
-                    auth_request.extend_from_slice(password.as_bytes());
-                    tcp_stream.write_all(&auth_request).await.map_err(
-                        |error: std::io::Error| RequestError::Request(error.to_string()),
-                    )?;
-                    let mut auth_response = [0u8; 2];
-                    tcp_stream.read_exact(&mut auth_response).await.map_err(
-                        |error: std::io::Error| RequestError::Request(error.to_string()),
-                    )?;
-                    if auth_response[1] != 0x00 {
-                        return Err(RequestError::Request("Internal Server Error".to_string()));
-                    }
-                } else {
+                let (Some(u), Some(p)) = (&proxy.username, &proxy.password) else {
+                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                };
+                let mut auth_req = vec![0x01u8];
+                auth_req.push(u.len() as u8);
+                auth_req.extend_from_slice(u.as_bytes());
+                auth_req.push(p.len() as u8);
+                auth_req.extend_from_slice(p.as_bytes());
+                tcp.write_all(&auth_req)
+                    .await
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                let mut auth_resp = [0u8; 2];
+                tcp.read_exact(&mut auth_resp)
+                    .await
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                if auth_resp[1] != 0x00 {
                     return Err(RequestError::Request("Internal Server Error".to_string()));
                 }
             }
-            0xFF => {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
-            }
-            _ => {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
-            }
+            _ => return Err(RequestError::Request("Internal Server Error".to_string())),
         }
-        let mut connect_request: Vec<u8> = vec![0x05, 0x01, 0x00];
-        if target_host.parse::<Ipv4Addr>().is_ok() {
-            connect_request.push(0x01);
-            let ip: Ipv4Addr = target_host.parse().unwrap();
-            connect_request.extend_from_slice(&ip.octets());
-        } else if target_host.parse::<Ipv6Addr>().is_ok() {
-            connect_request.push(0x04);
-            let ip: Ipv6Addr = target_host.parse().unwrap();
-            connect_request.extend_from_slice(&ip.octets());
+        let mut connect_req: Vec<u8> = vec![0x05, 0x01, 0x00];
+        if let Ok(ip) = target_host.parse::<Ipv4Addr>() {
+            connect_req.push(0x01);
+            connect_req.extend_from_slice(&ip.octets());
+        } else if let Ok(ip) = target_host.parse::<Ipv6Addr>() {
+            connect_req.push(0x04);
+            connect_req.extend_from_slice(&ip.octets());
         } else {
-            connect_request.push(0x03);
-            connect_request.push(target_host.len() as u8);
-            connect_request.extend_from_slice(target_host.as_bytes());
+            connect_req.push(0x03);
+            connect_req.push(target_host.len() as u8);
+            connect_req.extend_from_slice(target_host.as_bytes());
         }
-        connect_request.extend_from_slice(&target_port.to_be_bytes());
-        tcp_stream
-            .write_all(&connect_request)
+        connect_req.extend_from_slice(&target_port.to_be_bytes());
+        tcp.write_all(&connect_req)
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        let mut connect_response: [u8; 4] = [0u8; 4];
-        tcp_stream
-            .read_exact(&mut connect_response)
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut connect_resp = [0u8; 4];
+        tcp.read_exact(&mut connect_resp)
             .await
-            .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-        if connect_response[0] != 0x05 || connect_response[1] != 0x00 {
+            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        if connect_resp[0] != 0x05 || connect_resp[1] != 0x00 {
             return Err(RequestError::Request("Internal Server Error".to_string()));
         }
-        match connect_response[3] {
+        match connect_resp[3] {
             0x01 => {
-                let mut skip: [u8; 6] = [0u8; 6];
-                tcp_stream
-                    .read_exact(&mut skip)
+                let mut skip = [0u8; 6];
+                tcp.read_exact(&mut skip)
                     .await
-                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
             }
             0x03 => {
-                let mut len: [u8; 1] = [0u8; 1];
-                tcp_stream
-                    .read_exact(&mut len)
+                let mut len = [0u8; 1];
+                tcp.read_exact(&mut len)
                     .await
-                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-                let mut skip: Vec<u8> = vec![0u8; len[0] as usize + 2];
-                tcp_stream
-                    .read_exact(&mut skip)
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                let mut skip = vec![0u8; len[0] as usize + 2];
+                tcp.read_exact(&mut skip)
                     .await
-                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
             }
             0x04 => {
-                let mut skip: [u8; 18] = [0u8; 18];
-                tcp_stream
-                    .read_exact(&mut skip)
+                let mut skip = [0u8; 18];
+                tcp.read_exact(&mut skip)
                     .await
-                    .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
+                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
             }
-            _ => {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
-            }
+            _ => return Err(RequestError::Request("Internal Server Error".to_string())),
         }
-        let proxy_stream: BoxAsyncReadWrite = Box::new(tcp_stream);
-        let config: Config = self
-            .config
-            .read()
-            .map_or(Config::default(), |config| config.clone());
-        if Self::get_protocol(&config) == HTTPS_LOWERCASE {
-            let roots: RootCertStore = {
-                match self.tmp.clone().read() {
-                    Ok(tmp) => tmp.root_cert.clone(),
-                    Err(error) => {
-                        return Err(RequestError::Request(error.to_string()));
-                    }
-                }
-            };
-            let tls_config: ClientConfig = ClientConfig::builder()
+        if self.is_https() {
+            let roots = self.tmp.root_cert.clone();
+            let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_config));
-            let dns_name: ServerName<'_> = ServerName::try_from(target_host.clone())
-                .map_err(|error: InvalidDnsNameError| RequestError::Request(error.to_string()))?;
-            let tunnel_stream: ProxyTunnelStream = ProxyTunnelStream::new(proxy_stream, Vec::new());
-            let tls_stream: TlsStream<ProxyTunnelStream> = connector
-                .connect(dns_name, tunnel_stream)
+            let connector = TlsConnector::from(Arc::new(tls_cfg));
+            let dns = ServerName::try_from(target_host)
+                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+            let proxy_box: BoxAsyncReadWrite = Box::new(tcp);
+            let tunnel = ProxyTunnelStream::new(proxy_box, Vec::new());
+            let tls = connector
+                .connect(dns, tunnel)
                 .await
-                .map_err(|error: std::io::Error| RequestError::Request(error.to_string()))?;
-            return Ok(Box::new(tls_stream) as BoxAsyncReadWrite);
+                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            Ok(Box::new(tls))
+        } else {
+            Ok(Box::new(tcp))
         }
-        Ok(proxy_stream)
-    }
-    pub(crate) async fn send_async(&mut self) -> RequestResult {
-        let methods: Method = self.get_methods();
-        let (host, port) = {
-            if let Ok(mut config) = self.config.write() {
-                config.url_obj = self
-                    .parse_url()
-                    .map_err(|error: RequestError| RequestError::Request(error.to_string()))?;
-                let host: String = config.url_obj.host.clone().unwrap_or_default();
-                let port = self.get_port(config.url_obj.port.unwrap_or_default(), &config);
-                (host, port)
-            } else {
-                (String::new(), 0u16)
-            }
-        };
-        let mut stream: BoxAsyncReadWrite = self.get_connection_stream_async(host, port).await?;
-        let res: Result<BoxResponseTrait, RequestError> = match methods {
-            m if m.is_get() => self.send_get_request_async(&mut stream).await,
-            m if m.is_post() => self.send_post_request_async(&mut stream).await,
-            _err => Err(RequestError::Request("Method Not Allowed".to_string())),
-        };
-        res
     }
 }
 ```
@@ -12298,24 +9985,77 @@ pub(crate) const CHUNKED_PATTERN: &[u8] = b"chunked";
 # Path: hyperlane/request/src/request/http_request/type.rs
 ```rust
 use super::*;
-pub type RequestResult = Result<BoxResponseTrait, RequestError>;
-pub type BoxAsyncRequestTrait = Box<dyn AsyncRequestTrait<RequestResult = RequestResult>>;
-pub type BoxRequestTrait = Box<dyn RequestTrait<RequestResult = RequestResult>>;
-pub(crate) type BoxAsyncReadWrite = Box<dyn AsyncReadWrite>;
-pub(crate) type BoxReadWrite = Box<dyn ReadWrite>;
+pub type RequestHeadersKey = String;
+pub type RequestHeadersValue = String;
+pub type RequestHeaders = HashMapXxHash3_64<RequestHeadersKey, RequestHeadersValue>;
 ```
 # Path: hyperlane/request/src/request/http_request/struct.rs
 ```rust
 use super::*;
-#[derive(Clone, Debug)]
-pub(crate) struct HttpRequest {
-    pub(crate) methods: Arc<Method>,
-    pub(crate) url: Arc<String>,
-    pub(crate) header: Arc<RequestHeaders>,
-    pub(crate) body: Arc<Body>,
-    pub(crate) config: ArcRwLock<Config>,
-    pub(crate) tmp: ArcRwLock<Tmp>,
-    pub(crate) response: ArcRwLock<HttpResponseBinary>,
+pub type RequestResult = Result<HttpResponse, RequestError>;
+#[derive(Clone, Debug, Default)]
+pub struct HttpRequest {
+    pub method: Method,
+    pub url: String,
+    pub headers: HashMap<String, String>,
+    pub body: Body,
+    pub config: RequestConfig,
+    pub(crate) tmp: Tmp,
+}
+impl HttpRequest {
+    pub fn get(url: impl Into<String>) -> Self {
+        Self {
+            method: Method::Get,
+            url: url.into(),
+            headers: HashMap::new(),
+            body: Body::default(),
+            config: RequestConfig::default(),
+            tmp: Tmp::default(),
+        }
+    }
+    pub fn post(url: impl Into<String>) -> Self {
+        Self {
+            method: Method::Post,
+            url: url.into(),
+            headers: HashMap::new(),
+            body: Body::default(),
+            config: RequestConfig::default(),
+            tmp: Tmp::default(),
+        }
+    }
+    pub fn set_method(&mut self, method: Method) -> &mut Self {
+        self.method = method;
+        self
+    }
+    pub fn set_url(&mut self, url: impl Into<String>) -> &mut Self {
+        self.url = url.into();
+        self
+    }
+    pub fn set_header<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) -> &mut Self {
+        let normalized = Self::normalize_header_key(key.as_ref());
+        self.headers.insert(normalized, value.as_ref().to_owned());
+        self
+    }
+    pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
+        let normalized = Self::normalize_header_key(key.as_ref());
+        self.headers.remove(&normalized);
+        self
+    }
+    pub fn clear_headers(&mut self) -> &mut Self {
+        self.headers.clear();
+        self
+    }
+    pub fn set_body(&mut self, body: Body) -> &mut Self {
+        self.body = body;
+        self
+    }
+    pub fn set_config(&mut self, config: RequestConfig) -> &mut Self {
+        self.config = config;
+        self
+    }
+    fn normalize_header_key(key: &str) -> String {
+        key.to_ascii_lowercase()
+    }
 }
 ```
 # Path: hyperlane/request/src/request/http_request/mod.rs
@@ -12323,59 +10063,54 @@ pub(crate) struct HttpRequest {
 mod r#const;
 mod r#impl;
 mod r#struct;
-mod r#trait;
 mod r#type;
-use http_type::HTTPS_LOWERCASE;
-pub use {r#trait::*, r#type::*};
-pub(crate) use {r#const::*, r#struct::*};
+pub use {r#struct::*, r#type::*};
+pub(crate) use {r#const::*, r#impl::*};
 use super::*;
-```
-# Path: hyperlane/request/src/response/trait.rs
-```rust
-use super::*;
-pub trait ResponseTrait: Send + Debug {
-    type OutputText: Clone + Sized;
-    type OutputBinary: Clone + Sized;
-    fn text(&self) -> Self::OutputText;
-    fn binary(&self) -> Self::OutputBinary;
-    fn from(response: &[u8]) -> Self
-    where
-        Self: Sized;
-    fn decode(&self, buffer_size: usize) -> Self::OutputBinary;
-}
 ```
 # Path: hyperlane/request/src/response/type.rs
 ```rust
 use super::*;
-pub type BoxResponseTrait =
-    Box<dyn ResponseTrait<OutputText = HttpResponseText, OutputBinary = HttpResponseBinary>>;
+pub type HttpResponseHeaders = HashMapXxHash3_64<String, String>;
+pub type ResponseBody = Vec<u8>;
+pub type ResponseData = Vec<u8>;
+pub type ResponseDataString = String;
+pub fn new_response_headers() -> HttpResponseHeaders {
+    hash_map_xx_hash3_64()
+}
 ```
-# Path: hyperlane/request/src/response/mod.rs
-```rust
-mod response_binary;
-mod response_text;
-mod r#trait;
-mod r#type;
-pub use response_binary::*;
-pub use response_text::*;
-pub use {r#trait::*, r#type::*};
-use super::*;
-```
-# Path: hyperlane/request/src/response/response_binary/impl.rs
+# Path: hyperlane/request/src/response/struct.rs
 ```rust
 use super::*;
-impl ResponseTrait for HttpResponseBinary {
-    type OutputText = HttpResponseText;
-    type OutputBinary = HttpResponseBinary;
-    fn from(response: &[u8]) -> Self
-    where
-        Self: Sized,
-    {
+#[derive(Clone, Debug, Getter, Setter)]
+pub struct HttpResponse {
+    pub version: HttpVersion,
+    #[get(type(copy))]
+    pub status_code: ResponseStatusCode,
+    #[set(type(AsRef<str>))]
+    pub reason_phrase: String,
+    pub headers: HttpResponseHeaders,
+    #[set(type(AsRef<[u8]>))]
+    pub body: ResponseBody,
+}
+impl Default for HttpResponse {
+    fn default() -> Self {
+        Self {
+            version: HttpVersion::default(),
+            status_code: HttpStatus::Unknown.code(),
+            reason_phrase: HttpStatus::Unknown.to_string(),
+            headers: new_response_headers(),
+            body: ResponseBody::new(),
+        }
+    }
+}
+impl HttpResponse {
+    pub fn from_bytes(response: &[u8]) -> Self {
         let split_lines: Vec<&[u8]> = split_multi_byte(response, HTTP_BR_BYTES);
         let mut lines: IntoIter<&[u8]> = split_lines.into_iter();
         let status_line: &[u8] = lines.next().unwrap_or(&[]);
         let status_parts: Vec<&[u8]> = split_whitespace(status_line);
-        let http_version: HttpVersion = status_parts
+        let version: HttpVersion = status_parts
             .first()
             .and_then(|part: &&[u8]| from_utf8(part).ok())
             .and_then(|version_str: &str| version_str.parse::<HttpVersion>().ok())
@@ -12385,7 +10120,7 @@ impl ResponseTrait for HttpResponseBinary {
             .and_then(|part: &&[u8]| from_utf8(part).ok())
             .and_then(|code_str: &str| code_str.parse().ok())
             .unwrap_or(HttpStatus::Unknown.code());
-        let status_text: String = status_parts.get(2..).map_or_else(
+        let reason_phrase: String = status_parts.get(2..).map_or_else(
             || HttpStatus::Unknown.to_string(),
             |parts: &[&[u8]]| {
                 if parts.is_empty() {
@@ -12406,7 +10141,7 @@ impl ResponseTrait for HttpResponseBinary {
                 }
             },
         );
-        let mut headers: HashMapXxHash3_64<String, VecDeque<String>> = hash_map_xx_hash3_64();
+        let mut headers: HttpResponseHeaders = new_response_headers();
         for line in lines.by_ref() {
             if line.is_empty() {
                 break;
@@ -12431,19 +10166,18 @@ impl ResponseTrait for HttpResponseBinary {
                 let value_bytes: &[u8] = &line[value_start..];
                 if let (Ok(key_str), Ok(value_str)) = (from_utf8(key_bytes), from_utf8(value_bytes))
                 {
-                    let mut value_deque: VecDeque<String> = VecDeque::new();
-                    value_deque.push_front(value_str.trim().to_string());
-                    headers.insert(key_str.trim().to_string(), value_deque);
+                    headers.insert(
+                        key_str.trim().to_ascii_lowercase(),
+                        value_str.trim().to_owned(),
+                    );
                 }
             }
         }
-        let body: Vec<u8> = match lines.len() {
-            0 => Vec::new(),
+        let body: ResponseBody = match lines.len() {
+            0 => ResponseBody::new(),
             1 => {
                 let line: &[u8] = lines.next().unwrap_or(&[]);
-                let mut body = Vec::with_capacity(line.len());
-                body.extend_from_slice(line);
-                body
+                line.to_vec()
             }
             _ => {
                 let lines_slice: &[&[u8]] = lines.as_slice();
@@ -12452,7 +10186,7 @@ impl ResponseTrait for HttpResponseBinary {
                     .map(|line: &&[u8]| line.len())
                     .sum::<usize>()
                     + lines_slice.len().saturating_sub(1) * BR_BYTES.len();
-                let mut body: Vec<u8> = Vec::with_capacity(total_size);
+                let mut body: ResponseBody = ResponseBody::with_capacity(total_size);
                 let mut first: bool = true;
                 for line in lines {
                     if !first {
@@ -12464,311 +10198,93 @@ impl ResponseTrait for HttpResponseBinary {
                 body
             }
         };
-        HttpResponseBinary {
-            http_version: Arc::new(RwLock::new(http_version)),
+        HttpResponse {
+            version,
             status_code,
-            status_text: Arc::new(RwLock::new(status_text)),
-            headers: Arc::new(RwLock::new(headers)),
-            body: Arc::new(RwLock::new(body)),
+            reason_phrase,
+            headers,
+            body,
         }
     }
-    fn binary(&self) -> Self::OutputBinary {
-        self.clone()
+    pub fn is_success(&self) -> bool {
+        (200..300).contains(&self.status_code)
     }
-    fn text(&self) -> HttpResponseText {
-        let body: String = self.body.read().map_or(String::new(), |body_ref| {
-            String::from_utf8_lossy(&body_ref).into_owned()
-        });
-        HttpResponseText {
-            http_version: Arc::clone(&self.http_version),
-            status_code: self.status_code,
-            status_text: Arc::clone(&self.status_text),
-            headers: Arc::clone(&self.headers),
-            body: Arc::new(RwLock::new(body)),
-        }
+    pub fn is_redirect(&self) -> bool {
+        (300..400).contains(&self.status_code)
     }
-    fn decode(&self, buffer_size: usize) -> HttpResponseBinary {
-        let decoded_body: Vec<u8> = {
-            let headers_guard = self.headers.read();
-            let body_guard = self.body.read();
-            match (headers_guard, body_guard) {
-                (Ok(headers_ref), Ok(body_ref)) => {
-                    let mut string_headers: HashMapXxHash3_64<String, String> =
-                        hash_map_xx_hash3_64();
-                    for (key, value_deque) in headers_ref.iter() {
-                        if let Some(first_value) = value_deque.front() {
-                            string_headers.insert(key.clone(), first_value.clone());
-                        }
-                    }
-                    Compress::from(&string_headers)
-                        .decode(&body_ref, buffer_size)
-                        .into_owned()
-                }
-                _ => Vec::new(),
-            }
-        };
-        HttpResponseBinary {
-            http_version: Arc::clone(&self.http_version),
-            status_code: self.status_code,
-            status_text: Arc::clone(&self.status_text),
-            headers: Arc::clone(&self.headers),
-            body: Arc::new(RwLock::new(decoded_body)),
-        }
+    pub fn get_header<K: AsRef<str>>(&self, key: K) -> Option<&str> {
+        let normalized = key.as_ref().to_ascii_lowercase();
+        self.headers.get(&normalized).map(String::as_str)
     }
-}
-impl HttpResponseBinary {
-    pub fn get_http_version(&self) -> HttpVersion {
-        if let Ok(http_version) = self.http_version.read() {
-            return http_version
-                .to_string()
-                .parse::<HttpVersion>()
-                .unwrap_or_default();
-        }
-        HttpVersion::default()
+    pub fn text(&self) -> String {
+        String::from_utf8_lossy(&self.body).into_owned()
     }
-    pub fn get_status_code(&self) -> ResponseStatusCode {
-        self.status_code
+    pub fn bytes(&self) -> &[u8] {
+        &self.body
     }
-    pub fn get_status_text(&self) -> String {
-        if let Ok(status_text) = self.status_text.read() {
-            return status_text.to_string();
-        }
-        HttpStatus::Unknown.to_string()
-    }
-    pub fn get_headers(&self) -> ResponseHeaders {
-        if let Ok(headers) = self.headers.read() {
-            return headers.clone();
-        }
-        hash_map_xx_hash3_64()
-    }
-    pub fn get_body(&self) -> RequestBody {
-        if let Ok(body) = self.body.read() {
-            return body.clone();
-        }
-        RequestBody::new()
-    }
-}
-impl Default for HttpResponseBinary {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            http_version: Arc::new(RwLock::new(HttpVersion::Unknown(String::new()))),
-            status_code: HttpStatus::Unknown.code(),
-            status_text: Arc::new(RwLock::new(HttpStatus::Unknown.to_string())),
-            headers: Arc::new(RwLock::new(hash_map_xx_hash3_64())),
-            body: Arc::new(RwLock::new(Vec::new())),
-        }
-    }
-}
-```
-# Path: hyperlane/request/src/response/response_binary/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Debug)]
-pub struct HttpResponseBinary {
-    pub(crate) http_version: ArcRwLock<HttpVersion>,
-    pub(crate) status_code: ResponseStatusCode,
-    pub(crate) status_text: ArcRwLock<String>,
-    pub(crate) headers: ArcRwLock<ResponseHeaders>,
-    pub(crate) body: ArcRwLock<RequestBody>,
-}
-```
-# Path: hyperlane/request/src/response/response_binary/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub use r#struct::*;
-use super::*;
-```
-# Path: hyperlane/request/src/response/response_text/impl.rs
-```rust
-use super::*;
-impl ResponseTrait for HttpResponseText {
-    type OutputText = HttpResponseText;
-    type OutputBinary = HttpResponseBinary;
-    fn from(response: &[u8]) -> Self::OutputText
-    where
-        Self: Sized,
-    {
-        <HttpResponseBinary as ResponseTrait>::from(response).text()
-    }
-    fn text(&self) -> Self::OutputText {
-        self.clone()
-    }
-    fn binary(&self) -> HttpResponseBinary {
-        let body: Vec<u8> = self
-            .body
-            .read()
-            .map_or(Vec::new(), |body| body.clone().into_bytes());
-        HttpResponseBinary {
-            http_version: self.http_version.clone(),
-            status_code: self.status_code,
-            status_text: self.status_text.clone(),
-            headers: self.headers.clone(),
-            body: Arc::new(RwLock::new(body)),
-        }
-    }
-    fn decode(&self, buffer_size: usize) -> HttpResponseBinary {
-        let http_response: HttpResponseText = self.clone();
-        let tmp_body: Vec<u8> = self
-            .body
-            .read()
-            .map_or(Vec::new(), |body| body.as_bytes().to_vec())
-            .to_vec();
-        let headers: HashMapXxHash3_64<String, String> =
-            self.headers
-                .read()
-                .map_or(hash_map_xx_hash3_64(), |headers_ref| {
-                    let mut string_headers: HashMapXxHash3_64<String, String> =
-                        hash_map_xx_hash3_64();
-                    for (key, value_deque) in headers_ref.iter() {
-                        if let Some(first_value) = value_deque.front() {
-                            string_headers.insert(key.clone(), first_value.clone());
-                        }
-                    }
-                    string_headers
-                });
-        let body: Vec<u8> = Compress::from(&headers)
-            .decode(&tmp_body, buffer_size)
+    pub fn decode(&self, buffer_size: usize) -> HttpResponse {
+        let flat_headers: HttpResponseHeaders = self.headers.clone();
+        let decoded: ResponseBody = Compress::from(&flat_headers)
+            .decode(&self.body, buffer_size)
             .into_owned();
-        HttpResponseBinary {
-            http_version: http_response.http_version,
-            status_code: http_response.status_code,
-            status_text: http_response.status_text,
-            headers: http_response.headers,
-            body: Arc::new(RwLock::new(body)),
-        }
-    }
-}
-impl HttpResponseText {
-    pub fn get_http_version(&self) -> HttpVersion {
-        if let Ok(http_version) = self.http_version.read() {
-            return http_version
-                .to_string()
-                .parse::<HttpVersion>()
-                .unwrap_or_default();
-        }
-        HttpVersion::default()
-    }
-    pub fn get_status_code(&self) -> ResponseStatusCode {
-        self.status_code
-    }
-    pub fn get_status_text(&self) -> String {
-        if let Ok(status_text) = self.status_text.read() {
-            return status_text.to_string();
-        }
-        HttpStatus::Unknown.to_string()
-    }
-    pub fn get_headers(&self) -> ResponseHeaders {
-        if let Ok(headers) = self.headers.read() {
-            return headers.clone();
-        }
-        hash_map_xx_hash3_64()
-    }
-    pub fn get_body(&self) -> RequestBodyString {
-        if let Ok(body) = self.body.read() {
-            return body.to_string();
-        }
-        RequestBodyString::new()
-    }
-}
-impl Default for HttpResponseText {
-    #[inline(always)]
-    fn default() -> Self {
-        Self {
-            http_version: Arc::new(RwLock::new(HttpVersion::Unknown(String::new()))),
-            status_code: HttpStatus::Unknown.code(),
-            status_text: Arc::new(RwLock::new(HttpStatus::Unknown.to_string())),
-            headers: Arc::new(RwLock::new(hash_map_xx_hash3_64())),
-            body: Arc::new(RwLock::new(String::new())),
+        HttpResponse {
+            version: self.version.clone(),
+            status_code: self.status_code,
+            reason_phrase: self.reason_phrase.clone(),
+            headers: self.headers.clone(),
+            body: decoded,
         }
     }
 }
 ```
-# Path: hyperlane/request/src/response/response_text/struct.rs
+# Path: hyperlane/request/src/response/mod.rs
 ```rust
-use super::*;
-#[derive(Clone, Debug)]
-pub struct HttpResponseText {
-    pub(crate) http_version: ArcRwLock<HttpVersion>,
-    pub(crate) status_code: ResponseStatusCode,
-    pub(crate) status_text: ArcRwLock<String>,
-    pub(crate) headers: ArcRwLock<ResponseHeaders>,
-    pub(crate) body: ArcRwLock<RequestBodyString>,
-}
-```
-# Path: hyperlane/request/src/response/response_text/mod.rs
-```rust
-mod r#impl;
 mod r#struct;
-pub use r#struct::*;
+mod r#type;
+pub use {r#struct::*, r#type::*};
 use super::*;
-```
-# Path: hyperlane/request/src/common/impl.rs
-```rust
-use super::*;
-impl Default for Body {
-    #[inline(always)]
-    fn default() -> Self {
-        Self::Text(EMPTY_STR.to_owned())
-    }
-}
-impl Display for Body {
-    #[inline(always)]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Text(text) => write!(f, "{text}"),
-            Self::Json(json) => write!(
-                f,
-                "{}",
-                serde_json::to_string(json).unwrap_or_else(|_| String::from("{}"))
-            ),
-            Self::Binary(binary) => write!(f, "{binary:?}"),
-        }
-    }
-}
-impl Serialize for Body {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            Self::Text(text) => text.serialize(serializer),
-            Self::Json(json) => json.serialize(serializer),
-            Self::Binary(binary) => binary.serialize(serializer),
-        }
-    }
-}
 ```
 # Path: hyperlane/request/src/common/const.rs
 ```rust
 pub const APP_NAME: &str = "http-request";
 ```
-# Path: hyperlane/request/src/common/type.rs
-```rust
-use super::*;
-pub(crate) type ArcRwLock<T> = Arc<RwLock<T>>;
-pub(crate) type BodyJson = HashMapXxHash3_64<String, serde_json::Value>;
-pub(crate) type BodyText = String;
-pub(crate) type BodyBinary = Vec<u8>;
-```
 # Path: hyperlane/request/src/common/enum.rs
 ```rust
 use super::*;
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum Body {
-    Text(BodyText),
-    Json(BodyJson),
-    Binary(BodyBinary),
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct Body {
+    pub bytes: Vec<u8>,
+}
+impl Body {
+    pub const fn empty() -> Self {
+        Self { bytes: Vec::new() }
+    }
+    pub fn from_bytes<B: Into<Vec<u8>>>(bytes: B) -> Self {
+        Self {
+            bytes: bytes.into(),
+        }
+    }
+    pub fn as_slice(&self) -> &[u8] {
+        &self.bytes
+    }
+    pub fn as_str(&self) -> Option<&str> {
+        std::str::from_utf8(&self.bytes).ok()
+    }
+}
+impl Display for Body {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.as_str() {
+            Some(s) => f.write_str(s),
+            None => f.write_str(&format!("{:?}", self.bytes)),
+        }
+    }
 }
 ```
 # Path: hyperlane/request/src/common/mod.rs
 ```rust
 mod r#const;
 mod r#enum;
-mod r#impl;
-mod r#type;
-pub(crate) use {r#const::*, r#enum::*, r#type::*};
+pub use {r#const::*, r#enum::*};
 use super::*;
 ```
 # Path: hyperlane/core/README.md
@@ -14590,7 +12106,7 @@ impl Server {
         let bind_address: &String = self.get_server_config().get_address();
         let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
             .await
-            .map_err(|error| Box::new(ServerError::from(error)))?;
+            .map_err(|error: std::io::Error| Box::new(ServerError::from(error)))?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
@@ -16258,7 +13774,7 @@ async fn check_git_available() -> Result<(), NewError> {
         .stderr(Stdio::null())
         .output()
         .await
-        .map_err(|_| NewError::GitNotFound)?;
+        .map_err(|_: std::io::Error| NewError::GitNotFound)?;
     if output.status.success() {
         Ok(())
     } else {
@@ -16518,7 +14034,11 @@ pub fn encode(data: &'_ [u8]) -> Cow<'_, [u8]> {
     if encoder.write_all(data).is_err() {
         return Cow::Owned(Vec::new());
     }
-    Cow::Owned(encoder.finish().unwrap_or_else(|_| Vec::new()))
+    Cow::Owned(
+        encoder
+            .finish()
+            .unwrap_or_else(|_: std::io::Error| Vec::new()),
+    )
 }
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
     let mut decompressor: Decompressor<&[u8]> = Decompressor::new(data, buffer_size);
@@ -16546,7 +14066,11 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
         return Cow::Owned(Vec::new());
     }
     match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_| Vec::new())),
+        Ok(encoder) => Cow::Owned(
+            encoder
+                .finish()
+                .unwrap_or_else(|_: std::io::Error| Vec::new()),
+        ),
         Err(_) => Cow::Owned(Vec::new()),
     }
 }
@@ -16578,7 +14102,11 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
         return Cow::Owned(Vec::new());
     }
     match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_| Vec::new())),
+        Ok(encoder) => Cow::Owned(
+            encoder
+                .finish()
+                .unwrap_or_else(|_: std::io::Error| Vec::new()),
+        ),
         Err(_) => Cow::Owned(Vec::new()),
     }
 }
@@ -16635,7 +14163,7 @@ impl Compress {
     pub fn from(header: &HashMap<String, String, BuildHasherDefault<XxHash3_64>>) -> Self {
         header
             .get(CONTENT_ENCODING)
-            .map(|value| value.parse::<Compress>().unwrap_or_default())
+            .map(|value: &String| value.parse::<Compress>().unwrap_or_default())
             .unwrap_or_default()
     }
     pub fn decode<'a>(&self, data: &'a [u8], buffer_size: usize) -> Cow<'a, [u8]> {
@@ -16664,7 +14192,7 @@ pub const CONTENT_ENCODING_DEFLATE: &str = "deflate";
 pub const CONTENT_ENCODING_BROTLI: &str = "br";
 pub const EMPTY_STR: &str = "";
 ```
-# Path: hyperlane/compress/src/compress/type.rs
+# Path: hyperlane/compress/src/compress/enum.rs
 ```rust
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Compress {
@@ -16678,9 +14206,9 @@ pub enum Compress {
 # Path: hyperlane/compress/src/compress/mod.rs
 ```rust
 mod r#const;
+mod r#enum;
 mod r#impl;
-mod r#type;
-pub use r#type::*;
+pub use r#enum::*;
 pub(crate) use r#const::*;
 use super::*;
 ```
@@ -17131,16 +14659,20 @@ pub(crate) fn prologue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(position, item, |context, stream| {
-        let hook_calls = functions.iter().map(|function_expr| {
+    inject(
+        position,
+        item,
+        |context: &syn::Ident, stream: &syn::Ident| {
+            let hook_calls = functions.iter().map(|function_expr: &syn::Expr| {
+                quote! {
+                    let _ = #function_expr(#stream, #context).await;
+                }
+            });
             quote! {
-                let _ = #function_expr(#stream, #context).await;
+                #(#hook_calls)*
             }
-        });
-        quote! {
-            #(#hook_calls)*
-        }
-    })
+        },
+    )
 }
 pub(crate) fn epilogue_hooks_macro(
     attr: TokenStream,
@@ -17149,16 +14681,20 @@ pub(crate) fn epilogue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(position, item, |context, stream| {
-        let hook_calls = functions.iter().map(|function_expr| {
+    inject(
+        position,
+        item,
+        |context: &syn::Ident, stream: &syn::Ident| {
+            let hook_calls = functions.iter().map(|function_expr: &syn::Expr| {
+                quote! {
+                    let _ = #function_expr(#stream, #context).await;
+                }
+            });
             quote! {
-                let _ = #function_expr(#stream, #context).await;
+                #(#hook_calls)*
             }
-        });
-        quote! {
-            #(#hook_calls)*
-        }
-    })
+        },
+    )
 }
 ```
 # Path: hyperlane/macros/src/hook/mod.rs
@@ -17210,7 +14746,7 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
             init_statements.push(quote! {
                 let mut hooks: Vec<::hyperlane_core::HookType> = ::hyperlane_core::inventory::iter().cloned().collect();
                 ::hyperlane_core::HookType::assert_unique_order(hooks.clone());
-                hooks.sort_by_key(|hook| hook.try_get_order());
+                hooks.sort_by_key(|hook: &::hyperlane_core::HookType| hook.try_get_order());
                 for hook in hooks {
                     #var_name.handle_hook(hook.clone());
                 }
@@ -17332,9 +14868,9 @@ pub(crate) fn referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(true, |referer_header| referer_header != #referer_value) {
+                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(true, |referer_header: ::hyperlane_core::RequestHeadersValueItem| referer_header != #referer_value) {
                     return ::hyperlane_core::Status::Continue;
                 }
             }
@@ -17351,9 +14887,9 @@ pub(crate) fn reject_referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value| {
+        let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(false, |referer_header| referer_header == #referer_value) {
+                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(false, |referer_header: ::hyperlane_core::RequestHeadersValueItem| referer_header == #referer_value) {
                     return ::hyperlane_core::Status::Continue;
                 }
             }
@@ -17687,7 +15223,7 @@ pub(crate) fn request_body_macro(
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_body.variables.iter().map(|variable| {
+        let statements = multi_body.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane_core::RequestBody = #new_context.get_request().get_body();
             }
@@ -17705,7 +15241,7 @@ pub(crate) fn request_body_json_result_macro(
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_body_json.params.iter().map(|(variable, type_name)| {
+        let statements = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
             quote! {
                 let #variable: Result<#type_name, ::hyperlane_core::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
             }
@@ -17723,7 +15259,7 @@ pub(crate) fn request_body_json_macro(
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_body_json.params.iter().map(|(variable, type_name)| {
+        let statements = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
             quote! {
                 let #variable: #type_name = #context.get_request().get_body_json::<#type_name>();
             }
@@ -17740,14 +15276,13 @@ pub(crate) fn try_get_attribute_macro(
 ) -> TokenStream {
     let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_attr
-            .params
-            .iter()
-            .map(|(key_name, variable, type_name)| {
+        let statements = multi_attr.params.iter().map(
+            |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
                 quote! {
                     let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name);
                 }
-            });
+            },
+        );
         quote! {
             #(#statements)*
         }
@@ -17760,14 +15295,13 @@ pub(crate) fn attribute_macro(
 ) -> TokenStream {
     let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_attr
-            .params
-            .iter()
-            .map(|(key_name, variable, type_name)| {
+        let statements = multi_attr.params.iter().map(
+            |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
                 quote! {
                     let #variable: #type_name = #context.get_attribute(&#key_name);
                 }
-            });
+            },
+        );
         quote! {
             #(#statements)*
         }
@@ -17781,7 +15315,7 @@ pub(crate) fn attributes_macro(
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_attrs.variables.iter().map(|variable| {
+        let statements = multi_attrs.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane_core::ThreadSafeAttributeStore = #new_context.get_attributes();
             }
@@ -17798,7 +15332,7 @@ pub(crate) fn try_get_task_panic_data_macro(
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_task_panic_data.variables.iter().map(|variable| {
+        let statements = multi_task_panic_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: Option<::hyperlane_core::PanicData> = #context.try_get_task_panic_data();
             }
@@ -17815,11 +15349,14 @@ pub(crate) fn task_panic_data_macro(
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_task_panic_data.variables.iter().map(|variable| {
-            quote! {
-                let #variable: ::hyperlane_core::PanicData = #context.get_task_panic_data();
-            }
-        });
+        let statements = multi_task_panic_data
+            .variables
+            .iter()
+            .map(|variable: &syn::Ident| {
+                quote! {
+                    let #variable: ::hyperlane_core::PanicData = #context.get_task_panic_data();
+                }
+            });
         quote! {
             #(#statements)*
         }
@@ -17832,7 +15369,7 @@ pub(crate) fn try_get_request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_error_data.variables.iter().map(|variable| {
+        let statements = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: Option<::hyperlane_core::RequestError> = #context.try_get_request_error_data();
             }
@@ -17849,7 +15386,7 @@ pub(crate) fn request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_error_data.variables.iter().map(|variable| {
+        let statements = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: ::hyperlane_core::RequestError = #context.get_request_error_data();
             }
@@ -17866,7 +15403,7 @@ pub(crate) fn try_get_route_param_macro(
 ) -> TokenStream {
     let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_param.params.iter().map(|(key_name, variable)| {
+        let statements = multi_param.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<std::string::String> = #context.try_get_route_param(#key_name);
             }
@@ -17883,11 +15420,15 @@ pub(crate) fn route_param_macro(
 ) -> TokenStream {
     let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_param.params.iter().map(|(key_name, variable)| {
-            quote! {
-                let #variable: std::string::String = #context.get_route_param(#key_name);
-            }
-        });
+        let statements =
+            multi_param
+                .params
+                .iter()
+                .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+                    quote! {
+                        let #variable: std::string::String = #context.get_route_param(#key_name);
+                    }
+                });
         quote! {
             #(#statements)*
         }
@@ -17901,11 +15442,14 @@ pub(crate) fn route_params_macro(
     let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_route_params.variables.iter().map(|variable| {
-            quote! {
-                let #variable: &::hyperlane_core::RouteParams = #new_context.get_route_params();
-            }
-        });
+        let statements = multi_route_params
+            .variables
+            .iter()
+            .map(|variable: &syn::Ident| {
+                quote! {
+                    let #variable: &::hyperlane_core::RouteParams = #new_context.get_route_params();
+                }
+            });
         quote! {
             #(#statements)*
         }
@@ -17918,7 +15462,7 @@ pub(crate) fn try_get_request_query_macro(
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_query.params.iter().map(|(key_name, variable)| {
+        let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane_core::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
             }
@@ -17935,7 +15479,7 @@ pub(crate) fn request_query_macro(
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_query.params.iter().map(|(key_name, variable)| {
+        let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane_core::RequestQuerysValue = #context.get_request().get_query(#key_name);
             }
@@ -17953,7 +15497,7 @@ pub(crate) fn request_querys_macro(
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_querys.variables.iter().map(|variable| {
+        let statements = multi_querys.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane_core::RequestQuerys = #new_context.get_request().get_querys();
             }
@@ -17970,7 +15514,7 @@ pub(crate) fn try_get_request_header_macro(
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_header.params.iter().map(|(key_name, variable)| {
+        let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane_core::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
             }
@@ -17987,7 +15531,7 @@ pub(crate) fn request_header_macro(
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_header.params.iter().map(|(key_name, variable)| {
+        let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane_core::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
             }
@@ -18005,7 +15549,7 @@ pub(crate) fn request_headers_macro(
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_headers.variables.iter().map(|variable| {
+        let statements = multi_headers.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane_core::RequestHeaders = #new_context.get_request().get_headers();
             }
@@ -18022,7 +15566,7 @@ pub(crate) fn try_get_request_cookie_macro(
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookie.params.iter().map(|(key_name, variable)| {
+        let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane_core::CookieValue> = #context.get_request().try_get_cookie(#key_name);
             }
@@ -18039,7 +15583,7 @@ pub(crate) fn request_cookie_macro(
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookie.params.iter().map(|(key_name, variable)| {
+        let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane_core::CookieValue = #context.get_request().get_cookie(#key_name);
             }
@@ -18056,7 +15600,7 @@ pub(crate) fn request_cookies_macro(
 ) -> TokenStream {
     let multi_cookies: MultiCookiesData = parse_macro_input!(attr as MultiCookiesData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookies.variables.iter().map(|variable| {
+        let statements = multi_cookies.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: ::hyperlane_core::Cookies = #context.get_request().get_cookies();
             }
@@ -18075,7 +15619,7 @@ pub(crate) fn request_version_macro(
         parse_macro_input!(attr as MultiRequestVersionData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_version.variables.iter().map(|variable| {
+        let statements = multi_version.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane_core::RequestVersion = #new_context.get_request().get_version();
             }
@@ -18093,7 +15637,7 @@ pub(crate) fn request_path_macro(
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_path.variables.iter().map(|variable| {
+        let statements = multi_path.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane_core::RequestPath = #new_context.get_request().get_path();
             }
@@ -18368,18 +15912,22 @@ pub(crate) fn try_send_macro(
         let data: SendData = parse_macro_input!(attr as SendData);
         Some(data.data)
     };
-    inject(position, item, |context, stream| match data_expr {
-        Some(expr) => {
-            quote! {
-                let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#expr).await;
+    inject(
+        position,
+        item,
+        |context: &syn::Ident, stream: &syn::Ident| match data_expr {
+            Some(expr) => {
+                quote! {
+                    let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#expr).await;
+                }
             }
-        }
-        None => {
-            quote! {
-                let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
+            None => {
+                quote! {
+                    let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
+                }
             }
-        }
-    })
+        },
+    )
 }
 pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
     let data_expr: Option<Expr> = if attr.is_empty() {
@@ -18388,18 +15936,22 @@ pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Positio
         let data: SendData = parse_macro_input!(attr as SendData);
         Some(data.data)
     };
-    inject(position, item, |context, stream| match data_expr {
-        Some(expr) => {
-            quote! {
-                #stream.send(#expr).await;
+    inject(
+        position,
+        item,
+        |context: &syn::Ident, stream: &syn::Ident| match data_expr {
+            Some(expr) => {
+                quote! {
+                    #stream.send(#expr).await;
+                }
             }
-        }
-        None => {
-            quote! {
-                #stream.send(#context.get_mut_response().build()).await;
+            None => {
+                quote! {
+                    #stream.send(#context.get_mut_response().build()).await;
+                }
             }
-        }
-    })
+        },
+    )
 }
 ```
 # Path: hyperlane/macros/src/send/struct.rs
@@ -18786,7 +16338,7 @@ pub(crate) fn methods_macro(
     let sig: &Signature = &input_fn.sig;
     match parse_context_from_signature(sig) {
         Ok(context) => {
-            let method_checks = methods.methods.iter().map(|method| {
+            let method_checks = methods.methods.iter().map(|method: &syn::Ident| {
                 let method_str: String = method.to_string();
                 let check_fn: proc_macro2::Ident =
                     Ident::new(&format!("is_{method_str}"), method.span());
@@ -18912,7 +16464,7 @@ fn inject_at_end(
                 };
                 let normalized_leading: Vec<proc_macro2::TokenStream> = leading_stmts
                     .iter()
-                    .map(|stmt| match stmt {
+                    .map(|stmt: &syn::Stmt| match stmt {
                         Stmt::Expr(expr, None) => quote! { #expr; },
                         _ => quote! { #stmt },
                     })
@@ -18957,7 +16509,7 @@ fn is_context_type(ty: &Type) -> bool {
     {
         let path: &Path = &type_path.path;
         if path.segments.len() >= 2 {
-            let segments: Vec<_> = path.segments.iter().collect();
+            let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
                 if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
@@ -18977,7 +16529,7 @@ fn is_stream_type(ty: &Type) -> bool {
     {
         let path: &Path = &type_path.path;
         if path.segments.len() >= 2 {
-            let segments: Vec<_> = path.segments.iter().collect();
+            let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
                 if last_two[0].ident == "hyperlane" && last_two[1].ident == "Stream" {
@@ -19498,7 +17050,7 @@ use super::*;
 pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_host.host_values.iter().map(|host_value| {
+        let statements = multi_host.host_values.iter().map(|host_value: &syn::Expr| {
             quote! {
                 if #context.get_request().get_host() != #host_value {
                     return ::hyperlane_core::Status::Continue;
@@ -19517,7 +17069,7 @@ pub(crate) fn reject_host_macro(
 ) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_host.host_values.iter().map(|host_value| {
+        let statements = multi_host.host_values.iter().map(|host_value: &syn::Expr| {
             quote! {
                 if #context.get_request().get_host() == #host_value {
                     return ::hyperlane_core::Status::Continue;
@@ -19589,7 +17141,7 @@ use super::*;
 # Path: hyperlane/type/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
-> A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+> A comprehensive Rust type library for HTTP operations and concurrent programming. Provides core HTTP types (Request/Response with builder patterns, Method, HttpStatus, HttpVersion, ContentType, FileExtension with MIME mapping, Cookie parsing/building, HttpUrl parsing, WebSocket frame/opcode, protocol upgrade types, stream/task management, panic handling), thread-safe concurrent wrappers (ArcMutex, ArcRwLock, BoxRwLock, RcRwLock), dynamic dispatch types (BoxAny, RcAny, ArcAny with Send/Sync variants), high-performance hash collections (HashMapXxHash3_64, HashSetXxHash3_64), and static lifetime utilities (BoxLeak, Lifetime trait).
 ## Installation
 To use this crate, you can run cmd:
 ```shell
