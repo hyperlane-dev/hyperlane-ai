@@ -1,4 +1,4 @@
-<!--2026-09-26 20:50:39-->
+<!--2026-09-27 04:30:50-->
 # Path: hyperlane-utils/README.md
 ## hyperlane-utils
 [Api Docs](https://docs.rs/hyperlane-utils/latest/)
@@ -1281,6 +1281,10 @@ pub const ZERO_STR: &str = "0";
 pub const ZERO_STR_BYTES: &[u8] = ZERO_STR.as_bytes();
 pub const ZERO_STR_U8: u8 = ZERO_STR_BYTES[0];
 pub const DEFAULT_BUFFER_SIZE: usize = KB_4;
+pub const REQUEST_LINE_BUFFER_CAPACITY: usize = B_128;
+pub const HEADER_LINE_BUFFER_CAPACITY: usize = B_256;
+pub const MAX_POOLED_READ_BUFFERS: usize = B_64;
+pub const MAX_POOLED_READ_BUFFER_SIZE: usize = KB_64;
 pub const DEFAULT_MAX_PATH_SIZE: usize = KB_8;
 pub const DEFAULT_MAX_HEADER_COUNT: usize = 100;
 pub const DEFAULT_MAX_HEADER_KEY_SIZE: usize = KB_8;
@@ -7930,13 +7934,13 @@ impl AsyncRead for ProxyTunnelStream {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        if !self.pre_read_data.is_empty() {
-            let len: usize = std::cmp::min(self.pre_read_data.len(), buf.remaining());
-            buf.put_slice(&self.pre_read_data[..len]);
-            self.pre_read_data.drain(..len);
+        if !self.get_pre_read_data().is_empty() {
+            let len: usize = std::cmp::min(self.get_pre_read_data().len(), buf.remaining());
+            buf.put_slice(&self.get_pre_read_data()[..len]);
+            self.get_mut_pre_read_data().drain(..len);
             return Poll::Ready(Ok(()));
         }
-        Pin::new(&mut self.inner).poll_read(cx, buf)
+        Pin::new(self.get_mut_inner()).poll_read(cx, buf)
     }
 }
 impl AsyncWrite for ProxyTunnelStream {
@@ -7945,19 +7949,19 @@ impl AsyncWrite for ProxyTunnelStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, std::io::Error>> {
-        Pin::new(&mut self.inner).poll_write(cx, buf)
+        Pin::new(self.get_mut_inner()).poll_write(cx, buf)
     }
     fn poll_flush(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
+        Pin::new(self.get_mut_inner()).poll_flush(cx)
     }
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
+        Pin::new(self.get_mut_inner()).poll_shutdown(cx)
     }
 }
 impl Unpin for ProxyTunnelStream {}
@@ -7971,21 +7975,21 @@ impl SyncProxyTunnelStream {
 }
 impl Read for SyncProxyTunnelStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if !self.pre_read_data.is_empty() {
-            let len: usize = std::cmp::min(self.pre_read_data.len(), buf.len());
-            buf[..len].copy_from_slice(&self.pre_read_data[..len]);
-            self.pre_read_data.drain(..len);
+        if !self.get_pre_read_data().is_empty() {
+            let len: usize = std::cmp::min(self.get_pre_read_data().len(), buf.len());
+            buf[..len].copy_from_slice(&self.get_pre_read_data()[..len]);
+            self.get_mut_pre_read_data().drain(..len);
             return Ok(len);
         }
-        self.inner.read(buf)
+        self.get_mut_inner().read(buf)
     }
 }
 impl Write for SyncProxyTunnelStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.inner.write(buf)
+        self.get_mut_inner().write(buf)
     }
     fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
+        self.get_mut_inner().flush()
     }
 }
 ```
@@ -7998,7 +8002,7 @@ pub enum ProxyType {
     Https,
     Socks5,
 }
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
 pub struct Proxy {
     pub proxy_type: ProxyType,
     pub host: String,
@@ -8017,8 +8021,8 @@ impl Proxy {
         Self::new(ProxyType::Socks5, host, port)
     }
     pub fn auth<U: AsRef<str>, P: AsRef<str>>(mut self, username: U, password: P) -> Self {
-        self.username = Some(username.as_ref().to_owned());
-        self.password = Some(password.as_ref().to_owned());
+        self.set_username(Some(username.as_ref().to_owned()));
+        self.set_password(Some(password.as_ref().to_owned()));
         self
     }
     fn new<H: AsRef<str>>(proxy_type: ProxyType, host: H, port: u16) -> Self {
@@ -8031,12 +8035,26 @@ impl Proxy {
         }
     }
 }
+#[derive(Data)]
 pub struct ProxyTunnelStream {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(super) inner: BoxAsyncReadWrite,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(super) pre_read_data: Vec<u8>,
 }
+#[derive(Data)]
 pub struct SyncProxyTunnelStream {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(super) inner: BoxReadWrite,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(super) pre_read_data: Vec<u8>,
 }
 ```
@@ -8370,21 +8388,16 @@ use super::*;
 # Path: hyperlane/request/src/request/tmp/struct.rs
 ```rust
 use super::*;
-#[derive(Clone, Debug)]
+#[derive(Clone, Data, Debug)]
 pub struct Tmp {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(crate) visit_url: HashSet<String>,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     pub(crate) root_cert: RootCertStore,
-}
-impl Tmp {
-    pub(crate) fn visit_url_ref(&self) -> &HashSet<String> {
-        &self.visit_url
-    }
-    pub(crate) fn visit_url_mut(&mut self) -> &mut HashSet<String> {
-        &mut self.visit_url
-    }
-    pub(crate) fn root_cert_clone(&self) -> RootCertStore {
-        self.root_cert.clone()
-    }
 }
 impl Default for Tmp {
     #[inline(always)]
@@ -8407,34 +8420,40 @@ use super::*;
 # Path: hyperlane/request/src/request/request_builder/struct.rs
 ```rust
 use super::*;
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Data, Debug, Default)]
 pub struct RequestBuilder {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
     request: HttpRequest,
 }
 impl RequestBuilder {
+    pub fn get_request_mut(&mut self) -> &mut HttpRequest {
+        &mut self.request
+    }
     pub fn new() -> Self {
         Self::default()
     }
     pub fn get(&mut self, url: impl Into<String>) -> &mut Self {
-        self.request.set_method(Method::Get);
-        self.request.set_url(url);
+        self.get_mut_request().set_method(Method::Get);
+        self.get_mut_request().set_url(url);
         self
     }
     pub fn post(&mut self, url: impl Into<String>) -> &mut Self {
-        self.request.set_method(Method::Post);
-        self.request.set_url(url);
+        self.get_mut_request().set_method(Method::Post);
+        self.get_mut_request().set_url(url);
         self
     }
     pub fn method(&mut self, method: Method) -> &mut Self {
-        self.request.set_method(method);
+        self.get_mut_request().set_method(method);
         self
     }
     pub fn url(&mut self, url: impl Into<String>) -> &mut Self {
-        self.request.set_url(url);
+        self.get_mut_request().set_url(url);
         self
     }
     pub fn header<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) -> &mut Self {
-        self.request.set_header(key, value);
+        self.get_mut_request().set_header(key, value);
         self
     }
     pub fn headers<K, V>(&mut self, headers: HashMap<K, V>) -> &mut Self
@@ -8443,79 +8462,87 @@ impl RequestBuilder {
         V: AsRef<str>,
     {
         for (k, v) in headers {
-            self.request.set_header(k, v);
+            self.get_mut_request().set_header(k, v);
         }
         self
     }
     pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
-        self.request.remove_header(key);
+        self.get_mut_request().remove_header(key);
         self
     }
     pub fn clear_headers(&mut self) -> &mut Self {
-        self.request.clear_headers();
+        self.get_mut_request().clear_headers();
         self
     }
     pub fn body<B: Into<Vec<u8>>>(&mut self, bytes: B) -> &mut Self {
-        self.request.set_body(Body::from_bytes(bytes));
+        self.get_mut_request().set_body(Body::from_bytes(bytes));
         self
     }
     pub fn body_text<T: Into<String>>(&mut self, text: T) -> &mut Self {
-        self.request
+        self.get_mut_request()
             .set_body(Body::from_bytes(text.into().into_bytes()));
         self
     }
     pub fn body_json<V: serde::Serialize>(&mut self, value: &V) -> &mut Self {
         if let Ok(bytes) = serde_json::to_vec(value) {
-            self.request.set_body(Body::from_bytes(bytes));
+            self.get_mut_request().set_body(Body::from_bytes(bytes));
         }
         self
     }
     pub fn timeout(&mut self, ms: u64) -> &mut Self {
-        self.request.get_config_mut().set_timeout(ms);
+        self.get_mut_request().get_config_mut().set_timeout(ms);
         self
     }
     pub fn buffer_size(&mut self, n: usize) -> &mut Self {
-        self.request.get_config_mut().set_buffer_size(n);
+        self.get_mut_request().get_config_mut().set_buffer_size(n);
         self
     }
     pub fn http1_1_only(&mut self) -> &mut Self {
-        self.request.get_config_mut().http_version = HttpVersion::Http1_1;
+        self.get_mut_request()
+            .get_config_mut()
+            .set_http_version(HttpVersion::Http1_1);
         self
     }
     pub fn http2_only(&mut self) -> &mut Self {
-        self.request.get_config_mut().http_version = HttpVersion::Http2;
+        self.get_mut_request()
+            .get_config_mut()
+            .set_http_version(HttpVersion::Http2);
         self
     }
     pub fn redirect(&mut self) -> &mut Self {
-        self.request.get_config_mut().set_redirect(true);
+        self.get_mut_request().get_config_mut().set_redirect(true);
         self
     }
     pub fn no_redirect(&mut self) -> &mut Self {
-        self.request.get_config_mut().set_redirect(false);
+        self.get_mut_request().get_config_mut().set_redirect(false);
         self
     }
     pub fn max_redirect_times(&mut self, n: usize) -> &mut Self {
-        self.request.get_config_mut().set_max_redirect_times(n);
+        self.get_mut_request()
+            .get_config_mut()
+            .set_max_redirect_times(n);
         self
     }
     pub fn decode(&mut self) -> &mut Self {
-        self.request.get_config_mut().set_decode(true);
+        self.get_mut_request().get_config_mut().set_decode(true);
         self
     }
     pub fn no_decode(&mut self) -> &mut Self {
-        self.request.get_config_mut().set_decode(false);
+        self.get_mut_request().get_config_mut().set_decode(false);
         self
     }
     pub fn proxy(&mut self, proxy: Proxy) -> &mut Self {
-        self.request.get_config_mut().set_proxy(Some(proxy));
+        self.get_mut_request()
+            .get_config_mut()
+            .set_proxy(Some(proxy));
         self
     }
     pub fn no_proxy(&mut self) -> &mut Self {
-        self.request.get_config_mut().set_proxy(None);
+        self.get_mut_request().get_config_mut().set_proxy(None);
         self
     }
     pub fn build(&mut self) -> HttpRequest {
-        std::mem::take(&mut self.request)
+        std::mem::take(self.get_mut_request())
     }
 }
 ```
@@ -8661,7 +8688,7 @@ impl HttpRequest {
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
-            let roots = self.get_tmp_ref().root_cert_clone();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -8785,10 +8812,10 @@ impl HttpRequest {
         if !self.get_config_ref().redirect {
             return Err(RequestError::Request("Redirect Not Enabled".to_string()));
         }
-        if self.get_tmp_ref().visit_url_ref().contains(&url) {
+        if self.get_tmp_ref().get_visit_url().contains(&url) {
             return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
         }
-        self.get_tmp_mut().visit_url_mut().insert(url.clone());
+        self.get_tmp_mut().get_mut_visit_url().insert(url.clone());
         if self.get_config_ref().max_redirect_times == 0 {
             return Err(RequestError::Request(
                 "Max Redirect Times Exceeded".to_string(),
@@ -8844,7 +8871,7 @@ impl HttpRequest {
             .await
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
-            let roots = self.get_tmp_ref().root_cert_clone();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -8980,10 +9007,10 @@ impl HttpRequest {
         if !self.get_config_ref().redirect {
             return Err(RequestError::Request("Redirect Not Enabled".to_string()));
         }
-        if self.get_tmp_ref().visit_url_ref().contains(&url) {
+        if self.get_tmp_ref().get_visit_url().contains(&url) {
             return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
         }
-        self.get_tmp_mut().visit_url_mut().insert(url.clone());
+        self.get_tmp_mut().get_mut_visit_url().insert(url.clone());
         if self.get_config_ref().max_redirect_times == 0 {
             return Err(RequestError::Request(
                 "Max Redirect Times Exceeded".to_string(),
@@ -9020,7 +9047,7 @@ impl HttpRequest {
         tcp.set_write_timeout(Some(timeout))
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxReadWrite = if proxy.proxy_type == ProxyType::Https {
-            let roots = self.get_tmp_ref().root_cert_clone();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9069,7 +9096,7 @@ impl HttpRequest {
             Vec::new()
         };
         if self.is_https() {
-            let roots = self.get_tmp_ref().root_cert_clone();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9173,7 +9200,7 @@ impl HttpRequest {
             _ => return Err(RequestError::Request("Internal Server Error".to_string())),
         }
         if self.is_https() {
-            let roots = self.get_tmp_ref().root_cert_clone();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9214,7 +9241,7 @@ impl HttpRequest {
             .await
             .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxAsyncReadWrite = if proxy.proxy_type == ProxyType::Https {
-            let roots = self.get_tmp_ref().root_cert_clone();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9269,7 +9296,7 @@ impl HttpRequest {
             Vec::new()
         };
         if self.is_https() {
-            let roots = self.get_tmp_ref().root_cert_clone();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9383,7 +9410,7 @@ impl HttpRequest {
             _ => return Err(RequestError::Request("Internal Server Error".to_string())),
         }
         if self.is_https() {
-            let roots = self.get_tmp_ref().root_cert_clone();
+            let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
             let tls_cfg = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
@@ -9434,13 +9461,18 @@ pub type RequestHeaders = HashMapXxHash3_64<RequestHeadersKey, RequestHeadersVal
 ```rust
 use super::*;
 pub type RequestResult = Result<HttpResponse, RequestError>;
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, GetterMut)]
 pub struct HttpRequest {
+    #[get_mut(skip)]
     pub method: Method,
+    #[get_mut(skip)]
     pub url: String,
     pub headers: HashMap<String, String>,
+    #[get_mut(skip)]
     pub body: Body,
+    #[get_mut(skip)]
     pub config: RequestConfig,
+    #[get_mut(skip)]
     pub(crate) tmp: Tmp,
 }
 impl HttpRequest {
@@ -9479,11 +9511,11 @@ impl HttpRequest {
     }
     pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
         let normalized = Self::normalize_header_key(key.as_ref());
-        self.headers.remove(&normalized);
+        self.get_mut_headers().remove(&normalized);
         self
     }
     pub fn clear_headers(&mut self) -> &mut Self {
-        self.headers.clear();
+        self.get_mut_headers().clear();
         self
     }
     pub fn set_body(&mut self, body: Body) -> &mut Self {
@@ -9508,6 +9540,9 @@ impl HttpRequest {
     }
     pub fn get_headers_ref(&self) -> &HashMap<String, String> {
         &self.headers
+    }
+    pub fn get_headers_mut(&mut self) -> &mut HashMap<String, String> {
+        &mut self.headers
     }
     pub fn get_body(&self) -> Body {
         self.body.clone()
@@ -9684,31 +9719,31 @@ impl HttpResponse {
         }
     }
     pub fn is_success(&self) -> bool {
-        (200..300).contains(&self.status_code)
+        (200..300).contains(&self.get_status_code())
     }
     pub fn is_redirect(&self) -> bool {
-        (300..400).contains(&self.status_code)
+        (300..400).contains(&self.get_status_code())
     }
     pub fn get_header<K: AsRef<str>>(&self, key: K) -> Option<&str> {
         let normalized = key.as_ref().to_ascii_lowercase();
         self.headers.get(&normalized).map(String::as_str)
     }
     pub fn text(&self) -> String {
-        String::from_utf8_lossy(&self.body).into_owned()
+        String::from_utf8_lossy(self.get_body()).into_owned()
     }
     pub fn bytes(&self) -> &[u8] {
-        &self.body
+        self.get_body()
     }
     pub fn decode(&self, buffer_size: usize) -> HttpResponse {
-        let flat_headers: HttpResponseHeaders = self.headers.clone();
+        let flat_headers: HttpResponseHeaders = self.get_headers().clone();
         let decoded: ResponseBody = Compress::from(&flat_headers)
-            .decode(&self.body, buffer_size)
+            .decode(self.get_body(), buffer_size)
             .into_owned();
         HttpResponse {
-            version: self.version.clone(),
-            status_code: self.status_code,
-            reason_phrase: self.reason_phrase.clone(),
-            headers: self.headers.clone(),
+            version: self.get_version().clone(),
+            status_code: self.get_status_code(),
+            reason_phrase: self.get_reason_phrase().clone(),
+            headers: self.get_headers().clone(),
             body: decoded,
         }
     }
@@ -9728,7 +9763,7 @@ pub const APP_NAME: &str = "http-request";
 # Path: hyperlane/request/src/common/enum.rs
 ```rust
 use super::*;
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, Getter, PartialEq, Serialize)]
 pub struct Body {
     pub bytes: Vec<u8>,
 }
@@ -9741,11 +9776,14 @@ impl Body {
             bytes: bytes.into(),
         }
     }
-    pub fn as_slice(&self) -> &[u8] {
+    pub fn get_bytes_ref(&self) -> &[u8] {
         &self.bytes
     }
+    pub fn as_slice(&self) -> &[u8] {
+        self.get_bytes()
+    }
     pub fn as_str(&self) -> Option<&str> {
-        std::str::from_utf8(&self.bytes).ok()
+        std::str::from_utf8(self.get_bytes()).ok()
     }
 }
 impl Display for Body {
@@ -10907,6 +10945,7 @@ use std::{
     future::Future,
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
+    mem,
     pin::Pin,
     sync::Arc,
 };
@@ -11500,25 +11539,19 @@ impl Server {
             }
         }
     }
-    async fn request_hook(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-        request: &Request,
-    ) -> bool {
-        let mut response: Response = Response::default();
-        response.set_version(request.get_version().clone());
-        ctx.set_request(request.clone());
-        ctx.set_response(response);
-        ctx.set_route_params(RouteParams::default());
+    async fn request_hook(&self, stream: &mut Stream, ctx: &mut Context, request: Request) -> bool {
+        let keep_alive: bool = request.is_enable_keep_alive();
+        let version: RequestVersion = request.get_version().clone();
+        let route: RequestPath = request.get_path().clone();
+        ctx.set_request(request);
+        ctx.get_mut_response().reset().set_version(version);
+        ctx.clear_route_params();
         ctx.clear_attribute();
         stream.set_closed(false);
-        let keep_alive: bool = request.is_enable_keep_alive();
         if self.handle_request_middleware(stream, ctx).await {
             return stream.is_keep_alive(keep_alive);
         }
-        let route: &str = request.get_path();
-        if self.handle_route_matcher(stream, ctx, route).await {
+        if self.handle_route_matcher(stream, ctx, &route).await {
             return stream.is_keep_alive(keep_alive);
         }
         if self.handle_response_middleware(stream, ctx).await {
@@ -11526,23 +11559,20 @@ impl Server {
         }
         stream.is_keep_alive(keep_alive)
     }
-    async fn handle_http_requests(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-        request: &Request,
-    ) {
+    async fn handle_http_requests(&self, stream: &mut Stream, ctx: &mut Context, request: Request) {
         if !self.request_hook(stream, ctx, request).await {
             return;
         }
         loop {
-            match stream.try_get_http_request().await {
-                Ok(new_request) => {
-                    if !self.request_hook(stream, ctx, &new_request).await {
+            let mut reused_request: Request = mem::take(ctx.get_mut_request());
+            match stream.try_fill_http_request(&mut reused_request).await {
+                Ok(()) => {
+                    if !self.request_hook(stream, ctx, reused_request).await {
                         return;
                     }
                 }
                 Err(error) => {
+                    ctx.set_request(reused_request);
                     self.handle_request_error(stream, ctx, &error).await;
                     return;
                 }
@@ -11552,7 +11582,7 @@ impl Server {
     async fn handle_connection(&self, stream: &mut Stream, ctx: &mut Context) {
         match stream.try_get_http_request().await {
             Ok(request) => {
-                self.handle_http_requests(stream, ctx, &request).await;
+                self.handle_http_requests(stream, ctx, request).await;
             }
             Err(error) => {
                 self.handle_request_error(stream, ctx, &error).await;
@@ -11763,6 +11793,11 @@ impl Lifetime for Context {
 }
 impl Context {
     #[inline(always)]
+    pub(crate) fn clear_route_params(&mut self) -> &mut Self {
+        self.get_mut_route_params().clear();
+        self
+    }
+    #[inline(always)]
     pub fn try_get_route_param<T>(&self, name: T) -> Option<String>
     where
         T: AsRef<str>,
@@ -11878,7 +11913,6 @@ use super::*;
 pub struct Context {
     pub(super) request: Request,
     pub(super) response: Response,
-    #[get_mut(skip)]
     pub(super) route_params: RouteParams,
     pub(super) attributes: ThreadSafeAttributeStore,
 }
@@ -19849,10 +19883,12 @@ pub use {
 pub use {http_compress::*, http_constant::*, serde_json, tokio};
 use std::{
     any::Any,
+    cell::{RefCell, RefMut},
     collections::{HashMap, HashSet, VecDeque},
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter, Write},
     hash::Hash,
-    io::ErrorKind,
+    io::{self, ErrorKind},
+    mem,
     net::IpAddr,
     num::ParseIntError,
     pin::Pin,
@@ -19863,6 +19899,8 @@ use std::{
         Arc,
         atomic::{self, AtomicBool, AtomicUsize},
     },
+    task::{Context, Poll},
+    thread_local,
     time::Duration,
 };
 use {
@@ -19870,7 +19908,7 @@ use {
     lombok_macros::*,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
     tokio::{
-        io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+        io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, ReadBuf},
         net::TcpStream,
         runtime::Handle,
         sync::{
@@ -21470,22 +21508,22 @@ impl CookieBuilder {
     }
     #[inline(always)]
     pub fn secure(&mut self) -> &mut Self {
-        self.secure = Some(true);
+        *self.get_mut_secure() = Some(true);
         self
     }
     #[inline(always)]
     pub fn http_only(&mut self) -> &mut Self {
-        self.http_only = Some(true);
+        *self.get_mut_http_only() = Some(true);
         self
     }
     #[inline(always)]
     pub fn disable_secure(&mut self) -> &mut Self {
-        self.secure = Some(false);
+        *self.get_mut_secure() = Some(false);
         self
     }
     #[inline(always)]
     pub fn disable_http_only(&mut self) -> &mut Self {
-        self.http_only = Some(false);
+        *self.get_mut_http_only() = Some(false);
         self
     }
     #[inline(always)]
@@ -21894,6 +21932,16 @@ impl Default for Request {
     }
 }
 impl Request {
+    pub fn reset(&mut self) -> &mut Self {
+        self.set_method(Method::default());
+        self.get_mut_host().clear();
+        self.set_version(HttpVersion::default());
+        self.get_mut_path().clear();
+        self.get_mut_querys().clear();
+        self.get_mut_headers().clear();
+        self.get_mut_body().clear();
+        self
+    }
     #[inline(always)]
     pub(crate) fn get_http_first_line(
         line: &str,
@@ -21949,29 +21997,26 @@ impl Request {
         path: &str,
         query_index: Option<usize>,
         hash_index: Option<usize>,
-    ) -> RequestPath {
+    ) -> &str {
         match query_index.or(hash_index) {
-            Some(separator_index) => path[..separator_index].to_owned(),
-            None => path.to_owned(),
+            Some(separator_index) => &path[..separator_index],
+            None => path,
         }
     }
     #[inline(always)]
-    pub(crate) fn get_http_querys(query: &str) -> RequestQuerys {
-        let estimated_capacity: usize = query.matches(AND).count() + 1;
-        let mut query_map: RequestQuerys = HashMapXxHash3_64::with_capacity_and_hasher(
-            estimated_capacity,
-            BuildHasherDefault::default(),
-        );
+    pub(crate) fn fill_http_querys(query: &str, querys: &mut RequestQuerys) {
+        if query.is_empty() {
+            return;
+        }
         for pair in query.split(AND) {
             if let Some((key, value)) = pair.split_once(EQUAL) {
                 if !key.is_empty() {
-                    query_map.insert(key.to_string(), value.to_string());
+                    querys.insert(key.to_string(), value.to_string());
                 }
             } else if !pair.is_empty() {
-                query_map.insert(pair.to_string(), String::new());
+                querys.insert(pair.to_string(), String::new());
             }
         }
-        query_map
     }
     #[inline(always)]
     pub(crate) fn check_http_header_count(
@@ -22023,23 +22068,21 @@ impl Request {
         Ok(length)
     }
     pub(crate) async fn get_http_headers<R>(
+        &mut self,
         reader: &mut R,
         config: &RequestConfig,
-    ) -> Result<(RequestHeaders, RequestHost, usize), RequestError>
+    ) -> Result<usize, RequestError>
     where
         R: AsyncBufReadExt + Unpin,
     {
-        let buffer_size: usize = config.get_buffer_size();
+        let Request { headers, host, .. } = self;
         let max_header_count: usize = config.get_max_header_count();
         let max_header_key_size: usize = config.get_max_header_key_size();
         let max_header_value_size: usize = config.get_max_header_value_size();
         let max_body_size: usize = config.get_max_body_size();
-        let mut headers: RequestHeaders =
-            HashMapXxHash3_64::with_capacity_and_hasher(B_16, BuildHasherDefault::default());
-        let mut host: RequestHost = String::new();
         let mut content_size: usize = 0;
         let mut header_count: usize = 0;
-        let mut header_line_buffer: String = String::with_capacity(buffer_size);
+        let mut header_line_buffer: String = String::with_capacity(HEADER_LINE_BUFFER_CAPACITY);
         loop {
             header_line_buffer.clear();
             AsyncBufReadExt::read_line(reader, &mut header_line_buffer).await?;
@@ -22059,30 +22102,37 @@ impl Request {
             }
             let key: String = key_trimmed.to_ascii_lowercase();
             Self::check_http_header_key_size(&key, max_header_key_size)?;
-            let value: String = value_part.trim().to_string();
-            Self::check_http_header_value_size(&value, max_header_value_size)?;
+            let value: &str = value_part.trim();
+            Self::check_http_header_value_size(value, max_header_value_size)?;
             match key.as_str() {
-                HOST => host = value.clone(),
+                HOST => {
+                    host.clear();
+                    host.push_str(value);
+                }
                 CONTENT_LENGTH => {
-                    content_size = Self::check_http_body_size(&value, max_body_size)?;
+                    content_size = Self::check_http_body_size(value, max_body_size)?;
                 }
                 _ => {}
             }
-            headers.entry(key).or_default().push_back(value);
+            headers.entry(key).or_default().push_back(value.to_string());
         }
-        Ok((headers, host, content_size))
+        Ok(content_size)
     }
     #[inline(always)]
-    pub(crate) async fn get_http_body(
-        reader: &mut BufReader<&mut TcpStream>,
+    pub(crate) async fn fill_http_body<R>(
+        reader: &mut R,
+        body: &mut RequestBody,
         content_size: usize,
-    ) -> Result<RequestBody, RequestError> {
-        let mut body: RequestBody = Vec::with_capacity(content_size);
+    ) -> Result<(), RequestError>
+    where
+        R: AsyncRead + Unpin,
+    {
+        body.clear();
         if content_size > 0 {
             body.resize(content_size, 0);
-            AsyncReadExt::read_exact(reader, &mut body).await?;
+            AsyncReadExt::read_exact(reader, body).await?;
         }
-        Ok(body)
+        Ok(())
     }
     #[inline(always)]
     pub fn try_get_query<K>(&self, key: K) -> Option<RequestQuerysValue>
@@ -22176,7 +22226,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.headers.contains_key(key.as_ref())
+        self.get_headers().contains_key(key.as_ref())
     }
     #[inline(always)]
     pub fn has_header_value<K, V>(&self, key: K, value: V) -> bool
@@ -22184,7 +22234,7 @@ impl Request {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        if let Some(values) = self.headers.get(key.as_ref()) {
+        if let Some(values) = self.get_headers().get(key.as_ref()) {
             values.iter().any(|data: &String| data == value.as_ref())
         } else {
             false
@@ -22481,50 +22531,106 @@ impl Lifetime for Stream {
         address.into()
     }
 }
+impl Drop for PooledReader<'_> {
+    fn drop(&mut self) {
+        let buffer: Vec<u8> = mem::take(self.get_mut_buffer());
+        return_read_buffer(buffer);
+    }
+}
+impl AsyncRead for PooledReader<'_> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this: &mut Self = self.get_mut();
+        if *this.get_start() < *this.get_end() {
+            let available: usize = *this.get_end() - *this.get_start();
+            let amount: usize = available.min(buf.remaining());
+            let end: usize = *this.get_start() + amount;
+            buf.put_slice(&this.get_buffer()[*this.get_start()..end]);
+            this.set_start(end);
+            return Poll::Ready(Ok(()));
+        }
+        Pin::new(&mut **this.get_mut_stream()).poll_read(cx, buf)
+    }
+}
+impl AsyncBufRead for PooledReader<'_> {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        let this: &mut Self = self.get_mut();
+        let PooledReader {
+            stream,
+            buffer,
+            start,
+            end,
+        } = this;
+        if *start >= *end {
+            *start = 0;
+            *end = 0;
+            let mut read_buf: ReadBuf<'_> = ReadBuf::new(buffer);
+            match Pin::new(&mut **stream).poll_read(cx, &mut read_buf) {
+                Poll::Ready(Ok(())) => {
+                    *end = read_buf.filled().len();
+                }
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        Poll::Ready(Ok(&buffer[*start..*end]))
+    }
+    fn consume(self: Pin<&mut Self>, amount: usize) {
+        let this: &mut Self = self.get_mut();
+        let new_start: usize = (*this.get_start() + amount).min(*this.get_end());
+        this.set_start(new_start);
+    }
+}
 impl Stream {
     #[inline(always)]
     pub fn is_keep_alive(&self, keep_alive: bool) -> bool {
         !self.get_closed() && keep_alive
     }
-    async fn get_http_from_stream(&mut self) -> Result<Request, RequestError> {
+    async fn fill_http_from_stream(&mut self, request: &mut Request) -> Result<(), RequestError> {
+        request.reset();
         let config: RequestConfig = *self.get_request_config();
         let buffer_size: usize = config.get_buffer_size();
         let max_path_size: usize = config.get_max_path_size();
-        let reader: &mut BufReader<&mut TcpStream> =
-            &mut BufReader::with_capacity(buffer_size, self.get_mut_stream());
-        let mut line: String = String::with_capacity(buffer_size);
-        AsyncBufReadExt::read_line(reader, &mut line).await?;
+        let buffer: Vec<u8> = take_read_buffer(buffer_size);
+        let mut reader: PooledReader<'_> = PooledReader::new(self.get_mut_stream(), buffer);
+        let mut line: String = String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY);
+        AsyncBufReadExt::read_line(&mut reader, &mut line).await?;
         let (method, path, version): (RequestMethod, &str, RequestVersion) =
             Request::get_http_first_line(&line)?;
         Request::check_http_path_size(path, max_path_size)?;
         let hash_index: Option<usize> = path.find(HASH);
         let query_index: Option<usize> = path.find(QUERY);
         let query: &str = Request::get_http_query(path, query_index, hash_index);
-        let querys: RequestQuerys = Request::get_http_querys(query);
-        let path: RequestPath = Request::get_http_path(path, query_index, hash_index);
-        let (headers, host, content_size): (RequestHeaders, RequestHost, usize) =
-            Request::get_http_headers(reader, &config).await?;
-        let body: RequestBody = Request::get_http_body(reader, content_size).await?;
-        Ok(Request {
-            method,
-            host,
-            version,
-            path,
-            querys,
-            headers,
-            body,
-        })
+        Request::fill_http_querys(query, request.get_mut_querys());
+        let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
+        request.get_mut_path().push_str(path_slice);
+        let content_size: usize = request.get_http_headers(&mut reader, &config).await?;
+        request.set_method(method);
+        request.set_version(version);
+        Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
+        Ok(())
     }
-    pub async fn try_get_http_request(&mut self) -> Result<Request, RequestError> {
+    pub async fn try_fill_http_request(
+        &mut self,
+        request: &mut Request,
+    ) -> Result<(), RequestError> {
         if self.get_closed() {
             return Err(RequestError::ServerClosedConnection(HttpStatus::BadRequest));
         }
         let timeout_ms: u64 = self.get_request_config().get_read_timeout_ms();
         if timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
-            return self.get_http_from_stream().await;
+            return self.fill_http_from_stream(request).await;
         }
         let duration: Duration = Duration::from_millis(timeout_ms);
-        timeout(duration, self.get_http_from_stream()).await?
+        timeout(duration, self.fill_http_from_stream(request)).await?
+    }
+    pub async fn try_get_http_request(&mut self) -> Result<Request, RequestError> {
+        let mut request: Request = Request::default();
+        self.try_fill_http_request(&mut request).await?;
+        Ok(request)
     }
     pub async fn try_get_websocket_request(&mut self) -> Result<RequestBody, RequestError> {
         if self.get_closed() {
@@ -22658,12 +22764,48 @@ impl Stream {
     }
 }
 ```
+# Path: hyperlane/type/src/stream/fn.rs
+```rust
+use super::*;
+pub(crate) fn take_read_buffer(capacity: usize) -> Vec<u8> {
+    READ_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut pool: RefMut<'_, Vec<Vec<u8>>> = pool.borrow_mut();
+        match pool.pop() {
+            Some(mut buffer) => {
+                if buffer.len() < capacity {
+                    buffer.resize(capacity, 0);
+                }
+                buffer
+            }
+            None => vec![0; capacity],
+        }
+    })
+}
+pub(crate) fn return_read_buffer(buffer: Vec<u8>) {
+    if buffer.len() > MAX_POOLED_READ_BUFFER_SIZE {
+        return;
+    }
+    READ_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut pool: RefMut<'_, Vec<Vec<u8>>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_READ_BUFFERS {
+            pool.push(buffer);
+        }
+    });
+}
+```
 # Path: hyperlane/type/src/stream/type.rs
 ```rust
 use super::*;
 pub type ArcStream = Arc<TcpStream>;
 pub type SocketHost = IpAddr;
 pub type SocketPort = u16;
+```
+# Path: hyperlane/type/src/stream/static.rs
+```rust
+use super::*;
+thread_local! {
+    pub(crate) static READ_BUFFER_POOL: RefCell<Vec<Vec<u8>>> = const { RefCell::new(Vec::new()) };
+}
 ```
 # Path: hyperlane/type/src/stream/struct.rs
 ```rust
@@ -22680,13 +22822,37 @@ pub struct Stream {
     #[get_mut(pub(super))]
     pub(super) closed: bool,
 }
+#[derive(Data, New)]
+pub(crate) struct PooledReader<'a> {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) stream: &'a mut TcpStream,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) buffer: Vec<u8>,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    #[new(skip)]
+    pub(super) start: usize,
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    #[new(skip)]
+    pub(super) end: usize,
+}
 ```
 # Path: hyperlane/type/src/stream/mod.rs
 ```rust
+mod r#fn;
 mod r#impl;
+mod r#static;
 mod r#struct;
 mod r#type;
 pub use {r#struct::*, r#type::*};
+pub(crate) use {r#fn::*, r#static::*};
 use super::*;
 ```
 # Path: hyperlane/type/src/http_version/impl.rs
@@ -23343,15 +23509,6 @@ impl Response {
         response_string.push_str(HTTP_BR);
     }
     #[inline(always)]
-    fn push_http_first_line(&self, response_string: &mut String) {
-        response_string.push_str(&self.get_version().to_string());
-        response_string.push_str(SPACE);
-        response_string.push_str(&self.get_status_code().to_string());
-        response_string.push_str(SPACE);
-        response_string.push_str(self.get_reason_phrase());
-        response_string.push_str(HTTP_BR);
-    }
-    #[inline(always)]
     pub fn try_get_header<K>(&self, key: K) -> Option<ResponseHeadersValue>
     where
         K: AsRef<str>,
@@ -23402,7 +23559,7 @@ impl Response {
     where
         K: AsRef<str>,
     {
-        self.headers.contains_key(key.as_ref())
+        self.get_headers().contains_key(key.as_ref())
     }
     #[inline(always)]
     pub fn has_header_value<K, V>(&self, key: K, value: V) -> bool
@@ -23410,7 +23567,7 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        if let Some(values) = self.headers.get(key.as_ref()) {
+        if let Some(values) = self.get_headers().get(key.as_ref()) {
             values.contains(&value.as_ref().to_owned())
         } else {
             false
@@ -23499,7 +23656,7 @@ impl Response {
         if self.should_skip_header(&key) {
             return self;
         }
-        self.headers
+        self.get_mut_headers()
             .entry(key)
             .or_default()
             .push_back(value.as_ref().to_owned());
@@ -23510,7 +23667,7 @@ impl Response {
     where
         K: AsRef<str>,
     {
-        let _: bool = self.headers.remove(key.as_ref()).is_some();
+        let _: bool = self.get_mut_headers().remove(key.as_ref()).is_some();
         self
     }
     #[inline(always)]
@@ -23520,17 +23677,26 @@ impl Response {
         V: AsRef<str>,
     {
         let key: ResponseHeadersKey = key.as_ref().to_owned();
-        if let Some(values) = self.headers.get_mut(&key) {
+        if let Some(values) = self.get_mut_headers().get_mut(&key) {
             values.retain(|data: &String| data != &value.as_ref().to_owned());
             if values.is_empty() {
-                self.headers.remove(&key);
+                self.get_mut_headers().remove(&key);
             }
         }
         self
     }
     #[inline(always)]
     pub fn clear_headers(&mut self) -> &mut Self {
-        self.headers.clear();
+        self.get_mut_headers().clear();
+        self
+    }
+    pub fn reset(&mut self) -> &mut Self {
+        let http_status: HttpStatus = HttpStatus::default();
+        self.set_status_code(http_status.code());
+        self.get_mut_reason_phrase().clear();
+        let _: fmt::Result = write!(self.get_mut_reason_phrase(), "{}", http_status);
+        self.get_mut_headers().clear();
+        self.get_mut_body().clear();
         self
     }
     #[inline(always)]
@@ -23558,11 +23724,9 @@ impl Response {
         self.try_get_cookie(key).unwrap()
     }
     pub fn build(&mut self) -> ResponseData {
-        if self.reason_phrase.is_empty() {
+        if self.get_reason_phrase().is_empty() {
             self.set_reason_phrase(HttpStatus::phrase(self.get_status_code()));
         }
-        let mut response_string: String = String::with_capacity(DEFAULT_BUFFER_SIZE);
-        self.push_http_first_line(&mut response_string);
         let compress_type_opt: Option<Compress> = self
             .try_get_header_back(CONTENT_ENCODING)
             .map(|data: String| data.parse::<Compress>().unwrap_or_default());
@@ -23580,17 +23744,42 @@ impl Response {
                 self.set_header_without_check(CONTENT_TYPE, &content_type);
                 content_type
             });
-        let mut body: ResponseBody = self.get_body().clone();
-        if let Some(compress_type) = compress_type_opt
-            && !compress_type.is_unknown()
-        {
-            body = compress_type
-                .encode(&body, DEFAULT_BUFFER_SIZE)
-                .into_owned();
-        }
+        let compressed_body: Option<Vec<u8>> = match compress_type_opt {
+            Some(compress_type) if !compress_type.is_unknown() => Some(
+                compress_type
+                    .encode(self.get_body(), DEFAULT_BUFFER_SIZE)
+                    .into_owned(),
+            ),
+            _ => None,
+        };
+        let body_len: usize = compressed_body
+            .as_ref()
+            .map_or_else(|| self.get_body().len(), Vec::len);
         if !content_type.eq_ignore_ascii_case(TEXT_EVENT_STREAM) {
-            self.set_header_without_check(CONTENT_LENGTH, body.len().to_string());
+            self.set_header_without_check(CONTENT_LENGTH, body_len.to_string());
         }
+        let mut head_size: usize = self.get_reason_phrase().len() + B_16 + HTTP_BR.len();
+        head_size += self
+            .get_headers()
+            .iter()
+            .map(|header_entry: (&String, &VecDeque<String>)| {
+                let (header_key, header_values): (&String, &VecDeque<String>) = header_entry;
+                header_values
+                    .iter()
+                    .map(|header_value: &String| {
+                        header_key.len() + COLON.len() + header_value.len() + HTTP_BR.len()
+                    })
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        let mut response_string: String = String::with_capacity(head_size + body_len);
+        let _: fmt::Result = write!(
+            response_string,
+            "{} {} {}{HTTP_BR}",
+            self.get_version(),
+            self.get_status_code(),
+            self.get_reason_phrase()
+        );
         self.get_headers()
             .iter()
             .for_each(|header_entry: (&String, &VecDeque<String>)| {
@@ -23601,7 +23790,10 @@ impl Response {
             });
         response_string.push_str(HTTP_BR);
         let mut response_bytes: Vec<u8> = response_string.into_bytes();
-        response_bytes.extend_from_slice(&body);
+        match &compressed_body {
+            Some(body) => response_bytes.extend_from_slice(body),
+            None => response_bytes.extend_from_slice(self.get_body()),
+        }
         response_bytes
     }
 }
@@ -23972,31 +24164,31 @@ impl WebSocketFrame {
     }
     #[inline(always)]
     pub fn is_continuation_opcode(&self) -> bool {
-        self.opcode.is_continuation()
+        self.get_opcode().is_continuation()
     }
     #[inline(always)]
     pub fn is_text_opcode(&self) -> bool {
-        self.opcode.is_text()
+        self.get_opcode().is_text()
     }
     #[inline(always)]
     pub fn is_binary_opcode(&self) -> bool {
-        self.opcode.is_binary()
+        self.get_opcode().is_binary()
     }
     #[inline(always)]
     pub fn is_close_opcode(&self) -> bool {
-        self.opcode.is_close()
+        self.get_opcode().is_close()
     }
     #[inline(always)]
     pub fn is_ping_opcode(&self) -> bool {
-        self.opcode.is_ping()
+        self.get_opcode().is_ping()
     }
     #[inline(always)]
     pub fn is_pong_opcode(&self) -> bool {
-        self.opcode.is_pong()
+        self.get_opcode().is_pong()
     }
     #[inline(always)]
     pub fn is_reserved_opcode(&self) -> bool {
-        self.opcode.is_reserved()
+        self.get_opcode().is_reserved()
     }
     #[inline(always)]
     pub(crate) fn build_full_frame(
