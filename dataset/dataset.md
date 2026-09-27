@@ -1,4 +1,4 @@
-<!--2026-09-27 11:43:22-->
+<!--2026-09-27 16:41:36-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -14891,7 +14891,7 @@ pub(crate) fn create_protocol_check(
             Ident::new(&format!("is_{upgrade_type_str}"), context.span());
         quote! {
             if !#context.get_request().get_upgrade_type().#check_fn() {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     }
@@ -14935,8 +14935,8 @@ pub(crate) fn task_panic_macro(attr: TokenStream, item: TokenStream) -> TokenStr
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
-        ::hyperlane_core::inventory::submit! {
-            ::hyperlane_core::HookType::TaskPanic(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::TaskPanic(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -14948,8 +14948,8 @@ pub(crate) fn request_error_macro(attr: TokenStream, item: TokenStream) -> Token
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
-        ::hyperlane_core::inventory::submit! {
-            ::hyperlane_core::HookType::RequestError(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::RequestError(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -15046,9 +15046,9 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
         });
         if type_name == SERVER_TYPE_KEY {
             init_statements.push(quote! {
-                let mut hooks: Vec<::hyperlane_core::HookType> = ::hyperlane_core::inventory::iter().cloned().collect();
-                ::hyperlane_core::HookType::assert_unique_order(hooks.clone());
-                hooks.sort_by_key(|hook: &::hyperlane_core::HookType| hook.try_get_order());
+                let mut hooks: Vec<::hyperlane::HookType> = ::hyperlane::inventory::iter().cloned().collect();
+                ::hyperlane::HookType::assert_unique_order(hooks.clone());
+                hooks.sort_by_key(|hook: &::hyperlane::HookType| hook.try_get_order());
                 for hook in hooks {
                     #var_name.handle_hook(hook.clone());
                 }
@@ -15127,7 +15127,7 @@ pub(crate) fn filter_macro(
     inject(position, item, |_: &Ident, _: &Ident| {
         quote! {
             if !(#condition) {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     })
@@ -15172,8 +15172,8 @@ pub(crate) fn referer_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(true, |referer_header: ::hyperlane_core::RequestHeadersValueItem| referer_header != #referer_value) {
-                    return ::hyperlane_core::Status::Continue;
+                if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header != #referer_value) {
+                    return ::hyperlane::Status::Continue;
                 }
             }
         });
@@ -15191,8 +15191,8 @@ pub(crate) fn reject_referer_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane_core::REFERER).map_or(false, |referer_header: ::hyperlane_core::RequestHeadersValueItem| referer_header == #referer_value) {
-                    return ::hyperlane_core::Status::Continue;
+                if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header == #referer_value) {
+                    return ::hyperlane::Status::Continue;
                 }
             }
         });
@@ -15527,7 +15527,7 @@ pub(crate) fn request_body_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_body.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestBody = #new_context.get_request().get_body();
+                let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
             }
         });
         quote! {
@@ -15545,7 +15545,7 @@ pub(crate) fn request_body_json_result_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
             quote! {
-                let #variable: Result<#type_name, ::hyperlane_core::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
+                let #variable: Result<#type_name, ::hyperlane::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
             }
         });
         quote! {
@@ -15619,7 +15619,7 @@ pub(crate) fn attributes_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_attrs.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::ThreadSafeAttributeStore = #new_context.get_attributes();
+                let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
             }
         });
         quote! {
@@ -15636,7 +15636,7 @@ pub(crate) fn try_get_task_panic_data_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_task_panic_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: Option<::hyperlane_core::PanicData> = #context.try_get_task_panic_data();
+                let #variable: Option<::hyperlane::PanicData> = #context.try_get_task_panic_data();
             }
         });
         quote! {
@@ -15656,7 +15656,7 @@ pub(crate) fn task_panic_data_macro(
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
-                    let #variable: ::hyperlane_core::PanicData = #context.get_task_panic_data();
+                    let #variable: ::hyperlane::PanicData = #context.get_task_panic_data();
                 }
             });
         quote! {
@@ -15673,7 +15673,7 @@ pub(crate) fn try_get_request_error_data_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: Option<::hyperlane_core::RequestError> = #context.try_get_request_error_data();
+                let #variable: Option<::hyperlane::RequestError> = #context.try_get_request_error_data();
             }
         });
         quote! {
@@ -15688,11 +15688,14 @@ pub(crate) fn request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
-            quote! {
-                let #variable: ::hyperlane_core::RequestError = #context.get_request_error_data();
-            }
-        });
+        let statements = multi_error_data
+            .variables
+            .iter()
+            .map(|variable: &syn::Ident| {
+                quote! {
+                    let #variable: ::hyperlane::RequestError = #context.get_request_error_data();
+                }
+            });
         quote! {
             #(#statements)*
         }
@@ -15749,7 +15752,7 @@ pub(crate) fn route_params_macro(
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
-                    let #variable: &::hyperlane_core::RouteParams = #new_context.get_route_params();
+                    let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
                 }
             });
         quote! {
@@ -15766,7 +15769,7 @@ pub(crate) fn try_get_request_query_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: Option<::hyperlane_core::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
+                let #variable: Option<::hyperlane::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
             }
         });
         quote! {
@@ -15783,7 +15786,7 @@ pub(crate) fn request_query_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: ::hyperlane_core::RequestQuerysValue = #context.get_request().get_query(#key_name);
+                let #variable: ::hyperlane::RequestQuerysValue = #context.get_request().get_query(#key_name);
             }
         });
         quote! {
@@ -15801,7 +15804,7 @@ pub(crate) fn request_querys_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_querys.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestQuerys = #new_context.get_request().get_querys();
+                let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
             }
         });
         quote! {
@@ -15818,7 +15821,7 @@ pub(crate) fn try_get_request_header_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: Option<::hyperlane_core::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
+                let #variable: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
             }
         });
         quote! {
@@ -15835,7 +15838,7 @@ pub(crate) fn request_header_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: ::hyperlane_core::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
+                let #variable: ::hyperlane::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
             }
         });
         quote! {
@@ -15853,7 +15856,7 @@ pub(crate) fn request_headers_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_headers.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestHeaders = #new_context.get_request().get_headers();
+                let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
             }
         });
         quote! {
@@ -15870,7 +15873,7 @@ pub(crate) fn try_get_request_cookie_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: Option<::hyperlane_core::CookieValue> = #context.get_request().try_get_cookie(#key_name);
+                let #variable: Option<::hyperlane::CookieValue> = #context.get_request().try_get_cookie(#key_name);
             }
         });
         quote! {
@@ -15887,7 +15890,7 @@ pub(crate) fn request_cookie_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
-                let #variable: ::hyperlane_core::CookieValue = #context.get_request().get_cookie(#key_name);
+                let #variable: ::hyperlane::CookieValue = #context.get_request().get_cookie(#key_name);
             }
         });
         quote! {
@@ -15904,7 +15907,7 @@ pub(crate) fn request_cookies_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let statements = multi_cookies.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: ::hyperlane_core::Cookies = #context.get_request().get_cookies();
+                let #variable: ::hyperlane::Cookies = #context.get_request().get_cookies();
             }
         });
         quote! {
@@ -15923,7 +15926,7 @@ pub(crate) fn request_version_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_version.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestVersion = #new_context.get_request().get_version();
+                let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
             }
         });
         quote! {
@@ -15941,7 +15944,7 @@ pub(crate) fn request_path_macro(
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
         let statements = multi_path.variables.iter().map(|variable: &syn::Ident| {
             quote! {
-                let #variable: &::hyperlane_core::RequestPath = #new_context.get_request().get_path();
+                let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
             }
         });
         quote! {
@@ -16089,7 +16092,7 @@ pub(crate) fn generate_http_stream(
                     #context.set_request(#variable_name.clone());
                     #(#stmts)*
                 }
-                ::hyperlane_core::Status::Continue
+                ::hyperlane::Status::Continue
             }
         }
         None => {
@@ -16098,7 +16101,7 @@ pub(crate) fn generate_http_stream(
                     #context.set_request(_request);
                     #(#stmts)*
                 }
-                ::hyperlane_core::Status::Continue
+                ::hyperlane::Status::Continue
             }
         }
     }
@@ -16117,7 +16120,7 @@ pub(crate) fn generate_websocket_stream(
                     #context.get_mut_request().set_body(#variable_name.clone());
                     #(#stmts)*
                 }
-                ::hyperlane_core::Status::Continue
+                ::hyperlane::Status::Continue
             }
         }
         None => {
@@ -16126,7 +16129,7 @@ pub(crate) fn generate_websocket_stream(
                     #context.get_mut_request().set_body(_body);
                     #(#stmts)*
                 }
-                ::hyperlane_core::Status::Continue
+                ::hyperlane::Status::Continue
             }
         }
     }
@@ -16220,12 +16223,12 @@ pub(crate) fn try_send_macro(
         |context: &syn::Ident, stream: &syn::Ident| match data_expr {
             Some(expr) => {
                 quote! {
-                    let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#expr).await;
+                    let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_send(#expr).await;
                 }
             }
             None => {
                 quote! {
-                    let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
+                    let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_send(#context.get_mut_response().build()).await;
                 }
             }
         },
@@ -16288,7 +16291,7 @@ pub(crate) fn reject_macro(
     inject(position, item, |_: &Ident, _: &Ident| {
         quote! {
             if #condition {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     })
@@ -16310,8 +16313,8 @@ pub(crate) fn response_middleware_macro(attr: TokenStream, item: TokenStream) ->
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
-        ::hyperlane_core::inventory::submit! {
-            ::hyperlane_core::HookType::ResponseMiddleware(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::ResponseMiddleware(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -16333,8 +16336,8 @@ pub(crate) fn request_middleware_macro(attr: TokenStream, item: TokenStream) -> 
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
-        ::hyperlane_core::inventory::submit! {
-            ::hyperlane_core::HookType::RequestMiddleware(#order, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::RequestMiddleware(#order, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -16357,7 +16360,7 @@ pub(crate) fn create_version_check(
         let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{version_str}"), context.span());
         quote! {
             if !#context.get_request().get_version().#check_fn() {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     }
@@ -16507,7 +16510,7 @@ pub(crate) fn response_status_code_macro(
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_mut_context(false, context);
         quote! {
-            #new_context.get_mut_response().set_status_code(::hyperlane_core::ResponseStatusCode::from(#value as usize));
+            #new_context.get_mut_response().set_status_code(::hyperlane::ResponseStatusCode::from(#value as usize));
         }
     })
 }
@@ -16625,7 +16628,7 @@ pub(crate) fn create_method_check(
         let check_fn: proc_macro2::Ident = Ident::new(&format!("is_{method_str}"), context.span());
         quote! {
             if !#context.get_request().get_method().#check_fn() {
-                return ::hyperlane_core::Status::Continue;
+                return ::hyperlane::Status::Continue;
             }
         }
     }
@@ -16654,7 +16657,7 @@ pub(crate) fn methods_macro(
                 |_: &Ident, _: &Ident| {
                     quote! {
                         if !(#(#method_checks)||*) {
-                            return ::hyperlane_core::Status::Continue;
+                            return ::hyperlane::Status::Continue;
                         }
                     }
                 },
@@ -16865,7 +16868,7 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
     }
     Err(syn::Error::new_spanned(
         &sig.inputs,
-        "expected at least one parameter of type &::hyperlane_core::Context",
+        "expected at least one parameter of type &::hyperlane::Context",
     ))
 }
 pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident> {
@@ -16888,7 +16891,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
     }
     Err(syn::Error::new_spanned(
         &sig.inputs,
-        "expected at least one parameter of type &::hyperlane_core::Stream",
+        "expected at least one parameter of type &::hyperlane::Stream",
     ))
 }
 pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream {
@@ -17303,8 +17306,8 @@ pub(crate) fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let struct_name: &Ident = &input_struct.ident;
     let gen_code: proc_macro2::TokenStream = quote! {
         #input_struct
-        ::hyperlane_core::inventory::submit! {
-            ::hyperlane_core::HookType::Route(#path, || ::hyperlane_core::Hook::factory::<#struct_name>())
+        ::hyperlane::inventory::submit! {
+            ::hyperlane::HookType::Route(#path, || ::hyperlane::Hook::factory::<#struct_name>())
         }
     };
     gen_code.into()
@@ -17355,7 +17358,7 @@ pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Positio
         let statements = multi_host.host_values.iter().map(|host_value: &syn::Expr| {
             quote! {
                 if #context.get_request().get_host() != #host_value {
-                    return ::hyperlane_core::Status::Continue;
+                    return ::hyperlane::Status::Continue;
                 }
             }
         });
@@ -17374,7 +17377,7 @@ pub(crate) fn reject_host_macro(
         let statements = multi_host.host_values.iter().map(|host_value: &syn::Expr| {
             quote! {
                 if #context.get_request().get_host() == #host_value {
-                    return ::hyperlane_core::Status::Continue;
+                    return ::hyperlane::Status::Continue;
                 }
             }
         });
@@ -17405,7 +17408,7 @@ use super::*;
 pub(crate) fn try_flush_macro(item: TokenStream, position: Position) -> TokenStream {
     inject(position, item, |_: &Ident, stream: &Ident| {
         quote! {
-            let _: ::std::result::Result<(), ::hyperlane_core::ResponseError> = #stream.try_flush().await;
+            let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_flush().await;
         }
     })
 }
