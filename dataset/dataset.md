@@ -1,29 +1,4 @@
-<!--2026-09-27 04:30:50-->
-# Path: hyperlane-utils/README.md
-## hyperlane-utils
-[Api Docs](https://docs.rs/hyperlane-utils/latest/)
-> A library providing utils for hyperlane.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-utils
-```
-## Contact
-# Path: hyperlane-utils/src/lib.rs
-```rust
-pub use {
-    aes, ahash, base64, bin_encode_decode::*, bytemuck_derive, chrono, chunkify::*, cipher,
-    clonelicious::*, color_output::*, compare_version::*, dotenvy, ed25519_dalek,
-    file_operation::*, future_fn::*, futures, getrandom, hex, hot_restart::*,
-    hyperlane_broadcast::*, hyperlane_log::*, hyperlane_macros::*, hyperlane_plugin_websocket::*,
-    instrument_level::*, jsonwebtoken, jwt_service::*, log, lombok_macros::*, md5, num_cpus,
-    once_cell, rand, recoverable_spawn::*, recoverable_thread_pool::*, redis, regex, reqwest, rsa,
-    rust_decimal, rustls_pki_types, scraper, sea_orm, serde_urlencoded, serde_with, serde_xml_rs,
-    serde_yaml, server_manager::*, sha2, simd_json, snafu, sqlx, std_macro_extensions::*, sysinfo,
-    tracing_log, tracing_subscriber, twox_hash, url, urlencoding, utoipa, utoipa_rapidoc,
-    utoipa_swagger_ui, uuid,
-};
-```
+<!--2026-09-27 11:43:22-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -12412,6 +12387,822 @@ mod r#struct;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
 use super::*;
+```
+# Path: hyperlane/plugin/websocket/README.md
+## hyperlane-plugin-websocket
+[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
+> A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with tokio-broadcast for efficient message dissemination.
+## Installation
+To use this crate, you can run cmd:
+```shell
+cargo add hyperlane-plugin-websocket
+```
+## Contact
+# Path: hyperlane/plugin/websocket/tests/mod.rs
+```rust
+mod websocket;
+use hyperlane_plugin_websocket::*;
+use std::sync::OnceLock;
+use {
+    hyperlane::*,
+    tokio::{spawn, time::sleep},
+    tokio_broadcast::*,
+};
+```
+# Path: hyperlane/plugin/websocket/tests/websocket/impl.rs
+```rust
+use super::*;
+impl ServerHook for TaskPanicHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
+        let response_body: String = error.to_string();
+        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
+        Self {
+            response_body,
+            content_type,
+        }
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(500)
+            .clear_headers()
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONTENT_TYPE, &self.content_type)
+            .set_body(&self.response_body)
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for RequestErrorHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
+        Self {
+            response_status_code: request_error.get_http_status_code(),
+            response_body: request_error.to_string(),
+        }
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(self.response_status_code)
+            .set_body(self.response_body)
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for RequestMiddleware {
+    async fn new(stream: &mut Stream, _: &mut Context) -> Self {
+        let socket_addr: String = stream
+            .get_stream()
+            .peer_addr()
+            .map(|data| data.to_string())
+            .unwrap_or_default();
+        Self { socket_addr }
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response()
+            .set_version(HttpVersion::Http1_1)
+            .set_status_code(200)
+            .set_header(SERVER, HYPERLANE)
+            .set_header(CONNECTION, KEEP_ALIVE)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
+            .set_header("SocketAddr", &self.socket_addr);
+        Status::Continue
+    }
+}
+impl ServerHook for UpgradeHook {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        if !ctx.get_request().is_ws_upgrade_type() {
+            return Status::Continue;
+        }
+        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            let data: Vec<u8> = ctx
+                .get_mut_response()
+                .set_version(HttpVersion::Http1_1)
+                .set_status_code(101)
+                .set_header(UPGRADE, WEBSOCKET)
+                .set_header(CONNECTION, UPGRADE)
+                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .set_body(Vec::new())
+                .build();
+            if stream.try_send(data).await.is_err() {
+                stream.set_closed(true);
+                return Status::Reject;
+            }
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for ConnectedHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap_or_default();
+        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let group_receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count(group_broadcast_type.clone());
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap_or_default();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap_or_default();
+        let private_broadcast_type: BroadcastType<String> =
+            BroadcastType::PointToPoint(my_name, your_name);
+        let private_receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count(private_broadcast_type.clone());
+        let receiver_count: usize = if group_receiver_count > 0 {
+            group_receiver_count
+        } else {
+            private_receiver_count
+        };
+        let data: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            receiver_count,
+            data,
+            group_broadcast_type,
+            private_broadcast_type,
+        }
+    }
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .try_send(self.group_broadcast_type, self.data.clone())
+            .unwrap_or_else(|err| {
+                println!("[connected_hook] send group error => {:?}", err.to_string());
+                None
+            });
+        BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .try_send(self.private_broadcast_type, self.data)
+            .unwrap_or_else(|err| {
+                println!(
+                    "[connected_hook] send private error => {:?}",
+                    err.to_string()
+                );
+                None
+            });
+        println!(
+            "[connected_hook] receiver_count => {:?}",
+            self.receiver_count
+        );
+        Server::flush_stdout();
+        Status::Continue
+    }
+}
+impl ServerHook for SendedHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let msg: String = ctx.get_response().get_body_string();
+        Self { msg }
+    }
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        println!("[sended_hook] msg => {}", self.msg);
+        Server::flush_stdout();
+        Status::Continue
+    }
+}
+impl ServerHook for GroupChatRequestHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let mut receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request().get_body().clone();
+        if body.is_empty() {
+            receiver_count = BROADCAST_MAP
+                .get_or_init(WebSocket::new)
+                .receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response().set_body(&self.body);
+        println!("[group_chat] receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+        Status::Continue
+    }
+}
+impl ServerHook for GroupClosedHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count_after_closed(key.clone());
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response().set_body(&self.body);
+        println!("[group_closed] receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+        Status::Continue
+    }
+}
+impl ServerHook for GroupChat {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new(stream, ctx)
+            .set_capacity(1024)
+            .set_broadcast_type(key)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<GroupChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<GroupClosedHook>();
+        BROADCAST_MAP.get_or_init(WebSocket::new).run(config).await;
+        Status::Continue
+    }
+}
+impl ServerHook for PrivateChatRequestHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let mut receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count(key.clone());
+        let mut body: RequestBody = ctx.get_request().get_body().clone();
+        if body.is_empty() {
+            receiver_count = BROADCAST_MAP
+                .get_or_init(WebSocket::new)
+                .receiver_count_after_closed(key);
+            body = format!("receiver_count => {receiver_count:?}").into();
+        }
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response().set_body(&self.body);
+        println!("[private_chat] receiver_count => {:?}", self.receiver_count);
+        Server::flush_stdout();
+        Status::Continue
+    }
+}
+impl ServerHook for PrivateClosedHook {
+    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let receiver_count: ReceiverCount = BROADCAST_MAP
+            .get_or_init(WebSocket::new)
+            .receiver_count_after_closed(key);
+        let body: String = format!("receiver_count => {receiver_count:?}");
+        Self {
+            body,
+            receiver_count,
+        }
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response().set_body(&self.body);
+        println!(
+            "[private_closed] receiver_count => {:?}",
+            self.receiver_count
+        );
+        Server::flush_stdout();
+        Status::Continue
+    }
+}
+impl ServerHook for PrivateChat {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
+        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
+        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
+        let config: WebSocketConfig<String> = WebSocketConfig::new(stream, ctx)
+            .set_capacity(1024)
+            .set_broadcast_type(key)
+            .set_connected_hook::<ConnectedHook>()
+            .set_request_hook::<PrivateChatRequestHook>()
+            .set_sended_hook::<SendedHook>()
+            .set_closed_hook::<PrivateClosedHook>();
+        BROADCAST_MAP.get_or_init(WebSocket::new).run(config).await;
+        Status::Continue
+    }
+}
+```
+# Path: hyperlane/plugin/websocket/tests/websocket/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn main() {
+    let mut server: Server = Server::default();
+    let request_config: RequestConfig = RequestConfig::low_security();
+    server.request_config(request_config);
+    server.task_panic::<TaskPanicHook>();
+    server.request_error::<RequestErrorHook>();
+    server.request_middleware::<RequestMiddleware>();
+    server.request_middleware::<UpgradeHook>();
+    server.route::<GroupChat>("/{group_name}");
+    server.route::<PrivateChat>("/{my_name}/{your_name}");
+    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
+    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
+    spawn(async move {
+        sleep(std::time::Duration::from_secs(60)).await;
+        server_control_hook_2.shutdown().await;
+    });
+    server_control_hook_1.wait().await;
+}
+```
+# Path: hyperlane/plugin/websocket/tests/websocket/static.rs
+```rust
+use super::*;
+pub(crate) static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
+```
+# Path: hyperlane/plugin/websocket/tests/websocket/struct.rs
+```rust
+use super::*;
+pub(crate) struct TaskPanicHook {
+    pub(crate) response_body: String,
+    pub(crate) content_type: String,
+}
+pub(crate) struct RequestErrorHook {
+    pub(crate) response_status_code: ResponseStatusCode,
+    pub(crate) response_body: String,
+}
+pub(crate) struct RequestMiddleware {
+    pub(crate) socket_addr: String,
+}
+pub(crate) struct UpgradeHook;
+pub(crate) struct ConnectedHook {
+    pub(crate) receiver_count: ReceiverCount,
+    pub(crate) data: String,
+    pub(crate) group_broadcast_type: BroadcastType<String>,
+    pub(crate) private_broadcast_type: BroadcastType<String>,
+}
+pub(crate) struct SendedHook {
+    pub(crate) msg: String,
+}
+pub(crate) struct GroupChatRequestHook {
+    pub(crate) body: RequestBody,
+    pub(crate) receiver_count: ReceiverCount,
+}
+pub(crate) struct GroupClosedHook {
+    pub(crate) body: String,
+    pub(crate) receiver_count: ReceiverCount,
+}
+pub(crate) struct GroupChat;
+pub(crate) struct PrivateChatRequestHook {
+    pub(crate) body: RequestBody,
+    pub(crate) receiver_count: ReceiverCount,
+}
+pub(crate) struct PrivateClosedHook {
+    pub(crate) body: String,
+    pub(crate) receiver_count: ReceiverCount,
+}
+pub(crate) struct PrivateChat;
+```
+# Path: hyperlane/plugin/websocket/tests/websocket/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub(crate) use {r#static::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/plugin/websocket/src/impl.rs
+```rust
+use super::*;
+impl BroadcastTypeTrait for String {}
+impl BroadcastTypeTrait for &str {}
+impl BroadcastTypeTrait for char {}
+impl BroadcastTypeTrait for bool {}
+impl BroadcastTypeTrait for i8 {}
+impl BroadcastTypeTrait for i16 {}
+impl BroadcastTypeTrait for i32 {}
+impl BroadcastTypeTrait for i64 {}
+impl BroadcastTypeTrait for i128 {}
+impl BroadcastTypeTrait for isize {}
+impl BroadcastTypeTrait for u8 {}
+impl BroadcastTypeTrait for u16 {}
+impl BroadcastTypeTrait for u32 {}
+impl BroadcastTypeTrait for u64 {}
+impl BroadcastTypeTrait for u128 {}
+impl BroadcastTypeTrait for usize {}
+impl BroadcastTypeTrait for f32 {}
+impl BroadcastTypeTrait for f64 {}
+impl BroadcastTypeTrait for IpAddr {}
+impl BroadcastTypeTrait for Ipv4Addr {}
+impl BroadcastTypeTrait for Ipv6Addr {}
+impl BroadcastTypeTrait for SocketAddr {}
+impl BroadcastTypeTrait for NonZeroU8 {}
+impl BroadcastTypeTrait for NonZeroU16 {}
+impl BroadcastTypeTrait for NonZeroU32 {}
+impl BroadcastTypeTrait for NonZeroU64 {}
+impl BroadcastTypeTrait for NonZeroU128 {}
+impl BroadcastTypeTrait for NonZeroUsize {}
+impl BroadcastTypeTrait for NonZeroI8 {}
+impl BroadcastTypeTrait for NonZeroI16 {}
+impl BroadcastTypeTrait for NonZeroI32 {}
+impl BroadcastTypeTrait for NonZeroI64 {}
+impl BroadcastTypeTrait for NonZeroI128 {}
+impl BroadcastTypeTrait for NonZeroIsize {}
+impl BroadcastTypeTrait for Infallible {}
+impl BroadcastTypeTrait for &String {}
+impl BroadcastTypeTrait for &&str {}
+impl BroadcastTypeTrait for &char {}
+impl BroadcastTypeTrait for &bool {}
+impl BroadcastTypeTrait for &i8 {}
+impl BroadcastTypeTrait for &i16 {}
+impl BroadcastTypeTrait for &i32 {}
+impl BroadcastTypeTrait for &i64 {}
+impl BroadcastTypeTrait for &i128 {}
+impl BroadcastTypeTrait for &isize {}
+impl BroadcastTypeTrait for &u8 {}
+impl BroadcastTypeTrait for &u16 {}
+impl BroadcastTypeTrait for &u32 {}
+impl BroadcastTypeTrait for &u128 {}
+impl BroadcastTypeTrait for &usize {}
+impl BroadcastTypeTrait for &f32 {}
+impl BroadcastTypeTrait for &f64 {}
+impl BroadcastTypeTrait for &IpAddr {}
+impl BroadcastTypeTrait for &Ipv4Addr {}
+impl BroadcastTypeTrait for &Ipv6Addr {}
+impl BroadcastTypeTrait for &SocketAddr {}
+impl BroadcastTypeTrait for &NonZeroU8 {}
+impl BroadcastTypeTrait for &NonZeroU16 {}
+impl BroadcastTypeTrait for &NonZeroU32 {}
+impl BroadcastTypeTrait for &NonZeroU64 {}
+impl BroadcastTypeTrait for &NonZeroU128 {}
+impl BroadcastTypeTrait for &NonZeroUsize {}
+impl BroadcastTypeTrait for &NonZeroI8 {}
+impl BroadcastTypeTrait for &NonZeroI16 {}
+impl BroadcastTypeTrait for &NonZeroI32 {}
+impl BroadcastTypeTrait for &NonZeroI64 {}
+impl BroadcastTypeTrait for &NonZeroI128 {}
+impl BroadcastTypeTrait for &NonZeroIsize {}
+impl BroadcastTypeTrait for &Infallible {}
+impl<B> Default for BroadcastType<B>
+where
+    B: BroadcastTypeTrait,
+{
+    #[inline(always)]
+    fn default() -> Self {
+        BroadcastType::Unknown
+    }
+}
+impl<B> BroadcastType<B>
+where
+    B: BroadcastTypeTrait,
+{
+    #[inline(always)]
+    pub fn get_key(broadcast_type: BroadcastType<B>) -> String {
+        match broadcast_type {
+            BroadcastType::PointToPoint(key1, key2) => {
+                let (first_key, second_key) = if key1 <= key2 {
+                    (key1, key2)
+                } else {
+                    (key2, key1)
+                };
+                format!(
+                    "{}-{}-{}",
+                    POINT_TO_POINT_KEY,
+                    first_key.to_string(),
+                    second_key.to_string()
+                )
+            }
+            BroadcastType::PointToGroup(key) => {
+                format!("{}-{}", POINT_TO_GROUP_KEY, key.to_string())
+            }
+            BroadcastType::Unknown => String::new(),
+        }
+    }
+}
+impl<'a, B> WebSocketConfig<'a, B>
+where
+    B: BroadcastTypeTrait,
+{
+    #[inline(always)]
+    pub fn new(stream: &'a mut Stream, context: &'a mut Context) -> Self {
+        Self {
+            stream,
+            context,
+            capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
+            broadcast_type: BroadcastType::default(),
+            connected_hook: Hook::default_handler(),
+            request_hook: Hook::default_handler(),
+            sended_hook: Hook::default_handler(),
+            closed_hook: Hook::default_handler(),
+        }
+    }
+}
+impl<'a, B> WebSocketConfig<'a, B>
+where
+    B: BroadcastTypeTrait,
+{
+    #[inline(always)]
+    pub fn set_capacity(mut self, capacity: Capacity) -> Self {
+        self.capacity = capacity;
+        self
+    }
+    #[inline(always)]
+    pub fn set_context(mut self, context: &'a mut Context) -> Self {
+        self.context = context;
+        self
+    }
+    #[inline(always)]
+    pub fn set_broadcast_type(mut self, broadcast_type: BroadcastType<B>) -> Self {
+        self.broadcast_type = broadcast_type;
+        self
+    }
+    #[inline(always)]
+    pub fn get_stream(&mut self) -> &mut Stream {
+        self.stream
+    }
+    #[inline(always)]
+    pub fn get_context(&mut self) -> &mut Context {
+        self.context
+    }
+    #[inline(always)]
+    pub fn get_capacity(&self) -> Capacity {
+        self.capacity
+    }
+    #[inline(always)]
+    pub fn get_broadcast_type(&self) -> &BroadcastType<B> {
+        &self.broadcast_type
+    }
+    #[inline(always)]
+    pub fn set_connected_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.connected_hook = Hook::factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_request_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.request_hook = Hook::factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_sended_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.sended_hook = Hook::factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn set_closed_hook<S>(mut self) -> Self
+    where
+        S: ServerHook,
+    {
+        self.closed_hook = Hook::factory::<S>();
+        self
+    }
+    #[inline(always)]
+    pub fn get_connected_hook(&self) -> &ServerHookHandler {
+        &self.connected_hook
+    }
+    #[inline(always)]
+    pub fn get_request_hook(&self) -> &ServerHookHandler {
+        &self.request_hook
+    }
+    #[inline(always)]
+    pub fn get_sended_hook(&self) -> &ServerHookHandler {
+        &self.sended_hook
+    }
+    #[inline(always)]
+    pub fn get_closed_hook(&self) -> &ServerHookHandler {
+        &self.closed_hook
+    }
+}
+impl WebSocket {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    #[inline(always)]
+    fn subscribe_unwrap_or_insert<B>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+        capacity: Capacity,
+    ) -> BroadcastMapReceiver<Vec<u8>>
+    where
+        B: BroadcastTypeTrait,
+    {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.subscribe_or_insert(&key, capacity)
+    }
+    #[inline(always)]
+    fn point_to_point<B>(
+        &self,
+        key1: &B,
+        key2: &B,
+        capacity: Capacity,
+    ) -> BroadcastMapReceiver<Vec<u8>>
+    where
+        B: BroadcastTypeTrait,
+    {
+        self.subscribe_unwrap_or_insert(
+            BroadcastType::PointToPoint(key1.clone(), key2.clone()),
+            capacity,
+        )
+    }
+    #[inline(always)]
+    fn point_to_group<B>(&self, key: &B, capacity: Capacity) -> BroadcastMapReceiver<Vec<u8>>
+    where
+        B: BroadcastTypeTrait,
+    {
+        self.subscribe_unwrap_or_insert(BroadcastType::PointToGroup(key.clone()), capacity)
+    }
+    #[inline(always)]
+    pub fn receiver_count<B>(&self, broadcast_type: BroadcastType<B>) -> ReceiverCount
+    where
+        B: BroadcastTypeTrait,
+    {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.receiver_count(&key).unwrap_or(0)
+    }
+    #[inline(always)]
+    pub fn receiver_count_before_connected<B>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+    ) -> ReceiverCount
+    where
+        B: BroadcastTypeTrait,
+    {
+        let count: ReceiverCount = self.receiver_count(broadcast_type);
+        count.clamp(0, ReceiverCount::MAX - 1) + 1
+    }
+    #[inline(always)]
+    pub fn receiver_count_after_closed<B>(&self, broadcast_type: BroadcastType<B>) -> ReceiverCount
+    where
+        B: BroadcastTypeTrait,
+    {
+        let count: ReceiverCount = self.receiver_count(broadcast_type);
+        count.clamp(1, ReceiverCount::MAX) - 1
+    }
+    #[inline(always)]
+    pub fn try_send<T, B>(
+        &self,
+        broadcast_type: BroadcastType<B>,
+        data: T,
+    ) -> Result<Option<ReceiverCount>, SendError<Vec<u8>>>
+    where
+        T: Into<Vec<u8>>,
+        B: BroadcastTypeTrait,
+    {
+        let key: String = BroadcastType::get_key(broadcast_type);
+        self.broadcast_map.try_send(&key, data.into())
+    }
+    #[inline(always)]
+    pub fn send<T, B>(&self, broadcast_type: BroadcastType<B>, data: T) -> Option<ReceiverCount>
+    where
+        T: Into<Vec<u8>>,
+        B: BroadcastTypeTrait,
+    {
+        self.try_send(broadcast_type, data).unwrap()
+    }
+    pub async fn run<B>(&self, websocket_config: WebSocketConfig<'_, B>)
+    where
+        B: BroadcastTypeTrait,
+    {
+        let capacity: Capacity = websocket_config.get_capacity();
+        let broadcast_type: BroadcastType<B> = websocket_config.get_broadcast_type().clone();
+        let connected_hook: ServerHookHandler = websocket_config.get_connected_hook().clone();
+        let sended_hook: ServerHookHandler = websocket_config.get_sended_hook().clone();
+        let request_hook: ServerHookHandler = websocket_config.get_request_hook().clone();
+        let closed_hook: ServerHookHandler = websocket_config.get_closed_hook().clone();
+        let WebSocketConfig {
+            stream,
+            context: ctx,
+            ..
+        } = websocket_config;
+        let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
+            BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
+            BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
+            BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
+        };
+        let key: String = BroadcastType::get_key(broadcast_type);
+        if connected_hook(stream, ctx).await.is_reject() {
+            return;
+        }
+        let mut is_reject: bool;
+        loop {
+            tokio::select! {
+                request_res = stream.try_get_websocket_request() => {
+                    if let Ok(body) = request_res {
+                        ctx.get_mut_request().set_body(body);
+                        is_reject = request_hook(stream, ctx).await.is_reject();
+                    } else {
+                        is_reject = true;
+                        closed_hook(stream, ctx).await;
+                    }
+                    let body: ResponseBody = ctx.get_response().get_body().clone();
+                    let is_err: bool = self.broadcast_map.try_send(&key, body).is_err();
+                    if is_err || sended_hook(stream, ctx).await.is_reject() || is_reject {
+                        break;
+                    }
+                },
+                msg_res = receiver.recv() => {
+                    if let Ok(msg) = &msg_res {
+                        if stream.try_send_list(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
+                            continue;
+                        } else {
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        stream.set_closed(true);
+    }
+}
+```
+# Path: hyperlane/plugin/websocket/src/trait.rs
+```rust
+pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
+```
+# Path: hyperlane/plugin/websocket/src/const.rs
+```rust
+pub(crate) const POINT_TO_POINT_KEY: &str = "ptp-";
+pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
+```
+# Path: hyperlane/plugin/websocket/src/lib.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#impl;
+mod r#struct;
+mod r#trait;
+pub use {r#enum::*, r#struct::*};
+use {r#const::*, r#trait::*};
+use std::{
+    convert::Infallible,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    num::{
+        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
+        NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
+    },
+};
+use {
+    hyperlane::{
+        tokio::sync::broadcast::{Receiver, error::SendError},
+        *,
+    },
+    tokio_broadcast::*,
+};
+```
+# Path: hyperlane/plugin/websocket/src/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum BroadcastType<T: BroadcastTypeTrait> {
+    PointToPoint(T, T),
+    PointToGroup(T),
+    Unknown,
+}
+```
+# Path: hyperlane/plugin/websocket/src/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default)]
+pub struct WebSocket {
+    pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
+}
+pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
+    pub(super) stream: &'a mut Stream,
+    pub(super) context: &'a mut Context,
+    pub(super) capacity: Capacity,
+    pub(super) broadcast_type: BroadcastType<B>,
+    pub(super) connected_hook: ServerHookHandler,
+    pub(super) request_hook: ServerHookHandler,
+    pub(super) sended_hook: ServerHookHandler,
+    pub(super) closed_hook: ServerHookHandler,
+}
 ```
 # Path: hyperlane/src/lib.rs
 ```rust
@@ -29563,820 +30354,4 @@ RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86
     cp -f /hyperlane-quick-start/target/x86_64-unknown-linux-gnu/release/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start
 EXPOSE 65002
 CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
-```
-# Path: hyperlane-plugin-websocket/README.md
-## hyperlane-plugin-websocket
-[Api Docs](https://docs.rs/hyperlane-plugin-websocket/latest/)
-> A WebSocket plugin for the Hyperlane framework, providing robust WebSocket communication capabilities and integrating with hyperlane-broadcast for efficient message dissemination.
-## Installation
-To use this crate, you can run cmd:
-```shell
-cargo add hyperlane-plugin-websocket
-```
-## Contact
-# Path: hyperlane-plugin-websocket/tests/mod.rs
-```rust
-mod websocket;
-use hyperlane_plugin_websocket::*;
-use std::sync::OnceLock;
-use {
-    hyperlane::*,
-    hyperlane_broadcast::*,
-    tokio::{spawn, time::sleep},
-};
-```
-# Path: hyperlane-plugin-websocket/tests/websocket/impl.rs
-```rust
-use super::*;
-impl ServerHook for TaskPanicHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let error: PanicData = ctx.try_get_task_panic_data().unwrap_or_default();
-        let response_body: String = error.to_string();
-        let content_type: String = ContentType::format_content_type_with_charset(TEXT_PLAIN, UTF8);
-        Self {
-            response_body,
-            content_type,
-        }
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let data: Vec<u8> = ctx
-            .get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(500)
-            .clear_headers()
-            .set_header(SERVER, HYPERLANE)
-            .set_header(CONTENT_TYPE, &self.content_type)
-            .set_body(&self.response_body)
-            .build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        Status::Continue
-    }
-}
-impl ServerHook for RequestErrorHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let request_error: RequestError = ctx.try_get_request_error_data().unwrap_or_default();
-        Self {
-            response_status_code: request_error.get_http_status_code(),
-            response_body: request_error.to_string(),
-        }
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let data: Vec<u8> = ctx
-            .get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(self.response_status_code)
-            .set_body(self.response_body)
-            .build();
-        if stream.try_send(data).await.is_err() {
-            stream.set_closed(true);
-            return Status::Reject;
-        }
-        Status::Continue
-    }
-}
-impl ServerHook for RequestMiddleware {
-    async fn new(stream: &mut Stream, _: &mut Context) -> Self {
-        let socket_addr: String = stream
-            .get_stream()
-            .peer_addr()
-            .map(|data| data.to_string())
-            .unwrap_or_default();
-        Self { socket_addr }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response()
-            .set_version(HttpVersion::Http1_1)
-            .set_status_code(200)
-            .set_header(SERVER, HYPERLANE)
-            .set_header(CONNECTION, KEEP_ALIVE)
-            .set_header(CONTENT_TYPE, TEXT_PLAIN)
-            .set_header(ACCESS_CONTROL_ALLOW_ORIGIN, WILDCARD_ANY)
-            .set_header("SocketAddr", &self.socket_addr);
-        Status::Continue
-    }
-}
-impl ServerHook for UpgradeHook {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        if !ctx.get_request().is_ws_upgrade_type() {
-            return Status::Continue;
-        }
-        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
-            let accept_key: String = WebSocketFrame::generate_accept_key(key);
-            let data: Vec<u8> = ctx
-                .get_mut_response()
-                .set_version(HttpVersion::Http1_1)
-                .set_status_code(101)
-                .set_header(UPGRADE, WEBSOCKET)
-                .set_header(CONNECTION, UPGRADE)
-                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
-                .set_body(Vec::new())
-                .build();
-            if stream.try_send(data).await.is_err() {
-                stream.set_closed(true);
-                return Status::Reject;
-            }
-        }
-        Status::Continue
-    }
-}
-impl ServerHook for ConnectedHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").unwrap_or_default();
-        let group_broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let group_receiver_count: ReceiverCount = BROADCAST_MAP
-            .get_or_init(WebSocket::new)
-            .receiver_count(group_broadcast_type.clone());
-        let my_name: String = ctx.try_get_route_param("my_name").unwrap_or_default();
-        let your_name: String = ctx.try_get_route_param("your_name").unwrap_or_default();
-        let private_broadcast_type: BroadcastType<String> =
-            BroadcastType::PointToPoint(my_name, your_name);
-        let private_receiver_count: ReceiverCount = BROADCAST_MAP
-            .get_or_init(WebSocket::new)
-            .receiver_count(private_broadcast_type.clone());
-        let receiver_count: usize = if group_receiver_count > 0 {
-            group_receiver_count
-        } else {
-            private_receiver_count
-        };
-        let data: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            receiver_count,
-            data,
-            group_broadcast_type,
-            private_broadcast_type,
-        }
-    }
-    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
-        BROADCAST_MAP
-            .get_or_init(WebSocket::new)
-            .try_send(self.group_broadcast_type, self.data.clone())
-            .unwrap_or_else(|err| {
-                println!("[connected_hook] send group error => {:?}", err.to_string());
-                None
-            });
-        BROADCAST_MAP
-            .get_or_init(WebSocket::new)
-            .try_send(self.private_broadcast_type, self.data)
-            .unwrap_or_else(|err| {
-                println!(
-                    "[connected_hook] send private error => {:?}",
-                    err.to_string()
-                );
-                None
-            });
-        println!(
-            "[connected_hook] receiver_count => {:?}",
-            self.receiver_count
-        );
-        Server::flush_stdout();
-        Status::Continue
-    }
-}
-impl ServerHook for SendedHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let msg: String = ctx.get_response().get_body_string();
-        Self { msg }
-    }
-    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
-        println!("[sended_hook] msg => {}", self.msg);
-        Server::flush_stdout();
-        Status::Continue
-    }
-}
-impl ServerHook for GroupChatRequestHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let mut receiver_count: ReceiverCount = BROADCAST_MAP
-            .get_or_init(WebSocket::new)
-            .receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request().get_body().clone();
-        if body.is_empty() {
-            receiver_count = BROADCAST_MAP
-                .get_or_init(WebSocket::new)
-                .receiver_count_after_closed(key);
-            body = format!("receiver_count => {receiver_count:?}").into();
-        }
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response().set_body(&self.body);
-        println!("[group_chat] receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-        Status::Continue
-    }
-}
-impl ServerHook for GroupClosedHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let receiver_count: ReceiverCount = BROADCAST_MAP
-            .get_or_init(WebSocket::new)
-            .receiver_count_after_closed(key.clone());
-        let body: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response().set_body(&self.body);
-        println!("[group_closed] receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-        Status::Continue
-    }
-}
-impl ServerHook for GroupChat {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let group_name: String = ctx.try_get_route_param("group_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToGroup(group_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new(stream, ctx)
-            .set_capacity(1024)
-            .set_broadcast_type(key)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<GroupChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<GroupClosedHook>();
-        BROADCAST_MAP.get_or_init(WebSocket::new).run(config).await;
-        Status::Continue
-    }
-}
-impl ServerHook for PrivateChatRequestHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let mut receiver_count: ReceiverCount = BROADCAST_MAP
-            .get_or_init(WebSocket::new)
-            .receiver_count(key.clone());
-        let mut body: RequestBody = ctx.get_request().get_body().clone();
-        if body.is_empty() {
-            receiver_count = BROADCAST_MAP
-                .get_or_init(WebSocket::new)
-                .receiver_count_after_closed(key);
-            body = format!("receiver_count => {receiver_count:?}").into();
-        }
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response().set_body(&self.body);
-        println!("[private_chat] receiver_count => {:?}", self.receiver_count);
-        Server::flush_stdout();
-        Status::Continue
-    }
-}
-impl ServerHook for PrivateClosedHook {
-    async fn new(_: &mut Stream, ctx: &mut Context) -> Self {
-        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let receiver_count: ReceiverCount = BROADCAST_MAP
-            .get_or_init(WebSocket::new)
-            .receiver_count_after_closed(key);
-        let body: String = format!("receiver_count => {receiver_count:?}");
-        Self {
-            body,
-            receiver_count,
-        }
-    }
-    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
-        ctx.get_mut_response().set_body(&self.body);
-        println!(
-            "[private_closed] receiver_count => {:?}",
-            self.receiver_count
-        );
-        Server::flush_stdout();
-        Status::Continue
-    }
-}
-impl ServerHook for PrivateChat {
-    async fn new(_: &mut Stream, _: &mut Context) -> Self {
-        Self
-    }
-    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
-        let my_name: String = ctx.try_get_route_param("my_name").unwrap();
-        let your_name: String = ctx.try_get_route_param("your_name").unwrap();
-        let key: BroadcastType<String> = BroadcastType::PointToPoint(my_name, your_name);
-        let config: WebSocketConfig<String> = WebSocketConfig::new(stream, ctx)
-            .set_capacity(1024)
-            .set_broadcast_type(key)
-            .set_connected_hook::<ConnectedHook>()
-            .set_request_hook::<PrivateChatRequestHook>()
-            .set_sended_hook::<SendedHook>()
-            .set_closed_hook::<PrivateClosedHook>();
-        BROADCAST_MAP.get_or_init(WebSocket::new).run(config).await;
-        Status::Continue
-    }
-}
-```
-# Path: hyperlane-plugin-websocket/tests/websocket/fn.rs
-```rust
-use super::*;
-#[tokio::test]
-async fn main() {
-    let mut server: Server = Server::default();
-    let request_config: RequestConfig = RequestConfig::low_security();
-    server.request_config(request_config);
-    server.task_panic::<TaskPanicHook>();
-    server.request_error::<RequestErrorHook>();
-    server.request_middleware::<RequestMiddleware>();
-    server.request_middleware::<UpgradeHook>();
-    server.route::<GroupChat>("/{group_name}");
-    server.route::<PrivateChat>("/{my_name}/{your_name}");
-    let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
-    let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
-    spawn(async move {
-        sleep(std::time::Duration::from_secs(60)).await;
-        server_control_hook_2.shutdown().await;
-    });
-    server_control_hook_1.wait().await;
-}
-```
-# Path: hyperlane-plugin-websocket/tests/websocket/static.rs
-```rust
-use super::*;
-pub(crate) static BROADCAST_MAP: OnceLock<WebSocket> = OnceLock::new();
-```
-# Path: hyperlane-plugin-websocket/tests/websocket/struct.rs
-```rust
-use super::*;
-pub(crate) struct TaskPanicHook {
-    pub(crate) response_body: String,
-    pub(crate) content_type: String,
-}
-pub(crate) struct RequestErrorHook {
-    pub(crate) response_status_code: ResponseStatusCode,
-    pub(crate) response_body: String,
-}
-pub(crate) struct RequestMiddleware {
-    pub(crate) socket_addr: String,
-}
-pub(crate) struct UpgradeHook;
-pub(crate) struct ConnectedHook {
-    pub(crate) receiver_count: ReceiverCount,
-    pub(crate) data: String,
-    pub(crate) group_broadcast_type: BroadcastType<String>,
-    pub(crate) private_broadcast_type: BroadcastType<String>,
-}
-pub(crate) struct SendedHook {
-    pub(crate) msg: String,
-}
-pub(crate) struct GroupChatRequestHook {
-    pub(crate) body: RequestBody,
-    pub(crate) receiver_count: ReceiverCount,
-}
-pub(crate) struct GroupClosedHook {
-    pub(crate) body: String,
-    pub(crate) receiver_count: ReceiverCount,
-}
-pub(crate) struct GroupChat;
-pub(crate) struct PrivateChatRequestHook {
-    pub(crate) body: RequestBody,
-    pub(crate) receiver_count: ReceiverCount,
-}
-pub(crate) struct PrivateClosedHook {
-    pub(crate) body: String,
-    pub(crate) receiver_count: ReceiverCount,
-}
-pub(crate) struct PrivateChat;
-```
-# Path: hyperlane-plugin-websocket/tests/websocket/mod.rs
-```rust
-mod r#fn;
-mod r#impl;
-mod r#static;
-mod r#struct;
-pub(crate) use {r#static::*, r#struct::*};
-use super::*;
-```
-# Path: hyperlane-plugin-websocket/src/impl.rs
-```rust
-use super::*;
-impl BroadcastTypeTrait for String {}
-impl BroadcastTypeTrait for &str {}
-impl BroadcastTypeTrait for char {}
-impl BroadcastTypeTrait for bool {}
-impl BroadcastTypeTrait for i8 {}
-impl BroadcastTypeTrait for i16 {}
-impl BroadcastTypeTrait for i32 {}
-impl BroadcastTypeTrait for i64 {}
-impl BroadcastTypeTrait for i128 {}
-impl BroadcastTypeTrait for isize {}
-impl BroadcastTypeTrait for u8 {}
-impl BroadcastTypeTrait for u16 {}
-impl BroadcastTypeTrait for u32 {}
-impl BroadcastTypeTrait for u64 {}
-impl BroadcastTypeTrait for u128 {}
-impl BroadcastTypeTrait for usize {}
-impl BroadcastTypeTrait for f32 {}
-impl BroadcastTypeTrait for f64 {}
-impl BroadcastTypeTrait for IpAddr {}
-impl BroadcastTypeTrait for Ipv4Addr {}
-impl BroadcastTypeTrait for Ipv6Addr {}
-impl BroadcastTypeTrait for SocketAddr {}
-impl BroadcastTypeTrait for NonZeroU8 {}
-impl BroadcastTypeTrait for NonZeroU16 {}
-impl BroadcastTypeTrait for NonZeroU32 {}
-impl BroadcastTypeTrait for NonZeroU64 {}
-impl BroadcastTypeTrait for NonZeroU128 {}
-impl BroadcastTypeTrait for NonZeroUsize {}
-impl BroadcastTypeTrait for NonZeroI8 {}
-impl BroadcastTypeTrait for NonZeroI16 {}
-impl BroadcastTypeTrait for NonZeroI32 {}
-impl BroadcastTypeTrait for NonZeroI64 {}
-impl BroadcastTypeTrait for NonZeroI128 {}
-impl BroadcastTypeTrait for NonZeroIsize {}
-impl BroadcastTypeTrait for Infallible {}
-impl BroadcastTypeTrait for &String {}
-impl BroadcastTypeTrait for &&str {}
-impl BroadcastTypeTrait for &char {}
-impl BroadcastTypeTrait for &bool {}
-impl BroadcastTypeTrait for &i8 {}
-impl BroadcastTypeTrait for &i16 {}
-impl BroadcastTypeTrait for &i32 {}
-impl BroadcastTypeTrait for &i64 {}
-impl BroadcastTypeTrait for &i128 {}
-impl BroadcastTypeTrait for &isize {}
-impl BroadcastTypeTrait for &u8 {}
-impl BroadcastTypeTrait for &u16 {}
-impl BroadcastTypeTrait for &u32 {}
-impl BroadcastTypeTrait for &u128 {}
-impl BroadcastTypeTrait for &usize {}
-impl BroadcastTypeTrait for &f32 {}
-impl BroadcastTypeTrait for &f64 {}
-impl BroadcastTypeTrait for &IpAddr {}
-impl BroadcastTypeTrait for &Ipv4Addr {}
-impl BroadcastTypeTrait for &Ipv6Addr {}
-impl BroadcastTypeTrait for &SocketAddr {}
-impl BroadcastTypeTrait for &NonZeroU8 {}
-impl BroadcastTypeTrait for &NonZeroU16 {}
-impl BroadcastTypeTrait for &NonZeroU32 {}
-impl BroadcastTypeTrait for &NonZeroU64 {}
-impl BroadcastTypeTrait for &NonZeroU128 {}
-impl BroadcastTypeTrait for &NonZeroUsize {}
-impl BroadcastTypeTrait for &NonZeroI8 {}
-impl BroadcastTypeTrait for &NonZeroI16 {}
-impl BroadcastTypeTrait for &NonZeroI32 {}
-impl BroadcastTypeTrait for &NonZeroI64 {}
-impl BroadcastTypeTrait for &NonZeroI128 {}
-impl BroadcastTypeTrait for &NonZeroIsize {}
-impl BroadcastTypeTrait for &Infallible {}
-impl<B> Default for BroadcastType<B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    fn default() -> Self {
-        BroadcastType::Unknown
-    }
-}
-impl<B> BroadcastType<B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    pub fn get_key(broadcast_type: BroadcastType<B>) -> String {
-        match broadcast_type {
-            BroadcastType::PointToPoint(key1, key2) => {
-                let (first_key, second_key) = if key1 <= key2 {
-                    (key1, key2)
-                } else {
-                    (key2, key1)
-                };
-                format!(
-                    "{}-{}-{}",
-                    POINT_TO_POINT_KEY,
-                    first_key.to_string(),
-                    second_key.to_string()
-                )
-            }
-            BroadcastType::PointToGroup(key) => {
-                format!("{}-{}", POINT_TO_GROUP_KEY, key.to_string())
-            }
-            BroadcastType::Unknown => String::new(),
-        }
-    }
-}
-impl<'a, B> WebSocketConfig<'a, B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    pub fn new(stream: &'a mut Stream, context: &'a mut Context) -> Self {
-        Self {
-            stream,
-            context,
-            capacity: DEFAULT_BROADCAST_SENDER_CAPACITY,
-            broadcast_type: BroadcastType::default(),
-            connected_hook: Hook::default_handler(),
-            request_hook: Hook::default_handler(),
-            sended_hook: Hook::default_handler(),
-            closed_hook: Hook::default_handler(),
-        }
-    }
-}
-impl<'a, B> WebSocketConfig<'a, B>
-where
-    B: BroadcastTypeTrait,
-{
-    #[inline(always)]
-    pub fn set_capacity(mut self, capacity: Capacity) -> Self {
-        self.capacity = capacity;
-        self
-    }
-    #[inline(always)]
-    pub fn set_context(mut self, context: &'a mut Context) -> Self {
-        self.context = context;
-        self
-    }
-    #[inline(always)]
-    pub fn set_broadcast_type(mut self, broadcast_type: BroadcastType<B>) -> Self {
-        self.broadcast_type = broadcast_type;
-        self
-    }
-    #[inline(always)]
-    pub fn get_stream(&mut self) -> &mut Stream {
-        self.stream
-    }
-    #[inline(always)]
-    pub fn get_context(&mut self) -> &mut Context {
-        self.context
-    }
-    #[inline(always)]
-    pub fn get_capacity(&self) -> Capacity {
-        self.capacity
-    }
-    #[inline(always)]
-    pub fn get_broadcast_type(&self) -> &BroadcastType<B> {
-        &self.broadcast_type
-    }
-    #[inline(always)]
-    pub fn set_connected_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.connected_hook = Hook::factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_request_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.request_hook = Hook::factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_sended_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.sended_hook = Hook::factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn set_closed_hook<S>(mut self) -> Self
-    where
-        S: ServerHook,
-    {
-        self.closed_hook = Hook::factory::<S>();
-        self
-    }
-    #[inline(always)]
-    pub fn get_connected_hook(&self) -> &ServerHookHandler {
-        &self.connected_hook
-    }
-    #[inline(always)]
-    pub fn get_request_hook(&self) -> &ServerHookHandler {
-        &self.request_hook
-    }
-    #[inline(always)]
-    pub fn get_sended_hook(&self) -> &ServerHookHandler {
-        &self.sended_hook
-    }
-    #[inline(always)]
-    pub fn get_closed_hook(&self) -> &ServerHookHandler {
-        &self.closed_hook
-    }
-}
-impl WebSocket {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-    #[inline(always)]
-    fn subscribe_unwrap_or_insert<B>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-        capacity: Capacity,
-    ) -> BroadcastMapReceiver<Vec<u8>>
-    where
-        B: BroadcastTypeTrait,
-    {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.subscribe_or_insert(&key, capacity)
-    }
-    #[inline(always)]
-    fn point_to_point<B>(
-        &self,
-        key1: &B,
-        key2: &B,
-        capacity: Capacity,
-    ) -> BroadcastMapReceiver<Vec<u8>>
-    where
-        B: BroadcastTypeTrait,
-    {
-        self.subscribe_unwrap_or_insert(
-            BroadcastType::PointToPoint(key1.clone(), key2.clone()),
-            capacity,
-        )
-    }
-    #[inline(always)]
-    fn point_to_group<B>(&self, key: &B, capacity: Capacity) -> BroadcastMapReceiver<Vec<u8>>
-    where
-        B: BroadcastTypeTrait,
-    {
-        self.subscribe_unwrap_or_insert(BroadcastType::PointToGroup(key.clone()), capacity)
-    }
-    #[inline(always)]
-    pub fn receiver_count<B>(&self, broadcast_type: BroadcastType<B>) -> ReceiverCount
-    where
-        B: BroadcastTypeTrait,
-    {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.receiver_count(&key).unwrap_or(0)
-    }
-    #[inline(always)]
-    pub fn receiver_count_before_connected<B>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-    ) -> ReceiverCount
-    where
-        B: BroadcastTypeTrait,
-    {
-        let count: ReceiverCount = self.receiver_count(broadcast_type);
-        count.clamp(0, ReceiverCount::MAX - 1) + 1
-    }
-    #[inline(always)]
-    pub fn receiver_count_after_closed<B>(&self, broadcast_type: BroadcastType<B>) -> ReceiverCount
-    where
-        B: BroadcastTypeTrait,
-    {
-        let count: ReceiverCount = self.receiver_count(broadcast_type);
-        count.clamp(1, ReceiverCount::MAX) - 1
-    }
-    #[inline(always)]
-    pub fn try_send<T, B>(
-        &self,
-        broadcast_type: BroadcastType<B>,
-        data: T,
-    ) -> Result<Option<ReceiverCount>, SendError<Vec<u8>>>
-    where
-        T: Into<Vec<u8>>,
-        B: BroadcastTypeTrait,
-    {
-        let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.try_send(&key, data.into())
-    }
-    #[inline(always)]
-    pub fn send<T, B>(&self, broadcast_type: BroadcastType<B>, data: T) -> Option<ReceiverCount>
-    where
-        T: Into<Vec<u8>>,
-        B: BroadcastTypeTrait,
-    {
-        self.try_send(broadcast_type, data).unwrap()
-    }
-    pub async fn run<B>(&self, websocket_config: WebSocketConfig<'_, B>)
-    where
-        B: BroadcastTypeTrait,
-    {
-        let capacity: Capacity = websocket_config.get_capacity();
-        let broadcast_type: BroadcastType<B> = websocket_config.get_broadcast_type().clone();
-        let connected_hook: ServerHookHandler = websocket_config.get_connected_hook().clone();
-        let sended_hook: ServerHookHandler = websocket_config.get_sended_hook().clone();
-        let request_hook: ServerHookHandler = websocket_config.get_request_hook().clone();
-        let closed_hook: ServerHookHandler = websocket_config.get_closed_hook().clone();
-        let WebSocketConfig {
-            stream,
-            context: ctx,
-            ..
-        } = websocket_config;
-        let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
-            BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
-            BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
-            BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
-        };
-        let key: String = BroadcastType::get_key(broadcast_type);
-        if connected_hook(stream, ctx).await.is_reject() {
-            return;
-        }
-        let mut is_reject: bool;
-        loop {
-            tokio::select! {
-                request_res = stream.try_get_websocket_request() => {
-                    if let Ok(body) = request_res {
-                        ctx.get_mut_request().set_body(body);
-                        is_reject = request_hook(stream, ctx).await.is_reject();
-                    } else {
-                        is_reject = true;
-                        closed_hook(stream, ctx).await;
-                    }
-                    let body: ResponseBody = ctx.get_response().get_body().clone();
-                    let is_err: bool = self.broadcast_map.try_send(&key, body).is_err();
-                    if is_err || sended_hook(stream, ctx).await.is_reject() || is_reject {
-                        break;
-                    }
-                },
-                msg_res = receiver.recv() => {
-                    if let Ok(msg) = &msg_res {
-                        if stream.try_send_list(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
-                            continue;
-                        } else {
-                            break;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-        stream.set_closed(true);
-    }
-}
-```
-# Path: hyperlane-plugin-websocket/src/trait.rs
-```rust
-pub trait BroadcastTypeTrait: ToString + PartialOrd + Clone {}
-```
-# Path: hyperlane-plugin-websocket/src/const.rs
-```rust
-pub(crate) const POINT_TO_POINT_KEY: &str = "ptp-";
-pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
-```
-# Path: hyperlane-plugin-websocket/src/lib.rs
-```rust
-mod r#const;
-mod r#enum;
-mod r#impl;
-mod r#struct;
-mod r#trait;
-pub use {r#enum::*, r#struct::*};
-use {r#const::*, r#trait::*};
-use std::{
-    convert::Infallible,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    num::{
-        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
-        NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
-    },
-};
-use {
-    hyperlane::{
-        tokio::sync::broadcast::{Receiver, error::SendError},
-        *,
-    },
-    hyperlane_broadcast::*,
-};
-```
-# Path: hyperlane-plugin-websocket/src/enum.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum BroadcastType<T: BroadcastTypeTrait> {
-    PointToPoint(T, T),
-    PointToGroup(T),
-    Unknown,
-}
-```
-# Path: hyperlane-plugin-websocket/src/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Debug, Default)]
-pub struct WebSocket {
-    pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
-}
-pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
-    pub(super) stream: &'a mut Stream,
-    pub(super) context: &'a mut Context,
-    pub(super) capacity: Capacity,
-    pub(super) broadcast_type: BroadcastType<B>,
-    pub(super) connected_hook: ServerHookHandler,
-    pub(super) request_hook: ServerHookHandler,
-    pub(super) sended_hook: ServerHookHandler,
-    pub(super) closed_hook: ServerHookHandler,
-}
 ```
