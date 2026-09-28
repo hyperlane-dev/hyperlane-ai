@@ -1,4 +1,4 @@
-<!--2026-09-27 21:07:06-->
+<!--2026-09-28 04:32:15-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -12360,20 +12360,16 @@ pub enum RouteSegment {
 use super::*;
 #[derive(Clone, Debug, DisplayDebug, Getter)]
 pub struct RoutePattern(
-    #[get]
     pub(super) RouteSegmentList,
 );
 #[derive(Clone, CustomDebug, DisplayDebug, Getter, GetterMut, Setter)]
 pub struct RouteMatcher {
-    #[get]
     #[set(skip)]
     #[debug(skip)]
     pub(super) static_route: ServerHookMap,
-    #[get]
     #[set(skip)]
     #[debug(skip)]
     pub(super) dynamic_route: ServerHookPatternRoute,
-    #[get]
     #[set(skip)]
     #[debug(skip)]
     pub(super) regex_route: ServerHookPatternRoute,
@@ -23198,25 +23194,18 @@ use super::*;
 #[derive(Clone, Copy, Data, Debug, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct RequestConfig {
     #[get(type(copy))]
-    #[set]
     pub buffer_size: usize,
     #[get(type(copy))]
-    #[set]
     pub max_path_size: usize,
     #[get(type(copy))]
-    #[set]
     pub max_header_count: usize,
     #[get(type(copy))]
-    #[set]
     pub max_header_key_size: usize,
     #[get(type(copy))]
-    #[set]
     pub max_header_value_size: usize,
     #[get(type(copy))]
-    #[set]
     pub max_body_size: usize,
     #[get(type(copy))]
-    #[set]
     pub read_timeout_ms: u64,
 }
 #[derive(
@@ -25221,21 +25210,9 @@ pub type AsyncTask = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Task {
-    #[get(pub)]
-    #[get_mut(pub)]
-    #[set(pub)]
     pub pool: Vec<UnboundedSender<AsyncTask>>,
-    #[get(pub)]
-    #[get_mut(pub)]
-    #[set(pub)]
     pub counter: Arc<AtomicUsize>,
-    #[get(pub)]
-    #[get_mut(pub)]
-    #[set(pub)]
     pub shutdown: Arc<AtomicBool>,
-    #[get(pub)]
-    #[get_mut(pub)]
-    #[set(pub)]
     pub notifies: Vec<Arc<Notify>>,
 }
 ```
