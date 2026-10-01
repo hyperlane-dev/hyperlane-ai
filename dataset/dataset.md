@@ -1,4 +1,4 @@
-<!--2026-09-30 22:02:13-->
+<!--2026-10-01 05:00:09-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -7814,7 +7814,7 @@ pub use http_type::{
 };
 pub use std::{
     collections::{HashMap, HashSet, VecDeque},
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     io::{Read, Write},
     net::{Ipv4Addr, Ipv6Addr, TcpStream},
     pin::Pin,
@@ -7835,8 +7835,8 @@ pub use {
     tokio_rustls::TlsConnector,
     webpki_roots::TLS_SERVER_ROOTS,
 };
-use common::*;
-use lombok_macros::*;
+pub use common::*;
+pub use lombok_macros::*;
 ```
 # Path: hyperlane/request/src/utils/mod.rs
 ```rust
@@ -7967,24 +7967,6 @@ impl Write for SyncProxyTunnelStream {
         self.get_mut_inner().flush()
     }
 }
-```
-# Path: hyperlane/request/src/request/proxy/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ProxyType {
-    Http,
-    Https,
-    Socks5,
-}
-#[derive(Clone, Data, Debug, Eq, PartialEq)]
-pub struct Proxy {
-    pub proxy_type: ProxyType,
-    pub host: String,
-    pub port: u16,
-    pub username: Option<String>,
-    pub password: Option<String>,
-}
 impl Proxy {
     pub fn http<H: AsRef<str>>(host: H, port: u16) -> Self {
         Self::new(ProxyType::Http, host, port)
@@ -8009,6 +7991,27 @@ impl Proxy {
             password: None,
         }
     }
+}
+```
+# Path: hyperlane/request/src/request/proxy/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProxyType {
+    Http,
+    Https,
+    Socks5,
+}
+```
+# Path: hyperlane/request/src/request/proxy/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct Proxy {
+    pub proxy_type: ProxyType,
+    pub host: String,
+    pub port: u16,
+    pub username: Option<String>,
+    pub password: Option<String>,
 }
 #[derive(Data)]
 pub struct ProxyTunnelStream {
@@ -8035,24 +8038,15 @@ pub struct SyncProxyTunnelStream {
 ```
 # Path: hyperlane/request/src/request/proxy/mod.rs
 ```rust
+mod r#enum;
 mod r#impl;
 mod r#struct;
-pub use r#struct::*;
+pub use {r#enum::*, r#struct::*};
 use super::*;
 ```
-# Path: hyperlane/request/src/request/config/struct.rs
+# Path: hyperlane/request/src/request/config/impl.rs
 ```rust
 use super::*;
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct RequestConfig {
-    pub buffer_size: usize,
-    pub timeout: u64,
-    pub max_redirect_times: usize,
-    pub http_version: HttpVersion,
-    pub redirect: bool,
-    pub decode: bool,
-    pub proxy: Option<Proxy>,
-}
 impl RequestConfig {
     pub fn set_buffer_size(&mut self, v: usize) -> &mut Self {
         self.buffer_size = v;
@@ -8105,8 +8099,23 @@ impl RequestConfig {
     }
 }
 ```
+# Path: hyperlane/request/src/request/config/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RequestConfig {
+    pub buffer_size: usize,
+    pub timeout: u64,
+    pub max_redirect_times: usize,
+    pub http_version: HttpVersion,
+    pub redirect: bool,
+    pub decode: bool,
+    pub proxy: Option<Proxy>,
+}
+```
 # Path: hyperlane/request/src/request/config/mod.rs
 ```rust
+mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
@@ -8392,16 +8401,9 @@ mod r#struct;
 pub(crate) use r#struct::*;
 use super::*;
 ```
-# Path: hyperlane/request/src/request/request_builder/struct.rs
+# Path: hyperlane/request/src/request/request_builder/impl.rs
 ```rust
 use super::*;
-#[derive(Clone, Data, Debug, Default)]
-pub struct RequestBuilder {
-    #[get(pub(crate))]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    request: HttpRequest,
-}
 impl RequestBuilder {
     pub fn get_request_mut(&mut self) -> &mut HttpRequest {
         &mut self.request
@@ -8409,12 +8411,12 @@ impl RequestBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn get(&mut self, url: impl Into<String>) -> &mut Self {
+    pub fn get<T: Into<String>>(&mut self, url: T) -> &mut Self {
         self.get_mut_request().set_method(Method::Get);
         self.get_mut_request().set_url(url);
         self
     }
-    pub fn post(&mut self, url: impl Into<String>) -> &mut Self {
+    pub fn post<T: Into<String>>(&mut self, url: T) -> &mut Self {
         self.get_mut_request().set_method(Method::Post);
         self.get_mut_request().set_url(url);
         self
@@ -8423,7 +8425,7 @@ impl RequestBuilder {
         self.get_mut_request().set_method(method);
         self
     }
-    pub fn url(&mut self, url: impl Into<String>) -> &mut Self {
+    pub fn url<T: Into<String>>(&mut self, url: T) -> &mut Self {
         self.get_mut_request().set_url(url);
         self
     }
@@ -8521,8 +8523,20 @@ impl RequestBuilder {
     }
 }
 ```
+# Path: hyperlane/request/src/request/request_builder/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Default)]
+pub struct RequestBuilder {
+    #[get(pub(crate))]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(crate) request: HttpRequest,
+}
+```
 # Path: hyperlane/request/src/request/request_builder/mod.rs
 ```rust
+mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use super::*;
@@ -8530,12 +8544,8 @@ use super::*;
 # Path: hyperlane/request/src/request/http_request/impl.rs
 ```rust
 use super::*;
-pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
-pub(crate) trait ReadWrite: Read + Write {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
 impl<T: Read + Write> ReadWrite for T {}
-pub(crate) type BoxAsyncReadWrite = Box<dyn AsyncReadWrite>;
-pub(crate) type BoxReadWrite = Box<dyn ReadWrite>;
 impl HttpRequest {
     pub fn send(&mut self) -> RequestResult {
         self.send_sync()
@@ -9404,54 +9414,8 @@ impl HttpRequest {
         }
     }
 }
-```
-# Path: hyperlane/request/src/request/http_request/trait.rs
-```rust
-use super::*;
-pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
-pub(crate) trait ReadWrite: Read + Write {}
-pub trait AsyncRequestTrait: Send + Debug {
-    type RequestResult: Sized;
-    fn send(&mut self) -> Pin<Box<dyn Future<Output = Self::RequestResult> + Send + '_>>;
-}
-pub trait RequestTrait: Send + Debug {
-    type RequestResult: Sized;
-    fn send(&mut self) -> Self::RequestResult;
-}
-```
-# Path: hyperlane/request/src/request/http_request/const.rs
-```rust
-pub(crate) const CONTENT_LENGTH_PATTERN: &[u8] = b"content-length:";
-pub(crate) const TRANSFER_ENCODING_PATTERN: &[u8] = b"transfer-encoding:";
-pub(crate) const CHUNKED_PATTERN: &[u8] = b"chunked";
-```
-# Path: hyperlane/request/src/request/http_request/type.rs
-```rust
-use super::*;
-pub type RequestHeadersKey = String;
-pub type RequestHeadersValue = String;
-pub type RequestHeaders = HashMapXxHash3_64<RequestHeadersKey, RequestHeadersValue>;
-```
-# Path: hyperlane/request/src/request/http_request/struct.rs
-```rust
-use super::*;
-pub type RequestResult = Result<HttpResponse, RequestError>;
-#[derive(Clone, Debug, Default, GetterMut)]
-pub struct HttpRequest {
-    #[get_mut(skip)]
-    pub method: Method,
-    #[get_mut(skip)]
-    pub url: String,
-    pub headers: HashMap<String, String>,
-    #[get_mut(skip)]
-    pub body: Body,
-    #[get_mut(skip)]
-    pub config: RequestConfig,
-    #[get_mut(skip)]
-    pub(crate) tmp: Tmp,
-}
 impl HttpRequest {
-    pub fn get(url: impl Into<String>) -> Self {
+    pub fn get<T: Into<String>>(url: T) -> Self {
         Self {
             method: Method::Get,
             url: url.into(),
@@ -9461,7 +9425,7 @@ impl HttpRequest {
             tmp: Tmp::default(),
         }
     }
-    pub fn post(url: impl Into<String>) -> Self {
+    pub fn post<T: Into<String>>(url: T) -> Self {
         Self {
             method: Method::Post,
             url: url.into(),
@@ -9475,7 +9439,7 @@ impl HttpRequest {
         self.method = method;
         self
     }
-    pub fn set_url(&mut self, url: impl Into<String>) -> &mut Self {
+    pub fn set_url<T: Into<String>>(&mut self, url: T) -> &mut Self {
         self.url = url.into();
         self
     }
@@ -9545,41 +9509,68 @@ impl HttpRequest {
     }
 }
 ```
+# Path: hyperlane/request/src/request/http_request/trait.rs
+```rust
+use super::*;
+pub trait AsyncRequestTrait: Send + Debug {
+    type RequestResult: Sized;
+    fn send(&mut self) -> Pin<Box<dyn Future<Output = Self::RequestResult> + Send + '_>>;
+}
+pub trait RequestTrait: Send + Debug {
+    type RequestResult: Sized;
+    fn send(&mut self) -> Self::RequestResult;
+}
+pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
+pub(crate) trait ReadWrite: Read + Write {}
+```
+# Path: hyperlane/request/src/request/http_request/const.rs
+```rust
+pub(crate) const CONTENT_LENGTH_PATTERN: &[u8] = b"content-length:";
+pub(crate) const TRANSFER_ENCODING_PATTERN: &[u8] = b"transfer-encoding:";
+pub(crate) const CHUNKED_PATTERN: &[u8] = b"chunked";
+```
+# Path: hyperlane/request/src/request/http_request/type.rs
+```rust
+use super::*;
+pub type RequestHeadersKey = String;
+pub type RequestHeadersValue = String;
+pub type RequestHeaders = HashMapXxHash3_64<RequestHeadersKey, RequestHeadersValue>;
+pub(crate) type BoxAsyncReadWrite = Box<dyn AsyncReadWrite>;
+pub(crate) type BoxReadWrite = Box<dyn ReadWrite>;
+pub type RequestResult = Result<HttpResponse, RequestError>;
+```
+# Path: hyperlane/request/src/request/http_request/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default, GetterMut)]
+pub struct HttpRequest {
+    #[get_mut(skip)]
+    pub method: Method,
+    #[get_mut(skip)]
+    pub url: String,
+    pub headers: HashMap<String, String>,
+    #[get_mut(skip)]
+    pub body: Body,
+    #[get_mut(skip)]
+    pub config: RequestConfig,
+    #[get_mut(skip)]
+    pub(crate) tmp: Tmp,
+}
+```
 # Path: hyperlane/request/src/request/http_request/mod.rs
 ```rust
 mod r#const;
 mod r#impl;
 mod r#struct;
+mod r#trait;
 mod r#type;
-pub use {r#struct::*, r#type::*};
-pub(crate) use {r#const::*, r#impl::*};
+pub use {r#struct::*, r#trait::*, r#type::*};
+pub(crate) use r#const::*;
 use super::*;
 ```
-# Path: hyperlane/request/src/response/type.rs
+# Path: hyperlane/request/src/response/impl.rs
 ```rust
 use super::*;
-pub type HttpResponseHeaders = HashMapXxHash3_64<String, String>;
-pub type ResponseBody = Vec<u8>;
-pub type ResponseData = Vec<u8>;
-pub type ResponseDataString = String;
-pub fn new_response_headers() -> HttpResponseHeaders {
-    hash_map_xx_hash3_64()
-}
-```
-# Path: hyperlane/request/src/response/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Debug, Getter, Setter)]
-pub struct HttpResponse {
-    pub version: HttpVersion,
-    #[get(type(copy))]
-    pub status_code: ResponseStatusCode,
-    #[set(type(AsRef<str>))]
-    pub reason_phrase: String,
-    pub headers: HttpResponseHeaders,
-    #[set(type(AsRef<[u8]>))]
-    pub body: ResponseBody,
-}
 impl Default for HttpResponse {
     fn default() -> Self {
         Self {
@@ -9724,24 +9715,48 @@ impl HttpResponse {
     }
 }
 ```
+# Path: hyperlane/request/src/response/fn.rs
+```rust
+use super::*;
+pub fn new_response_headers() -> HttpResponseHeaders {
+    hash_map_xx_hash3_64()
+}
+```
+# Path: hyperlane/request/src/response/type.rs
+```rust
+use super::*;
+pub type HttpResponseHeaders = HashMapXxHash3_64<String, String>;
+pub type ResponseBody = Vec<u8>;
+pub type ResponseData = Vec<u8>;
+pub type ResponseDataString = String;
+```
+# Path: hyperlane/request/src/response/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Getter, Setter)]
+pub struct HttpResponse {
+    pub version: HttpVersion,
+    #[get(type(copy))]
+    pub status_code: ResponseStatusCode,
+    #[set(type(AsRef<str>))]
+    pub reason_phrase: String,
+    pub headers: HttpResponseHeaders,
+    #[set(type(AsRef<[u8]>))]
+    pub body: ResponseBody,
+}
+```
 # Path: hyperlane/request/src/response/mod.rs
 ```rust
+mod r#fn;
+mod r#impl;
 mod r#struct;
 mod r#type;
-pub use {r#struct::*, r#type::*};
+pub use {r#fn::*, r#struct::*, r#type::*};
 use super::*;
 ```
-# Path: hyperlane/request/src/common/const.rs
-```rust
-pub const APP_NAME: &str = "http-request";
-```
-# Path: hyperlane/request/src/common/enum.rs
+# Path: hyperlane/request/src/common/impl.rs
 ```rust
 use super::*;
-#[derive(Clone, Debug, Default, Eq, Getter, PartialEq, Serialize)]
-pub struct Body {
-    pub bytes: Vec<u8>,
-}
 impl Body {
     pub const fn empty() -> Self {
         Self { bytes: Vec::new() }
@@ -9770,11 +9785,24 @@ impl Display for Body {
     }
 }
 ```
+# Path: hyperlane/request/src/common/const.rs
+```rust
+pub const APP_NAME: &str = "http-request";
+```
+# Path: hyperlane/request/src/common/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default, Eq, Getter, PartialEq, Serialize)]
+pub struct Body {
+    pub bytes: Vec<u8>,
+}
+```
 # Path: hyperlane/request/src/common/mod.rs
 ```rust
 mod r#const;
-mod r#enum;
-pub use {r#const::*, r#enum::*};
+mod r#impl;
+mod r#struct;
+pub use {r#const::*, r#struct::*};
 use super::*;
 ```
 # Path: hyperlane/core/README.md
@@ -13445,6 +13473,7 @@ pub(crate) use std::{
     str::FromStr,
 };
 pub(crate) use {
+    lombok_macros::*,
     notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
     std::ffi::OsStr,
     tokio::{
@@ -13898,7 +13927,7 @@ pub(crate) static LOGGER: Logger = Logger;
 ```
 # Path: hyperlane/cli/src/logger/struct.rs
 ```rust
-use lombok_macros::{Data, New};
+use super::*;
 #[derive(Data, New)]
 pub struct Logger;
 ```
@@ -13912,6 +13941,7 @@ pub use r#struct::*;
 pub use {::log, color_output::*};
 pub(crate) use {r#const::*, r#static::*};
 pub(crate) use log::SetLoggerError;
+use super::*;
 ```
 # Path: hyperlane/cli/src/help/fn.rs
 ```rust
