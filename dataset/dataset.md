@@ -1,4 +1,4 @@
-<!--2026-10-06 13:02:44-->
+<!--2026-10-06 22:31:23-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -24,6 +24,253 @@ To use this crate, you can run cmd:
 cargo add http-constant
 ```
 ## Contact
+# Path: hyperlane/constant/tests/mod.rs
+```rust
+mod r#constant;
+use http_constant::*;
+```
+# Path: hyperlane/constant/tests/constant/fn.rs
+```rust
+use super::*;
+#[test]
+fn http_methods_are_uppercase_tokens() {
+    assert_eq!(GET, "GET");
+    assert_eq!(POST, "POST");
+    assert_eq!(PUT, "PUT");
+    assert_eq!(DELETE, "DELETE");
+    assert_eq!(HEAD, "HEAD");
+    assert_eq!(OPTIONS, "OPTIONS");
+    assert_eq!(PATCH, "PATCH");
+}
+#[test]
+fn header_keys_are_lowercase_tokens() {
+    assert_eq!(CONTENT_TYPE, "content-type");
+    assert_eq!(CONTENT_LENGTH, "content-length");
+    assert_eq!(CONTENT_ENCODING, "content-encoding");
+    assert_eq!(TRANSFER_ENCODING, "transfer-encoding");
+    assert_eq!(ACCEPT_ENCODING, "accept-encoding");
+}
+#[test]
+fn header_keys_contain_no_whitespace() {
+    let keys: Vec<&str> = vec![
+        CONTENT_TYPE,
+        CONTENT_LENGTH,
+        CONTENT_ENCODING,
+        TRANSFER_ENCODING,
+        ACCEPT_ENCODING,
+        SERVER,
+        HOST,
+    ];
+    for key in keys {
+        assert!(!key.contains(' '), "header key has a space: {key}");
+        assert!(!key.contains('\t'), "header key has a tab: {key}");
+        assert_eq!(key, key.to_lowercase());
+    }
+}
+#[test]
+fn content_type_values_are_lowercase_media_types() {
+    assert_eq!(APPLICATION_JSON, "application/json");
+    assert_eq!(TEXT_HTML, "text/html");
+    assert_eq!(TEXT_PLAIN, "text/plain");
+}
+#[test]
+fn media_types_are_lowercase_and_slash_separated() {
+    let types: Vec<&str> = vec![APPLICATION_JSON, TEXT_HTML, TEXT_PLAIN];
+    for media in types {
+        assert_eq!(media, media.to_lowercase());
+        assert!(media.contains('/'), "media type lacks a slash: {media}");
+        let parts: Vec<&str> = media.split('/').collect();
+        assert_eq!(parts.len(), 2, "media type malformed: {media}");
+    }
+}
+#[test]
+fn byte_views_match_their_string_constants() {
+    assert_eq!(SPACE_BYTES, SPACE.as_bytes());
+    assert_eq!(TAB_BYTES, TAB.as_bytes());
+    assert_eq!(BR_BYTES, BR.as_bytes());
+    assert_eq!(DOUBLE_BR_BYTES, DOUBLE_BR.as_bytes());
+    assert_eq!(COLON_BYTES, COLON.as_bytes());
+    assert_eq!(COLON_SPACE_BYTES, COLON_SPACE.as_bytes());
+    assert_eq!(EQUAL_BYTES, EQUAL.as_bytes());
+    assert_eq!(AND_BYTES, AND.as_bytes());
+    assert_eq!(COMMA_BYTES, COMMA.as_bytes());
+    assert_eq!(HASH_BYTES, HASH.as_bytes());
+    assert_eq!(SEMICOLON_BYTES, SEMICOLON.as_bytes());
+    assert_eq!(QUERY_BYTES, QUERY.as_bytes());
+    assert_eq!(POINT_BYTES, POINT.as_bytes());
+    assert_eq!(ROOT_PATH_BYTES, ROOT_PATH.as_bytes());
+    assert_eq!(HTTP_BR_BYTES, HTTP_BR.as_bytes());
+    assert_eq!(HTTP_DOUBLE_BR_BYTES, HTTP_DOUBLE_BR.as_bytes());
+    assert_eq!(HYPERLANE_BYTES, HYPERLANE.as_bytes());
+    assert_eq!(LOCALHOST_BYTES, LOCALHOST.as_bytes());
+    assert_eq!(DEFAULT_HTTP_PATH_BYTES, DEFAULT_HTTP_PATH.as_bytes());
+}
+#[test]
+fn single_byte_views_take_the_first_byte() {
+    assert_eq!(SPACE_U8, SPACE_BYTES[0]);
+    assert_eq!(TAB_U8, TAB_BYTES[0]);
+    assert_eq!(COLON_U8, COLON_BYTES[0]);
+    assert_eq!(EQUAL_U8, EQUAL_BYTES[0]);
+    assert_eq!(AND_U8, AND_BYTES[0]);
+    assert_eq!(COMMA_U8, COMMA_BYTES[0]);
+    assert_eq!(HASH_U8, HASH_BYTES[0]);
+    assert_eq!(SEMICOLON_U8, SEMICOLON_BYTES[0]);
+    assert_eq!(QUERY_U8, QUERY_BYTES[0]);
+    assert_eq!(POINT_U8, POINT_BYTES[0]);
+    assert_eq!(ZERO_STR_U8, ZERO_STR_BYTES[0]);
+}
+#[test]
+fn delimiter_constants_are_single_ascii_characters() {
+    let pairs: Vec<(&str, &str)> = vec![
+        (SPACE, " "),
+        (TAB, "\t"),
+        (COLON, ":"),
+        (EQUAL, "="),
+        (AND, "&"),
+        (COMMA, ","),
+        (HASH, "#"),
+        (SEMICOLON, ";"),
+        (QUERY, "?"),
+        (POINT, "."),
+    ];
+    for (actual, expected) in pairs {
+        assert_eq!(actual, expected);
+        assert_eq!(actual.len(), 1);
+    }
+}
+#[test]
+fn multi_char_delimiters_have_expected_content() {
+    assert_eq!(BR, "\n");
+    assert_eq!(DOUBLE_BR, "\n\n");
+    assert_eq!(HTTP_BR, "\r\n");
+    assert_eq!(HTTP_DOUBLE_BR, "\r\n\r\n");
+    assert_eq!(COLON_SPACE, ": ");
+    assert_eq!(SEMICOLON_SPACE, "; ");
+}
+#[test]
+fn empty_and_zero_constants_agree() {
+    assert_eq!(EMPTY_STR, "");
+    assert!(EMPTY_STR_BYTES.is_empty());
+    assert_eq!(ZERO_STR, "0");
+    assert_eq!(ZERO_STR_BYTES, ZERO_STR.as_bytes());
+}
+#[test]
+fn http_version_tokens_are_prefixed() {
+    assert_eq!(HTTP_VERSION_1_0, "HTTP/1.0");
+    assert_eq!(HTTP_VERSION_1_1, "HTTP/1.1");
+    assert_eq!(HTTP_VERSION_2, "HTTP/2");
+    for version in [HTTP_VERSION_1_0, HTTP_VERSION_1_1, HTTP_VERSION_2] {
+        assert!(version.starts_with("HTTP/"));
+    }
+}
+#[test]
+fn default_path_and_root_path_agree() {
+    assert_eq!(DEFAULT_HTTP_PATH, "/");
+    assert_eq!(ROOT_PATH, "/");
+    assert_eq!(DEFAULT_HTTP_PATH_BYTES, ROOT_PATH_BYTES);
+}
+#[test]
+fn security_level_limits_are_ordered() {
+    let low_body: usize = DEFAULT_LOW_SECURITY_MAX_BODY_SIZE;
+    let high_body: usize = DEFAULT_HIGH_SECURITY_MAX_BODY_SIZE;
+    let low_path: usize = DEFAULT_LOW_SECURITY_MAX_PATH_SIZE;
+    let high_path: usize = DEFAULT_HIGH_SECURITY_MAX_PATH_SIZE;
+    let low_headers: usize = DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT;
+    let high_headers: usize = DEFAULT_HIGH_SECURITY_MAX_HEADER_COUNT;
+    assert!(low_body >= high_body);
+    assert!(low_path >= high_path);
+    assert!(low_headers >= high_headers);
+    assert!(high_body > 0);
+    assert!(high_path > 0);
+    assert!(high_headers > 0);
+}
+#[test]
+fn buffer_defaults_are_non_zero() {
+    let buffer: usize = DEFAULT_BUFFER_SIZE;
+    let request_line: usize = REQUEST_LINE_BUFFER_CAPACITY;
+    let header_line: usize = HEADER_LINE_BUFFER_CAPACITY;
+    let pooled_count: usize = MAX_POOLED_READ_BUFFERS;
+    let pooled_size: usize = MAX_POOLED_READ_BUFFER_SIZE;
+    assert!(buffer > 0);
+    assert!(request_line > 0);
+    assert!(header_line > 0);
+    assert!(pooled_count > 0);
+    assert!(pooled_size > 0);
+}
+#[test]
+fn redirect_limit_is_bounded() {
+    let limit: usize = DEFAULT_MAX_REDIRECT_TIMES;
+    assert!(limit > 0);
+    assert!(limit <= 10);
+}
+#[test]
+fn hyperlane_name_variants_are_consistent() {
+    assert_eq!(HYPERLANE, "hyperlane");
+    assert_eq!(HYPERLANE_PASCAL_CASE, "Hyperlane");
+    assert_eq!(HYPERLANE_UPPERCASE, "HYPERLANE");
+    assert_eq!(
+        HYPERLANE_PASCAL_CASE_BYTES,
+        HYPERLANE_PASCAL_CASE.as_bytes()
+    );
+    assert_eq!(HYPERLANE_UPPERCASE_BYTES, HYPERLANE_UPPERCASE.as_bytes());
+    assert_eq!(HYPERLANE_BYTES, HYPERLANE.as_bytes());
+}
+#[test]
+fn log_level_names_have_expected_values() {
+    assert_eq!(ERROR, "error");
+    assert_eq!(WARNING, "warning");
+    assert_eq!(INFO, "info");
+    assert_eq!(DEBUG, "debug");
+    assert_eq!(TRACE, "TRACE");
+    assert_eq!(SUCCESS, "success");
+    assert_eq!(FAIL, "fail");
+}
+#[test]
+fn log_level_byte_views_match() {
+    assert_eq!(WARNING_BYTES, WARNING.as_bytes());
+    assert_eq!(SUCCESS_BYTES, SUCCESS.as_bytes());
+    assert_eq!(FAIL_BYTES, FAIL.as_bytes());
+    assert_eq!(ERROR_BYTES, ERROR.as_bytes());
+    assert_eq!(INFO_BYTES, INFO.as_bytes());
+    assert_eq!(DEBUG_BYTES, DEBUG.as_bytes());
+    assert_eq!(PLAIN_BYTES, PLAIN.as_bytes());
+    assert_eq!(BINARY_BYTES, BINARY.as_bytes());
+}
+#[test]
+fn bracket_pairs_are_balanced() {
+    assert_eq!(LEFT_BRACKET, "{");
+    assert_eq!(RIGHT_BRACKET, "}");
+    assert_eq!(LEFT_SQUARE_BRACKET, "[");
+    assert_eq!(RIGHT_SQUARE_BRACKET, "]");
+    assert_eq!(LEFT_PAREN, "(");
+    assert_eq!(RIGHT_PAREN, ")");
+    assert_eq!(LEFT_BRACKET_BYTES, LEFT_BRACKET.as_bytes());
+    assert_eq!(RIGHT_BRACKET_BYTES, RIGHT_BRACKET.as_bytes());
+    assert_eq!(LEFT_PAREN_BYTES, LEFT_PAREN.as_bytes());
+    assert_eq!(RIGHT_PAREN_BYTES, RIGHT_PAREN.as_bytes());
+    assert_eq!(LEFT_SQUARE_BRACKET_BYTES, LEFT_SQUARE_BRACKET.as_bytes());
+    assert_eq!(RIGHT_SQUARE_BRACKET_BYTES, RIGHT_SQUARE_BRACKET.as_bytes());
+}
+#[test]
+fn default_ports_are_standard() {
+    assert_eq!(DEFAULT_HTTP_PORT, 80);
+    assert_eq!(DEFAULT_HTTPS_PORT, 443);
+    assert_eq!(DEFAULT_HTTP_PORT_STR, "80");
+    assert_eq!(DEFAULT_HTTPS_PORT_STR, "443");
+}
+#[test]
+fn loopback_addresses_are_local() {
+    assert_eq!(LOCALHOST, "localhost");
+    assert_eq!(LOOPBACK, "127.0.0.1");
+    assert_eq!(DEFAULT_HOST_IPV4_ADDR.to_string(), "0.0.0.0");
+    assert_eq!(DEFAULT_IPV4_ADDR.to_string(), "0.0.0.0");
+}
+```
+# Path: hyperlane/constant/tests/constant/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
 # Path: hyperlane/constant/src/lib.rs
 ```rust
 mod body;
@@ -7635,9 +7882,770 @@ Ensure that CMake is installed on the system
 ## Contact
 # Path: hyperlane/request/tests/mod.rs
 ```rust
+mod body;
+mod builder;
+mod proxy;
+mod request_api;
 mod request_builder;
+mod response;
+mod url;
 use http_request::*;
 use serde_json::json;
+```
+# Path: hyperlane/request/tests/proxy/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_proxy_http_sets_http_variant() {
+    let proxy: Proxy = Proxy::http("127.0.0.1", 7890u16);
+    assert_eq!(proxy.proxy_type, ProxyType::Http);
+    assert_eq!(proxy.host, "127.0.0.1");
+    assert_eq!(proxy.port, 7890u16);
+    assert!(proxy.username.is_none());
+    assert!(proxy.password.is_none());
+}
+#[test]
+fn test_proxy_https_sets_https_variant() {
+    let proxy: Proxy = Proxy::https("proxy.example.com", 443u16);
+    assert_eq!(proxy.proxy_type, ProxyType::Https);
+    assert_eq!(proxy.host, "proxy.example.com");
+    assert_eq!(proxy.port, 443u16);
+    assert!(proxy.username.is_none());
+    assert!(proxy.password.is_none());
+}
+#[test]
+fn test_proxy_socks5_sets_socks5_variant() {
+    let proxy: Proxy = Proxy::socks5("127.0.0.1", 1080u16);
+    assert_eq!(proxy.proxy_type, ProxyType::Socks5);
+    assert_eq!(proxy.host, "127.0.0.1");
+    assert_eq!(proxy.port, 1080u16);
+    assert!(proxy.username.is_none());
+    assert!(proxy.password.is_none());
+}
+#[test]
+fn test_proxy_accepts_owned_string_host() {
+    let proxy: Proxy = Proxy::http(String::from("owned.host"), 1u16);
+    assert_eq!(proxy.host, "owned.host");
+}
+#[test]
+fn test_proxy_auth_sets_username_and_password() {
+    let proxy: Proxy = Proxy::socks5("127.0.0.1", 1080u16).auth("user", "pass");
+    assert_eq!(proxy.username, Some("user".to_string()));
+    assert_eq!(proxy.password, Some("pass".to_string()));
+    assert_eq!(proxy.proxy_type, ProxyType::Socks5);
+}
+#[test]
+fn test_proxy_auth_overwrites_previous_credentials() {
+    let proxy: Proxy = Proxy::http("h", 1u16)
+        .auth("first", "one")
+        .auth("second", "two");
+    assert_eq!(proxy.username, Some("second".to_string()));
+    assert_eq!(proxy.password, Some("two".to_string()));
+}
+#[test]
+fn test_proxy_type_is_copy_and_eq() {
+    let proxy: Proxy = Proxy::https("h", 2u16);
+    let copied: ProxyType = proxy.proxy_type;
+    assert_eq!(copied, ProxyType::Https);
+    assert_eq!(proxy.proxy_type, copied);
+}
+#[test]
+fn test_proxy_type_variants_are_distinct() {
+    assert_ne!(ProxyType::Http, ProxyType::Https);
+    assert_ne!(ProxyType::Https, ProxyType::Socks5);
+    assert_ne!(ProxyType::Http, ProxyType::Socks5);
+}
+#[test]
+fn test_proxy_equality_compares_every_field() {
+    assert_eq!(Proxy::http("h", 1u16), Proxy::http("h", 1u16));
+    assert_ne!(Proxy::http("h", 1u16), Proxy::https("h", 1u16));
+    assert_ne!(Proxy::http("h", 1u16), Proxy::http("h2", 1u16));
+    assert_ne!(Proxy::http("h", 1u16), Proxy::http("h", 2u16));
+    assert_ne!(
+        Proxy::http("h", 1u16),
+        Proxy::http("h", 1u16).auth("u", "p")
+    );
+}
+#[test]
+fn test_proxy_clone_preserves_credentials() {
+    let proxy: Proxy = Proxy::socks5("h", 5u16).auth("u", "p");
+    let cloned: Proxy = proxy.clone();
+    assert_eq!(cloned, proxy);
+    assert_eq!(cloned.username, Some("u".to_string()));
+    assert_eq!(cloned.password, Some("p".to_string()));
+}
+```
+# Path: hyperlane/request/tests/proxy/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/request/tests/body/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_body_empty_has_no_bytes() {
+    let body: Body = Body::empty();
+    assert!(body.get_bytes_ref().is_empty());
+    assert!(body.as_slice().is_empty());
+    assert!(body.get_bytes().is_empty());
+    assert_eq!(body.as_str(), Some(""));
+}
+#[test]
+fn test_body_default_equals_empty() {
+    let body: Body = Body::default();
+    assert_eq!(body, Body::empty());
+    assert!(body.get_bytes_ref().is_empty());
+}
+#[test]
+fn test_body_from_bytes_accepts_str_and_vec() {
+    let from_str: Body = Body::from_bytes("hi");
+    let from_vec: Body = Body::from_bytes(vec![b'h', b'i']);
+    assert_eq!(from_str, from_vec);
+    assert_eq!(from_str.get_bytes_ref(), from_vec.get_bytes_ref());
+    assert_eq!(from_str.as_str(), Some("hi"));
+    assert_eq!(from_str.get_bytes_ref().len(), 2usize);
+}
+#[test]
+fn test_body_from_bytes_accepts_slice() {
+    let body: Body = Body::from_bytes(&[1u8, 2, 3][..]);
+    assert_eq!(body.get_bytes_ref(), &[1u8, 2, 3]);
+    assert_eq!(body.as_str(), Some("\u{1}\u{2}\u{3}"));
+}
+#[test]
+fn test_body_as_str_is_none_for_invalid_utf8() {
+    let body: Body = Body::from_bytes(vec![0xffu8, 0xfe]);
+    assert_eq!(body.as_str(), None);
+    assert_eq!(body.as_slice().len(), 2usize);
+    assert_eq!(body.get_bytes_ref(), &[0xffu8, 0xfe]);
+}
+#[test]
+fn test_body_display_writes_utf8_text() {
+    let body: Body = Body::from_bytes("hello");
+    assert_eq!(format!("{body}"), "hello");
+}
+#[test]
+fn test_body_display_falls_back_to_debug_bytes() {
+    let body: Body = Body::from_bytes(vec![0xffu8, 0xfe]);
+    assert_eq!(format!("{body}"), "[255, 254]");
+}
+#[test]
+fn test_body_clone_is_equal_and_independent() {
+    let body: Body = Body::from_bytes("abc");
+    let cloned: Body = body.clone();
+    assert_eq!(body, cloned);
+    assert_eq!(cloned.get_bytes_ref(), b"abc");
+}
+#[test]
+fn test_body_serializes_bytes_field() {
+    let body: Body = Body::from_bytes("hi");
+    let encoded: String = serde_json::to_string(&body).unwrap_or_default();
+    assert_eq!(encoded, "{\"bytes\":[104,105]}");
+}
+```
+# Path: hyperlane/request/tests/body/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/request/tests/url/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_url_components_parse_full_url() {
+    let components: HttpUrlComponents =
+        HttpUrlComponents::parse("https://host.test:8443/a/b?x=1&y=2#frag").unwrap_or_default();
+    assert_eq!(components.protocol, "https");
+    assert_eq!(components.host, Some("host.test".to_string()));
+    assert_eq!(components.port, Some(8443u16));
+    assert_eq!(components.path, Some("/a/b".to_string()));
+    assert_eq!(components.query, Some("x=1&y=2".to_string()));
+    assert_eq!(components.fragment, Some("frag".to_string()));
+}
+#[test]
+fn test_url_components_parse_bare_host_uses_root_path() {
+    let components: HttpUrlComponents =
+        HttpUrlComponents::parse("http://host.test").unwrap_or_default();
+    assert_eq!(components.protocol, "http");
+    assert_eq!(components.host, Some("host.test".to_string()));
+    assert_eq!(components.port, None);
+    assert_eq!(components.path, Some("/".to_string()));
+    assert_eq!(components.query, None);
+    assert_eq!(components.fragment, None);
+}
+#[test]
+fn test_url_components_parse_keeps_empty_query() {
+    let components: HttpUrlComponents =
+        HttpUrlComponents::parse("http://host.test/p?").unwrap_or_default();
+    assert_eq!(components.query, Some(String::new()));
+    assert_eq!(components.path, Some("/p".to_string()));
+}
+#[test]
+fn test_url_components_parse_rejects_relative_url() {
+    assert!(HttpUrlComponents::parse("not a url").is_err());
+    assert!(HttpUrlComponents::parse("").is_err());
+}
+#[test]
+fn test_url_components_default_is_all_empty() {
+    let components: HttpUrlComponents = HttpUrlComponents::default();
+    assert_eq!(components.protocol, "");
+    assert_eq!(components.host, None);
+    assert_eq!(components.port, None);
+    assert_eq!(components.path, None);
+    assert_eq!(components.query, None);
+    assert_eq!(components.fragment, None);
+}
+#[test]
+fn test_url_components_equality_and_clone() {
+    let first: HttpUrlComponents = HttpUrlComponents::parse("http://a.test/x").unwrap_or_default();
+    let second: HttpUrlComponents = first.clone();
+    assert_eq!(first, second);
+    let other: HttpUrlComponents = HttpUrlComponents::parse("http://a.test/y").unwrap_or_default();
+    assert_ne!(first, other);
+}
+#[test]
+fn test_url_parse_error_display_message() {
+    let message: String = match HttpUrlComponents::parse("not a url") {
+        Ok(parsed) => format!("ok:{parsed:?}"),
+        Err(error) => format!("{error}"),
+    };
+    assert_eq!(message, "Invalid URL");
+}
+#[test]
+fn test_request_headers_alias_is_single_valued_map() {
+    let mut headers: RequestHeaders = hash_map_xx_hash3_64();
+    assert!(headers.is_empty());
+    headers.insert("accept".to_string(), "*/*".to_string());
+    assert_eq!(headers.len(), 1usize);
+    assert_eq!(headers.get("accept").map(String::as_str), Some("*/*"));
+}
+#[test]
+fn test_request_result_alias_carries_request_error() {
+    let result: RequestResult = Err(RequestError::Request("boom".to_string()));
+    assert!(result.is_err());
+    let ok: RequestResult = Ok(HttpResponse::default());
+    assert!(ok.is_ok());
+}
+#[test]
+fn test_request_error_display_matches_debug() {
+    let error: RequestError = RequestError::Request("boom".to_string());
+    let displayed: String = format!("{error}");
+    let debugged: String = format!("{error:?}");
+    assert!(displayed.contains("Request"));
+    assert_eq!(displayed, debugged);
+}
+#[test]
+fn test_request_error_clone_and_equality() {
+    let error: RequestError = RequestError::Request("boom".to_string());
+    let cloned: RequestError = error.clone();
+    assert_eq!(cloned, error);
+    assert_ne!(cloned, RequestError::Request("other".to_string()));
+}
+#[test]
+fn test_app_name_constant() {
+    assert_eq!(APP_NAME, "http-request");
+}
+#[test]
+fn test_header_name_constants() {
+    assert_eq!(ACCEPT, "accept");
+    assert_eq!(HOST, "host");
+    assert_eq!(LOCATION, "location");
+    assert_eq!(CONTENT_LENGTH, "content-length");
+    assert_eq!(CONTENT_TYPE, "content-type");
+    assert_eq!(USER_AGENT, "user-agent");
+    assert_eq!(ACCEPT_ANY, "*/*");
+    assert_eq!(HTTPS_LOWERCASE, "https");
+    assert_eq!(QUERY, "?");
+}
+#[test]
+fn test_byte_constants() {
+    assert_eq!(SPACE_U8, b' ');
+    assert_eq!(TAB_U8, b'\t');
+    assert_eq!(COLON_U8, b':');
+    assert_eq!(BR_BYTES, b"\n");
+    assert_eq!(HTTP_BR_BYTES, b"\r\n");
+}
+```
+# Path: hyperlane/request/tests/url/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/request/tests/request_api/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_http_request_get_sets_method_and_url() {
+    let request: HttpRequest = HttpRequest::get("http://example.com/a");
+    assert_eq!(request.get_method(), Method::Get);
+    assert!(request.get_method().is_get());
+    assert_eq!(request.get_url(), "http://example.com/a");
+    assert_eq!(request.get_url_ref(), "http://example.com/a");
+    assert!(request.get_headers().is_empty());
+    assert!(request.get_body_ref().get_bytes_ref().is_empty());
+}
+#[test]
+fn test_http_request_post_sets_method_and_url() {
+    let request: HttpRequest = HttpRequest::post("https://example.com/b");
+    assert_eq!(request.get_method(), Method::Post);
+    assert!(request.get_method().is_post());
+    assert_eq!(request.get_url_ref(), "https://example.com/b");
+}
+#[test]
+fn test_http_request_accepts_owned_url() {
+    let request: HttpRequest = HttpRequest::get(String::from("http://owned.test/"));
+    assert_eq!(request.get_url_ref(), "http://owned.test/");
+}
+#[test]
+fn test_http_request_default_is_empty_request() {
+    let request: HttpRequest = HttpRequest::default();
+    assert_eq!(request.get_url_ref(), "");
+    assert_eq!(request.url, "");
+    assert!(request.get_method().is_unknown());
+    assert!(request.get_headers_ref().is_empty());
+    assert!(request.get_body_ref().get_bytes_ref().is_empty());
+    assert_eq!(
+        *request.get_config_ref().get_http_version(),
+        HttpVersion::Http1_1
+    );
+}
+#[test]
+fn test_http_request_get_sets_url_matches_field() {
+    let request: HttpRequest = HttpRequest::get("http://example.com/");
+    assert_eq!(request.url, "http://example.com/");
+    assert_eq!(request.method, Method::Get);
+}
+#[test]
+fn test_http_request_set_method_overrides_default() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    request.set_method(Method::Put);
+    assert_eq!(request.get_method(), Method::Put);
+    assert!(!request.get_method().is_get());
+    assert_eq!(request.method, Method::Put);
+}
+#[test]
+fn test_http_request_set_url_overrides_previous() {
+    let mut request: HttpRequest = HttpRequest::get("http://first.test/");
+    request.set_url("http://second.test/");
+    assert_eq!(request.get_url_ref(), "http://second.test/");
+}
+#[test]
+fn test_http_request_set_header_normalizes_key_to_lowercase() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    request.set_header("Content-Type", "application/json");
+    let headers: &HashMap<String, String> = request.get_headers_ref();
+    assert_eq!(headers.len(), 1usize);
+    assert_eq!(
+        headers.get("content-type").map(String::as_str),
+        Some("application/json")
+    );
+    assert!(headers.get("Content-Type").is_none());
+}
+#[test]
+fn test_http_request_set_header_last_write_wins_across_cases() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    request.set_header("X-Token", "first");
+    request.set_header("x-token", "second");
+    let headers: &HashMap<String, String> = request.get_headers_ref();
+    assert_eq!(headers.len(), 1usize);
+    assert_eq!(headers.get("x-token").map(String::as_str), Some("second"));
+    assert!(headers.get("X-Token").is_none());
+}
+#[test]
+fn test_http_request_remove_header_is_case_insensitive() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    request.set_header("X-Token", "value");
+    request.remove_header("x-token");
+    assert!(request.get_headers_ref().is_empty());
+    request.set_header("X-Token", "value");
+    request.remove_header("X-TOKEN");
+    assert!(request.get_headers_ref().is_empty());
+}
+#[test]
+fn test_http_request_remove_missing_header_is_noop() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    request.set_header("X-Token", "value");
+    request.remove_header("absent");
+    assert_eq!(request.get_headers_ref().len(), 1usize);
+}
+#[test]
+fn test_http_request_clear_headers_drops_all() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    request.set_header("A", "1");
+    request.set_header("B", "2");
+    assert_eq!(request.get_headers().len(), 2usize);
+    request.clear_headers();
+    assert!(request.get_headers_ref().is_empty());
+}
+#[test]
+fn test_http_request_get_mut_headers_writes_directly() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    let headers: &mut HashMap<String, String> = request.get_mut_headers();
+    headers.insert("X-raw".to_string(), "v".to_string());
+    assert_eq!(
+        request.get_headers_ref().get("X-raw").map(String::as_str),
+        Some("v")
+    );
+}
+#[test]
+fn test_http_request_set_body_replaces_previous() {
+    let mut request: HttpRequest = HttpRequest::post("http://example.com/");
+    request.set_body(Body::from_bytes("data"));
+    assert_eq!(request.get_body().get_bytes_ref(), b"data");
+    assert_eq!(request.get_body_ref().as_str(), Some("data"));
+    request.set_body(Body::empty());
+    assert!(request.get_body_ref().get_bytes_ref().is_empty());
+    assert_eq!(request.body, Body::empty());
+}
+#[test]
+fn test_http_request_config_defaults() {
+    let request: HttpRequest = HttpRequest::get("http://example.com/");
+    assert_eq!(request.get_config_ref().get_buffer_size(), 0usize);
+    assert_eq!(request.get_config_ref().get_timeout(), 0u64);
+    assert_eq!(request.get_config_ref().get_max_redirect_times(), 0usize);
+    assert_eq!(
+        *request.get_config_ref().get_http_version(),
+        HttpVersion::Http1_1
+    );
+    assert!(!request.get_config_ref().get_redirect());
+    assert!(!request.get_config_ref().get_decode());
+    assert!(request.get_config_ref().get_proxy().is_none());
+}
+#[test]
+fn test_http_request_config_setters_are_chainable() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    request
+        .get_config_mut()
+        .set_buffer_size(4096usize)
+        .set_timeout(1500u64)
+        .set_max_redirect_times(3usize)
+        .set_http_version(HttpVersion::Http2)
+        .set_redirect(true)
+        .set_decode(true);
+    assert_eq!(request.get_config_ref().get_buffer_size(), 4096usize);
+    assert_eq!(request.get_config_ref().get_timeout(), 1500u64);
+    assert_eq!(request.get_config_ref().get_max_redirect_times(), 3usize);
+    assert_eq!(
+        *request.get_config_ref().get_http_version(),
+        HttpVersion::Http2
+    );
+    assert!(request.get_config_ref().get_redirect());
+    assert!(request.get_config_ref().get_decode());
+}
+#[test]
+fn test_http_request_config_proxy_setter() {
+    let mut request: HttpRequest = HttpRequest::get("http://example.com/");
+    request
+        .get_config_mut()
+        .set_proxy(Some(Proxy::http("h", 1u16)));
+    let proxy: &Option<Proxy> = request.get_config_ref().get_proxy();
+    assert_eq!(
+        proxy.as_ref().map(|item: &Proxy| item.host.clone()),
+        Some("h".to_string())
+    );
+    request.get_config_mut().set_proxy(None);
+    assert!(request.get_config_ref().get_proxy().is_none());
+}
+#[test]
+fn test_http_request_set_config_replaces_whole_config() {
+    let mut source: HttpRequest = HttpRequest::get("http://source.test/");
+    source.get_config_mut().set_timeout(1234u64);
+    source.get_config_mut().set_buffer_size(64usize);
+    let mut target: HttpRequest = HttpRequest::post("http://target.test/");
+    target.get_config_mut().set_timeout(9999u64);
+    target.set_config(source.get_config());
+    assert_eq!(target.get_config(), source.get_config());
+    assert_eq!(target.get_config_ref().get_timeout(), 1234u64);
+    assert_eq!(target.get_config_ref().get_buffer_size(), 64usize);
+    assert_eq!(target.config, source.config);
+}
+#[test]
+fn test_http_request_get_config_returns_owned_copy() {
+    let request: HttpRequest = HttpRequest::get("http://example.com/");
+    assert_eq!(request.get_config(), request.get_config());
+    assert_eq!(request.config, request.get_config());
+}
+#[test]
+fn test_http_request_clone_copies_headers_and_body() {
+    let mut request: HttpRequest = HttpRequest::post("http://example.com/");
+    request.set_header("X-Token", "v");
+    request.set_body(Body::from_bytes("payload"));
+    let cloned: HttpRequest = request.clone();
+    assert_eq!(cloned.get_url_ref(), request.get_url_ref());
+    assert_eq!(cloned.get_method(), request.get_method());
+    assert_eq!(cloned.get_headers_ref(), request.get_headers_ref());
+    assert_eq!(cloned.get_body_ref(), request.get_body_ref());
+}
+#[test]
+fn test_http_request_debug_lists_url() {
+    let request: HttpRequest = HttpRequest::get("http://debug.test/");
+    let debugged: String = format!("{request:?}");
+    assert!(debugged.contains("http://debug.test/"));
+}
+```
+# Path: hyperlane/request/tests/request_api/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/request/tests/builder/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_builder_new_builds_empty_request() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.build();
+    assert_eq!(request.get_url_ref(), "");
+    assert!(request.get_method().is_unknown());
+    assert!(request.get_headers_ref().is_empty());
+    assert!(request.get_body_ref().get_bytes_ref().is_empty());
+}
+#[test]
+fn test_builder_get_sets_method_and_url() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.get("http://get.test/").build();
+    assert!(request.get_method().is_get());
+    assert_eq!(request.get_url_ref(), "http://get.test/");
+}
+#[test]
+fn test_builder_post_sets_method_and_url() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.post("http://post.test/").build();
+    assert!(request.get_method().is_post());
+    assert_eq!(request.get_url_ref(), "http://post.test/");
+}
+#[test]
+fn test_builder_method_and_url_overrides_shortcuts() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder
+        .get("http://first.test/")
+        .method(Method::Put)
+        .url("http://second.test/")
+        .build();
+    assert!(request.get_method() == Method::Put);
+    assert_eq!(request.get_url_ref(), "http://second.test/");
+}
+#[test]
+fn test_builder_header_normalizes_key() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder
+        .get("http://a.test/")
+        .header("Accept", "application/json")
+        .build();
+    assert_eq!(
+        request.get_headers_ref().get("accept").map(String::as_str),
+        Some("application/json")
+    );
+}
+#[test]
+fn test_builder_headers_inserts_every_pair() {
+    let mut headers: HashMap<String, String> = HashMap::new();
+    headers.insert("A".to_string(), "1".to_string());
+    headers.insert("B".to_string(), "2".to_string());
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.get("http://a.test/").headers(headers).build();
+    assert_eq!(request.get_headers_ref().len(), 2usize);
+    assert_eq!(
+        request.get_headers_ref().get("a").map(String::as_str),
+        Some("1")
+    );
+    assert_eq!(
+        request.get_headers_ref().get("b").map(String::as_str),
+        Some("2")
+    );
+}
+#[test]
+fn test_builder_remove_and_clear_headers() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder
+        .get("http://a.test/")
+        .header("A", "1")
+        .header("B", "2")
+        .remove_header("a")
+        .build();
+    assert_eq!(request.get_headers_ref().len(), 1usize);
+    assert!(request.get_headers_ref().get("a").is_none());
+    let mut second: RequestBuilder = RequestBuilder::new();
+    let cleared: HttpRequest = second
+        .get("http://a.test/")
+        .header("A", "1")
+        .clear_headers()
+        .build();
+    assert!(cleared.get_headers_ref().is_empty());
+}
+#[test]
+fn test_builder_body_accepts_raw_bytes() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.post("http://a.test/").body(vec![1u8, 2, 3]).build();
+    assert_eq!(request.get_body_ref().get_bytes_ref(), &[1u8, 2, 3]);
+}
+#[test]
+fn test_builder_body_text_stores_utf8_bytes() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.post("http://a.test/").body_text("héllo").build();
+    assert_eq!(request.get_body_ref().as_str(), Some("héllo"));
+    assert_eq!(request.get_body_ref().get_bytes_ref().len(), 6usize);
+}
+#[test]
+fn test_builder_body_json_serialises_value() {
+    let body: serde_json::Value = json!({ "code": 1 });
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.post("http://a.test/").body_json(&body).build();
+    assert_eq!(request.get_body_ref().as_str(), Some("{\"code\":1}"));
+}
+#[test]
+fn test_builder_body_json_replaces_previous_body() {
+    let first: serde_json::Value = json!({ "a": 1 });
+    let second: serde_json::Value = json!({ "b": 2 });
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder
+        .post("http://a.test/")
+        .body_json(&first)
+        .body_json(&second)
+        .build();
+    assert_eq!(request.get_body_ref().as_str(), Some("{\"b\":2}"));
+}
+#[test]
+fn test_builder_timeout_and_buffer_size() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder
+        .get("http://a.test/")
+        .timeout(6000u64)
+        .buffer_size(8192usize)
+        .build();
+    assert_eq!(request.get_config_ref().get_timeout(), 6000u64);
+    assert_eq!(request.get_config_ref().get_buffer_size(), 8192usize);
+}
+#[test]
+fn test_builder_http_version_toggles() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let http2: HttpRequest = builder.get("http://a.test/").http2_only().build();
+    assert_eq!(
+        *http2.get_config_ref().get_http_version(),
+        HttpVersion::Http2
+    );
+    let mut other: RequestBuilder = RequestBuilder::new();
+    let http1: HttpRequest = other
+        .get("http://a.test/")
+        .http2_only()
+        .http1_1_only()
+        .build();
+    assert_eq!(
+        *http1.get_config_ref().get_http_version(),
+        HttpVersion::Http1_1
+    );
+}
+#[test]
+fn test_builder_redirect_toggles() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.get("http://a.test/").build();
+    assert!(!request.get_config_ref().get_redirect());
+    let mut enabled: RequestBuilder = RequestBuilder::new();
+    let redirected: HttpRequest = enabled.get("http://a.test/").redirect().build();
+    assert!(redirected.get_config_ref().get_redirect());
+    let mut disabled: RequestBuilder = RequestBuilder::new();
+    let plain: HttpRequest = disabled
+        .get("http://a.test/")
+        .redirect()
+        .no_redirect()
+        .build();
+    assert!(!plain.get_config_ref().get_redirect());
+}
+#[test]
+fn test_builder_max_redirect_times() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder
+        .get("http://a.test/")
+        .max_redirect_times(5usize)
+        .build();
+    assert_eq!(request.get_config_ref().get_max_redirect_times(), 5usize);
+}
+#[test]
+fn test_builder_decode_toggles() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder.get("http://a.test/").build();
+    assert!(!request.get_config_ref().get_decode());
+    let mut enabled: RequestBuilder = RequestBuilder::new();
+    let decoded: HttpRequest = enabled.get("http://a.test/").decode().build();
+    assert!(decoded.get_config_ref().get_decode());
+    let mut disabled: RequestBuilder = RequestBuilder::new();
+    let plain: HttpRequest = disabled.get("http://a.test/").decode().no_decode().build();
+    assert!(!plain.get_config_ref().get_decode());
+}
+#[test]
+fn test_builder_proxy_and_no_proxy() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let request: HttpRequest = builder
+        .get("http://a.test/")
+        .proxy(Proxy::socks5("127.0.0.1", 1080u16))
+        .build();
+    let proxy: &Option<Proxy> = request.get_config_ref().get_proxy();
+    assert_eq!(
+        proxy.as_ref().map(|item: &Proxy| item.proxy_type),
+        Some(ProxyType::Socks5)
+    );
+    assert_eq!(proxy.as_ref().map(|item: &Proxy| item.port), Some(1080u16));
+    let mut cleared: RequestBuilder = RequestBuilder::new();
+    let direct: HttpRequest = cleared
+        .get("http://a.test/")
+        .proxy(Proxy::http("h", 1u16))
+        .no_proxy()
+        .build();
+    assert!(direct.get_config_ref().get_proxy().is_none());
+}
+#[test]
+fn test_builder_build_resets_the_builder() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    builder.get("http://a.test/");
+    let first: HttpRequest = builder.build();
+    let second: HttpRequest = builder.build();
+    assert_eq!(first.get_url_ref(), "http://a.test/");
+    assert_eq!(second.get_url_ref(), "");
+    assert!(second.get_headers_ref().is_empty());
+}
+#[test]
+fn test_builder_get_request_mut_exposes_underlying_request() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    let inner: &mut HttpRequest = builder.get_request_mut();
+    inner.set_url("http://inner.test/");
+    inner.set_header("X-Token", "v");
+    let request: HttpRequest = builder.build();
+    assert_eq!(request.get_url_ref(), "http://inner.test/");
+    assert_eq!(
+        request.get_headers_ref().get("x-token").map(String::as_str),
+        Some("v")
+    );
+}
+#[test]
+fn test_builder_default_and_clone_preserve_state() {
+    let mut base: RequestBuilder = RequestBuilder::default();
+    base.get("http://base.test/").header("A", "1");
+    let mut cloned: RequestBuilder = base.clone();
+    let from_clone: HttpRequest = cloned.build();
+    let from_base: HttpRequest = base.build();
+    assert_eq!(from_clone.get_url_ref(), "http://base.test/");
+    assert_eq!(from_base.get_url_ref(), "http://base.test/");
+    assert_eq!(
+        from_clone.get_headers_ref().get("a").map(String::as_str),
+        Some("1")
+    );
+    assert_eq!(
+        from_base.get_headers_ref().get("a").map(String::as_str),
+        Some("1")
+    );
+}
+#[test]
+fn test_builder_debug_lists_url() {
+    let mut builder: RequestBuilder = RequestBuilder::new();
+    builder.get("http://debug.test/");
+    let debugged: String = format!("{builder:?}");
+    assert!(debugged.contains("http://debug.test/"));
+}
+```
+# Path: hyperlane/request/tests/builder/mod.rs
+```rust
+mod r#fn;
+use super::*;
 ```
 # Path: hyperlane/request/tests/request_builder/fn.rs
 ```rust
@@ -7799,6 +8807,195 @@ fn test_readme_sync_post_json_request() {
 mod r#fn;
 use super::*;
 ```
+# Path: hyperlane/request/tests/response/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_response_default_is_unknown() {
+    let response: HttpResponse = HttpResponse::default();
+    assert_eq!(response.status_code, HttpStatus::Unknown.code());
+    assert_eq!(response.status_code, 0usize);
+    assert_eq!(response.reason_phrase, "Unknown");
+    assert_eq!(response.version, HttpVersion::Http1_1);
+    assert!(response.headers.is_empty());
+    assert!(response.body.is_empty());
+    assert!(!response.is_success());
+    assert!(!response.is_redirect());
+}
+#[test]
+fn test_response_from_bytes_parses_status_headers_body() {
+    let response: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Empty:\r\n\r\nhello",
+    );
+    assert_eq!(response.status_code, 200usize);
+    assert_eq!(response.reason_phrase, "OK");
+    assert_eq!(response.version, HttpVersion::Http1_1);
+    assert_eq!(response.headers.len(), 1usize);
+    assert_eq!(
+        response.get_header("content-type"),
+        Some("application/json")
+    );
+    assert_eq!(response.bytes(), b"hello");
+    assert_eq!(response.text(), "hello");
+    assert!(response.is_success());
+    assert!(!response.is_redirect());
+}
+#[test]
+fn test_response_get_header_is_case_insensitive() {
+    let response: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Empty:\r\n\r\nhello",
+    );
+    assert_eq!(
+        response.get_header("Content-Type"),
+        Some("application/json")
+    );
+    assert_eq!(
+        response.get_header("CONTENT-TYPE"),
+        Some("application/json")
+    );
+    assert_eq!(response.get_header("absent"), None);
+}
+#[test]
+fn test_response_from_bytes_skips_valueless_header() {
+    let response: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Empty:\r\n\r\nhello",
+    );
+    assert!(response.get_header("x-empty").is_none());
+    assert!(!response.headers.contains_key("x-empty"));
+}
+#[test]
+fn test_response_from_bytes_parses_redirect() {
+    let raw: &[u8] = b"HTTP/1.1 302 Found\r\nLocation: http://target.test/\r\n\r\n";
+    let response: HttpResponse = HttpResponse::from_bytes(raw);
+    assert_eq!(response.status_code, 302usize);
+    assert_eq!(response.reason_phrase, "Found");
+    assert_eq!(response.get_header("location"), Some("http://target.test/"));
+    assert!(response.is_redirect());
+    assert!(!response.is_success());
+}
+#[test]
+fn test_response_from_bytes_joins_multi_word_reason_and_body() {
+    let raw: &[u8] = b"HTTP/1.1 500 Internal Server Error\r\nX-Trace: t1\r\n\r\nline1\r\nline2";
+    let response: HttpResponse = HttpResponse::from_bytes(raw);
+    assert_eq!(response.status_code, 500usize);
+    assert_eq!(response.reason_phrase, "Internal Server Error");
+    assert_eq!(response.get_header("x-trace"), Some("t1"));
+    assert_eq!(response.bytes(), b"line1\nline2");
+    assert!(!response.is_success());
+    assert!(!response.is_redirect());
+}
+#[test]
+fn test_response_from_bytes_falls_back_on_unparsable_status_line() {
+    let raw: &[u8] = b"garbage\r\n\r\n";
+    let response: HttpResponse = HttpResponse::from_bytes(raw);
+    assert_eq!(response.status_code, HttpStatus::Unknown.code());
+    assert_eq!(response.reason_phrase, "Unknown");
+    assert!(response.version.is_unknown());
+    assert!(response.body.is_empty());
+}
+#[test]
+fn test_response_from_bytes_handles_empty_input() {
+    let response: HttpResponse = HttpResponse::from_bytes(&[]);
+    assert_eq!(response.status_code, HttpStatus::Unknown.code());
+    assert_eq!(response.reason_phrase, "Unknown");
+    assert!(response.body.is_empty());
+    assert!(response.headers.is_empty());
+}
+#[test]
+fn test_response_from_bytes_status_code_needs_three_digits() {
+    let raw: &[u8] = b"HTTP/1.1 20 OK\r\n\r\n";
+    let response: HttpResponse = HttpResponse::from_bytes(raw);
+    assert_eq!(response.status_code, 20usize);
+}
+#[test]
+fn test_response_getters_read_public_fields() {
+    let response: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Empty:\r\n\r\nhello",
+    );
+    assert_eq!(response.get_status_code(), response.status_code);
+    assert_eq!(response.get_reason_phrase(), &response.reason_phrase);
+    assert_eq!(response.get_headers(), &response.headers);
+    assert_eq!(response.get_body(), &response.body);
+    assert_eq!(response.get_version(), &response.version);
+}
+#[test]
+fn test_response_setters_write_public_fields() {
+    let mut response: HttpResponse = HttpResponse::default();
+    response.set_status_code(201usize);
+    response.set_reason_phrase("Created");
+    response.set_version(HttpVersion::Http2);
+    response.set_body(vec![b'a', b'b', b'c']);
+    assert_eq!(response.status_code, 201usize);
+    assert_eq!(response.reason_phrase, "Created");
+    assert_eq!(response.version, HttpVersion::Http2);
+    assert_eq!(response.bytes(), b"abc");
+}
+#[test]
+fn test_response_set_headers_replaces_map() {
+    let mut response: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Empty:\r\n\r\nhello",
+    );
+    let mut replacement: HttpResponseHeaders = new_response_headers();
+    replacement.insert("x-only".to_string(), "1".to_string());
+    response.set_headers(replacement);
+    assert_eq!(response.headers.len(), 1usize);
+    assert_eq!(response.get_header("x-only"), Some("1"));
+    assert!(response.get_header("content-type").is_none());
+}
+#[test]
+fn test_response_clone_is_equal_by_content() {
+    let response: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Empty:\r\n\r\nhello",
+    );
+    let cloned: HttpResponse = response.clone();
+    assert_eq!(cloned.status_code, response.status_code);
+    assert_eq!(cloned.reason_phrase, response.reason_phrase);
+    assert_eq!(cloned.headers, response.headers);
+    assert_eq!(cloned.body, response.body);
+}
+#[test]
+fn test_response_decode_without_content_encoding_keeps_body() {
+    let response: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Empty:\r\n\r\nhello",
+    );
+    let decoded: HttpResponse = response.decode(4096usize);
+    assert_eq!(decoded.body, response.body);
+    assert_eq!(decoded.status_code, response.status_code);
+    assert_eq!(decoded.reason_phrase, response.reason_phrase);
+    assert_eq!(decoded.headers, response.headers);
+    assert_eq!(decoded.version, response.version);
+}
+#[test]
+fn test_response_text_replaces_invalid_utf8() {
+    let mut response: HttpResponse = HttpResponse::default();
+    response.set_body(vec![b'a', 0xff, b'b']);
+    assert_eq!(response.bytes(), &[b'a', 0xff, b'b']);
+    assert_eq!(response.text(), "a\u{fffd}b");
+    assert_eq!(response.text().len(), 5usize);
+}
+#[test]
+fn test_new_response_headers_starts_empty() {
+    let mut headers: HttpResponseHeaders = new_response_headers();
+    assert!(headers.is_empty());
+    headers.insert("k".to_string(), "v".to_string());
+    assert_eq!(headers.len(), 1usize);
+    assert_eq!(headers.get("k").map(String::as_str), Some("v"));
+}
+#[test]
+fn test_response_debug_lists_status() {
+    let response: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Empty:\r\n\r\nhello",
+    );
+    let debugged: String = format!("{response:?}");
+    assert!(debugged.contains("200"));
+    assert!(debugged.contains("OK"));
+}
+```
+# Path: hyperlane/request/tests/response/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
 # Path: hyperlane/request/src/lib.rs
 ```rust
 mod common;
@@ -7813,9 +9010,11 @@ pub use http_type::{
     RequestHeadersValue, ResponseStatusCode, SPACE_U8, TAB_U8, USER_AGENT, hash_map_xx_hash3_64,
 };
 pub use std::{
+    cmp,
     collections::{HashMap, HashSet, VecDeque},
     fmt::{self, Debug, Display, Formatter},
-    io::{Read, Write},
+    io::{self, Read, Write},
+    mem,
     net::{Ipv4Addr, Ipv6Addr, TcpStream},
     pin::Pin,
     str::from_utf8,
@@ -7908,9 +9107,9 @@ impl AsyncRead for ProxyTunnelStream {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
+    ) -> Poll<io::Result<()>> {
         if !self.get_pre_read_data().is_empty() {
-            let len: usize = std::cmp::min(self.get_pre_read_data().len(), buf.remaining());
+            let len: usize = cmp::min(self.get_pre_read_data().len(), buf.remaining());
             buf.put_slice(&self.get_pre_read_data()[..len]);
             self.get_mut_pre_read_data().drain(..len);
             return Poll::Ready(Ok(()));
@@ -7923,19 +9122,16 @@ impl AsyncWrite for ProxyTunnelStream {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, std::io::Error>> {
+    ) -> Poll<Result<usize, io::Error>> {
         Pin::new(self.get_mut_inner()).poll_write(cx, buf)
     }
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         Pin::new(self.get_mut_inner()).poll_flush(cx)
     }
     fn poll_shutdown(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Result<(), std::io::Error>> {
+    ) -> Poll<Result<(), io::Error>> {
         Pin::new(self.get_mut_inner()).poll_shutdown(cx)
     }
 }
@@ -7949,9 +9145,9 @@ impl SyncProxyTunnelStream {
     }
 }
 impl Read for SyncProxyTunnelStream {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if !self.get_pre_read_data().is_empty() {
-            let len: usize = std::cmp::min(self.get_pre_read_data().len(), buf.len());
+            let len: usize = cmp::min(self.get_pre_read_data().len(), buf.len());
             buf[..len].copy_from_slice(&self.get_pre_read_data()[..len]);
             self.get_mut_pre_read_data().drain(..len);
             return Ok(len);
@@ -7960,10 +9156,10 @@ impl Read for SyncProxyTunnelStream {
     }
 }
 impl Write for SyncProxyTunnelStream {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.get_mut_inner().write(buf)
     }
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> io::Result<()> {
         self.get_mut_inner().flush()
     }
 }
@@ -8193,7 +9389,7 @@ pub(crate) fn parse_chunked_body(body_bytes: &[u8]) -> Vec<u8> {
             Some(p) => &chunk_size_str[..p],
             None => chunk_size_str,
         };
-        let chunk_size: usize = match std::str::from_utf8(chunk_size_str) {
+        let chunk_size: usize = match from_utf8(chunk_size_str) {
             Ok(s) => match usize::from_str_radix(s.trim(), 16) {
                 Ok(n) => n,
                 Err(_) => break,
@@ -8351,7 +9547,7 @@ pub(crate) fn parse_response_headers(
             {
                 let start: usize = location_pos + location_sign_key.len();
                 if let Some(end_pos) = find_crlf(headers_bytes, start) {
-                    let mut url_vec = Vec::with_capacity(end_pos - start);
+                    let mut url_vec: Vec<u8> = Vec::with_capacity(end_pos - start);
                     url_vec.extend_from_slice(&headers_bytes[start..end_pos]);
                     *redirect_url = Some(url_vec);
                 }
@@ -8519,7 +9715,7 @@ impl RequestBuilder {
         self
     }
     pub fn build(&mut self) -> HttpRequest {
-        std::mem::take(self.get_mut_request())
+        mem::take(self.get_mut_request())
     }
 }
 ```
@@ -8558,9 +9754,9 @@ impl HttpRequest {
             .map_err(|e: ::http_type::HttpUrlError| RequestError::Request(e.to_string()))
     }
     pub(crate) fn full_path(&self) -> String {
-        let url_obj = self.parse_url().unwrap_or_default();
-        let query = url_obj.query.unwrap_or_default();
-        let path = url_obj.path.unwrap_or_default();
+        let url_obj: HttpUrlComponents = self.parse_url().unwrap_or_default();
+        let query: String = url_obj.query.unwrap_or_default();
+        let path: String = url_obj.path.unwrap_or_default();
         if query.is_empty() {
             path
         } else {
@@ -8604,11 +9800,11 @@ impl HttpRequest {
         out
     }
     fn header_has_key(header: &HashMap<String, String>, target_key: &str) -> bool {
-        let target = target_key.to_ascii_lowercase();
+        let target: String = target_key.to_ascii_lowercase();
         header.keys().any(|k: &String| k == &target)
     }
     pub(crate) fn body_bytes(&self) -> Vec<u8> {
-        let ct = self
+        let ct: Option<String> = self
             .headers
             .iter()
             .find(|(k, _): &(&String, &String)| k.eq_ignore_ascii_case(CONTENT_TYPE))
@@ -8624,38 +9820,38 @@ impl HttpRequest {
         }
     }
     pub(crate) fn send_sync(&mut self) -> RequestResult {
-        let url_obj = self.parse_url()?;
+        let url_obj: HttpUrlComponents = self.parse_url()?;
         let host: String = url_obj.host.clone().unwrap_or_default();
         let port: u16 = self.resolve_port(url_obj.port.unwrap_or_default());
         let mut stream: BoxReadWrite = self.open_sync_stream(host, port)?;
-        let method = self.get_method();
+        let method: Method = self.get_method();
         if method.is_get() {
             self.send_get_request_sync(&mut stream)
         } else if method.is_post() {
             self.send_post_request_sync(&mut stream)
         } else {
-            Err(RequestError::Request("Method Not Allowed".to_string()))
+            Err(RequestError::Request(METHOD_NOT_ALLOWED.to_string()))
         }
     }
     async fn send_async_impl(&mut self) -> RequestResult {
-        let url_obj = self.parse_url()?;
+        let url_obj: HttpUrlComponents = self.parse_url()?;
         let host: String = url_obj.host.clone().unwrap_or_default();
         let port: u16 = self.resolve_port(url_obj.port.unwrap_or_default());
         let mut stream: BoxAsyncReadWrite = self.open_async_stream(host, port).await?;
-        let method = self.get_method();
+        let method: Method = self.get_method();
         if method.is_get() {
             self.send_get_request_async(&mut stream).await
         } else if method.is_post() {
             self.send_post_request_async(&mut stream).await
         } else {
-            Err(RequestError::Request("Method Not Allowed".to_string()))
+            Err(RequestError::Request(METHOD_NOT_ALLOWED.to_string()))
         }
     }
     fn resolve_port(&self, port: u16) -> u16 {
         if port != 0 {
             return port;
         }
-        let protocol = Self::protocol_lower(self.get_config_ref());
+        let protocol: String = Self::protocol_lower(self.get_config_ref());
         Protocol::get_port(&protocol)
     }
     fn is_https(&self) -> bool {
@@ -8665,21 +9861,21 @@ impl HttpRequest {
         if let Some(proxy) = &self.get_config_ref().proxy {
             return self.open_sync_proxy_stream(host, port, proxy);
         }
-        let timeout = Duration::from_millis(self.get_config_ref().timeout);
-        let tcp = TcpStream::connect((host.clone(), port))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let timeout: Duration = Duration::from_millis(self.get_config_ref().timeout);
+        let tcp: TcpStream = TcpStream::connect((host.clone(), port))
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_write_timeout(Some(timeout))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
             let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
-            let tls_cfg = ClientConfig::builder()
+            let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let dns = ServerName::try_from(host.clone())
+            let dns: ServerName<'static> = ServerName::try_from(host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let session = ClientConnection::new(Arc::new(tls_cfg), dns)
+            let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
                 .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
             Ok(Box::new(StreamOwned::new(session, tcp)))
         } else {
@@ -8690,65 +9886,72 @@ impl HttpRequest {
         &mut self,
         stream: &mut BoxReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let path = self.full_path();
-        let header_bytes = self.header_bytes(0);
-        let version = self.get_config_ref().http_version.to_string();
-        let request = build_http_request("GET", path, header_bytes, None, version);
+        let path: String = self.full_path();
+        let header_bytes: Vec<u8> = self.header_bytes(0);
+        let version: String = self.get_config_ref().http_version.to_string();
+        let request: Vec<u8> = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
             .and_then(|_: ()| stream.flush())
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         self.read_response_sync(stream)
     }
     fn send_post_request_sync(
         &mut self,
         stream: &mut BoxReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let body_bytes = self.body_bytes();
-        let path = self.full_path();
-        let header_bytes = self.header_bytes(body_bytes.len());
-        let version = self.get_config_ref().http_version.to_string();
-        let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
+        let body_bytes: Vec<u8> = self.body_bytes();
+        let path: String = self.full_path();
+        let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len());
+        let version: String = self.get_config_ref().http_version.to_string();
+        let request: Vec<u8> = build_http_request(
+            HTTP_METHOD_POST,
+            path,
+            header_bytes,
+            Some(body_bytes),
+            version,
+        );
         stream
             .write_all(&request)
             .and_then(|_: ()| stream.flush())
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         self.read_response_sync(stream)
     }
     fn read_response_sync(
         &mut self,
         stream: &mut BoxReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let buffer_size = self.get_config_ref().buffer_size;
-        let mut buffer = vec![0u8; buffer_size];
+        let buffer_size: usize = self.get_config_ref().buffer_size;
+        let mut buffer: Vec<u8> = vec![0u8; buffer_size];
         let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
-        let mut headers_done = false;
-        let mut content_length = 0usize;
+        let mut headers_done: bool = false;
+        let mut content_length: usize = 0usize;
         let mut redirect_url: Option<Vec<u8>> = None;
-        let mut headers_end_pos = 0usize;
-        let mut is_chunked = false;
-        let version_bytes = self
+        let mut headers_end_pos: usize = 0usize;
+        let mut is_chunked: bool = false;
+        let version_bytes: Vec<u8> = self
             .config
             .http_version
             .to_string()
             .to_ascii_lowercase()
             .into_bytes();
-        let location_key = format!("{}:", LOCATION.to_ascii_lowercase()).into_bytes();
+        let location_key: Vec<u8> = format!("{}:", LOCATION.to_ascii_lowercase()).into_bytes();
         loop {
-            let n = stream
+            let n: usize = stream
                 .read(&mut buffer)
-                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             if n == 0 {
                 break;
             }
-            let new_cap = calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
+            let new_cap: usize =
+                calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
             if new_cap > 0 {
                 response_bytes.reserve(new_cap - response_bytes.capacity());
             }
-            let old_len = response_bytes.len();
+            let old_len: usize = response_bytes.len();
             response_bytes.extend_from_slice(&buffer[..n]);
             if !headers_done {
-                let search_start = old_len.saturating_sub(3);
+                let search_start: usize = old_len.saturating_sub(3);
                 if let Some(pos) = find_double_crlf(&response_bytes, search_start) {
                     headers_done = true;
                     headers_end_pos = pos + 4;
@@ -8774,12 +9977,12 @@ impl HttpRequest {
             }
         }
         if is_chunked {
-            let body_bytes = response_bytes[headers_end_pos..].to_vec();
-            let decoded = parse_chunked_body(&body_bytes);
+            let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
+            let decoded: Vec<u8> = parse_chunked_body(&body_bytes);
             response_bytes.truncate(headers_end_pos);
             response_bytes.extend_from_slice(&decoded);
         }
-        let mut response = HttpResponse::from_bytes(&response_bytes);
+        let mut response: HttpResponse = HttpResponse::from_bytes(&response_bytes);
         if !self.get_config_ref().redirect || redirect_url.is_none() {
             if self.get_config_ref().decode {
                 response = response.decode(self.get_config_ref().buffer_size);
@@ -8788,22 +9991,22 @@ impl HttpRequest {
         }
         let url_bytes: Vec<u8> = redirect_url
             .take()
-            .ok_or_else(|| RequestError::Request("Missing Redirect URL".to_string()))?;
-        let url = String::from_utf8(url_bytes)
+            .ok_or_else(|| RequestError::Request(MISSING_REDIRECT_URL.to_string()))?;
+        let url: String = String::from_utf8(url_bytes)
             .map_err(|e: FromUtf8Error| RequestError::Request(e.to_string()))?;
         self.handle_redirect(url)
     }
     fn handle_redirect(&mut self, url: String) -> Result<HttpResponse, RequestError> {
         if !self.get_config_ref().redirect {
-            return Err(RequestError::Request("Redirect Not Enabled".to_string()));
+            return Err(RequestError::Request(REDIRECT_NOT_ENABLED.to_string()));
         }
         if self.get_tmp_ref().get_visit_url().contains(&url) {
-            return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
+            return Err(RequestError::Request(REDIRECT_URL_DEAD_LOOP.to_string()));
         }
         self.get_tmp_mut().get_mut_visit_url().insert(url.clone());
         if self.get_config_ref().max_redirect_times == 0 {
             return Err(RequestError::Request(
-                "Max Redirect Times Exceeded".to_string(),
+                MAX_REDIRECT_TIMES_EXCEEDED.to_string(),
             ));
         }
         self.get_config_mut().max_redirect_times -= 1;
@@ -8811,21 +10014,21 @@ impl HttpRequest {
         self.send_sync()
     }
     fn is_chunked_response_complete(body_bytes: &[u8]) -> bool {
-        let mut pos = 0;
+        let mut pos: usize = 0;
         while pos < body_bytes.len() {
-            let chunk_size_end = match body_bytes[pos..]
+            let chunk_size_end: usize = match body_bytes[pos..]
                 .windows(2)
                 .position(|w: &[u8]| w == b"\r\n")
             {
                 Some(p) => pos + p,
                 None => return false,
             };
-            let raw = &body_bytes[pos..chunk_size_end];
+            let raw: &[u8] = &body_bytes[pos..chunk_size_end];
             let chunk_size_str: &[u8] = match raw.iter().position(|&b: &u8| b == b';') {
                 Some(p) => &raw[..p],
                 None => raw,
             };
-            let chunk_size: usize = match std::str::from_utf8(chunk_size_str) {
+            let chunk_size: usize = match from_utf8(chunk_size_str) {
                 Ok(s) => match usize::from_str_radix(s.trim(), 16) {
                     Ok(n) => n,
                     Err(_) => return false,
@@ -8835,8 +10038,8 @@ impl HttpRequest {
             if chunk_size == 0 {
                 return true;
             }
-            let start = chunk_size_end + 2;
-            let end = start + chunk_size;
+            let start: usize = chunk_size_end + 2;
+            let end: usize = start + chunk_size;
             if end + 2 > body_bytes.len() {
                 return false;
             }
@@ -8852,21 +10055,22 @@ impl HttpRequest {
         if let Some(proxy) = &self.get_config_ref().proxy {
             return self.open_async_proxy_stream(host, port, proxy).await;
         }
-        let tcp = http_type::tokio::net::TcpStream::connect((host.clone(), port))
-            .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let tcp: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect((host.clone(), port))
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         if self.is_https() {
             let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
-            let tls_cfg = ClientConfig::builder()
+            let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let connector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns = ServerName::try_from(host.clone())
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
+            let dns: ServerName<'static> = ServerName::try_from(host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tls = connector
+            let tls: tokio_rustls::client::TlsStream<http_type::tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
                 .await
-                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             Ok(Box::new(tls))
         } else {
             Ok(Box::new(tcp))
@@ -8876,74 +10080,81 @@ impl HttpRequest {
         &mut self,
         stream: &mut BoxAsyncReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let path = self.full_path();
-        let header_bytes = self.header_bytes(0);
-        let version = self.get_config_ref().http_version.to_string();
-        let request = build_http_request("GET", path, header_bytes, None, version);
+        let path: String = self.full_path();
+        let header_bytes: Vec<u8> = self.header_bytes(0);
+        let version: String = self.get_config_ref().http_version.to_string();
+        let request: Vec<u8> = build_http_request("GET", path, header_bytes, None, version);
         stream
             .write_all(&request)
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         stream
             .flush()
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         self.read_response_async(stream).await
     }
     async fn send_post_request_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let body_bytes = self.body_bytes();
-        let path = self.full_path();
-        let header_bytes = self.header_bytes(body_bytes.len());
-        let version = self.get_config_ref().http_version.to_string();
-        let request = build_http_request("POST", path, header_bytes, Some(body_bytes), version);
+        let body_bytes: Vec<u8> = self.body_bytes();
+        let path: String = self.full_path();
+        let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len());
+        let version: String = self.get_config_ref().http_version.to_string();
+        let request: Vec<u8> = build_http_request(
+            HTTP_METHOD_POST,
+            path,
+            header_bytes,
+            Some(body_bytes),
+            version,
+        );
         stream
             .write_all(&request)
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         stream
             .flush()
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         self.read_response_async(stream).await
     }
     async fn read_response_async(
         &mut self,
         stream: &mut BoxAsyncReadWrite,
     ) -> Result<HttpResponse, RequestError> {
-        let buffer_size = self.get_config_ref().buffer_size;
-        let mut buffer = vec![0u8; buffer_size];
+        let buffer_size: usize = self.get_config_ref().buffer_size;
+        let mut buffer: Vec<u8> = vec![0u8; buffer_size];
         let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
-        let mut headers_done = false;
-        let mut content_length = 0usize;
+        let mut headers_done: bool = false;
+        let mut content_length: usize = 0usize;
         let mut redirect_url: Option<Vec<u8>> = None;
-        let mut headers_end_pos = 0usize;
-        let mut is_chunked = false;
-        let version_bytes = self
+        let mut headers_end_pos: usize = 0usize;
+        let mut is_chunked: bool = false;
+        let version_bytes: Vec<u8> = self
             .config
             .http_version
             .to_string()
             .to_ascii_lowercase()
             .into_bytes();
-        let location_key = format!("{}:", LOCATION.to_ascii_lowercase()).into_bytes();
+        let location_key: Vec<u8> = format!("{}:", LOCATION.to_ascii_lowercase()).into_bytes();
         loop {
-            let n = stream
+            let n: usize = stream
                 .read(&mut buffer)
                 .await
-                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             if n == 0 {
                 break;
             }
-            let new_cap = calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
+            let new_cap: usize =
+                calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
             if new_cap > 0 {
                 response_bytes.reserve(new_cap - response_bytes.capacity());
             }
-            let old_len = response_bytes.len();
+            let old_len: usize = response_bytes.len();
             response_bytes.extend_from_slice(&buffer[..n]);
             if !headers_done {
-                let search_start = old_len.saturating_sub(3);
+                let search_start: usize = old_len.saturating_sub(3);
                 if let Some(pos) = find_double_crlf(&response_bytes, search_start) {
                     headers_done = true;
                     headers_end_pos = pos + 4;
@@ -8969,12 +10180,12 @@ impl HttpRequest {
             }
         }
         if is_chunked {
-            let body_bytes = response_bytes[headers_end_pos..].to_vec();
-            let decoded = parse_chunked_body(&body_bytes);
+            let body_bytes: Vec<u8> = response_bytes[headers_end_pos..].to_vec();
+            let decoded: Vec<u8> = parse_chunked_body(&body_bytes);
             response_bytes.truncate(headers_end_pos);
             response_bytes.extend_from_slice(&decoded);
         }
-        let mut response = HttpResponse::from_bytes(&response_bytes);
+        let mut response: HttpResponse = HttpResponse::from_bytes(&response_bytes);
         if !self.get_config_ref().redirect || redirect_url.is_none() {
             if self.get_config_ref().decode {
                 response = response.decode(self.get_config_ref().buffer_size);
@@ -8983,22 +10194,22 @@ impl HttpRequest {
         }
         let url_bytes: Vec<u8> = redirect_url
             .take()
-            .ok_or_else(|| RequestError::Request("Missing Redirect URL".to_string()))?;
-        let url = String::from_utf8(url_bytes)
+            .ok_or_else(|| RequestError::Request(MISSING_REDIRECT_URL.to_string()))?;
+        let url: String = String::from_utf8(url_bytes)
             .map_err(|e: FromUtf8Error| RequestError::Request(e.to_string()))?;
         self.handle_redirect_async(url).await
     }
     async fn handle_redirect_async(&mut self, url: String) -> Result<HttpResponse, RequestError> {
         if !self.get_config_ref().redirect {
-            return Err(RequestError::Request("Redirect Not Enabled".to_string()));
+            return Err(RequestError::Request(REDIRECT_NOT_ENABLED.to_string()));
         }
         if self.get_tmp_ref().get_visit_url().contains(&url) {
-            return Err(RequestError::Request("Redirect URL Dead Loop".to_string()));
+            return Err(RequestError::Request(REDIRECT_URL_DEAD_LOOP.to_string()));
         }
         self.get_tmp_mut().get_mut_visit_url().insert(url.clone());
         if self.get_config_ref().max_redirect_times == 0 {
             return Err(RequestError::Request(
-                "Max Redirect Times Exceeded".to_string(),
+                MAX_REDIRECT_TIMES_EXCEEDED.to_string(),
             ));
         }
         self.get_config_mut().max_redirect_times -= 1;
@@ -9024,21 +10235,21 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        let timeout = Duration::from_millis(self.get_config_ref().timeout);
-        let tcp = TcpStream::connect((proxy.host.clone(), proxy.port))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let timeout: Duration = Duration::from_millis(self.get_config_ref().timeout);
+        let tcp: TcpStream = TcpStream::connect((proxy.host.clone(), proxy.port))
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_write_timeout(Some(timeout))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxReadWrite = if proxy.proxy_type == ProxyType::Https {
             let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
-            let tls_cfg = ClientConfig::builder()
+            let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let dns = ServerName::try_from(proxy.host.clone())
+            let dns: ServerName<'static> = ServerName::try_from(proxy.host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let session = ClientConnection::new(Arc::new(tls_cfg), dns)
+            let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
                 .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
             Box::new(StreamOwned::new(session, tcp))
         } else {
@@ -9046,8 +10257,8 @@ impl HttpRequest {
         };
         let connect_request: String = if let (Some(u), Some(p)) = (&proxy.username, &proxy.password)
         {
-            let auth = format!("{u}:{p}");
-            let encoded = crate::utils::base64_encode(auth.as_bytes());
+            let auth: String = format!("{u}:{p}");
+            let encoded: String = crate::utils::base64_encode(auth.as_bytes());
             format!(
                 "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {encoded}\r\n\r\n"
             )
@@ -9058,38 +10269,39 @@ impl HttpRequest {
         };
         proxy_stream
             .write_all(connect_request.as_bytes())
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         proxy_stream
             .flush()
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-        let mut buf = [0u8; 1024];
-        let n = proxy_stream
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut buf: [u8; 1024] = [0u8; 1024];
+        let n: usize = proxy_stream
             .read(&mut buf)
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-        let s = std::str::from_utf8(&buf[..n]).unwrap_or("");
-        let pre_read = if let Some(pos) = s.find("\r\n\r\n") {
-            let header_part = &s[..pos];
-            if !header_part.starts_with("HTTP/1.1 200") && !header_part.starts_with("HTTP/1.0 200")
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let s: &str = from_utf8(&buf[..n]).unwrap_or("");
+        let pre_read: Vec<u8> = if let Some(pos) = s.find(HEADER_TERMINATOR) {
+            let header_part: &str = &s[..pos];
+            if !header_part.starts_with(HTTP_1_1_OK_PREFIX)
+                && !header_part.starts_with(HTTP_1_0_OK_PREFIX)
             {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
+                return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
             }
             buf[pos + 4..n].to_vec()
         } else {
-            if !s.starts_with("HTTP/1.1 200") && !s.starts_with("HTTP/1.0 200") {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
+            if !s.starts_with(HTTP_1_1_OK_PREFIX) && !s.starts_with(HTTP_1_0_OK_PREFIX) {
+                return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
             }
             Vec::new()
         };
         if self.is_https() {
             let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
-            let tls_cfg = ClientConfig::builder()
+            let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let dns = ServerName::try_from(target_host.clone())
+            let dns: ServerName<'static> = ServerName::try_from(target_host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let session = ClientConnection::new(Arc::new(tls_cfg), dns)
+            let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
                 .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
-            let tunnel = SyncProxyTunnelStream::new(proxy_stream, pre_read);
+            let tunnel: SyncProxyTunnelStream = SyncProxyTunnelStream::new(proxy_stream, pre_read);
             return Ok(Box::new(StreamOwned::new(session, tunnel)));
         }
         Ok(Box::new(SyncProxyTunnelStream::new(proxy_stream, pre_read)))
@@ -9100,47 +10312,47 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        let timeout = Duration::from_millis(self.get_config_ref().timeout);
-        let mut tcp = TcpStream::connect((proxy.host.clone(), proxy.port))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let timeout: Duration = Duration::from_millis(self.get_config_ref().timeout);
+        let mut tcp: TcpStream = TcpStream::connect((proxy.host.clone(), proxy.port))
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_write_timeout(Some(timeout))
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let auth_methods: Vec<u8> = if proxy.username.is_some() && proxy.password.is_some() {
             vec![0x05, 0x02, 0x00, 0x02]
         } else {
             vec![0x05, 0x01, 0x00]
         };
         tcp.write_all(&auth_methods)
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-        let mut resp = [0u8; 2];
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut resp: [u8; 2] = [0u8; 2];
         tcp.read_exact(&mut resp)
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         if resp[0] != 0x05 {
-            return Err(RequestError::Request("Internal Server Error".to_string()));
+            return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
         }
         match resp[1] {
             0x00 => {}
             0x02 => {
                 let (Some(u), Some(p)) = (&proxy.username, &proxy.password) else {
-                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                    return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 };
-                let mut auth_req = vec![0x01];
+                let mut auth_req: Vec<u8> = vec![0x01];
                 auth_req.push(u.len() as u8);
                 auth_req.extend_from_slice(u.as_bytes());
                 auth_req.push(p.len() as u8);
                 auth_req.extend_from_slice(p.as_bytes());
                 tcp.write_all(&auth_req)
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-                let mut auth_resp = [0u8; 2];
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+                let mut auth_resp: [u8; 2] = [0u8; 2];
                 tcp.read_exact(&mut auth_resp)
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
                 if auth_resp[1] != 0x00 {
-                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                    return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 }
             }
-            _ => return Err(RequestError::Request("Internal Server Error".to_string())),
+            _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
         let mut connect_req: Vec<u8> = vec![0x05, 0x01, 0x00];
         if let Ok(ip) = target_host.parse::<Ipv4Addr>() {
@@ -9156,45 +10368,45 @@ impl HttpRequest {
         }
         connect_req.extend_from_slice(&target_port.to_be_bytes());
         tcp.write_all(&connect_req)
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-        let mut connect_resp = [0u8; 4];
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut connect_resp: [u8; 4] = [0u8; 4];
         tcp.read_exact(&mut connect_resp)
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         if connect_resp[0] != 0x05 || connect_resp[1] != 0x00 {
-            return Err(RequestError::Request("Internal Server Error".to_string()));
+            return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
         }
         match connect_resp[3] {
             0x01 => {
-                let mut skip = [0u8; 6];
+                let mut skip: [u8; 6] = [0u8; 6];
                 tcp.read_exact(&mut skip)
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             }
             0x03 => {
-                let mut len = [0u8; 1];
+                let mut len: [u8; 1] = [0u8; 1];
                 tcp.read_exact(&mut len)
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-                let mut skip = vec![0u8; len[0] as usize + 2];
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+                let mut skip: Vec<u8> = vec![0u8; len[0] as usize + 2];
                 tcp.read_exact(&mut skip)
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             }
             0x04 => {
-                let mut skip = [0u8; 18];
+                let mut skip: [u8; 18] = [0u8; 18];
                 tcp.read_exact(&mut skip)
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             }
-            _ => return Err(RequestError::Request("Internal Server Error".to_string())),
+            _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
         if self.is_https() {
             let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
-            let tls_cfg = ClientConfig::builder()
+            let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let dns = ServerName::try_from(target_host)
+            let dns: ServerName<'static> = ServerName::try_from(target_host)
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let session = ClientConnection::new(Arc::new(tls_cfg), dns)
+            let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
                 .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
             let proxy_box: BoxReadWrite = Box::new(tcp);
-            let tunnel = SyncProxyTunnelStream::new(proxy_box, Vec::new());
+            let tunnel: SyncProxyTunnelStream = SyncProxyTunnelStream::new(proxy_box, Vec::new());
             return Ok(Box::new(StreamOwned::new(session, tunnel)));
         }
         Ok(Box::new(tcp))
@@ -9222,29 +10434,30 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let tcp = http_type::tokio::net::TcpStream::connect((proxy.host.clone(), proxy.port))
-            .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let tcp: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect((proxy.host.clone(), proxy.port))
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxAsyncReadWrite = if proxy.proxy_type == ProxyType::Https {
             let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
-            let tls_cfg = ClientConfig::builder()
+            let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let connector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns = ServerName::try_from(proxy.host.clone())
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
+            let dns: ServerName<'static> = ServerName::try_from(proxy.host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tls = connector
+            let tls: tokio_rustls::client::TlsStream<http_type::tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
                 .await
-                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             Box::new(tls)
         } else {
             Box::new(tcp)
         };
         let connect_request: String = if let (Some(u), Some(p)) = (&proxy.username, &proxy.password)
         {
-            let auth = format!("{u}:{p}");
-            let encoded = crate::utils::base64_encode(auth.as_bytes());
+            let auth: String = format!("{u}:{p}");
+            let encoded: String = crate::utils::base64_encode(auth.as_bytes());
             format!(
                 "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {encoded}\r\n\r\n"
             )
@@ -9256,43 +10469,44 @@ impl HttpRequest {
         proxy_stream
             .write_all(connect_request.as_bytes())
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         proxy_stream
             .flush()
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-        let mut buf = [0u8; 1024];
-        let n = proxy_stream
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut buf: [u8; 1024] = [0u8; 1024];
+        let n: usize = proxy_stream
             .read(&mut buf)
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-        let s = std::str::from_utf8(&buf[..n]).unwrap_or("");
-        let pre_read = if let Some(pos) = s.find("\r\n\r\n") {
-            let header_part = &s[..pos];
-            if !header_part.starts_with("HTTP/1.1 200") && !header_part.starts_with("HTTP/1.0 200")
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let s: &str = from_utf8(&buf[..n]).unwrap_or("");
+        let pre_read: Vec<u8> = if let Some(pos) = s.find(HEADER_TERMINATOR) {
+            let header_part: &str = &s[..pos];
+            if !header_part.starts_with(HTTP_1_1_OK_PREFIX)
+                && !header_part.starts_with(HTTP_1_0_OK_PREFIX)
             {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
+                return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
             }
             buf[pos + 4..n].to_vec()
         } else {
-            if !s.starts_with("HTTP/1.1 200") && !s.starts_with("HTTP/1.0 200") {
-                return Err(RequestError::Request("Internal Server Error".to_string()));
+            if !s.starts_with(HTTP_1_1_OK_PREFIX) && !s.starts_with(HTTP_1_0_OK_PREFIX) {
+                return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
             }
             Vec::new()
         };
         if self.is_https() {
             let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
-            let tls_cfg = ClientConfig::builder()
+            let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let connector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns = ServerName::try_from(target_host.clone())
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
+            let dns: ServerName<'static> = ServerName::try_from(target_host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tunnel = ProxyTunnelStream::new(proxy_stream, pre_read);
-            let tls = connector
+            let tunnel: ProxyTunnelStream = ProxyTunnelStream::new(proxy_stream, pre_read);
+            let tls: tokio_rustls::client::TlsStream<ProxyTunnelStream> = connector
                 .connect(dns, tunnel)
                 .await
-                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             Ok(Box::new(tls))
         } else {
             Ok(Box::new(ProxyTunnelStream::new(proxy_stream, pre_read)))
@@ -9304,9 +10518,10 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let mut tcp = http_type::tokio::net::TcpStream::connect((proxy.host.clone(), proxy.port))
-            .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+        let mut tcp: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect((proxy.host.clone(), proxy.port))
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let auth_methods: Vec<u8> = if proxy.username.is_some() && proxy.password.is_some() {
             vec![0x05, 0x02, 0x00, 0x02]
         } else {
@@ -9314,37 +10529,37 @@ impl HttpRequest {
         };
         tcp.write_all(&auth_methods)
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-        let mut resp = [0u8; 2];
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut resp: [u8; 2] = [0u8; 2];
         tcp.read_exact(&mut resp)
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         if resp[0] != 0x05 {
-            return Err(RequestError::Request("Internal Server Error".to_string()));
+            return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
         }
         match resp[1] {
             0x00 => {}
             0x02 => {
                 let (Some(u), Some(p)) = (&proxy.username, &proxy.password) else {
-                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                    return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 };
-                let mut auth_req = vec![0x01u8];
+                let mut auth_req: Vec<u8> = vec![0x01u8];
                 auth_req.push(u.len() as u8);
                 auth_req.extend_from_slice(u.as_bytes());
                 auth_req.push(p.len() as u8);
                 auth_req.extend_from_slice(p.as_bytes());
                 tcp.write_all(&auth_req)
                     .await
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-                let mut auth_resp = [0u8; 2];
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+                let mut auth_resp: [u8; 2] = [0u8; 2];
                 tcp.read_exact(&mut auth_resp)
                     .await
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
                 if auth_resp[1] != 0x00 {
-                    return Err(RequestError::Request("Internal Server Error".to_string()));
+                    return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 }
             }
-            _ => return Err(RequestError::Request("Internal Server Error".to_string())),
+            _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
         let mut connect_req: Vec<u8> = vec![0x05, 0x01, 0x00];
         if let Ok(ip) = target_host.parse::<Ipv4Addr>() {
@@ -9361,53 +10576,53 @@ impl HttpRequest {
         connect_req.extend_from_slice(&target_port.to_be_bytes());
         tcp.write_all(&connect_req)
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-        let mut connect_resp = [0u8; 4];
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut connect_resp: [u8; 4] = [0u8; 4];
         tcp.read_exact(&mut connect_resp)
             .await
-            .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         if connect_resp[0] != 0x05 || connect_resp[1] != 0x00 {
-            return Err(RequestError::Request("Internal Server Error".to_string()));
+            return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
         }
         match connect_resp[3] {
             0x01 => {
-                let mut skip = [0u8; 6];
+                let mut skip: [u8; 6] = [0u8; 6];
                 tcp.read_exact(&mut skip)
                     .await
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             }
             0x03 => {
-                let mut len = [0u8; 1];
+                let mut len: [u8; 1] = [0u8; 1];
                 tcp.read_exact(&mut len)
                     .await
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
-                let mut skip = vec![0u8; len[0] as usize + 2];
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+                let mut skip: Vec<u8> = vec![0u8; len[0] as usize + 2];
                 tcp.read_exact(&mut skip)
                     .await
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             }
             0x04 => {
-                let mut skip = [0u8; 18];
+                let mut skip: [u8; 18] = [0u8; 18];
                 tcp.read_exact(&mut skip)
                     .await
-                    .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             }
-            _ => return Err(RequestError::Request("Internal Server Error".to_string())),
+            _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
         if self.is_https() {
             let roots: RootCertStore = self.get_tmp_ref().get_root_cert().clone();
-            let tls_cfg = ClientConfig::builder()
+            let tls_cfg: ClientConfig = ClientConfig::builder()
                 .with_root_certificates(roots)
                 .with_no_client_auth();
-            let connector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns = ServerName::try_from(target_host)
+            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
+            let dns: ServerName<'static> = ServerName::try_from(target_host)
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let proxy_box: BoxAsyncReadWrite = Box::new(tcp);
-            let tunnel = ProxyTunnelStream::new(proxy_box, Vec::new());
-            let tls = connector
+            let tunnel: ProxyTunnelStream = ProxyTunnelStream::new(proxy_box, Vec::new());
+            let tls: tokio_rustls::client::TlsStream<ProxyTunnelStream> = connector
                 .connect(dns, tunnel)
                 .await
-                .map_err(|e: std::io::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             Ok(Box::new(tls))
         } else {
             Ok(Box::new(tcp))
@@ -9444,12 +10659,12 @@ impl HttpRequest {
         self
     }
     pub fn set_header<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) -> &mut Self {
-        let normalized = Self::normalize_header_key(key.as_ref());
+        let normalized: String = Self::normalize_header_key(key.as_ref());
         self.headers.insert(normalized, value.as_ref().to_owned());
         self
     }
     pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
-        let normalized = Self::normalize_header_key(key.as_ref());
+        let normalized: String = Self::normalize_header_key(key.as_ref());
         self.get_mut_headers().remove(&normalized);
         self
     }
@@ -9528,6 +10743,16 @@ pub(crate) trait ReadWrite: Read + Write {}
 pub(crate) const CONTENT_LENGTH_PATTERN: &[u8] = b"content-length:";
 pub(crate) const TRANSFER_ENCODING_PATTERN: &[u8] = b"transfer-encoding:";
 pub(crate) const CHUNKED_PATTERN: &[u8] = b"chunked";
+pub(crate) const METHOD_NOT_ALLOWED: &str = "Method Not Allowed";
+pub(crate) const MISSING_REDIRECT_URL: &str = "Missing Redirect URL";
+pub(crate) const REDIRECT_NOT_ENABLED: &str = "Redirect Not Enabled";
+pub(crate) const REDIRECT_URL_DEAD_LOOP: &str = "Redirect URL Dead Loop";
+pub(crate) const MAX_REDIRECT_TIMES_EXCEEDED: &str = "Max Redirect Times Exceeded";
+pub(crate) const INTERNAL_SERVER_ERROR: &str = "Internal Server Error";
+pub(crate) const HTTP_1_1_OK_PREFIX: &str = "HTTP/1.1 200";
+pub(crate) const HTTP_1_0_OK_PREFIX: &str = "HTTP/1.0 200";
+pub(crate) const HEADER_TERMINATOR: &str = "\r\n\r\n";
+pub(crate) const HTTP_METHOD_POST: &str = "POST";
 ```
 # Path: hyperlane/request/src/request/http_request/type.rs
 ```rust
@@ -9691,7 +10916,7 @@ impl HttpResponse {
         (300..400).contains(&self.get_status_code())
     }
     pub fn get_header<K: AsRef<str>>(&self, key: K) -> Option<&str> {
-        let normalized = key.as_ref().to_ascii_lowercase();
+        let normalized: String = key.as_ref().to_ascii_lowercase();
         self.headers.get(&normalized).map(String::as_str)
     }
     pub fn text(&self) -> String {
@@ -9773,7 +10998,7 @@ impl Body {
         self.get_bytes()
     }
     pub fn as_str(&self) -> Option<&str> {
-        std::str::from_utf8(self.get_bytes()).ok()
+        from_utf8(self.get_bytes()).ok()
     }
 }
 impl Display for Body {
@@ -9829,6 +11054,7 @@ mod route;
 mod server;
 use hyperlane_core::*;
 use std::{
+    io,
     net::TcpListener,
     sync::{Arc, OnceLock},
     time::{Duration, Instant},
@@ -10209,7 +11435,7 @@ fn server_send_sync() {
 #[tokio::test]
 async fn server_clone_across_threads() {
     let mut server: Server = Server::default();
-    server.route::<TestSendRoute>("/test");
+    server.route::<TestSendRoute, &str>("/test");
     let server_clone: Server = server.clone();
     let handle: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread: Server = server_clone;
@@ -10221,7 +11447,7 @@ async fn server_clone_across_threads() {
 #[tokio::test]
 async fn server_share_across_threads() {
     let mut server: Server = Server::default();
-    server.route::<TestSendRoute>("/test");
+    server.route::<TestSendRoute, &str>("/test");
     let server: Arc<Server> = Arc::new(server);
     let server1: Arc<Server> = server.clone();
     let server2: Arc<Server> = server.clone();
@@ -10251,12 +11477,12 @@ async fn main() {
     server.request_middleware::<RequestMiddleware>();
     server.request_middleware::<UpgradeMiddleware>();
     server.response_middleware::<ResponseMiddleware>();
-    server.route::<RootRoute>("/");
-    server.route::<SseRoute>("/sse");
-    server.route::<WebsocketRoute>("/websocket");
-    server.route::<GetAllRoutes>("/get/all/routes");
-    server.route::<DynamicRoute>("/dynamic/{routing}");
-    server.route::<DynamicRoute>("/regex/{file:^.*$}");
+    server.route::<RootRoute, &str>("/");
+    server.route::<SseRoute, &str>("/sse");
+    server.route::<WebsocketRoute, &str>("/websocket");
+    server.route::<GetAllRoutes, &str>("/get/all/routes");
+    server.route::<DynamicRoute, &str>("/dynamic/{routing}");
+    server.route::<DynamicRoute, &str>("/regex/{file:^.*$}");
     let _: Result<(), Server> = SERVER_REF.set(server.clone());
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
@@ -10337,7 +11563,7 @@ async fn client_format_bind_address_concatenates_host_and_port() {
 }
 #[tokio::test]
 async fn client_try_flush_stdout_returns_ok() {
-    let result: std::io::Result<()> = Server::try_flush_stdout();
+    let result: io::Result<()> = Server::try_flush_stdout();
     assert!(result.is_ok());
 }
 #[tokio::test]
@@ -10346,7 +11572,7 @@ async fn client_flush_stdout_does_not_panic() {
 }
 #[tokio::test]
 async fn client_try_flush_stderr_returns_ok() {
-    let result: std::io::Result<()> = Server::try_flush_stderr();
+    let result: io::Result<()> = Server::try_flush_stderr();
     assert!(result.is_ok());
 }
 #[tokio::test]
@@ -10355,7 +11581,7 @@ async fn client_flush_stderr_does_not_panic() {
 }
 #[tokio::test]
 async fn client_try_flush_stdout_and_stderr_returns_ok() {
-    let result: std::io::Result<()> = Server::try_flush_stdout_and_stderr();
+    let result: io::Result<()> = Server::try_flush_stdout_and_stderr();
     assert!(result.is_ok());
 }
 #[tokio::test]
@@ -10374,7 +11600,7 @@ async fn client_handle_hook_dispatches_to_correct_handler_list() {
 #[tokio::test]
 async fn client_route_basic_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -10385,7 +11611,7 @@ async fn client_route_basic_serial_e2e() {
 #[tokio::test]
 async fn client_dynamic_route_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<DynamicRoute>("/dynamic/:id");
+        register.route::<DynamicRoute, &str>("/dynamic/:id");
     })
     .await;
     let request: &[u8] =
@@ -10397,7 +11623,7 @@ async fn client_dynamic_route_serial_e2e() {
 #[tokio::test]
 async fn client_regex_route_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<WebsocketRoute>("/ws");
+        register.route::<WebsocketRoute, &str>("/ws");
     })
     .await;
     let request: &[u8] = b"GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -10408,7 +11634,7 @@ async fn client_regex_route_serial_e2e() {
 #[tokio::test]
 async fn client_request_error_404_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
         register.request_error::<RequestErrorHook>();
     })
     .await;
@@ -10420,7 +11646,7 @@ async fn client_request_error_404_serial_e2e() {
 #[tokio::test]
 async fn client_request_middleware_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
         register.request_middleware::<RequestMiddleware>();
     })
     .await;
@@ -10432,7 +11658,7 @@ async fn client_request_middleware_serial_e2e() {
 #[tokio::test]
 async fn client_response_middleware_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
         register.response_middleware::<ResponseMiddleware>();
     })
     .await;
@@ -10444,7 +11670,7 @@ async fn client_response_middleware_serial_e2e() {
 #[tokio::test]
 async fn client_task_panic_handler_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<DynamicRoute>("/panic/:msg");
+        register.route::<DynamicRoute, &str>("/panic/:msg");
         register.task_panic::<TaskPanicHook>();
     })
     .await;
@@ -10457,7 +11683,7 @@ async fn client_task_panic_handler_serial_e2e() {
 #[tokio::test]
 async fn client_two_servers_on_distinct_ports_serial_e2e() {
     let (control_a, port_a) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -10465,7 +11691,7 @@ async fn client_two_servers_on_distinct_ports_serial_e2e() {
     control_a.shutdown().await;
     control_a.wait().await;
     let (control_b, port_b) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     assert_ne!(port_a, port_b);
@@ -10476,11 +11702,11 @@ async fn client_two_servers_on_distinct_ports_serial_e2e() {
 #[tokio::test]
 async fn client_concurrent_servers_on_distinct_ports_e2e() {
     let (control_a, port_a) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     let (control_b, port_b) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute>("/");
+        register.route::<RootRoute, &str>("/");
     })
     .await;
     assert_ne!(port_a, port_b);
@@ -10666,7 +11892,7 @@ fn run_set_func() {
         assert_eq!(msg, PARAM);
     };
     ctx.set_attribute(KEY, func);
-    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync)>(KEY);
+    let hyperlane = ctx.get_attribute::<&(dyn Fn(&str) + Send + Sync), &str>(KEY);
     hyperlane(PARAM);
 }
 ```
@@ -10733,22 +11959,22 @@ use super::*;
 #[tokio::test]
 #[should_panic(expected = "EmptyPattern")]
 async fn empty_route() {
-    let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
+    let _server: &Server = Server::default().route::<TestRoute, &str>(EMPTY_STR);
 }
 #[tokio::test]
 #[should_panic(expected = "DuplicatePattern")]
 async fn duplicate_route() {
     let _server: &Server = Server::default()
-        .route::<TestRoute>(ROOT_PATH)
-        .route::<TestRoute>(ROOT_PATH);
+        .route::<TestRoute, &str>(ROOT_PATH)
+        .route::<TestRoute, &str>(ROOT_PATH);
 }
 #[test]
 fn get_route() {
     let mut server: Server = Server::default();
     server
-        .route::<TestRoute>(ROOT_PATH)
-        .route::<TestRoute>("/dynamic/{routing}")
-        .route::<TestRoute>("/regex/{file:^.*$}");
+        .route::<TestRoute, &str>(ROOT_PATH)
+        .route::<TestRoute, &str>("/dynamic/{routing}")
+        .route::<TestRoute, &str>("/regex/{file:^.*$}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     for key in route_matcher.get_static_route().keys() {
         println!("Static route: {key}");
@@ -10767,10 +11993,10 @@ fn get_route() {
 #[test]
 fn segment_count_optimization() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute>("/users/{id}");
-    server.route::<TestRoute>("/users/{id}/posts");
-    server.route::<TestRoute>("/users/{id}/posts/{post_id}");
-    server.route::<TestRoute>("/api/v1/users/{id}");
+    server.route::<TestRoute, &str>("/users/{id}");
+    server.route::<TestRoute, &str>("/users/{id}/posts");
+    server.route::<TestRoute, &str>("/users/{id}/posts/{post_id}");
+    server.route::<TestRoute, &str>("/api/v1/users/{id}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_dynamic_route().contains_key(&2),
@@ -10791,9 +12017,9 @@ fn segment_count_optimization() {
 #[test]
 fn regex_route_segment_count() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute>("/files/{path:.*}");
-    server.route::<TestRoute>("/api/{version:\\d+}/users");
-    server.route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}");
+    server.route::<TestRoute, &str>("/files/{path:.*}");
+    server.route::<TestRoute, &str>("/api/{version:\\d+}/users");
+    server.route::<TestRoute, &str>("/api/{version:\\d+}/posts/{id:\\d+}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_regex_route().contains_key(&2),
@@ -10811,11 +12037,11 @@ fn regex_route_segment_count() {
 #[test]
 fn mixed_route_types() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute>("/");
-    server.route::<TestRoute>("/about");
-    server.route::<TestRoute>("/users/{id}");
-    server.route::<TestRoute>("/posts/{slug}");
-    server.route::<TestRoute>("/files/{path:.*}");
+    server.route::<TestRoute, &str>("/");
+    server.route::<TestRoute, &str>("/about");
+    server.route::<TestRoute, &str>("/users/{id}");
+    server.route::<TestRoute, &str>("/posts/{slug}");
+    server.route::<TestRoute, &str>("/files/{path:.*}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert_eq!(route_matcher.get_static_route().len(), 2);
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
@@ -10828,7 +12054,7 @@ fn large_dynamic_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute, &String>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
@@ -10860,7 +12086,7 @@ fn large_regex_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute, &String>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
@@ -10892,7 +12118,7 @@ fn large_tail_regex_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{path:.*}}");
-        server.route::<TestRoute>(&path);
+        server.route::<TestRoute, &String>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
@@ -10950,6 +12176,7 @@ use std::{
     io::{self, Write, stderr, stdout},
     mem,
     pin::Pin,
+    ptr,
     sync::Arc,
 };
 use {
@@ -11030,23 +12257,23 @@ impl PartialEq for HookType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (HookType::TaskPanic(order1, factory1), HookType::TaskPanic(order2, factory2)) => {
-                order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2)
+                order1 == order2 && ptr::fn_addr_eq(*factory1, *factory2)
             }
             (
                 HookType::RequestError(order1, factory1),
                 HookType::RequestError(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && ptr::fn_addr_eq(*factory1, *factory2),
             (
                 HookType::RequestMiddleware(order1, factory1),
                 HookType::RequestMiddleware(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && ptr::fn_addr_eq(*factory1, *factory2),
             (HookType::Route(path1, factory1), HookType::Route(path2, factory2)) => {
-                path1 == path2 && std::ptr::fn_addr_eq(*factory1, *factory2)
+                path1 == path2 && ptr::fn_addr_eq(*factory1, *factory2)
             }
             (
                 HookType::ResponseMiddleware(order1, factory1),
                 HookType::ResponseMiddleware(order2, factory2),
-            ) => order1 == order2 && std::ptr::fn_addr_eq(*factory1, *factory2),
+            ) => order1 == order2 && ptr::fn_addr_eq(*factory1, *factory2),
             _ => false,
         }
     }
@@ -11398,9 +12625,10 @@ impl Server {
         self
     }
     #[inline(always)]
-    pub fn route<S>(&mut self, path: impl AsRef<str>) -> &mut Self
+    pub fn route<S, P>(&mut self, path: P) -> &mut Self
     where
         S: ServerHook,
+        P: AsRef<str>,
     {
         self.get_mut_route_matcher()
             .add(path.as_ref(), Hook::factory::<S>())
@@ -11485,10 +12713,10 @@ impl Server {
     fn configure_stream(&self, stream: &TcpStream) {
         let config: &ServerConfig = self.get_server_config();
         if let Some(nodelay) = config.try_get_nodelay() {
-            let _: Result<(), std::io::Error> = stream.set_nodelay(*nodelay);
+            let _: Result<(), io::Error> = stream.set_nodelay(nodelay);
         }
         if let Some(ttl) = config.try_get_ttl() {
-            let _: Result<(), std::io::Error> = stream.set_ttl(*ttl);
+            let _: Result<(), io::Error> = stream.set_ttl(ttl);
         }
     }
     pub(super) async fn handle_request_middleware(
@@ -11616,7 +12844,7 @@ impl Server {
         let bind_address: &String = self.get_server_config().get_address();
         let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
             .await
-            .map_err(|error: std::io::Error| Box::new(ServerError::from(error)))?;
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
         let server: &'static Self = unsafe { self.leak() };
         let (wait_sender, wait_receiver) = channel(());
         let (shutdown_sender, mut shutdown_receiver) = channel(());
@@ -11709,7 +12937,9 @@ use super::*;
 pub struct ServerConfig {
     #[set(type(AsRef<str>))]
     pub(super) address: String,
+    #[get(type(copy))]
     pub(super) nodelay: Option<bool>,
+    #[get(type(copy))]
     pub(super) ttl: Option<u32>,
 }
 ```
@@ -11815,9 +13045,10 @@ impl Context {
         self.try_get_route_param(name).unwrap()
     }
     #[inline(always)]
-    pub fn try_get_attribute<V>(&self, key: impl AsRef<str>) -> Option<V>
+    pub fn try_get_attribute<V, K>(&self, key: K) -> Option<V>
     where
         V: AnySendSyncClone,
+        K: AsRef<str>,
     {
         self.get_attributes()
             .get(&Attribute::External(key.as_ref().to_owned()).to_string())
@@ -11825,9 +13056,10 @@ impl Context {
             .cloned()
     }
     #[inline(always)]
-    pub fn get_attribute<V>(&self, key: impl AsRef<str>) -> V
+    pub fn get_attribute<V, K>(&self, key: K) -> V
     where
         V: AnySendSyncClone,
+        K: AsRef<str>,
     {
         self.try_get_attribute(key).unwrap()
     }
@@ -11930,9 +13162,9 @@ use super::*;
 # Path: hyperlane/core/src/error/impl.rs
 ```rust
 use super::*;
-impl From<std::io::Error> for ServerError {
+impl From<io::Error> for ServerError {
     #[inline(always)]
-    fn from(error: std::io::Error) -> Self {
+    fn from(error: io::Error) -> Self {
         ServerError::TcpBind(error.to_string())
     }
 }
@@ -12241,12 +13473,12 @@ impl RoutePattern {
                         path_segments[idx..].join(DEFAULT_HTTP_PATH)
                     } else {
                         {
-                            let val = path_segments.get(idx)?;
+                            let val: &&str = path_segments.get(idx)?;
                             val.to_string()
                         }
                     };
                     {
-                        let mat = regex.find(&segment_value)?;
+                        let mat: regex::Match<'_> = regex.find(&segment_value)?;
                         if mat.start() != 0 || mat.end() != segment_value.len() {
                             return None;
                         }
@@ -12424,14 +13656,296 @@ cargo add hyperlane-plugin-websocket
 ## Contact
 # Path: hyperlane/plugin/websocket/tests/mod.rs
 ```rust
+mod broadcast_type;
 mod websocket;
+mod websocket_map;
 use hyperlane_plugin_websocket::*;
-use std::sync::OnceLock;
+use std::{
+    collections::HashSet,
+    convert::Infallible,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    num::{
+        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
+        NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
+    },
+    sync::OnceLock,
+    time::Duration,
+};
 use {
     hyperlane::*,
-    tokio::{spawn, time::sleep},
+    tokio::{spawn, sync::broadcast::error::RecvError, time::sleep},
     tokio_broadcast::*,
 };
+```
+# Path: hyperlane/plugin/websocket/tests/broadcast_type/fn.rs
+```rust
+use super::*;
+#[test]
+fn point_to_point_key_is_independent_of_identifier_order() {
+    let ascending: String = BroadcastType::<String>::get_key(BroadcastType::PointToPoint(
+        String::from("alice"),
+        String::from("bob"),
+    ));
+    let descending: String = BroadcastType::<String>::get_key(BroadcastType::PointToPoint(
+        String::from("bob"),
+        String::from("alice"),
+    ));
+    assert_eq!(ascending, descending);
+    assert_eq!(ascending, String::from("ptp--alice-bob"));
+}
+#[test]
+fn point_to_point_key_repeats_a_self_paired_identifier() {
+    let key: String = BroadcastType::<String>::get_key(BroadcastType::PointToPoint(
+        String::from("carol"),
+        String::from("carol"),
+    ));
+    assert_eq!(key, String::from("ptp--carol-carol"));
+}
+#[test]
+fn point_to_point_key_orders_numeric_identifiers_by_value() {
+    let key: String = BroadcastType::<u8>::get_key(BroadcastType::PointToPoint(10, 2));
+    assert_eq!(key, String::from("ptp--2-10"));
+    let swapped: String = BroadcastType::<u8>::get_key(BroadcastType::PointToPoint(2, 10));
+    assert_eq!(key, swapped);
+}
+#[test]
+fn point_to_point_key_orders_floating_point_identifiers_by_value() {
+    let key: String = BroadcastType::<f64>::get_key(BroadcastType::PointToPoint(1.5, 0.5));
+    assert_eq!(key, String::from("ptp--0.5-1.5"));
+    let swapped: String = BroadcastType::<f64>::get_key(BroadcastType::PointToPoint(0.5, 1.5));
+    assert_eq!(key, swapped);
+}
+#[test]
+fn point_to_group_key_is_the_group_name_behind_the_point_to_group_prefix() {
+    let key: String =
+        BroadcastType::<String>::get_key(BroadcastType::PointToGroup(String::from("room-7")));
+    assert_eq!(key, String::from("ptg--room-7"));
+}
+#[test]
+fn unknown_broadcast_type_key_is_the_empty_string() {
+    let key: String = BroadcastType::<String>::get_key(BroadcastType::Unknown);
+    assert_eq!(key, String::new());
+    assert!(key.is_empty());
+}
+#[test]
+fn get_key_renders_scalar_payloads_through_their_display_form() {
+    let character: String = BroadcastType::<char>::get_key(BroadcastType::PointToGroup('x'));
+    assert_eq!(character, String::from("ptg--x"));
+    let boolean: String = BroadcastType::<bool>::get_key(BroadcastType::PointToPoint(true, false));
+    assert_eq!(boolean, String::from("ptp--false-true"));
+    let slice: String = BroadcastType::<&str>::get_key(BroadcastType::PointToGroup("room"));
+    assert_eq!(slice, String::from("ptg--room"));
+    let signed: String = BroadcastType::<i64>::get_key(BroadcastType::PointToPoint(-3, 4));
+    assert_eq!(signed, String::from("ptp---3-4"));
+    let unsigned: String = BroadcastType::<u128>::get_key(BroadcastType::PointToGroup(
+        340282366920938463463374607431768211455,
+    ));
+    assert_eq!(
+        unsigned,
+        String::from("ptg--340282366920938463463374607431768211455")
+    );
+}
+#[test]
+fn get_key_renders_network_payloads_through_their_display_form() {
+    let v4: String =
+        BroadcastType::<Ipv4Addr>::get_key(BroadcastType::PointToGroup(Ipv4Addr::new(10, 0, 0, 1)));
+    assert_eq!(v4, String::from("ptg--10.0.0.1"));
+    let v6: String =
+        BroadcastType::<Ipv6Addr>::get_key(BroadcastType::PointToGroup(Ipv6Addr::LOCALHOST));
+    assert_eq!(v6, String::from("ptg--::1"));
+    let ip: String = BroadcastType::<IpAddr>::get_key(BroadcastType::PointToGroup(IpAddr::V4(
+        Ipv4Addr::new(127, 0, 0, 1),
+    )));
+    assert_eq!(ip, String::from("ptg--127.0.0.1"));
+    let socket: String = BroadcastType::<SocketAddr>::get_key(BroadcastType::PointToGroup(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+    ));
+    assert_eq!(socket, String::from("ptg--127.0.0.1:8080"));
+}
+#[test]
+fn get_key_renders_non_zero_payloads_through_their_display_form() {
+    let nine: NonZeroU8 = NonZeroU8::new(9).unwrap_or(NonZeroU8::MIN);
+    let unsigned: String = BroadcastType::<NonZeroU8>::get_key(BroadcastType::PointToGroup(nine));
+    assert_eq!(unsigned, String::from("ptg--9"));
+    let minus_two: NonZeroI32 = NonZeroI32::new(-2).unwrap_or(NonZeroI32::MIN);
+    let signed: String =
+        BroadcastType::<NonZeroI32>::get_key(BroadcastType::PointToGroup(minus_two));
+    assert_eq!(signed, String::from("ptg---2"));
+    let size: NonZeroUsize = NonZeroUsize::new(1024).unwrap_or(NonZeroUsize::MIN);
+    let on_host: String = BroadcastType::<NonZeroUsize>::get_key(BroadcastType::PointToGroup(size));
+    assert_eq!(on_host, String::from("ptg--1024"));
+}
+#[test]
+fn get_key_never_merges_a_point_to_point_key_with_a_point_to_group_key() {
+    let group: String =
+        BroadcastType::<String>::get_key(BroadcastType::PointToGroup(String::from("a-b")));
+    let pair: String = BroadcastType::<String>::get_key(BroadcastType::PointToPoint(
+        String::from("a"),
+        String::from("b"),
+    ));
+    assert_ne!(group, pair);
+    let unknown: String = BroadcastType::<String>::get_key(BroadcastType::Unknown);
+    assert_ne!(group, unknown);
+    assert_ne!(pair, unknown);
+}
+#[test]
+fn default_broadcast_type_is_unknown() {
+    let owned: BroadcastType<String> = BroadcastType::default();
+    assert_eq!(owned, BroadcastType::Unknown);
+    let borrowed: BroadcastType<&str> = BroadcastType::default();
+    assert_eq!(borrowed, BroadcastType::Unknown);
+    let numeric: BroadcastType<u8> = BroadcastType::default();
+    assert!(matches!(numeric, BroadcastType::Unknown));
+}
+#[test]
+fn broadcast_type_is_copy_when_its_payload_is_copy() {
+    let original: BroadcastType<u8> = BroadcastType::PointToPoint(3, 4);
+    let moved: BroadcastType<u8> = original;
+    let reused: BroadcastType<u8> = original;
+    assert_eq!(moved, reused);
+    assert_eq!(original, BroadcastType::PointToPoint(3, 4));
+}
+#[test]
+fn broadcast_type_with_an_owned_payload_survives_being_cloned() {
+    let original: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let clone: BroadcastType<String> = original.clone();
+    assert_eq!(original, clone);
+    assert!(matches!(original, BroadcastType::PointToGroup(_)));
+}
+#[test]
+fn distinct_broadcast_types_collapse_in_a_hash_set_by_value() {
+    let mut set: HashSet<BroadcastType<String>> = HashSet::new();
+    set.insert(BroadcastType::PointToGroup(String::from("room")));
+    set.insert(BroadcastType::PointToGroup(String::from("room")));
+    set.insert(BroadcastType::PointToPoint(
+        String::from("a"),
+        String::from("b"),
+    ));
+    set.insert(BroadcastType::PointToPoint(
+        String::from("b"),
+        String::from("a"),
+    ));
+    set.insert(BroadcastType::Unknown);
+    set.insert(BroadcastType::Unknown);
+    assert_eq!(set.len(), 4);
+    assert!(set.contains(&BroadcastType::PointToPoint(
+        String::from("a"),
+        String::from("b")
+    )));
+    assert!(set.contains(&BroadcastType::PointToPoint(
+        String::from("b"),
+        String::from("a")
+    )));
+}
+#[test]
+fn point_to_point_equality_ignores_the_sorted_key_but_not_the_tuple_order() {
+    let forward: BroadcastType<String> =
+        BroadcastType::PointToPoint(String::from("a"), String::from("b"));
+    let reverse: BroadcastType<String> =
+        BroadcastType::PointToPoint(String::from("b"), String::from("a"));
+    assert_ne!(forward, reverse);
+    assert_eq!(
+        BroadcastType::get_key(forward.clone()),
+        BroadcastType::get_key(reverse)
+    );
+    assert_eq!(forward, forward.clone());
+    assert_ne!(forward, BroadcastType::Unknown);
+}
+#[test]
+fn debug_names_the_variant_and_renders_its_payload() {
+    let group: String = format!(
+        "{:?}",
+        BroadcastType::<String>::PointToGroup(String::from("room"))
+    );
+    assert_eq!(group, String::from("PointToGroup(\"room\")"));
+    let pair: String = format!("{:?}", BroadcastType::<&str>::PointToPoint("a", "b"));
+    assert_eq!(pair, String::from("PointToPoint(\"a\", \"b\")"));
+    let unknown: String = format!("{:?}", BroadcastType::<u8>::Unknown);
+    assert_eq!(unknown, String::from("Unknown"));
+}
+#[test]
+fn broadcast_type_trait_covers_owned_scalar_identifiers() {
+    let _: BroadcastType<String> = BroadcastType::Unknown;
+    let _: BroadcastType<&str> = BroadcastType::Unknown;
+    let _: BroadcastType<char> = BroadcastType::Unknown;
+    let _: BroadcastType<bool> = BroadcastType::Unknown;
+    let _: BroadcastType<i8> = BroadcastType::Unknown;
+    let _: BroadcastType<i16> = BroadcastType::Unknown;
+    let _: BroadcastType<i32> = BroadcastType::Unknown;
+    let _: BroadcastType<i64> = BroadcastType::Unknown;
+    let _: BroadcastType<i128> = BroadcastType::Unknown;
+    let _: BroadcastType<isize> = BroadcastType::Unknown;
+    let _: BroadcastType<u8> = BroadcastType::Unknown;
+    let _: BroadcastType<u16> = BroadcastType::Unknown;
+    let _: BroadcastType<u32> = BroadcastType::Unknown;
+    let _: BroadcastType<u64> = BroadcastType::Unknown;
+    let _: BroadcastType<u128> = BroadcastType::Unknown;
+    let _: BroadcastType<usize> = BroadcastType::Unknown;
+    let _: BroadcastType<f32> = BroadcastType::Unknown;
+    let _: BroadcastType<f64> = BroadcastType::Unknown;
+}
+#[test]
+fn broadcast_type_trait_covers_network_non_zero_and_infallible_identifiers() {
+    let _: BroadcastType<IpAddr> = BroadcastType::Unknown;
+    let _: BroadcastType<Ipv4Addr> = BroadcastType::Unknown;
+    let _: BroadcastType<Ipv6Addr> = BroadcastType::Unknown;
+    let _: BroadcastType<SocketAddr> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroU8> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroU16> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroU32> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroU64> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroU128> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroUsize> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroI8> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroI16> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroI32> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroI64> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroI128> = BroadcastType::Unknown;
+    let _: BroadcastType<NonZeroIsize> = BroadcastType::Unknown;
+    let _: BroadcastType<Infallible> = BroadcastType::Unknown;
+}
+#[test]
+fn broadcast_type_trait_covers_reference_identifiers() {
+    let _: BroadcastType<&String> = BroadcastType::Unknown;
+    let _: BroadcastType<&&str> = BroadcastType::Unknown;
+    let _: BroadcastType<&char> = BroadcastType::Unknown;
+    let _: BroadcastType<&bool> = BroadcastType::Unknown;
+    let _: BroadcastType<&i8> = BroadcastType::Unknown;
+    let _: BroadcastType<&i16> = BroadcastType::Unknown;
+    let _: BroadcastType<&i32> = BroadcastType::Unknown;
+    let _: BroadcastType<&i64> = BroadcastType::Unknown;
+    let _: BroadcastType<&i128> = BroadcastType::Unknown;
+    let _: BroadcastType<&isize> = BroadcastType::Unknown;
+    let _: BroadcastType<&u8> = BroadcastType::Unknown;
+    let _: BroadcastType<&u16> = BroadcastType::Unknown;
+    let _: BroadcastType<&u32> = BroadcastType::Unknown;
+    let _: BroadcastType<&u128> = BroadcastType::Unknown;
+    let _: BroadcastType<&usize> = BroadcastType::Unknown;
+    let _: BroadcastType<&f32> = BroadcastType::Unknown;
+    let _: BroadcastType<&f64> = BroadcastType::Unknown;
+    let _: BroadcastType<&IpAddr> = BroadcastType::Unknown;
+    let _: BroadcastType<&Ipv4Addr> = BroadcastType::Unknown;
+    let _: BroadcastType<&Ipv6Addr> = BroadcastType::Unknown;
+    let _: BroadcastType<&SocketAddr> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroU8> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroU16> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroU32> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroU64> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroU128> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroUsize> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroI8> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroI16> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroI32> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroI64> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroI128> = BroadcastType::Unknown;
+    let _: BroadcastType<&NonZeroIsize> = BroadcastType::Unknown;
+    let _: BroadcastType<&Infallible> = BroadcastType::Unknown;
+}
+```
+# Path: hyperlane/plugin/websocket/tests/broadcast_type/mod.rs
+```rust
+mod r#fn;
+use super::*;
 ```
 # Path: hyperlane/plugin/websocket/tests/websocket/impl.rs
 ```rust
@@ -12744,12 +14258,12 @@ async fn main() {
     server.request_error::<RequestErrorHook>();
     server.request_middleware::<RequestMiddleware>();
     server.request_middleware::<UpgradeHook>();
-    server.route::<GroupChat>("/{group_name}");
-    server.route::<PrivateChat>("/{my_name}/{your_name}");
+    server.route::<GroupChat, &str>("/{group_name}");
+    server.route::<PrivateChat, &str>("/{my_name}/{your_name}");
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     spawn(async move {
-        sleep(std::time::Duration::from_secs(60)).await;
+        sleep(Duration::from_secs(60)).await;
         server_control_hook_2.shutdown().await;
     });
     server_control_hook_1.wait().await;
@@ -12812,6 +14326,288 @@ mod r#struct;
 pub(crate) use {r#static::*, r#struct::*};
 use super::*;
 ```
+# Path: hyperlane/plugin/websocket/tests/websocket_map/fn.rs
+```rust
+use super::*;
+#[test]
+fn a_new_web_socket_exposes_an_empty_broadcast_map() {
+    let created: WebSocket = WebSocket::new();
+    let defaulted: WebSocket = WebSocket::default();
+    let created_missing: Option<ReceiverCount> =
+        created.get_broadcast_map().receiver_count("absent");
+    let defaulted_missing: Option<ReceiverCount> =
+        defaulted.get_broadcast_map().receiver_count("absent");
+    assert_eq!(created_missing, None);
+    assert_eq!(defaulted_missing, None);
+}
+#[test]
+fn receiver_count_is_zero_before_anything_subscribes() {
+    let web_socket: WebSocket = WebSocket::new();
+    let group: ReceiverCount =
+        web_socket.receiver_count(BroadcastType::<String>::PointToGroup(String::from("room")));
+    let pair: ReceiverCount = web_socket.receiver_count(BroadcastType::<String>::PointToPoint(
+        String::from("a"),
+        String::from("b"),
+    ));
+    let unknown: ReceiverCount = web_socket.receiver_count(BroadcastType::<String>::Unknown);
+    assert_eq!(group, 0);
+    assert_eq!(pair, 0);
+    assert_eq!(unknown, 0);
+}
+#[test]
+fn receiver_count_tracks_every_subscriber_of_the_generated_key() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let _first: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let _second: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let count: ReceiverCount = web_socket.receiver_count(broadcast_type);
+    assert_eq!(count, 2);
+}
+#[test]
+fn both_point_to_point_orders_reach_the_same_channel() {
+    let web_socket: WebSocket = WebSocket::new();
+    let forward: BroadcastType<String> =
+        BroadcastType::PointToPoint(String::from("alice"), String::from("bob"));
+    let reverse: BroadcastType<String> =
+        BroadcastType::PointToPoint(String::from("bob"), String::from("alice"));
+    let key: String = BroadcastType::get_key(forward.clone());
+    let _receiver: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let forward_count: ReceiverCount = web_socket.receiver_count(forward);
+    let reverse_count: ReceiverCount = web_socket.receiver_count(reverse);
+    assert_eq!(key, String::from("ptp--alice-bob"));
+    assert_eq!(forward_count, 1);
+    assert_eq!(reverse_count, 1);
+}
+#[test]
+fn receiver_count_before_connected_reports_one_more_than_the_live_count() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let before_any: ReceiverCount =
+        web_socket.receiver_count_before_connected(broadcast_type.clone());
+    let _first: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let after_one: ReceiverCount =
+        web_socket.receiver_count_before_connected(broadcast_type.clone());
+    let _second: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let _third: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let after_three: ReceiverCount =
+        web_socket.receiver_count_before_connected(broadcast_type.clone());
+    let untouched: ReceiverCount =
+        web_socket
+            .receiver_count_before_connected(BroadcastType::<String>::PointToGroup(String::new()));
+    assert_eq!(before_any, 1);
+    assert_eq!(after_one, 2);
+    assert_eq!(after_three, 4);
+    assert_eq!(untouched, 1);
+}
+#[test]
+fn receiver_count_after_closed_never_drops_below_zero() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let with_no_subscriber: ReceiverCount =
+        web_socket.receiver_count_after_closed(broadcast_type.clone());
+    let _first: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let with_one_subscriber: ReceiverCount =
+        web_socket.receiver_count_after_closed(broadcast_type.clone());
+    let _second: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let with_two_subscribers: ReceiverCount =
+        web_socket.receiver_count_after_closed(broadcast_type);
+    let untouched: ReceiverCount = web_socket
+        .receiver_count_after_closed(BroadcastType::<String>::PointToGroup(String::new()));
+    assert_eq!(with_no_subscriber, 0);
+    assert_eq!(with_one_subscriber, 0);
+    assert_eq!(with_two_subscribers, 1);
+    assert_eq!(untouched, 0);
+}
+#[test]
+fn try_send_reports_no_channel_for_an_unused_broadcast_type() {
+    let web_socket: WebSocket = WebSocket::new();
+    let result: Result<Option<ReceiverCount>, BroadcastMapSendError<Vec<u8>>> = web_socket
+        .try_send(
+            BroadcastType::<String>::PointToGroup(String::from("room")),
+            "payload",
+        );
+    let count: Option<ReceiverCount> = result.unwrap();
+    assert_eq!(count, None);
+}
+#[tokio::test]
+async fn try_send_delivers_the_payload_to_every_subscriber() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let mut first: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let mut second: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let result: Result<Option<ReceiverCount>, BroadcastMapSendError<Vec<u8>>> =
+        web_socket.try_send(broadcast_type, String::from("hello"));
+    let count: Option<ReceiverCount> = result.unwrap();
+    assert_eq!(count, Some(2));
+    let first_message: Result<Vec<u8>, RecvError> = first.recv().await;
+    let second_message: Result<Vec<u8>, RecvError> = second.recv().await;
+    assert_eq!(first_message.unwrap(), String::from("hello").into_bytes());
+    assert_eq!(second_message.unwrap(), String::from("hello").into_bytes());
+}
+#[tokio::test]
+async fn try_send_accepts_every_byte_vector_payload_shape() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let mut receiver: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let from_str: Result<Option<ReceiverCount>, BroadcastMapSendError<Vec<u8>>> =
+        web_socket.try_send(broadcast_type.clone(), "one");
+    let from_string: Result<Option<ReceiverCount>, BroadcastMapSendError<Vec<u8>>> =
+        web_socket.try_send(broadcast_type.clone(), String::from("two"));
+    let from_bytes: Result<Option<ReceiverCount>, BroadcastMapSendError<Vec<u8>>> =
+        web_socket.try_send(broadcast_type, String::from("three").into_bytes());
+    assert_eq!(from_str.unwrap(), Some(1));
+    assert_eq!(from_string.unwrap(), Some(1));
+    assert_eq!(from_bytes.unwrap(), Some(1));
+    let first: Result<Vec<u8>, RecvError> = receiver.recv().await;
+    let second: Result<Vec<u8>, RecvError> = receiver.recv().await;
+    let third: Result<Vec<u8>, RecvError> = receiver.recv().await;
+    assert_eq!(first.unwrap(), String::from("one").into_bytes());
+    assert_eq!(second.unwrap(), String::from("two").into_bytes());
+    assert_eq!(third.unwrap(), String::from("three").into_bytes());
+}
+#[test]
+fn try_send_fails_and_hands_the_payload_back_when_no_subscriber_is_left() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let receiver: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    drop(receiver);
+    let result: Result<Option<ReceiverCount>, BroadcastMapSendError<Vec<u8>>> =
+        web_socket.try_send(broadcast_type, String::from("hello"));
+    let error: BroadcastMapSendError<Vec<u8>> = result.unwrap_err();
+    let message: String = error.to_string();
+    assert_eq!(message, String::from("channel closed"));
+    let recovered: Vec<u8> = error.0;
+    assert_eq!(recovered, String::from("hello").into_bytes());
+}
+#[test]
+fn send_returns_the_number_of_receivers() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let _receiver: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let count: Option<ReceiverCount> = web_socket.send(broadcast_type, "hello");
+    assert_eq!(count, Some(1));
+}
+#[test]
+fn send_returns_none_for_a_channel_that_was_never_created() {
+    let web_socket: WebSocket = WebSocket::new();
+    let count: Option<ReceiverCount> = web_socket.send(
+        BroadcastType::<String>::PointToGroup(String::from("room")),
+        "hello",
+    );
+    assert_eq!(count, None);
+}
+#[test]
+#[should_panic(expected = "SendError")]
+fn send_panics_when_the_channel_has_no_subscriber() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let receiver: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    drop(receiver);
+    let count: Option<ReceiverCount> = web_socket.send(broadcast_type, "hello");
+    assert_eq!(count, None);
+}
+#[test]
+fn unsubscribing_a_key_removes_the_whole_channel() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let _receiver: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let removed: Option<Broadcast<Vec<u8>>> = web_socket.get_broadcast_map().unsubscribe(&key);
+    assert!(removed.is_some());
+    let count: ReceiverCount = web_socket.receiver_count(broadcast_type.clone());
+    assert_eq!(count, 0);
+    let result: Result<Option<ReceiverCount>, BroadcastMapSendError<Vec<u8>>> =
+        web_socket.try_send(broadcast_type, "hello");
+    let sent: Option<ReceiverCount> = result.unwrap();
+    assert_eq!(sent, None);
+    let removed_again: Option<Broadcast<Vec<u8>>> =
+        web_socket.get_broadcast_map().unsubscribe(&key);
+    assert!(removed_again.is_none());
+}
+#[test]
+fn a_cloned_web_socket_keeps_counting_the_subscribers_of_the_original() {
+    let web_socket: WebSocket = WebSocket::new();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let _receiver: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let clone: WebSocket = web_socket.clone();
+    let count: ReceiverCount = clone.receiver_count(broadcast_type);
+    assert_eq!(count, 1);
+}
+#[test]
+fn a_cloned_web_socket_does_not_share_later_map_insertions() {
+    let web_socket: WebSocket = WebSocket::new();
+    let clone: WebSocket = web_socket.clone();
+    let broadcast_type: BroadcastType<String> = BroadcastType::PointToGroup(String::from("room"));
+    let key: String = BroadcastType::get_key(broadcast_type.clone());
+    let _receiver: BroadcastMapReceiver<Vec<u8>> = clone
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let clone_count: ReceiverCount = clone.receiver_count(broadcast_type.clone());
+    let original_count: ReceiverCount = web_socket.receiver_count(broadcast_type);
+    assert_eq!(clone_count, 1);
+    assert_eq!(original_count, 0);
+}
+#[test]
+fn debug_renders_the_inner_broadcast_map_without_panicking() {
+    let web_socket: WebSocket = WebSocket::new();
+    let empty: String = format!("{:?}", web_socket);
+    assert!(!empty.is_empty());
+    let key: String =
+        BroadcastType::<String>::get_key(BroadcastType::PointToGroup(String::from("room")));
+    let _receiver: BroadcastMapReceiver<Vec<u8>> = web_socket
+        .get_broadcast_map()
+        .subscribe_or_insert(&key, DEFAULT_BROADCAST_SENDER_CAPACITY);
+    let populated: String = format!("{:?}", web_socket);
+    assert!(populated.contains("ptg--room"));
+    assert_ne!(empty, populated);
+}
+```
+# Path: hyperlane/plugin/websocket/tests/websocket_map/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
 # Path: hyperlane/plugin/websocket/src/impl.rs
 ```rust
 use super::*;
@@ -12863,6 +14659,7 @@ impl BroadcastTypeTrait for &isize {}
 impl BroadcastTypeTrait for &u8 {}
 impl BroadcastTypeTrait for &u16 {}
 impl BroadcastTypeTrait for &u32 {}
+impl BroadcastTypeTrait for &u64 {}
 impl BroadcastTypeTrait for &u128 {}
 impl BroadcastTypeTrait for &usize {}
 impl BroadcastTypeTrait for &f32 {}
@@ -13028,6 +14825,10 @@ impl WebSocket {
         Self::default()
     }
     #[inline(always)]
+    pub fn get_broadcast_map(&self) -> &BroadcastMap<Vec<u8>> {
+        &self.broadcast_map
+    }
+    #[inline(always)]
     fn subscribe_unwrap_or_insert<B>(
         &self,
         broadcast_type: BroadcastType<B>,
@@ -13037,7 +14838,7 @@ impl WebSocket {
         B: BroadcastTypeTrait,
     {
         let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.subscribe_or_insert(&key, capacity)
+        self.get_broadcast_map().subscribe_or_insert(&key, capacity)
     }
     #[inline(always)]
     fn point_to_point<B>(
@@ -13067,7 +14868,7 @@ impl WebSocket {
         B: BroadcastTypeTrait,
     {
         let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.receiver_count(&key).unwrap_or(0)
+        self.get_broadcast_map().receiver_count(&key).unwrap_or(0)
     }
     #[inline(always)]
     pub fn receiver_count_before_connected<B>(
@@ -13099,7 +14900,7 @@ impl WebSocket {
         B: BroadcastTypeTrait,
     {
         let key: String = BroadcastType::get_key(broadcast_type);
-        self.broadcast_map.try_send(&key, data.into())
+        self.get_broadcast_map().try_send(&key, data.into())
     }
     #[inline(always)]
     pub fn send<T, B>(&self, broadcast_type: BroadcastType<B>, data: T) -> Option<ReceiverCount>
@@ -13145,7 +14946,7 @@ impl WebSocket {
                         closed_hook(stream, ctx).await;
                     }
                     let body: ResponseBody = ctx.get_response().get_body().clone();
-                    let is_err: bool = self.broadcast_map.try_send(&key, body).is_err();
+                    let is_err: bool = self.get_broadcast_map().try_send(&key, body).is_err();
                     if is_err || sended_hook(stream, ctx).await.is_reject() || is_reject {
                         break;
                     }
@@ -13182,8 +14983,8 @@ mod r#enum;
 mod r#impl;
 mod r#struct;
 mod r#trait;
-pub use {r#enum::*, r#struct::*};
-use {r#const::*, r#trait::*};
+pub use {r#enum::*, r#struct::*, r#trait::*};
+use r#const::*;
 use std::{
     convert::Infallible,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
@@ -13249,15 +15050,323 @@ git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 ## Contact
 # Path: hyperlane/cli/tests/mod.rs
 ```rust
+mod command;
 mod config;
+mod help;
+mod logger;
 mod new;
+mod template;
 mod version;
 use hyperlane_cli::*;
-use std::io;
+use std::{env::args, io};
+```
+# Path: hyperlane/cli/tests/template/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_template_type_from_str_lowercase_names() {
+    assert_eq!(
+        "controller".parse::<TemplateType>().ok(),
+        Some(TemplateType::Controller)
+    );
+    assert_eq!(
+        "domain".parse::<TemplateType>().ok(),
+        Some(TemplateType::Domain)
+    );
+    assert_eq!(
+        "exception".parse::<TemplateType>().ok(),
+        Some(TemplateType::Exception)
+    );
+    assert_eq!(
+        "mapper".parse::<TemplateType>().ok(),
+        Some(TemplateType::Mapper)
+    );
+    assert_eq!(
+        "model".parse::<TemplateType>().ok(),
+        Some(TemplateType::Model)
+    );
+    assert_eq!(
+        "repository".parse::<TemplateType>().ok(),
+        Some(TemplateType::Repository)
+    );
+    assert_eq!(
+        "service".parse::<TemplateType>().ok(),
+        Some(TemplateType::Service)
+    );
+    assert_eq!(
+        "utils".parse::<TemplateType>().ok(),
+        Some(TemplateType::Utils)
+    );
+    assert_eq!(
+        "view".parse::<TemplateType>().ok(),
+        Some(TemplateType::View)
+    );
+}
+#[test]
+fn test_template_type_from_str_is_case_insensitive() {
+    assert_eq!(
+        "CONTROLLER".parse::<TemplateType>().ok(),
+        Some(TemplateType::Controller)
+    );
+    assert_eq!(
+        "Model".parse::<TemplateType>().ok(),
+        Some(TemplateType::Model)
+    );
+}
+#[test]
+fn test_template_type_from_str_rejects_unknown() {
+    let result: Result<TemplateType, TemplateError> = "nope".parse::<TemplateType>();
+    assert!(result.is_err());
+    let error: TemplateError = result.unwrap_err();
+    assert!(error.to_string().contains("Invalid template type: nope"));
+}
+#[test]
+fn test_template_type_from_str_rejects_empty() {
+    let result: Result<TemplateType, TemplateError> = "".parse::<TemplateType>();
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid template type")
+    );
+}
+#[test]
+fn test_template_type_variants_are_distinct() {
+    assert_ne!(TemplateType::Controller, TemplateType::Model);
+    assert_ne!(TemplateType::Domain, TemplateType::Service);
+    assert_ne!(TemplateType::Mapper, TemplateType::Repository);
+    assert_ne!(TemplateType::Exception, TemplateType::Utils);
+    assert_ne!(TemplateType::View, TemplateType::Controller);
+}
+#[test]
+fn test_template_type_is_copy() {
+    let value: TemplateType = TemplateType::Domain;
+    let copied: TemplateType = value;
+    assert_eq!(value, copied);
+}
+#[test]
+fn test_model_sub_type_from_str_lowercase_names() {
+    assert_eq!(
+        "application".parse::<ModelSubType>().ok(),
+        Some(ModelSubType::Application)
+    );
+    assert_eq!(
+        "request".parse::<ModelSubType>().ok(),
+        Some(ModelSubType::Request)
+    );
+    assert_eq!(
+        "response".parse::<ModelSubType>().ok(),
+        Some(ModelSubType::Response)
+    );
+}
+#[test]
+fn test_model_sub_type_from_str_is_case_insensitive() {
+    assert_eq!(
+        "Request".parse::<ModelSubType>().ok(),
+        Some(ModelSubType::Request)
+    );
+    assert_eq!(
+        "RESPONSE".parse::<ModelSubType>().ok(),
+        Some(ModelSubType::Response)
+    );
+}
+#[test]
+fn test_model_sub_type_from_str_rejects_template_names() {
+    let result: Result<ModelSubType, TemplateError> = "model".parse::<ModelSubType>();
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid model subtype: model")
+    );
+}
+#[test]
+fn test_model_sub_type_variants_are_distinct() {
+    assert_ne!(ModelSubType::Application, ModelSubType::Request);
+    assert_ne!(ModelSubType::Request, ModelSubType::Response);
+    assert_ne!(ModelSubType::Application, ModelSubType::Response);
+}
+#[test]
+fn test_template_config_new_defaults_base_directory() {
+    let config: TemplateConfig = TemplateConfig::new(
+        TemplateType::Controller,
+        "user".to_string(),
+        None::<ModelSubType>,
+    );
+    assert_eq!(config.template_type, TemplateType::Controller);
+    assert_eq!(config.component_name, "user");
+    assert!(config.model_sub_type.is_none());
+    assert_eq!(config.base_directory, "./application");
+}
+#[test]
+fn test_template_config_new_keeps_model_sub_type() {
+    let config: TemplateConfig = TemplateConfig::new(
+        TemplateType::Model,
+        "order".to_string(),
+        Some(ModelSubType::Request),
+    );
+    assert_eq!(config.template_type, TemplateType::Model);
+    assert_eq!(config.model_sub_type, Some(ModelSubType::Request));
+    assert_eq!(config.component_name, "order");
+}
+#[test]
+fn test_template_config_fields_are_mutable() {
+    let mut config: TemplateConfig = TemplateConfig::new(
+        TemplateType::Utils,
+        "helper".to_string(),
+        None::<ModelSubType>,
+    );
+    config.template_type = TemplateType::View;
+    config.component_name = "page".to_string();
+    config.model_sub_type = Some(ModelSubType::Response);
+    config.base_directory = "./custom".to_string();
+    assert_eq!(config.template_type, TemplateType::View);
+    assert_eq!(config.component_name, "page");
+    assert_eq!(config.model_sub_type, Some(ModelSubType::Response));
+    assert_eq!(config.base_directory, "./custom");
+}
+#[test]
+fn test_template_config_clone_and_debug() {
+    let config: TemplateConfig = TemplateConfig::new(
+        TemplateType::Service,
+        "svc".to_string(),
+        None::<ModelSubType>,
+    );
+    let cloned: TemplateConfig = config.clone();
+    assert_eq!(cloned.component_name, "svc");
+    assert_eq!(cloned.template_type, TemplateType::Service);
+    let debugged: String = format!("{config:?}");
+    assert!(debugged.contains("svc"));
+    assert!(debugged.contains("./application"));
+}
+#[test]
+fn test_template_error_variants_display_messages() {
+    let invalid_type: TemplateError = TemplateError::InvalidTemplateType("bogus".to_string());
+    assert_eq!(invalid_type.to_string(), "Invalid template type: bogus");
+    let invalid_sub: TemplateError = TemplateError::InvalidModelSubType("bogus".to_string());
+    assert_eq!(invalid_sub.to_string(), "Invalid model subtype: bogus");
+    let exists: TemplateError = TemplateError::DirectoryExists("./a/b".to_string());
+    assert_eq!(exists.to_string(), "Directory './a/b' already exists");
+}
+#[test]
+fn test_template_error_from_io() {
+    let io_error: io::Error = io::Error::new(io::ErrorKind::PermissionDenied, "denied");
+    let template_error: TemplateError = TemplateError::from(io_error);
+    assert_eq!(template_error.to_string(), "IO error: denied");
+}
+#[test]
+fn test_template_error_debug_names_variant() {
+    let error: TemplateError = TemplateError::InvalidTemplateType("x".to_string());
+    let debugged: String = format!("{error:?}");
+    assert!(debugged.contains("InvalidTemplateType"));
+}
+```
+# Path: hyperlane/cli/tests/template/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/tests/logger/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_logger_unit_value_is_constructible() {
+    let logger: Logger = Logger;
+    let other: Logger = Logger;
+    log::Log::flush(&logger);
+    log::Log::flush(&other);
+}
+#[test]
+fn test_logger_flush_is_a_noop() {
+    let logger: Logger = Logger;
+    log::Log::flush(&logger);
+}
+#[test]
+fn test_logger_enabled_follows_max_level() {
+    log::set_max_level(log::LevelFilter::Info);
+    let logger: Logger = Logger;
+    let error_metadata: log::Metadata<'_> = log::Metadata::builder()
+        .level(log::Level::Error)
+        .target("hyperlane-cli")
+        .build();
+    let trace_metadata: log::Metadata<'_> = log::Metadata::builder()
+        .level(log::Level::Trace)
+        .target("hyperlane-cli")
+        .build();
+    assert!(log::Log::enabled(&logger, &error_metadata));
+    assert!(!log::Log::enabled(&logger, &trace_metadata));
+}
+#[test]
+fn test_logger_init_sets_max_level() {
+    Logger::init(log::LevelFilter::Warn);
+    assert_eq!(log::max_level(), log::LevelFilter::Warn);
+    log::set_max_level(log::LevelFilter::Info);
+}
+#[test]
+fn test_logger_new_constructs_instance() {
+    let logger: Logger = Logger::new();
+    log::Log::flush(&logger);
+}
+```
+# Path: hyperlane/cli/tests/logger/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/tests/help/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_print_help_runs_without_logger() {
+    print_help();
+}
+#[test]
+fn test_print_help_is_idempotent() {
+    print_help();
+    print_help();
+}
+```
+# Path: hyperlane/cli/tests/help/mod.rs
+```rust
+mod r#fn;
+use super::*;
 ```
 # Path: hyperlane/cli/tests/config/fn.rs
 ```rust
 use super::*;
+#[test]
+fn test_parse_args_defaults_to_help_without_command_tokens() {
+    let recognised: bool = args().any(|item: String| {
+        matches!(
+            item.as_str(),
+            "-h" | "--help" | "-v" | "--version" | "watch" | "new" | "template"
+        )
+    });
+    if recognised {
+        return;
+    }
+    let args: Args = parse_args();
+    assert_eq!(args.command, CommandType::Help);
+    assert!(args.project_name.is_none());
+    assert!(args.template_type.is_none());
+    assert!(args.model_sub_type.is_none());
+    assert!(args.component_name.is_none());
+}
+#[test]
+fn test_parse_args_returns_populated_args() {
+    let args: Args = parse_args();
+    let command: CommandType = args.command;
+    assert!(matches!(
+        command,
+        CommandType::Watch
+            | CommandType::New
+            | CommandType::Template
+            | CommandType::Help
+            | CommandType::Version
+    ));
+}
 #[test]
 fn test_args_default_values() {
     let args: Args = Args {
@@ -13372,6 +15481,65 @@ fn test_new_project_config_debug() {
     let debug_str: String = format!("{config:?}");
     assert!(debug_str.contains("test"));
 }
+#[test]
+fn test_new_project_config_fields_are_mutable() {
+    let mut config: NewProjectConfig = NewProjectConfig::new("first".to_string());
+    config.project_name = "second".to_string();
+    config.template_url = "https://example.test/repo".to_string();
+    assert_eq!(config.project_name, "second");
+    assert_eq!(config.template_url, "https://example.test/repo");
+}
+#[test]
+fn test_new_project_config_new_keeps_given_name() {
+    let config: NewProjectConfig = NewProjectConfig::new(String::new());
+    assert_eq!(config.project_name, "");
+    assert!(config.template_url.starts_with("https://"));
+}
+#[tokio::test]
+async fn test_execute_new_rejects_empty_project_name() {
+    let result: Result<(), NewError> = execute_new("").await;
+    assert!(result.is_err());
+    let error: NewError = result.unwrap_err();
+    assert!(error.to_string().contains("Invalid project name"));
+    assert!(error.to_string().contains("empty"));
+}
+#[tokio::test]
+async fn test_execute_new_rejects_path_separators() {
+    let slash: Result<(), NewError> = execute_new("a/b").await;
+    assert!(
+        slash
+            .unwrap_err()
+            .to_string()
+            .contains("invalid characters")
+    );
+    let backslash: Result<(), NewError> = execute_new("a\\b").await;
+    assert!(
+        backslash
+            .unwrap_err()
+            .to_string()
+            .contains("invalid characters")
+    );
+    let colon: Result<(), NewError> = execute_new("a:b").await;
+    assert!(
+        colon
+            .unwrap_err()
+            .to_string()
+            .contains("invalid characters")
+    );
+}
+#[tokio::test]
+async fn test_execute_new_rejects_dot_and_dash_prefix() {
+    let dot: Result<(), NewError> = execute_new(".hidden").await;
+    assert!(dot.unwrap_err().to_string().contains("cannot start"));
+    let dash: Result<(), NewError> = execute_new("-flag").await;
+    assert!(dash.unwrap_err().to_string().contains("cannot start"));
+}
+#[tokio::test]
+async fn test_execute_new_name_check_precedes_git_probe() {
+    let result: Result<(), NewError> = execute_new("..").await;
+    let error: NewError = result.unwrap_err();
+    assert!(matches!(error, NewError::InvalidName(message) if message.contains("cannot start")));
+}
 ```
 # Path: hyperlane/cli/tests/new/mod.rs
 ```rust
@@ -13387,6 +15555,57 @@ fn test_print_version_runs() {
 }
 ```
 # Path: hyperlane/cli/tests/version/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/cli/tests/command/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_command_type_is_copy() {
+    let value: CommandType = CommandType::Template;
+    let copied: CommandType = value;
+    assert_eq!(value, copied);
+}
+#[test]
+fn test_command_type_variants_are_distinct() {
+    assert_ne!(CommandType::Watch, CommandType::New);
+    assert_ne!(CommandType::New, CommandType::Template);
+    assert_ne!(CommandType::Template, CommandType::Help);
+    assert_ne!(CommandType::Help, CommandType::Version);
+    assert_ne!(CommandType::Version, CommandType::Watch);
+}
+#[test]
+fn test_command_type_debug_names_variant() {
+    let watch: String = format!("{:?}", CommandType::Watch);
+    let version: String = format!("{:?}", CommandType::Version);
+    assert_eq!(watch, "Watch");
+    assert_eq!(version, "Version");
+}
+#[test]
+fn test_command_type_copy_preserves_value() {
+    let original: CommandType = CommandType::New;
+    let copied: CommandType = original;
+    assert_eq!(copied, CommandType::New);
+    assert_eq!(original, CommandType::New);
+}
+#[test]
+fn test_args_debug_lists_optional_fields() {
+    let args: Args = Args {
+        command: CommandType::Template,
+        project_name: Some("proj".to_string()),
+        template_type: Some(TemplateType::Model),
+        model_sub_type: Some(ModelSubType::Application),
+        component_name: Some("thing".to_string()),
+    };
+    let debugged: String = format!("{args:?}");
+    assert!(debugged.contains("proj"));
+    assert!(debugged.contains("thing"));
+    assert!(debugged.contains("Model"));
+}
+```
+# Path: hyperlane/cli/tests/command/mod.rs
 ```rust
 mod r#fn;
 use super::*;
@@ -13467,12 +15686,14 @@ mod watch;
 pub use {command::*, config::*, help::*, logger::*, new::*, template::*, version::*, watch::*};
 pub(crate) use std::{
     env::args,
+    fmt::Arguments,
     io,
     path::{Path, PathBuf},
-    process::Stdio,
+    process::{Output, Stdio},
     str::FromStr,
 };
 pub(crate) use {
+    log::SetLoggerError,
     lombok_macros::*,
     notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
     std::ffi::OsStr,
@@ -13491,15 +15712,15 @@ impl FromStr for TemplateType {
     type Err = TemplateError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "controller" => Ok(Self::Controller),
-            "domain" => Ok(Self::Domain),
-            "exception" => Ok(Self::Exception),
-            "mapper" => Ok(Self::Mapper),
-            "model" => Ok(Self::Model),
-            "repository" => Ok(Self::Repository),
-            "service" => Ok(Self::Service),
-            "utils" => Ok(Self::Utils),
-            "view" => Ok(Self::View),
+            TEMPLATE_TYPE_CONTROLLER => Ok(Self::Controller),
+            TEMPLATE_TYPE_DOMAIN => Ok(Self::Domain),
+            TEMPLATE_TYPE_EXCEPTION => Ok(Self::Exception),
+            TEMPLATE_TYPE_MAPPER => Ok(Self::Mapper),
+            TEMPLATE_TYPE_MODEL => Ok(Self::Model),
+            TEMPLATE_TYPE_REPOSITORY => Ok(Self::Repository),
+            TEMPLATE_TYPE_SERVICE => Ok(Self::Service),
+            TEMPLATE_TYPE_UTILS => Ok(Self::Utils),
+            TEMPLATE_TYPE_VIEW => Ok(Self::View),
             _ => Err(TemplateError::InvalidTemplateType(s.to_string())),
         }
     }
@@ -13514,7 +15735,7 @@ impl TemplateConfig {
             template_type,
             component_name,
             model_sub_type,
-            base_directory: "./application".to_string(),
+            base_directory: TEMPLATE_CONFIG_BASE_DIRECTORY.to_string(),
         }
     }
 }
@@ -13522,35 +15743,68 @@ impl FromStr for ModelSubType {
     type Err = TemplateError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "application" => Ok(Self::Application),
-            "request" => Ok(Self::Request),
-            "response" => Ok(Self::Response),
+            MODEL_SUB_TYPE_APPLICATION => Ok(Self::Application),
+            MODEL_SUB_TYPE_REQUEST => Ok(Self::Request),
+            MODEL_SUB_TYPE_RESPONSE => Ok(Self::Response),
             _ => Err(TemplateError::InvalidModelSubType(s.to_string())),
         }
     }
 }
+```
+# Path: hyperlane/cli/src/template/const.rs
+```rust
+pub(crate) const TEMPLATE_TYPE_CONTROLLER: &str = "controller";
+pub(crate) const TEMPLATE_TYPE_DOMAIN: &str = "domain";
+pub(crate) const TEMPLATE_TYPE_EXCEPTION: &str = "exception";
+pub(crate) const TEMPLATE_TYPE_MAPPER: &str = "mapper";
+pub(crate) const TEMPLATE_TYPE_MODEL: &str = "model";
+pub(crate) const TEMPLATE_TYPE_REPOSITORY: &str = "repository";
+pub(crate) const TEMPLATE_TYPE_SERVICE: &str = "service";
+pub(crate) const TEMPLATE_TYPE_UTILS: &str = "utils";
+pub(crate) const TEMPLATE_TYPE_VIEW: &str = "view";
+pub(crate) const MODEL_SUB_TYPE_APPLICATION: &str = "application";
+pub(crate) const MODEL_SUB_TYPE_REQUEST: &str = "request";
+pub(crate) const MODEL_SUB_TYPE_RESPONSE: &str = "response";
+pub(crate) const TEMPLATE_CONFIG_BASE_DIRECTORY: &str = "./application";
+pub(crate) const MODULE_NAME_CONST: &str = "const";
+pub(crate) const MODULE_NAME_ENUM: &str = "enum";
+pub(crate) const MODULE_NAME_FN: &str = "fn";
+pub(crate) const MODULE_NAME_IMPL: &str = "impl";
+pub(crate) const MODULE_NAME_STATIC: &str = "static";
+pub(crate) const MODULE_NAME_STRUCT: &str = "struct";
+pub(crate) const FILE_NAME_MOD_RS: &str = "mod.rs";
+pub(crate) const FILE_NAME_CONST_RS: &str = "const.rs";
+pub(crate) const FILE_NAME_ENUM_RS: &str = "enum.rs";
+pub(crate) const FILE_NAME_FN_RS: &str = "fn.rs";
+pub(crate) const FILE_NAME_IMPL_RS: &str = "impl.rs";
+pub(crate) const FILE_NAME_STATIC_RS: &str = "static.rs";
+pub(crate) const FILE_NAME_STRUCT_RS: &str = "struct.rs";
+pub(crate) const PUB_USE_PREFIX: &str = "pub use {";
+pub(crate) const KEYWORD_FILE_HEADER: &str = "use super::*;\n";
+pub(crate) const ERROR_MISSING_MODEL_SUB_TYPE: &str = "Missing model subtype";
+pub(crate) const CARGO_FMT_PROGRAM: &str = "cargo";
 ```
 # Path: hyperlane/cli/src/template/fn.rs
 ```rust
 use super::*;
 fn get_directory_name(template_type: &TemplateType) -> String {
     match template_type {
-        TemplateType::Controller => "controller".to_string(),
-        TemplateType::Domain => "domain".to_string(),
-        TemplateType::Exception => "exception".to_string(),
-        TemplateType::Mapper => "mapper".to_string(),
-        TemplateType::Model => "model".to_string(),
-        TemplateType::Repository => "repository".to_string(),
-        TemplateType::Service => "service".to_string(),
-        TemplateType::Utils => "utils".to_string(),
-        TemplateType::View => "view".to_string(),
+        TemplateType::Controller => TEMPLATE_TYPE_CONTROLLER.to_string(),
+        TemplateType::Domain => TEMPLATE_TYPE_DOMAIN.to_string(),
+        TemplateType::Exception => TEMPLATE_TYPE_EXCEPTION.to_string(),
+        TemplateType::Mapper => TEMPLATE_TYPE_MAPPER.to_string(),
+        TemplateType::Model => TEMPLATE_TYPE_MODEL.to_string(),
+        TemplateType::Repository => TEMPLATE_TYPE_REPOSITORY.to_string(),
+        TemplateType::Service => TEMPLATE_TYPE_SERVICE.to_string(),
+        TemplateType::Utils => TEMPLATE_TYPE_UTILS.to_string(),
+        TemplateType::View => TEMPLATE_TYPE_VIEW.to_string(),
     }
 }
 fn get_model_sub_type_name(sub_type: &ModelSubType) -> String {
     match sub_type {
-        ModelSubType::Application => "application".to_string(),
-        ModelSubType::Request => "request".to_string(),
-        ModelSubType::Response => "response".to_string(),
+        ModelSubType::Application => MODEL_SUB_TYPE_APPLICATION.to_string(),
+        ModelSubType::Request => MODEL_SUB_TYPE_REQUEST.to_string(),
+        ModelSubType::Response => MODEL_SUB_TYPE_RESPONSE.to_string(),
     }
 }
 async fn ensure_directory(path: &Path) -> Result<(), TemplateError> {
@@ -13582,21 +15836,21 @@ async fn write_mod_rs(path: &Path, modules: &[&str]) -> Result<(), TemplateError
         } else {
             format!("r#{module}")
         };
-        if raw_name == "const" || raw_name == "static" {
+        if raw_name == MODULE_NAME_CONST || raw_name == MODULE_NAME_STATIC {
             pub_use_parts.push(mod_name);
-        } else if raw_name == "enum" || raw_name == "fn" {
+        } else if raw_name == MODULE_NAME_ENUM || raw_name == MODULE_NAME_FN {
             pub_use_parts.push(format!("{mod_name}::*"));
-        } else if raw_name == "struct" {
+        } else if raw_name == MODULE_NAME_STRUCT {
             pub_use_parts.push(mod_name);
         }
     }
     if !pub_use_parts.is_empty() {
-        content.push_str("pub use {");
+        content.push_str(PUB_USE_PREFIX);
         content.push_str(&pub_use_parts.join(", "));
         content.push_str("};\n");
     }
     content.push('\n');
-    content.push_str("use super::*;\n");
+    content.push_str(KEYWORD_FILE_HEADER);
     write(path, content).await?;
     Ok(())
 }
@@ -13609,14 +15863,18 @@ async fn create_controller_template(
     _component_name: &str,
 ) -> Result<(), TemplateError> {
     ensure_directory(target_dir).await?;
-    let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["fn", "impl", "struct"]).await?;
-    let fn_rs: PathBuf = target_dir.join("fn.rs");
-    write(&fn_rs, "use super::*;\n").await?;
-    let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n").await?;
-    let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n").await?;
+    let mod_rs: PathBuf = target_dir.join(FILE_NAME_MOD_RS);
+    write_mod_rs(
+        &mod_rs,
+        &[MODULE_NAME_FN, MODULE_NAME_IMPL, MODULE_NAME_STRUCT],
+    )
+    .await?;
+    let fn_rs: PathBuf = target_dir.join(FILE_NAME_FN_RS);
+    write(&fn_rs, KEYWORD_FILE_HEADER).await?;
+    let impl_rs: PathBuf = target_dir.join(FILE_NAME_IMPL_RS);
+    write(&impl_rs, KEYWORD_FILE_HEADER).await?;
+    let struct_rs: PathBuf = target_dir.join(FILE_NAME_STRUCT_RS);
+    write(&struct_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
 async fn create_view_template(
@@ -13624,14 +15882,18 @@ async fn create_view_template(
     _component_name: &str,
 ) -> Result<(), TemplateError> {
     ensure_directory(target_dir).await?;
-    let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["fn", "impl", "struct"]).await?;
-    let fn_rs: PathBuf = target_dir.join("fn.rs");
-    write(&fn_rs, "use super::*;\n").await?;
-    let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n").await?;
-    let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n").await?;
+    let mod_rs: PathBuf = target_dir.join(FILE_NAME_MOD_RS);
+    write_mod_rs(
+        &mod_rs,
+        &[MODULE_NAME_FN, MODULE_NAME_IMPL, MODULE_NAME_STRUCT],
+    )
+    .await?;
+    let fn_rs: PathBuf = target_dir.join(FILE_NAME_FN_RS);
+    write(&fn_rs, KEYWORD_FILE_HEADER).await?;
+    let impl_rs: PathBuf = target_dir.join(FILE_NAME_IMPL_RS);
+    write(&impl_rs, KEYWORD_FILE_HEADER).await?;
+    let struct_rs: PathBuf = target_dir.join(FILE_NAME_STRUCT_RS);
+    write(&struct_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
 async fn create_service_template(
@@ -13639,12 +15901,12 @@ async fn create_service_template(
     _component_name: &str,
 ) -> Result<(), TemplateError> {
     ensure_directory(target_dir).await?;
-    let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
-    let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n").await?;
-    let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n").await?;
+    let mod_rs: PathBuf = target_dir.join(FILE_NAME_MOD_RS);
+    write_mod_rs(&mod_rs, &[MODULE_NAME_IMPL, MODULE_NAME_STRUCT]).await?;
+    let impl_rs: PathBuf = target_dir.join(FILE_NAME_IMPL_RS);
+    write(&impl_rs, KEYWORD_FILE_HEADER).await?;
+    let struct_rs: PathBuf = target_dir.join(FILE_NAME_STRUCT_RS);
+    write(&struct_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
 async fn create_domain_template(
@@ -13652,12 +15914,12 @@ async fn create_domain_template(
     _component_name: &str,
 ) -> Result<(), TemplateError> {
     ensure_directory(target_dir).await?;
-    let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
-    let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n").await?;
-    let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n").await?;
+    let mod_rs: PathBuf = target_dir.join(FILE_NAME_MOD_RS);
+    write_mod_rs(&mod_rs, &[MODULE_NAME_IMPL, MODULE_NAME_STRUCT]).await?;
+    let impl_rs: PathBuf = target_dir.join(FILE_NAME_IMPL_RS);
+    write(&impl_rs, KEYWORD_FILE_HEADER).await?;
+    let struct_rs: PathBuf = target_dir.join(FILE_NAME_STRUCT_RS);
+    write(&struct_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
 async fn create_mapper_template(
@@ -13665,24 +15927,31 @@ async fn create_mapper_template(
     _component_name: &str,
 ) -> Result<(), TemplateError> {
     ensure_directory(target_dir).await?;
-    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    let mod_rs: PathBuf = target_dir.join(FILE_NAME_MOD_RS);
     write_mod_rs(
         &mod_rs,
-        &["const", "enum", "fn", "impl", "static", "struct"],
+        &[
+            MODULE_NAME_CONST,
+            MODULE_NAME_ENUM,
+            MODULE_NAME_FN,
+            MODULE_NAME_IMPL,
+            MODULE_NAME_STATIC,
+            MODULE_NAME_STRUCT,
+        ],
     )
     .await?;
-    let const_rs: PathBuf = target_dir.join("const.rs");
-    write(&const_rs, "use super::*;\n").await?;
-    let enum_rs: PathBuf = target_dir.join("enum.rs");
-    write(&enum_rs, "use super::*;\n").await?;
-    let fn_rs: PathBuf = target_dir.join("fn.rs");
-    write(&fn_rs, "use super::*;\n").await?;
-    let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n").await?;
-    let static_rs: PathBuf = target_dir.join("static.rs");
-    write(&static_rs, "use super::*;\n").await?;
-    let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n").await?;
+    let const_rs: PathBuf = target_dir.join(FILE_NAME_CONST_RS);
+    write(&const_rs, KEYWORD_FILE_HEADER).await?;
+    let enum_rs: PathBuf = target_dir.join(FILE_NAME_ENUM_RS);
+    write(&enum_rs, KEYWORD_FILE_HEADER).await?;
+    let fn_rs: PathBuf = target_dir.join(FILE_NAME_FN_RS);
+    write(&fn_rs, KEYWORD_FILE_HEADER).await?;
+    let impl_rs: PathBuf = target_dir.join(FILE_NAME_IMPL_RS);
+    write(&impl_rs, KEYWORD_FILE_HEADER).await?;
+    let static_rs: PathBuf = target_dir.join(FILE_NAME_STATIC_RS);
+    write(&static_rs, KEYWORD_FILE_HEADER).await?;
+    let struct_rs: PathBuf = target_dir.join(FILE_NAME_STRUCT_RS);
+    write(&struct_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
 async fn create_utils_template(
@@ -13690,10 +15959,10 @@ async fn create_utils_template(
     _component_name: &str,
 ) -> Result<(), TemplateError> {
     ensure_directory(target_dir).await?;
-    let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["fn"]).await?;
-    let fn_rs: PathBuf = target_dir.join("fn.rs");
-    write(&fn_rs, "use super::*;\n").await?;
+    let mod_rs: PathBuf = target_dir.join(FILE_NAME_MOD_RS);
+    write_mod_rs(&mod_rs, &[MODULE_NAME_FN]).await?;
+    let fn_rs: PathBuf = target_dir.join(FILE_NAME_FN_RS);
+    write(&fn_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
 async fn create_exception_template(
@@ -13701,7 +15970,7 @@ async fn create_exception_template(
     _component_name: &str,
 ) -> Result<(), TemplateError> {
     ensure_directory(target_dir).await?;
-    let mod_rs: PathBuf = target_dir.join("mod.rs");
+    let mod_rs: PathBuf = target_dir.join(FILE_NAME_MOD_RS);
     write_empty_mod_rs(&mod_rs).await?;
     Ok(())
 }
@@ -13710,12 +15979,12 @@ async fn create_repository_template(
     _component_name: &str,
 ) -> Result<(), TemplateError> {
     ensure_directory(target_dir).await?;
-    let mod_rs: PathBuf = target_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["impl", "struct"]).await?;
-    let impl_rs: PathBuf = target_dir.join("impl.rs");
-    write(&impl_rs, "use super::*;\n").await?;
-    let struct_rs: PathBuf = target_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n").await?;
+    let mod_rs: PathBuf = target_dir.join(FILE_NAME_MOD_RS);
+    write_mod_rs(&mod_rs, &[MODULE_NAME_IMPL, MODULE_NAME_STRUCT]).await?;
+    let impl_rs: PathBuf = target_dir.join(FILE_NAME_IMPL_RS);
+    write(&impl_rs, KEYWORD_FILE_HEADER).await?;
+    let struct_rs: PathBuf = target_dir.join(FILE_NAME_STRUCT_RS);
+    write(&struct_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
 async fn create_model_template(
@@ -13726,10 +15995,10 @@ async fn create_model_template(
     let sub_type_name: String = get_model_sub_type_name(sub_type);
     let model_dir: PathBuf = target_dir.join(&sub_type_name);
     ensure_directory(&model_dir).await?;
-    let mod_rs: PathBuf = model_dir.join("mod.rs");
-    write_mod_rs(&mod_rs, &["struct"]).await?;
-    let struct_rs: PathBuf = model_dir.join("struct.rs");
-    write(&struct_rs, "use super::*;\n").await?;
+    let mod_rs: PathBuf = model_dir.join(FILE_NAME_MOD_RS);
+    write_mod_rs(&mod_rs, &[MODULE_NAME_STRUCT]).await?;
+    let struct_rs: PathBuf = model_dir.join(FILE_NAME_STRUCT_RS);
+    write(&struct_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
 pub async fn execute_template(
@@ -13768,7 +16037,7 @@ pub async fn execute_template(
         }
         TemplateType::Model => {
             let sub_type: ModelSubType = config.model_sub_type.ok_or_else(|| {
-                TemplateError::InvalidModelSubType("Missing model subtype".to_string())
+                TemplateError::InvalidModelSubType(ERROR_MISSING_MODEL_SUB_TYPE.to_string())
             })?;
             create_model_template(&target_dir, &config.component_name, &sub_type).await?;
         }
@@ -13782,8 +16051,10 @@ pub async fn execute_template(
     Ok(())
 }
 async fn format_generated_path(path: &Path) -> Result<(), io::Error> {
-    let mut cmd: Command = Command::new("cargo");
-    cmd.arg("fmt").arg("--").arg(path);
+    let mut cmd: Command = Command::new(CARGO_FMT_PROGRAM);
+    cmd.arg("fmt");
+    cmd.arg("--");
+    cmd.arg(path);
     cmd.stdout(Stdio::null()).stderr(Stdio::null());
     cmd.status().await?;
     Ok(())
@@ -13835,11 +16106,13 @@ pub struct TemplateConfig {
 ```
 # Path: hyperlane/cli/src/template/mod.rs
 ```rust
+mod r#const;
 mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/cli/src/logger/impl.rs
@@ -13855,7 +16128,7 @@ impl log::Log for Logger {
         }
         let now_time: String = color_output::time();
         let level: log::Level = record.level();
-        let args: &std::fmt::Arguments<'_> = record.args();
+        let args: &Arguments<'_> = record.args();
         let file: Option<&str> = record.file();
         let module_path: Option<&str> = record.module_path();
         let target: &str = record.target();
@@ -13940,7 +16213,6 @@ mod r#struct;
 pub use r#struct::*;
 pub use {::log, color_output::*};
 pub(crate) use {r#const::*, r#static::*};
-pub(crate) use log::SetLoggerError;
 use super::*;
 ```
 # Path: hyperlane/cli/src/help/fn.rs
@@ -13966,6 +16238,13 @@ pub fn print_help() {
 mod r#fn;
 pub use r#fn::*;
 ```
+# Path: hyperlane/cli/src/config/const.rs
+```rust
+pub(crate) const FLAG_LONG_HELP: &str = "--help";
+pub(crate) const FLAG_LONG_VERSION: &str = "--version";
+pub(crate) const COMMAND_WATCH: &str = "watch";
+pub(crate) const COMMAND_TEMPLATE: &str = "template";
+```
 # Path: hyperlane/cli/src/config/fn.rs
 ```rust
 use super::*;
@@ -13980,13 +16259,13 @@ pub fn parse_args() -> Args {
     while i < raw_args.len() {
         let arg: &str = raw_args[i].as_str();
         match arg {
-            "-h" | "--help" => {
+            "-h" | FLAG_LONG_HELP => {
                 command = CommandType::Help;
             }
-            "-v" | "--version" => {
+            "-v" | FLAG_LONG_VERSION => {
                 command = CommandType::Version;
             }
-            "watch" if (command == CommandType::Help || command == CommandType::Version) => {
+            COMMAND_WATCH if (command == CommandType::Help || command == CommandType::Version) => {
                 command = CommandType::Watch;
             }
             "new" if (command == CommandType::Help || command == CommandType::Version) => {
@@ -14001,7 +16280,9 @@ pub fn parse_args() -> Args {
                     i -= 1;
                 }
             }
-            "template" if (command == CommandType::Help || command == CommandType::Version) => {
+            COMMAND_TEMPLATE
+                if (command == CommandType::Help || command == CommandType::Version) =>
+            {
                 command = CommandType::Template;
                 i += 1;
                 if i < raw_args.len()
@@ -14057,9 +16338,11 @@ pub struct Args {
 ```
 # Path: hyperlane/cli/src/config/mod.rs
 ```rust
+mod r#const;
 mod r#fn;
 mod r#struct;
 pub use {r#fn::*, r#struct::*};
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/cli/src/new/impl.rs
@@ -14069,40 +16352,50 @@ impl NewProjectConfig {
     pub fn new(project_name: String) -> Self {
         Self {
             project_name,
-            template_url: "https://github.com/hyperlane-dev/hyperlane-quick-start".to_string(),
+            template_url: DEFAULT_TEMPLATE_URL.to_string(),
         }
     }
 }
+```
+# Path: hyperlane/cli/src/new/const.rs
+```rust
+pub(crate) const ERROR_PROJECT_NAME_EMPTY: &str = "Project name cannot be empty";
+pub(crate) const ERROR_PROJECT_NAME_INVALID_CHARACTERS: &str =
+    "Project name contains invalid characters";
+pub(crate) const ERROR_PROJECT_NAME_INVALID_PREFIX: &str =
+    "Project name cannot start with '.' or '-'";
+pub(crate) const DEFAULT_TEMPLATE_URL: &str =
+    "https://github.com/hyperlane-dev/hyperlane-quick-start";
+pub(crate) const GIT_FLAG_VERSION: &str = "--version";
+pub(crate) const GIT_SUBCOMMAND_CLONE: &str = "clone";
 ```
 # Path: hyperlane/cli/src/new/fn.rs
 ```rust
 use super::*;
 fn validate_project_name(name: &str) -> Result<(), NewError> {
     if name.is_empty() {
-        return Err(NewError::InvalidName(
-            "Project name cannot be empty".to_string(),
-        ));
+        return Err(NewError::InvalidName(ERROR_PROJECT_NAME_EMPTY.to_string()));
     }
     if name.contains('/') || name.contains('\\') || name.contains(':') {
         return Err(NewError::InvalidName(
-            "Project name contains invalid characters".to_string(),
+            ERROR_PROJECT_NAME_INVALID_CHARACTERS.to_string(),
         ));
     }
     if name.starts_with('.') || name.starts_with('-') {
         return Err(NewError::InvalidName(
-            "Project name cannot start with '.' or '-'".to_string(),
+            ERROR_PROJECT_NAME_INVALID_PREFIX.to_string(),
         ));
     }
     Ok(())
 }
 async fn check_git_available() -> Result<(), NewError> {
-    let output: std::process::Output = Command::new("git")
-        .arg("--version")
+    let output: Output = Command::new("git")
+        .arg(GIT_FLAG_VERSION)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .output()
         .await
-        .map_err(|_: std::io::Error| NewError::GitNotFound)?;
+        .map_err(|_: io::Error| NewError::GitNotFound)?;
     if output.status.success() {
         Ok(())
     } else {
@@ -14114,8 +16407,8 @@ async fn git_clone(config: &NewProjectConfig) -> Result<(), NewError> {
     if project_path.exists() {
         return Err(NewError::ProjectExists(config.project_name.clone()));
     }
-    let output: std::process::Output = Command::new("git")
-        .arg("clone")
+    let output: Output = Command::new("git")
+        .arg(GIT_SUBCOMMAND_CLONE)
         .arg(&config.template_url)
         .arg(&config.project_name)
         .stdout(Stdio::piped())
@@ -14172,11 +16465,13 @@ pub struct NewProjectConfig {
 ```
 # Path: hyperlane/cli/src/new/mod.rs
 ```rust
+mod r#const;
 mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#struct;
 pub use {r#enum::*, r#fn::*, r#struct::*};
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/cli/src/version/fn.rs
@@ -14206,11 +16501,17 @@ pub enum CommandType {
 mod r#enum;
 pub use r#enum::*;
 ```
+# Path: hyperlane/cli/src/watch/const.rs
+```rust
+pub(crate) const CARGO_RUN_PROGRAM: &str = "cargo";
+pub(crate) const ERROR_SRC_DIRECTORY_NOT_FOUND: &str =
+    "src directory not found in current directory";
+```
 # Path: hyperlane/cli/src/watch/fn.rs
 ```rust
 use super::*;
 async fn run_cargo_run() -> Result<(), io::Error> {
-    let output: std::process::Output = Command::new("cargo")
+    let output: Output = Command::new(CARGO_RUN_PROGRAM)
         .arg("run")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -14246,9 +16547,7 @@ async fn run_cargo_run() -> Result<(), io::Error> {
 pub async fn execute_watch() -> Result<(), io::Error> {
     let src_path: PathBuf = PathBuf::from("src");
     if !src_path.exists() {
-        return Err(io::Error::other(
-            "src directory not found in current directory",
-        ));
+        return Err(io::Error::other(ERROR_SRC_DIRECTORY_NOT_FOUND));
     }
     run_cargo_run().await?;
     let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));
@@ -14284,8 +16583,10 @@ pub async fn execute_watch() -> Result<(), io::Error> {
 ```
 # Path: hyperlane/cli/src/watch/mod.rs
 ```rust
+mod r#const;
 mod r#fn;
 pub use r#fn::*;
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/compress/README.md
@@ -14303,25 +16604,183 @@ cargo add http-compress
 ```rust
 mod compress;
 use http_compress::*;
-use std::{borrow::Cow, collections::HashMap};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 use {core::hash::BuildHasherDefault, twox_hash::XxHash3_64};
 ```
 # Path: hyperlane/compress/tests/compress/fn.rs
 ```rust
 use super::*;
 #[test]
-fn test() {
-    let headers: HashMap<_, _, BuildHasherDefault<XxHash3_64>> =
+fn from_str_maps_known_encoding_names() {
+    let gzip: Compress = "gzip".parse::<Compress>().unwrap_or_default();
+    let deflate: Compress = "deflate".parse::<Compress>().unwrap_or_default();
+    let brotli: Compress = "br".parse::<Compress>().unwrap_or_default();
+    let unknown: Compress = "lzma".parse::<Compress>().unwrap_or_default();
+    let empty: Compress = "".parse::<Compress>().unwrap_or_default();
+    assert_eq!(gzip, Compress::Gzip);
+    assert_eq!(deflate, Compress::Deflate);
+    assert_eq!(brotli, Compress::Br);
+    assert_eq!(unknown, Compress::Unknown);
+    assert_eq!(empty, Compress::Unknown);
+}
+#[test]
+fn from_str_is_case_insensitive() {
+    let upper: Compress = "GZIP".parse::<Compress>().unwrap_or_default();
+    let mixed: Compress = "DeFlAtE".parse::<Compress>().unwrap_or_default();
+    let brotli: Compress = "BR".parse::<Compress>().unwrap_or_default();
+    assert_eq!(upper, Compress::Gzip);
+    assert_eq!(mixed, Compress::Deflate);
+    assert_eq!(brotli, Compress::Br);
+}
+#[test]
+fn display_renders_content_encoding_token() {
+    assert_eq!(Compress::Gzip.to_string(), "gzip");
+    assert_eq!(Compress::Deflate.to_string(), "deflate");
+    assert_eq!(Compress::Br.to_string(), "br");
+    assert_eq!(Compress::Unknown.to_string(), "");
+}
+#[test]
+fn display_round_trips_through_from_str() {
+    let variants: Vec<Compress> = vec![
+        Compress::Gzip,
+        Compress::Deflate,
+        Compress::Br,
+        Compress::Unknown,
+    ];
+    for variant in variants {
+        let text: String = variant.to_string();
+        let parsed: Compress = text.parse::<Compress>().unwrap_or_default();
+        if variant == Compress::Unknown {
+            assert_eq!(parsed, Compress::Unknown);
+        } else {
+            assert_eq!(parsed, variant);
+        }
+    }
+}
+#[test]
+fn is_unknown_is_true_only_for_unknown() {
+    assert!(Compress::Unknown.is_unknown());
+    assert!(!Compress::Gzip.is_unknown());
+    assert!(!Compress::Deflate.is_unknown());
+    assert!(!Compress::Br.is_unknown());
+}
+#[test]
+fn default_is_unknown() {
+    assert_eq!(Compress::default(), Compress::Unknown);
+    assert!(Compress::default().is_unknown());
+}
+#[test]
+fn from_reads_content_encoding_header() {
+    let mut headers: HashMap<String, String, BuildHasherDefault<XxHash3_64>> =
         HashMap::with_hasher(BuildHasherDefault::default());
-    let data: Vec<u8> = vec![];
-    let body: Cow<'_, [u8]> = Compress::from(&headers).decode(&data, 1_024_000);
-    assert_eq!(*body, data);
-    let _: Cow<'_, [u8]> = Compress::Gzip.encode(&[], 1_024_000);
-    let _: Cow<'_, [u8]> = Compress::Deflate.encode(&[], 1_024_000);
-    let _: Cow<'_, [u8]> = Compress::Br.encode(&[], 1_024_000);
-    let _: Cow<'_, [u8]> = Compress::Gzip.decode(&[], 1_024_000);
-    let _: Cow<'_, [u8]> = Compress::Deflate.decode(&[], 1_024_000);
-    let _: Cow<'_, [u8]> = Compress::Br.decode(&[], 1_024_000);
+    assert_eq!(Compress::from(&headers), Compress::Unknown);
+    headers.insert(String::from("content-encoding"), String::from("gzip"));
+    assert_eq!(Compress::from(&headers), Compress::Gzip);
+    headers.insert(String::from("content-encoding"), String::from("deflate"));
+    assert_eq!(Compress::from(&headers), Compress::Deflate);
+    headers.insert(String::from("content-encoding"), String::from("br"));
+    assert_eq!(Compress::from(&headers), Compress::Br);
+    headers.insert(String::from("content-encoding"), String::from("lzma"));
+    assert_eq!(Compress::from(&headers), Compress::Unknown);
+}
+#[test]
+fn from_ignores_unrelated_headers() {
+    let mut headers: HashMap<String, String, BuildHasherDefault<XxHash3_64>> =
+        HashMap::with_hasher(BuildHasherDefault::default());
+    headers.insert(String::from("accept"), String::from("gzip"));
+    assert_eq!(Compress::from(&headers), Compress::Unknown);
+}
+#[test]
+fn gzip_round_trip_restores_payload() {
+    let payload: Vec<u8> = b"hyperlane gzip round trip payload".to_vec();
+    let encoded: Cow<'_, [u8]> = Compress::Gzip.encode(&payload, 1_024_000);
+    let decoded: Cow<'_, [u8]> = Compress::Gzip.decode(&encoded, 1_024_000);
+    assert_eq!(*decoded, payload);
+}
+#[test]
+fn deflate_round_trip_restores_payload() {
+    let payload: Vec<u8> = b"hyperlane deflate round trip payload".to_vec();
+    let encoded: Cow<'_, [u8]> = Compress::Deflate.encode(&payload, 1_024_000);
+    let decoded: Cow<'_, [u8]> = Compress::Deflate.decode(&encoded, 1_024_000);
+    assert_eq!(*decoded, payload);
+}
+#[test]
+fn brotli_round_trip_restores_payload() {
+    let payload: Vec<u8> = b"hyperlane brotli round trip payload".to_vec();
+    let encoded: Cow<'_, [u8]> = Compress::Br.encode(&payload, 1_024_000);
+    let decoded: Cow<'_, [u8]> = Compress::Br.decode(&encoded, 1_024_000);
+    assert_eq!(*decoded, payload);
+}
+#[test]
+fn every_known_variant_round_trips() {
+    let payload: Vec<u8> = b"hyperlane all variants round trip".to_vec();
+    let variants: Vec<Compress> = vec![Compress::Gzip, Compress::Deflate, Compress::Br];
+    for variant in variants {
+        let encoded: Cow<'_, [u8]> = variant.encode(&payload, 1_024_000);
+        let decoded: Cow<'_, [u8]> = variant.decode(&encoded, 1_024_000);
+        assert_eq!(*decoded, payload);
+    }
+}
+#[test]
+fn unknown_passes_data_through_unchanged() {
+    let payload: Vec<u8> = b"hyperlane passthrough payload".to_vec();
+    let encoded: Cow<'_, [u8]> = Compress::Unknown.encode(&payload, 1_024_000);
+    let decoded: Cow<'_, [u8]> = Compress::Unknown.decode(&payload, 1_024_000);
+    assert_eq!(*encoded, payload);
+    assert_eq!(*decoded, payload);
+}
+#[test]
+fn empty_input_round_trips_for_every_variant() {
+    let payload: Vec<u8> = Vec::new();
+    let variants: Vec<Compress> = vec![
+        Compress::Gzip,
+        Compress::Deflate,
+        Compress::Br,
+        Compress::Unknown,
+    ];
+    for variant in variants {
+        let encoded: Cow<'_, [u8]> = variant.encode(&payload, 1_024_000);
+        let decoded: Cow<'_, [u8]> = variant.decode(&encoded, 1_024_000);
+        assert_eq!(*decoded, payload);
+    }
+}
+#[test]
+fn corrupt_input_decodes_to_empty_for_known_variants() {
+    let garbage: Vec<u8> = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05];
+    let gzip: Cow<'_, [u8]> = Compress::Gzip.decode(&garbage, 1_024_000);
+    let deflate: Cow<'_, [u8]> = Compress::Deflate.decode(&garbage, 1_024_000);
+    let brotli: Cow<'_, [u8]> = Compress::Br.decode(&garbage, 1_024_000);
+    assert!(gzip.is_empty());
+    assert!(deflate.is_empty());
+    assert!(brotli.is_empty());
+}
+#[test]
+fn large_payload_round_trips_across_all_variants() {
+    let mut payload: Vec<u8> = Vec::with_capacity(65_536);
+    for index in 0..65_536u32 {
+        payload.push((index % 251) as u8);
+    }
+    let variants: Vec<Compress> = vec![Compress::Gzip, Compress::Deflate, Compress::Br];
+    for variant in variants {
+        let encoded: Cow<'_, [u8]> = variant.encode(&payload, 1_024_000);
+        let decoded: Cow<'_, [u8]> = variant.decode(&encoded, 1_024_000);
+        assert_eq!(decoded.len(), payload.len());
+        assert_eq!(*decoded, payload);
+    }
+}
+#[test]
+fn variants_are_ordered_and_hashable() {
+    assert!(Compress::Gzip < Compress::Deflate);
+    assert!(Compress::Deflate < Compress::Br);
+    assert!(Compress::Br < Compress::Unknown);
+    let mut set: HashSet<Compress> = HashSet::new();
+    set.insert(Compress::Gzip);
+    set.insert(Compress::Gzip);
+    set.insert(Compress::Br);
+    assert_eq!(set.len(), 2);
 }
 ```
 # Path: hyperlane/compress/tests/compress/mod.rs
@@ -14341,11 +16800,11 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fmt,
-    io::{BufReader, BufWriter, Read, prelude::*},
+    io::{self, BufReader, BufWriter, Read, prelude::*},
     str::FromStr,
 };
 use {
-    ::brotli::Decompressor,
+    ::brotli::{CompressorWriter, Decompressor},
     core::hash::BuildHasherDefault,
     flate2::{
         Compression,
@@ -14357,16 +16816,17 @@ use {
 # Path: hyperlane/compress/src/brotli/fn.rs
 ```rust
 use super::*;
-pub fn encode(data: &'_ [u8]) -> Cow<'_, [u8]> {
-    let mut encoder: GzEncoder<Vec<u8>> = GzEncoder::new(Vec::new(), Compression::default());
+pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
+    let mut encoder: CompressorWriter<Vec<u8>> = CompressorWriter::new(
+        Vec::new(),
+        buffer_size,
+        BROTLI_DEFAULT_QUALITY,
+        BROTLI_DEFAULT_WINDOW_BITS,
+    );
     if encoder.write_all(data).is_err() {
         return Cow::Owned(Vec::new());
     }
-    Cow::Owned(
-        encoder
-            .finish()
-            .unwrap_or_else(|_: std::io::Error| Vec::new()),
-    )
+    Cow::Owned(encoder.into_inner())
 }
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
     let mut decompressor: Decompressor<&[u8]> = Decompressor::new(data, buffer_size);
@@ -14394,11 +16854,7 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
         return Cow::Owned(Vec::new());
     }
     match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(
-            encoder
-                .finish()
-                .unwrap_or_else(|_: std::io::Error| Vec::new()),
-        ),
+        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new())),
         Err(_) => Cow::Owned(Vec::new()),
     }
 }
@@ -14430,11 +16886,7 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
         return Cow::Owned(Vec::new());
     }
     match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(
-            encoder
-                .finish()
-                .unwrap_or_else(|_: std::io::Error| Vec::new()),
-        ),
+        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new())),
         Err(_) => Cow::Owned(Vec::new()),
     }
 }
@@ -14506,7 +16958,7 @@ impl Compress {
         match self {
             Self::Gzip => gzip::encode(data, buffer_size),
             Self::Deflate => deflate::encode(data, buffer_size),
-            Self::Br => brotli::encode(data),
+            Self::Br => brotli::encode(data, buffer_size),
             Self::Unknown => Cow::Owned(data.to_vec()),
         }
     }
@@ -14519,6 +16971,8 @@ pub const CONTENT_ENCODING_GZIP: &str = "gzip";
 pub const CONTENT_ENCODING_DEFLATE: &str = "deflate";
 pub const CONTENT_ENCODING_BROTLI: &str = "br";
 pub const EMPTY_STR: &str = "";
+pub const BROTLI_DEFAULT_QUALITY: u32 = 5;
+pub const BROTLI_DEFAULT_WINDOW_BITS: u32 = 22;
 ```
 # Path: hyperlane/compress/src/compress/enum.rs
 ```rust
@@ -14991,11 +17445,14 @@ pub(crate) fn prologue_hooks_macro(
         position,
         item,
         |context: &syn::Ident, stream: &syn::Ident| {
-            let hook_calls = functions.iter().map(|function_expr: &syn::Expr| {
-                quote! {
-                    let _ = #function_expr(#stream, #context).await;
-                }
-            });
+            let hook_calls: Vec<proc_macro2::TokenStream> = functions
+                .iter()
+                .map(|function_expr: &syn::Expr| {
+                    quote! {
+                        let _ = #function_expr(#stream, #context).await;
+                    }
+                })
+                .collect();
             quote! {
                 #(#hook_calls)*
             }
@@ -15013,11 +17470,14 @@ pub(crate) fn epilogue_hooks_macro(
         position,
         item,
         |context: &syn::Ident, stream: &syn::Ident| {
-            let hook_calls = functions.iter().map(|function_expr: &syn::Expr| {
-                quote! {
-                    let _ = #function_expr(#stream, #context).await;
-                }
-            });
+            let hook_calls: Vec<proc_macro2::TokenStream> = functions
+                .iter()
+                .map(|function_expr: &syn::Expr| {
+                    quote! {
+                        let _ = #function_expr(#stream, #context).await;
+                    }
+                })
+                .collect();
             quote! {
                 #(#hook_calls)*
             }
@@ -15118,7 +17578,7 @@ impl Parse for FromStreamData {
             if !input.is_empty() {
                 return Err(syn::Error::new(
                     input.span(),
-                    "expected at most one parameter",
+                    EXPECTED_AT_MOST_ONE_PARAMETER,
                 ));
             }
             Some(expr)
@@ -15126,6 +17586,10 @@ impl Parse for FromStreamData {
         Ok(FromStreamData { variable_name })
     }
 }
+```
+# Path: hyperlane/macros/src/from_stream/const.rs
+```rust
+pub(crate) const EXPECTED_AT_MOST_ONE_PARAMETER: &str = "expected at most one parameter";
 ```
 # Path: hyperlane/macros/src/from_stream/struct.rs
 ```rust
@@ -15136,9 +17600,10 @@ pub(crate) struct FromStreamData {
 ```
 # Path: hyperlane/macros/src/from_stream/mod.rs
 ```rust
+mod r#const;
 mod r#impl;
 mod r#struct;
-pub(crate) use r#struct::*;
+pub(crate) use {r#const::*, r#struct::*};
 use super::*;
 ```
 # Path: hyperlane/macros/src/filter/fn.rs
@@ -15196,13 +17661,13 @@ pub(crate) fn referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
                 if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header != #referer_value) {
                     return ::hyperlane::Status::Continue;
                 }
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15215,13 +17680,13 @@ pub(crate) fn reject_referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
             quote! {
                 if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header == #referer_value) {
                     return ::hyperlane::Status::Continue;
                 }
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15551,11 +18016,11 @@ pub(crate) fn request_body_macro(
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_body.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15569,11 +18034,11 @@ pub(crate) fn request_body_json_result_macro(
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
             quote! {
                 let #variable: Result<#type_name, ::hyperlane::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15587,11 +18052,11 @@ pub(crate) fn request_body_json_macro(
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
             quote! {
                 let #variable: #type_name = #context.get_request().get_body_json::<#type_name>();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15604,13 +18069,17 @@ pub(crate) fn try_get_attribute_macro(
 ) -> TokenStream {
     let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_attr.params.iter().map(
-            |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
-                quote! {
-                    let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name);
-                }
-            },
-        );
+        let statements: Vec<proc_macro2::TokenStream> = multi_attr
+            .params
+            .iter()
+            .map(
+                |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
+                    quote! {
+                        let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name);
+                    }
+                },
+            )
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -15623,13 +18092,17 @@ pub(crate) fn attribute_macro(
 ) -> TokenStream {
     let multi_attr: MultiAttributeData = parse_macro_input!(attr as MultiAttributeData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_attr.params.iter().map(
-            |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
-                quote! {
-                    let #variable: #type_name = #context.get_attribute(&#key_name);
-                }
-            },
-        );
+        let statements: Vec<proc_macro2::TokenStream> = multi_attr
+            .params
+            .iter()
+            .map(
+                |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
+                    quote! {
+                        let #variable: #type_name = #context.get_attribute(&#key_name);
+                    }
+                },
+            )
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -15643,11 +18116,11 @@ pub(crate) fn attributes_macro(
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_attrs.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_attrs.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15660,11 +18133,11 @@ pub(crate) fn try_get_task_panic_data_macro(
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_task_panic_data.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_task_panic_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: Option<::hyperlane::PanicData> = #context.try_get_task_panic_data();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15677,14 +18150,15 @@ pub(crate) fn task_panic_data_macro(
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_task_panic_data
+        let statements: Vec<proc_macro2::TokenStream> = multi_task_panic_data
             .variables
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
                     let #variable: ::hyperlane::PanicData = #context.get_task_panic_data();
                 }
-            });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -15697,11 +18171,11 @@ pub(crate) fn try_get_request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: Option<::hyperlane::RequestError> = #context.try_get_request_error_data();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15714,14 +18188,15 @@ pub(crate) fn request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_error_data
+        let statements: Vec<proc_macro2::TokenStream> = multi_error_data
             .variables
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
                     let #variable: ::hyperlane::RequestError = #context.get_request_error_data();
                 }
-            });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -15734,11 +18209,15 @@ pub(crate) fn try_get_route_param_macro(
 ) -> TokenStream {
     let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_param.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
-            quote! {
-                let #variable: Option<std::string::String> = #context.try_get_route_param(#key_name);
-            }
-        });
+        let statements: Vec<proc_macro2::TokenStream> = multi_param
+            .params
+            .iter()
+            .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+                quote! {
+                    let #variable: Option<String> = #context.try_get_route_param(#key_name);
+                }
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -15751,15 +18230,15 @@ pub(crate) fn route_param_macro(
 ) -> TokenStream {
     let multi_param: MultiRouteParamData = parse_macro_input!(attr as MultiRouteParamData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements =
-            multi_param
-                .params
-                .iter()
-                .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
-                    quote! {
-                        let #variable: std::string::String = #context.get_route_param(#key_name);
-                    }
-                });
+        let statements: Vec<proc_macro2::TokenStream> = multi_param
+            .params
+            .iter()
+            .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+                quote! {
+                    let #variable: String = #context.get_route_param(#key_name);
+                }
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -15773,14 +18252,15 @@ pub(crate) fn route_params_macro(
     let multi_route_params: MultiRouteParamsData = parse_macro_input!(attr as MultiRouteParamsData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_route_params
+        let statements: Vec<proc_macro2::TokenStream> = multi_route_params
             .variables
             .iter()
             .map(|variable: &syn::Ident| {
                 quote! {
                     let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
                 }
-            });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -15793,11 +18273,11 @@ pub(crate) fn try_get_request_query_macro(
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15810,11 +18290,11 @@ pub(crate) fn request_query_macro(
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane::RequestQuerysValue = #context.get_request().get_query(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15828,11 +18308,11 @@ pub(crate) fn request_querys_macro(
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_querys.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_querys.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15845,11 +18325,11 @@ pub(crate) fn try_get_request_header_macro(
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15862,11 +18342,11 @@ pub(crate) fn request_header_macro(
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15880,11 +18360,11 @@ pub(crate) fn request_headers_macro(
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_headers.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_headers.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15897,11 +18377,11 @@ pub(crate) fn try_get_request_cookie_macro(
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::CookieValue> = #context.get_request().try_get_cookie(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15914,11 +18394,11 @@ pub(crate) fn request_cookie_macro(
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
             quote! {
                 let #variable: ::hyperlane::CookieValue = #context.get_request().get_cookie(#key_name);
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15931,11 +18411,15 @@ pub(crate) fn request_cookies_macro(
 ) -> TokenStream {
     let multi_cookies: MultiCookiesData = parse_macro_input!(attr as MultiCookiesData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_cookies.variables.iter().map(|variable: &syn::Ident| {
-            quote! {
-                let #variable: ::hyperlane::Cookies = #context.get_request().get_cookies();
-            }
-        });
+        let statements: Vec<proc_macro2::TokenStream> = multi_cookies
+            .variables
+            .iter()
+            .map(|variable: &syn::Ident| {
+                quote! {
+                    let #variable: ::hyperlane::Cookies = #context.get_request().get_cookies();
+                }
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -15950,11 +18434,11 @@ pub(crate) fn request_version_macro(
         parse_macro_input!(attr as MultiRequestVersionData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_version.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_version.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -15968,11 +18452,11 @@ pub(crate) fn request_path_macro(
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements = multi_path.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_path.variables.iter().map(|variable: &syn::Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
             }
-        });
+        }).collect();
         quote! {
             #(#statements)*
         }
@@ -16101,6 +18585,11 @@ mod r#struct;
 pub(crate) use {r#fn::*, r#struct::*};
 use super::*;
 ```
+# Path: hyperlane/macros/src/stream/const.rs
+```rust
+pub(crate) const TRY_GET_HTTP_REQUEST_METHOD_NAME: &str = "try_get_http_request";
+pub(crate) const TRY_GET_WEBSOCKET_REQUEST_METHOD_NAME: &str = "try_get_websocket_request";
+```
 # Path: hyperlane/macros/src/stream/fn.rs
 ```rust
 use super::*;
@@ -16110,7 +18599,7 @@ pub(crate) fn generate_http_stream(
     data: &FromStreamData,
     stmts: &[Stmt],
 ) -> proc_macro2::TokenStream {
-    let method_ident: Ident = Ident::new("try_get_http_request", Span::call_site());
+    let method_ident: Ident = Ident::new(TRY_GET_HTTP_REQUEST_METHOD_NAME, Span::call_site());
     match data.variable_name.clone() {
         Some(variable_name) => {
             quote! {
@@ -16138,7 +18627,7 @@ pub(crate) fn generate_websocket_stream(
     data: &FromStreamData,
     stmts: &[Stmt],
 ) -> proc_macro2::TokenStream {
-    let method_ident: Ident = Ident::new("try_get_websocket_request", Span::call_site());
+    let method_ident: Ident = Ident::new(TRY_GET_WEBSOCKET_REQUEST_METHOD_NAME, Span::call_site());
     match data.variable_name.clone() {
         Some(variable_name) => {
             quote! {
@@ -16215,8 +18704,9 @@ pub(crate) fn try_get_websocket_request_macro(attr: TokenStream, item: TokenStre
 ```
 # Path: hyperlane/macros/src/stream/mod.rs
 ```rust
+mod r#const;
 mod r#fn;
-pub(crate) use r#fn::*;
+pub(crate) use {r#const::*, r#fn::*};
 use super::*;
 ```
 # Path: hyperlane/macros/src/send/impl.rs
@@ -16424,6 +18914,11 @@ mod r#fn;
 pub(crate) use r#fn::*;
 use super::*;
 ```
+# Path: hyperlane/macros/src/inject/const.rs
+```rust
+pub(crate) const MACRO_PATH_SHOULD_HAVE_IDENTIFIER: &str = "Macro path should have an identifier";
+pub(crate) const FAILED_TO_PARSE_MACRO_ATTRIBUTES: &str = "Failed to parse macro attributes";
+```
 # Path: hyperlane/macros/src/inject/fn.rs
 ```rust
 use super::*;
@@ -16431,7 +18926,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
     let (macro_name, macro_attr) = match macro_meta {
         Meta::Path(path) => (
             path.get_ident()
-                .expect("Macro path should have an identifier")
+                .expect(MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
                 .to_string(),
             TokenStream::new(),
         ),
@@ -16439,7 +18934,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
             meta_list
                 .path
                 .get_ident()
-                .expect("Macro path should have an identifier")
+                .expect(MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
                 .to_string(),
             meta_list.tokens.clone().into(),
         ),
@@ -16464,7 +18959,7 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
 pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
         .parse(attr)
-        .expect("Failed to parse macro attributes");
+        .expect(FAILED_TO_PARSE_MACRO_ATTRIBUTES);
     let mut current_stream: TokenStream = item;
     for meta in metas.iter().rev() {
         current_stream = apply_macro(meta, current_stream, Position::Prologue);
@@ -16474,7 +18969,7 @@ pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
         .parse(attr)
-        .expect("Failed to parse macro attributes");
+        .expect(FAILED_TO_PARSE_MACRO_ATTRIBUTES);
     let mut current_stream: TokenStream = item;
     for meta in metas.iter() {
         current_stream = apply_macro(meta, current_stream, Position::Epilogue);
@@ -16484,8 +18979,9 @@ pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
 ```
 # Path: hyperlane/macros/src/inject/mod.rs
 ```rust
+mod r#const;
 mod r#fn;
-pub(crate) use r#fn::*;
+pub(crate) use {r#const::*, r#fn::*};
 use super::*;
 ```
 # Path: hyperlane/macros/src/response/impl.rs
@@ -16501,10 +18997,7 @@ impl Parse for ResponseHeaderData {
             input.parse::<Token![,]>()?;
             HeaderOperation::Add
         } else {
-            return Err(syn::Error::new(
-                input.span(),
-                "Expected either ',' for add operation or '=>' for set operation",
-            ));
+            return Err(syn::Error::new(input.span(), EXPECTED_ADD_OR_SET_OPERATION));
         };
         let value: Expr = input.parse()?;
         Ok(ResponseHeaderData {
@@ -16520,6 +19013,11 @@ impl Parse for ResponseBodyData {
         Ok(ResponseBodyData { body })
     }
 }
+```
+# Path: hyperlane/macros/src/response/const.rs
+```rust
+pub(crate) const EXPECTED_ADD_OR_SET_OPERATION: &str =
+    "Expected either ',' for add operation or '=>' for set operation";
 ```
 # Path: hyperlane/macros/src/response/fn.rs
 ```rust
@@ -16636,11 +19134,12 @@ pub(crate) struct SendData {
 ```
 # Path: hyperlane/macros/src/response/mod.rs
 ```rust
+mod r#const;
 mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#struct;
-pub(crate) use {r#enum::*, r#fn::*, r#struct::*};
+pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#struct::*};
 use super::*;
 ```
 # Path: hyperlane/macros/src/method/fn.rs
@@ -16669,14 +19168,18 @@ pub(crate) fn methods_macro(
     let sig: &Signature = &input_fn.sig;
     match parse_context_from_signature(sig) {
         Ok(context) => {
-            let method_checks = methods.methods.iter().map(|method: &syn::Ident| {
-                let method_str: String = method.to_string();
-                let check_fn: proc_macro2::Ident =
-                    Ident::new(&format!("is_{method_str}"), method.span());
-                quote! {
-                    #context.get_request().get_method().#check_fn()
-                }
-            });
+            let method_checks: Vec<proc_macro2::TokenStream> = methods
+                .methods
+                .iter()
+                .map(|method: &syn::Ident| {
+                    let method_str: String = method.to_string();
+                    let check_fn: proc_macro2::Ident =
+                        Ident::new(&format!("is_{method_str}"), method.span());
+                    quote! {
+                        #context.get_request().get_method().#check_fn()
+                    }
+                })
+                .collect();
             inject(
                 position,
                 TokenStream::from(quote! { #input_fn }),
@@ -16739,14 +19242,103 @@ impl Parse for OrderAttr {
 # Path: hyperlane/macros/src/common/const.rs
 ```rust
 pub(crate) const SERVER_TYPE_KEY: &str = "Server";
+pub(crate) const HYPERLANE_CRATE_NAME: &str = "hyperlane";
+pub(crate) const CONTEXT_TYPE_NAME: &str = "Context";
+pub(crate) const STREAM_TYPE_NAME: &str = "Stream";
+pub(crate) const EXPECTED_IDENTIFIER_FOR_CONTEXT_PARAMETER: &str =
+    "expected identifier for context parameter";
+pub(crate) const EXPECTED_CONTEXT_PARAMETER: &str =
+    "expected at least one parameter of type &::hyperlane::Context";
+pub(crate) const EXPECTED_IDENTIFIER_FOR_STREAM_PARAMETER: &str =
+    "expected identifier for stream parameter";
+pub(crate) const EXPECTED_STREAM_PARAMETER: &str =
+    "expected at least one parameter of type &::hyperlane::Stream";
+pub(crate) const CANNOT_PARSE_TO_ISIZE: &str = "Cannot parse to isize";
+pub(crate) const INJECTABLE_MACRO_NAME_CLOSED: &str = "closed";
+pub(crate) const INJECTABLE_MACRO_NAME_FILTER: &str = "filter";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_FLUSH: &str = "try_flush";
+pub(crate) const INJECTABLE_MACRO_NAME_FLUSH: &str = "flush";
+pub(crate) const INJECTABLE_MACRO_NAME_TASK_PANIC: &str = "task_panic";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_ERROR: &str = "request_error";
+pub(crate) const INJECTABLE_MACRO_NAME_PROLOGUE_HOOKS: &str = "prologue_hooks";
+pub(crate) const INJECTABLE_MACRO_NAME_EPILOGUE_HOOKS: &str = "epilogue_hooks";
+pub(crate) const INJECTABLE_MACRO_NAME_HOST: &str = "host";
+pub(crate) const INJECTABLE_MACRO_NAME_REJECT_HOST: &str = "reject_host";
+pub(crate) const INJECTABLE_MACRO_NAME_HYPERLANE: &str = "hyperlane";
+pub(crate) const INJECTABLE_MACRO_NAME_METHODS: &str = "methods";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_GET_METHOD: &str = "is_get_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_POST_METHOD: &str = "is_post_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_PUT_METHOD: &str = "is_put_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_DELETE_METHOD: &str = "is_delete_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_PATCH_METHOD: &str = "is_patch_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_HEAD_METHOD: &str = "is_head_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_OPTIONS_METHOD: &str = "is_options_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_CONNECT_METHOD: &str = "is_connect_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_TRACE_METHOD: &str = "is_trace_method";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_UNKNOWN_METHOD: &str = "is_unknown_method";
+pub(crate) const INJECTABLE_MACRO_NAME_REFERER: &str = "referer";
+pub(crate) const INJECTABLE_MACRO_NAME_REJECT_REFERER: &str = "reject_referer";
+pub(crate) const INJECTABLE_MACRO_NAME_REJECT: &str = "reject";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_BODY: &str = "request_body";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_BODY_JSON_RESULT: &str = "request_body_json_result";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_BODY_JSON: &str = "request_body_json";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_ATTRIBUTE: &str = "try_get_attribute";
+pub(crate) const INJECTABLE_MACRO_NAME_ATTRIBUTE: &str = "attribute";
+pub(crate) const INJECTABLE_MACRO_NAME_ATTRIBUTES: &str = "attributes";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_TASK_PANIC_DATA: &str = "try_get_task_panic_data";
+pub(crate) const INJECTABLE_MACRO_NAME_TASK_PANIC_DATA: &str = "task_panic_data";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_REQUEST_ERROR_DATA: &str =
+    "try_get_request_error_data";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_ERROR_DATA: &str = "request_error_data";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_ROUTE_PARAM: &str = "try_get_route_param";
+pub(crate) const INJECTABLE_MACRO_NAME_ROUTE_PARAM: &str = "route_param";
+pub(crate) const INJECTABLE_MACRO_NAME_ROUTE_PARAMS: &str = "route_params";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_REQUEST_QUERY: &str = "try_get_request_query";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_QUERY: &str = "request_query";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_QUERYS: &str = "request_querys";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_REQUEST_HEADER: &str = "try_get_request_header";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_HEADER: &str = "request_header";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_HEADERS: &str = "request_headers";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_REQUEST_COOKIE: &str = "try_get_request_cookie";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_COOKIE: &str = "request_cookie";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_COOKIES: &str = "request_cookies";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_VERSION: &str = "request_version";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_PATH: &str = "request_path";
+pub(crate) const INJECTABLE_MACRO_NAME_REQUEST_MIDDLEWARE: &str = "request_middleware";
+pub(crate) const INJECTABLE_MACRO_NAME_RESPONSE_STATUS_CODE: &str = "response_status_code";
+pub(crate) const INJECTABLE_MACRO_NAME_RESPONSE_REASON_PHRASE: &str = "response_reason_phrase";
+pub(crate) const INJECTABLE_MACRO_NAME_RESPONSE_HEADER: &str = "response_header";
+pub(crate) const INJECTABLE_MACRO_NAME_RESPONSE_BODY: &str = "response_body";
+pub(crate) const INJECTABLE_MACRO_NAME_CLEAR_RESPONSE_HEADERS: &str = "clear_response_headers";
+pub(crate) const INJECTABLE_MACRO_NAME_RESPONSE_VERSION: &str = "response_version";
+pub(crate) const INJECTABLE_MACRO_NAME_RESPONSE_MIDDLEWARE: &str = "response_middleware";
+pub(crate) const INJECTABLE_MACRO_NAME_ROUTE: &str = "route";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_SEND: &str = "try_send";
+pub(crate) const INJECTABLE_MACRO_NAME_SEND: &str = "send";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_HTTP_REQUEST: &str = "try_get_http_request";
+pub(crate) const INJECTABLE_MACRO_NAME_TRY_GET_WEBSOCKET_REQUEST: &str =
+    "try_get_websocket_request";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_WS_UPGRADE_TYPE: &str = "is_ws_upgrade_type";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_H2C_UPGRADE_TYPE: &str = "is_h2c_upgrade_type";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_TLS_UPGRADE_TYPE: &str = "is_tls_upgrade_type";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_UNKNOWN_UPGRADE_TYPE: &str = "is_unknown_upgrade_type";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_HTTP0_9_VERSION: &str = "is_http0_9_version";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_HTTP1_0_VERSION: &str = "is_http1_0_version";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_HTTP1_1_VERSION: &str = "is_http1_1_version";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_HTTP2_VERSION: &str = "is_http2_version";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_HTTP3_VERSION: &str = "is_http3_version";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_HTTP1_1_OR_HIGHER_VERSION: &str =
+    "is_http1_1_or_higher_version";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_HTTP_VERSION: &str = "is_http_version";
+pub(crate) const INJECTABLE_MACRO_NAME_IS_UNKNOWN_VERSION: &str = "is_unknown_version";
 ```
 # Path: hyperlane/macros/src/common/fn.rs
 ```rust
 use super::*;
-fn inject_at_start(
-    input: TokenStream,
-    before_fn: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
-) -> TokenStream {
+fn inject_at_start<F>(input: TokenStream, before_fn: F) -> TokenStream
+where
+    F: FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+{
     let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
     let sig: &Signature = &input_fn.sig;
@@ -16771,10 +19363,10 @@ fn inject_at_start(
         Err(err) => err.to_compile_error().into(),
     }
 }
-fn inject_at_end(
-    input: TokenStream,
-    after_fn: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
-) -> TokenStream {
+fn inject_at_end<F>(input: TokenStream, after_fn: F) -> TokenStream
+where
+    F: FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+{
     let input_fn: ItemFn = parse_macro_input!(input as ItemFn);
     let vis: &Visibility = &input_fn.vis;
     let sig: &Signature = &input_fn.sig;
@@ -16824,11 +19416,10 @@ fn inject_at_end(
         Err(err) => err.to_compile_error().into(),
     }
 }
-pub(crate) fn inject(
-    position: Position,
-    input: TokenStream,
-    hook: impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
-) -> TokenStream {
+pub(crate) fn inject<F>(position: Position, input: TokenStream, hook: F) -> TokenStream
+where
+    F: FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream,
+{
     match position {
         Position::Prologue => inject_at_start(input, hook),
         Position::Epilogue => inject_at_end(input, hook),
@@ -16843,12 +19434,14 @@ fn is_context_type(ty: &Type) -> bool {
             let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
-                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Context" {
+                if last_two[0].ident == HYPERLANE_CRATE_NAME
+                    && last_two[1].ident == CONTEXT_TYPE_NAME
+                {
                     return true;
                 }
             }
         }
-        if path.segments.len() == 1 && path.segments[0].ident == "Context" {
+        if path.segments.len() == 1 && path.segments[0].ident == CONTEXT_TYPE_NAME {
             return true;
         }
     }
@@ -16863,12 +19456,14 @@ fn is_stream_type(ty: &Type) -> bool {
             let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
-                if last_two[0].ident == "hyperlane" && last_two[1].ident == "Stream" {
+                if last_two[0].ident == HYPERLANE_CRATE_NAME
+                    && last_two[1].ident == STREAM_TYPE_NAME
+                {
                     return true;
                 }
             }
         }
-        if path.segments.len() == 1 && path.segments[0].ident == "Stream" {
+        if path.segments.len() == 1 && path.segments[0].ident == STREAM_TYPE_NAME {
             return true;
         }
     }
@@ -16885,7 +19480,7 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
                 _ => {
                     return Err(syn::Error::new_spanned(
                         &pat_type.pat,
-                        "expected identifier for context parameter",
+                        EXPECTED_IDENTIFIER_FOR_CONTEXT_PARAMETER,
                     ));
                 }
             };
@@ -16894,7 +19489,7 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
     }
     Err(syn::Error::new_spanned(
         &sig.inputs,
-        "expected at least one parameter of type &::hyperlane::Context",
+        EXPECTED_CONTEXT_PARAMETER,
     ))
 }
 pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident> {
@@ -16908,7 +19503,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
                 _ => {
                     return Err(syn::Error::new_spanned(
                         &pat_type.pat,
-                        "expected identifier for stream parameter",
+                        EXPECTED_IDENTIFIER_FOR_STREAM_PARAMETER,
                     ));
                 }
             };
@@ -16917,7 +19512,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
     }
     Err(syn::Error::new_spanned(
         &sig.inputs,
-        "expected at least one parameter of type &::hyperlane::Stream",
+        EXPECTED_STREAM_PARAMETER,
     ))
 }
 pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream {
@@ -16934,7 +19529,7 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream
                 lit: Lit::Str(lit_str),
                 ..
             }) => {
-                let value: isize = lit_str.value().parse().expect("Cannot parse to isize");
+                let value: isize = lit_str.value().parse().expect(CANNOT_PARSE_TO_ISIZE);
                 quote! { Some(#value) }
             }
             _ => quote! { None },
@@ -16978,299 +19573,299 @@ pub(crate) type MacroHandlerWithAttrPosition =
 use super::*;
 pub(crate) static INJECTABLE_MACROS: &[InjectableMacro] = &[
     InjectableMacro {
-        name: "closed",
+        name: INJECTABLE_MACRO_NAME_CLOSED,
         handler: Handler::NoAttrPosition(closed_macro),
     },
     InjectableMacro {
-        name: "filter",
+        name: INJECTABLE_MACRO_NAME_FILTER,
         handler: Handler::WithAttrPosition(filter_macro),
     },
     InjectableMacro {
-        name: "try_flush",
+        name: INJECTABLE_MACRO_NAME_TRY_FLUSH,
         handler: Handler::NoAttrPosition(try_flush_macro),
     },
     InjectableMacro {
-        name: "flush",
+        name: INJECTABLE_MACRO_NAME_FLUSH,
         handler: Handler::NoAttrPosition(flush_macro),
     },
     InjectableMacro {
-        name: "task_panic",
+        name: INJECTABLE_MACRO_NAME_TASK_PANIC,
         handler: Handler::WithAttr(task_panic_macro),
     },
     InjectableMacro {
-        name: "request_error",
+        name: INJECTABLE_MACRO_NAME_REQUEST_ERROR,
         handler: Handler::WithAttr(request_error_macro),
     },
     InjectableMacro {
-        name: "prologue_hooks",
+        name: INJECTABLE_MACRO_NAME_PROLOGUE_HOOKS,
         handler: Handler::WithAttrPosition(prologue_hooks_macro),
     },
     InjectableMacro {
-        name: "epilogue_hooks",
+        name: INJECTABLE_MACRO_NAME_EPILOGUE_HOOKS,
         handler: Handler::WithAttrPosition(epilogue_hooks_macro),
     },
     InjectableMacro {
-        name: "host",
+        name: INJECTABLE_MACRO_NAME_HOST,
         handler: Handler::WithAttrPosition(host_macro),
     },
     InjectableMacro {
-        name: "reject_host",
+        name: INJECTABLE_MACRO_NAME_REJECT_HOST,
         handler: Handler::WithAttrPosition(reject_host_macro),
     },
     InjectableMacro {
-        name: "hyperlane",
+        name: INJECTABLE_MACRO_NAME_HYPERLANE,
         handler: Handler::WithAttr(hyperlane_macro),
     },
     InjectableMacro {
-        name: "methods",
+        name: INJECTABLE_MACRO_NAME_METHODS,
         handler: Handler::WithAttrPosition(methods_macro),
     },
     InjectableMacro {
-        name: "is_get_method",
+        name: INJECTABLE_MACRO_NAME_IS_GET_METHOD,
         handler: Handler::NoAttrPosition(is_get_method_handler),
     },
     InjectableMacro {
-        name: "is_post_method",
+        name: INJECTABLE_MACRO_NAME_IS_POST_METHOD,
         handler: Handler::NoAttrPosition(is_post_method_handler),
     },
     InjectableMacro {
-        name: "is_put_method",
+        name: INJECTABLE_MACRO_NAME_IS_PUT_METHOD,
         handler: Handler::NoAttrPosition(is_put_method_handler),
     },
     InjectableMacro {
-        name: "is_delete_method",
+        name: INJECTABLE_MACRO_NAME_IS_DELETE_METHOD,
         handler: Handler::NoAttrPosition(is_delete_method_handler),
     },
     InjectableMacro {
-        name: "is_patch_method",
+        name: INJECTABLE_MACRO_NAME_IS_PATCH_METHOD,
         handler: Handler::NoAttrPosition(is_patch_method_handler),
     },
     InjectableMacro {
-        name: "is_head_method",
+        name: INJECTABLE_MACRO_NAME_IS_HEAD_METHOD,
         handler: Handler::NoAttrPosition(is_head_method_handler),
     },
     InjectableMacro {
-        name: "is_options_method",
+        name: INJECTABLE_MACRO_NAME_IS_OPTIONS_METHOD,
         handler: Handler::NoAttrPosition(is_options_method_handler),
     },
     InjectableMacro {
-        name: "is_connect_method",
+        name: INJECTABLE_MACRO_NAME_IS_CONNECT_METHOD,
         handler: Handler::NoAttrPosition(is_connect_method_handler),
     },
     InjectableMacro {
-        name: "is_trace_method",
+        name: INJECTABLE_MACRO_NAME_IS_TRACE_METHOD,
         handler: Handler::NoAttrPosition(is_trace_method_handler),
     },
     InjectableMacro {
-        name: "is_unknown_method",
+        name: INJECTABLE_MACRO_NAME_IS_UNKNOWN_METHOD,
         handler: Handler::NoAttrPosition(is_unknown_method_handler),
     },
     InjectableMacro {
-        name: "referer",
+        name: INJECTABLE_MACRO_NAME_REFERER,
         handler: Handler::WithAttrPosition(referer_macro),
     },
     InjectableMacro {
-        name: "reject_referer",
+        name: INJECTABLE_MACRO_NAME_REJECT_REFERER,
         handler: Handler::WithAttrPosition(reject_referer_macro),
     },
     InjectableMacro {
-        name: "reject",
+        name: INJECTABLE_MACRO_NAME_REJECT,
         handler: Handler::WithAttrPosition(reject_macro),
     },
     InjectableMacro {
-        name: "request_body",
+        name: INJECTABLE_MACRO_NAME_REQUEST_BODY,
         handler: Handler::WithAttrPosition(request_body_macro),
     },
     InjectableMacro {
-        name: "request_body_json_result",
+        name: INJECTABLE_MACRO_NAME_REQUEST_BODY_JSON_RESULT,
         handler: Handler::WithAttrPosition(request_body_json_result_macro),
     },
     InjectableMacro {
-        name: "request_body_json",
+        name: INJECTABLE_MACRO_NAME_REQUEST_BODY_JSON,
         handler: Handler::WithAttrPosition(request_body_json_macro),
     },
     InjectableMacro {
-        name: "try_get_attribute",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_ATTRIBUTE,
         handler: Handler::WithAttrPosition(try_get_attribute_macro),
     },
     InjectableMacro {
-        name: "attribute",
+        name: INJECTABLE_MACRO_NAME_ATTRIBUTE,
         handler: Handler::WithAttrPosition(attribute_macro),
     },
     InjectableMacro {
-        name: "attributes",
+        name: INJECTABLE_MACRO_NAME_ATTRIBUTES,
         handler: Handler::WithAttrPosition(attributes_macro),
     },
     InjectableMacro {
-        name: "try_get_task_panic_data",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_TASK_PANIC_DATA,
         handler: Handler::WithAttrPosition(try_get_task_panic_data_macro),
     },
     InjectableMacro {
-        name: "task_panic_data",
+        name: INJECTABLE_MACRO_NAME_TASK_PANIC_DATA,
         handler: Handler::WithAttrPosition(task_panic_data_macro),
     },
     InjectableMacro {
-        name: "try_get_request_error_data",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_REQUEST_ERROR_DATA,
         handler: Handler::WithAttrPosition(try_get_request_error_data_macro),
     },
     InjectableMacro {
-        name: "request_error_data",
+        name: INJECTABLE_MACRO_NAME_REQUEST_ERROR_DATA,
         handler: Handler::WithAttrPosition(request_error_data_macro),
     },
     InjectableMacro {
-        name: "try_get_route_param",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_ROUTE_PARAM,
         handler: Handler::WithAttrPosition(try_get_route_param_macro),
     },
     InjectableMacro {
-        name: "route_param",
+        name: INJECTABLE_MACRO_NAME_ROUTE_PARAM,
         handler: Handler::WithAttrPosition(route_param_macro),
     },
     InjectableMacro {
-        name: "route_params",
+        name: INJECTABLE_MACRO_NAME_ROUTE_PARAMS,
         handler: Handler::WithAttrPosition(route_params_macro),
     },
     InjectableMacro {
-        name: "try_get_request_query",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_REQUEST_QUERY,
         handler: Handler::WithAttrPosition(try_get_request_query_macro),
     },
     InjectableMacro {
-        name: "request_query",
+        name: INJECTABLE_MACRO_NAME_REQUEST_QUERY,
         handler: Handler::WithAttrPosition(request_query_macro),
     },
     InjectableMacro {
-        name: "request_querys",
+        name: INJECTABLE_MACRO_NAME_REQUEST_QUERYS,
         handler: Handler::WithAttrPosition(request_querys_macro),
     },
     InjectableMacro {
-        name: "try_get_request_header",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_REQUEST_HEADER,
         handler: Handler::WithAttrPosition(try_get_request_header_macro),
     },
     InjectableMacro {
-        name: "request_header",
+        name: INJECTABLE_MACRO_NAME_REQUEST_HEADER,
         handler: Handler::WithAttrPosition(request_header_macro),
     },
     InjectableMacro {
-        name: "request_headers",
+        name: INJECTABLE_MACRO_NAME_REQUEST_HEADERS,
         handler: Handler::WithAttrPosition(request_headers_macro),
     },
     InjectableMacro {
-        name: "try_get_request_cookie",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_REQUEST_COOKIE,
         handler: Handler::WithAttrPosition(try_get_request_cookie_macro),
     },
     InjectableMacro {
-        name: "request_cookie",
+        name: INJECTABLE_MACRO_NAME_REQUEST_COOKIE,
         handler: Handler::WithAttrPosition(request_cookie_macro),
     },
     InjectableMacro {
-        name: "request_cookies",
+        name: INJECTABLE_MACRO_NAME_REQUEST_COOKIES,
         handler: Handler::WithAttrPosition(request_cookies_macro),
     },
     InjectableMacro {
-        name: "request_version",
+        name: INJECTABLE_MACRO_NAME_REQUEST_VERSION,
         handler: Handler::WithAttrPosition(request_version_macro),
     },
     InjectableMacro {
-        name: "request_path",
+        name: INJECTABLE_MACRO_NAME_REQUEST_PATH,
         handler: Handler::WithAttrPosition(request_path_macro),
     },
     InjectableMacro {
-        name: "request_middleware",
+        name: INJECTABLE_MACRO_NAME_REQUEST_MIDDLEWARE,
         handler: Handler::WithAttr(request_middleware_macro),
     },
     InjectableMacro {
-        name: "response_status_code",
+        name: INJECTABLE_MACRO_NAME_RESPONSE_STATUS_CODE,
         handler: Handler::WithAttrPosition(response_status_code_macro),
     },
     InjectableMacro {
-        name: "response_reason_phrase",
+        name: INJECTABLE_MACRO_NAME_RESPONSE_REASON_PHRASE,
         handler: Handler::WithAttrPosition(response_reason_phrase_macro),
     },
     InjectableMacro {
-        name: "response_header",
+        name: INJECTABLE_MACRO_NAME_RESPONSE_HEADER,
         handler: Handler::WithAttrPosition(response_header_macro),
     },
     InjectableMacro {
-        name: "response_body",
+        name: INJECTABLE_MACRO_NAME_RESPONSE_BODY,
         handler: Handler::WithAttrPosition(response_body_macro),
     },
     InjectableMacro {
-        name: "clear_response_headers",
+        name: INJECTABLE_MACRO_NAME_CLEAR_RESPONSE_HEADERS,
         handler: Handler::NoAttrPosition(clear_response_headers_macro),
     },
     InjectableMacro {
-        name: "response_version",
+        name: INJECTABLE_MACRO_NAME_RESPONSE_VERSION,
         handler: Handler::WithAttrPosition(response_version_macro),
     },
     InjectableMacro {
-        name: "response_middleware",
+        name: INJECTABLE_MACRO_NAME_RESPONSE_MIDDLEWARE,
         handler: Handler::WithAttr(response_middleware_macro),
     },
     InjectableMacro {
-        name: "route",
+        name: INJECTABLE_MACRO_NAME_ROUTE,
         handler: Handler::WithAttr(route_macro),
     },
     InjectableMacro {
-        name: "try_send",
+        name: INJECTABLE_MACRO_NAME_TRY_SEND,
         handler: Handler::WithAttrPosition(try_send_macro),
     },
     InjectableMacro {
-        name: "send",
+        name: INJECTABLE_MACRO_NAME_SEND,
         handler: Handler::WithAttrPosition(send_macro),
     },
     InjectableMacro {
-        name: "try_get_http_request",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_HTTP_REQUEST,
         handler: Handler::WithAttr(try_get_http_request_macro),
     },
     InjectableMacro {
-        name: "try_get_websocket_request",
+        name: INJECTABLE_MACRO_NAME_TRY_GET_WEBSOCKET_REQUEST,
         handler: Handler::WithAttr(try_get_websocket_request_macro),
     },
     InjectableMacro {
-        name: "is_ws_upgrade_type",
+        name: INJECTABLE_MACRO_NAME_IS_WS_UPGRADE_TYPE,
         handler: Handler::NoAttrPosition(is_ws_upgrade_type_macro),
     },
     InjectableMacro {
-        name: "is_h2c_upgrade_type",
+        name: INJECTABLE_MACRO_NAME_IS_H2C_UPGRADE_TYPE,
         handler: Handler::NoAttrPosition(is_h2c_upgrade_type_macro),
     },
     InjectableMacro {
-        name: "is_tls_upgrade_type",
+        name: INJECTABLE_MACRO_NAME_IS_TLS_UPGRADE_TYPE,
         handler: Handler::NoAttrPosition(is_tls_upgrade_type_macro),
     },
     InjectableMacro {
-        name: "is_unknown_upgrade_type",
+        name: INJECTABLE_MACRO_NAME_IS_UNKNOWN_UPGRADE_TYPE,
         handler: Handler::NoAttrPosition(is_unknown_upgrade_type_macro),
     },
     InjectableMacro {
-        name: "is_http0_9_version",
+        name: INJECTABLE_MACRO_NAME_IS_HTTP0_9_VERSION,
         handler: Handler::NoAttrPosition(is_http0_9_version_macro),
     },
     InjectableMacro {
-        name: "is_http1_0_version",
+        name: INJECTABLE_MACRO_NAME_IS_HTTP1_0_VERSION,
         handler: Handler::NoAttrPosition(is_http1_0_version_macro),
     },
     InjectableMacro {
-        name: "is_http1_1_version",
+        name: INJECTABLE_MACRO_NAME_IS_HTTP1_1_VERSION,
         handler: Handler::NoAttrPosition(is_http1_1_version_macro),
     },
     InjectableMacro {
-        name: "is_http2_version",
+        name: INJECTABLE_MACRO_NAME_IS_HTTP2_VERSION,
         handler: Handler::NoAttrPosition(is_http2_version_macro),
     },
     InjectableMacro {
-        name: "is_http3_version",
+        name: INJECTABLE_MACRO_NAME_IS_HTTP3_VERSION,
         handler: Handler::NoAttrPosition(is_http3_version_macro),
     },
     InjectableMacro {
-        name: "is_http1_1_or_higher_version",
+        name: INJECTABLE_MACRO_NAME_IS_HTTP1_1_OR_HIGHER_VERSION,
         handler: Handler::NoAttrPosition(is_http1_1_or_higher_version_macro),
     },
     InjectableMacro {
-        name: "is_http_version",
+        name: INJECTABLE_MACRO_NAME_IS_HTTP_VERSION,
         handler: Handler::NoAttrPosition(is_http_version_macro),
     },
     InjectableMacro {
-        name: "is_unknown_version",
+        name: INJECTABLE_MACRO_NAME_IS_UNKNOWN_VERSION,
         handler: Handler::NoAttrPosition(is_unknown_version_macro),
     },
 ];
@@ -17381,13 +19976,17 @@ use super::*;
 pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_host.host_values.iter().map(|host_value: &syn::Expr| {
-            quote! {
-                if #context.get_request().get_host() != #host_value {
-                    return ::hyperlane::Status::Continue;
+        let statements: Vec<proc_macro2::TokenStream> = multi_host
+            .host_values
+            .iter()
+            .map(|host_value: &syn::Expr| {
+                quote! {
+                    if #context.get_request().get_host() != #host_value {
+                        return ::hyperlane::Status::Continue;
+                    }
                 }
-            }
-        });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -17400,13 +19999,17 @@ pub(crate) fn reject_host_macro(
 ) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements = multi_host.host_values.iter().map(|host_value: &syn::Expr| {
-            quote! {
-                if #context.get_request().get_host() == #host_value {
-                    return ::hyperlane::Status::Continue;
+        let statements: Vec<proc_macro2::TokenStream> = multi_host
+            .host_values
+            .iter()
+            .map(|host_value: &syn::Expr| {
+                quote! {
+                    if #context.get_request().get_host() == #host_value {
+                        return ::hyperlane::Status::Continue;
+                    }
                 }
-            }
-        });
+            })
+            .collect();
         quote! {
             #(#statements)*
         }
@@ -17515,8 +20118,10 @@ mod websocket_frame;
 use http_type::*;
 use std::{
     collections::VecDeque,
-    io::ErrorKind,
+    io::{self, ErrorKind},
+    mem,
     num::ParseIntError,
+    ptr,
     rc::Rc,
     sync::{
         Arc,
@@ -17981,8 +20586,8 @@ impl Lifetime for TestLifetimeStruct {
     }
     unsafe fn leak_mut(&self) -> &'static mut Self {
         let mut boxed: Box<Self> = Box::new(Self { value: self.value });
-        let reference: *mut Self = std::ptr::addr_of_mut!(*boxed);
-        std::mem::forget(boxed);
+        let reference: *mut Self = ptr::addr_of_mut!(*boxed);
+        mem::forget(boxed);
         unsafe { &mut *reference }
     }
 }
@@ -18034,7 +20639,7 @@ fn test_cookie_builder_new() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
@@ -18047,7 +20652,7 @@ fn test_cookie_builder_default() {
     assert_eq!(cookie.get_name(), "");
     assert_eq!(cookie.get_value(), "");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
@@ -18060,7 +20665,7 @@ fn test_cookie_builder_parse_basic() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
@@ -18077,7 +20682,7 @@ fn test_cookie_builder_parse_with_expires() {
         *cookie.try_get_expires(),
         Some("Wed, 21 Oct 2015 07:28:00 GMT".to_string())
     );
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
@@ -18090,7 +20695,7 @@ fn test_cookie_builder_parse_with_max_age() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), Some(3600));
+    assert_eq!(cookie.try_get_max_age(), Some(3600));
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
@@ -18103,7 +20708,7 @@ fn test_cookie_builder_parse_with_domain() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
@@ -18116,7 +20721,7 @@ fn test_cookie_builder_parse_with_path() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), Some("/admin".to_string()));
     assert!(cookie.try_get_secure().is_none());
@@ -18129,10 +20734,10 @@ fn test_cookie_builder_parse_with_secure() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
-    assert_eq!(*cookie.try_get_secure(), Some(true));
+    assert_eq!(cookie.try_get_secure(), Some(true));
     assert!(cookie.try_get_http_only().is_none());
     assert_eq!(*cookie.try_get_same_site(), None);
 }
@@ -18142,11 +20747,11 @@ fn test_cookie_builder_parse_with_http_only() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
-    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(cookie.try_get_http_only(), Some(true));
     assert_eq!(*cookie.try_get_same_site(), None);
 }
 #[test]
@@ -18155,7 +20760,7 @@ fn test_cookie_builder_parse_with_same_site() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
@@ -18173,11 +20778,11 @@ fn test_cookie_builder_parse_complex() {
         *cookie.try_get_expires(),
         Some("Wed, 21 Oct 2015 07:28:00 GMT".to_string())
     );
-    assert_eq!(*cookie.try_get_max_age(), Some(3600));
+    assert_eq!(cookie.try_get_max_age(), Some(3600));
     assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
     assert_eq!(*cookie.try_get_path(), Some("/admin".to_string()));
-    assert_eq!(*cookie.try_get_secure(), Some(true));
-    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(cookie.try_get_secure(), Some(true));
+    assert_eq!(cookie.try_get_http_only(), Some(true));
     assert_eq!(*cookie.try_get_same_site(), Some("lax".to_string()));
 }
 #[test]
@@ -18186,7 +20791,7 @@ fn test_cookie_builder_parse_empty_string() {
     assert_eq!(cookie.get_name(), "");
     assert_eq!(cookie.get_value(), "");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), None);
     assert_eq!(*cookie.try_get_path(), None);
     assert!(cookie.try_get_secure().is_none());
@@ -18201,11 +20806,11 @@ fn test_cookie_builder_parse_case_insensitive() {
     assert_eq!(cookie.get_name(), "session_id");
     assert_eq!(cookie.get_value(), "abc123");
     assert_eq!(*cookie.try_get_expires(), None);
-    assert_eq!(*cookie.try_get_max_age(), None);
+    assert_eq!(cookie.try_get_max_age(), None);
     assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
     assert_eq!(*cookie.try_get_path(), None);
-    assert_eq!(*cookie.try_get_secure(), Some(true));
-    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(cookie.try_get_secure(), Some(true));
+    assert_eq!(cookie.try_get_http_only(), Some(true));
     assert_eq!(*cookie.try_get_same_site(), Some("Strict".to_string()));
 }
 #[test]
@@ -18221,7 +20826,7 @@ fn test_cookie_builder_expires() {
 fn test_cookie_builder_max_age() {
     let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
     cookie.set_max_age(3600);
-    assert_eq!(*cookie.try_get_max_age(), Some(3600));
+    assert_eq!(cookie.try_get_max_age(), Some(3600));
 }
 #[test]
 fn test_cookie_builder_domain() {
@@ -18239,13 +20844,13 @@ fn test_cookie_builder_path() {
 fn test_cookie_builder_secure() {
     let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
     cookie.secure();
-    assert_eq!(*cookie.try_get_secure(), Some(true));
+    assert_eq!(cookie.try_get_secure(), Some(true));
 }
 #[test]
 fn test_cookie_builder_http_only() {
     let mut cookie: CookieBuilder = CookieBuilder::new("test", "value");
     cookie.http_only();
-    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(cookie.try_get_http_only(), Some(true));
 }
 #[test]
 fn test_cookie_builder_same_site() {
@@ -18270,11 +20875,11 @@ fn test_cookie_builder_chaining() {
         *cookie.try_get_expires(),
         Some("Wed, 21 Oct 2015 07:28:00 GMT".to_string())
     );
-    assert_eq!(*cookie.try_get_max_age(), Some(3600));
+    assert_eq!(cookie.try_get_max_age(), Some(3600));
     assert_eq!(*cookie.try_get_domain(), Some("example.com".to_string()));
     assert_eq!(*cookie.try_get_path(), Some("/admin".to_string()));
-    assert_eq!(*cookie.try_get_secure(), Some(true));
-    assert_eq!(*cookie.try_get_http_only(), Some(true));
+    assert_eq!(cookie.try_get_secure(), Some(true));
+    assert_eq!(cookie.try_get_http_only(), Some(true));
     assert_eq!(*cookie.try_get_same_site(), Some("Strict".to_string()));
 }
 #[test]
@@ -18878,10 +21483,10 @@ fn request_error_default() {
 }
 #[test]
 fn request_error_from_io_error() {
-    let io_error: std::io::Error = std::io::Error::new(ErrorKind::ConnectionReset, "reset");
+    let io_error: io::Error = io::Error::new(ErrorKind::ConnectionReset, "reset");
     let request_error: RequestError = RequestError::from(io_error);
     assert!(matches!(request_error, RequestError::ClientDisconnected(_)));
-    let io_error: std::io::Error = std::io::Error::other("other");
+    let io_error: io::Error = io::Error::other("other");
     let request_error: RequestError = RequestError::from(io_error);
     assert!(matches!(request_error, RequestError::ReadConnection(_)));
 }
@@ -19884,7 +22489,7 @@ fn response_error_display() {
 }
 #[test]
 fn response_error_from_io() {
-    let io_error: std::io::Error = std::io::Error::other("test error");
+    let io_error: io::Error = io::Error::other("test error");
     let response_error: ResponseError = ResponseError::from(io_error);
     assert!(matches!(response_error, ResponseError::Send(_)));
 }
@@ -20705,6 +23310,7 @@ use std::{
     any::Any,
     cell::{RefCell, RefMut},
     collections::{HashMap, HashSet, VecDeque},
+    error::Error,
     fmt::{self, Debug, Display, Formatter, Write},
     hash::Hash,
     io::{self, ErrorKind},
@@ -20714,7 +23320,7 @@ use std::{
     pin::Pin,
     rc::Rc,
     result::Result,
-    str::{FromStr, SplitWhitespace},
+    str::{FromStr, SplitWhitespace, from_utf8},
     sync::{
         Arc,
         atomic::{self, AtomicBool, AtomicUsize},
@@ -20744,7 +23350,7 @@ use {
 # Path: hyperlane/type/src/http_url/impl.rs
 ```rust
 use super::*;
-impl std::error::Error for HttpUrlError {}
+impl Error for HttpUrlError {}
 impl Display for HttpUrlError {
     #[inline(always)]
     fn fmt(&self, data: &mut Formatter<'_>) -> fmt::Result {
@@ -20878,9 +23484,9 @@ impl ContentType {
         T: Serialize + Debug + Clone + Default,
     {
         let mut html: String = String::with_capacity(64);
-        html.push_str("<table><tr><td>");
+        html.push_str(HTML_TABLE_OPEN);
         html.push_str(&format!("{data:?}"));
-        html.push_str("</td></tr></table>");
+        html.push_str(HTML_TABLE_CLOSE);
         html
     }
     fn get_form_url_encoded<T>(data: &T) -> String
@@ -20960,6 +23566,11 @@ impl FromStr for ContentType {
     }
 }
 ```
+# Path: hyperlane/type/src/content_type/const.rs
+```rust
+pub(crate) const HTML_TABLE_OPEN: &str = "<table><tr><td>";
+pub(crate) const HTML_TABLE_CLOSE: &str = "</td></tr></table>";
+```
 # Path: hyperlane/type/src/content_type/enum.rs
 ```rust
 use super::*;
@@ -20976,9 +23587,11 @@ pub enum ContentType {
 ```
 # Path: hyperlane/type/src/content_type/mod.rs
 ```rust
+mod r#const;
 mod r#enum;
 mod r#impl;
 pub use r#enum::*;
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/type/src/file_extension/impl.rs
@@ -21119,6 +23732,10 @@ impl FileExtension {
             Self::FileExtensionChm => APPLICATION_VND_MS_HTMLHELP,
             Self::FileExtensionChrt => APPLICATION_VND_KDE_KCHART,
             Self::FileExtensionCif => CHEMICAL_X_CIF,
+```
+# Path: hyperlane/type/src/file_extension/const.rs
+```rust
+pub(crate) const FILE_EXTENSION_WASM: &str = "wasm";
 ```
 # Path: hyperlane/type/src/file_extension/enum.rs
 ```rust
@@ -22193,9 +24810,11 @@ pub enum FileExtension {
 ```
 # Path: hyperlane/type/src/file_extension/mod.rs
 ```rust
+mod r#const;
 mod r#enum;
 mod r#impl;
 pub use r#enum::*;
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/type/src/lifetime/trait.rs
@@ -22437,14 +25056,17 @@ pub struct CookieBuilder {
     pub(super) value: CookieValue,
     #[set(skip)]
     pub(super) expires: Option<String>,
+    #[get(type(copy))]
     #[set(skip)]
     pub(super) max_age: Option<i64>,
     #[set(skip)]
     pub(super) domain: Option<String>,
     #[set(skip)]
     pub(super) path: Option<String>,
+    #[get(type(copy))]
     #[set(skip)]
     pub(super) secure: Option<bool>,
+    #[get(type(copy))]
     #[set(skip)]
     pub(super) http_only: Option<bool>,
     #[set(skip)]
@@ -22596,16 +25218,16 @@ use super::*;
 # Path: hyperlane/type/src/request/impl.rs
 ```rust
 use super::*;
-impl std::error::Error for RequestError {}
+impl Error for RequestError {}
 impl Default for RequestError {
     #[inline(always)]
     fn default() -> Self {
         RequestError::Unknown(HttpStatus::InternalServerError)
     }
 }
-impl From<std::io::Error> for RequestError {
+impl From<io::Error> for RequestError {
     #[inline(always)]
-    fn from(error: std::io::Error) -> Self {
+    fn from(error: io::Error) -> Self {
         let kind: ErrorKind = error.kind();
         if kind == ErrorKind::ConnectionReset || kind == ErrorKind::ConnectionAborted {
             return RequestError::ClientDisconnected(HttpStatus::BadRequest);
@@ -24274,10 +26896,10 @@ use super::*;
 # Path: hyperlane/type/src/response/impl.rs
 ```rust
 use super::*;
-impl std::error::Error for ResponseError {}
-impl From<std::io::Error> for ResponseError {
+impl Error for ResponseError {}
+impl From<io::Error> for ResponseError {
     #[inline(always)]
-    fn from(error: std::io::Error) -> Self {
+    fn from(error: io::Error) -> Self {
         ResponseError::Send(error.to_string())
     }
 }
@@ -24811,7 +27433,7 @@ impl WebSocketFrame {
         let mut frames_list: Vec<ResponseBody> =
             Vec::with_capacity((total_len / MAX_FRAME_SIZE) + 1);
         let mut is_first_frame: bool = true;
-        let is_valid_utf8: bool = std::str::from_utf8(data_ref).is_ok();
+        let is_valid_utf8: bool = from_utf8(data_ref).is_ok();
         let base_opcode: WebSocketOpcode = if is_valid_utf8 {
             WebSocketOpcode::Text
         } else {
