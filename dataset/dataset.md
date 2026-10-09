@@ -1,4 +1,4 @@
-<!--2026-10-09 05:21:03-->
+<!--2026-10-09 12:52:19-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -8142,10 +8142,6 @@ fn test_request_error_clone_and_equality() {
     assert_ne!(cloned, RequestError::Request("other".to_string()));
 }
 #[test]
-fn test_app_name_constant() {
-    assert_eq!(APP_NAME, "http-request");
-}
-#[test]
 fn test_header_name_constants() {
     assert_eq!(ACCEPT, "accept");
     assert_eq!(HOST, "host");
@@ -11012,7 +11008,7 @@ impl Display for Body {
 ```
 # Path: hyperlane/request/src/common/const.rs
 ```rust
-pub const APP_NAME: &str = "http-request";
+pub(crate) const APP_NAME: &str = "http-request";
 ```
 # Path: hyperlane/request/src/common/struct.rs
 ```rust
@@ -11027,7 +11023,8 @@ pub struct Body {
 mod r#const;
 mod r#impl;
 mod r#struct;
-pub use {r#const::*, r#struct::*};
+pub use r#struct::*;
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/core/README.md
@@ -11435,7 +11432,7 @@ fn server_send_sync() {
 #[tokio::test]
 async fn server_clone_across_threads() {
     let mut server: Server = Server::default();
-    server.route::<TestSendRoute, &str>("/test");
+    server.route::<TestSendRoute>("/test");
     let server_clone: Server = server.clone();
     let handle: JoinHandle<&'static str> = spawn(async move {
         let _server_in_thread: Server = server_clone;
@@ -11447,7 +11444,7 @@ async fn server_clone_across_threads() {
 #[tokio::test]
 async fn server_share_across_threads() {
     let mut server: Server = Server::default();
-    server.route::<TestSendRoute, &str>("/test");
+    server.route::<TestSendRoute>("/test");
     let server: Arc<Server> = Arc::new(server);
     let server1: Arc<Server> = server.clone();
     let server2: Arc<Server> = server.clone();
@@ -11477,12 +11474,12 @@ async fn main() {
     server.request_middleware::<RequestMiddleware>();
     server.request_middleware::<UpgradeMiddleware>();
     server.response_middleware::<ResponseMiddleware>();
-    server.route::<RootRoute, &str>("/");
-    server.route::<SseRoute, &str>("/sse");
-    server.route::<WebsocketRoute, &str>("/websocket");
-    server.route::<GetAllRoutes, &str>("/get/all/routes");
-    server.route::<DynamicRoute, &str>("/dynamic/{routing}");
-    server.route::<DynamicRoute, &str>("/regex/{file:^.*$}");
+    server.route::<RootRoute>("/");
+    server.route::<SseRoute>("/sse");
+    server.route::<WebsocketRoute>("/websocket");
+    server.route::<GetAllRoutes>("/get/all/routes");
+    server.route::<DynamicRoute>("/dynamic/{routing}");
+    server.route::<DynamicRoute>("/regex/{file:^.*$}");
     let _: Result<(), Server> = SERVER_REF.set(server.clone());
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
@@ -11600,7 +11597,7 @@ async fn client_handle_hook_dispatches_to_correct_handler_list() {
 #[tokio::test]
 async fn client_route_basic_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute, &str>("/");
+        register.route::<RootRoute>("/");
     })
     .await;
     let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -11611,7 +11608,7 @@ async fn client_route_basic_serial_e2e() {
 #[tokio::test]
 async fn client_dynamic_route_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<DynamicRoute, &str>("/dynamic/:id");
+        register.route::<DynamicRoute>("/dynamic/:id");
     })
     .await;
     let request: &[u8] =
@@ -11623,7 +11620,7 @@ async fn client_dynamic_route_serial_e2e() {
 #[tokio::test]
 async fn client_regex_route_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<WebsocketRoute, &str>("/ws");
+        register.route::<WebsocketRoute>("/ws");
     })
     .await;
     let request: &[u8] = b"GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -11634,7 +11631,7 @@ async fn client_regex_route_serial_e2e() {
 #[tokio::test]
 async fn client_request_error_404_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute, &str>("/");
+        register.route::<RootRoute>("/");
         register.request_error::<RequestErrorHook>();
     })
     .await;
@@ -11646,7 +11643,7 @@ async fn client_request_error_404_serial_e2e() {
 #[tokio::test]
 async fn client_request_middleware_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute, &str>("/");
+        register.route::<RootRoute>("/");
         register.request_middleware::<RequestMiddleware>();
     })
     .await;
@@ -11658,7 +11655,7 @@ async fn client_request_middleware_serial_e2e() {
 #[tokio::test]
 async fn client_response_middleware_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute, &str>("/");
+        register.route::<RootRoute>("/");
         register.response_middleware::<ResponseMiddleware>();
     })
     .await;
@@ -11670,7 +11667,7 @@ async fn client_response_middleware_serial_e2e() {
 #[tokio::test]
 async fn client_task_panic_handler_serial_e2e() {
     let (control, port) = start_server_with(|register: &mut Server| {
-        register.route::<DynamicRoute, &str>("/panic/:msg");
+        register.route::<DynamicRoute>("/panic/:msg");
         register.task_panic::<TaskPanicHook>();
     })
     .await;
@@ -11683,7 +11680,7 @@ async fn client_task_panic_handler_serial_e2e() {
 #[tokio::test]
 async fn client_two_servers_on_distinct_ports_serial_e2e() {
     let (control_a, port_a) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute, &str>("/");
+        register.route::<RootRoute>("/");
     })
     .await;
     let request: &[u8] = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
@@ -11691,7 +11688,7 @@ async fn client_two_servers_on_distinct_ports_serial_e2e() {
     control_a.shutdown().await;
     control_a.wait().await;
     let (control_b, port_b) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute, &str>("/");
+        register.route::<RootRoute>("/");
     })
     .await;
     assert_ne!(port_a, port_b);
@@ -11702,11 +11699,11 @@ async fn client_two_servers_on_distinct_ports_serial_e2e() {
 #[tokio::test]
 async fn client_concurrent_servers_on_distinct_ports_e2e() {
     let (control_a, port_a) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute, &str>("/");
+        register.route::<RootRoute>("/");
     })
     .await;
     let (control_b, port_b) = start_server_with(|register: &mut Server| {
-        register.route::<RootRoute, &str>("/");
+        register.route::<RootRoute>("/");
     })
     .await;
     assert_ne!(port_a, port_b);
@@ -11959,22 +11956,36 @@ use super::*;
 #[tokio::test]
 #[should_panic(expected = "EmptyPattern")]
 async fn empty_route() {
-    let _server: &Server = Server::default().route::<TestRoute, &str>(EMPTY_STR);
+    let _server: &Server = Server::default().route::<TestRoute>(EMPTY_STR);
 }
 #[tokio::test]
 #[should_panic(expected = "DuplicatePattern")]
 async fn duplicate_route() {
     let _server: &Server = Server::default()
-        .route::<TestRoute, &str>(ROOT_PATH)
-        .route::<TestRoute, &str>(ROOT_PATH);
+        .route::<TestRoute>(ROOT_PATH)
+        .route::<TestRoute>(ROOT_PATH);
+}
+#[test]
+fn route_path_type_inference() {
+    let mut server: Server = Server::default();
+    server.route::<TestRoute>("/infer/str");
+    let owned_path: String = "/infer/string".to_string();
+    server.route::<TestRoute>(owned_path);
+    let ref_path: String = "/infer/ref".to_string();
+    server.route::<TestRoute>(&ref_path);
+    server
+        .route::<TestRoute>("/infer/chain/a")
+        .route::<TestRoute>("/infer/chain/b");
+    let route_matcher: RouteMatcher = server.get_route_matcher().clone();
+    assert_eq!(route_matcher.get_static_route().len(), 5);
 }
 #[test]
 fn get_route() {
     let mut server: Server = Server::default();
     server
-        .route::<TestRoute, &str>(ROOT_PATH)
-        .route::<TestRoute, &str>("/dynamic/{routing}")
-        .route::<TestRoute, &str>("/regex/{file:^.*$}");
+        .route::<TestRoute>(ROOT_PATH)
+        .route::<TestRoute>("/dynamic/{routing}")
+        .route::<TestRoute>("/regex/{file:^.*$}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     for key in route_matcher.get_static_route().keys() {
         println!("Static route: {key}");
@@ -11993,10 +12004,10 @@ fn get_route() {
 #[test]
 fn segment_count_optimization() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute, &str>("/users/{id}");
-    server.route::<TestRoute, &str>("/users/{id}/posts");
-    server.route::<TestRoute, &str>("/users/{id}/posts/{post_id}");
-    server.route::<TestRoute, &str>("/api/v1/users/{id}");
+    server.route::<TestRoute>("/users/{id}");
+    server.route::<TestRoute>("/users/{id}/posts");
+    server.route::<TestRoute>("/users/{id}/posts/{post_id}");
+    server.route::<TestRoute>("/api/v1/users/{id}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_dynamic_route().contains_key(&2),
@@ -12017,9 +12028,9 @@ fn segment_count_optimization() {
 #[test]
 fn regex_route_segment_count() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute, &str>("/files/{path:.*}");
-    server.route::<TestRoute, &str>("/api/{version:\\d+}/users");
-    server.route::<TestRoute, &str>("/api/{version:\\d+}/posts/{id:\\d+}");
+    server.route::<TestRoute>("/files/{path:.*}");
+    server.route::<TestRoute>("/api/{version:\\d+}/users");
+    server.route::<TestRoute>("/api/{version:\\d+}/posts/{id:\\d+}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert!(
         route_matcher.get_regex_route().contains_key(&2),
@@ -12037,11 +12048,11 @@ fn regex_route_segment_count() {
 #[test]
 fn mixed_route_types() {
     let mut server: Server = Server::default();
-    server.route::<TestRoute, &str>("/");
-    server.route::<TestRoute, &str>("/about");
-    server.route::<TestRoute, &str>("/users/{id}");
-    server.route::<TestRoute, &str>("/posts/{slug}");
-    server.route::<TestRoute, &str>("/files/{path:.*}");
+    server.route::<TestRoute>("/");
+    server.route::<TestRoute>("/about");
+    server.route::<TestRoute>("/users/{id}");
+    server.route::<TestRoute>("/posts/{slug}");
+    server.route::<TestRoute>("/files/{path:.*}");
     let route_matcher: RouteMatcher = server.get_route_matcher().clone();
     assert_eq!(route_matcher.get_static_route().len(), 2);
     assert!(route_matcher.get_dynamic_route().contains_key(&2));
@@ -12054,7 +12065,7 @@ fn large_dynamic_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id}}");
-        server.route::<TestRoute, &String>(&path);
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
@@ -12086,7 +12097,7 @@ fn large_regex_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{id:[0-9]+}}");
-        server.route::<TestRoute, &String>(&path);
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
@@ -12118,7 +12129,7 @@ fn large_tail_regex_routes() {
     let start_insert: Instant = Instant::now();
     for i in 0..ROUTE_COUNT {
         let path: String = format!("/api/resource{i}/{{path:.*}}");
-        server.route::<TestRoute, &String>(&path);
+        server.route::<TestRoute>(&path);
     }
     let insert_duration: Duration = start_insert.elapsed();
     println!(
@@ -12625,10 +12636,9 @@ impl Server {
         self
     }
     #[inline(always)]
-    pub fn route<S, P>(&mut self, path: P) -> &mut Self
+    pub fn route<S>(&mut self, path: impl AsRef<str>) -> &mut Self
     where
         S: ServerHook,
-        P: AsRef<str>,
     {
         self.get_mut_route_matcher()
             .add(path.as_ref(), Hook::factory::<S>())
@@ -14258,8 +14268,8 @@ async fn main() {
     server.request_error::<RequestErrorHook>();
     server.request_middleware::<RequestMiddleware>();
     server.request_middleware::<UpgradeHook>();
-    server.route::<GroupChat, &str>("/{group_name}");
-    server.route::<PrivateChat, &str>("/{my_name}/{your_name}");
+    server.route::<GroupChat>("/{group_name}");
+    server.route::<PrivateChat>("/{my_name}/{your_name}");
     let server_control_hook_1: ServerControlHook = server.run().await.unwrap_or_default();
     let server_control_hook_2: ServerControlHook = server_control_hook_1.clone();
     spawn(async move {
@@ -16966,8 +16976,8 @@ impl Compress {
 ```
 # Path: hyperlane/compress/src/compress/const.rs
 ```rust
-pub const CONTENT_ENCODING: &str = "content-encoding";
-pub const EMPTY_STR: &str = "";
+pub(crate) const CONTENT_ENCODING: &str = "content-encoding";
+pub(crate) const EMPTY_STR: &str = "";
 pub(crate) const CONTENT_ENCODING_GZIP: &str = "gzip";
 pub(crate) const CONTENT_ENCODING_DEFLATE: &str = "deflate";
 pub(crate) const CONTENT_ENCODING_BROTLI: &str = "br";
@@ -20480,7 +20490,6 @@ fn test_content_type_charset_formatting_edge_cases() {
 }
 #[test]
 fn test_content_type_memory_size() {
-    use std::mem;
     let size: usize = mem::size_of::<ContentType>();
     assert!(size > 0);
     let json_size: usize = mem::size_of_val(&ContentType::ApplicationJson);
@@ -21853,7 +21862,6 @@ fn test_http_version_ordering() {
 }
 #[test]
 fn test_http_version_memory_size() {
-    use std::mem;
     let size: usize = mem::size_of::<HttpVersion>();
     assert!(size > 0);
     let http11_size: usize = mem::size_of_val(&HttpVersion::Http1_1);
@@ -29266,6 +29274,10 @@ impl ServerHook for UpgradeMiddleware {
     }
 }
 ```
+# Path: hyperlane-quick-start/application/middleware/request/const.rs
+```rust
+pub(crate) const DATE: &str = "date";
+```
 # Path: hyperlane-quick-start/application/middleware/request/struct.rs
 ```rust
 use super::*;
@@ -29290,9 +29302,11 @@ pub struct UpgradeMiddleware;
 ```
 # Path: hyperlane-quick-start/application/middleware/request/mod.rs
 ```rust
+mod r#const;
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane-quick-start/application/middleware/response/impl.rs
