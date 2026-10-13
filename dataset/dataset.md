@@ -1,4 +1,4 @@
-<!--2026-10-13 00:22:01-->
+<!--2026-10-13 13:52:10-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -10971,7 +10971,13 @@ use std::{
     sync::{Arc, OnceLock},
     time::{Duration, Instant},
 };
-use tokio::{io::AsyncWriteExt, net::TcpStream, spawn, task::JoinHandle, time::sleep};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+    spawn,
+    task::JoinHandle,
+    time::sleep,
+};
 ```
 # Path: hyperlane/core/tests/server/impl.rs
 ```rust
@@ -11629,6 +11635,84 @@ async fn client_concurrent_servers_on_distinct_ports_e2e() {
     control_b.shutdown().await;
     control_a.wait().await;
     control_b.wait().await;
+}
+#[tokio::test]
+async fn server_pipelined_requests_all_get_responses() {
+    let control_hook: ServerControlHook;
+    let port: u16;
+    {
+        let (hook, bound_port) = start_server_with(|server: &mut Server| {
+            server.route::<RootRoute>("/");
+        })
+        .await;
+        control_hook = hook;
+        port = bound_port;
+    }
+    sleep(Duration::from_millis(120)).await;
+    const REQUESTS: usize = 8;
+    let mut stream: TcpStream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+    let request: Vec<u8> =
+        b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: keep-alive\r\n\r\n".to_vec();
+    let mut batch: Vec<u8> = Vec::with_capacity(request.len() * REQUESTS);
+    for _ in 0..REQUESTS {
+        batch.extend_from_slice(&request);
+    }
+    stream.write_all(&batch).await.unwrap();
+    stream.flush().await.unwrap();
+    let mut received: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        let mut chunk: [u8; 8192] = [0; 8192];
+        match stream.read(&mut chunk).await {
+            Ok(0) => break,
+            Ok(n) => received.extend_from_slice(&chunk[..n]),
+            Err(_) => break,
+        }
+        if count_pipelined_responses(&received) >= REQUESTS {
+            break;
+        }
+    }
+    let responses: usize = count_pipelined_responses(&received);
+    assert_eq!(
+        responses, REQUESTS,
+        "expected {REQUESTS} pipelined responses, got {responses}"
+    );
+    control_hook.shutdown().await;
+}
+fn count_pipelined_responses(buffer: &[u8]) -> usize {
+    let mut count: usize = 0;
+    let mut position: usize = 0;
+    while let Some(head_end) = find_subslice(buffer, position, b"\r\n\r\n") {
+        let head: String = String::from_utf8_lossy(&buffer[position..head_end]).to_string();
+        let mut content_length: Option<usize> = None;
+        for line in head.split("\r\n") {
+            if let Some((key, value)) = line.split_once(':')
+                && key.trim().eq_ignore_ascii_case("content-length")
+            {
+                content_length = value.trim().parse::<usize>().ok();
+            }
+        }
+        let body_length: usize = match content_length {
+            Some(length) => length,
+            None => break,
+        };
+        let body_start: usize = head_end + 4;
+        if buffer.len() < body_start + body_length {
+            break;
+        }
+        count += 1;
+        position = body_start + body_length;
+    }
+    count
+}
+fn find_subslice(haystack: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
+    if from > haystack.len() {
+        return None;
+    }
+    haystack[from..]
+        .windows(needle.len())
+        .position(|window: &[u8]| window == needle)
+        .map(|index: usize| index + from)
 }
 ```
 # Path: hyperlane/core/tests/server/static.rs
@@ -26838,8 +26922,28 @@ impl Stream {
         let config: RequestConfig = *self.get_request_config();
         let buffer_size: usize = config.get_buffer_size();
         let max_path_size: usize = config.get_max_path_size();
+        let seeded: Vec<u8> = {
+            let start: usize = self.get_leftover_start();
+            let end: usize = self.get_leftover_end();
+            let mut pending: Vec<u8> = Vec::new();
+            if start < end {
+                let leftover: Vec<u8> = mem::take(self.get_mut_leftover());
+                let take: usize = (end - start).min(leftover.len());
+                pending.extend_from_slice(&leftover[start..start + take]);
+            }
+            self.set_leftover(Vec::new());
+            self.set_leftover_start(0);
+            self.set_leftover_end(0);
+            pending
+        };
         let buffer: Vec<u8> = take_read_buffer(buffer_size);
         let mut reader: PooledReader<'_> = PooledReader::new(self.get_mut_stream(), buffer);
+        if !seeded.is_empty() {
+            let target: &mut Vec<u8> = reader.get_mut_buffer();
+            let copy_len: usize = seeded.len().min(target.len());
+            target[..copy_len].copy_from_slice(&seeded[..copy_len]);
+            reader.set_end(copy_len);
+        }
         let mut line: String = String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY);
         AsyncBufReadExt::read_line(&mut reader, &mut line).await?;
         let (method, path, version): (RequestMethod, &str, RequestVersion) =
@@ -26855,6 +26959,18 @@ impl Stream {
         request.set_method(method);
         request.set_version(version);
         Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
+        let reader_start: usize = *reader.get_start();
+        let reader_end: usize = *reader.get_end();
+        let pending: Vec<u8> = if reader_start < reader_end {
+            reader.get_buffer()[reader_start..reader_end].to_vec()
+        } else {
+            Vec::new()
+        };
+        drop(reader);
+        let pending_len: usize = pending.len();
+        self.set_leftover(pending);
+        self.set_leftover_start(0);
+        self.set_leftover_end(pending_len);
         Ok(())
     }
     pub async fn try_fill_http_request(
@@ -27065,6 +27181,20 @@ pub struct Stream {
     #[get(type(copy))]
     #[get_mut(pub(super))]
     pub(super) closed: bool,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    #[new(skip)]
+    pub(super) leftover: Vec<u8>,
+    #[get(type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    #[new(skip)]
+    pub(super) leftover_start: usize,
+    #[get(type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    #[new(skip)]
+    pub(super) leftover_end: usize,
 }
 #[derive(Data, New)]
 pub(crate) struct PooledReader<'a> {
