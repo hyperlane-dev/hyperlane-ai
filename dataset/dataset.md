@@ -1,4 +1,4 @@
-<!--2026-10-16 11:01:17-->
+<!--2026-10-16 16:21:12-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -29735,6 +29735,49 @@ use super::*;
 # Path: hyperlane-quick-start/README.md
 ## hyperlane-quick-start
 > A lightweight, high-performance, and cross-platform Rust HTTP server library built on Tokio. It simplifies modern web service development by providing built-in support for middleware, WebSocket, Server-Sent Events (SSE), and raw TCP communication. With a unified and ergonomic API across Windows, Linux, and MacOS, it enables developers to build robust, scalable, and event-driven network applications with minimal overhead and maximum flexibility.
+## Run it
+```sh
+git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git && cd hyperlane-quick-start
+docker compose up -d
+```
+Then open <http://127.0.0.1:65002>.
+That is the whole procedure. `compose.yaml` in the repository root builds the
+server image from source, starts MySQL, PostgreSQL and Redis, waits for all three
+to report healthy, and starts the server. Nothing has to be configured first — the
+release environment file is read automatically in a release build and already
+names the three containers.
+**The first run takes 25 to 30 minutes** because it compiles from source. To skip
+that, pull the published image instead:
+| Branch | Image |
+| --- | --- |
+| `master` | `hkccr.ccs.tencentyun.com/hyperlane-dev/hyperlane-quick-start:1.0.0` |
+| `playground` | `hkccr.ccs.tencentyun.com/hyperlane-dev/hyperlane-quick-start-playground:1.0.0` |
+```sh
+docker compose pull    # fetches the four services
+docker compose up -d
+```
+The server logs its own progress; this is what a healthy start looks like:
+```
+[AUTO-CREATION] Initialization complete MySQL (mysql_default) verified,
+PostgreSQL (postgres_default) verified, Redis (redis_default) verified
+Server listen in 0.0.0.0:65002
+```
+```sh
+docker compose ps
+docker compose logs -f server
+docker compose down            # stop, keep the data
+docker compose down -v         # stop and discard the data
+```
+The three databases are reachable by their compose service names and are not
+published to the host, so the stack does not collide with anything else already
+listening. To inspect one:
+```sh
+docker compose exec postgresql psql -U hyperlane -d hyperlane
+docker compose exec mysql mysql -uhyperlane -phyperlane hyperlane
+docker compose exec redis redis-cli -a hyperlane ping
+```
+Add `-T` and a command when running these from a script, or they wait on stdin
+forever.
 ## Api Docs
 - [Api Docs](https://docs.rs/hyperlane/latest/)
 ## Contact
@@ -33994,7 +34037,9 @@ pub mod path;
 ```
 # Path: hyperlane-quick-start/resources/docker/dev/server.dockerfile
 ```dockerfile
-FROM rust:1.93-bookworm
+ARG TARGETPLATFORM
+ARG RUST_VERSION=1.93
+FROM --platform=$TARGETPLATFORM rust:${RUST_VERSION}-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
@@ -34003,6 +34048,7 @@ RUN cargo install wasm-bindgen-cli --locked && \
     cargo install wasm-pack --locked
 RUN cargo build && \
     cp -f /hyperlane-quick-start/target/debug/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start
+RUN mkdir -p /hyperlane-quick-start/data/dev/logs /hyperlane-quick-start/data/dev/process
 EXPOSE 80
 CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
@@ -34026,15 +34072,18 @@ pub use r#const::*;
 ```
 # Path: hyperlane-quick-start/resources/docker/release/server.dockerfile
 ```dockerfile
-FROM rust:1.93-bookworm
+ARG TARGETPLATFORM
+ARG RUST_VERSION=1.93
+FROM --platform=$TARGETPLATFORM rust:${RUST_VERSION}-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
 RUN rustup target add wasm32-unknown-unknown
 RUN cargo install wasm-bindgen-cli --locked && \
     cargo install wasm-pack --locked
-RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --target x86_64-unknown-linux-gnu && \
-    cp -f /hyperlane-quick-start/target/x86_64-unknown-linux-gnu/release/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start
+RUN RUSTFLAGS='-C target-feature=-crt-static' cargo build --release && \
+    cp -f /hyperlane-quick-start/target/release/hyperlane-quick-start /hyperlane-quick-start/hyperlane-quick-start
+RUN mkdir -p /hyperlane-quick-start/data/release/logs /hyperlane-quick-start/data/release/process
 EXPOSE 65002
 CMD ["/hyperlane-quick-start/hyperlane-quick-start"]
 ```
