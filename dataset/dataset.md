@@ -1,4 +1,4 @@
-<!--2026-10-16 20:43:33-->
+<!--2026-10-17 03:40:09-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -29797,7 +29797,10 @@ pub mod view;
 use {
     chrono::Utc,
     hyperlane::*,
-    hyperlane_utils::{log::*, *},
+    hyperlane_time::*,
+    instrument_level::*,
+    log::*,
+    lombok_macros::*,
     serde::{Deserialize, Serialize},
     serde_with::skip_serializing_none,
     utoipa::ToSchema,
@@ -30340,10 +30343,7 @@ pub mod application;
 pub mod common;
 pub mod framework;
 use common::*;
-use {
-    hyperlane::*,
-    hyperlane_utils::{log::*, *},
-};
+use {hyperlane::*, hyperlane_log::*, log::*, lombok_macros::*};
 use hyperlane::hyperlane;
 ```
 # Path: hyperlane-quick-start/bootstrap/README.md
@@ -30519,11 +30519,8 @@ pub struct ServerBootstrap;
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
-use {
-    super::*,
-    config::*,
-    hyperlane_plugin::{common::*, env::*, shutdown::*},
-};
+use {super::*, config::*};
+use hyperlane_plugin::{common::*, env::*, shutdown::*};
 ```
 # Path: hyperlane-quick-start/bootstrap/framework/config/impl.rs
 ```rust
@@ -30620,7 +30617,6 @@ pub use r#trait::*;
 #![recursion_limit = "1024"]
 pub mod application;
 pub mod framework;
-use hyperlane_utils::log::*;
 ```
 # Path: hyperlane-quick-start/config/README.md
 ## hyperlane-config
@@ -30632,7 +30628,6 @@ use hyperlane_utils::log::*;
 ```rust
 pub mod logger;
 pub mod logo_img;
-use super::*;
 ```
 # Path: hyperlane-quick-start/config/application/logger/const.rs
 ```rust
@@ -30646,7 +30641,7 @@ pub const LOG_LEVEL_FILTER: LevelFilter = LevelFilter::Info;
 ```rust
 mod r#const;
 pub use r#const::*;
-use super::*;
+use log::LevelFilter;
 ```
 # Path: hyperlane-quick-start/config/application/logo_img/const.rs
 ```rust
@@ -30687,9 +30682,15 @@ use std::{
     time::{Duration, Instant},
 };
 use {
+    color_output::*,
+    file_operation::*,
     hyperlane::*,
-    hyperlane_utils::{log::*, *},
+    hyperlane_log::*,
+    instrument_level::*,
+    log::*,
+    lombok_macros::*,
     sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, Statement},
+    server_manager::*,
 };
 ```
 # Path: hyperlane-quick-start/plugin/README.md
@@ -32015,7 +32016,7 @@ mod r#type;
 pub use {r#const::*, r#struct::*, r#type::*};
 use {super::*, database::*, env::*, r#static::*};
 use {
-    hyperlane_utils::redis::*,
+    ::redis::{Client, Connection, RedisError, cmd},
     tokio::{
         spawn,
         sync::{RwLock, RwLockWriteGuard},
@@ -32571,7 +32572,7 @@ mod r#enum;
 mod r#impl;
 mod r#struct;
 pub use {r#const::*, r#enum::*, r#struct::*};
-use {super::*, env::*, mysql::*, postgresql::*, redis::*};
+use {super::*, crate::redis::RedisPlugin, env::*, mysql::*, postgresql::*};
 use std::{
     env::var,
     error::Error,
@@ -33935,7 +33936,7 @@ use {
     },
     hyperlane_plugin::{common::GetOrInit, env::*, process::*},
 };
-use hyperlane_utils::log::*;
+use log::*;
 fn main() {
     EnvBootstrap::init();
     LoggerBootstrap::init();
