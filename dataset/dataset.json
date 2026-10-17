@@ -41490,6 +41490,276 @@
     "system": ""
   },
   {
+    "instruction": "try_table函数的源码是怎么实现的？",
+    "input": "",
+    "output": "try_table函数的源码实现如下：\n\n```rust\nfn try_table(name: &str, dependencies: Vec<&str>) -> TableSchema {\n    TableSchema::new(\n        dependencies\n            .iter()\n            .map(|dep: &&str| String::from(*dep))\n            .collect(),\n        name.to_string(),\n        format!(\"CREATE TABLE {name} (id INT);\"),\n    )\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释try_table这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "try_table函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nfn try_table(name: &str, dependencies: Vec<&str>) -> TableSchema {\n    TableSchema::new(\n        dependencies\n            .iter()\n            .map(|dep: &&str| String::from(*dep))\n            .collect(),\n        name.to_string(),\n        format!(\"CREATE TABLE {name} (id INT);\"),\n    )\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：10\n- 包含高级特性：泛型编程、闭包",
+    "system": ""
+  },
+  {
+    "instruction": "try_table函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "try_table函数的泛型设计和使用如下：\n\n```rust\nfn try_table(name: &str, dependencies: Vec<&str>) -> TableSchema {\n    TableSchema::new(\n        dependencies\n            .iter()\n            .map(|dep: &&str| String::from(*dep))\n            .collect(),\n        name.to_string(),\n        format!(\"CREATE TABLE {name} (id INT);\"),\n    )\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "try_table函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "try_table函数的参数设计如下：\n\n```rust\nfn try_table(name: &str, dependencies: Vec<&str>) -> TableSchema {\n    TableSchema::new(\n        dependencies\n            .iter()\n            .map(|dep: &&str| String::from(*dep))\n            .collect(),\n        name.to_string(),\n        format!(\"CREATE TABLE {name} (id INT);\"),\n    )\n}\n```\n\n参数列表：\n- name: &str\n- dependencies: Vec<&str>\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "try_table函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "try_table函数的返回值类型设计如下：\n\n```rust\nfn try_table(name: &str, dependencies: Vec<&str>) -> TableSchema {\n    TableSchema::new(\n        dependencies\n            .iter()\n            .map(|dep: &&str| String::from(*dep))\n            .collect(),\n        name.to_string(),\n        format!(\"CREATE TABLE {name} (id INT);\"),\n    )\n}\n```\n\n返回类型：TableSchema\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "try_names函数的源码是怎么实现的？",
+    "input": "",
+    "output": "try_names函数的源码实现如下：\n\n```rust\nfn try_names(tables: Vec<&TableSchema>) -> Vec<String> {\n    tables\n        .iter()\n        .map(|table: &&TableSchema| table.get_name().clone())\n        .collect()\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "请解释try_names这个函数的实现逻辑和设计思路。",
+    "input": "",
+    "output": "try_names函数的实现较为复杂，其设计思路和逻辑如下：\n\n```rust\nfn try_names(tables: Vec<&TableSchema>) -> Vec<String> {\n    tables\n        .iter()\n        .map(|table: &&TableSchema| table.get_name().clone())\n        .collect()\n}\n```\n\n这个实现包含以下特点：\n- 复杂度评分：4\n- 代码行数：6\n- 包含高级特性：泛型编程、闭包",
+    "system": ""
+  },
+  {
+    "instruction": "try_names函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "try_names函数的泛型设计和使用如下：\n\n```rust\nfn try_names(tables: Vec<&TableSchema>) -> Vec<String> {\n    tables\n        .iter()\n        .map(|table: &&TableSchema| table.get_name().clone())\n        .collect()\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "try_names函数的参数设计有什么考虑？",
+    "input": "",
+    "output": "try_names函数的参数设计如下：\n\n```rust\nfn try_names(tables: Vec<&TableSchema>) -> Vec<String> {\n    tables\n        .iter()\n        .map(|table: &&TableSchema| table.get_name().clone())\n        .collect()\n}\n```\n\n参数列表：\n- tables: Vec<&TableSchema>\n\n这种参数设计体现了Rust的类型安全性和表达力。",
+    "system": ""
+  },
+  {
+    "instruction": "try_names函数的返回值类型设计有什么特点？",
+    "input": "",
+    "output": "try_names函数的返回值类型设计如下：\n\n```rust\nfn try_names(tables: Vec<&TableSchema>) -> Vec<String> {\n    tables\n        .iter()\n        .map(|table: &&TableSchema| table.get_name().clone())\n        .collect()\n}\n```\n\n返回类型：Vec<String>\n\n这种返回类型设计体现了Rust的所有权系统和错误处理理念。",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_puts_ready_tables_first函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_ordered_tables_puts_ready_tables_first函数的源码实现如下：\n\n```rust\n#[test]\nfn test_ordered_tables_puts_ready_tables_first() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"users\", vec![]))\n        .add_table(try_table(\"sessions\", vec![\"users\"]));\n    let names: Vec<String> = try_names(schema.ordered_tables());\n    assert_eq!(names, vec![String::from(\"users\"), String::from(\"sessions\")]);\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_puts_ready_tables_first函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_ordered_tables_puts_ready_tables_first函数的泛型设计和使用如下：\n\n```rust\n#[test]\nfn test_ordered_tables_puts_ready_tables_first() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"users\", vec![]))\n        .add_table(try_table(\"sessions\", vec![\"users\"]));\n    let names: Vec<String> = try_names(schema.ordered_tables());\n    assert_eq!(names, vec![String::from(\"users\"), String::from(\"sessions\")]);\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_orders_by_dependency_not_declaration函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_ordered_tables_orders_by_dependency_not_declaration函数的源码实现如下：\n\n```rust\n#[test]\nfn test_ordered_tables_orders_by_dependency_not_declaration() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"sessions\", vec![\"users\"]))\n        .add_table(try_table(\"users\", vec![]));\n    let names: Vec<String> = try_names(schema.ordered_tables());\n    let users_at: usize = names\n        .iter()\n        .position(|name: &String| name.as_str() == \"users\")\n        .expect(\"users present\");\n    let sessions_at: usize = names\n        .iter()\n        .position(|name: &String| name.as_str() == \"sessions\")\n        .expect(\"sessions present\");\n    assert!(\n        users_at < sessions_at,\n        \"dependency must be created first: {names:?}\"\n    );\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_orders_by_dependency_not_declaration函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_ordered_tables_orders_by_dependency_not_declaration函数的泛型设计和使用如下：\n\n```rust\n#[test]\nfn test_ordered_tables_orders_by_dependency_not_declaration() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"sessions\", vec![\"users\"]))\n        .add_table(try_table(\"users\", vec![]));\n    let names: Vec<String> = try_names(schema.ordered_tables());\n    let users_at: usize = names\n        .iter()\n        .position(|name: &String| name.as_str() == \"users\")\n        .expect(\"users present\");\n    let sessions_at: usize = names\n        .iter()\n        .position(|name: &String| name.as_str() == \"sessions\")\n        .expect(\"sessions present\");\n    assert!(\n        users_at < sessions_at,\n        \"dependency must be created first: {names:?}\"\n    );\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_sorts_a_transitive_chain函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_ordered_tables_sorts_a_transitive_chain函数的源码实现如下：\n\n```rust\n#[test]\nfn test_ordered_tables_sorts_a_transitive_chain() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"c\", vec![\"b\"]))\n        .add_table(try_table(\"a\", vec![]))\n        .add_table(try_table(\"b\", vec![\"a\"]));\n    assert_eq!(\n        try_names(schema.ordered_tables()),\n        vec![String::from(\"a\"), String::from(\"b\"), String::from(\"c\")]\n    );\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_survives_a_dependency_cycle函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_ordered_tables_survives_a_dependency_cycle函数的源码实现如下：\n\n```rust\n#[test]\nfn test_ordered_tables_survives_a_dependency_cycle() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"a\", vec![\"b\"]))\n        .add_table(try_table(\"b\", vec![\"a\"]));\n    let names: Vec<String> = try_names(schema.ordered_tables());\n    assert_eq!(names.len(), 2, \"a cycle must still return every table\");\n    let unique: HashSet<&String> = names.iter().collect();\n    assert_eq!(unique.len(), 2, \"no table may be emitted twice: {names:?}\");\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_survives_a_dependency_cycle函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_ordered_tables_survives_a_dependency_cycle函数的泛型设计和使用如下：\n\n```rust\n#[test]\nfn test_ordered_tables_survives_a_dependency_cycle() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"a\", vec![\"b\"]))\n        .add_table(try_table(\"b\", vec![\"a\"]));\n    let names: Vec<String> = try_names(schema.ordered_tables());\n    assert_eq!(names.len(), 2, \"a cycle must still return every table\");\n    let unique: HashSet<&String> = names.iter().collect();\n    assert_eq!(unique.len(), 2, \"no table may be emitted twice: {names:?}\");\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_appends_tables_with_unknown_dependency函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_ordered_tables_appends_tables_with_unknown_dependency函数的源码实现如下：\n\n```rust\n#[test]\nfn test_ordered_tables_appends_tables_with_unknown_dependency() {\n    let schema: DatabaseSchema =\n        DatabaseSchema::default().add_table(try_table(\"a\", vec![\"missing_table\"]));\n    assert_eq!(try_names(schema.ordered_tables()), vec![String::from(\"a\")]);\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_of_empty_schema_is_empty函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_ordered_tables_of_empty_schema_is_empty函数的源码实现如下：\n\n```rust\n#[test]\nfn test_ordered_tables_of_empty_schema_is_empty() {\n    assert!(DatabaseSchema::default().ordered_tables().is_empty());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_returns_each_table_once函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_ordered_tables_returns_each_table_once函数的源码实现如下：\n\n```rust\n#[test]\nfn test_ordered_tables_returns_each_table_once() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"a\", vec![]))\n        .add_table(try_table(\"b\", vec![]))\n        .add_table(try_table(\"c\", vec![]));\n    let names: Vec<String> = try_names(schema.ordered_tables());\n    assert_eq!(names.len(), 3);\n    let unique: HashSet<&String> = names.iter().collect();\n    assert_eq!(unique.len(), 3, \"duplicates in {names:?}\");\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_ordered_tables_returns_each_table_once函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_ordered_tables_returns_each_table_once函数的泛型设计和使用如下：\n\n```rust\n#[test]\nfn test_ordered_tables_returns_each_table_once() {\n    let schema: DatabaseSchema = DatabaseSchema::default()\n        .add_table(try_table(\"a\", vec![]))\n        .add_table(try_table(\"b\", vec![]))\n        .add_table(try_table(\"c\", vec![]));\n    let names: Vec<String> = try_names(schema.ordered_tables());\n    assert_eq!(names.len(), 3);\n    let unique: HashSet<&String> = names.iter().collect();\n    assert_eq!(unique.len(), 3, \"duplicates in {names:?}\");\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_has_changes_is_false_for_an_untouched_result函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_has_changes_is_false_for_an_untouched_result函数的源码实现如下：\n\n```rust\n#[test]\nfn test_has_changes_is_false_for_an_untouched_result() {\n    assert!(!AutoCreationResult::default().has_changes());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_has_changes_is_true_when_database_created函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_has_changes_is_true_when_database_created函数的源码实现如下：\n\n```rust\n#[test]\nfn test_has_changes_is_true_when_database_created() {\n    let mut result: AutoCreationResult = AutoCreationResult::default();\n    result.set_database_created(true);\n    assert!(result.has_changes());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_has_changes_is_false_for_errors_only函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_has_changes_is_false_for_errors_only函数的源码实现如下：\n\n```rust\n#[test]\nfn test_has_changes_is_false_for_errors_only() {\n    let mut result: AutoCreationResult = AutoCreationResult::default();\n    result.set_errors(vec![String::from(\"permission denied\")]);\n    assert!(!result.has_changes());\n    assert!(result.has_errors());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_has_errors_is_false_when_no_errors函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_has_errors_is_false_when_no_errors函数的源码实现如下：\n\n```rust\n#[test]\nfn test_has_errors_is_false_when_no_errors() {\n    assert!(!AutoCreationResult::default().has_errors());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_is_plugin_enabled_accepts_known_names函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_is_plugin_enabled_accepts_known_names函数的源码实现如下：\n\n```rust\n#[test]\nfn test_is_plugin_enabled_accepts_known_names() {\n    assert!(\n        AutoCreationConfig::for_plugin(\"MySQL\").is_plugin_enabled(),\n        \"MySQL must be enabled\"\n    );\n    assert!(\n        AutoCreationConfig::for_plugin(\"PostgreSQL\").is_plugin_enabled(),\n        \"PostgreSQL must be enabled\"\n    );\n    assert!(\n        AutoCreationConfig::for_plugin(\"Redis\").is_plugin_enabled(),\n        \"Redis must be enabled\"\n    );\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_is_plugin_enabled_rejects_unknown_name函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_is_plugin_enabled_rejects_unknown_name函数的源码实现如下：\n\n```rust\n#[test]\nfn test_is_plugin_enabled_rejects_unknown_name() {\n    assert!(!AutoCreationConfig::for_plugin(\"mongodb\").is_plugin_enabled());\n    assert!(!AutoCreationConfig::for_plugin(\"\").is_plugin_enabled());\n    assert!(!AutoCreationConfig::for_plugin(\"mysql\").is_plugin_enabled());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_for_plugin_keeps_the_plugin_name函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_for_plugin_keeps_the_plugin_name函数的源码实现如下：\n\n```rust\n#[test]\nfn test_for_plugin_keeps_the_plugin_name() {\n    let config: PluginAutoCreationConfig = AutoCreationConfig::for_plugin(\"Redis\");\n    assert_eq!(config.get_plugin_name().as_str(), \"Redis\");\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_plugin_type_from_str_is_case_sensitive函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_plugin_type_from_str_is_case_sensitive函数的源码实现如下：\n\n```rust\n#[test]\nfn test_plugin_type_from_str_is_case_sensitive() {\n    assert_eq!(\n        PluginType::from_str(\"PostgreSQL\").expect(\"exact name parses\"),\n        PluginType::PostgreSQL\n    );\n    assert!(PluginType::from_str(\"postgresql\").is_err());\n    assert!(PluginType::from_str(\"POSTGRESQL\").is_err());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_plugin_type_parses_all_display_names函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_plugin_type_parses_all_display_names函数的源码实现如下：\n\n```rust\n#[test]\nfn test_plugin_type_parses_all_display_names() {\n    assert_eq!(\n        PluginType::from_str(\"MySQL\").expect(\"mysql parses\"),\n        PluginType::MySQL\n    );\n    assert_eq!(\n        PluginType::from_str(\"PostgreSQL\").expect(\"postgresql parses\"),\n        PluginType::PostgreSQL\n    );\n    assert_eq!(\n        PluginType::from_str(\"Redis\").expect(\"redis parses\"),\n        PluginType::Redis\n    );\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_auto_creation_config_is_constructible函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_auto_creation_config_is_constructible函数的源码实现如下：\n\n```rust\n#[test]\nfn test_auto_creation_config_is_constructible() {\n    let config: PluginAutoCreationConfig = AutoCreationConfig::for_plugin(\"MySQL\");\n    assert!(\n        config.is_plugin_enabled(),\n        \"the built config must be usable\"\n    );\n    assert_eq!(\n        AutoCreationConfig::for_plugin(\"Redis\")\n            .get_plugin_name()\n            .as_str(),\n        \"Redis\"\n    );\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_file_logger_zero_limit_is_disable函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_file_logger_zero_limit_is_disable函数的源码实现如下：\n\n```rust\n#[test]\nfn test_file_logger_zero_limit_is_disable() {\n    let logger: FileLogger = FileLogger::new(\"./logs\", 0);\n    assert!(logger.is_disable());\n    assert!(!logger.is_enable());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_file_logger_non_zero_limit_is_enable函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_file_logger_non_zero_limit_is_enable函数的源码实现如下：\n\n```rust\n#[test]\nfn test_file_logger_non_zero_limit_is_enable() {\n    let logger: FileLogger = FileLogger::new(\"./logs\", 1024);\n    assert!(logger.is_enable());\n    assert!(!logger.is_disable());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_file_logger_new_keeps_path_and_limit函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_file_logger_new_keeps_path_and_limit函数的源码实现如下：\n\n```rust\n#[test]\nfn test_file_logger_new_keeps_path_and_limit() {\n    let logger: FileLogger = FileLogger::new(\"/var/log/app\", 2048);\n    assert_eq!(logger.get_path().as_str(), \"/var/log/app\");\n    assert_eq!(logger.get_limit_file_size(), 2048);\n    assert_eq!(logger.get_trace_dir().as_str(), \"trace\");\n    assert_eq!(logger.get_error_dir().as_str(), \"error\");\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_file_logger_default_uses_default_dir函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_file_logger_default_uses_default_dir函数的源码实现如下：\n\n```rust\n#[test]\nfn test_file_logger_default_uses_default_dir() {\n    assert_eq!(FileLogger::default().get_path().as_str(), \"./logs\");\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_common_log_prefixes_and_terminates_each_line函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_common_log_prefixes_and_terminates_each_line函数的源码实现如下：\n\n```rust\n#[test]\nfn test_common_log_prefixes_and_terminates_each_line() {\n    let logged: String = common_log(\"first\\nsecond\");\n    let lines: Vec<&str> = logged.lines().collect();\n    assert_eq!(lines.len(), 2);\n    assert!(lines[0].ends_with(\" first\"));\n    assert!(lines[1].ends_with(\" second\"));\n    assert!(logged.ends_with('\\n'), \"every line must be terminated\");\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_common_log_prefixes_and_terminates_each_line函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_common_log_prefixes_and_terminates_each_line函数的泛型设计和使用如下：\n\n```rust\n#[test]\nfn test_common_log_prefixes_and_terminates_each_line() {\n    let logged: String = common_log(\"first\\nsecond\");\n    let lines: Vec<&str> = logged.lines().collect();\n    assert_eq!(lines.len(), 2);\n    assert!(lines[0].ends_with(\" first\"));\n    assert!(lines[1].ends_with(\" second\"));\n    assert!(logged.ends_with('\\n'), \"every line must be terminated\");\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_common_log_of_empty_is_empty函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_common_log_of_empty_is_empty函数的源码实现如下：\n\n```rust\n#[test]\nfn test_common_log_of_empty_is_empty() {\n    assert!(common_log(\"\").is_empty());\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_log_handler_matches_common_log函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_log_handler_matches_common_log函数的源码实现如下：\n\n```rust\n#[test]\nfn test_log_handler_matches_common_log() {\n    assert_eq!(log_handler(\"payload\"), common_log(\"payload\"));\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_fresh_connection_cache_is_not_expired函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_fresh_connection_cache_is_not_expired函数的源码实现如下：\n\n```rust\n#[test]\nfn test_fresh_connection_cache_is_not_expired() {\n    let cache: ConnectionCache<String> = ConnectionCache::new(Err(String::from(\"refused\")));\n    assert!(!cache.is_expired(Duration::from_secs(60)));\n    assert!(!cache.should_retry(Duration::from_secs(60)));\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_fresh_connection_cache_is_not_expired函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_fresh_connection_cache_is_not_expired函数的泛型设计和使用如下：\n\n```rust\n#[test]\nfn test_fresh_connection_cache_is_not_expired() {\n    let cache: ConnectionCache<String> = ConnectionCache::new(Err(String::from(\"refused\")));\n    assert!(!cache.is_expired(Duration::from_secs(60)));\n    assert!(!cache.should_retry(Duration::from_secs(60)));\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_expired_failure_is_retryable函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_expired_failure_is_retryable函数的源码实现如下：\n\n```rust\n#[test]\nfn test_expired_failure_is_retryable() {\n    let cache: ConnectionCache<String> = ConnectionCache::new(Err(String::from(\"refused\")));\n    assert!(cache.is_expired(Duration::from_nanos(0)));\n    assert!(cache.should_retry(Duration::from_nanos(0)));\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_expired_failure_is_retryable函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_expired_failure_is_retryable函数的泛型设计和使用如下：\n\n```rust\n#[test]\nfn test_expired_failure_is_retryable() {\n    let cache: ConnectionCache<String> = ConnectionCache::new(Err(String::from(\"refused\")));\n    assert!(cache.is_expired(Duration::from_nanos(0)));\n    assert!(cache.should_retry(Duration::from_nanos(0)));\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
+    "instruction": "test_cached_success_is_never_retryable函数的源码是怎么实现的？",
+    "input": "",
+    "output": "test_cached_success_is_never_retryable函数的源码实现如下：\n\n```rust\n#[test]\nfn test_cached_success_is_never_retryable() {\n    let cache: ConnectionCache<String> = ConnectionCache::new(Ok(String::from(\"connected\")));\n    assert!(!cache.should_retry(Duration::from_nanos(0)));\n    assert_eq!(\n        cache\n            .try_get_result()\n            .clone()\n            .expect(\"the cached success must be readable\"),\n        String::from(\"connected\")\n    );\n}\n```",
+    "system": ""
+  },
+  {
+    "instruction": "test_cached_success_is_never_retryable函数中的泛型是如何设计和使用的？",
+    "input": "",
+    "output": "test_cached_success_is_never_retryable函数的泛型设计和使用如下：\n\n```rust\n#[test]\nfn test_cached_success_is_never_retryable() {\n    let cache: ConnectionCache<String> = ConnectionCache::new(Ok(String::from(\"connected\")));\n    assert!(!cache.should_retry(Duration::from_nanos(0)));\n    assert_eq!(\n        cache\n            .try_get_result()\n            .clone()\n            .expect(\"the cached success must be readable\"),\n        String::from(\"connected\")\n    );\n}\n```\n\n这个实现展示了泛型编程的高级用法，包括类型参数的约束和生命周期管理。",
+    "system": ""
+  },
+  {
     "instruction": "Err类型别名的源码是怎么实现的？",
     "input": "",
     "output": "Err类型别名的源码实现如下：\n\n```rust\ntype Err = ();\n```",
