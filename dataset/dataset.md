@@ -1,4 +1,4 @@
-<!--2026-10-17 03:40:09-->
+<!--2026-10-17 10:22:22-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -17009,6 +17009,7 @@ mod from_stream;
 mod hook;
 mod host;
 mod hyperlane;
+mod import;
 mod inject;
 mod method;
 mod referer;
@@ -17024,8 +17025,9 @@ mod upgrade;
 mod version;
 use {
     closed::*, common::*, context::*, filter::*, flush::*, from_stream::*, hook::*, host::*,
-    hyperlane::*, inject::*, method::*, referer::*, reject::*, request::*, request_middleware::*,
-    response::*, response_middleware::*, route::*, send::*, stream::*, upgrade::*, version::*,
+    hyperlane::*, import::*, inject::*, method::*, referer::*, reject::*, request::*,
+    request_middleware::*, response::*, response_middleware::*, route::*, send::*, stream::*,
+    upgrade::*, version::*,
 };
 use {
     proc_macro::TokenStream,
@@ -17347,6 +17349,10 @@ pub fn flush(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn context(input: TokenStream) -> TokenStream {
     context_macro(input)
 }
+#[proc_macro_attribute]
+pub fn import(attr: TokenStream, item: TokenStream) -> TokenStream {
+    import_macro(attr, item)
+}
 ```
 # Path: hyperlane/macros/src/upgrade/fn.rs
 ```rust
@@ -17593,6 +17599,36 @@ mod r#const;
 mod r#impl;
 mod r#struct;
 pub(crate) use {r#const::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/macros/src/import/fn.rs
+```rust
+use super::*;
+pub(crate) fn import_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let path: Path = match parse(attr) {
+        Ok(path) => path,
+        Err(error) => return error.to_compile_error().into(),
+    };
+    let input_fn: ItemFn = parse_macro_input!(item as ItemFn);
+    let attrs: &Vec<Attribute> = &input_fn.attrs;
+    let vis: &Visibility = &input_fn.vis;
+    let sig: &Signature = &input_fn.sig;
+    let stmts: &Vec<Stmt> = &input_fn.block.stmts;
+    let gen_code: proc_macro2::TokenStream = quote! {
+        #(#attrs)*
+        #vis #sig {
+            #[allow(unused_imports)]
+            use #path as _;
+            #(#stmts)*
+        }
+    };
+    gen_code.into()
+}
+```
+# Path: hyperlane/macros/src/import/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
 use super::*;
 ```
 # Path: hyperlane/macros/src/filter/fn.rs
