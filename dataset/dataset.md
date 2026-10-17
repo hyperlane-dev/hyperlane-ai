@@ -1,4 +1,4 @@
-<!--2026-10-17 10:22:22-->
+<!--2026-10-17 15:16:21-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -763,13 +763,13 @@ pub const STATUS_CODE_507: &str = "507";
 pub const STATUS_CODE_508: &str = "508";
 pub const STATUS_CODE_510: &str = "510";
 pub const STATUS_CODE_511: &str = "511";
-pub(crate) const STATUS_CODE_200: &str = "200";
-pub(crate) const STATUS_CODE_204: &str = "204";
-pub(crate) const STATUS_CODE_206: &str = "206";
-pub(crate) const STATUS_CODE_304: &str = "304";
-pub(crate) const STATUS_CODE_400: &str = "400";
-pub(crate) const STATUS_CODE_404: &str = "404";
-pub(crate) const STATUS_CODE_500: &str = "500";
+pub const STATUS_CODE_200: &str = "200";
+pub const STATUS_CODE_204: &str = "204";
+pub const STATUS_CODE_206: &str = "206";
+pub const STATUS_CODE_304: &str = "304";
+pub const STATUS_CODE_400: &str = "400";
+pub const STATUS_CODE_404: &str = "404";
+pub const STATUS_CODE_500: &str = "500";
 ```
 # Path: hyperlane/constant/src/http_status/mod.rs
 ```rust
@@ -1161,43 +1161,43 @@ pub const HTTP2_FORBIDDEN_HEADERS: [&str; 5] = [
 ];
 pub const SOCKET_ADDRESS: &str = "socket-address";
 pub const TOKEN: &str = "token";
-pub(crate) const ACCEPT_LANGUAGE: &str = "accept-language";
-pub(crate) const AUTHORIZATION: &str = "authorization";
-pub(crate) const CACHE_CONTROL: &str = "cache-control";
-pub(crate) const DATE: &str = "date";
-pub(crate) const ETAG: &str = "etag";
-pub(crate) const LAST_MODIFIED: &str = "last-modified";
-pub(crate) const REFRESH: &str = "refresh";
-pub(crate) const VARY: &str = "vary";
-pub(crate) const EXPIRES: &str = "expires";
-pub(crate) const IF_MATCH: &str = "if-match";
-pub(crate) const IF_NONE_MATCH: &str = "if-none-match";
-pub(crate) const IF_MODIFIED_SINCE: &str = "if-modified-since";
-pub(crate) const IF_UNMODIFIED_SINCE: &str = "if-unmodified-since";
-pub(crate) const ACCEPT_CHARSET: &str = "accept-charset";
-pub(crate) const ALLOW: &str = "allow";
-pub(crate) const CONTENT_DISPOSITION: &str = "content-disposition";
-pub(crate) const CONTENT_LANGUAGE: &str = "content-language";
-pub(crate) const CONTENT_RANGE: &str = "content-range";
-pub(crate) const PROXY_AUTHENTICATE: &str = "proxy-authenticate";
-pub(crate) const PROXY_AUTHORIZATION: &str = "proxy-authorization";
-pub(crate) const RETRY_AFTER: &str = "retry-after";
-pub(crate) const STRICT_TRANSPORT_SECURITY: &str = "strict-transport-security";
-pub(crate) const WWW_AUTHENTICATE: &str = "www-authenticate";
-pub(crate) const COLON_AUTHORITY: &str = ":authority";
-pub(crate) const COLON_METHOD: &str = ":method";
-pub(crate) const COLON_PATH: &str = ":path";
-pub(crate) const COLON_SCHEME: &str = ":scheme";
-pub(crate) const AGE: &str = "age";
-pub(crate) const EXPECT: &str = "expect";
-pub(crate) const FROM: &str = "from";
-pub(crate) const LINK: &str = "link";
-pub(crate) const MAX_FORWARDS: &str = "max-forwards";
-pub(crate) const RANGE: &str = "range";
-pub(crate) const VIA: &str = "via";
-pub(crate) const ACCEPT_RANGES: &str = "accept-ranges";
-pub(crate) const CONTENT_LOCATION: &str = "content-location";
-pub(crate) const IF_RANGE: &str = "if-range";
+pub const ACCEPT_LANGUAGE: &str = "accept-language";
+pub const AUTHORIZATION: &str = "authorization";
+pub const CACHE_CONTROL: &str = "cache-control";
+pub const DATE: &str = "date";
+pub const ETAG: &str = "etag";
+pub const LAST_MODIFIED: &str = "last-modified";
+pub const REFRESH: &str = "refresh";
+pub const VARY: &str = "vary";
+pub const EXPIRES: &str = "expires";
+pub const IF_MATCH: &str = "if-match";
+pub const IF_NONE_MATCH: &str = "if-none-match";
+pub const IF_MODIFIED_SINCE: &str = "if-modified-since";
+pub const IF_UNMODIFIED_SINCE: &str = "if-unmodified-since";
+pub const ACCEPT_CHARSET: &str = "accept-charset";
+pub const ALLOW: &str = "allow";
+pub const CONTENT_DISPOSITION: &str = "content-disposition";
+pub const CONTENT_LANGUAGE: &str = "content-language";
+pub const CONTENT_RANGE: &str = "content-range";
+pub const PROXY_AUTHENTICATE: &str = "proxy-authenticate";
+pub const PROXY_AUTHORIZATION: &str = "proxy-authorization";
+pub const RETRY_AFTER: &str = "retry-after";
+pub const STRICT_TRANSPORT_SECURITY: &str = "strict-transport-security";
+pub const WWW_AUTHENTICATE: &str = "www-authenticate";
+pub const COLON_AUTHORITY: &str = ":authority";
+pub const COLON_METHOD: &str = ":method";
+pub const COLON_PATH: &str = ":path";
+pub const COLON_SCHEME: &str = ":scheme";
+pub const AGE: &str = "age";
+pub const EXPECT: &str = "expect";
+pub const FROM: &str = "from";
+pub const LINK: &str = "link";
+pub const MAX_FORWARDS: &str = "max-forwards";
+pub const RANGE: &str = "range";
+pub const VIA: &str = "via";
+pub const ACCEPT_RANGES: &str = "accept-ranges";
+pub const CONTENT_LOCATION: &str = "content-location";
+pub const IF_RANGE: &str = "if-range";
 ```
 # Path: hyperlane/constant/src/header_key/mod.rs
 ```rust
@@ -29784,13 +29784,13 @@ release environment file is read automatically in a release build and already
 names the three containers.
 **The first run takes 25 to 30 minutes** because it compiles from source. To skip
 that, pull the published image instead:
-| Branch | Image |
-| --- | --- |
-| `master` | `hkccr.ccs.tencentyun.com/hyperlane-dev/hyperlane-quick-start:1.0.0` |
+| Branch       | Image                                                                           |
+| ------------ | ------------------------------------------------------------------------------- |
+| `master`     | `hkccr.ccs.tencentyun.com/hyperlane-dev/hyperlane-quick-start:1.0.0`            |
 | `playground` | `hkccr.ccs.tencentyun.com/hyperlane-dev/hyperlane-quick-start-playground:1.0.0` |
 ```sh
-docker compose pull    # fetches the four services
-docker compose up -d
+docker compose pull;
+docker compose up -d;
 ```
 The server logs its own progress; this is what a healthy start looks like:
 ```
@@ -29808,9 +29808,9 @@ The three databases are reachable by their compose service names and are not
 published to the host, so the stack does not collide with anything else already
 listening. To inspect one:
 ```sh
-docker compose exec postgresql psql -U hyperlane -d hyperlane
-docker compose exec mysql mysql -uhyperlane -phyperlane hyperlane
-docker compose exec redis redis-cli -a hyperlane ping
+docker compose exec postgresql psql -U hyperlane -d hyperlane;
+docker compose exec mysql mysql -uhyperlane -phyperlane hyperlane;
+docker compose exec redis redis-cli -a hyperlane ping;
 ```
 Add `-T` and a command when running these from a script, or they wait on stdin
 forever.
@@ -30379,8 +30379,7 @@ pub mod application;
 pub mod common;
 pub mod framework;
 use common::*;
-use {hyperlane::*, hyperlane_log::*, log::*, lombok_macros::*};
-use hyperlane::hyperlane;
+use {hyperlane::*, log::*, lombok_macros::*};
 ```
 # Path: hyperlane-quick-start/bootstrap/README.md
 ## hyperlane-bootstrap
@@ -30428,7 +30427,7 @@ impl BootstrapSyncInit for LoggerBootstrap {
     fn init() -> Self {
         let env_config: &EnvConfig = EnvPlugin::get_or_init();
         let mut file_logger: FileLogger = FileLogger::default();
-        file_logger.set_path(env_config.get_server_log_dir());
+        file_logger.set_path(env_config.get_server_log_dir().to_string());
         file_logger.set_limit_file_size(env_config.get_server_log_size());
         Logger::init(LOG_LEVEL_FILTER, file_logger);
         Self
@@ -30520,6 +30519,7 @@ impl ServerBootstrap {
 }
 impl BootstrapAsyncInit for ServerBootstrap {
     #[hyperlane(server: Server)]
+    #[import(hyperlane_application)]
     async fn init() -> Self {
         let config: ConfigBootstrap = ConfigBootstrap::init().await;
         server
@@ -30721,7 +30721,6 @@ use {
     color_output::*,
     file_operation::*,
     hyperlane::*,
-    hyperlane_log::*,
     instrument_level::*,
     log::*,
     lombok_macros::*,
@@ -31320,8 +31319,10 @@ impl ProcessPlugin {
         trace!("Pid file path: {}", pid_path.as_ref());
         let mut manager: ServerManager = ServerManager::new();
         manager
-            .set_pid_file(pid_path.as_ref())
-            .set_server_hook(server_hook);
+            .set_pid_file(pid_path.as_ref().to_string())
+            .set_server_hook(Arc::new(move || {
+                Box::pin(server_hook()) as Pin<Box<dyn Future<Output = ()> + Send>>
+            }));
         let is_daemon: bool = args.len() >= 3 && args[2].to_lowercase() == DAEMON_FLAG;
         if args.len() < 2 {
             warn!("No additional command-line parameters, default startup");
@@ -31380,7 +31381,7 @@ mod r#impl;
 mod r#struct;
 pub use r#struct::*;
 use {super::*, r#const::*};
-use std::{env::args, future::Future};
+use std::{env::args, future::Future, pin::Pin};
 ```
 # Path: hyperlane-quick-start/plugin/logger/impl.rs
 ```rust
@@ -31528,13 +31529,209 @@ pub struct Logger;
 ```
 # Path: hyperlane-quick-start/plugin/logger/mod.rs
 ```rust
+mod file_logger;
 mod r#impl;
 mod r#static;
 mod r#struct;
-pub use r#struct::*;
+pub use {file_logger::*, r#struct::*};
 use {super::*, r#static::*};
 use std::{fmt::Arguments, sync::OnceLock};
 use hyperlane::tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+```
+# Path: hyperlane-quick-start/plugin/logger/file_logger/impl.rs
+```rust
+use super::*;
+impl Default for FileLogger {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            path: DEFAULT_LOG_DIR.to_owned(),
+            limit_file_size: DEFAULT_LOG_FILE_SIZE,
+            trace_dir: TRACE_DIR.to_owned(),
+            debug_dir: DEBUG_DIR.to_owned(),
+            info_dir: INFO_DIR.to_owned(),
+            warn_dir: WARN_DIR.to_owned(),
+            error_dir: ERROR_DIR.to_owned(),
+        }
+    }
+}
+impl FileLogger {
+    #[inline(always)]
+    pub fn new<P: AsRef<str>>(path: P, limit_file_size: usize) -> Self {
+        Self {
+            path: path.as_ref().to_owned(),
+            limit_file_size,
+            ..Self::default()
+        }
+    }
+    #[inline(always)]
+    pub fn is_enable(&self) -> bool {
+        self.get_limit_file_size() != DISABLE_LOG_FILE_SIZE
+    }
+    #[inline(always)]
+    pub fn is_disable(&self) -> bool {
+        !self.is_enable()
+    }
+    fn write_sync<T, L>(&self, data: T, func: L, dir: &str) -> &Self
+    where
+        T: AsRef<str>,
+        L: Fn(T) -> String + Send + Sync,
+    {
+        if self.is_disable() {
+            return self;
+        }
+        let out: String = func(data);
+        let path: String = get_log_path(dir, self.get_path(), &self.get_limit_file_size());
+        let _: Result<(), Error> = append_to_file(&path, out.as_bytes());
+        self
+    }
+    pub fn trace<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: Fn(T) -> String + Send + Sync,
+    {
+        self.write_sync(data, func, self.get_trace_dir())
+    }
+    pub fn debug<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: Fn(T) -> String + Send + Sync,
+    {
+        self.write_sync(data, func, self.get_debug_dir())
+    }
+    pub fn info<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: Fn(T) -> String + Send + Sync,
+    {
+        self.write_sync(data, func, self.get_info_dir())
+    }
+    pub fn warn<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: Fn(T) -> String + Send + Sync,
+    {
+        self.write_sync(data, func, self.get_warn_dir())
+    }
+    pub fn error<T, L>(&self, data: T, func: L) -> &Self
+    where
+        T: AsRef<str>,
+        L: Fn(T) -> String + Send + Sync,
+    {
+        self.write_sync(data, func, self.get_error_dir())
+    }
+}
+```
+# Path: hyperlane-quick-start/plugin/logger/file_logger/const.rs
+```rust
+pub(crate) const DEFAULT_LOG_DIR: &str = "./logs";
+pub(crate) const LOG_EXTENSION: &str = "log";
+pub(crate) const DEFAULT_LOG_FILE_START_IDX: usize = 1;
+pub(crate) const DEFAULT_LOG_FILE_SIZE: usize = 1_024_000_000;
+pub(crate) const DISABLE_LOG_FILE_SIZE: usize = 0;
+pub(crate) const ROOT_PATH: &str = "/";
+pub(crate) const POINT: &str = ".";
+pub(crate) const BR: &str = "\n";
+pub(crate) const TRACE_DIR: &str = "trace";
+pub(crate) const DEBUG_DIR: &str = "debug";
+pub(crate) const INFO_DIR: &str = "info";
+pub(crate) const WARN_DIR: &str = "warn";
+pub(crate) const ERROR_DIR: &str = "error";
+```
+# Path: hyperlane-quick-start/plugin/logger/file_logger/fn.rs
+```rust
+use super::*;
+pub(crate) fn get_second_element_from_filename(dir_path: &str) -> usize {
+    let mut res_idx: usize = DEFAULT_LOG_FILE_START_IDX;
+    if let Ok(entries) = read_dir(dir_path) {
+        for entry in entries.filter_map(Result::ok) {
+            let file_name: String = entry.file_name().to_string_lossy().to_string();
+            let parts: Vec<&str> = file_name.split(POINT).collect();
+            if parts.len() > 1
+                && let Ok(second_element) = parts[1].parse::<usize>()
+            {
+                res_idx = second_element.max(res_idx);
+            }
+        }
+    }
+    res_idx.max(DEFAULT_LOG_FILE_START_IDX)
+}
+#[inline(always)]
+pub(crate) fn get_file_name(idx: usize) -> String {
+    format!(
+        "{}{}{}{}{}{}",
+        ROOT_PATH,
+        date(),
+        POINT,
+        idx,
+        POINT,
+        LOG_EXTENSION
+    )
+}
+#[inline(always)]
+pub(crate) fn get_file_dir_name() -> String {
+    format!("{}{}", ROOT_PATH, date())
+}
+pub(crate) fn get_log_path(system_dir: &str, base_path: &str, limit_file_size: &usize) -> String {
+    let mut combined_path: String = base_path.trim_end_matches(ROOT_PATH).to_string();
+    if !system_dir.starts_with(ROOT_PATH) {
+        combined_path.push_str(ROOT_PATH);
+    }
+    combined_path.push_str(
+        system_dir
+            .trim_start_matches(ROOT_PATH)
+            .trim_end_matches(ROOT_PATH),
+    );
+    combined_path.push_str(&get_file_dir_name());
+    let idx: usize = get_second_element_from_filename(&combined_path);
+    let mut combined_path_clone: String = combined_path.clone();
+    combined_path.push_str(&get_file_name(idx));
+    let file_size: usize = get_file_size(&combined_path).unwrap_or_default() as usize;
+    if &file_size <= limit_file_size {
+        return combined_path;
+    }
+    combined_path_clone.push_str(&get_file_name(idx + 1));
+    combined_path_clone
+}
+#[inline(always)]
+pub fn common_log<T: AsRef<str>>(data: T) -> String {
+    let mut log_string: String = String::new();
+    for line in data.as_ref().lines() {
+        let line_string: String = format!("{} {}{}", time(), line, BR);
+        log_string.push_str(&line_string);
+    }
+    log_string
+}
+#[inline(always)]
+pub fn log_handler<T: AsRef<str>>(log_data: T) -> String {
+    common_log(log_data)
+}
+```
+# Path: hyperlane-quick-start/plugin/logger/file_logger/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data)]
+pub struct FileLogger {
+    pub path: String,
+    #[get(type(copy))]
+    pub limit_file_size: usize,
+    pub trace_dir: String,
+    pub debug_dir: String,
+    pub info_dir: String,
+    pub warn_dir: String,
+    pub error_dir: String,
+}
+```
+# Path: hyperlane-quick-start/plugin/logger/file_logger/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub use {r#fn::*, r#struct::*};
+pub(crate) use r#const::*;
+use super::*;
+use std::{fs::read_dir, io::Error};
 ```
 # Path: hyperlane-quick-start/plugin/redis/impl.rs
 ```rust
@@ -32912,7 +33109,7 @@ impl PostgreSqlAutoCreation {
             self.get_instance().get_database().as_str()
         );
         let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, query);
-        match connection.query_all(statement).await {
+        match connection.query_all_raw(statement).await {
             Ok(results) => Ok(!results.is_empty()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
                 "Failed to check if database exists {error}"
@@ -32937,7 +33134,7 @@ impl PostgreSqlAutoCreation {
             self.get_instance().get_database().as_str()
         );
         let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, create_query);
-        match connection.execute(statement).await {
+        match connection.execute_raw(statement).await {
             Ok(_) => {
                 AutoCreationLogger::log_database_created(
                     self.get_instance().get_database().as_str(),
@@ -32987,7 +33184,7 @@ impl PostgreSqlAutoCreation {
             "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table_name_str}'"
         );
         let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, query);
-        match connection.query_all(statement).await {
+        match connection.query_all_raw(statement).await {
             Ok(results) => Ok(!results.is_empty()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
                 "Failed to check if table '{table_name_str}' exists {error}"
@@ -33002,7 +33199,7 @@ impl PostgreSqlAutoCreation {
     ) -> Result<(), AutoCreationError> {
         let statement: Statement =
             Statement::from_string(DatabaseBackend::Postgres, table.get_sql().clone());
-        match connection.execute(statement).await {
+        match connection.execute_raw(statement).await {
             Ok(_) => Ok(()),
             Err(error) => {
                 let error_msg: String = error.to_string();
@@ -33032,7 +33229,7 @@ impl PostgreSqlAutoCreation {
         S: AsRef<str>,
     {
         let statement: Statement = Statement::from_string(DatabaseBackend::Postgres, sql.as_ref());
-        match connection.execute(statement).await {
+        match connection.execute_raw(statement).await {
             Ok(_) => Ok(()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
                 "Failed to execute SQL {error}"
@@ -33154,7 +33351,7 @@ impl DatabaseAutoCreation for PostgreSqlAutoCreation {
             DatabaseBackend::Postgres,
             CONNECTION_PROBE_QUERY.to_string(),
         );
-        match connection.query_all(statement).await {
+        match connection.query_all_raw(statement).await {
             Ok(_) => {
                 let _: Result<(), DbErr> = connection.close().await;
                 AutoCreationLogger::log_connection_verification(
@@ -33510,7 +33707,7 @@ impl MySqlAutoCreation {
             self.get_instance().get_database()
         );
         let statement: Statement = Statement::from_string(DatabaseBackend::MySql, query);
-        match connection.query_all(statement).await {
+        match connection.query_all_raw(statement).await {
             Ok(results) => Ok(!results.is_empty()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
                 "Failed to check if database exists {error}"
@@ -33535,7 +33732,7 @@ impl MySqlAutoCreation {
             self.get_instance().get_database()
         );
         let statement: Statement = Statement::from_string(DatabaseBackend::MySql, create_query);
-        match connection.execute(statement).await {
+        match connection.execute_raw(statement).await {
             Ok(_) => {
                 AutoCreationLogger::log_database_created(
                     self.get_instance().get_database().as_str(),
@@ -33602,7 +33799,7 @@ impl MySqlAutoCreation {
             self.get_instance().get_database()
         );
         let statement: Statement = Statement::from_string(DatabaseBackend::MySql, query);
-        match connection.query_all(statement).await {
+        match connection.query_all_raw(statement).await {
             Ok(results) => Ok(!results.is_empty()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
                 "Failed to check if table '{table_name_str}' exists {error}"
@@ -33617,7 +33814,7 @@ impl MySqlAutoCreation {
     ) -> Result<(), AutoCreationError> {
         let statement: Statement =
             Statement::from_string(DatabaseBackend::MySql, table.get_sql().clone());
-        match connection.execute(statement).await {
+        match connection.execute_raw(statement).await {
             Ok(_) => Ok(()),
             Err(error) => {
                 let error_msg: String = error.to_string();
@@ -33649,7 +33846,7 @@ impl MySqlAutoCreation {
         S: AsRef<str>,
     {
         let statement: Statement = Statement::from_string(DatabaseBackend::MySql, sql.as_ref());
-        match connection.execute(statement).await {
+        match connection.execute_raw(statement).await {
             Ok(_) => Ok(()),
             Err(error) => Err(AutoCreationError::DatabaseError(format!(
                 "Failed to execute SQL {error}"
@@ -33785,7 +33982,7 @@ impl DatabaseAutoCreation for MySqlAutoCreation {
         })?;
         let statement: Statement =
             Statement::from_string(DatabaseBackend::MySql, CONNECTION_PROBE_QUERY.to_string());
-        match connection.query_all(statement).await {
+        match connection.query_all_raw(statement).await {
             Ok(_) => {
                 let _: Result<(), DbErr> = connection.close().await;
                 AutoCreationLogger::log_connection_verification(
@@ -34075,7 +34272,7 @@ pub mod path;
 # Path: hyperlane-quick-start/resources/docker/dev/server.dockerfile
 ```dockerfile
 ARG TARGETPLATFORM
-ARG RUST_VERSION=1.93
+ARG RUST_VERSION=1.99
 FROM --platform=$TARGETPLATFORM rust:${RUST_VERSION}-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
@@ -34110,7 +34307,7 @@ pub use r#const::*;
 # Path: hyperlane-quick-start/resources/docker/release/server.dockerfile
 ```dockerfile
 ARG TARGETPLATFORM
-ARG RUST_VERSION=1.93
+ARG RUST_VERSION=1.99
 FROM --platform=$TARGETPLATFORM rust:${RUST_VERSION}-bookworm
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
