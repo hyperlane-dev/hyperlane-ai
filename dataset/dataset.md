@@ -1,4 +1,4 @@
-<!--2026-10-18 03:46:49-->
+<!--2026-10-18 10:39:43-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -29782,8 +29782,15 @@ server image from source, starts MySQL, PostgreSQL and Redis, waits for all thre
 to report healthy, and starts the server. Nothing has to be configured first — the
 release environment file is read automatically in a release build and already
 names the three containers.
-**The first run takes 25 to 30 minutes** because it compiles from source. To skip
-that, pull the published image instead:
+The first run compiles from source and can take a long time on a small machine.
+The repository builds serially by default (`.cargo/config.toml` sets
+`build.jobs = 1`) and the release profile has no LTO, which lowers the peak
+memory a build needs rather than fixing a floor every machine clears. CI
+compiles the tree inside a container capped at 2 CPUs and 4 GiB with no swap and
+prints the peak that run actually reached, so the number to compare against is
+in the job log rather than in this file. On a stronger machine, raise
+parallelism explicitly with `cargo build --release -j <N>`. To skip the build
+entirely, pull the published image instead:
 | Branch       | Image                                                                           |
 | ------------ | ------------------------------------------------------------------------------- |
 | `master`     | `hkccr.ccs.tencentyun.com/hyperlane-dev/hyperlane-quick-start:1.0.0`            |
@@ -34522,6 +34529,7 @@ pub mod path;
 ARG TARGETPLATFORM
 ARG RUST_VERSION=1.99
 FROM --platform=$TARGETPLATFORM rust:${RUST_VERSION}-bookworm
+ENV CARGO_BUILD_JOBS=1
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
@@ -34557,6 +34565,7 @@ pub use r#const::*;
 ARG TARGETPLATFORM
 ARG RUST_VERSION=1.99
 FROM --platform=$TARGETPLATFORM rust:${RUST_VERSION}-bookworm
+ENV CARGO_BUILD_JOBS=1
 RUN apt-get update -yqq && apt-get install -yqq cmake g++ binutils lld
 WORKDIR /hyperlane-quick-start
 COPY . .
