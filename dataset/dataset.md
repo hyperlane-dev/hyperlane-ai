@@ -1,4 +1,4 @@
-<!--2026-10-19 03:56:25-->
+<!--2026-10-19 12:37:20-->
 # Path: hyperlane/README.md
 ## hyperlane
 [Api Docs](https://docs.rs/hyperlane/latest/)
@@ -9195,6 +9195,7 @@ use super::*;
 pub struct Proxy {
     pub proxy_type: ProxyType,
     pub host: String,
+    #[get(type(copy))]
     pub port: u16,
     #[get(type(clone))]
     pub username: Option<String>,
@@ -9238,18 +9239,18 @@ use super::*;
 #[derive(Clone, Data, Debug, Default, Eq, PartialEq)]
 pub struct RequestConfig {
     #[get(type(copy))]
-    pub(crate) buffer_size: usize,
+    pub buffer_size: usize,
     #[get(type(copy))]
-    pub(super) timeout: u64,
+    pub timeout: u64,
     #[get(type(copy))]
-    pub(super) max_redirect_times: usize,
-    pub(super) http_version: HttpVersion,
+    pub max_redirect_times: usize,
+    pub http_version: HttpVersion,
     #[get(type(copy))]
-    pub(super) redirect: bool,
+    pub redirect: bool,
     #[get(type(copy))]
-    pub(super) decode: bool,
+    pub decode: bool,
     #[get(type(clone))]
-    pub(super) proxy: Option<Proxy>,
+    pub proxy: Option<Proxy>,
 }
 ```
 # Path: hyperlane/request/src/request/config/mod.rs
@@ -10181,7 +10182,7 @@ impl HttpRequest {
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
         let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
-        let tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), *proxy.get_port()))
+        let tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -10259,7 +10260,7 @@ impl HttpRequest {
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
         let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
-        let mut tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), *proxy.get_port()))
+        let mut tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         tcp.set_read_timeout(Some(timeout))
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -10381,12 +10382,10 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let tcp: http_type::tokio::net::TcpStream = http_type::tokio::net::TcpStream::connect((
-            proxy.get_host().clone(),
-            *proxy.get_port(),
-        ))
-        .await
-        .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let tcp: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let mut proxy_stream: BoxAsyncReadWrite = if proxy.get_proxy_type() == &ProxyType::Https {
             let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
             let tls_cfg: ClientConfig = ClientConfig::builder()
@@ -10468,11 +10467,10 @@ impl HttpRequest {
         target_port: u16,
         proxy: &Proxy,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let mut tcp: http_type::tokio::net::TcpStream = http_type::tokio::net::TcpStream::connect(
-            (proxy.get_host().clone(), *proxy.get_port()),
-        )
-        .await
-        .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let mut tcp: http_type::tokio::net::TcpStream =
+            http_type::tokio::net::TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let auth_methods: Vec<u8> =
             if proxy.get_username().is_some() && proxy.get_password().is_some() {
                 vec![0x05, 0x02, 0x00, 0x02]
@@ -10930,7 +10928,7 @@ pub(crate) const APP_NAME: &str = "http-request";
 use super::*;
 #[derive(Clone, Debug, Default, Eq, Getter, PartialEq, Serialize)]
 pub struct Body {
-    pub(super) bytes: Vec<u8>,
+    pub bytes: Vec<u8>,
 }
 ```
 # Path: hyperlane/request/src/common/mod.rs
@@ -10962,22 +10960,34 @@ git clone https://github.com/hyperlane-dev/hyperlane-quick-start.git
 mod config;
 mod context;
 mod error;
+mod protocol;
 mod route;
 mod server;
 use hyperlane_core::*;
 use std::{
+    any::Any,
+    collections::VecDeque,
     io,
-    net::TcpListener,
-    sync::{Arc, OnceLock},
+    net::{AddrParseError, SocketAddr, TcpListener, UdpSocket},
+    path::PathBuf,
+    sync::{Arc, Mutex, OnceLock},
     time::{Duration, Instant},
 };
+use bytes::{Buf, Bytes};
+use h3::error::Code;
+use rustls::{
+    ClientConfig, RootCertStore,
+    pki_types::{CertificateDer, ServerName, pem::PemObject},
+};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
     spawn,
+    sync::Notify,
     task::JoinHandle,
-    time::sleep,
+    time::{sleep, timeout},
 };
+pub(crate) type ClientTlsStream = tokio_rustls::client::TlsStream<TcpStream>;
 ```
 # Path: hyperlane/core/tests/server/impl.rs
 ```rust
@@ -12168,39 +12178,5071 @@ mod r#struct;
 use r#struct::*;
 use super::*;
 ```
+# Path: hyperlane/core/tests/protocol/mod.rs
+```rust
+mod r#common;
+mod r#http1;
+mod r#http2;
+mod r#http3;
+mod r#limits;
+mod r#middleware;
+mod r#runtime;
+mod r#tls;
+mod r#websocket;
+mod r#wire;
+use r#common::{r#const::*, r#fn::*, r#gate::*, r#server::*};
+use r#http2::{r#fn::*, r#type::*};
+use r#http3::{r#fn::*, r#type::*};
+use r#middleware::r#fn::*;
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/tls/fn.rs
+```rust
+use super::*;
+#[test]
+fn tls_config_new_keeps_the_paths_it_was_given() {
+    let chain: String = fixture_path(LEAF_CHAIN_PEM_NAME)
+        .to_string_lossy()
+        .to_string();
+    let key: String = fixture_path(LEAF_KEY_NAME).to_string_lossy().to_string();
+    let config: TlsConfig = TlsConfig::new(chain.clone(), key.clone());
+    assert_eq!(config.get_certificate_path(), &chain);
+    assert_eq!(config.get_private_key_path(), &key);
+}
+#[test]
+fn server_protocol_defaults_to_http1() {
+    let protocol: ServerProtocol = ServerProtocol::default();
+    assert_eq!(protocol, ServerProtocol::Http1);
+}
+fn protocol_from_wire_name(name: &str) -> Option<ServerProtocol> {
+    let json: String = format!("{{\"address\":\"127.0.0.1:8080\",\"protocol\":\"{name}\"}}");
+    match ServerConfig::from_json(json) {
+        Ok(config) => Some(config.get_protocol()),
+        Err(_) => None,
+    }
+}
+#[test]
+fn server_protocol_wire_names_are_http1_http2_and_http3() {
+    assert_eq!(
+        protocol_from_wire_name(WIRE_HTTP1),
+        Some(ServerProtocol::Http1)
+    );
+    assert_eq!(
+        protocol_from_wire_name(WIRE_HTTP2),
+        Some(ServerProtocol::Http2)
+    );
+    assert_eq!(
+        protocol_from_wire_name(WIRE_HTTP3),
+        Some(ServerProtocol::Http3)
+    );
+}
+#[test]
+fn an_omitted_protocol_field_loads_as_http1() {
+    let config: ServerConfig =
+        ServerConfig::from_json("{\"address\":\"127.0.0.1:8080\"}").expect("legacy json must load");
+    assert_eq!(config.get_protocol(), ServerProtocol::Http1);
+}
+#[test]
+fn a_legacy_config_without_protocol_or_tls_still_loads_as_plaintext_http1() {
+    let legacy: &str = "{\"address\":\"127.0.0.1:8080\"}";
+    let config: ServerConfig = ServerConfig::from_json(legacy).expect("legacy json must load");
+    assert_eq!(config.get_address(), "127.0.0.1:8080");
+    assert_eq!(
+        config.get_protocol(),
+        ServerProtocol::Http1,
+        "an omitted protocol must resolve to the historical default"
+    );
+    assert!(
+        config.get_tls().is_none(),
+        "a legacy config must carry no tls material"
+    );
+    assert_eq!(
+        config.get_alpn_protocol(),
+        ALPN_HTTP1,
+        "a legacy config must advertise the http/1.1 alpn"
+    );
+}
+#[test]
+fn the_three_argument_constructor_keeps_speaking_http1_without_tls() {
+    let legacy: String = SERVER_CONFIG_LEGACY_ADDRESS.to_string();
+    let config: ServerConfig = ServerConfig::new(legacy, None, None);
+    assert_eq!(*config.get_address(), SERVER_CONFIG_LEGACY_ADDRESS);
+    assert_eq!(config.get_protocol(), ServerProtocol::Http1);
+    assert!(config.get_tls().is_none());
+}
+#[test]
+fn a_config_built_from_json_and_rebuilt_through_the_constructor_agree() {
+    let from_json: ServerConfig =
+        ServerConfig::from_json("{\"address\":\"127.0.0.1:9090\",\"protocol\":\"http2\"}")
+            .expect("json config must load");
+    let other: String = "127.0.0.1:9090".to_string();
+    let built: ServerConfig = ServerConfig::new(other, None, None);
+    assert_eq!(from_json.get_protocol(), ServerProtocol::Http2);
+    assert_eq!(
+        built.get_protocol(),
+        ServerProtocol::Http1,
+        "the old constructor cannot select a protocol, so it stays on http1"
+    );
+    assert_eq!(from_json.get_address(), built.get_address());
+}
+#[test]
+fn an_unknown_protocol_wire_name_is_rejected() {
+    assert_eq!(
+        protocol_from_wire_name(WIRE_UNKNOWN),
+        None,
+        "an unknown protocol name must not silently fall back to http1"
+    );
+}
+#[test]
+fn a_protocol_and_tls_config_round_trips_through_json() {
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address("127.0.0.1:8443")
+        .set_protocol(ServerProtocol::Http2)
+        .set_tls(Some(TlsConfig::new(
+            fixture_path(LEAF_CHAIN_PEM_NAME)
+                .to_string_lossy()
+                .to_string(),
+            fixture_path(LEAF_KEY_NAME).to_string_lossy().to_string(),
+        )));
+    let encoded: String = format!(
+        "{{\"address\":\"127.0.0.1:8443\",\"protocol\":\"{WIRE_HTTP2}\",\"tls\":{{\"certificate_path\":\"{}\",\"private_key_path\":\"{}\"}}}}",
+        fixture_path(LEAF_CHAIN_PEM_NAME).to_string_lossy(),
+        fixture_path(LEAF_KEY_NAME).to_string_lossy()
+    );
+    let decoded: ServerConfig = ServerConfig::from_json(encoded).expect("config must decode");
+    assert_eq!(decoded.get_protocol(), ServerProtocol::Http2);
+    let decoded_tls: Option<TlsConfig> = decoded.get_tls().clone();
+    match decoded_tls {
+        Some(value) => {
+            assert_eq!(
+                *value.get_certificate_path(),
+                fixture_path(LEAF_CHAIN_PEM_NAME)
+                    .to_string_lossy()
+                    .to_string()
+            );
+        }
+        None => panic!("the tls block must survive the round trip"),
+    }
+}
+#[test]
+fn clearing_tls_leaves_the_protocol_choice_untouched() {
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_protocol(ServerProtocol::Http3)
+        .set_tls(Some(TlsConfig::new("a".to_string(), "b".to_string())))
+        .set_tls(None);
+    assert_eq!(config.get_protocol(), ServerProtocol::Http3);
+    assert!(config.get_tls().is_none());
+}
+#[tokio::test]
+async fn a_truncated_certificate_is_rejected_before_the_listener_binds() {
+    let port: u16 = reserve_tcp_port();
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(format!("{LOOPBACK_HOST}:{port}"))
+        .set_protocol(ServerProtocol::Http2)
+        .set_tls(Some(TlsConfig::new(
+            fixture_path(TRUNCATED_CERTIFICATE_PEM_NAME)
+                .to_string_lossy()
+                .to_string(),
+            fixture_path(LEAF_KEY_NAME).to_string_lossy().to_string(),
+        )));
+    let mut server: Server = Server::default();
+    server.server_config(config);
+    register_probe_hooks(&mut server);
+    let outcome: Result<ServerControlHook, Box<ServerError>> = server.run().await;
+    assert!(
+        outcome.is_err(),
+        "a truncated certificate must fail configuration, not start a listener"
+    );
+    let rebound: io::Result<TcpListener> = TcpListener::bind(("127.0.0.1", port));
+    assert!(
+        rebound.is_ok(),
+        "a rejected certificate must leave port {port} unbound"
+    );
+}
+#[tokio::test]
+async fn a_malformed_certificate_is_rejected_before_the_listener_binds() {
+    let port: u16 = reserve_tcp_port();
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(format!("{LOOPBACK_HOST}:{port}"))
+        .set_protocol(ServerProtocol::Http2)
+        .set_tls(Some(TlsConfig::new(
+            fixture_path(MALFORMED_CERTIFICATE_PEM_NAME)
+                .to_string_lossy()
+                .to_string(),
+            fixture_path(LEAF_KEY_NAME).to_string_lossy().to_string(),
+        )));
+    let mut server: Server = Server::default();
+    server.server_config(config);
+    register_probe_hooks(&mut server);
+    let outcome: Result<ServerControlHook, Box<ServerError>> = server.run().await;
+    assert!(
+        outcome.is_err(),
+        "a malformed certificate must fail configuration, not start a listener"
+    );
+    let rebound: io::Result<TcpListener> = TcpListener::bind(("127.0.0.1", port));
+    assert!(
+        rebound.is_ok(),
+        "a rejected certificate must leave port {port} unbound"
+    );
+}
+#[tokio::test]
+async fn an_invalid_private_key_is_rejected_before_the_listener_binds() {
+    let port: u16 = reserve_tcp_port();
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(format!("{LOOPBACK_HOST}:{port}"))
+        .set_protocol(ServerProtocol::Http2)
+        .set_tls(Some(TlsConfig::new(
+            fixture_path(LEAF_CHAIN_PEM_NAME)
+                .to_string_lossy()
+                .to_string(),
+            fixture_path(INVALID_PRIVATE_KEY_PEM_NAME)
+                .to_string_lossy()
+                .to_string(),
+        )));
+    let mut server: Server = Server::default();
+    server.server_config(config);
+    register_probe_hooks(&mut server);
+    let outcome: Result<ServerControlHook, Box<ServerError>> = server.run().await;
+    assert!(
+        outcome.is_err(),
+        "an invalid private key must fail configuration, not start a listener"
+    );
+    let rebound: io::Result<TcpListener> = TcpListener::bind(("127.0.0.1", port));
+    assert!(
+        rebound.is_ok(),
+        "a rejected key must leave port {port} unbound"
+    );
+}
+#[tokio::test]
+async fn a_certificate_and_key_from_different_chains_are_rejected() {
+    let port: u16 = reserve_tcp_port();
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(format!("{LOOPBACK_HOST}:{port}"))
+        .set_protocol(ServerProtocol::Http2)
+        .set_tls(Some(TlsConfig::new(
+            fixture_path(LEAF_CHAIN_PEM_NAME)
+                .to_string_lossy()
+                .to_string(),
+            fixture_path(MISMATCHED_LEAF_KEY_NAME)
+                .to_string_lossy()
+                .to_string(),
+        )));
+    let mut server: Server = Server::default();
+    server.server_config(config);
+    register_probe_hooks(&mut server);
+    let outcome: Result<ServerControlHook, Box<ServerError>> = server.run().await;
+    assert!(
+        outcome.is_err(),
+        "a certificate and key from different chains must not pair up"
+    );
+    let rebound: io::Result<TcpListener> = TcpListener::bind(("127.0.0.1", port));
+    assert!(
+        rebound.is_ok(),
+        "a rejected key pair must leave port {port} unbound"
+    );
+}
+#[tokio::test]
+async fn a_missing_certificate_file_is_rejected_before_the_listener_binds() {
+    let port: u16 = reserve_tcp_port();
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(format!("{LOOPBACK_HOST}:{port}"))
+        .set_protocol(ServerProtocol::Http2)
+        .set_tls(Some(TlsConfig::new(
+            fixture_path(MISSING_PEM_NAME).to_string_lossy().to_string(),
+            fixture_path(LEAF_KEY_NAME).to_string_lossy().to_string(),
+        )));
+    let mut server: Server = Server::default();
+    server.server_config(config);
+    register_probe_hooks(&mut server);
+    let outcome: Result<ServerControlHook, Box<ServerError>> = server.run().await;
+    assert!(
+        outcome.is_err(),
+        "a missing certificate file must fail configuration"
+    );
+}
+#[tokio::test]
+async fn http3_without_tls_is_refused_and_never_binds_the_udp_port() {
+    let port: u16 = reserve_udp_port();
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(format!("{LOOPBACK_HOST}:{port}"))
+        .set_protocol(ServerProtocol::Http3)
+        .set_tls(None);
+    let mut server: Server = Server::default();
+    server.server_config(config);
+    register_probe_hooks(&mut server);
+    let outcome: Result<ServerControlHook, Box<ServerError>> = server.run().await;
+    assert!(
+        outcome.is_err(),
+        "http3 over quic without tls must be refused, tls is mandatory"
+    );
+    let rebound: io::Result<UdpSocket> = UdpSocket::bind(format!("{LOOPBACK_HOST}:{port}"));
+    assert!(
+        rebound.is_ok(),
+        "a refused http3 start must leave udp port {port} unbound"
+    );
+}
+#[tokio::test]
+async fn an_http2_tls_client_that_offers_no_alpn_is_not_served() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, Some(trusted_tls_config()))
+            .await
+            .expect("http2 tls server must start");
+    let mut stream: ClientTlsStream = connect_tls_without_alpn(port)
+        .await
+        .expect("the handshake itself must still complete");
+    let mut observed: Vec<u8> = Vec::new();
+    let mut chunk: [u8; 512] = [0; 512];
+    if let Ok(Ok(read)) = timeout(
+        Duration::from_millis(SHUTDOWN_PROBE_MILLIS),
+        stream.read(&mut chunk),
+    )
+    .await
+    {
+        observed.extend_from_slice(&chunk[..read]);
+    }
+    assert!(
+        observed.is_empty(),
+        "a client that negotiated no protocol must not receive an http2 response, got: {:?}",
+        String::from_utf8_lossy(&observed)
+    );
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn an_http1_tls_client_that_offers_no_alpn_is_still_served() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, Some(trusted_tls_config()))
+            .await
+            .expect("http1 tls server must start");
+    let mut stream: ClientTlsStream = connect_tls_without_alpn(port)
+        .await
+        .expect("a legacy client without alpn must complete the handshake");
+    let request: String = format!(
+        "GET {VERSION_ROUTE_PATH} HTTP/1.1\r\nHost: {TLS_SERVER_NAME}\r\nConnection: close\r\n\r\n"
+    );
+    let written: io::Result<()> = write_bounded(&mut stream, request.as_bytes()).await;
+    assert!(written.is_ok(), "the request must reach the server");
+    let mut collected: Vec<u8> = Vec::new();
+    let mut chunk: [u8; 512] = [0; 512];
+    if let Ok(Ok(read)) = timeout(
+        Duration::from_millis(SHUTDOWN_PROBE_MILLIS),
+        stream.read(&mut chunk),
+    )
+    .await
+    {
+        collected.extend_from_slice(&chunk[..read]);
+    }
+    let (head, body): (String, Vec<u8>) = response_head_and_body(&collected);
+    assert!(
+        head.starts_with("HTTP/1.1 200"),
+        "a no-alpn client must still be served over http1, got: {head}"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        format!("{:?}", HttpVersion::Http1_1)
+    );
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn a_client_that_does_not_trust_the_server_ca_is_refused() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, Some(trusted_tls_config()))
+            .await
+            .expect("http2 tls server must start");
+    let outcome: Result<(), String> = connect_tls_untrusted(port).await;
+    assert!(
+        outcome.is_err(),
+        "a client without the fixture ca in its trust store must be refused"
+    );
+    let (sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("the server must keep serving a properly trusting client");
+    drop(sender);
+    drop(connection);
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn an_infinite_read_timeout_tls_close_still_delivers_close_notify() {
+    let port: u16 = reserve_tcp_port();
+    let address: String = format!("{LOOPBACK_HOST}:{port}");
+    let mut server: Server = Server::default();
+    server
+        .server_config(protocol_config(
+            &address,
+            ServerProtocol::Http1,
+            Some(trusted_tls_config()),
+        ))
+        .request_config(RequestConfig {
+            read_timeout_ms: u64::MAX,
+            ..RequestConfig::default()
+        });
+    register_probe_hooks(&mut server);
+    let control: ServerControlHook = server
+        .run()
+        .await
+        .expect("http1 tls server must start with an infinite read timeout");
+    drop(server);
+    sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
+    let stream: ClientTlsStream = connect_tls(port, ALPN_HTTP1)
+        .await
+        .expect("validating client must complete the handshake");
+    let request: Vec<u8> = http1_close_request("GET", VERSION_ROUTE_PATH);
+    let exchanged: Vec<u8> = timeout(
+        Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        tls_exchange(stream, request),
+    )
+    .await
+    .expect("the tls exchange must not outlive the client timeout")
+    .expect("the tls exchange must complete without a transport error");
+    let (head, body): (String, Vec<u8>) = response_head_and_body(&exchanged);
+    assert!(
+        head.starts_with("HTTP/1.1 200"),
+        "an infinite read timeout must still serve the request, got: {head}"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        format!("{:?}", HttpVersion::Http1_1),
+        "the body must arrive complete before the session is closed"
+    );
+    control.shutdown().await;
+}
+```
+# Path: hyperlane/core/tests/protocol/tls/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/http2/fn.rs
+```rust
+use super::*;
+pub(crate) async fn h2_plaintext_session(
+    port: u16,
+) -> Result<
+    (
+        h2::client::SendRequest<Bytes>,
+        h2::client::Connection<TcpStream, Bytes>,
+    ),
+    String,
+> {
+    let socket: TcpStream = connect_tcp(port)
+        .await
+        .map_err(|error: io::Error| format!("h2 plaintext connect failed: {error}"))?;
+    timeout(
+        Duration::from_secs(CONNECT_TIMEOUT_SECS),
+        h2::client::handshake(socket),
+    )
+    .await
+    .map_err(|_| "h2 plaintext handshake timed out".to_string())?
+    .map_err(|error: h2::Error| format!("h2 plaintext handshake failed: {error}"))
+}
+pub(crate) async fn h2_tls_alpn(port: u16) -> Result<(Option<Vec<u8>>, H2TlsSession), String> {
+    let stream: ClientTlsStream = connect_tls(port, ALPN_HTTP2)
+        .await
+        .map_err(|error: io::Error| format!("h2 tls connect failed: {error}"))?;
+    let alpn: Option<Vec<u8>> = negotiated_alpn(&stream);
+    let (send, connection) = timeout(
+        Duration::from_secs(CONNECT_TIMEOUT_SECS),
+        h2::client::handshake(stream),
+    )
+    .await
+    .map_err(|_| "h2 tls handshake timed out".to_string())?
+    .map_err(|error: h2::Error| format!("h2 tls handshake failed: {error}"))?;
+    Ok((alpn, (send, connection)))
+}
+pub(crate) async fn h2_request(
+    sender: &mut h2::client::SendRequest<Bytes>,
+    method: &str,
+    target: &str,
+    body: &[u8],
+) -> Result<H2Reply, String> {
+    let request: http::Request<()> = http::Request::builder()
+        .method(method)
+        .uri(target)
+        .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
+        .body(())
+        .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
+    let (response, mut send_stream) = sender
+        .send_request(request, body.is_empty())
+        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
+    if !body.is_empty() {
+        send_stream
+            .send_data(Bytes::copy_from_slice(body), true)
+            .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))?;
+    }
+    let response: http::Response<h2::RecvStream> =
+        timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
+            .await
+            .map_err(|_| "h2 response timed out".to_string())?
+            .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
+    let status: u16 = response.status().as_u16();
+    let version: http::Version = response.version();
+    let mut received: h2::RecvStream = response.into_body();
+    let mut collected: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err("h2 body timed out".to_string());
+        }
+        match timeout(remaining, received.data()).await {
+            Ok(Some(Ok(chunk))) => {
+                let _released: Result<(), h2::Error> =
+                    received.flow_control().release_capacity(chunk.len());
+                collected.extend_from_slice(&chunk);
+            }
+            Ok(Some(Err(error))) => return Err(format!("h2 body read failed: {error}")),
+            Ok(None) => break,
+            Err(_) => return Err("h2 body timed out".to_string()),
+        }
+    }
+    Ok((status, version, collected))
+}
+pub(crate) async fn h2_request_with_headers(
+    sender: &mut h2::client::SendRequest<Bytes>,
+    method: &str,
+    target: &str,
+    body: &[u8],
+) -> Result<H2HeadReply, String> {
+    let request: http::Request<()> = http::Request::builder()
+        .method(method)
+        .uri(target)
+        .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
+        .body(())
+        .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
+    let (response, mut send_stream) = sender
+        .send_request(request, body.is_empty())
+        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
+    if !body.is_empty() {
+        send_stream
+            .send_data(Bytes::copy_from_slice(body), true)
+            .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))?;
+    }
+    let response: http::Response<h2::RecvStream> =
+        timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
+            .await
+            .map_err(|_| "h2 response timed out".to_string())?
+            .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
+    let status: u16 = response.status().as_u16();
+    let headers: http::HeaderMap = response.headers().clone();
+    let mut received: h2::RecvStream = response.into_body();
+    let mut collected: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err("h2 body timed out".to_string());
+        }
+        match timeout(remaining, received.data()).await {
+            Ok(Some(Ok(chunk))) => {
+                let _released: Result<(), h2::Error> =
+                    received.flow_control().release_capacity(chunk.len());
+                collected.extend_from_slice(&chunk);
+            }
+            Ok(Some(Err(error))) => return Err(format!("h2 body read failed: {error}")),
+            Ok(None) => break,
+            Err(_) => return Err("h2 body timed out".to_string()),
+        }
+    }
+    Ok((status, headers, collected))
+}
+pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (Vec<u8>, bool) {
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let request: http::Request<()> = http::Request::builder()
+        .method("GET")
+        .uri(target)
+        .body(())
+        .expect("request must build");
+    let (response, _send_stream) = sender
+        .send_request(request, true)
+        .expect("h2 request must be accepted");
+    let response: http::Response<h2::RecvStream> =
+        timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
+            .await
+            .expect("h2 response head must arrive")
+            .expect("h2 response must not fail");
+    let mut body: h2::RecvStream = response.into_body();
+    let mut collected: Vec<u8> = Vec::new();
+    let mut matched: bool = false;
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        if String::from_utf8_lossy(&collected).contains(needle) {
+            matched = true;
+            break;
+        }
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match timeout(remaining, body.data()).await {
+            Ok(Some(Ok(chunk))) => {
+                let _released: Result<(), h2::Error> =
+                    body.flow_control().release_capacity(chunk.len());
+                collected.extend_from_slice(&chunk);
+            }
+            Ok(Some(Err(_))) => break,
+            Ok(None) => break,
+            Err(_) => break,
+        }
+    }
+    drop(sender);
+    driving.abort();
+    (collected, matched)
+}
+```
+# Path: hyperlane/core/tests/protocol/http2/type.rs
+```rust
+use super::*;
+pub(crate) type H2TlsSession = (
+    h2::client::SendRequest<Bytes>,
+    h2::client::Connection<ClientTlsStream, Bytes>,
+);
+pub(crate) type H2Reply = (u16, http::Version, Vec<u8>);
+pub(crate) type H2HeadReply = (u16, http::HeaderMap, Vec<u8>);
+```
+# Path: hyperlane/core/tests/protocol/http2/assert.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn http2_plaintext_reports_the_real_local_and_peer_addresses_of_the_connection() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let socket: TcpStream = connect_tcp(port).await.expect("socket must connect");
+    let client_local: SocketAddr = socket
+        .local_addr()
+        .expect("a connected socket must report its local address");
+    let (mut sender, connection) = timeout(
+        Duration::from_secs(CONNECT_TIMEOUT_SECS),
+        h2::client::handshake(socket),
+    )
+    .await
+    .expect("h2 prior-knowledge handshake must not time out")
+    .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let (status, _version, body): H2Reply = h2_request(
+        &mut sender,
+        "GET",
+        &format!("http://{TLS_SERVER_NAME}:{port}{SOCKET_METADATA_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("h2 socket metadata request must complete");
+    assert_eq!(status, 200);
+    let text: String = String::from_utf8_lossy(&body).to_string();
+    let (reported_local, reported_peer): (String, String) =
+        match text.split_once(SOCKET_METADATA_SEPARATOR) {
+            Some(pair) => (pair.0.to_string(), pair.1.to_string()),
+            None => panic!("the route must report both addresses, got: {text:?}"),
+        };
+    let expected_local: SocketAddr = format!("{LOOPBACK_HOST}:{port}")
+        .parse()
+        .expect("the bind address must parse");
+    assert_eq!(
+        reported_local,
+        expected_local.to_string(),
+        "an h2 stream must carry the connection's real local address"
+    );
+    assert_eq!(
+        reported_peer,
+        client_local.to_string(),
+        "an h2 stream must carry the connection's real peer address, not a fabricated one"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_streams_a_body_that_never_announced_a_content_length() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let (status, headers, body): H2HeadReply = h2_request_with_headers(
+        &mut sender,
+        "GET",
+        &format!("http://{TLS_SERVER_NAME}:{port}{UNFRAMED_BODY_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("an unframed h2 body must be accepted");
+    assert_eq!(status, 200);
+    assert!(
+        !headers.contains_key(CONTENT_LENGTH),
+        "the head must not announce a length for a body framed by data frames"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        UNFRAMED_BODY,
+        "a body with no content-length must still reach the client in full"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_plaintext_prior_knowledge_serves_http2_over_tcp() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let (status, version, body): H2Reply = h2_request(
+        &mut sender,
+        "GET",
+        &format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("h2 plaintext request must complete");
+    assert_eq!(status, 200);
+    assert_eq!(
+        version,
+        http::Version::HTTP_2,
+        "the response must be framed as HTTP/2, not downgraded"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        format!("{:?}", HttpVersion::Http2)
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_plaintext_prior_knowledge_reads_path_query_and_header() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let target: String = format!(
+        "http://{TLS_SERVER_NAME}:{port}{PROBE_PATH}?{}",
+        PROBE_QUERY
+    );
+    let (status, _version, _body): H2Reply = h2_request(&mut sender, "GET", &target, &[])
+        .await
+        .expect("h2 probe request must complete");
+    assert_eq!(status, 200);
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_tls_negotiates_h2_alpn_against_validated_chain() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, Some(trusted_tls_config()))
+            .await
+            .expect("http2 tls server must start");
+    let (alpn, (mut sender, connection)): (Option<Vec<u8>>, H2TlsSession) = h2_tls_alpn(port)
+        .await
+        .expect("h2 tls handshake must succeed");
+    assert_eq!(
+        alpn,
+        Some(ALPN_HTTP2.to_vec()),
+        "the server must select the h2 ALPN identifier"
+    );
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let (status, version, body): H2Reply = h2_request(
+        &mut sender,
+        "GET",
+        &format!("https://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("h2 tls request must complete");
+    assert_eq!(status, 200);
+    assert_eq!(version, http::Version::HTTP_2);
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        format!("{:?}", HttpVersion::Http2)
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_tls_rejects_a_client_offering_only_http11() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, Some(trusted_tls_config()))
+            .await
+            .expect("http2 tls server must start");
+    let outcome: io::Result<ClientTlsStream> = connect_tls(port, ALPN_HTTP1).await;
+    assert!(
+        outcome.is_err(),
+        "an http2 listener must refuse an http/1.1-only client instead of downgrading"
+    );
+    let valid: io::Result<ClientTlsStream> = connect_tls(port, ALPN_HTTP2).await;
+    assert!(
+        valid.is_ok(),
+        "a rejected client must not disturb a later valid connection"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_plaintext_binary_post_round_trips_hostile_bytes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let payload: Vec<u8> = hostile_binary_payload();
+    let (status, version, body): H2Reply = h2_request(
+        &mut sender,
+        "POST",
+        &format!("http://{TLS_SERVER_NAME}:{port}{BINARY_ROUTE_PATH}"),
+        &payload,
+    )
+    .await
+    .expect("h2 binary post must complete");
+    assert_eq!(status, 200);
+    assert_eq!(version, http::Version::HTTP_2);
+    assert_eq!(
+        body, payload,
+        "every hostile byte must survive the h2 body round trip"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_plaintext_delivers_a_response_above_the_flow_control_window() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let expected: Vec<u8> = large_binary_payload();
+    let (status, _version, body): H2Reply = h2_request(
+        &mut sender,
+        "GET",
+        &format!("http://{TLS_SERVER_NAME}:{port}{LARGE_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("large h2 response must complete");
+    assert_eq!(status, 200);
+    assert_eq!(
+        body.len(),
+        expected.len(),
+        "the whole multi-megabyte body must arrive"
+    );
+    assert!(
+        body == expected,
+        "the large response must be byte identical past the flow control window"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_blocked() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let (sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 prior-knowledge handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let _lease: GateLease = gate_lease(GateSlot::SlowHttp2).await;
+    let order: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
+    let slow_target: String = format!("http://{TLS_SERVER_NAME}:{port}{SLOW_ROUTE_PATH}");
+    let slow_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
+    let mut slow_sender: h2::client::SendRequest<Bytes> = sender.clone();
+    let slow: JoinHandle<Result<H2Reply, String>> = spawn(async move {
+        let outcome: Result<H2Reply, String> =
+            h2_request(&mut slow_sender, "GET", &slow_target, &[]).await;
+        slow_order.lock().expect("order lock").push("slow");
+        outcome
+    });
+    route_gate(GateSlot::SlowHttp2).await_slow_entered().await;
+    let fast_target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
+    let fast_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
+    let mut fast_sender: h2::client::SendRequest<Bytes> = sender.clone();
+    let fast: JoinHandle<Result<H2Reply, String>> = spawn(async move {
+        let outcome: Result<H2Reply, String> =
+            h2_request(&mut fast_sender, "GET", &fast_target, &[]).await;
+        fast_order.lock().expect("order lock").push("fast");
+        outcome
+    });
+    let budget: Duration = Duration::from_millis(FAST_STREAM_BUDGET_MILLIS);
+    let fast_result: Result<H2Reply, String> = timeout(budget, fast)
+        .await
+        .expect("the fast stream must complete while the slow handler is still blocked")
+        .expect("the fast stream task must not panic");
+    assert!(
+        fast_result.is_ok(),
+        "the fast request must succeed while the slow handler is held"
+    );
+    assert_eq!(
+        *order.lock().expect("order lock"),
+        vec!["fast"],
+        "only the fast stream may complete while the slow handler is blocked"
+    );
+    route_gate(GateSlot::SlowHttp2).release_slow();
+    let slow_result: Result<H2Reply, String> =
+        timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), slow)
+            .await
+            .expect("the released slow stream must finish inside its timeout")
+            .expect("the slow stream task must not panic");
+    assert!(slow_result.is_ok());
+    assert_eq!(
+        *order.lock().expect("order lock"),
+        vec!["fast", "slow"],
+        "the fast stream must complete before the released slow one"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_plaintext_shutdown_releases_the_bound_tcp_port() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    assert_wait_pending_then_complete(&control).await;
+    let rebound: io::Result<TcpListener> = TcpListener::bind(format!("{LOOPBACK_HOST}:{port}"));
+    assert!(
+        rebound.is_ok(),
+        "port {port} must be free again after shutdown and wait"
+    );
+}
+#[tokio::test]
+async fn http2_sse_chunk_reaches_the_client_before_the_handler_finishes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 plaintext server must start");
+    let _lease: GateLease = gate_lease(GateSlot::SseHttp2).await;
+    let target: String = format!("http://{TLS_SERVER_NAME}:{port}{SSE_ROUTE_PATH_HTTP2}");
+    let reading: JoinHandle<(Vec<u8>, bool)> =
+        spawn(async move { h2_stream_until(port, &target, SSE_FIRST_CHUNK).await });
+    route_gate(GateSlot::SseHttp2)
+        .await_first_chunk_sent()
+        .await;
+    let (collected, matched): (Vec<u8>, bool) =
+        timeout(Duration::from_secs(FAST_STREAM_BUDGET_MILLIS), reading)
+            .await
+            .expect("the first sse chunk must be readable while the handler is still blocked")
+            .expect("the reader task must not panic");
+    let text: String = String::from_utf8_lossy(&collected).to_string();
+    assert!(
+        matched,
+        "the first sse chunk must be readable while the handler is still blocked, got: {text:?}"
+    );
+    assert!(
+        !text.contains(SSE_SECOND_CHUNK),
+        "the second chunk must wait for the handler to be released, got: {text:?}"
+    );
+    route_gate(GateSlot::SseHttp2).release_sse();
+    control.shutdown().await;
+}
+```
+# Path: hyperlane/core/tests/protocol/http2/mod.rs
+```rust
+pub(crate) mod r#assert;
+pub(crate) mod r#fn;
+pub(crate) mod r#type;
+use {r#fn::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/limits/impl.rs
+```rust
+use super::*;
+const PANIC_PAYLOAD: &str = "limits-panic-payload";
+impl ServerHook for HeadBodyRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response()
+            .set_status_code(OK_STATUS)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_body(HEAD_BODY_TEXT);
+        Status::Continue
+    }
+}
+impl ServerHook for NoContentRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response()
+            .set_status_code(NO_CONTENT_STATUS)
+            .set_header("x-no-content", "limits")
+            .set_body(CHUNKED_PAYLOAD);
+        Status::Continue
+    }
+}
+impl ServerHook for NotModifiedRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response()
+            .set_status_code(NOT_MODIFIED_STATUS)
+            .set_header("x-not-modified", "limits")
+            .set_body(CHUNKED_PAYLOAD);
+        Status::Continue
+    }
+}
+impl ServerHook for RawChunkedRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, _: &mut Context) -> Status {
+        let mut head: String = format!("{HTTP_VERSION_1_1} {OK_STATUS}{HTTP_BR}");
+        head.push_str(&format!("{CONTENT_TYPE}: {TEXT_PLAIN}{HTTP_BR}"));
+        head.push_str(&format!("{RAW_MARKER_HEADER}: chunked{HTTP_BR}"));
+        head.push_str(&format!("{CHUNKED_TRANSFER_HEADER}: {CHUNKED}{HTTP_BR}"));
+        head.push_str(&format!("{CONNECTION}: {CLOSE}{HTTP_BR}"));
+        head.push_str(HTTP_BR);
+        if stream.try_send(head.into_bytes()).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        let framed: Vec<u8> =
+            format!("{CHUNK_SIZE_LINE}{CHUNKED_PAYLOAD}{HTTP_BR}0{HTTP_BR}{HTTP_BR}").into_bytes();
+        if stream.try_send(framed).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        stream.set_closed(true);
+        Status::Reject
+    }
+}
+impl ServerHook for PanicRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        panic!("{PANIC_PAYLOAD}");
+    }
+}
+impl ServerHook for BodyEchoRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let body: Vec<u8> = ctx.get_request().get_body().clone();
+        let length: String = body.len().to_string();
+        ctx.get_mut_response()
+            .set_status_code(OK_STATUS)
+            .set_header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
+            .set_header(BODY_ECHO_HEADER, &length)
+            .set_body(&body);
+        Status::Continue
+    }
+}
+impl ServerHook for LimitsResponseSender {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx.get_mut_response().build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for RequestErrorRecorder {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        mark_request_error();
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(TOO_LARGE_STATUS)
+            .set_header(REQUEST_ERROR_MARKER_HEADER, "seen")
+            .set_body(REQUEST_ERROR_BODY)
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Reject
+    }
+}
+impl ServerHook for TaskPanicRecorder {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        mark_task_panic();
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(SERVER_ERROR_STATUS)
+            .set_header(TASK_PANIC_MARKER_HEADER, "seen")
+            .set_body(TASK_PANIC_BODY)
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Reject
+    }
+}
+```
+# Path: hyperlane/core/tests/protocol/limits/const.rs
+```rust
+pub(crate) const HEAD_ROUTE_PATH: &str = "/head-body";
+pub(crate) const NO_CONTENT_ROUTE_PATH: &str = "/no-content";
+pub(crate) const NOT_MODIFIED_ROUTE_PATH: &str = "/not-modified";
+pub(crate) const RAW_CHUNKED_ROUTE_PATH: &str = "/raw-chunked";
+pub(crate) const PANIC_ROUTE_PATH: &str = "/panic";
+pub(crate) const BODY_ECHO_ROUTE_PATH: &str = "/body-echo";
+pub(crate) const HEAD_BODY_TEXT: &str = "head-method-body";
+pub(crate) const OK_STATUS: usize = 200;
+pub(crate) const NO_CONTENT_STATUS: usize = 204;
+pub(crate) const NOT_MODIFIED_STATUS: usize = 304;
+pub(crate) const TOO_LARGE_STATUS: usize = 413;
+pub(crate) const SERVER_ERROR_STATUS: usize = 500;
+pub(crate) const WIRE_OK_STATUS: u16 = OK_STATUS as u16;
+pub(crate) const WIRE_NO_CONTENT_STATUS: u16 = NO_CONTENT_STATUS as u16;
+pub(crate) const WIRE_NOT_MODIFIED_STATUS: u16 = NOT_MODIFIED_STATUS as u16;
+pub(crate) const WIRE_SERVER_ERROR_STATUS: u16 = SERVER_ERROR_STATUS as u16;
+pub(crate) const CHUNKED_PAYLOAD: &str = "chunked-decoded-payload";
+pub(crate) const CHUNK_SIZE_LINE: &str = "10\r\n";
+pub(crate) const TASK_PANIC_BODY: &str = "task-panic-handled";
+pub(crate) const REQUEST_ERROR_BODY: &str = "request-error-handled";
+pub(crate) const MAX_BODY_SIZE: usize = 1024;
+pub(crate) const OVERSIZED_BODY_LEN: usize = 4096;
+pub(crate) const WRONG_CONTENT_LENGTH: usize = 512;
+pub(crate) const DECLARED_BODY_LEN: usize = 32;
+pub(crate) const DECLARED_BODY_TEXT: &str = "32";
+pub(crate) const READ_TIMEOUT_MS: u64 = 1500;
+pub(crate) const CONCURRENT_BUDGET_MS: u64 = 1200;
+pub(crate) const INCOMPLETE_BODY_PREFIX: &[u8] = b"incomplete-";
+pub(crate) const BODY_ECHO_HEADER: &str = "x-body-len";
+pub(crate) const RAW_MARKER_HEADER: &str = "x-raw-marker";
+pub(crate) const CHUNKED_TRANSFER_HEADER: &str = "transfer-encoding";
+pub(crate) const REQUEST_ERROR_MARKER_HEADER: &str = "x-request-error";
+pub(crate) const TASK_PANIC_MARKER_HEADER: &str = "x-task-panic";
+```
+# Path: hyperlane/core/tests/protocol/limits/fn.rs
+```rust
+use super::*;
+pub(crate) fn limits_request_config(max_body_size: usize, read_timeout_ms: u64) -> RequestConfig {
+    RequestConfig {
+        max_body_size,
+        read_timeout_ms,
+        ..RequestConfig::default()
+    }
+}
+fn register_limits_hooks(server: &mut Server) -> &mut Server {
+    server.route::<HeadBodyRoute>(HEAD_ROUTE_PATH);
+    server.route::<NoContentRoute>(NO_CONTENT_ROUTE_PATH);
+    server.route::<NotModifiedRoute>(NOT_MODIFIED_ROUTE_PATH);
+    server.route::<RawChunkedRoute>(RAW_CHUNKED_ROUTE_PATH);
+    server.route::<PanicRoute>(PANIC_ROUTE_PATH);
+    server.route::<BodyEchoRoute>(BODY_ECHO_ROUTE_PATH);
+    server.response_middleware::<LimitsResponseSender>();
+    server.task_panic::<TaskPanicRecorder>();
+    server.request_error::<RequestErrorRecorder>();
+    server
+}
+pub(crate) async fn start_limits_server(
+    protocol: ServerProtocol,
+    request_config: RequestConfig,
+) -> Result<(ServerControlHook, u16), Box<ServerError>> {
+    let mut server: Server = Server::default();
+    let address: String = if protocol.is_quic() {
+        format!("{LOOPBACK_HOST}:{}", reserve_udp_port())
+    } else {
+        format!("{LOOPBACK_HOST}:{}", reserve_tcp_port())
+    };
+    let tls: Option<TlsConfig> = if protocol.is_quic() {
+        Some(trusted_tls_config())
+    } else {
+        None
+    };
+    server.server_config(protocol_config(&address, protocol, tls));
+    server.request_config(request_config);
+    register_limits_hooks(&mut server);
+    let control: ServerControlHook = server.run().await?;
+    drop(server);
+    sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
+    let port: u16 = address
+        .rsplit(':')
+        .next()
+        .and_then(|value: &str| value.parse::<u16>().ok())
+        .expect("bind address must carry a numeric port");
+    Ok((control, port))
+}
+pub(crate) fn h2_build_request(
+    method: &str,
+    target: &str,
+    content_length: Option<usize>,
+) -> Result<http::Request<()>, String> {
+    let mut builder: http::request::Builder = http::Request::builder()
+        .method(method)
+        .uri(target)
+        .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE);
+    if let Some(length) = content_length {
+        builder = builder.header(CONTENT_LENGTH, length.to_string());
+    }
+    builder
+        .body(())
+        .map_err(|error: http::Error| format!("h2 request build failed: {error}"))
+}
+pub(crate) fn h2_open_stream(
+    sender: &mut h2::client::SendRequest<Bytes>,
+    request: http::Request<()>,
+    end_of_stream: bool,
+) -> Result<(h2::client::ResponseFuture, h2::SendStream<Bytes>), String> {
+    sender
+        .send_request(request, end_of_stream)
+        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))
+}
+pub(crate) fn h2_push_body(
+    send_stream: &mut h2::SendStream<Bytes>,
+    body: &[u8],
+    end_of_stream: bool,
+) -> Result<(), String> {
+    send_stream
+        .send_data(Bytes::copy_from_slice(body), end_of_stream)
+        .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))
+}
+pub(crate) fn h2_push_body_typed(
+    send_stream: &mut h2::SendStream<Bytes>,
+    body: &[u8],
+    end_of_stream: bool,
+) -> Result<(), h2::Error> {
+    send_stream.send_data(Bytes::copy_from_slice(body), end_of_stream)
+}
+pub(crate) async fn h2_await_response(
+    response: h2::client::ResponseFuture,
+) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    match h2_await_outcome(response).await {
+        LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
+        LimitsOutcome::H2Reset(error) => Err(format!("h2 stream reset: {error:?}")),
+        LimitsOutcome::H3Reset(error) => Err(format!("h3 stream reset: {error:?}")),
+        LimitsOutcome::TimedOut => Err("h2 exchange timed out".to_string()),
+        LimitsOutcome::SetupFailed => Err("h2 response future must resolve".to_string()),
+    }
+}
+pub(crate) async fn h2_await_outcome(response: h2::client::ResponseFuture) -> LimitsOutcome {
+    let received: Result<http::Response<h2::RecvStream>, h2::Error> =
+        match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response).await {
+            Ok(received) => received,
+            Err(_) => return LimitsOutcome::TimedOut,
+        };
+    let received: http::Response<h2::RecvStream> = match received {
+        Ok(received) => received,
+        Err(error) => return LimitsOutcome::H2Reset(error),
+    };
+    let status: u16 = received.status().as_u16();
+    let headers: http::HeaderMap = received.headers().clone();
+    let mut body_stream: h2::RecvStream = received.into_body();
+    let mut collected: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        let chunk: Result<Option<Result<Bytes, h2::Error>>, tokio::time::error::Elapsed> =
+            timeout(remaining, body_stream.data()).await;
+        match chunk {
+            Err(_) => return LimitsOutcome::TimedOut,
+            Ok(None) => break,
+            Ok(Some(Err(error))) => return LimitsOutcome::H2Reset(error),
+            Ok(Some(Ok(chunk))) => {
+                let released: Result<(), h2::Error> =
+                    body_stream.flow_control().release_capacity(chunk.len());
+                collected.extend_from_slice(&chunk);
+                let _: Result<(), h2::Error> = released;
+            }
+        }
+    }
+    LimitsOutcome::Replied(status, headers, collected)
+}
+pub(crate) async fn h2_still_pending(response: h2::client::ResponseFuture, budget_ms: u64) -> bool {
+    let outcome: Result<
+        Result<http::Response<h2::RecvStream>, h2::Error>,
+        tokio::time::error::Elapsed,
+    > = timeout(Duration::from_millis(budget_ms), response).await;
+    outcome.is_err()
+}
+pub(crate) async fn h2_get(
+    sender: &mut h2::client::SendRequest<Bytes>,
+    port: u16,
+    path: &str,
+) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    let request: http::Request<()> =
+        h2_build_request("GET", &h2_target(port, path), None).map_err(|error: String| error)?;
+    let (response, _send_stream) =
+        h2_open_stream(sender, request, true).map_err(|error: String| error)?;
+    h2_await_response(response).await
+}
+pub(crate) fn h2_target(port: u16, path: &str) -> String {
+    format!("http://{TLS_SERVER_NAME}:{port}{path}")
+}
+pub(crate) fn h3_target(port: u16, path: &str) -> String {
+    format!("https://{TLS_SERVER_NAME}:{port}{path}")
+}
+pub(crate) fn h3_reset_is_internal(error: &h3::error::StreamError) -> bool {
+    match error {
+        h3::error::StreamError::StreamError { code, .. } => *code == Code::H3_INTERNAL_ERROR,
+        h3::error::StreamError::RemoteTerminate { code, .. } => *code == Code::H3_INTERNAL_ERROR,
+        _ => false,
+    }
+}
+pub(crate) fn header_value(headers: &http::HeaderMap, key: &str) -> Option<String> {
+    headers
+        .get(key)
+        .map(|value: &http::HeaderValue| value.to_str().unwrap_or_default().to_owned())
+}
+pub(crate) fn oversized_payload() -> Vec<u8> {
+    let mut payload: Vec<u8> = Vec::with_capacity(OVERSIZED_BODY_LEN);
+    let mut seed: u32 = 0x2468_1357;
+    while payload.len() < OVERSIZED_BODY_LEN {
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        payload.extend_from_slice(&seed.to_be_bytes());
+    }
+    payload.truncate(OVERSIZED_BODY_LEN);
+    payload
+}
+pub(crate) fn declared_short_payload() -> Vec<u8> {
+    let mut payload: Vec<u8> = INCOMPLETE_BODY_PREFIX.to_vec();
+    payload.resize(DECLARED_BODY_LEN, b'a');
+    payload
+}
+pub(crate) async fn h3_collect(
+    stream: &mut h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>,
+) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    match h3_collect_outcome(stream).await {
+        LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
+        LimitsOutcome::H3Reset(error) => Err(format!("h3 stream reset: {error:?}")),
+        LimitsOutcome::TimedOut => Err("h3 exchange timed out".to_string()),
+        LimitsOutcome::H2Reset(error) => Err(format!("h2 reset on an h3 exchange: {error:?}")),
+        LimitsOutcome::SetupFailed => Err("h3 response must resolve".to_string()),
+    }
+}
+async fn h3_collect_outcome(
+    stream: &mut h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>,
+) -> LimitsOutcome {
+    let received: Result<http::Response<()>, h3::error::StreamError> = match timeout(
+        Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        stream.recv_response(),
+    )
+    .await
+    {
+        Ok(received) => received,
+        Err(_) => return LimitsOutcome::TimedOut,
+    };
+    let received: http::Response<()> = match received {
+        Ok(received) => received,
+        Err(error) => return LimitsOutcome::H3Reset(error),
+    };
+    let status: u16 = received.status().as_u16();
+    let headers: http::HeaderMap = received.headers().clone();
+    let mut collected: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        match timeout(remaining, stream.recv_data()).await {
+            Err(_) => return LimitsOutcome::TimedOut,
+            Ok(Err(error)) => return LimitsOutcome::H3Reset(error),
+            Ok(Ok(None)) => break,
+            Ok(Ok(Some(mut chunk))) => {
+                collected.extend_from_slice(&chunk.copy_to_bytes(chunk.remaining()));
+            }
+        }
+    }
+    LimitsOutcome::Replied(status, headers, collected)
+}
+pub(crate) async fn h3_exchange(
+    port: u16,
+    method: &str,
+    target: &str,
+    body: &[u8],
+) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    match h3_exchange_outcome(port, method, target, body).await {
+        LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
+        LimitsOutcome::H3Reset(error) => Err(format!("h3 stream reset: {error:?}")),
+        LimitsOutcome::TimedOut => Err("h3 exchange timed out".to_string()),
+        LimitsOutcome::H2Reset(error) => Err(format!("h2 reset on an h3 exchange: {error:?}")),
+        LimitsOutcome::SetupFailed => Err("h3 exchange could not be set up".to_string()),
+    }
+}
+pub(crate) async fn h3_exchange_outcome(
+    port: u16,
+    method: &str,
+    target: &str,
+    body: &[u8],
+) -> LimitsOutcome {
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        match connect_quic(port, ALPN_HTTP3).await {
+            Ok(pair) => pair,
+            Err(_) => return LimitsOutcome::SetupFailed,
+        };
+    let (mut driver, mut client) =
+        match h3::client::new(h3_quinn::Connection::new(connection.clone())).await {
+            Ok(pair) => pair,
+            Err(_) => return LimitsOutcome::SetupFailed,
+        };
+    let driving: JoinHandle<()> = spawn(async move {
+        let _final: h3::error::ConnectionError = driver.wait_idle().await;
+    });
+    let outcome: LimitsOutcome = h3_drive(&mut client, method, target, body).await;
+    drop(client);
+    driving.abort();
+    connection.close(quinn::VarInt::from_u32(0), b"done");
+    outcome
+}
+async fn h3_drive(
+    client: &mut h3::client::SendRequest<h3_quinn::OpenStreams, Bytes>,
+    method: &str,
+    target: &str,
+    body: &[u8],
+) -> LimitsOutcome {
+    let request: http::Request<()> = match http::Request::builder()
+        .method(method)
+        .uri(target)
+        .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
+        .body(())
+    {
+        Ok(request) => request,
+        Err(_) => return LimitsOutcome::SetupFailed,
+    };
+    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> =
+        match client.send_request(request).await {
+            Ok(stream) => stream,
+            Err(error) => return LimitsOutcome::H3Reset(error),
+        };
+    if !body.is_empty()
+        && let Err(error) = stream.send_data(Bytes::copy_from_slice(body)).await
+    {
+        return LimitsOutcome::H3Reset(error);
+    }
+    if let Err(error) = stream.finish().await {
+        return LimitsOutcome::H3Reset(error);
+    }
+    h3_collect_outcome(&mut stream).await
+}
+```
+# Path: hyperlane/core/tests/protocol/limits/assert.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn http2_head_response_carries_headers_without_a_body() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http2,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http2 limits server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 plaintext handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let request: http::Request<()> =
+        h2_build_request("HEAD", &h2_target(port, HEAD_ROUTE_PATH), None)
+            .expect("h2 head request must build");
+    let (response, _send_stream) =
+        h2_open_stream(&mut sender, request, true).expect("h2 head stream must open");
+    let (status, _headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_await_response(response)
+        .await
+        .unwrap_or_else(|error: String| panic!("h2 HEAD response failed: {error}"));
+    assert_eq!(status, WIRE_OK_STATUS);
+    assert!(
+        body.is_empty(),
+        "a HEAD response must carry no body bytes, got {} bytes",
+        body.len()
+    );
+    let after: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+        .await
+        .expect("the same connection must serve a later valid request");
+    assert_eq!(after.0, WIRE_OK_STATUS);
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http2,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http2 limits server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 plaintext handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    for (path, expected) in [
+        (NO_CONTENT_ROUTE_PATH, WIRE_NO_CONTENT_STATUS),
+        (NOT_MODIFIED_ROUTE_PATH, WIRE_NOT_MODIFIED_STATUS),
+    ] {
+        let request: http::Request<()> =
+            h2_build_request("GET", &h2_target(port, path), None).expect("h2 request must build");
+        let (response, _send_stream) =
+            h2_open_stream(&mut sender, request, true).expect("h2 stream must open");
+        let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_await_response(response)
+            .await
+            .unwrap_or_else(|error: String| panic!("h2 {expected} response failed: {error}"));
+        assert_eq!(status, expected);
+        assert!(
+            body.is_empty(),
+            "status {expected} must not carry body bytes, got {:?}",
+            String::from_utf8_lossy(&body)
+        );
+        if expected == WIRE_NO_CONTENT_STATUS {
+            assert!(
+                header_value(&headers, CONTENT_LENGTH).is_none(),
+                "204 must not announce a content length, got headers: {headers:?}"
+            );
+        }
+    }
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_head_and_no_body_statuses_carry_no_body() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http3,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http3 limits server must start");
+    for (method, path, expected) in [
+        ("HEAD", HEAD_ROUTE_PATH, WIRE_OK_STATUS),
+        ("GET", NO_CONTENT_ROUTE_PATH, WIRE_NO_CONTENT_STATUS),
+        ("GET", NOT_MODIFIED_ROUTE_PATH, WIRE_NOT_MODIFIED_STATUS),
+    ] {
+        let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) =
+            h3_exchange(port, method, &h3_target(port, path), &[])
+                .await
+                .unwrap_or_else(|error: String| panic!("h3 {method} {path} failed: {error}"));
+        assert_eq!(status, expected, "h3 {method} {path} answered {status}");
+        assert!(
+            body.is_empty(),
+            "h3 {method} {path} must carry no body bytes, got {}",
+            body.len()
+        );
+        if expected == WIRE_NO_CONTENT_STATUS {
+            assert!(
+                header_value(&headers, CONTENT_LENGTH).is_none(),
+                "h3 204 must not announce a content length, got headers: {headers:?}"
+            );
+        }
+    }
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http2,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http2 limits server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 plaintext handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let request: http::Request<()> =
+        h2_build_request("GET", &h2_target(port, RAW_CHUNKED_ROUTE_PATH), None)
+            .expect("h2 chunked request must build");
+    let (response, _send_stream) =
+        h2_open_stream(&mut sender, request, true).expect("h2 stream must open");
+    match h2_await_outcome(response).await {
+        LimitsOutcome::Replied(status, headers, body) => {
+            assert_eq!(
+                status, WIRE_OK_STATUS,
+                "a decodable chunked response must not be downgraded, got status {status}"
+            );
+            assert!(
+                !headers.contains_key(CHUNKED_TRANSFER_HEADER),
+                "a transfer coding is hop by hop on http2 and must be stripped, got: {headers:?}"
+            );
+            let text: String = String::from_utf8_lossy(&body).to_string();
+            assert!(
+                text.contains(CHUNKED_PAYLOAD) && !text.contains(CHUNK_SIZE_LINE),
+                "a chunked body must reach the client decoded, never as chunk size bytes, got: {text:?}"
+            );
+        }
+        LimitsOutcome::H2Reset(error) => {
+            assert!(
+                error.reason() == Some(h2::Reason::INTERNAL_ERROR),
+                "an undecodable chunked body must be refused as an explicit internal reset, got: {error:?}"
+            );
+        }
+        LimitsOutcome::H3Reset(error) => {
+            panic!("an http2 request must never be answered with an http3 reset: {error:?}");
+        }
+        LimitsOutcome::TimedOut => {
+            panic!("the raw chunked request must be answered or explicitly rejected, never stall");
+        }
+        LimitsOutcome::SetupFailed => {
+            panic!("the raw chunked request must reach the server, never fail in the fixture");
+        }
+    }
+    let after: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+        .await
+        .expect("the same connection must serve a later valid request");
+    assert_eq!(after.0, WIRE_OK_STATUS);
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http3,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http3 limits server must start");
+    match h3_exchange_outcome(port, "GET", &h3_target(port, RAW_CHUNKED_ROUTE_PATH), &[]).await {
+        LimitsOutcome::Replied(status, headers, body) => {
+            assert_eq!(
+                status, WIRE_OK_STATUS,
+                "a decodable chunked response must not be downgraded, got status {status}"
+            );
+            assert!(
+                !headers.contains_key(RAW_MARKER_HEADER),
+                "the raw marker header does not exist on an http3 response, got: {headers:?}"
+            );
+            let text: String = String::from_utf8_lossy(&body).to_string();
+            assert!(
+                text.contains(CHUNKED_PAYLOAD) && !text.contains(CHUNK_SIZE_LINE),
+                "a chunked body must reach the client decoded, never as chunk size bytes, got: {text:?}"
+            );
+        }
+        LimitsOutcome::H3Reset(error) => {
+            assert!(
+                h3_reset_is_internal(&error),
+                "an undecodable chunked body must be refused as an explicit internal reset, got: {error:?}"
+            );
+        }
+        LimitsOutcome::H2Reset(error) => {
+            panic!("an http3 request must never be answered with an http2 reset: {error:?}");
+        }
+        LimitsOutcome::TimedOut => {
+            panic!("the raw chunked request must be answered or explicitly rejected, never stall");
+        }
+        LimitsOutcome::SetupFailed => {
+            panic!("the raw chunked request must reach the server, never fail in the fixture");
+        }
+    }
+    let after: (u16, http::HeaderMap, Vec<u8>) =
+        h3_exchange(port, "GET", &h3_target(port, BODY_ECHO_ROUTE_PATH), &[])
+            .await
+            .unwrap_or_else(|error: String| panic!("the later valid request failed: {error}"));
+    assert_eq!(after.0, WIRE_OK_STATUS);
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_oversized_body_hits_max_body_size_and_the_request_error_hook() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http2,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http2 limits server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 plaintext handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let before: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+        .await
+        .expect("a valid request before the oversized one must succeed");
+    assert_eq!(before.0, WIRE_OK_STATUS);
+    let payload: Vec<u8> = oversized_payload();
+    let request: http::Request<()> = h2_build_request(
+        "POST",
+        &h2_target(port, BODY_ECHO_ROUTE_PATH),
+        Some(payload.len()),
+    )
+    .expect("h2 oversized request must build");
+    let (response, mut send_stream) =
+        h2_open_stream(&mut sender, request, false).expect("h2 stream must open");
+    match h2_push_body_typed(&mut send_stream, &payload, true) {
+        Ok(()) => {}
+        Err(error) => {
+            assert!(
+                error.is_reset() || error.is_go_away(),
+                "an oversized body must be rejected as a stream reset, not a local failure, got: {error}"
+            );
+        }
+    }
+    if let LimitsOutcome::Replied(status, _headers, body) = h2_await_outcome(response).await {
+        assert_ne!(
+            status, WIRE_OK_STATUS,
+            "a body above max_body_size must never be accepted as a normal 200"
+        );
+        assert!(
+            body.len() < payload.len(),
+            "an oversized body must never be echoed whole, got {} of {}",
+            body.len(),
+            payload.len()
+        );
+    }
+    assert!(
+        request_error_seen(),
+        "an oversized body must reach the request_error hook"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_oversized_body_hits_max_body_size_and_the_request_error_hook() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http3,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http3 limits server must start");
+    let before: (u16, http::HeaderMap, Vec<u8>) =
+        h3_exchange(port, "GET", &h3_target(port, BODY_ECHO_ROUTE_PATH), &[])
+            .await
+            .unwrap_or_else(|error: String| panic!("the baseline h3 request failed: {error}"));
+    assert_eq!(before.0, WIRE_OK_STATUS);
+    let payload: Vec<u8> = oversized_payload();
+    let outcome: Result<(u16, http::HeaderMap, Vec<u8>), String> = h3_exchange(
+        port,
+        "POST",
+        &h3_target(port, BODY_ECHO_ROUTE_PATH),
+        &payload,
+    )
+    .await;
+    if let Ok((status, _headers, body)) = outcome {
+        assert_ne!(
+            status, WIRE_OK_STATUS,
+            "a body above max_body_size must never be accepted as a normal 200"
+        );
+        assert!(
+            body.len() < payload.len(),
+            "an oversized body must never be echoed whole, got {} of {}",
+            body.len(),
+            payload.len()
+        );
+    }
+    assert!(
+        request_error_seen(),
+        "an oversized body must reach the request_error hook"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_request() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http2,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http2 limits server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 plaintext handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let payload: Vec<u8> = declared_short_payload();
+    let stalled: http::Request<()> = h2_build_request(
+        "POST",
+        &h2_target(port, BODY_ECHO_ROUTE_PATH),
+        Some(WRONG_CONTENT_LENGTH),
+    )
+    .expect("h2 incomplete request must build");
+    let (stalled_response, mut stalled_send) =
+        h2_open_stream(&mut sender, stalled, false).expect("stalled stream must open");
+    h2_push_body(&mut stalled_send, &payload, false).expect("the partial body must be accepted");
+    assert!(
+        h2_still_pending(stalled_response, CONCURRENT_BUDGET_MS).await,
+        "an incomplete body must stay pending until the read timeout fires"
+    );
+    let valid: http::Request<()> =
+        h2_build_request("GET", &h2_target(port, BODY_ECHO_ROUTE_PATH), None)
+            .expect("h2 valid request must build");
+    let (valid_response, _valid_send) =
+        h2_open_stream(&mut sender, valid, true).expect("valid stream must open");
+    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = timeout(
+        Duration::from_millis(CONCURRENT_BUDGET_MS),
+        h2_await_response(valid_response),
+    )
+    .await
+    .unwrap_or_else(|_: tokio::time::error::Elapsed| {
+        panic!("the valid request was blocked by the stalled one")
+    })
+    .expect("the valid request must complete");
+    assert_eq!(status, WIRE_OK_STATUS);
+    assert!(body.is_empty());
+    assert_eq!(
+        header_value(&headers, BODY_ECHO_HEADER).as_deref(),
+        Some("0"),
+        "the valid request must be answered from its own empty body, got headers: {headers:?}"
+    );
+    drop(stalled_send);
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_request() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http3,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http3 limits server must start");
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3)
+            .await
+            .expect("quic connect must succeed");
+    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+        .await
+        .expect("h3 handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _final: h3::error::ConnectionError = driver.wait_idle().await;
+    });
+    let payload: Vec<u8> = declared_short_payload();
+    let stalled: http::Request<()> = http::Request::builder()
+        .method("POST")
+        .uri(h3_target(port, BODY_ECHO_ROUTE_PATH))
+        .header(CONTENT_LENGTH, WRONG_CONTENT_LENGTH.to_string())
+        .body(())
+        .expect("h3 incomplete request must build");
+    let mut stalled_stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+        .send_request(stalled)
+        .await
+        .expect("stalled stream must open");
+    stalled_stream
+        .send_data(Bytes::copy_from_slice(&payload))
+        .await
+        .expect("the partial body must be accepted");
+    let still_pending: bool = timeout(
+        Duration::from_millis(CONCURRENT_BUDGET_MS),
+        stalled_stream.recv_response(),
+    )
+    .await
+    .is_err();
+    assert!(
+        still_pending,
+        "an incomplete body must stay pending until the read timeout fires"
+    );
+    let valid: http::Request<()> = http::Request::builder()
+        .method("GET")
+        .uri(h3_target(port, BODY_ECHO_ROUTE_PATH))
+        .body(())
+        .expect("h3 valid request must build");
+    let mut valid_stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+        .send_request(valid)
+        .await
+        .expect("valid stream must open");
+    valid_stream
+        .finish()
+        .await
+        .expect("the valid request must finish");
+    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = timeout(
+        Duration::from_millis(CONCURRENT_BUDGET_MS),
+        h3_collect(&mut valid_stream),
+    )
+    .await
+    .unwrap_or_else(|_: tokio::time::error::Elapsed| {
+        panic!("the valid request was blocked by the stalled one")
+    })
+    .expect("the valid request must complete");
+    assert_eq!(status, WIRE_OK_STATUS);
+    assert!(body.is_empty());
+    assert_eq!(
+        header_value(&headers, BODY_ECHO_HEADER).as_deref(),
+        Some("0"),
+        "the valid request must be answered from its own empty body, got headers: {headers:?}"
+    );
+    drop(client);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_wrong_declared_content_length_never_yields_a_truncated_success() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http2,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http2 limits server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 plaintext handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let payload: Vec<u8> = declared_short_payload();
+    let request: http::Request<()> = h2_build_request(
+        "POST",
+        &h2_target(port, BODY_ECHO_ROUTE_PATH),
+        Some(WRONG_CONTENT_LENGTH),
+    )
+    .expect("h2 truncated request must build");
+    let (response, mut send_stream) =
+        h2_open_stream(&mut sender, request, false).expect("h2 stream must open");
+    h2_push_body(&mut send_stream, &payload, false).expect("the partial body must be accepted");
+    if let Ok((status, headers, body)) = h2_await_response(response).await {
+        assert_ne!(
+            status, WIRE_OK_STATUS,
+            "a short body against a larger declared length must never succeed"
+        );
+        assert!(
+            body.is_empty() || body.len() != payload.len(),
+            "a truncated body must not be handed to the handler as if complete, got {} bytes",
+            body.len()
+        );
+        assert_ne!(
+            header_value(&headers, BODY_ECHO_HEADER).as_deref(),
+            Some(DECLARED_BODY_TEXT),
+            "the handler must not observe the declared length as received, got headers: {headers:?}"
+        );
+    }
+    drop(send_stream);
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_panicking_route_reaches_the_task_panic_hook() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http2,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http2 limits server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 plaintext handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let request: http::Request<()> =
+        h2_build_request("GET", &h2_target(port, PANIC_ROUTE_PATH), None)
+            .expect("h2 panic request must build");
+    let (response, _send_stream) =
+        h2_open_stream(&mut sender, request, true).expect("h2 stream must open");
+    if let Ok((status, headers, _body)) = h2_await_response(response).await {
+        assert_eq!(
+            status, WIRE_SERVER_ERROR_STATUS,
+            "a panicking route must answer 500, got headers: {headers:?}"
+        );
+        assert_eq!(
+            header_value(&headers, TASK_PANIC_MARKER_HEADER).as_deref(),
+            Some("seen"),
+            "the task_panic hook must own the response, got headers: {headers:?}"
+        );
+    }
+    assert!(
+        task_panic_seen(),
+        "a panicking route must reach the task_panic hook"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_panicking_route_reaches_the_task_panic_hook() {
+    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    reset_signals();
+    let (control, port): (ServerControlHook, u16) = start_limits_server(
+        ServerProtocol::Http3,
+        limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
+    )
+    .await
+    .expect("http3 limits server must start");
+    if let Ok((status, headers, _body)) =
+        h3_exchange(port, "GET", &h3_target(port, PANIC_ROUTE_PATH), &[]).await
+    {
+        assert_eq!(
+            status, WIRE_SERVER_ERROR_STATUS,
+            "a panicking route must answer 500, got headers: {headers:?}"
+        );
+        assert_eq!(
+            header_value(&headers, TASK_PANIC_MARKER_HEADER).as_deref(),
+            Some("seen"),
+            "the task_panic hook must own the response, got headers: {headers:?}"
+        );
+    }
+    assert!(
+        task_panic_seen(),
+        "a panicking route must reach the task_panic hook"
+    );
+    control.shutdown().await;
+}
+```
+# Path: hyperlane/core/tests/protocol/limits/struct.rs
+```rust
+use super::*;
+pub(crate) struct HeadBodyRoute;
+pub(crate) struct NoContentRoute;
+pub(crate) struct NotModifiedRoute;
+pub(crate) struct RawChunkedRoute;
+pub(crate) struct PanicRoute;
+pub(crate) struct BodyEchoRoute;
+pub(crate) struct LimitsResponseSender;
+pub(crate) struct RequestErrorRecorder;
+pub(crate) struct TaskPanicRecorder;
+pub(crate) enum LimitsOutcome {
+    Replied(u16, http::HeaderMap, Vec<u8>),
+    H2Reset(h2::Error),
+    H3Reset(h3::error::StreamError),
+    TimedOut,
+    SetupFailed,
+}
+struct LimitsSignals {
+    request_error: Mutex<bool>,
+    task_panic: Mutex<bool>,
+}
+fn limits_signals() -> &'static LimitsSignals {
+    static SIGNALS: OnceLock<LimitsSignals> = OnceLock::new();
+    SIGNALS.get_or_init(|| LimitsSignals {
+        request_error: Mutex::new(false),
+        task_panic: Mutex::new(false),
+    })
+}
+fn flag_set(signal: &Mutex<bool>) {
+    if let Ok(mut held) = signal.lock() {
+        *held = true;
+    }
+}
+fn flag_cleared(signal: &Mutex<bool>) {
+    if let Ok(mut held) = signal.lock() {
+        *held = false;
+    }
+}
+fn flag_read(signal: &Mutex<bool>) -> bool {
+    match signal.lock() {
+        Ok(held) => *held,
+        Err(_) => false,
+    }
+}
+pub(crate) fn mark_request_error() {
+    flag_set(&limits_signals().request_error);
+}
+pub(crate) fn mark_task_panic() {
+    flag_set(&limits_signals().task_panic);
+}
+pub(crate) fn request_error_seen() -> bool {
+    flag_read(&limits_signals().request_error)
+}
+pub(crate) fn task_panic_seen() -> bool {
+    flag_read(&limits_signals().task_panic)
+}
+pub(crate) fn reset_signals() {
+    flag_cleared(&limits_signals().request_error);
+    flag_cleared(&limits_signals().task_panic);
+}
+pub(crate) fn limits_test_lock() -> &'static tokio::sync::Mutex<()> {
+    static LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    &LOCK
+}
+```
+# Path: hyperlane/core/tests/protocol/limits/mod.rs
+```rust
+mod r#assert;
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#struct;
+use {r#const::*, r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/websocket/impl.rs
+```rust
+use super::*;
+impl ServerHook for WebsocketUpgradeMiddleware {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        if !ctx.get_request().is_ws_upgrade_type() {
+            return Status::Continue;
+        }
+        if let Some(key) = &ctx.get_request().try_get_header_back(SEC_WEBSOCKET_KEY) {
+            let accept_key: String = WebSocketFrame::generate_accept_key(key);
+            let data: Vec<u8> = ctx
+                .get_mut_response()
+                .set_version(HttpVersion::Http1_1)
+                .set_status_code(101)
+                .set_header(UPGRADE, WEBSOCKET)
+                .set_header(CONNECTION, WEBSOCKET_CONNECTION_VALUE)
+                .set_header(SEC_WEBSOCKET_ACCEPT, &accept_key)
+                .set_body(Vec::new())
+                .build();
+            if stream.try_send(data).await.is_err() {
+                stream.set_closed(true);
+                return Status::Reject;
+            }
+        }
+        Status::Continue
+    }
+}
+impl WebsocketEchoRoute {
+    async fn try_send_frame(&self, stream: &mut Stream, body: &[u8]) -> Result<(), ResponseError> {
+        let frame_list: Vec<ResponseBody> = WebSocketFrame::create_frame_list(body);
+        stream.try_send_list(&frame_list).await
+    }
+}
+impl ServerHook for WebsocketEchoRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, _: &mut Context) -> Status {
+        while let Ok(body) = stream.try_get_websocket_request().await {
+            let payload: Vec<u8> = body;
+            if self.try_send_frame(stream, &payload).await.is_err() {
+                stream.set_closed(true);
+                return Status::Reject;
+            }
+        }
+        Status::Continue
+    }
+}
+```
+# Path: hyperlane/core/tests/protocol/websocket/const.rs
+```rust
+pub(crate) const WEBSOCKET_ROUTE_PATH: &str = "/ws";
+pub(crate) const WEBSOCKET_PROTOCOL_VERSION: &str = "13";
+pub(crate) const WEBSOCKET_SWITCHING_LINE: &str = "HTTP/1.1 101";
+pub(crate) const WEBSOCKET_UPGRADE_VALUE: &str = "websocket";
+pub(crate) const WEBSOCKET_CONNECTION_VALUE: &str = "Upgrade";
+pub(crate) const RFC6455_SAMPLE_KEY: &str = "dGhlIHNhbXBsZSBub25jZQ==";
+pub(crate) const RFC6455_SAMPLE_ACCEPT: &str = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
+pub(crate) const WEBSOCKET_FIN_BIT: u8 = 0b1000_0000;
+pub(crate) const WEBSOCKET_MASK_BIT: u8 = 0b1000_0000;
+pub(crate) const WEBSOCKET_BINARY_OPCODE: u8 = 0x02;
+pub(crate) const WEBSOCKET_CLOSE_OPCODE: u8 = 0x08;
+pub(crate) const WEBSOCKET_EXTENDED_LENGTH_MARK: u8 = 126;
+pub(crate) const WEBSOCKET_MAX_SHORT_FRAME: usize = 0xFFFF;
+pub(crate) const WEBSOCKET_MAX_LENGTH_MARK: u8 = 127;
+pub(crate) const RFC6455_HELLO_MASK: [u8; 4] = [0x37, 0xFA, 0x21, 0x3D];
+pub(crate) const WEBSOCKET_TEXT_OPCODE: u8 = 0x01;
+pub(crate) const RFC6455_HELLO_PAYLOAD: &str = "Hello";
+pub(crate) const RFC6455_HELLO_FRAME: [u8; 11] = [
+    0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58,
+];
+pub(crate) const WEBSOCKET_CLIENT_MASK: [u8; 4] = [0x37, 0xFA, 0x21, 0x3D];
+pub(crate) const WEBSOCKET_READ_CHUNK_LEN: usize = 8192;
+pub(crate) const WEBSOCKET_EXCHANGE_TIMEOUT_SECS: u64 = 30;
+```
+# Path: hyperlane/core/tests/protocol/websocket/fn.rs
+```rust
+use super::*;
+fn websocket_upgrade_request(key: &str) -> Vec<u8> {
+    let mut head: String =
+        format!("GET {WEBSOCKET_ROUTE_PATH} HTTP/1.1{HTTP_BR}Host: {TLS_SERVER_NAME}{HTTP_BR}");
+    head.push_str(&format!("{UPGRADE}: {WEBSOCKET_UPGRADE_VALUE}{HTTP_BR}"));
+    head.push_str(&format!(
+        "{CONNECTION}: {WEBSOCKET_CONNECTION_VALUE}{HTTP_BR}"
+    ));
+    head.push_str(&format!("{SEC_WEBSOCKET_VERSION}: "));
+    head.push_str(WEBSOCKET_PROTOCOL_VERSION);
+    head.push_str(HTTP_BR);
+    head.push_str(&format!("{SEC_WEBSOCKET_KEY}: {key}{HTTP_BR}"));
+    head.push_str(HTTP_BR);
+    head.into_bytes()
+}
+fn client_masked_frame(opcode: u8, payload: &[u8], mask: [u8; 4]) -> Vec<u8> {
+    let mut frame: Vec<u8> = vec![WEBSOCKET_FIN_BIT | opcode];
+    if payload.len() < WEBSOCKET_EXTENDED_LENGTH_MARK as usize {
+        frame.push(WEBSOCKET_MASK_BIT | payload.len() as u8);
+    } else if payload.len() <= WEBSOCKET_MAX_SHORT_FRAME {
+        frame.push(WEBSOCKET_MASK_BIT | WEBSOCKET_EXTENDED_LENGTH_MARK);
+        frame.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+    } else {
+        frame.push(WEBSOCKET_MASK_BIT | WEBSOCKET_MAX_LENGTH_MARK);
+        frame.extend_from_slice(&(payload.len() as u64).to_be_bytes());
+    }
+    frame.extend_from_slice(&mask);
+    for (index, byte) in payload.iter().enumerate() {
+        frame.push(byte ^ mask[index % 4]);
+    }
+    frame
+}
+fn decode_unmasked_frame(raw: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
+    if raw.len() < 2 {
+        return None;
+    }
+    if raw[1] & WEBSOCKET_MASK_BIT != 0 {
+        panic!("a server frame must never be masked, got: {raw:?}");
+    }
+    let short_length: usize = (raw[1] & !WEBSOCKET_MASK_BIT) as usize;
+    let mut cursor: usize = 2;
+    let payload_len: usize = if short_length == WEBSOCKET_EXTENDED_LENGTH_MARK as usize {
+        if raw.len() < cursor + 2 {
+            return None;
+        }
+        let value: usize = u16::from_be_bytes([raw[cursor], raw[cursor + 1]]) as usize;
+        cursor += 2;
+        value
+    } else {
+        short_length
+    };
+    if raw.len() < cursor + payload_len {
+        return None;
+    }
+    Some((
+        raw[..cursor].to_vec(),
+        raw[cursor..cursor + payload_len].to_vec(),
+    ))
+}
+async fn read_websocket_frame<T>(stream: &mut T) -> io::Result<(Vec<u8>, Vec<u8>)>
+where
+    T: AsyncRead + Unpin,
+{
+    let bound: Duration = Duration::from_secs(WEBSOCKET_EXCHANGE_TIMEOUT_SECS);
+    let mut collected: Vec<u8> = Vec::new();
+    loop {
+        if let Some(frame) = decode_unmasked_frame(&collected) {
+            return Ok(frame);
+        }
+        let mut chunk: [u8; WEBSOCKET_READ_CHUNK_LEN] = [0; WEBSOCKET_READ_CHUNK_LEN];
+        let read: usize = match timeout(bound, stream.read(&mut chunk)).await {
+            Ok(Ok(count)) => count,
+            Ok(Err(error)) => return Err(error),
+            Err(_) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "the echoed websocket frame did not arrive inside its timeout",
+                ));
+            }
+        };
+        if read == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "the connection ended before the echoed frame arrived",
+            ));
+        }
+        collected.extend_from_slice(&chunk[..read]);
+    }
+}
+async fn open_websocket<T>(stream: &mut T, key: &str) -> io::Result<String>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    let request: Vec<u8> = websocket_upgrade_request(key);
+    write_bounded(stream, &request).await?;
+    stream.flush().await?;
+    let (head, _leftover): (String, Vec<u8>) = read_http1_head(stream, 0).await?;
+    if !head.starts_with(WEBSOCKET_SWITCHING_LINE) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("the handshake must switch protocols, got: {head}"),
+        ));
+    }
+    Ok(head)
+}
+async fn echo_one_masked_frame<T>(stream: &mut T, payload: &[u8]) -> io::Result<(Vec<u8>, Vec<u8>)>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    let frame: Vec<u8> =
+        client_masked_frame(WEBSOCKET_BINARY_OPCODE, payload, WEBSOCKET_CLIENT_MASK);
+    write_bounded(stream, &frame).await?;
+    stream.flush().await?;
+    read_websocket_frame(stream).await
+}
+async fn close_websocket<T>(stream: &mut T) -> io::Result<()>
+where
+    T: AsyncWrite + Unpin,
+{
+    let frame: Vec<u8> = client_masked_frame(WEBSOCKET_CLOSE_OPCODE, &[], WEBSOCKET_CLIENT_MASK);
+    write_bounded(stream, &frame).await?;
+    stream.flush().await?;
+    let bound: Duration = Duration::from_secs(WEBSOCKET_EXCHANGE_TIMEOUT_SECS);
+    match timeout(bound, stream.shutdown()).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(error),
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "the client half close did not finish inside its timeout",
+        )),
+    }
+}
+async fn start_websocket_server(
+    tls: Option<TlsConfig>,
+) -> Result<(ServerControlHook, u16), Box<ServerError>> {
+    let port: u16 = reserve_tcp_port();
+    let address: String = format!("{LOOPBACK_HOST}:{port}");
+    let mut config: ServerConfig = ServerConfig::default();
+    config.set_address(&address).set_tls(tls);
+    let mut server: Server = Server::default();
+    server
+        .server_config(config)
+        .request_middleware::<WebsocketUpgradeMiddleware>()
+        .route::<WebsocketEchoRoute>(WEBSOCKET_ROUTE_PATH);
+    let control: ServerControlHook = server.run().await?;
+    drop(server);
+    let probe: io::Result<TcpStream> = connect_tcp(port).await;
+    assert!(
+        probe.is_ok(),
+        "the loopback websocket listener must accept once run resolved"
+    );
+    Ok((control, port))
+}
+fn assert_websocket_head(head: &str) {
+    assert!(
+        head.starts_with(WEBSOCKET_SWITCHING_LINE),
+        "an upgraded request must answer 101, got: {head}"
+    );
+    assert_eq!(
+        response_header_value(head, SEC_WEBSOCKET_ACCEPT),
+        RFC6455_SAMPLE_ACCEPT,
+        "the accept key must be the rfc6455 value for this key, got: {head}"
+    );
+    assert_eq!(
+        response_header_value(head, UPGRADE),
+        WEBSOCKET_UPGRADE_VALUE,
+        "the upgraded response must name the websocket protocol, got: {head}"
+    );
+    assert_eq!(
+        response_header_value(head, CONNECTION).to_ascii_lowercase(),
+        WEBSOCKET_CONNECTION_VALUE.to_ascii_lowercase(),
+        "the upgraded response must switch the connection, got: {head}"
+    );
+}
+fn assert_echoed_binary_frame(head: Vec<u8>, echoed: Vec<u8>, sent: &[u8]) {
+    let mut expected_head: Vec<u8> = vec![WEBSOCKET_FIN_BIT | WEBSOCKET_BINARY_OPCODE];
+    let payload_len: usize = sent.len();
+    if payload_len < WEBSOCKET_EXTENDED_LENGTH_MARK as usize {
+        expected_head.push(payload_len as u8);
+    } else {
+        expected_head.push(WEBSOCKET_EXTENDED_LENGTH_MARK);
+        expected_head.extend_from_slice(&(payload_len as u16).to_be_bytes());
+    }
+    assert_eq!(
+        head, expected_head,
+        "the echo must be one final unmasked binary frame with the rfc6455 length encoding"
+    );
+    assert_eq!(
+        echoed.len(),
+        payload_len,
+        "the echoed frame must carry every byte the client sent"
+    );
+    assert_eq!(
+        echoed, sent,
+        "hostile binary bytes must survive the upgrade unmasked and byte exact"
+    );
+}
+fn assert_port_released(port: u16) {
+    let rebound: io::Result<TcpListener> = TcpListener::bind((LOOPBACK_HOST, port));
+    assert!(
+        rebound.is_ok(),
+        "a stopped websocket server must release tcp port {port}, got: {:?}",
+        rebound.err()
+    );
+}
+#[tokio::test]
+async fn websocket_plaintext_upgrade_echoes_hostile_binary_frames() {
+    let (control, port): (ServerControlHook, u16) = start_websocket_server(None)
+        .await
+        .expect("the default plaintext http1 websocket server must start");
+    let bound: Duration = Duration::from_secs(WEBSOCKET_EXCHANGE_TIMEOUT_SECS);
+    let outcome: io::Result<()> = match timeout(bound, async {
+        let mut stream: TcpStream = connect_tcp(port).await?;
+        let head: String = open_websocket(&mut stream, RFC6455_SAMPLE_KEY).await?;
+        assert_websocket_head(&head);
+        let sent: Vec<u8> = hostile_binary_payload();
+        let (frame_head, echoed): (Vec<u8>, Vec<u8>) =
+            echo_one_masked_frame(&mut stream, &sent).await?;
+        assert_echoed_binary_frame(frame_head, echoed, &sent);
+        close_websocket(&mut stream).await?;
+        Ok(())
+    })
+    .await
+    {
+        Ok(value) => value,
+        Err(_) => panic!("the plaintext websocket exchange must finish inside its timeout"),
+    };
+    assert!(
+        outcome.is_ok(),
+        "the plaintext websocket exchange failed: {outcome:?}"
+    );
+    assert_wait_pending_then_complete(&control).await;
+    assert_port_released(port);
+}
+#[tokio::test]
+async fn websocket_tls_upgrade_echoes_hostile_binary_frames() {
+    let (control, port): (ServerControlHook, u16) =
+        start_websocket_server(Some(trusted_tls_config()))
+            .await
+            .expect("the default http1 websocket server must start over tls");
+    let bound: Duration = Duration::from_secs(WEBSOCKET_EXCHANGE_TIMEOUT_SECS);
+    let outcome: io::Result<()> = match timeout(bound, async {
+        let mut stream: ClientTlsStream = connect_tls(port, ALPN_HTTP1).await?;
+        let alpn: Option<Vec<u8>> = negotiated_alpn(&stream);
+        assert_eq!(
+            alpn,
+            Some(ALPN_HTTP1.to_vec()),
+            "the tls websocket server must negotiate http/1.1"
+        );
+        let head: String = open_websocket(&mut stream, RFC6455_SAMPLE_KEY).await?;
+        assert_websocket_head(&head);
+        let sent: Vec<u8> = hostile_binary_payload();
+        let (frame_head, echoed): (Vec<u8>, Vec<u8>) =
+            echo_one_masked_frame(&mut stream, &sent).await?;
+        assert_echoed_binary_frame(frame_head, echoed, &sent);
+        close_websocket(&mut stream).await?;
+        Ok(())
+    })
+    .await
+    {
+        Ok(value) => value,
+        Err(_) => panic!("the tls websocket exchange must finish inside its timeout"),
+    };
+    assert!(
+        outcome.is_ok(),
+        "the tls websocket exchange failed: {outcome:?}"
+    );
+    assert_wait_pending_then_complete(&control).await;
+    assert_port_released(port);
+}
+#[test]
+fn the_client_encoder_reproduces_the_rfc6455_masked_hello_frame() {
+    let frame: Vec<u8> = client_masked_frame(
+        WEBSOCKET_TEXT_OPCODE,
+        RFC6455_HELLO_PAYLOAD.as_bytes(),
+        RFC6455_HELLO_MASK,
+    );
+    assert_eq!(
+        frame,
+        RFC6455_HELLO_FRAME.to_vec(),
+        "the client encoder must emit the exact masked frame bytes rfc6455 publishes"
+    );
+}
+#[test]
+fn a_client_frame_never_carries_a_length_byte_of_its_own() {
+    let short_frame: Vec<u8> =
+        client_masked_frame(WEBSOCKET_BINARY_OPCODE, b"abc", RFC6455_HELLO_MASK);
+    assert_eq!(
+        short_frame[1],
+        WEBSOCKET_MASK_BIT | 3,
+        "the mask bit and the seven bit length share the second header byte"
+    );
+    assert_eq!(
+        short_frame.len(),
+        9,
+        "2 header bytes, 4 mask bytes, 3 payload bytes"
+    );
+    let long_frame: Vec<u8> = client_masked_frame(
+        WEBSOCKET_BINARY_OPCODE,
+        &hostile_binary_payload(),
+        WEBSOCKET_CLIENT_MASK,
+    );
+    assert_eq!(
+        long_frame[1],
+        WEBSOCKET_MASK_BIT | WEBSOCKET_EXTENDED_LENGTH_MARK,
+        "a payload past 125 bytes announces its length with the 126 marker"
+    );
+    assert_eq!(
+        &long_frame[2..4],
+        &(hostile_binary_payload().len() as u16).to_be_bytes(),
+        "the extended length must be the big endian payload size"
+    );
+}
+```
+# Path: hyperlane/core/tests/protocol/websocket/struct.rs
+```rust
+pub(crate) struct WebsocketUpgradeMiddleware;
+pub(crate) struct WebsocketEchoRoute;
+```
+# Path: hyperlane/core/tests/protocol/websocket/mod.rs
+```rust
+pub(crate) mod r#const;
+pub(crate) mod r#fn;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+use r#const::*;
+use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/wire/assert.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn http1_and_http2_plaintext_listeners_never_claim_the_same_tcp_port() {
+    let (first, first_port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 server must start");
+    let (second, second_port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 server must start");
+    assert_ne!(
+        first_port, second_port,
+        "each listener must own a distinct tcp port"
+    );
+    let request: Vec<u8> = http1_close_request("GET", VERSION_ROUTE_PATH);
+    let raw: Vec<u8> = raw_http1_exchange(first_port, &request)
+        .await
+        .expect("the http1 listener must answer a plain http1 request");
+    assert!(response_head(&raw).starts_with("HTTP/1.1 200"));
+    first.shutdown().await;
+    second.shutdown().await;
+}
+#[tokio::test]
+async fn an_http1_listener_refuses_a_prior_knowledge_http2_client() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("the client handshake future resolves before the wire is settled");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
+    let outcome: Result<H2Reply, String> = h2_request(&mut sender, "GET", &target, &[]).await;
+    assert!(
+        outcome.is_err(),
+        "an http1 listener must not answer an http2 request on the wire, got: {outcome:?}"
+    );
+    drop(sender);
+    driving.abort();
+    let request: Vec<u8> = http1_close_request("GET", VERSION_ROUTE_PATH);
+    let raw: Vec<u8> = raw_http1_exchange(port, &request)
+        .await
+        .expect("the http1 listener must still serve plain http1");
+    assert!(response_head(&raw).starts_with("HTTP/1.1 200"));
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn an_http2_listener_does_not_answer_a_plain_http1_request() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 server must start");
+    let request: &[u8] = b"GET /version HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
+    if let Ok(raw) = raw_http1_exchange(port, request).await {
+        let head: String = response_head(&raw);
+        assert!(
+            !head.starts_with("HTTP/1.1 200"),
+            "an http2 listener must not answer an http1 request, got: {head}"
+        );
+    }
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn an_http3_listener_does_not_answer_a_tcp_request() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 server must start");
+    let request: &[u8] = b"GET /version HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
+    if let Ok(raw) = raw_http1_exchange(port, request).await {
+        let head: String = response_head(&raw);
+        assert!(
+            !head.starts_with("HTTP/1.1 200"),
+            "an http3 listener binds udp only and must not answer tcp, got: {head}"
+        );
+    }
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_strips_every_hop_by_hop_header_but_keeps_end_to_end_ones() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_request_with_headers(
+        &mut sender,
+        "GET",
+        &format!("http://{TLS_SERVER_NAME}:{port}{HOP_BY_HOP_CLEAN_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("the hop-by-hop route must answer");
+    assert_eq!(status, 200);
+    for name in [
+        CONNECTION,
+        KEEP_ALIVE,
+        UPGRADE,
+        TE,
+        INTERNAL_CONNECTION_HEADER,
+    ] {
+        assert!(
+            !headers.contains_key(name),
+            "{name} is hop by hop on http2 and must not reach the client, got: {headers:?}"
+        );
+    }
+    assert_eq!(
+        headers
+            .get(PRESERVED_HEADER_KEY)
+            .map(|value: &http::HeaderValue| value.to_str().unwrap_or_default()),
+        Some(PRESERVED_HEADER_VALUE),
+        "an end-to-end header must survive the stripping, got: {headers:?}"
+    );
+    assert_eq!(String::from_utf8_lossy(&body), HOP_BY_HOP_SENT_BODY);
+    let (status, _version, body): (u16, http::Version, Vec<u8>) = h2_request(
+        &mut sender,
+        "GET",
+        &format!("http://{TLS_SERVER_NAME}:{port}{HOP_BY_HOP_CLEAN_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("the hop-by-hop route must answer a second time on the same connection");
+    assert_eq!(status, 200);
+    assert_eq!(String::from_utf8_lossy(&body), HOP_BY_HOP_SENT_BODY);
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http2_refuses_a_response_announcing_a_chunked_transfer_encoding() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http2, None)
+            .await
+            .expect("http2 server must start");
+    let (mut sender, connection) = h2_plaintext_session(port)
+        .await
+        .expect("h2 handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _result: Result<(), h2::Error> = connection.await;
+    });
+    let outcome: Result<H2Reply, String> = h2_request(
+        &mut sender,
+        "GET",
+        &format!("http://{TLS_SERVER_NAME}:{port}{HOP_BY_HOP_ROUTE_PATH}"),
+        &[],
+    )
+    .await;
+    assert!(
+        outcome.is_err(),
+        "a head announcing a transfer coding must be refused, never delivered as a success, got: {outcome:?}"
+    );
+    drop(sender);
+    driving.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_refuses_a_response_announcing_a_chunked_transfer_encoding() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let outcome: Result<H3Reply, String> = h3_request(
+        port,
+        "GET",
+        &format!("https://{TLS_SERVER_NAME}:{port}{HOP_BY_HOP_ROUTE_PATH}"),
+        &[],
+    )
+    .await;
+    assert!(
+        outcome.is_err(),
+        "a head announcing a transfer coding must be refused, never delivered as a success, got: {outcome:?}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_keeps_its_connection_header_because_it_is_end_to_end_on_http1() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 server must start");
+    let request: Vec<u8> = http1_close_request("GET", HOP_BY_HOP_ROUTE_PATH);
+    let raw: Vec<u8> = raw_http1_exchange(port, &request)
+        .await
+        .expect("http1 exchange must complete");
+    let head: String = response_head(&raw).to_lowercase();
+    assert!(
+        head.contains(CONNECTION),
+        "an http1 response keeps its connection header, got: {head}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_split_writes_reassemble_into_one_body_across_several_writes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 server must start");
+    let mut stream: TcpStream = connect_tcp(port).await.expect("socket must connect");
+    let request: Vec<u8> = http1_close_request("GET", SPLIT_ROUTE_PATH);
+    write_bounded(&mut stream, &request)
+        .await
+        .expect("request must be written");
+    let (head, body): (String, Vec<u8>) = read_http1_head(&mut stream, SPLIT_BODY_LEN)
+        .await
+        .expect("the split response head must be readable");
+    assert!(head.starts_with("HTTP/1.1 200"), "got: {head}");
+    let text: String = String::from_utf8_lossy(&body).to_string();
+    assert_eq!(
+        text,
+        format!("{SPLIT_HEAD_BODY}{SPLIT_TAIL_BODY}"),
+        "fragments written separately must reassemble into one body"
+    );
+    control.shutdown().await;
+}
+```
+# Path: hyperlane/core/tests/protocol/wire/mod.rs
+```rust
+mod r#assert;
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/middleware/impl.rs
+```rust
+use super::*;
+impl ServerHook for ProbeMiddleware {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let request: &Request = ctx.get_request();
+        let path: String = request.get_path().clone();
+        let method: String = request.get_method().to_string();
+        let query: String = joined_query(request, PROBE_QUERY_KEYS);
+        let header: String = joined_header(request, PROBE_HEADER_KEY);
+        let version: String = format!("{:?}", request.get_version());
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_header(PROBE_METHOD_HEADER, &method)
+            .set_header(PROBE_PATH_HEADER, &path)
+            .set_header(PROBE_QUERY_HEADER, &query)
+            .set_header(PROBE_HEADER_ECHO_HEADER, &header)
+            .set_header(PROBE_VERSION_HEADER, &version)
+            .set_body(String::new());
+        Status::Continue
+    }
+}
+impl ServerHook for ProbeResponseMiddleware {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx.get_mut_response().build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for EchoRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let body: Vec<u8> = ctx.get_request().get_body().clone();
+        let version: String = format!("{:?}", ctx.get_request().get_version());
+        let payload: Vec<u8> = body
+            .iter()
+            .map(|value: &u8| value.wrapping_add(1))
+            .collect::<Vec<u8>>();
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
+            .set_header("x-request-version", &version)
+            .set_body(&payload);
+        Status::Continue
+    }
+}
+impl ServerHook for GatedSlowRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let gate: &RouteGate = route_gate(GateSlot::SlowHttp2);
+        gate.mark_slow_entered();
+        gate.await_slow_release().await;
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_body(SLOW_DONE_BODY);
+        Status::Continue
+    }
+}
+impl ServerHook for GatedSlowRouteHttp3 {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let gate: &RouteGate = route_gate(GateSlot::SlowHttp3);
+        gate.mark_slow_entered();
+        gate.await_slow_release().await;
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_body(SLOW_DONE_BODY);
+        Status::Continue
+    }
+}
+impl ServerHook for SplitWriteRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .set_header(CACHE_CONTROL, NO_CACHE)
+            .set_body(Vec::new())
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        for piece in fragment_writes(SPLIT_HEAD_BODY.as_bytes()) {
+            if stream.try_send(piece).await.is_err() {
+                stream.set_closed(true);
+                return Status::Reject;
+            }
+        }
+        if stream.try_send(SPLIT_TAIL_BODY).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        stream.set_closed(true);
+        Status::Reject
+    }
+}
+impl ServerHook for DuplicateCookieRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let first: String = CookieBuilder::new(FIRST_COOKIE_NAME, FIRST_COOKIE_VALUE)
+            .http_only()
+            .build();
+        let second: String = CookieBuilder::new(SECOND_COOKIE_NAME, SECOND_COOKIE_VALUE)
+            .http_only()
+            .build();
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .add_header(SET_COOKIE, &first)
+            .add_header(SET_COOKIE, &second)
+            .set_header(CONNECTION, KEEP_ALIVE)
+            .set_body(COOKIE_SENT_BODY);
+        Status::Continue
+    }
+}
+impl ServerHook for LargeResponseRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let payload: Vec<u8> = large_binary_payload();
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
+            .set_body(&payload);
+        Status::Continue
+    }
+}
+impl ServerHook for BinaryEchoRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let body: Vec<u8> = ctx.get_request().get_body().clone();
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, APPLICATION_OCTET_STREAM)
+            .set_body(&body);
+        Status::Continue
+    }
+}
+impl ServerHook for GatedSseStreamRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .set_header(CACHE_CONTROL, NO_CACHE)
+            .set_body(Vec::new())
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        if stream.try_send(SSE_FIRST_CHUNK).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        let gate: &RouteGate = route_gate(GateSlot::SseHttp1);
+        gate.mark_sse_first_chunk_sent();
+        gate.await_sse_release().await;
+        if stream.try_send(SSE_SECOND_CHUNK).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        stream.set_closed(true);
+        Status::Reject
+    }
+}
+impl ServerHook for GatedSseStreamRouteHttp2 {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .set_header(CACHE_CONTROL, NO_CACHE)
+            .set_body(Vec::new())
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        if stream.try_send(SSE_FIRST_CHUNK).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        let gate: &RouteGate = route_gate(GateSlot::SseHttp2);
+        gate.mark_sse_first_chunk_sent();
+        gate.await_sse_release().await;
+        if stream.try_send(SSE_SECOND_CHUNK).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        stream.set_closed(true);
+        Status::Reject
+    }
+}
+impl ServerHook for GatedSseStreamRouteHttp3 {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .set_header(CACHE_CONTROL, NO_CACHE)
+            .set_body(Vec::new())
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        if stream.try_send(SSE_FIRST_CHUNK).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        let gate: &RouteGate = route_gate(GateSlot::SseHttp3);
+        gate.mark_sse_first_chunk_sent();
+        gate.await_sse_release().await;
+        if stream.try_send(SSE_SECOND_CHUNK).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        stream.set_closed(true);
+        Status::Reject
+    }
+}
+impl ServerHook for VersionRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let version: String = format!("{:?}", ctx.get_request().get_version());
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_body(&version);
+        Status::Continue
+    }
+}
+impl ServerHook for HopByHopStrippingMiddleware {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let named: String = format!("{INTERNAL_CONNECTION_HEADER}, {KEEP_ALIVE}");
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_header(CONNECTION, &named)
+            .set_header(INTERNAL_CONNECTION_HEADER, INTERNAL_CONNECTION_VALUE)
+            .set_header(TRANSFER_ENCODING, CHUNKED)
+            .set_header(UPGRADE, "h2c")
+            .set_header(PRESERVED_HEADER_KEY, PRESERVED_HEADER_VALUE)
+            .set_body(HOP_BY_HOP_SENT_BODY);
+        Status::Continue
+    }
+}
+impl ServerHook for HopByHopStrippingRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let named: String = format!("{INTERNAL_CONNECTION_HEADER}, {KEEP_ALIVE}");
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_header(CONNECTION, &named)
+            .set_header(KEEP_ALIVE, "timeout=5")
+            .set_header(INTERNAL_CONNECTION_HEADER, INTERNAL_CONNECTION_VALUE)
+            .set_header(UPGRADE, "h2c")
+            .set_header(TE, "trailers")
+            .set_header(PRESERVED_HEADER_KEY, PRESERVED_HEADER_VALUE)
+            .set_body(HOP_BY_HOP_SENT_BODY);
+        Status::Continue
+    }
+}
+impl ServerHook for SocketMetadataRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let local: SocketAddr = stream
+            .get_local_addr()
+            .expect("a serving stream must report its local address");
+        let peer: SocketAddr = stream
+            .get_peer_addr()
+            .expect("a serving stream must report its peer address");
+        let body: String = format!("{local}|{peer}");
+        ctx.get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_PLAIN)
+            .set_body(&body);
+        Status::Continue
+    }
+}
+impl ServerHook for UnframedBodyRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let data: Vec<u8> = ctx
+            .get_mut_response()
+            .set_status_code(200)
+            .set_header(CONTENT_TYPE, TEXT_EVENT_STREAM)
+            .set_body(Vec::new())
+            .build();
+        if stream.try_send(data).await.is_err() {
+            stream.set_closed(true);
+            return Status::Reject;
+        }
+        for piece in fragment_writes(UNFRAMED_BODY.as_bytes()) {
+            if stream.try_send(piece).await.is_err() {
+                stream.set_closed(true);
+                return Status::Reject;
+            }
+        }
+        stream.set_closed(true);
+        Status::Reject
+    }
+}
+```
+# Path: hyperlane/core/tests/protocol/middleware/fn.rs
+```rust
+use super::*;
+pub(crate) fn register_probe_hooks(server: &mut Server) -> &mut Server {
+    server.request_middleware::<ProbeMiddleware>();
+    server.response_middleware::<ProbeResponseMiddleware>();
+    server.route::<VersionRoute>(VERSION_ROUTE_PATH);
+    server.route::<EchoRoute>(ECHO_ROUTE_PATH);
+    server.route::<GatedSlowRoute>(SLOW_ROUTE_PATH);
+    server.route::<SplitWriteRoute>(SPLIT_ROUTE_PATH);
+    server.route::<DuplicateCookieRoute>(COOKIE_ROUTE_PATH);
+    server.route::<LargeResponseRoute>(LARGE_ROUTE_PATH);
+    server.route::<BinaryEchoRoute>(BINARY_ROUTE_PATH);
+    server.route::<GatedSseStreamRoute>(SSE_ROUTE_PATH);
+    server.route::<GatedSseStreamRouteHttp2>(SSE_ROUTE_PATH_HTTP2);
+    server.route::<GatedSseStreamRouteHttp3>(SSE_ROUTE_PATH_HTTP3);
+    server.route::<GatedSlowRouteHttp3>(SLOW_ROUTE_PATH_HTTP3);
+    server.route::<HopByHopStrippingMiddleware>(HOP_BY_HOP_ROUTE_PATH);
+    server.route::<HopByHopStrippingRoute>(HOP_BY_HOP_CLEAN_ROUTE_PATH);
+    server.route::<SocketMetadataRoute>(SOCKET_METADATA_ROUTE_PATH);
+    server.route::<UnframedBodyRoute>(UNFRAMED_BODY_ROUTE_PATH);
+    server
+}
+```
+# Path: hyperlane/core/tests/protocol/middleware/struct.rs
+```rust
+pub(crate) struct ProbeMiddleware;
+pub(crate) struct ProbeResponseMiddleware;
+pub(crate) struct EchoRoute;
+pub(crate) struct GatedSlowRoute;
+pub(crate) struct GatedSlowRouteHttp3;
+pub(crate) struct SplitWriteRoute;
+pub(crate) struct DuplicateCookieRoute;
+pub(crate) struct LargeResponseRoute;
+pub(crate) struct BinaryEchoRoute;
+pub(crate) struct GatedSseStreamRoute;
+pub(crate) struct GatedSseStreamRouteHttp2;
+pub(crate) struct GatedSseStreamRouteHttp3;
+pub(crate) struct VersionRoute;
+pub(crate) struct HopByHopStrippingMiddleware;
+pub(crate) struct HopByHopStrippingRoute;
+pub(crate) struct SocketMetadataRoute;
+pub(crate) struct UnframedBodyRoute;
+```
+# Path: hyperlane/core/tests/protocol/middleware/mod.rs
+```rust
+pub(crate) mod r#fn;
+pub(crate) mod r#impl;
+pub(crate) mod r#struct;
+use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/http3/fn.rs
+```rust
+use super::*;
+fn quic_client_config(alpn: &[u8]) -> quinn::ClientConfig {
+    let mut roots: RootCertStore = RootCertStore::empty();
+    install_trusted_ca(&mut roots);
+    let mut config: ClientConfig = ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    config.alpn_protocols = vec![alpn.to_vec()];
+    quinn::ClientConfig::new(Arc::new(
+        quinn::crypto::rustls::QuicClientConfig::try_from(config)
+            .expect("the ring provider supports the QUIC initial cipher suite"),
+    ))
+}
+pub(crate) async fn connect_quic(
+    port: u16,
+    alpn: &[u8],
+) -> Result<(quinn::Endpoint, quinn::Connection), String> {
+    let bind: SocketAddr = format!("{LOOPBACK_HOST}:0")
+        .parse()
+        .map_err(|error: AddrParseError| format!("loopback bind address is invalid: {error}"))?;
+    let mut endpoint: quinn::Endpoint = quinn::Endpoint::client(bind)
+        .map_err(|error: io::Error| format!("quic endpoint bind failed: {error}"))?;
+    endpoint.set_default_client_config(quic_client_config(alpn));
+    let address: SocketAddr = format!("{LOOPBACK_HOST}:{port}")
+        .parse()
+        .map_err(|error: AddrParseError| format!("loopback address is invalid: {error}"))?;
+    let connecting: quinn::Connecting = endpoint
+        .connect(address, TLS_SERVER_NAME)
+        .map_err(|error: quinn::ConnectError| format!("quic connect failed: {error}"))?;
+    let connection: quinn::Connection =
+        timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), connecting)
+            .await
+            .map_err(|_: tokio::time::error::Elapsed| "quic connect timed out".to_string())?
+            .map_err(|error: quinn::ConnectionError| format!("quic connect failed: {error}"))?;
+    Ok((endpoint, connection))
+}
+fn negotiated_quic_alpn(connection: &quinn::Connection) -> Option<Vec<u8>> {
+    let data: Option<Box<dyn Any>> = connection.handshake_data();
+    match data {
+        Some(data) => match data.downcast::<quinn::crypto::rustls::HandshakeData>() {
+            Ok(handshake) => handshake.protocol,
+            Err(_) => None,
+        },
+        None => None,
+    }
+}
+pub(crate) async fn h3_request_with_headers(
+    port: u16,
+    method: &str,
+    target: &str,
+    body: &[u8],
+) -> Result<H3HeadReply, String> {
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await?;
+    let alpn: Option<Vec<u8>> = negotiated_quic_alpn(&connection);
+    h3_exchange_on(H3Exchange {
+        connection,
+        alpn,
+        method,
+        target,
+        body,
+    })
+    .await
+}
+pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadReply, String> {
+    let H3Exchange {
+        connection,
+        alpn,
+        method,
+        target,
+        body,
+    } = exchange;
+    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+        .await
+        .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
+    let driving: JoinHandle<()> = spawn(async move {
+        let _final: h3::error::ConnectionError = driver.wait_idle().await;
+    });
+    let request: http::Request<()> = http::Request::builder()
+        .method(method)
+        .uri(target)
+        .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
+        .body(())
+        .map_err(|error: http::Error| format!("request build failed: {error}"))?;
+    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+        .send_request(request)
+        .await
+        .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
+    if !body.is_empty() {
+        stream
+            .send_data(Bytes::copy_from_slice(body))
+            .await
+            .map_err(|error: h3::error::StreamError| format!("send_data failed: {error}"))?;
+    }
+    stream
+        .finish()
+        .await
+        .map_err(|error: h3::error::StreamError| format!("finish failed: {error}"))?;
+    let response: http::Response<()> = timeout(
+        Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        stream.recv_response(),
+    )
+    .await
+    .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
+    .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
+    let status: u16 = response.status().as_u16();
+    let headers: http::HeaderMap = response.headers().clone();
+    let mut collected: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err("h3 body timed out".to_string());
+        }
+        match timeout(remaining, stream.recv_data()).await {
+            Ok(Ok(Some(chunk))) => collected.extend_from_slice(chunk.chunk()),
+            Ok(Ok(None)) => break,
+            Ok(Err(error)) => return Err(format!("h3 body read failed: {error}")),
+            Err(_) => return Err("h3 body timed out".to_string()),
+        }
+    }
+    drop(client);
+    driving.abort();
+    connection.close(quinn::VarInt::from_u32(0), b"done");
+    Ok((status, headers, collected, alpn))
+}
+pub(crate) async fn h3_stream_until(port: u16, target: &str, needle: &str) -> (Vec<u8>, bool) {
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3)
+            .await
+            .expect("quic connect must succeed");
+    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+        .await
+        .expect("h3 handshake must succeed");
+    let driving: JoinHandle<()> = spawn(async move {
+        let _final: h3::error::ConnectionError = driver.wait_idle().await;
+    });
+    let request: http::Request<()> = http::Request::builder()
+        .method("GET")
+        .uri(target)
+        .body(())
+        .expect("request must build");
+    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+        .send_request(request)
+        .await
+        .expect("h3 request must be accepted");
+    stream.finish().await.expect("h3 request must finish");
+    let _response: http::Response<()> = timeout(
+        Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        stream.recv_response(),
+    )
+    .await
+    .expect("the h3 response head must arrive inside its timeout")
+    .expect("the h3 response head must not fail");
+    let mut body: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = stream;
+    let mut collected: Vec<u8> = Vec::new();
+    let mut matched: bool = false;
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        if String::from_utf8_lossy(&collected).contains(needle) {
+            matched = true;
+            break;
+        }
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match timeout(remaining, body.recv_data()).await {
+            Ok(Ok(Some(chunk))) => collected.extend_from_slice(chunk.chunk()),
+            Ok(Ok(None)) => break,
+            Ok(Err(error)) => {
+                panic!("the h3 body read failed before the needle arrived: {error}")
+            }
+            Err(_) => break,
+        }
+    }
+    drop(client);
+    driving.abort();
+    connection.close(quinn::VarInt::from_u32(0), b"done");
+    (collected, matched)
+}
+pub(crate) async fn h3_request(
+    port: u16,
+    method: &str,
+    target: &str,
+    body: &[u8],
+) -> Result<H3Reply, String> {
+    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await?;
+    let alpn: Option<Vec<u8>> = negotiated_quic_alpn(&connection);
+    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+        .await
+        .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
+    let driving: JoinHandle<()> = spawn(async move {
+        let _final: h3::error::ConnectionError = driver.wait_idle().await;
+    });
+    let request: http::Request<()> = http::Request::builder()
+        .method(method)
+        .uri(target)
+        .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
+        .body(())
+        .map_err(|error: http::Error| format!("request build failed: {error}"))?;
+    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+        .send_request(request)
+        .await
+        .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
+    if !body.is_empty() {
+        stream
+            .send_data(Bytes::copy_from_slice(body))
+            .await
+            .map_err(|error: h3::error::StreamError| format!("send_data failed: {error}"))?;
+    }
+    stream
+        .finish()
+        .await
+        .map_err(|error: h3::error::StreamError| format!("finish failed: {error}"))?;
+    let response: http::Response<()> = timeout(
+        Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        stream.recv_response(),
+    )
+    .await
+    .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
+    .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
+    let status: u16 = response.status().as_u16();
+    let version: http::Version = response.version();
+    let mut collected: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    loop {
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err("h3 body timed out".to_string());
+        }
+        match timeout(remaining, stream.recv_data()).await {
+            Ok(Ok(Some(chunk))) => collected.extend_from_slice(chunk.chunk()),
+            Ok(Ok(None)) => break,
+            Ok(Err(error)) => return Err(format!("h3 body read failed: {error}")),
+            Err(_) => return Err("h3 body timed out".to_string()),
+        }
+    }
+    drop(client);
+    driving.abort();
+    connection.close(quinn::VarInt::from_u32(0), b"done");
+    Ok((status, version, collected, alpn))
+}
+```
+# Path: hyperlane/core/tests/protocol/http3/type.rs
+```rust
+pub(crate) type H3Reply = (u16, http::Version, Vec<u8>, Option<Vec<u8>>);
+pub(crate) type H3HeadReply = (u16, http::HeaderMap, Vec<u8>, Option<Vec<u8>>);
+pub(crate) struct H3Exchange<'a> {
+    pub(crate) connection: quinn::Connection,
+    pub(crate) alpn: Option<Vec<u8>>,
+    pub(crate) method: &'a str,
+    pub(crate) target: &'a str,
+    pub(crate) body: &'a [u8],
+}
+```
+# Path: hyperlane/core/tests/protocol/http3/assert.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn http3_over_quic_reports_the_real_local_and_peer_addresses_of_the_connection() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3)
+            .await
+            .expect("a quic client must connect");
+    let client_local: SocketAddr = endpoint
+        .local_addr()
+        .expect("the client endpoint must report its own udp address");
+    let target: String = format!("https://{TLS_SERVER_NAME}:{port}{SOCKET_METADATA_ROUTE_PATH}");
+    let (status, _headers, body, _alpn): H3HeadReply = h3_exchange_on(H3Exchange {
+        connection,
+        alpn: None,
+        method: "GET",
+        target: &target,
+        body: &[],
+    })
+    .await
+    .expect("h3 socket metadata request must complete");
+    assert_eq!(status, 200);
+    let text: String = String::from_utf8_lossy(&body).to_string();
+    let (reported_local, reported_peer): (String, String) =
+        match text.split_once(SOCKET_METADATA_SEPARATOR) {
+            Some(pair) => (pair.0.to_string(), pair.1.to_string()),
+            None => panic!("the route must report both addresses, got: {text:?}"),
+        };
+    let expected_local: SocketAddr = format!("{LOOPBACK_HOST}:{port}")
+        .parse()
+        .expect("the bind address must parse");
+    assert_eq!(
+        reported_local,
+        expected_local.to_string(),
+        "an h3 stream must carry the connection's real local address, not a fabricated one"
+    );
+    assert_eq!(
+        reported_peer,
+        client_local.to_string(),
+        "an h3 stream must carry the connection's real peer address"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_streams_a_body_that_never_announced_a_content_length() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let (status, headers, body, _alpn): H3HeadReply = h3_request_with_headers(
+        port,
+        "GET",
+        &format!("https://{TLS_SERVER_NAME}:{port}{UNFRAMED_BODY_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("an unframed h3 body must be accepted");
+    assert_eq!(status, 200);
+    assert!(
+        !headers.contains_key(CONTENT_LENGTH),
+        "the head must not announce a length for a body framed by data frames"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        UNFRAMED_BODY,
+        "a body with no content-length must still reach the client in full"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_over_quic_negotiates_h3_alpn_and_tls13() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let (status, version, body, alpn): H3Reply = h3_request(
+        port,
+        "GET",
+        &format!("https://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("h3 request must complete");
+    assert_eq!(status, 200);
+    assert_eq!(
+        version,
+        http::Version::HTTP_3,
+        "the response must be framed as HTTP/3, not downgraded"
+    );
+    assert_eq!(
+        alpn,
+        Some(ALPN_HTTP3.to_vec()),
+        "QUIC must negotiate the h3 ALPN identifier"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        format!("{:?}", HttpVersion::Http3)
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_over_quic_reads_path_query_and_header() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let target: String = format!(
+        "https://{TLS_SERVER_NAME}:{port}{PROBE_PATH}?{}",
+        PROBE_QUERY
+    );
+    let (status, version, _body, _alpn): H3Reply = h3_request(port, "GET", &target, &[])
+        .await
+        .expect("h3 probe request must complete");
+    assert_eq!(status, 200);
+    assert_eq!(version, http::Version::HTTP_3);
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_over_quic_binary_post_round_trips_hostile_bytes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let payload: Vec<u8> = hostile_binary_payload();
+    let (status, version, body, _alpn): H3Reply = h3_request(
+        port,
+        "POST",
+        &format!("https://{TLS_SERVER_NAME}:{port}{BINARY_ROUTE_PATH}"),
+        &payload,
+    )
+    .await
+    .expect("h3 binary post must complete");
+    assert_eq!(status, 200);
+    assert_eq!(version, http::Version::HTTP_3);
+    assert_eq!(
+        body, payload,
+        "every hostile byte must survive the h3 body round trip"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_over_quic_delivers_a_response_above_the_flow_control_window() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let expected: Vec<u8> = large_binary_payload();
+    let (status, version, body, _alpn): H3Reply = h3_request(
+        port,
+        "GET",
+        &format!("https://{TLS_SERVER_NAME}:{port}{LARGE_ROUTE_PATH}"),
+        &[],
+    )
+    .await
+    .expect("large h3 response must complete");
+    assert_eq!(status, 200);
+    assert_eq!(version, http::Version::HTTP_3);
+    assert_eq!(body.len(), expected.len());
+    assert!(
+        body == expected,
+        "the large response must be byte identical past the flow control window"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_over_quic_shutdown_releases_the_bound_udp_port() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    assert_wait_pending_then_complete(&control).await;
+    let rebound: io::Result<UdpSocket> = UdpSocket::bind(format!("{LOOPBACK_HOST}:{port}"));
+    assert!(
+        rebound.is_ok(),
+        "udp port {port} must be free again after shutdown and wait"
+    );
+}
+#[tokio::test]
+async fn http3_over_quic_rejects_a_client_offering_only_h2() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let outcome: Result<(quinn::Endpoint, quinn::Connection), String> =
+        connect_quic(port, ALPN_HTTP2).await;
+    assert!(
+        outcome.is_err(),
+        "an http3 listener must refuse an h2-only QUIC client instead of downgrading"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn h3_sse_chunk_reaches_the_client_before_the_handler_finishes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let _lease: GateLease = gate_lease(GateSlot::SseHttp3).await;
+    let target: String = format!("https://{TLS_SERVER_NAME}:{port}{SSE_ROUTE_PATH_HTTP3}");
+    let reading: JoinHandle<(Vec<u8>, bool)> =
+        spawn(async move { h3_stream_until(port, &target, SSE_FIRST_CHUNK).await });
+    route_gate(GateSlot::SseHttp3)
+        .await_first_chunk_sent()
+        .await;
+    let (collected, matched): (Vec<u8>, bool) =
+        timeout(Duration::from_secs(FAST_STREAM_BUDGET_MILLIS), reading)
+            .await
+            .expect("the first sse chunk must be readable while the handler is still blocked")
+            .expect("the reader task must not panic");
+    let text: String = String::from_utf8_lossy(&collected).to_string();
+    assert!(
+        matched,
+        "the first sse chunk must be readable while the handler is still blocked, got: {text:?}"
+    );
+    assert!(
+        !text.contains(SSE_SECOND_CHUNK),
+        "the second chunk must wait for the handler to be released, got: {text:?}"
+    );
+    route_gate(GateSlot::SseHttp3).release_sse();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_one_connection_answers_a_fast_stream_while_a_slow_stream_is_blocked() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 quic server must start");
+    let _lease: GateLease = gate_lease(GateSlot::SlowHttp3).await;
+    let order: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
+    let slow_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
+    let slow: JoinHandle<Result<H3Reply, String>> = spawn(async move {
+        let outcome: Result<H3Reply, String> = h3_request(
+            port,
+            "GET",
+            &format!("https://{TLS_SERVER_NAME}:{port}{SLOW_ROUTE_PATH_HTTP3}"),
+            &[],
+        )
+        .await;
+        slow_order.lock().expect("order lock").push("slow");
+        outcome
+    });
+    route_gate(GateSlot::SlowHttp3).await_slow_entered().await;
+    let fast_order: Arc<Mutex<Vec<&'static str>>> = Arc::clone(&order);
+    let fast: JoinHandle<Result<H3Reply, String>> = spawn(async move {
+        let outcome: Result<H3Reply, String> = h3_request(
+            port,
+            "GET",
+            &format!("https://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}"),
+            &[],
+        )
+        .await;
+        fast_order.lock().expect("order lock").push("fast");
+        outcome
+    });
+    let budget: Duration = Duration::from_millis(FAST_STREAM_BUDGET_MILLIS);
+    let fast_result: Result<H3Reply, String> = timeout(budget, fast)
+        .await
+        .expect("the fast stream must complete while the slow handler is still blocked")
+        .expect("the fast stream task must not panic");
+    assert!(
+        fast_result.is_ok(),
+        "the fast request must succeed while the slow handler is held"
+    );
+    assert_eq!(
+        *order.lock().expect("order lock"),
+        vec!["fast"],
+        "only the fast stream may complete while the slow handler is blocked"
+    );
+    route_gate(GateSlot::SlowHttp3).release_slow();
+    let slow_result: Result<H3Reply, String> =
+        timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), slow)
+            .await
+            .expect("the released slow stream must finish inside its timeout")
+            .expect("the slow stream task must not panic");
+    assert!(slow_result.is_ok());
+    assert_eq!(*order.lock().expect("order lock"), vec!["fast", "slow"]);
+    control.shutdown().await;
+}
+```
+# Path: hyperlane/core/tests/protocol/http3/mod.rs
+```rust
+pub(crate) mod r#assert;
+pub(crate) mod r#fn;
+pub(crate) mod r#type;
+use {r#fn::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/runtime/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn http1_default_config_serves_over_plaintext_tcp() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("the default plaintext server must start");
+    let raw: Vec<u8> = raw_http1_exchange(port, &http1_close_request("GET", VERSION_ROUTE_PATH))
+        .await
+        .expect("the plaintext exchange must complete");
+    let head: String = response_head(&raw);
+    assert!(
+        head.starts_with("HTTP/1.1 200"),
+        "the default protocol must answer over HTTP/1.1, got: {head}"
+    );
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn http3_without_tls_is_rejected_before_binding() {
+    let address: String = format!("{LOOPBACK_HOST}:{}", reserve_tcp_port());
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(address.clone())
+        .set_protocol(ServerProtocol::Http3);
+    let mut server: Server = Server::default();
+    server.server_config(config);
+    let result: Result<ServerControlHook, Box<ServerError>> = server.run().await;
+    let Err(error) = result else {
+        panic!("HTTP/3 without TLS must fail before the socket is bound");
+    };
+    assert!(
+        matches!(*error, ServerError::MissingTlsForHttp3),
+        "the rejection must name the missing TLS material, got: {error:?}"
+    );
+    let rebound: io::Result<TcpListener> = TcpListener::bind(&address);
+    assert!(rebound.is_ok(), "the rejected run must leave the port free");
+}
+#[tokio::test]
+async fn shutdown_releases_the_port_before_wait_returns() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("a plaintext server must start");
+    let raw: Vec<u8> = raw_http1_exchange(port, &http1_close_request("GET", VERSION_ROUTE_PATH))
+        .await
+        .expect("the exchange before shutdown must complete");
+    assert!(
+        response_head(&raw).starts_with("HTTP/1.1 200"),
+        "the server must serve before it is shut down"
+    );
+    assert_wait_pending_then_complete(&control).await;
+    let rebound: io::Result<TcpListener> = TcpListener::bind(format!("{LOOPBACK_HOST}:{port}"));
+    assert!(
+        rebound.is_ok(),
+        "the port must be released by the time wait returns"
+    );
+}
+#[tokio::test]
+async fn dropping_the_caller_server_keeps_the_listener_serving() {
+    let (control, port): (ServerControlHook, u16) = start_dropped_caller_server()
+        .await
+        .expect("a server whose caller is dropped must still serve");
+    let raw: Vec<u8> = raw_http1_exchange(port, &http1_close_request("GET", VERSION_ROUTE_PATH))
+        .await
+        .expect("the exchange must complete after the caller was dropped");
+    let head: String = response_head(&raw);
+    assert!(
+        head.starts_with("HTTP/1.1 200"),
+        "the accepted tasks must own the server, got: {head}"
+    );
+    control.shutdown().await;
+    control.wait().await;
+}
+#[tokio::test]
+async fn unreadable_tls_material_is_rejected_before_binding() {
+    let address: String = format!("{LOOPBACK_HOST}:{}", reserve_tcp_port());
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(address.clone())
+        .set_protocol(ServerProtocol::Http1)
+        .set_tls(Some(TlsConfig::new(
+            MISSING_PEM_NAME.to_string(),
+            MISSING_PEM_NAME.to_string(),
+        )));
+    let mut server: Server = Server::default();
+    server.server_config(config);
+    let result: Result<ServerControlHook, Box<ServerError>> = server.run().await;
+    let Err(error) = result else {
+        panic!("unreadable TLS material must fail before the socket is bound");
+    };
+    assert!(
+        matches!(*error, ServerError::Tls(_)),
+        "the failure must be reported as a TLS error, got: {error:?}"
+    );
+    let rebound: io::Result<TcpListener> = TcpListener::bind(&address);
+    assert!(rebound.is_ok(), "the rejected run must leave the port free");
+}
+```
+# Path: hyperlane/core/tests/protocol/runtime/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/common/const.rs
+```rust
+pub(crate) const FIXTURE_DIR_NAME: &str = "tests/fixtures/tls";
+pub(crate) const CA_PEM_NAME: &str = "ca.pem";
+pub(crate) const LEAF_CHAIN_PEM_NAME: &str = "leaf-chain.pem";
+pub(crate) const LEAF_KEY_NAME: &str = "leaf.key";
+pub(crate) const MISMATCHED_LEAF_KEY_NAME: &str = "mismatched-leaf.key";
+pub(crate) const MALFORMED_CERTIFICATE_PEM_NAME: &str = "malformed-certificate.pem";
+pub(crate) const TRUNCATED_CERTIFICATE_PEM_NAME: &str = "truncated-certificate.pem";
+pub(crate) const INVALID_PRIVATE_KEY_PEM_NAME: &str = "invalid-private-key.pem";
+pub(crate) const MISSING_PEM_NAME: &str = "this-file-does-not-exist.pem";
+pub(crate) const WIRE_HTTP1: &str = "http1";
+pub(crate) const WIRE_HTTP2: &str = "http2";
+pub(crate) const WIRE_HTTP3: &str = "http3";
+pub(crate) const WIRE_UNKNOWN: &str = "http9";
+pub(crate) const ALPN_HTTP1: &[u8] = b"http/1.1";
+pub(crate) const ALPN_HTTP2: &[u8] = b"h2";
+pub(crate) const ALPN_HTTP3: &[u8] = b"h3";
+pub(crate) const LOOPBACK_HOST: &str = "127.0.0.1";
+pub(crate) const TLS_SERVER_NAME: &str = "localhost";
+pub(crate) const CONNECT_TIMEOUT_SECS: u64 = 15;
+pub(crate) const REQUEST_TIMEOUT_SECS: u64 = 20;
+pub(crate) const GATE_TIMEOUT_SECS: u64 = 20;
+pub(crate) const SERVER_BOOT_MILLIS: u64 = 120;
+pub(crate) const SHUTDOWN_PROBE_MILLIS: u64 = 250;
+pub(crate) const SHUTDOWN_TIMEOUT_SECS: u64 = 15;
+pub(crate) const FAST_STREAM_BUDGET_MILLIS: u64 = 1500;
+pub(crate) const PROBE_PATH: &str = "/probe";
+pub(crate) const PROBE_QUERY: &str = "name=hyperlane&kind=protocol";
+pub(crate) const PROBE_QUERY_KEYS: [&str; 2] = ["name", "kind"];
+pub(crate) const PROBE_QUERY_EXPECTED: &str = "name=hyperlane;kind=protocol";
+pub(crate) const PROBE_METHOD: &str = "GET";
+pub(crate) const PROBE_HEADER_KEY: &str = "x-probe";
+pub(crate) const PROBE_HEADER_VALUE: &str = "probe-value";
+pub(crate) const PROBE_REPEATED_HEADERS: [&str; 2] = [PROBE_HEADER_VALUE, PROBE_SECOND_VALUE];
+pub(crate) const PROBE_HEADER_EXPECTED: &str = "probe-value;probe-second";
+pub(crate) const PROBE_METHOD_HEADER: &str = "x-probe-method";
+pub(crate) const PROBE_PATH_HEADER: &str = "x-probe-path";
+pub(crate) const PROBE_QUERY_HEADER: &str = "x-probe-query";
+pub(crate) const PROBE_HEADER_ECHO_HEADER: &str = "x-probe-header";
+pub(crate) const PROBE_VERSION_HEADER: &str = "x-probe-version";
+pub(crate) const ECHO_ROUTE_PATH: &str = "/echo";
+pub(crate) const SLOW_ROUTE_PATH: &str = "/slow";
+pub(crate) const SPLIT_ROUTE_PATH: &str = "/split";
+pub(crate) const COOKIE_ROUTE_PATH: &str = "/cookie";
+pub(crate) const LARGE_ROUTE_PATH: &str = "/large";
+pub(crate) const BINARY_ROUTE_PATH: &str = "/binary";
+pub(crate) const SSE_ROUTE_PATH: &str = "/sse";
+pub(crate) const SSE_ROUTE_PATH_HTTP2: &str = "/sse-h2";
+pub(crate) const SSE_ROUTE_PATH_HTTP3: &str = "/sse-h3";
+pub(crate) const SLOW_ROUTE_PATH_HTTP3: &str = "/slow-h3";
+pub(crate) const VERSION_ROUTE_PATH: &str = "/version";
+pub(crate) const HOP_BY_HOP_ROUTE_PATH: &str = "/hop-by-hop";
+pub(crate) const HOP_BY_HOP_CLEAN_ROUTE_PATH: &str = "/hop-by-hop-clean";
+pub(crate) const SOCKET_METADATA_ROUTE_PATH: &str = "/socket-metadata";
+pub(crate) const UNFRAMED_BODY_ROUTE_PATH: &str = "/unframed";
+pub(crate) const SLOW_DONE_BODY: &str = "slow-done";
+pub(crate) const COOKIE_SENT_BODY: &str = "cookie-sent";
+pub(crate) const HOP_BY_HOP_SENT_BODY: &str = "hop-by-hop-sent";
+pub(crate) const FIRST_COOKIE_NAME: &str = "dup";
+pub(crate) const FIRST_COOKIE_VALUE: &str = "one";
+pub(crate) const SECOND_COOKIE_NAME: &str = "dup2";
+pub(crate) const SECOND_COOKIE_VALUE: &str = "two";
+pub(crate) const PRESERVED_HEADER_KEY: &str = "x-end-to-end";
+pub(crate) const PRESERVED_HEADER_VALUE: &str = "kept";
+pub(crate) const INTERNAL_CONNECTION_HEADER: &str = "x-internal";
+pub(crate) const INTERNAL_CONNECTION_VALUE: &str = "secret";
+pub(crate) const HOSTILE_BYTES_LEN: usize = 1024;
+pub(crate) const ABOVE_FLOW_CONTROL_WINDOW_LEN: usize = 1024 * 1024;
+pub(crate) const SSE_FIRST_CHUNK: &str = "data:first\n\n";
+pub(crate) const SSE_SECOND_CHUNK: &str = "data:second\n\n";
+pub(crate) const SPLIT_HEAD_BODY: &str = "head-part";
+pub(crate) const SPLIT_TAIL_BODY: &str = "tail-part";
+pub(crate) const SPLIT_BODY_LEN: usize = 18;
+pub(crate) const SPLIT_FRAGMENT_LEN: usize = 5;
+pub(crate) const UNFRAMED_BODY: &str = "body-with-no-content-length";
+pub(crate) const SOCKET_METADATA_SEPARATOR: char = '|';
+pub(crate) const SERVER_CONFIG_LEGACY_ADDRESS: &str = "127.0.0.1:8080";
+const PROBE_SECOND_VALUE: &str = "probe-second";
+```
+# Path: hyperlane/core/tests/protocol/common/fn.rs
+```rust
+use super::*;
+pub(crate) fn fixture_path(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join(FIXTURE_DIR_NAME)
+        .join(name)
+}
+pub(crate) fn trusted_tls_config() -> TlsConfig {
+    TlsConfig::new(
+        fixture_path(LEAF_CHAIN_PEM_NAME)
+            .to_string_lossy()
+            .to_string(),
+        fixture_path(LEAF_KEY_NAME).to_string_lossy().to_string(),
+    )
+}
+pub(crate) fn install_trusted_ca(roots: &mut RootCertStore) {
+    let ca: CertificateDer<'static> =
+        CertificateDer::from_pem_file(fixture_path(CA_PEM_NAME)).expect("fixture CA must exist");
+    roots
+        .add(ca)
+        .expect("fixture CA must be a valid trust anchor certificate");
+}
+fn alpn_client_config(alpn: &[u8]) -> Arc<ClientConfig> {
+    let mut roots: RootCertStore = RootCertStore::empty();
+    install_trusted_ca(&mut roots);
+    let mut config: ClientConfig = ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    config.alpn_protocols = vec![alpn.to_vec()];
+    Arc::new(config)
+}
+fn no_alpn_client_config() -> Arc<ClientConfig> {
+    let mut roots: RootCertStore = RootCertStore::empty();
+    install_trusted_ca(&mut roots);
+    Arc::new(
+        ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth(),
+    )
+}
+pub(crate) fn negotiated_alpn(stream: &ClientTlsStream) -> Option<Vec<u8>> {
+    stream
+        .get_ref()
+        .1
+        .alpn_protocol()
+        .map(|alpn: &[u8]| alpn.to_vec())
+}
+pub(crate) fn hostile_binary_payload() -> Vec<u8> {
+    let mut payload: Vec<u8> = (0..=255).map(|value: u8| value).collect();
+    payload.extend_from_slice(b"\r\n\r\n");
+    payload.extend_from_slice(b"GET /admin HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    payload.extend_from_slice(&[0u8, 1u8, 2u8]);
+    while payload.len() < HOSTILE_BYTES_LEN {
+        payload.push((payload.len() % 251) as u8);
+    }
+    payload.truncate(HOSTILE_BYTES_LEN);
+    payload
+}
+pub(crate) fn large_binary_payload() -> Vec<u8> {
+    let mut payload: Vec<u8> = Vec::with_capacity(ABOVE_FLOW_CONTROL_WINDOW_LEN);
+    let mut seed: u32 = 0x1357_9bdf;
+    while payload.len() < ABOVE_FLOW_CONTROL_WINDOW_LEN {
+        for _ in 0..1024 {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            payload.extend_from_slice(&seed.to_be_bytes());
+        }
+    }
+    payload.truncate(ABOVE_FLOW_CONTROL_WINDOW_LEN);
+    payload
+}
+pub(crate) fn http1_request(method: &str, target: &str, body: &[u8]) -> Vec<u8> {
+    http1_request_with_headers(method, target, PROBE_REPEATED_HEADERS, body)
+}
+pub(crate) fn http1_request_with_headers(
+    method: &str,
+    target: &str,
+    header_values: [&str; 2],
+    body: &[u8],
+) -> Vec<u8> {
+    let mut head: String = format!("{method} {target} HTTP/1.1{HTTP_BR}");
+    head.push_str(&format!("Host: {TLS_SERVER_NAME}{HTTP_BR}"));
+    for value in header_values {
+        head.push_str(&format!("{PROBE_HEADER_KEY}: {value}{HTTP_BR}"));
+    }
+    head.push_str(&format!("Content-Length: {}{HTTP_BR}", body.len()));
+    head.push_str(HTTP_BR);
+    let mut request: Vec<u8> = head.into_bytes();
+    request.extend_from_slice(body);
+    request
+}
+pub(crate) fn http1_close_request(method: &str, target: &str) -> Vec<u8> {
+    let mut head: String = format!("{method} {target} HTTP/1.1{HTTP_BR}");
+    head.push_str(&format!("Host: {TLS_SERVER_NAME}{HTTP_BR}"));
+    head.push_str(&format!("Content-Length: 0{HTTP_BR}"));
+    head.push_str(&format!("{CONNECTION}: close{HTTP_BR}"));
+    head.push_str(HTTP_BR);
+    head.into_bytes()
+}
+pub(crate) fn response_header_value(head: &str, key: &str) -> String {
+    let needle: String = format!("{}:", key.to_ascii_lowercase());
+    let mut found: Vec<String> = Vec::new();
+    for line in head.lines() {
+        let Some((name, rest)) = line.split_once(':') else {
+            continue;
+        };
+        if name.trim().to_ascii_lowercase() == needle.trim_end_matches(':') {
+            found.push(rest.trim().to_string());
+        }
+    }
+    found.join(",")
+}
+pub(crate) async fn read_more(stream: &mut TcpStream, sink: &mut Vec<u8>) {
+    let mut chunk: [u8; 8192] = [0; 8192];
+    let bound: Duration = Duration::from_secs(2);
+    match timeout(bound, stream.read(&mut chunk)).await {
+        Ok(Ok(read)) => {
+            if read > 0 {
+                sink.extend_from_slice(&chunk[..read]);
+            }
+        }
+        Ok(Err(_)) => {}
+        Err(_) => {}
+    }
+}
+pub(crate) async fn http1_head_until<T>(stream: &mut T, delimiter: &str) -> String
+where
+    T: tokio::io::AsyncRead + Unpin,
+{
+    let mut collected: Vec<u8> = Vec::new();
+    let mut chunk: [u8; 8192] = [0; 8192];
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    while Instant::now() < deadline {
+        let text: String = String::from_utf8_lossy(&collected).to_string();
+        if text.contains(delimiter) {
+            return text;
+        }
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        let read: usize = match timeout(remaining, stream.read(&mut chunk)).await {
+            Ok(Ok(count)) => count,
+            Ok(Err(error)) => {
+                panic!("the response head read failed before the delimiter arrived: {error}")
+            }
+            Err(_) => panic!("the response head must arrive inside its timeout"),
+        };
+        if read == 0 {
+            return String::from_utf8_lossy(&collected).to_string();
+        }
+        collected.extend_from_slice(&chunk[..read]);
+    }
+    panic!("the response head never carried its {delimiter} delimiter")
+}
+pub(crate) async fn tls_exchange(
+    mut stream: ClientTlsStream,
+    request: Vec<u8>,
+) -> io::Result<Vec<u8>> {
+    write_bounded(&mut stream, &request).await?;
+    stream.flush().await?;
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    let mut received: Vec<u8> = Vec::new();
+    let mut chunk: [u8; 16 * 1024] = [0; 16 * 1024];
+    loop {
+        let remaining: Duration = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "the tls exchange did not reach end of stream inside its timeout",
+            ));
+        }
+        match timeout(remaining, stream.read(&mut chunk)).await {
+            Ok(Ok(0)) => break,
+            Ok(Ok(read)) => received.extend_from_slice(&chunk[..read]),
+            Ok(Err(error)) => return Err(error),
+            Err(_) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "the tls exchange did not reach end of stream inside its timeout",
+                ));
+            }
+        }
+    }
+    Ok(received)
+}
+pub(crate) async fn connect_tls(port: u16, alpn: &[u8]) -> io::Result<ClientTlsStream> {
+    let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME).map_err(
+        |error: rustls::pki_types::InvalidDnsNameError| {
+            io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
+        },
+    )?;
+    let connector: tokio_rustls::TlsConnector =
+        tokio_rustls::TlsConnector::from(alpn_client_config(alpn));
+    let socket: TcpStream = connect_tcp(port).await?;
+    let handshake: tokio_rustls::Connect<TcpStream> = connector.connect(name, socket);
+    let bound: Duration = Duration::from_secs(CONNECT_TIMEOUT_SECS);
+    match timeout(bound, handshake).await {
+        Ok(outcome) => outcome,
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "tls handshake timed out",
+        )),
+    }
+}
+pub(crate) async fn connect_tls_untrusted(port: u16) -> Result<(), String> {
+    let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME)
+        .map_err(|error: rustls::pki_types::InvalidDnsNameError| error.to_string())?;
+    let connector: tokio_rustls::TlsConnector =
+        tokio_rustls::TlsConnector::from(untrusted_client_config(ALPN_HTTP2));
+    let socket: TcpStream = connect_tcp(port)
+        .await
+        .map_err(|error: io::Error| error.to_string())?;
+    let bound: Duration = Duration::from_secs(CONNECT_TIMEOUT_SECS);
+    let outcome: io::Result<ClientTlsStream> = timeout(bound, connector.connect(name, socket))
+        .await
+        .map_err(|_| "handshake timed out".to_string())?;
+    match outcome {
+        Ok(_) => Ok(()),
+        Err(_) => Err("an untrusted chain must fail verification".to_string()),
+    }
+}
+fn untrusted_client_config(alpn: &[u8]) -> Arc<ClientConfig> {
+    let roots: RootCertStore = RootCertStore::empty();
+    let mut config: ClientConfig = ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    config.alpn_protocols = vec![alpn.to_vec()];
+    Arc::new(config)
+}
+pub(crate) async fn connect_tls_without_alpn(port: u16) -> io::Result<ClientTlsStream> {
+    let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME).map_err(
+        |error: rustls::pki_types::InvalidDnsNameError| {
+            io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
+        },
+    )?;
+    let connector: tokio_rustls::TlsConnector =
+        tokio_rustls::TlsConnector::from(no_alpn_client_config());
+    let socket: TcpStream = connect_tcp(port).await?;
+    let handshake: tokio_rustls::Connect<TcpStream> = connector.connect(name, socket);
+    let bound: Duration = Duration::from_secs(CONNECT_TIMEOUT_SECS);
+    match timeout(bound, handshake).await {
+        Ok(outcome) => outcome,
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "tls handshake timed out",
+        )),
+    }
+}
+```
+# Path: hyperlane/core/tests/protocol/common/server.rs
+```rust
+use super::*;
+pub(crate) fn reserve_tcp_port() -> u16 {
+    let listener: TcpListener = TcpListener::bind(format!("{LOOPBACK_HOST}:0"))
+        .expect("loopback TCP port must be reservable");
+    let port: u16 = listener
+        .local_addr()
+        .expect("reserved listener must report a local address")
+        .port();
+    drop(listener);
+    port
+}
+pub(crate) fn reserve_udp_port() -> u16 {
+    let socket: UdpSocket = UdpSocket::bind(format!("{LOOPBACK_HOST}:0"))
+        .expect("loopback UDP port must be reservable");
+    let port: u16 = socket
+        .local_addr()
+        .expect("reserved socket must report a local address")
+        .port();
+    drop(socket);
+    port
+}
+pub(crate) fn protocol_config(
+    address: &str,
+    protocol: ServerProtocol,
+    tls: Option<TlsConfig>,
+) -> ServerConfig {
+    let mut config: ServerConfig = ServerConfig::default();
+    config
+        .set_address(address)
+        .set_protocol(protocol)
+        .set_tls(tls);
+    config
+}
+pub(crate) async fn start_protocol_server(
+    protocol: ServerProtocol,
+    tls: Option<TlsConfig>,
+) -> Result<(ServerControlHook, u16), Box<ServerError>> {
+    let mut server: Server = Server::default();
+    let address: String = if protocol.is_quic() {
+        format!("{LOOPBACK_HOST}:{}", reserve_udp_port())
+    } else {
+        format!("{LOOPBACK_HOST}:{}", reserve_tcp_port())
+    };
+    server.server_config(protocol_config(&address, protocol, tls));
+    register_probe_hooks(&mut server);
+    let control: ServerControlHook = server.run().await?;
+    drop(server);
+    sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
+    let port: u16 = address
+        .rsplit(':')
+        .next()
+        .and_then(|value: &str| value.parse::<u16>().ok())
+        .expect("bind address must carry a numeric port");
+    Ok((control, port))
+}
+pub(crate) async fn start_dropped_caller_server()
+-> Result<(ServerControlHook, u16), Box<ServerError>> {
+    let address: String = format!("{LOOPBACK_HOST}:{}", reserve_tcp_port());
+    let control: ServerControlHook = {
+        let mut server: Server = Server::default();
+        server.server_config(protocol_config(&address, ServerProtocol::Http1, None));
+        register_probe_hooks(&mut server);
+        server.run().await?
+    };
+    sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
+    let port: u16 = address
+        .rsplit(':')
+        .next()
+        .and_then(|value: &str| value.parse::<u16>().ok())
+        .expect("bind address must carry a numeric port");
+    Ok((control, port))
+}
+pub(crate) async fn assert_wait_pending_then_complete(control: &ServerControlHook) {
+    let probe: ServerControlHook = control.clone();
+    let pending: JoinHandle<()> = spawn(async move {
+        probe.wait().await;
+    });
+    tokio::time::sleep(Duration::from_millis(SHUTDOWN_PROBE_MILLIS)).await;
+    assert!(
+        !pending.is_finished(),
+        "wait must still be pending before shutdown is requested"
+    );
+    control.shutdown().await;
+    timeout(Duration::from_secs(SHUTDOWN_TIMEOUT_SECS), pending)
+        .await
+        .expect("wait must complete once shutdown has been requested")
+        .expect("the wait task must not panic");
+}
+pub(crate) async fn connect_tcp(port: u16) -> io::Result<TcpStream> {
+    timeout(
+        Duration::from_secs(CONNECT_TIMEOUT_SECS),
+        TcpStream::connect((LOOPBACK_HOST, port)),
+    )
+    .await
+    .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "tcp connect timed out"))?
+}
+pub(crate) async fn raw_http1_exchange(port: u16, request: &[u8]) -> io::Result<Vec<u8>> {
+    timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async move {
+        let mut stream: TcpStream = connect_tcp(port).await?;
+        stream.write_all(request).await?;
+        stream.flush().await?;
+        let mut received: Vec<u8> = Vec::new();
+        let mut chunk: [u8; 16 * 1024] = [0; 16 * 1024];
+        loop {
+            match stream.read(&mut chunk).await {
+                Ok(0) => break,
+                Ok(read) => received.extend_from_slice(&chunk[..read]),
+                Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => break,
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(received)
+    })
+    .await
+    .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "http1 exchange timed out"))?
+}
+pub(crate) fn response_head(raw: &[u8]) -> String {
+    let text: String = String::from_utf8_lossy(raw).to_string();
+    let end: usize = text.find(HTTP_DOUBLE_BR).unwrap_or(text.len());
+    text[..end].to_string()
+}
+pub(crate) fn response_head_and_body(raw: &[u8]) -> (String, Vec<u8>) {
+    match raw
+        .windows(HTTP_DOUBLE_BR_BYTES.len())
+        .position(|window: &[u8]| window == HTTP_DOUBLE_BR_BYTES)
+    {
+        Some(index) => (
+            String::from_utf8_lossy(&raw[..index]).to_string(),
+            raw[index + HTTP_DOUBLE_BR_BYTES.len()..].to_vec(),
+        ),
+        None => (String::from_utf8_lossy(raw).to_string(), Vec::new()),
+    }
+}
+pub(crate) fn count_http1_responses(buffer: &[u8]) -> usize {
+    let mut count: usize = 0;
+    let mut position: usize = 0;
+    while let Some(index) = buffer[position.min(buffer.len())..]
+        .windows(HTTP_DOUBLE_BR_BYTES.len())
+        .position(|window: &[u8]| window == HTTP_DOUBLE_BR_BYTES)
+    {
+        let head_end: usize = position + index;
+        let head: String = String::from_utf8_lossy(&buffer[position..head_end]).to_string();
+        let mut content_length: Option<usize> = None;
+        for line in head.split(HTTP_BR) {
+            if let Some((key, value)) = line.split_once(':')
+                && key.trim().eq_ignore_ascii_case(CONTENT_LENGTH)
+            {
+                content_length = value.trim().parse::<usize>().ok();
+            }
+        }
+        let body_start: usize = head_end + HTTP_DOUBLE_BR_BYTES.len();
+        match content_length {
+            Some(length) if buffer.len() >= body_start + length => {
+                count += 1;
+                position = body_start + length;
+            }
+            _ => break,
+        }
+    }
+    count
+}
+pub(crate) async fn read_http1_head<T>(
+    stream: &mut T,
+    expected_body: usize,
+) -> io::Result<(String, Vec<u8>)>
+where
+    T: tokio::io::AsyncRead + Unpin,
+{
+    let mut collected: Vec<u8> = Vec::new();
+    let mut chunk: [u8; 16 * 1024] = [0; 16 * 1024];
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    while Instant::now() < deadline {
+        if let Some(index) = collected
+            .windows(HTTP_DOUBLE_BR_BYTES.len())
+            .position(|window: &[u8]| window == HTTP_DOUBLE_BR_BYTES)
+        {
+            let body_start: usize = index + HTTP_DOUBLE_BR_BYTES.len();
+            if collected.len() >= body_start + expected_body {
+                break;
+            }
+        }
+        let bound: Duration = Duration::from_secs(REQUEST_TIMEOUT_SECS);
+        let read: usize = match timeout(bound, stream.read(&mut chunk)).await {
+            Ok(Ok(count)) => count,
+            Ok(Err(error)) => return Err(error),
+            Err(_) => break,
+        };
+        if read == 0 {
+            break;
+        }
+        collected.extend_from_slice(&chunk[..read]);
+    }
+    Ok(response_head_and_body(&collected))
+}
+pub(crate) async fn write_bounded<T>(stream: &mut T, data: &[u8]) -> io::Result<()>
+where
+    T: tokio::io::AsyncWrite + Unpin,
+{
+    timeout(
+        Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        stream.write_all(data),
+    )
+    .await
+    .map_err(|_: tokio::time::error::Elapsed| {
+        io::Error::new(io::ErrorKind::TimedOut, "socket write timed out")
+    })?
+}
+pub(crate) async fn exchange_on(stream: &mut TcpStream, request: &[u8]) -> Vec<u8> {
+    write_bounded(stream, request)
+        .await
+        .expect("request write must not time out");
+    stream.flush().await.expect("request flush must succeed");
+    let mut received: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    let mut chunk: [u8; 16 * 1024] = [0; 16 * 1024];
+    while Instant::now() < deadline {
+        match stream.read(&mut chunk).await {
+            Ok(0) => break,
+            Ok(read) => received.extend_from_slice(&chunk[..read]),
+            Err(_) => break,
+        }
+    }
+    received
+}
+```
+# Path: hyperlane/core/tests/protocol/common/gate.rs
+```rust
+use super::*;
+#[derive(Clone, Copy)]
+pub(crate) enum GateSlot {
+    SlowHttp2,
+    SlowHttp3,
+    SseHttp1,
+    SseHttp2,
+    SseHttp3,
+}
+pub(crate) struct RouteGate {
+    slow_entered: Notify,
+    slow_release: Notify,
+    sse_first_chunk_sent: Notify,
+    sse_release: Notify,
+}
+impl RouteGate {
+    fn new() -> Self {
+        Self {
+            slow_entered: Notify::new(),
+            slow_release: Notify::new(),
+            sse_first_chunk_sent: Notify::new(),
+            sse_release: Notify::new(),
+        }
+    }
+}
+pub(crate) fn route_gate(slot: GateSlot) -> &'static RouteGate {
+    static SLOW_HTTP2: OnceLock<RouteGate> = OnceLock::new();
+    static SLOW_HTTP3: OnceLock<RouteGate> = OnceLock::new();
+    static SSE_HTTP1: OnceLock<RouteGate> = OnceLock::new();
+    static SSE_HTTP2: OnceLock<RouteGate> = OnceLock::new();
+    static SSE_HTTP3: OnceLock<RouteGate> = OnceLock::new();
+    match slot {
+        GateSlot::SlowHttp2 => SLOW_HTTP2.get_or_init(RouteGate::new),
+        GateSlot::SlowHttp3 => SLOW_HTTP3.get_or_init(RouteGate::new),
+        GateSlot::SseHttp1 => SSE_HTTP1.get_or_init(RouteGate::new),
+        GateSlot::SseHttp2 => SSE_HTTP2.get_or_init(RouteGate::new),
+        GateSlot::SseHttp3 => SSE_HTTP3.get_or_init(RouteGate::new),
+    }
+}
+pub(crate) type GateLease = tokio::sync::MutexGuard<'static, ()>;
+pub(crate) async fn gate_lease(slot: GateSlot) -> GateLease {
+    slot_mutex(slot).lock().await
+}
+fn slot_mutex(slot: GateSlot) -> &'static tokio::sync::Mutex<()> {
+    static SLOW_HTTP2: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+    static SLOW_HTTP3: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+    static SSE_HTTP1: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+    static SSE_HTTP2: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+    static SSE_HTTP3: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+    match slot {
+        GateSlot::SlowHttp2 => SLOW_HTTP2.get_or_init(|| tokio::sync::Mutex::new(())),
+        GateSlot::SlowHttp3 => SLOW_HTTP3.get_or_init(|| tokio::sync::Mutex::new(())),
+        GateSlot::SseHttp1 => SSE_HTTP1.get_or_init(|| tokio::sync::Mutex::new(())),
+        GateSlot::SseHttp2 => SSE_HTTP2.get_or_init(|| tokio::sync::Mutex::new(())),
+        GateSlot::SseHttp3 => SSE_HTTP3.get_or_init(|| tokio::sync::Mutex::new(())),
+    }
+}
+impl RouteGate {
+    pub(crate) fn mark_slow_entered(&self) {
+        self.slow_entered.notify_one();
+    }
+    pub(crate) async fn await_slow_entered(&self) {
+        let bound: Duration = Duration::from_secs(GATE_TIMEOUT_SECS);
+        timeout(bound, self.slow_entered.notified())
+            .await
+            .expect("the gated slow route must be entered within the gate timeout");
+    }
+    pub(crate) async fn await_slow_release(&self) {
+        let bound: Duration = Duration::from_secs(GATE_TIMEOUT_SECS);
+        timeout(bound, self.slow_release.notified())
+            .await
+            .expect("the gated slow route must be released within the gate timeout");
+    }
+    pub(crate) fn release_slow(&self) {
+        self.slow_release.notify_one();
+    }
+    pub(crate) fn mark_sse_first_chunk_sent(&self) {
+        self.sse_first_chunk_sent.notify_one();
+    }
+    pub(crate) async fn await_first_chunk_sent(&self) {
+        let bound: Duration = Duration::from_secs(GATE_TIMEOUT_SECS);
+        timeout(bound, self.sse_first_chunk_sent.notified())
+            .await
+            .expect("the first sse chunk must be sent within the gate timeout");
+    }
+    pub(crate) async fn await_sse_release(&self) {
+        let bound: Duration = Duration::from_secs(GATE_TIMEOUT_SECS);
+        timeout(bound, self.sse_release.notified())
+            .await
+            .expect("the sse handler must be released within the gate timeout");
+    }
+    pub(crate) fn release_sse(&self) {
+        self.sse_release.notify_one();
+    }
+}
+pub(crate) fn joined_query(request: &Request, keys: [&str; 2]) -> String {
+    let mut collected: Vec<String> = Vec::new();
+    for key in keys {
+        let value: Option<VecDeque<String>> = request.try_get_query(key);
+        match value {
+            Some(entries) => {
+                for entry in entries {
+                    collected.push(format!("{key}={entry}"));
+                }
+            }
+            None => collected.push(format!("{key}=")),
+        }
+    }
+    collected.join(";")
+}
+pub(crate) fn joined_header(request: &Request, key: &str) -> String {
+    let value: Option<VecDeque<String>> = request.try_get_header(key);
+    match value {
+        Some(entries) => entries.into_iter().collect::<Vec<String>>().join(";"),
+        None => String::new(),
+    }
+}
+pub(crate) fn fragment_writes(data: &[u8]) -> Vec<Vec<u8>> {
+    let mut pieces: Vec<Vec<u8>> = Vec::new();
+    let mut offset: usize = 0;
+    while offset < data.len() {
+        let end: usize = usize::min(offset + SPLIT_FRAGMENT_LEN, data.len());
+        pieces.push(data[offset..end].to_vec());
+        offset = end;
+    }
+    pieces
+}
+```
+# Path: hyperlane/core/tests/protocol/common/mod.rs
+```rust
+pub(crate) mod r#const;
+pub(crate) mod r#fn;
+pub(crate) mod r#gate;
+pub(crate) mod r#server;
+use {r#const::*, r#server::*};
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/http1/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn http1_plaintext_serves_default_protocol_over_tcp() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let request: Vec<u8> = http1_close_request("GET", VERSION_ROUTE_PATH);
+    let raw: Vec<u8> = raw_http1_exchange(port, &request)
+        .await
+        .expect("plaintext http1 exchange must complete");
+    let head: String = response_head(&raw);
+    assert!(
+        head.starts_with("HTTP/1.1 200"),
+        "expected an HTTP/1.1 200 head, got: {head}"
+    );
+    let (_, body): (String, Vec<u8>) = response_head_and_body(&raw);
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        format!("{:?}", HttpVersion::Http1_1)
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_plaintext_reads_path_query_and_header_through_middleware() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let target: String = format!("{PROBE_PATH}?{}", PROBE_QUERY);
+    let request: Vec<u8> = http1_request_with_headers("GET", &target, PROBE_REPEATED_HEADERS, &[]);
+    let raw: Vec<u8> = raw_http1_exchange(port, &request)
+        .await
+        .expect("plaintext http1 exchange must complete");
+    let head: String = response_head(&raw);
+    assert_eq!(
+        response_header_value(&head, PROBE_METHOD_HEADER),
+        PROBE_METHOD,
+        "the handler must observe the exact request method, got: {head}"
+    );
+    assert_eq!(
+        response_header_value(&head, PROBE_PATH_HEADER),
+        PROBE_PATH,
+        "the handler must observe the exact request path, got: {head}"
+    );
+    assert_eq!(
+        response_header_value(&head, PROBE_QUERY_HEADER),
+        PROBE_QUERY_EXPECTED,
+        "every query key must be read back with its value, got: {head}"
+    );
+    assert_eq!(
+        response_header_value(&head, PROBE_HEADER_ECHO_HEADER),
+        PROBE_HEADER_EXPECTED,
+        "a repeated request header must keep every value in order, got: {head}"
+    );
+    assert_eq!(
+        response_header_value(&head, PROBE_VERSION_HEADER),
+        format!("{:?}", HttpVersion::Http1_1),
+        "the handler must observe HTTP/1.1, got: {head}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_tls_negotiates_http11_alpn_against_validated_chain() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, Some(trusted_tls_config()))
+            .await
+            .expect("http1 tls server must start");
+    let stream: ClientTlsStream = connect_tls(port, ALPN_HTTP1)
+        .await
+        .expect("validating client must complete the handshake");
+    let alpn: Option<Vec<u8>> = negotiated_alpn(&stream);
+    assert_eq!(
+        alpn,
+        Some(ALPN_HTTP1.to_vec()),
+        "the server must select the http/1.1 ALPN identifier"
+    );
+    let request: Vec<u8> = http1_close_request("GET", VERSION_ROUTE_PATH);
+    let raw: Vec<u8> = tls_exchange(stream, request)
+        .await
+        .expect("tls http1 exchange must complete");
+    let head: String = response_head(&raw);
+    assert!(
+        head.starts_with("HTTP/1.1 200"),
+        "expected HTTP/1.1 over TLS, got: {head}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_tls_rejects_a_client_whose_alpn_never_matches() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, Some(trusted_tls_config()))
+            .await
+            .expect("http1 tls server must start");
+    let outcome: io::Result<ClientTlsStream> = connect_tls(port, ALPN_HTTP2).await;
+    assert!(
+        outcome.is_err(),
+        "an http1 listener must refuse an h2-only client instead of silently downgrading"
+    );
+    let valid: io::Result<ClientTlsStream> = connect_tls(port, ALPN_HTTP1).await;
+    assert!(
+        valid.is_ok(),
+        "a rejected client must not disturb a later valid connection"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_plaintext_binary_post_round_trips_hostile_bytes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let payload: Vec<u8> = hostile_binary_payload();
+    let request: Vec<u8> = http1_request("POST", BINARY_ROUTE_PATH, &payload);
+    let raw: Vec<u8> = raw_http1_exchange(port, &request)
+        .await
+        .expect("binary post must complete");
+    let (_, body): (String, Vec<u8>) = response_head_and_body(&raw);
+    assert_eq!(
+        body, payload,
+        "every hostile byte must survive the http1 body round trip"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_plaintext_refuses_a_truncated_content_length_body() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let head: Vec<u8> = format!(
+        "POST {BINARY_ROUTE_PATH} HTTP/1.1{HTTP_BR}Host: {TLS_SERVER_NAME}{HTTP_BR}Content-Length: 100{HTTP_BR}{HTTP_BR}"
+    )
+    .into_bytes();
+    let mut request: Vec<u8> = head;
+    request.extend_from_slice(b"only-ten!!");
+    if let Ok(raw) = raw_http1_exchange(port, &request).await {
+        let text: String = response_head(&raw);
+        assert!(
+            !text.contains(" 200"),
+            "a truncated body must not be answered as a complete request, got: {text}"
+        );
+    }
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_plaintext_streams_split_writes_before_the_handler_finishes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let request: Vec<u8> = http1_close_request("GET", SPLIT_ROUTE_PATH);
+    let raw: Vec<u8> = raw_http1_exchange(port, &request)
+        .await
+        .expect("split write exchange must complete");
+    let head: String = response_head(&raw);
+    assert!(
+        !head.to_lowercase().contains(CONTENT_LENGTH),
+        "an event-stream response must not be framed with a content-length, got: {head}"
+    );
+    let (_, body): (String, Vec<u8>) = response_head_and_body(&raw);
+    let text: String = String::from_utf8_lossy(&body).to_string();
+    assert_eq!(
+        text,
+        format!("{SPLIT_HEAD_BODY}{SPLIT_TAIL_BODY}"),
+        "every separately written fragment must reach the client in order, got: {text:?}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_tls_streams_split_writes_through_the_tls_listener() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, Some(trusted_tls_config()))
+            .await
+            .expect("http1 tls server must start");
+    let stream: ClientTlsStream = connect_tls(port, ALPN_HTTP1)
+        .await
+        .expect("validating client must complete the handshake");
+    let request: Vec<u8> = http1_close_request("GET", SPLIT_ROUTE_PATH);
+    let raw: Vec<u8> = tls_exchange(stream, request)
+        .await
+        .expect("split write exchange must complete");
+    let head: String = response_head(&raw);
+    assert!(
+        !head.to_lowercase().contains(CONTENT_LENGTH),
+        "an event-stream response must not be framed with a content-length, got: {head}"
+    );
+    let (_, body): (String, Vec<u8>) = response_head_and_body(&raw);
+    let text: String = String::from_utf8_lossy(&body).to_string();
+    assert_eq!(
+        text,
+        format!("{SPLIT_HEAD_BODY}{SPLIT_TAIL_BODY}"),
+        "every separately written fragment must survive TLS in order, got: {text:?}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_plaintext_reports_the_real_local_and_peer_addresses_of_the_socket() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let mut stream: TcpStream = connect_tcp(port).await.expect("socket must connect");
+    let client_local: SocketAddr = stream
+        .local_addr()
+        .expect("a connected socket must report its local address");
+    let request: Vec<u8> = http1_close_request("GET", SOCKET_METADATA_ROUTE_PATH);
+    let raw: Vec<u8> = exchange_on(&mut stream, &request).await;
+    let (_, body): (String, Vec<u8>) = response_head_and_body(&raw);
+    let text: String = String::from_utf8_lossy(&body).to_string();
+    let (reported_local, reported_peer): (String, String) =
+        match text.split_once(SOCKET_METADATA_SEPARATOR) {
+            Some(pair) => (pair.0.to_string(), pair.1.to_string()),
+            None => panic!("the route must report both addresses, got: {text:?}"),
+        };
+    let expected_local: SocketAddr = format!("{LOOPBACK_HOST}:{port}")
+        .parse()
+        .expect("the bind address must parse");
+    assert_eq!(
+        reported_local,
+        expected_local.to_string(),
+        "the handler must see the bound local address, not a fabricated one"
+    );
+    assert_eq!(
+        reported_peer,
+        client_local.to_string(),
+        "the handler must see this connection's own peer address"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_sse_chunk_reaches_the_client_before_the_handler_finishes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let _lease: GateLease = gate_lease(GateSlot::SseHttp1).await;
+    let mut stream: TcpStream = connect_tcp(port).await.expect("socket must connect");
+    let request: Vec<u8> = http1_close_request("GET", SSE_ROUTE_PATH);
+    write_bounded(&mut stream, &request)
+        .await
+        .expect("sse request must be written");
+    let mut received: Vec<u8> = Vec::new();
+    let first_chunk_deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    while !String::from_utf8_lossy(&received).contains(SSE_FIRST_CHUNK) {
+        assert!(
+            Instant::now() < first_chunk_deadline,
+            "the first sse chunk must arrive while the handler is still blocked, got: {:?}",
+            String::from_utf8_lossy(&received)
+        );
+        read_more(&mut stream, &mut received).await;
+    }
+    assert!(
+        !String::from_utf8_lossy(&received).contains(SSE_SECOND_CHUNK),
+        "the second chunk must not appear before the handler is released"
+    );
+    route_gate(GateSlot::SseHttp1).release_sse();
+    let completion_deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    while !String::from_utf8_lossy(&received).contains(SSE_SECOND_CHUNK) {
+        assert!(
+            Instant::now() < completion_deadline,
+            "the second sse chunk must arrive once the handler is released"
+        );
+        read_more(&mut stream, &mut received).await;
+    }
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_tls_sse_chunk_reaches_the_client_before_the_handler_finishes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, Some(trusted_tls_config()))
+            .await
+            .expect("http1 tls server must start");
+    let _lease: GateLease = gate_lease(GateSlot::SseHttp1).await;
+    let mut stream: ClientTlsStream = connect_tls(port, ALPN_HTTP1)
+        .await
+        .expect("validating client must complete the handshake");
+    let request: Vec<u8> = http1_close_request("GET", SSE_ROUTE_PATH);
+    write_bounded(&mut stream, &request)
+        .await
+        .expect("sse request must be written");
+    let first: String = http1_head_until(&mut stream, SSE_FIRST_CHUNK).await;
+    assert!(
+        first.contains(SSE_FIRST_CHUNK),
+        "the first chunk must arrive over tls while the handler is blocked, got: {first:?}"
+    );
+    assert!(
+        !first.contains(SSE_SECOND_CHUNK),
+        "the second chunk must wait for the handler to be released, got: {first:?}"
+    );
+    route_gate(GateSlot::SseHttp1).release_sse();
+    let second: String = http1_head_until(&mut stream, SSE_SECOND_CHUNK).await;
+    assert!(
+        second.contains(SSE_SECOND_CHUNK),
+        "the second chunk must arrive once the tls handler is released, got: {second:?}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_sse_response_carries_the_event_stream_content_type() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let _lease: GateLease = gate_lease(GateSlot::SseHttp1).await;
+    let mut stream: TcpStream = connect_tcp(port).await.expect("socket must connect");
+    let request: Vec<u8> = http1_close_request("GET", SSE_ROUTE_PATH);
+    write_bounded(&mut stream, &request)
+        .await
+        .expect("sse request must be written");
+    let head: String = http1_head_until(&mut stream, HTTP_DOUBLE_BR).await;
+    assert!(
+        head.to_lowercase().contains(TEXT_EVENT_STREAM),
+        "the sse route must send an event-stream content type, got: {head}"
+    );
+    route_gate(GateSlot::SseHttp1).release_sse();
+    let completed: String = http1_head_until(&mut stream, SSE_SECOND_CHUNK).await;
+    assert!(
+        completed.contains(SSE_SECOND_CHUNK),
+        "the sse response must run to its end once released, got: {completed:?}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_plaintext_repeats_a_duplicate_response_cookie() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    let request: Vec<u8> = http1_close_request("GET", COOKIE_ROUTE_PATH);
+    let raw: Vec<u8> = raw_http1_exchange(port, &request)
+        .await
+        .expect("cookie exchange must complete");
+    let head: String = response_head(&raw);
+    let cookies: usize = head.to_lowercase().matches(SET_COOKIE).count();
+    assert_eq!(
+        cookies, 2,
+        "both set-cookie headers must survive, got: {head}"
+    );
+    assert!(
+        head.contains("dup=one") && head.contains("dup2=two"),
+        "both cookie values must be present, got: {head}"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_plaintext_answers_four_pipelined_requests_on_one_connection() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    sleep(Duration::from_millis(SERVER_BOOT_MILLIS)).await;
+    let mut stream: TcpStream = connect_tcp(port).await.expect("socket must connect");
+    let mut batch: Vec<u8> = Vec::new();
+    for _ in 0..4 {
+        batch.extend_from_slice(&http1_request("GET", VERSION_ROUTE_PATH, &[]));
+    }
+    write_bounded(&mut stream, &batch)
+        .await
+        .expect("pipelined batch must be written");
+    let mut received: Vec<u8> = Vec::new();
+    let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
+    let mut chunk: [u8; 16 * 1024] = [0; 16 * 1024];
+    while Instant::now() < deadline && count_http1_responses(&received) < 4 {
+        match stream.read(&mut chunk).await {
+            Ok(0) => break,
+            Ok(read) => received.extend_from_slice(&chunk[..read]),
+            Err(_) => break,
+        }
+    }
+    assert_eq!(
+        count_http1_responses(&received),
+        4,
+        "every pipelined request must be answered on the same connection"
+    );
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http1_plaintext_shutdown_releases_the_bound_tcp_port() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, None)
+            .await
+            .expect("http1 plaintext server must start");
+    assert_wait_pending_then_complete(&control).await;
+    let rebound: io::Result<TcpListener> = TcpListener::bind(format!("{LOOPBACK_HOST}:{port}"));
+    assert!(
+        rebound.is_ok(),
+        "port {port} must be free again after shutdown and wait"
+    );
+}
+#[tokio::test]
+async fn http1_tls_shutdown_releases_the_bound_tcp_port() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http1, Some(trusted_tls_config()))
+            .await
+            .expect("http1 tls server must start");
+    assert_wait_pending_then_complete(&control).await;
+    let rebound: io::Result<TcpListener> = TcpListener::bind(format!("{LOOPBACK_HOST}:{port}"));
+    assert!(
+        rebound.is_ok(),
+        "port {port} must be free again after a tls shutdown and wait"
+    );
+}
+```
+# Path: hyperlane/core/tests/protocol/http1/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
 # Path: hyperlane/core/src/lib.rs
 ```rust
 mod config;
 mod context;
 mod error;
 mod hook;
+mod listener;
+mod protocol;
 mod route;
 mod server;
+mod tls;
 pub use {config::*, context::*, error::*, hook::*, route::*, server::*};
 pub use {http_type::*, inventory};
+pub(crate) use {listener::*, protocol::*, tls::*};
 use std::{
+    any::Any,
     cmp::Ordering,
     collections::HashSet,
-    future::Future,
+    future::{Future, poll_fn},
     hash::{Hash, Hasher},
     io::{self, Write, stderr, stdout},
     mem,
+    net::{AddrParseError, SocketAddr},
+    num::ParseIntError,
+    panic::AssertUnwindSafe,
     pin::Pin,
     ptr,
+    str::{Split, SplitWhitespace, Utf8Error, from_utf8},
     sync::Arc,
+    task::{self, Poll},
+    time::Duration,
 };
 use {
+    bytes::Bytes,
+    futures::FutureExt,
+    h3::error::Code,
     inventory::collect,
     lombok_macros::*,
+    quinn::{self, Endpoint, Incoming, VarInt},
     regex::Regex,
+    rustls::pki_types::{
+        CertificateDer, PrivateKeyDer,
+        pem::{self, PemObject},
+    },
     serde::{Deserialize, Serialize},
     tokio::{
+        io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf},
+        join,
         net::{TcpListener, TcpStream},
         spawn,
         sync::watch::{Receiver, Sender, channel},
         task::JoinHandle,
+        time::timeout,
     },
+    tokio_rustls::TlsAcceptor,
 };
+```
+# Path: hyperlane/core/src/tls/fn.rs
+```rust
+use super::*;
+pub fn build_server_tls_config(
+    tls: &TlsConfig,
+    alpn: &[u8],
+    versions: &[&'static SupportedProtocolVersion],
+) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
+    let certificate_chain: Vec<CertificateDer<'static>> =
+        CertificateDer::pem_file_iter(tls.get_certificate_path())
+            .map_err(|error: pem::Error| ServerError::Tls(tls_error_string(&error)))?
+            .collect::<Result<Vec<CertificateDer<'static>>, pem::Error>>()
+            .map_err(|error: pem::Error| ServerError::Tls(tls_error_string(&error)))?;
+    let private_key: PrivateKeyDer<'static> =
+        PrivateKeyDer::from_pem_file(tls.get_private_key_path())
+            .map_err(|error: pem::Error| ServerError::Tls(tls_error_string(&error)))?;
+    let mut server_config: TlsServerConfig =
+        TlsServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+            .with_protocol_versions(versions)
+            .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?
+            .with_no_client_auth()
+            .with_single_cert(certificate_chain, private_key)
+            .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?;
+    server_config.alpn_protocols = vec![alpn.to_vec()];
+    Ok(Arc::new(server_config))
+}
+pub fn build_stream_tls_config(
+    tls: &TlsConfig,
+    protocol: &ServerProtocol,
+) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
+    let versions: &[&'static SupportedProtocolVersion] =
+        &[&rustls::version::TLS13, &rustls::version::TLS12];
+    build_server_tls_config(tls, protocol.get_alpn_protocol(), versions)
+}
+pub fn build_quic_tls_config(tls: &TlsConfig) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
+    let versions: &[&'static SupportedProtocolVersion] = &[&rustls::version::TLS13];
+    build_server_tls_config(tls, ServerProtocol::Http3.get_alpn_protocol(), versions)
+}
+fn tls_error_string(error: &pem::Error) -> String {
+    format!("{error}")
+}
+```
+# Path: hyperlane/core/src/tls/type.rs
+```rust
+pub(crate) type SupportedProtocolVersion = rustls::SupportedProtocolVersion;
+pub(crate) type TlsServerConfig = rustls::ServerConfig;
+pub(crate) type TlsError = rustls::Error;
+```
+# Path: hyperlane/core/src/tls/mod.rs
+```rust
+mod r#fn;
+mod r#type;
+pub(crate) use {r#fn::*, r#type::*};
+use super::*;
 ```
 # Path: hyperlane/core/src/hook/impl.rs
 ```rust
@@ -12694,40 +17736,6 @@ impl Server {
         Self::flush_stdout();
         Self::flush_stderr();
     }
-    async fn task_handler<F>(&'static self, stream_address: usize, ctx_address: usize, hook: F)
-    where
-        F: Future<Output = ()> + Send + 'static,
-    {
-        if let Err(error) = spawn(hook).await
-            && error.is_panic()
-        {
-            let ctx: &mut Context = ctx_address.into();
-            let stream: &mut Stream = stream_address.into();
-            let panic: PanicData = PanicData::from_join_error(error);
-            ctx.set_task_panic(panic)
-                .get_mut_response()
-                .set_status_code(HttpStatus::InternalServerError.code());
-            stream.set_closed(false);
-            for hook in self.get_task_panic().iter() {
-                if hook(stream, ctx).await.is_reject() {
-                    break;
-                }
-            }
-            unsafe {
-                let _: Box<Context> = Box::from_raw(ctx);
-                let _: Box<Stream> = Box::from_raw(stream);
-            }
-        };
-    }
-    fn configure_stream(&self, stream: &TcpStream) {
-        let config: &ServerConfig = self.get_server_config();
-        if let Some(nodelay) = config.try_get_nodelay() {
-            let _: Result<(), io::Error> = stream.set_nodelay(nodelay);
-        }
-        if let Some(ttl) = config.try_get_ttl() {
-            let _: Result<(), io::Error> = stream.set_ttl(ttl);
-        }
-    }
     pub(super) async fn handle_request_middleware(
         &self,
         stream: &mut Stream,
@@ -12779,7 +17787,12 @@ impl Server {
             }
         }
     }
-    async fn request_hook(&self, stream: &mut Stream, ctx: &mut Context, request: Request) -> bool {
+    pub(crate) async fn request_hook(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        request: Request,
+    ) -> bool {
         let keep_alive: bool = request.is_enable_keep_alive();
         let version: RequestVersion = request.get_version().clone();
         let route: RequestPath = request.get_path().clone();
@@ -12828,44 +17841,134 @@ impl Server {
                 self.handle_request_error(stream, ctx, &error).await;
             }
         }
-        unsafe {
-            let _: Box<Context> = Box::from_raw(ctx);
-            let _: Box<Stream> = Box::from_raw(stream);
+    }
+    pub(crate) async fn serve_h1_connection_stream(&self, stream: &mut Stream) {
+        let mut ctx: Context = Context::default();
+        let panicked: Option<PanicData> =
+            catch_connection_panic(self.handle_connection(stream, &mut ctx)).await;
+        let Some(panic) = panicked else {
+            return;
+        };
+        ctx.set_task_panic(panic)
+            .get_mut_response()
+            .set_status_code(HttpStatus::InternalServerError.code());
+        stream.set_closed(false);
+        for hook in self.get_task_panic().iter() {
+            if hook(stream, &mut ctx).await.is_reject() {
+                break;
+            }
         }
     }
-    async fn tcp_accept(&'static self, tcp_listener: &TcpListener) {
-        loop {
-            if let Ok((stream, _)) = tcp_listener.accept().await {
-                self.configure_stream(&stream);
-                let request_config: RequestConfig = *self.get_request_config();
-                let stream: &'static mut Stream =
-                    Box::leak(Box::new(Stream::new(stream, request_config, false)));
-                let ctx: &'static mut Context = Box::leak(Box::new(Context::default()));
-                spawn(self.task_handler(
-                    stream.into(),
-                    ctx.into(),
-                    self.handle_connection(stream, ctx),
-                ));
+    pub(crate) async fn run_protocol_lifecycle(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        request: Request,
+    ) {
+        let panicked: Option<PanicData> = catch_connection_panic(async {
+            let _keep_alive: bool = self.request_hook(stream, ctx, request).await;
+        })
+        .await;
+        let Some(panic) = panicked else {
+            return;
+        };
+        ctx.set_task_panic(panic)
+            .get_mut_response()
+            .set_status_code(HttpStatus::InternalServerError.code());
+        stream.set_closed(false);
+        for hook in self.get_task_panic().iter() {
+            if hook(stream, ctx).await.is_reject() {
+                break;
             }
         }
     }
     pub async fn run(&self) -> Result<ServerControlHook, Box<ServerError>> {
-        let bind_address: &String = self.get_server_config().get_address();
-        let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
-            .await
-            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
-        let server: &'static Self = unsafe { self.leak() };
-        let (wait_sender, wait_receiver) = channel(());
-        let (shutdown_sender, mut shutdown_receiver) = channel(());
-        let accept_connections: JoinHandle<()> = spawn(async move {
-            server.tcp_accept(&tcp_listener).await;
-            let _: Result<(), tokio::sync::watch::error::SendError<()>> = wait_sender.send(());
-        });
+        let server_config: &ServerConfig = self.get_server_config();
+        let protocol: ServerProtocol = server_config.get_protocol();
+        let tls_config: Option<TlsConfig> = server_config.get_tls().clone();
+        if protocol == ServerProtocol::Http3 && tls_config.is_none() {
+            return Err(Box::new(ServerError::MissingTlsForHttp3));
+        }
+        let stream_tls: Option<Arc<rustls::ServerConfig>> = match tls_config.clone() {
+            Some(_) if protocol == ServerProtocol::Http3 => None,
+            Some(config) => Some(build_stream_tls_config(&config, &protocol)?),
+            None => None,
+        };
+        let bind_address: &String = server_config.get_address();
+        let server: Arc<Server> = Arc::new(Self::clone(self));
+        let request_config: RequestConfig = *self.get_request_config();
+        let (shutdown_sender, shutdown_receiver) = channel(());
+        let (running_sender, running_receiver) = channel(SERVER_RUNNING);
+        let _: JoinHandle<()> = match protocol {
+            ServerProtocol::Http3 => {
+                let Some(config) = tls_config.clone() else {
+                    return Err(Box::new(ServerError::MissingTlsForHttp3));
+                };
+                let quic_config: Arc<quinn::crypto::rustls::QuicServerConfig> = Arc::new(
+                    quinn::crypto::rustls::QuicServerConfig::try_from(build_quic_tls_config(
+                        &config,
+                    )?)
+                    .map_err(
+                        |error: quinn::crypto::rustls::NoInitialCipherSuite| {
+                            Box::new(ServerError::Tls(format!(
+                                "no compatible cipher suite for quic: {}",
+                                error
+                            )))
+                        },
+                    )?,
+                );
+                let bind_addr: SocketAddr =
+                    bind_address
+                        .parse::<SocketAddr>()
+                        .map_err(|error: AddrParseError| {
+                            Box::new(ServerError::Tls(format!(
+                                "invalid bind address {}: {}",
+                                bind_address, error
+                            )))
+                        })?;
+                let endpoint: Endpoint =
+                    Endpoint::server(quinn::ServerConfig::with_crypto(quic_config), bind_addr)
+                        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let env: ConnectionEnv = ConnectionEnv {
+                    server,
+                    request_config,
+                    protocol,
+                };
+                spawn(async move {
+                    let _: Result<(), Box<ServerError>> =
+                        quic_accept(env, endpoint, shutdown_receiver, running_sender).await;
+                })
+            }
+            _ => {
+                let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
+                    .await
+                    .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let env: ConnectionEnv = ConnectionEnv {
+                    server,
+                    request_config,
+                    protocol,
+                };
+                spawn(async move {
+                    tcp_accept(
+                        env,
+                        stream_tls,
+                        AcceptSignal {
+                            listener: tcp_listener,
+                            shutdown_receiver,
+                            running_sender,
+                        },
+                    )
+                    .await;
+                })
+            }
+        };
         let wait_hook: ServerControlHookHandler<()> = Arc::new(move || {
-            let mut wait_receiver_clone: Receiver<()> = wait_receiver.clone();
+            let mut running_receiver_clone: Receiver<bool> = running_receiver.clone();
             Box::pin(async move {
-                let _: Result<(), tokio::sync::watch::error::RecvError> =
-                    wait_receiver_clone.changed().await;
+                while !*running_receiver_clone.borrow_and_update() {
+                    let _: Result<(), tokio::sync::watch::error::RecvError> =
+                        running_receiver_clone.changed().await;
+                }
             })
         });
         let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
@@ -12874,11 +17977,6 @@ impl Server {
                 let _: Result<(), tokio::sync::watch::error::SendError<()>> =
                     shutdown_sender_clone.send(());
             })
-        });
-        spawn(async move {
-            let _: Result<(), tokio::sync::watch::error::RecvError> =
-                shutdown_receiver.changed().await;
-            accept_connections.abort();
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
         server_control_hook.set_shutdown_hook(shutdown_hook);
@@ -12892,22 +17990,22 @@ impl Server {
 use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Server {
-    pub(super) server_config: ServerConfig,
-    pub(super) request_config: RequestConfig,
+    pub server_config: ServerConfig,
+    pub request_config: RequestConfig,
     #[set(skip)]
-    pub(super) route_matcher: RouteMatcher,
+    pub route_matcher: RouteMatcher,
     #[debug(skip)]
     #[set(skip)]
-    pub(super) request_error: ServerHookList,
+    pub request_error: ServerHookList,
     #[debug(skip)]
     #[set(skip)]
-    pub(super) task_panic: ServerHookList,
+    pub task_panic: ServerHookList,
     #[debug(skip)]
     #[set(skip)]
-    pub(super) request_middleware: ServerHookList,
+    pub request_middleware: ServerHookList,
     #[debug(skip)]
     #[set(skip)]
-    pub(super) response_middleware: ServerHookList,
+    pub response_middleware: ServerHookList,
 }
 ```
 # Path: hyperlane/core/src/server/mod.rs
@@ -12920,6 +18018,28 @@ use super::*;
 # Path: hyperlane/core/src/config/impl.rs
 ```rust
 use super::*;
+impl ServerProtocol {
+    #[inline(always)]
+    pub fn get_alpn_protocol(&self) -> &'static [u8] {
+        match self {
+            Self::Http1 => ALPN_HTTP1,
+            Self::Http2 => ALPN_HTTP2,
+            Self::Http3 => ALPN_HTTP3,
+        }
+    }
+    #[inline(always)]
+    pub fn get_version(&self) -> HttpVersion {
+        match self {
+            Self::Http1 => HttpVersion::Http1_1,
+            Self::Http2 => HttpVersion::Http2,
+            Self::Http3 => HttpVersion::Http3,
+        }
+    }
+    #[inline(always)]
+    pub fn is_quic(&self) -> bool {
+        matches!(self, Self::Http3)
+    }
+}
 impl Default for ServerConfig {
     #[inline(always)]
     fn default() -> Self {
@@ -12927,6 +18047,8 @@ impl Default for ServerConfig {
             address: Server::format_bind_address(DEFAULT_HOST, DEFAULT_WEB_PORT),
             nodelay: DEFAULT_NODELAY,
             ttl: DEFAULT_TTI,
+            protocol: ServerProtocol::default(),
+            tls: None,
         }
     }
 }
@@ -12937,26 +18059,64 @@ impl ServerConfig {
     {
         serde_json::from_str(json.as_ref())
     }
+    #[inline(always)]
+    pub fn get_alpn_protocol(&self) -> &'static [u8] {
+        self.get_protocol().get_alpn_protocol()
+    }
+}
+```
+# Path: hyperlane/core/src/config/const.rs
+```rust
+pub(crate) const ALPN_HTTP1: &[u8] = b"http/1.1";
+pub(crate) const ALPN_HTTP2: &[u8] = b"h2";
+pub(crate) const ALPN_HTTP3: &[u8] = b"h3";
+```
+# Path: hyperlane/core/src/config/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Debug, Default, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ServerProtocol {
+    #[default]
+    Http1,
+    Http2,
+    Http3,
 }
 ```
 # Path: hyperlane/core/src/config/struct.rs
 ```rust
 use super::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
+pub struct TlsConfig {
+    pub certificate_path: String,
+    pub private_key_path: String,
+}
+#[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct ServerConfig {
     #[set(type(AsRef<str>))]
-    pub(super) address: String,
+    pub address: String,
     #[get(type(copy))]
-    pub(super) nodelay: Option<bool>,
+    pub nodelay: Option<bool>,
     #[get(type(copy))]
-    pub(super) ttl: Option<u32>,
+    pub ttl: Option<u32>,
+    #[get(type(copy))]
+    #[new(skip)]
+    #[serde(default)]
+    pub protocol: ServerProtocol,
+    #[get(type(clone))]
+    #[new(skip)]
+    #[serde(default)]
+    pub tls: Option<TlsConfig>,
 }
 ```
 # Path: hyperlane/core/src/config/mod.rs
 ```rust
+mod r#const;
+mod r#enum;
 mod r#impl;
 mod r#struct;
-pub use r#struct::*;
+pub use {r#enum::*, r#struct::*};
+pub(crate) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/core/src/context/impl.rs
@@ -13155,10 +18315,10 @@ impl Context {
 use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
-    pub(super) request: Request,
-    pub(super) response: Response,
-    pub(super) route_params: RouteParams,
-    pub(super) attributes: ThreadSafeAttributeStore,
+    pub request: Request,
+    pub response: Response,
+    pub route_params: RouteParams,
+    pub attributes: ThreadSafeAttributeStore,
 }
 ```
 # Path: hyperlane/core/src/context/mod.rs
@@ -13184,6 +18344,8 @@ use super::*;
 #[derive(Clone, CustomDebug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub enum ServerError {
     TcpBind(String),
+    Tls(String),
+    MissingTlsForHttp3,
     Unknown(String),
     HttpRead(String),
     InvalidHttpRequest(Request),
@@ -13631,17 +18793,17 @@ use super::*;
 pub struct RoutePattern(
     pub(super) RouteSegmentList,
 );
-#[derive(Clone, CustomDebug, DisplayDebug, Getter, GetterMut, Setter)]
+#[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct RouteMatcher {
     #[set(skip)]
     #[debug(skip)]
-    pub(super) static_route: ServerHookMap,
+    pub static_route: ServerHookMap,
     #[set(skip)]
     #[debug(skip)]
-    pub(super) dynamic_route: ServerHookPatternRoute,
+    pub dynamic_route: ServerHookPatternRoute,
     #[set(skip)]
     #[debug(skip)]
-    pub(super) regex_route: ServerHookPatternRoute,
+    pub regex_route: ServerHookPatternRoute,
 }
 ```
 # Path: hyperlane/core/src/route/mod.rs
@@ -13651,6 +18813,1681 @@ mod r#impl;
 mod r#struct;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/mod.rs
+```rust
+mod r#aliases;
+mod r#constants;
+mod r#framing;
+mod r#http2;
+mod r#http3;
+mod r#lifecycle;
+mod r#pump;
+mod r#request;
+mod r#response;
+mod r#transport;
+pub(crate) use {
+    r#aliases::*, r#constants::*, r#framing::*, r#http2::*, r#http3::*, r#lifecycle::*, r#pump::*,
+    r#request::*, r#response::*, r#transport::*,
+};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/http2/impl.rs
+```rust
+use super::*;
+impl H2Framer {
+    pub(crate) fn new(send_response: h2::server::SendResponse<Bytes>) -> Self {
+        Self {
+            send_response: Some(send_response),
+            send_stream: None,
+            finished: false,
+        }
+    }
+    pub(crate) fn reset(&mut self) {
+        if let Some(mut send_response) = self.get_mut_send_response().take() {
+            send_response.send_reset(h2::Reason::INTERNAL_ERROR);
+        }
+        if let Some(mut send_stream) = self.get_mut_send_stream().take() {
+            send_stream.send_reset(h2::Reason::INTERNAL_ERROR);
+        }
+    }
+}
+impl ResponseFramer for H2Framer {
+    fn send_head<'a>(
+        &'a mut self,
+        head: &'a FramedHead,
+        bodyless: bool,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
+        Box::pin(async move {
+            let nominated: Vec<String> = connection_nominated_headers(&head.headers);
+            let mut builder: http::response::Builder =
+                http::Response::builder().status(head.status_code as u16);
+            for (name, value) in head.headers.iter() {
+                let key: &str = name.as_str();
+                let nominated_by_connection: bool = nominated
+                    .iter()
+                    .any(|nominated: &String| nominated.as_str() == key);
+                if key.starts_with(PSEUDO_HEADER_PREFIX)
+                    || is_hop_by_hop(key)
+                    || nominated_by_connection
+                {
+                    continue;
+                }
+                if let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) {
+                    builder = builder.header(name.clone(), value);
+                }
+            }
+            let response: ProtocolResponse<()> = builder
+                .body(())
+                .map_err(|error: ProtocolBuildError| ResponseError::Send(error.to_string()))?;
+            let mut send_response: h2::server::SendResponse<Bytes> = self
+                .get_mut_send_response()
+                .take()
+                .ok_or(ResponseError::Terminated)?;
+            if bodyless {
+                self.set_finished(true);
+                send_response
+                    .send_response(response, true)
+                    .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
+                return Ok(());
+            }
+            let send_stream: H2SendStream = send_response
+                .send_response(response, false)
+                .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
+            self.set_send_stream(Some(send_stream));
+            Ok(())
+        })
+    }
+    fn send_data<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
+        Box::pin(async move {
+            if data.is_empty() || self.get_finished() {
+                return Ok(());
+            }
+            let Some(mut send_stream) = self.get_mut_send_stream().take() else {
+                return Err(ResponseError::Terminated);
+            };
+            let mut rest: &[u8] = data;
+            while !rest.is_empty() {
+                let granted: usize = next_h2_capacity(&mut send_stream, rest.len()).await?;
+                let take: usize = granted.min(rest.len());
+                let chunk: Bytes = Bytes::copy_from_slice(&rest[..take]);
+                rest = &rest[take..];
+                send_stream
+                    .send_data(chunk, false)
+                    .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
+            }
+            self.set_send_stream(Some(send_stream));
+            Ok(())
+        })
+    }
+    fn finish<'a>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
+        Box::pin(async move {
+            if self.get_finished() {
+                return Ok(());
+            }
+            self.set_finished(true);
+            let Some(mut send_stream) = self.get_mut_send_stream().take() else {
+                return Ok(());
+            };
+            send_stream
+                .send_data(Bytes::new(), true)
+                .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
+            Ok(())
+        })
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/http2/fn.rs
+```rust
+use super::*;
+pub(crate) async fn serve_h2_connection<T>(
+    env: ConnectionEnv,
+    peers: StreamPeers,
+    connection: Result<ConnectionH2<T>, String>,
+) where
+    T: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static,
+{
+    let mut connection: ConnectionH2<T> = match connection {
+        Ok(connection) => connection,
+        Err(_) => return,
+    };
+    loop {
+        match connection.accept().await {
+            Some(Ok((request, send_response))) => {
+                spawn(h2_request_task(
+                    H2RequestEnv {
+                        server: env.server.clone(),
+                        request_config: env.request_config,
+                        peers,
+                    },
+                    request,
+                    send_response,
+                ));
+            }
+            Some(Err(_)) => return,
+            None => return,
+        }
+    }
+}
+pub(crate) async fn h2_request_task(
+    env: H2RequestEnv,
+    request: ProtocolRequest<H2RecvStream>,
+    send_response: h2::server::SendResponse<Bytes>,
+) {
+    let H2RequestEnv {
+        server,
+        request_config,
+        peers,
+    } = env;
+    let (parts, mut recv_stream): (http::request::Parts, H2RecvStream) = request.into_parts();
+    let mut framer: H2Framer = H2Framer::new(send_response);
+    let mut body: Vec<u8> = Vec::new();
+    if let Err(error) =
+        collect_h2_body(&mut recv_stream, &request_config, &parts.headers, &mut body).await
+    {
+        h2_fail_request(
+            &H2RequestEnv {
+                server,
+                request_config,
+                peers,
+            },
+            &mut framer,
+            HttpVersion::Http2,
+            error,
+        )
+        .await;
+        return;
+    }
+    let built: Result<Request, RequestError> = build_protocol_request(
+        &request_config,
+        ProtocolRequestHead {
+            version: HttpVersion::Http2,
+            method: parts.method.clone(),
+            parts,
+            body,
+        },
+    );
+    let request: Request = match built {
+        Ok(request) => request,
+        Err(error) => {
+            h2_fail_request(
+                &H2RequestEnv {
+                    server,
+                    request_config,
+                    peers,
+                },
+                &mut framer,
+                HttpVersion::Http2,
+                error,
+            )
+            .await;
+            return;
+        }
+    };
+    let is_head: bool = request.get_method().is_head();
+    let (stream, peer): (Stream, DuplexStream) = build_duplex_transport(request_config, peers);
+    let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request);
+    let joined: Result<((), ()), ResponseError> = futures::try_join!(
+        async {
+            lifecycle.run(stream).await;
+            Ok::<(), ResponseError>(())
+        },
+        pump_response(&mut framer, peer, RESPONSE_HEAD_MAX, is_head)
+    );
+    let pump_result: Result<(), ResponseError> = joined.map(|(_, pumped): ((), ())| pumped);
+    if pump_result.is_err() {
+        framer.reset();
+    }
+}
+pub(crate) async fn h2_fail_request(
+    env: &H2RequestEnv,
+    framer: &mut H2Framer,
+    version: HttpVersion,
+    error: RequestError,
+) {
+    let mut ctx: Context = Context::default();
+    let mut request: Request = Request::default();
+    request.set_version(version.clone());
+    ctx.set_request(request);
+    ctx.get_mut_response().reset().set_version(version);
+    let (mut stream, peer): (Stream, DuplexStream) =
+        build_duplex_transport(env.request_config, env.peers);
+    let is_head: bool = false;
+    let server: Arc<Server> = env.server.clone();
+    let (_, pump_result): ((), Result<(), ResponseError>) = join!(
+        async move {
+            server
+                .handle_request_error(&mut stream, &mut ctx, &error)
+                .await;
+            drop(stream);
+        },
+        pump_response(framer, peer, RESPONSE_HEAD_MAX, is_head)
+    );
+    if pump_result.is_err() {
+        framer.reset();
+    }
+}
+pub(crate) async fn collect_h2_body(
+    recv_stream: &mut H2RecvStream,
+    request_config: &RequestConfig,
+    headers: &ProtocolHeaders,
+    body: &mut Vec<u8>,
+) -> Result<(), RequestError> {
+    let max_body_size: usize = request_config.get_max_body_size();
+    let declared: Option<usize> = declared_content_length(headers, max_body_size)?;
+    let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
+    if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+        collect_h2_body_until_end(recv_stream, max_body_size, body).await?;
+    } else {
+        let bound: Duration = Duration::from_millis(read_timeout_ms);
+        match timeout(
+            bound,
+            collect_h2_body_until_end(recv_stream, max_body_size, body),
+        )
+        .await
+        {
+            Ok(collected) => collected?,
+            Err(_) => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+        }
+    }
+    match declared {
+        None => Ok(()),
+        Some(declared) => match body.len().cmp(&declared) {
+            Ordering::Equal => Ok(()),
+            _ => Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned())),
+        },
+    }
+}
+async fn collect_h2_body_until_end(
+    recv_stream: &mut H2RecvStream,
+    max_body_size: usize,
+    body: &mut Vec<u8>,
+) -> Result<(), RequestError> {
+    loop {
+        let received: Option<Result<Bytes, H2Error>> = recv_stream.data().await;
+        let Some(received) = received else {
+            return Ok(());
+        };
+        let data: Bytes =
+            received.map_err(|error: H2Error| RequestError::Request(error.to_string()))?;
+        let data_len: usize = data.len();
+        let collected: Result<(), RequestError> = push_bounded_body(max_body_size, body, data);
+        let _: Result<(), H2Error> = recv_stream.flow_control().release_capacity(data_len);
+        collected?;
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/http2/struct.rs
+```rust
+use super::*;
+#[derive(Data)]
+pub(crate) struct H2Framer {
+    #[get(skip)]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) send_response: Option<h2::server::SendResponse<Bytes>>,
+    #[get(skip)]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) send_stream: Option<h2::SendStream<Bytes>>,
+    #[get(type(copy), pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(super) finished: bool,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct H2RequestEnv {
+    pub(crate) server: Arc<Server>,
+    pub(crate) request_config: RequestConfig,
+    pub(crate) peers: StreamPeers,
+}
+```
+# Path: hyperlane/core/src/protocol/http2/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/transport/impl.rs
+```rust
+use super::*;
+impl Transport for DuplexTransport {
+    fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        self.get_remote()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Unsupported, NO_ADDRESS))
+    }
+    fn local_addr(&self) -> Result<SocketAddr, io::Error> {
+        self.get_local()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Unsupported, NO_ADDRESS))
+    }
+}
+impl AsyncRead for DuplexTransport {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _context: &mut task::Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        buffer.advance(0);
+        Poll::Ready(Ok(()))
+    }
+}
+impl AsyncWrite for DuplexTransport {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+        bytes: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this: &mut Self = self.get_mut();
+        Pin::new(&mut this.get_mut_pipe()).poll_write(context, bytes)
+    }
+    fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+        let this: &mut Self = self.get_mut();
+        Pin::new(&mut this.get_mut_pipe()).poll_flush(context)
+    }
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this: &mut Self = self.get_mut();
+        Pin::new(&mut this.get_mut_pipe()).poll_shutdown(context)
+    }
+}
+impl TlsTransport {
+    pub(crate) fn new(session: tokio_rustls::server::TlsStream<TcpStream>) -> Self {
+        Self { session }
+    }
+}
+impl TlsTransport {
+    pub(crate) fn get_session_ref(&self) -> &tokio_rustls::server::TlsStream<TcpStream> {
+        &self.session
+    }
+}
+impl Transport for TlsTransport {
+    fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        TcpStream::peer_addr(self.get_session_ref().get_ref().0)
+    }
+    fn local_addr(&self) -> Result<SocketAddr, io::Error> {
+        TcpStream::local_addr(self.get_session_ref().get_ref().0)
+    }
+}
+impl AsyncRead for TlsTransport {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this: &mut Self = self.get_mut();
+        Pin::new(&mut this.get_mut_session()).poll_read(context, buffer)
+    }
+}
+impl AsyncWrite for TlsTransport {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+        bytes: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this: &mut Self = self.get_mut();
+        Pin::new(&mut this.get_mut_session()).poll_write(context, bytes)
+    }
+    fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+        let this: &mut Self = self.get_mut();
+        Pin::new(&mut this.get_mut_session()).poll_flush(context)
+    }
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this: &mut Self = self.get_mut();
+        Pin::new(&mut this.get_mut_session()).poll_shutdown(context)
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/transport/fn.rs
+```rust
+use super::*;
+pub(crate) fn build_duplex_transport(
+    request_config: RequestConfig,
+    peers: StreamPeers,
+) -> (Stream, DuplexStream) {
+    let (pipe, peer): (DuplexStream, DuplexStream) = tokio::io::duplex(PROTOCOL_STREAM_CAPACITY);
+    let transport: DuplexTransport = DuplexTransport {
+        pipe,
+        local: Some(peers.local),
+        remote: Some(peers.remote),
+    };
+    (
+        Stream::from_transport(transport, request_config, false),
+        peer,
+    )
+}
+```
+# Path: hyperlane/core/src/protocol/transport/struct.rs
+```rust
+use super::*;
+#[derive(Data, Debug)]
+pub(crate) struct DuplexTransport {
+    #[get(skip)]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) pipe: DuplexStream,
+    #[get(type(copy), pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(super) local: Option<SocketAddr>,
+    #[get(type(copy), pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(super) remote: Option<SocketAddr>,
+}
+#[derive(Data, Debug)]
+pub(crate) struct TlsTransport {
+    #[get(skip)]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) session: tokio_rustls::server::TlsStream<TcpStream>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct ConnectionEnv {
+    pub(crate) server: Arc<Server>,
+    pub(crate) request_config: RequestConfig,
+    pub(crate) protocol: ServerProtocol,
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct StreamPeers {
+    pub(crate) local: SocketAddr,
+    pub(crate) remote: SocketAddr,
+}
+```
+# Path: hyperlane/core/src/protocol/transport/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/request/fn.rs
+```rust
+use super::*;
+pub fn build_protocol_request(
+    config: &RequestConfig,
+    head: ProtocolRequestHead,
+) -> Result<Request, RequestError> {
+    let ProtocolRequestHead {
+        version,
+        method,
+        parts,
+        body,
+    } = head;
+    let uri: &http::Uri = &parts.uri;
+    let target: String = request_target(uri.path(), uri.query());
+    let max_path_size: usize = config.get_max_path_size();
+    if target.len() > max_path_size && max_path_size != DEFAULT_LOW_SECURITY_MAX_PATH_SIZE {
+        return Err(RequestError::PathTooLong(HttpStatus::URITooLong));
+    }
+    let max_body_size: usize = config.get_max_body_size();
+    if body.len() > max_body_size && max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
+        return Err(RequestError::ContentLengthTooLarge(
+            HttpStatus::PayloadTooLarge,
+        ));
+    }
+    let mut request: Request = Request::default();
+    let query_index: Option<usize> = target.find(QUESTION_MARK);
+    let hash_index: Option<usize> = target.find(HASH);
+    fill_request_querys(
+        split_target_query(&target, query_index, hash_index),
+        request.get_mut_querys(),
+    );
+    request
+        .get_mut_path()
+        .push_str(split_target_path(&target, query_index, hash_index));
+    request.set_method(protocol_method(method));
+    request.set_version(version);
+    fill_request_headers(&parts.headers, config, &mut request)?;
+    request.set_host(resolve_request_host(&parts.headers, uri));
+    request.get_mut_body().clear();
+    request.get_mut_body().extend_from_slice(&body);
+    Ok(request)
+}
+pub fn resolve_request_host(headers: &ProtocolHeaders, uri: &http::Uri) -> String {
+    if let Some(authority) = uri.authority() {
+        return authority.as_str().to_owned();
+    }
+    for name in [HOST, COLON_AUTHORITY] {
+        if let Some(value) = headers.get(name)
+            && let Ok(value) = value.to_str()
+        {
+            return value.to_owned();
+        }
+    }
+    EMPTY_STR.to_owned()
+}
+pub fn split_target_query(
+    target: &str,
+    query_index: Option<usize>,
+    hash_index: Option<usize>,
+) -> &str {
+    query_index.map_or(EMPTY_STR, |query_index: usize| {
+        let rest: &str = &target[query_index + 1..];
+        match hash_index {
+            None => rest,
+            Some(hash_index) if hash_index <= query_index => rest,
+            Some(hash_index) => &rest[..hash_index - query_index - 1],
+        }
+    })
+}
+pub fn split_target_path(
+    target: &str,
+    query_index: Option<usize>,
+    hash_index: Option<usize>,
+) -> &str {
+    match query_index.or(hash_index) {
+        Some(separator_index) => &target[..separator_index],
+        None => target,
+    }
+}
+pub fn fill_request_querys(query: &str, querys: &mut RequestQuerys) {
+    if query.is_empty() {
+        return;
+    }
+    for pair in query.split(AND) {
+        if let Some((key, value)) = pair.split_once(EQUAL) {
+            if !key.is_empty() {
+                querys
+                    .entry(key.to_string())
+                    .or_default()
+                    .push_back(value.to_string());
+            }
+        } else if !pair.is_empty() {
+            querys.entry(pair.to_string()).or_default();
+        }
+    }
+}
+pub fn protocol_method(method: ProtocolMethod) -> RequestMethod {
+    method
+        .as_str()
+        .parse::<RequestMethod>()
+        .unwrap_or(Method::Unknown(method.as_str().to_owned()))
+}
+pub fn fill_request_headers(
+    headers: &ProtocolHeaders,
+    config: &RequestConfig,
+    request: &mut Request,
+) -> Result<(), RequestError> {
+    let mut header_count: usize = 0;
+    for (name, value) in headers.iter() {
+        let key: &str = name.as_str();
+        if key.starts_with(PSEUDO_HEADER_PREFIX) || is_hop_by_hop(key) {
+            continue;
+        }
+        let Ok(value) = value.to_str() else {
+            continue;
+        };
+        header_count += 1;
+        if header_count > config.get_max_header_count()
+            && config.get_max_header_count() != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
+        {
+            return Err(RequestError::TooManyHeaders(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        if key.len() > config.get_max_header_key_size()
+            && config.get_max_header_key_size() != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+        {
+            return Err(RequestError::HeaderKeyTooLong(HttpStatus::BadRequest));
+        }
+        if value.len() > config.get_max_header_value_size()
+            && config.get_max_header_value_size() != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
+        {
+            return Err(RequestError::HeaderValueTooLong(HttpStatus::BadRequest));
+        }
+        request
+            .get_mut_headers()
+            .entry(key.to_owned())
+            .or_default()
+            .push_back(value.to_owned());
+    }
+    Ok(())
+}
+pub fn is_hop_by_hop(name: &str) -> bool {
+    matches!(
+        name,
+        CONNECTION
+            | KEEP_ALIVE
+            | PROXY_AUTHENTICATE
+            | PROXY_AUTHORIZATION
+            | TE
+            | TRAILER_HEADER
+            | TRANSFER_ENCODING
+            | UPGRADE
+    )
+}
+pub fn declared_content_length(
+    headers: &ProtocolHeaders,
+    max_body_size: usize,
+) -> Result<Option<usize>, RequestError> {
+    let Some(value) = headers.get(CONTENT_LENGTH) else {
+        return Ok(None);
+    };
+    let Ok(value) = value.to_str() else {
+        return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+    };
+    let declared: usize = parse_ascii_length(value)?;
+    if declared > max_body_size && max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
+        return Err(RequestError::ContentLengthTooLarge(
+            HttpStatus::PayloadTooLarge,
+        ));
+    }
+    Ok(Some(declared))
+}
+pub(crate) fn parse_ascii_length(value: &str) -> Result<usize, RequestError> {
+    let digits: &str = value.trim();
+    if digits.is_empty() || !digits.bytes().all(|byte: u8| byte.is_ascii_digit()) {
+        return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+    }
+    digits
+        .parse::<usize>()
+        .map_err(|_: ParseIntError| RequestError::InvalidContentLength(HttpStatus::BadRequest))
+}
+pub fn is_bodyless_status(status_code: usize, is_head: bool) -> bool {
+    is_head
+        || status_code < 200
+        || status_code == HttpStatus::NoContent.code()
+        || status_code == HttpStatus::NotModified.code()
+}
+pub fn push_bounded_body(
+    limit: usize,
+    body: &mut Vec<u8>,
+    chunk: Bytes,
+) -> Result<(), RequestError> {
+    if body.len() + chunk.len() > limit && limit != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
+        return Err(RequestError::ContentLengthTooLarge(
+            HttpStatus::PayloadTooLarge,
+        ));
+    }
+    body.extend_from_slice(chunk.as_ref());
+    Ok(())
+}
+pub fn request_target(path: &str, query: Option<&str>) -> String {
+    match query {
+        Some(query) if !query.is_empty() => {
+            let mut target: String = String::with_capacity(path.len() + query.len() + 1);
+            target.push_str(path);
+            target.push(QUESTION_MARK);
+            target.push_str(query);
+            target
+        }
+        _ => path.to_owned(),
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/request/struct.rs
+```rust
+use super::*;
+#[derive(Debug)]
+pub(crate) struct ProtocolRequestHead {
+    pub(crate) version: HttpVersion,
+    pub(crate) method: ProtocolMethod,
+    pub(crate) parts: http::request::Parts,
+    pub(crate) body: Vec<u8>,
+}
+```
+# Path: hyperlane/core/src/protocol/request/mod.rs
+```rust
+mod r#fn;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/lifecycle/impl.rs
+```rust
+use super::*;
+impl ServerLifecycle {
+    pub(crate) fn new(server: Arc<Server>, request: Request) -> Self {
+        Self { server, request }
+    }
+    pub(crate) async fn run(self, mut stream: Stream) {
+        let mut ctx: Context = Context::default();
+        self.get_server()
+            .run_protocol_lifecycle(&mut stream, &mut ctx, self.get_request())
+            .await;
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/lifecycle/struct.rs
+```rust
+use super::*;
+#[derive(Data, Debug)]
+pub(crate) struct ServerLifecycle {
+    #[get(type(clone), pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(super) server: Arc<Server>,
+    #[get(type(clone), pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(super) request: Request,
+}
+```
+# Path: hyperlane/core/src/protocol/lifecycle/mod.rs
+```rust
+mod r#impl;
+mod r#struct;
+pub(crate) use r#struct::*;
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/aliases/type.rs
+```rust
+use super::*;
+pub(crate) type DuplexStream = tokio::io::DuplexStream;
+pub(crate) type ProtocolHeaders = http::HeaderMap;
+pub(crate) type RequestH3Stream = h3::server::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>;
+pub(crate) type RequestResolverH3 = h3::server::RequestResolver<h3_quinn::Connection, Bytes>;
+pub(crate) type ConnectionH2<T> = h2::server::Connection<T, Bytes>;
+pub(crate) type H2Error = h2::Error;
+pub(crate) type H2RecvStream = h2::RecvStream;
+pub(crate) type H2SendStream = h2::SendStream<Bytes>;
+pub(crate) type ProtocolRequest<T> = http::Request<T>;
+pub(crate) type ProtocolResponse<T> = http::Response<T>;
+pub(crate) type ProtocolBuildError = http::Error;
+pub(crate) type ProtocolMethod = http::Method;
+pub(crate) const LF_U8: u8 = b'\n';
+pub(crate) const CR_U8: u8 = b'\r';
+pub(crate) const CRLF: &str = "\r\n";
+pub(crate) const HTTP_VERSION_PREFIX: &str = "HTTP/";
+pub(crate) type SplitLines<'a> = Split<'a, &'static str>;
+pub(crate) const COMMA_STR: &str = ",";
+pub(crate) const LF_CHAR: char = '\n';
+pub(crate) const MISSING_RESPONSE_VERSION: &str = "response head has no version line";
+pub(crate) const MISSING_RESPONSE_STATUS: &str = "response head has no status code";
+pub(crate) const NO_ADDRESS: &str = "transport has no socket address";
+pub(crate) const CONTENT_LENGTH_MISMATCH: &str =
+    "request body length does not match its content-length";
+```
+# Path: hyperlane/core/src/protocol/aliases/mod.rs
+```rust
+mod r#type;
+pub(crate) use r#type::*;
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/constants/const.rs
+```rust
+pub(crate) const PSEUDO_HEADER_PREFIX: &str = ":";
+pub(crate) const PROTOCOL_BODY_CHUNK: usize = 8 * 1024;
+pub(crate) const QUESTION_MARK: char = '?';
+pub(crate) const TRAILER_HEADER: &str = "trailer";
+pub(crate) const PROTOCOL_STREAM_CAPACITY: usize = 32 * 1024;
+pub(crate) const RESPONSE_HEAD_MAX: usize = 16 * 1024;
+pub(crate) const RESPONSE_HEAD_TOO_LONG: &str = "response head exceeds its bound";
+pub(crate) const MISSING_RESPONSE_HEAD: &str = "response ended before a head was written";
+pub(crate) const UNSUPPORTED_TRANSFER_ENCODING: &str =
+    "response transfer-encoding is not supported on this protocol";
+pub(crate) const INVALID_RESPONSE_STATUS: &str = "response head has an unusable status code";
+pub(crate) const MALFORMED_RESPONSE_HEADER: &str = "response head has a malformed header line";
+pub(crate) const TRUNCATED_RESPONSE_BODY: &str =
+    "response ended before the announced content length arrived";
+pub(crate) const OVERFLOWING_RESPONSE_BODY: &str =
+    "response carried more bytes than the announced content length";
+pub(crate) const MISSING_SEND_CAPACITY: &str =
+    "the send stream was closed before capacity was granted";
+pub(crate) const MIN_STATUS_CODE: usize = 100;
+pub(crate) const MAX_STATUS_CODE: usize = 999;
+```
+# Path: hyperlane/core/src/protocol/constants/mod.rs
+```rust
+mod r#const;
+pub(crate) use r#const::*;
+```
+# Path: hyperlane/core/src/protocol/http3/impl.rs
+```rust
+use super::*;
+impl H3Framer {
+    pub(crate) fn new(request_stream: RequestH3Stream) -> Self {
+        Self {
+            request_stream: Some(request_stream),
+            finished: false,
+        }
+    }
+    pub(crate) fn reset(&mut self) {
+        let Some(mut request_stream) = self.get_mut_request_stream().take() else {
+            return;
+        };
+        request_stream.stop_stream(Code::H3_INTERNAL_ERROR);
+    }
+}
+impl ResponseFramer for H3Framer {
+    fn send_head<'a>(
+        &'a mut self,
+        head: &'a FramedHead,
+        _bodyless: bool,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
+        Box::pin(async move {
+            let nominated: Vec<String> = connection_nominated_headers(&head.headers);
+            let mut builder: http::response::Builder =
+                http::Response::builder().status(head.status_code as u16);
+            for (name, value) in head.headers.iter() {
+                let key: &str = name.as_str();
+                let nominated_by_connection: bool = nominated
+                    .iter()
+                    .any(|nominated: &String| nominated.as_str() == key);
+                if key.starts_with(PSEUDO_HEADER_PREFIX)
+                    || is_hop_by_hop(key)
+                    || nominated_by_connection
+                {
+                    continue;
+                }
+                if let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) {
+                    builder = builder.header(name.clone(), value);
+                }
+            }
+            let response: ProtocolResponse<()> = builder
+                .body(())
+                .map_err(|error: ProtocolBuildError| ResponseError::Send(error.to_string()))?;
+            let Some(mut request_stream) = self.get_mut_request_stream().take() else {
+                return Err(ResponseError::Terminated);
+            };
+            request_stream
+                .send_response(response)
+                .await
+                .map_err(|error: h3::error::StreamError| ResponseError::Send(error.to_string()))?;
+            self.set_request_stream(Some(request_stream));
+            Ok(())
+        })
+    }
+    fn send_data<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
+        Box::pin(async move {
+            if data.is_empty() || self.get_finished() {
+                return Ok(());
+            }
+            let Some(mut request_stream) = self.get_mut_request_stream().take() else {
+                return Err(ResponseError::Terminated);
+            };
+            request_stream
+                .send_data(Bytes::copy_from_slice(data))
+                .await
+                .map_err(|error: h3::error::StreamError| ResponseError::Send(error.to_string()))?;
+            self.set_request_stream(Some(request_stream));
+            Ok(())
+        })
+    }
+    fn finish<'a>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
+        Box::pin(async move {
+            if self.get_finished() {
+                return Ok(());
+            }
+            self.set_finished(true);
+            let Some(mut request_stream) = self.get_mut_request_stream().take() else {
+                return Ok(());
+            };
+            request_stream
+                .finish()
+                .await
+                .map_err(|error: h3::error::StreamError| ResponseError::Send(error.to_string()))?;
+            Ok(())
+        })
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/http3/fn.rs
+```rust
+use super::*;
+pub(crate) async fn serve_h3_connection(
+    env: ConnectionEnv,
+    peers: StreamPeers,
+    mut connection: h3::server::Connection<h3_quinn::Connection, Bytes>,
+) {
+    loop {
+        let resolver: Option<h3::server::RequestResolver<h3_quinn::Connection, Bytes>> =
+            match connection.accept().await {
+                Ok(resolver) => resolver,
+                Err(_) => return,
+            };
+        let Some(resolver) = resolver else {
+            return;
+        };
+        spawn(h3_request_task(
+            H3RequestEnv {
+                server: env.server.clone(),
+                request_config: env.request_config,
+                peers,
+            },
+            resolver,
+        ));
+    }
+}
+pub(crate) async fn h3_request_task(env: H3RequestEnv, resolver: RequestResolverH3) {
+    let H3RequestEnv {
+        server,
+        request_config,
+        peers,
+    } = env;
+    let (head, request_stream): (http::Request<()>, RequestH3Stream) =
+        match resolver.resolve_request().await {
+            Ok(resolved) => resolved,
+            Err(_) => return,
+        };
+    let (parts, ()): (http::request::Parts, ()) = head.into_parts();
+    let mut framer: H3Framer = H3Framer::new(request_stream);
+    let mut body: Vec<u8> = Vec::new();
+    match collect_h3_body(&mut framer, &request_config, &parts.headers, &mut body).await {
+        Ok(()) => {}
+        Err(error) => {
+            h3_fail_request(
+                &H3RequestEnv {
+                    server,
+                    request_config,
+                    peers,
+                },
+                &mut framer,
+                HttpVersion::Http3,
+                error,
+            )
+            .await;
+            return;
+        }
+    }
+    let built: Result<Request, RequestError> = build_protocol_request(
+        &request_config,
+        ProtocolRequestHead {
+            version: HttpVersion::Http3,
+            method: parts.method.clone(),
+            parts,
+            body,
+        },
+    );
+    let request: Request = match built {
+        Ok(request) => request,
+        Err(error) => {
+            h3_fail_request(
+                &H3RequestEnv {
+                    server,
+                    request_config,
+                    peers,
+                },
+                &mut framer,
+                HttpVersion::Http3,
+                error,
+            )
+            .await;
+            return;
+        }
+    };
+    let is_head: bool = request.get_method().is_head();
+    let (stream, peer): (Stream, DuplexStream) = build_duplex_transport(request_config, peers);
+    let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request);
+    let joined: Result<((), ()), ResponseError> = futures::try_join!(
+        async {
+            lifecycle.run(stream).await;
+            Ok::<(), ResponseError>(())
+        },
+        pump_response(&mut framer, peer, RESPONSE_HEAD_MAX, is_head)
+    );
+    let pump_result: Result<(), ResponseError> = joined.map(|(_, pumped): ((), ())| pumped);
+    if pump_result.is_err() {
+        framer.reset();
+    }
+}
+pub(crate) async fn collect_h3_body(
+    framer: &mut H3Framer,
+    request_config: &RequestConfig,
+    headers: &ProtocolHeaders,
+    body: &mut Vec<u8>,
+) -> Result<(), RequestError> {
+    let max_body_size: usize = request_config.get_max_body_size();
+    let declared: Option<usize> = declared_content_length(headers, max_body_size)?;
+    let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
+    if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+        collect_h3_body_until_end(framer, max_body_size, body).await?;
+    } else {
+        let bound: Duration = Duration::from_millis(read_timeout_ms);
+        match timeout(
+            bound,
+            collect_h3_body_until_end(framer, max_body_size, body),
+        )
+        .await
+        {
+            Ok(collected) => collected?,
+            Err(_) => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+        }
+    }
+    match declared {
+        None => Ok(()),
+        Some(declared) => match body.len().cmp(&declared) {
+            Ordering::Equal => Ok(()),
+            _ => Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned())),
+        },
+    }
+}
+async fn collect_h3_body_until_end(
+    framer: &mut H3Framer,
+    max_body_size: usize,
+    body: &mut Vec<u8>,
+) -> Result<(), RequestError> {
+    loop {
+        let Some(request_stream) = framer.get_mut_request_stream().as_mut() else {
+            return Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned()));
+        };
+        let received: Result<Option<_>, h3::error::StreamError> = request_stream.recv_data().await;
+        match received {
+            Ok(Some(mut data)) => {
+                let remaining: usize = bytes::Buf::remaining(&data);
+                let chunk: Bytes = bytes::Buf::copy_to_bytes(&mut data, remaining);
+                let collected: Result<(), RequestError> =
+                    push_bounded_body(max_body_size, body, chunk);
+                collected?;
+            }
+            Ok(None) => return Ok(()),
+            Err(error) => return Err(RequestError::Request(error.to_string())),
+        }
+    }
+}
+pub(crate) async fn h3_fail_request(
+    env: &H3RequestEnv,
+    framer: &mut H3Framer,
+    version: HttpVersion,
+    error: RequestError,
+) {
+    let mut ctx: Context = Context::default();
+    let mut request: Request = Request::default();
+    request.set_version(version.clone());
+    ctx.set_request(request);
+    ctx.get_mut_response().reset().set_version(version);
+    let (mut stream, peer): (Stream, DuplexStream) =
+        build_duplex_transport(env.request_config, env.peers);
+    let is_head: bool = false;
+    let server: Arc<Server> = env.server.clone();
+    let (_, pump_result): ((), Result<(), ResponseError>) = join!(
+        async move {
+            server
+                .handle_request_error(&mut stream, &mut ctx, &error)
+                .await;
+            drop(stream);
+        },
+        pump_response(framer, peer, RESPONSE_HEAD_MAX, is_head)
+    );
+    if pump_result.is_err() {
+        framer.reset();
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/http3/struct.rs
+```rust
+use super::*;
+#[derive(Data)]
+pub(crate) struct H3Framer {
+    #[get(skip)]
+    #[get_mut(pub(crate))]
+    #[set(pub(crate))]
+    pub(super) request_stream: Option<RequestH3Stream>,
+    #[get(type(copy), pub(crate))]
+    #[get_mut(skip)]
+    #[set(pub(crate))]
+    pub(super) finished: bool,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct H3RequestEnv {
+    pub(crate) server: Arc<Server>,
+    pub(crate) request_config: RequestConfig,
+    pub(crate) peers: StreamPeers,
+}
+```
+# Path: hyperlane/core/src/protocol/http3/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/response/fn.rs
+```rust
+use super::*;
+pub fn find_head_end(buffer: &[u8]) -> Option<usize> {
+    let mut index: usize = 0;
+    while index < buffer.len() {
+        let rest: &[u8] = &buffer[index..];
+        let line_len: usize = find_line_end(rest)?;
+        let is_blank: bool = rest[..line_len]
+            .iter()
+            .all(|byte: &u8| *byte == CR_U8 || *byte == LF_U8);
+        if is_blank {
+            return Some(index + line_len);
+        }
+        index += line_len;
+    }
+    None
+}
+pub fn find_line_end(bytes: &[u8]) -> Option<usize> {
+    bytes
+        .iter()
+        .position(|byte: &u8| *byte == LF_U8)
+        .map(|index: usize| index + 1)
+}
+pub fn parse_response_head(head: &[u8]) -> Result<(usize, ProtocolHeaders), ResponseError> {
+    let text: &str =
+        from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
+    let mut lines: SplitLines<'_> = text.split(CRLF);
+    let status_line: &str = lines.next().unwrap_or(EMPTY_STR);
+    let mut fields: SplitWhitespace<'_> = status_line.split_whitespace();
+    let version: &str = fields.next().unwrap_or(EMPTY_STR);
+    if !version.starts_with(HTTP_VERSION_PREFIX) {
+        return Err(ResponseError::Send(MISSING_RESPONSE_VERSION.to_owned()));
+    }
+    let status_text: &str = fields.next().unwrap_or(EMPTY_STR);
+    if status_text.is_empty() {
+        return Err(ResponseError::Send(MISSING_RESPONSE_STATUS.to_owned()));
+    }
+    let status_code: usize = status_text
+        .parse::<usize>()
+        .map_err(|error: ParseIntError| ResponseError::Send(error.to_string()))?;
+    let mut headers: ProtocolHeaders = http::HeaderMap::new();
+    for line in lines {
+        let line: &str = line.trim_end_matches(LF_CHAR);
+        if line.is_empty() {
+            continue;
+        }
+        let Some((name, value)) = line.split_once(COLON) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let name: &str = name.trim();
+        if name.is_empty() {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        }
+        let Ok(header_name) = http::HeaderName::from_bytes(name.as_bytes()) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let Ok(header_value) = http::HeaderValue::from_bytes(value.trim().as_bytes()) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        headers.append(header_name, header_value);
+    }
+    Ok((status_code, headers))
+}
+pub fn has_transfer_encoding(headers: &ProtocolHeaders) -> bool {
+    headers.contains_key(TRANSFER_ENCODING)
+}
+pub fn parse_content_length(headers: &ProtocolHeaders) -> Result<Option<usize>, ResponseError> {
+    let mut announced: Option<usize> = None;
+    for value in headers.get_all(CONTENT_LENGTH).iter() {
+        let Ok(value) = value.to_str() else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let length: usize = parse_ascii_length(value)
+            .map_err(|error: RequestError| ResponseError::Send(error.to_string()))?;
+        match announced {
+            Some(previous) if previous != length => {
+                return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
+            }
+            _ => announced = Some(length),
+        }
+    }
+    Ok(announced)
+}
+pub fn connection_nominated_headers(headers: &ProtocolHeaders) -> Vec<String> {
+    let mut nominated: Vec<String> = vec![CONNECTION.to_owned()];
+    for value in headers.get_all(CONNECTION).iter() {
+        let Ok(value) = value.to_str() else {
+            continue;
+        };
+        for token in value.split(COMMA_STR) {
+            let token: String = token.trim().to_ascii_lowercase();
+            if !token.is_empty() && !nominated.contains(&token) {
+                nominated.push(token);
+            }
+        }
+    }
+    nominated
+}
+pub(crate) async fn next_h2_capacity(
+    send_stream: &mut h2::SendStream<Bytes>,
+    wanted: usize,
+) -> Result<usize, ResponseError> {
+    send_stream.reserve_capacity(wanted);
+    loop {
+        let granted: Option<Result<usize, h2::Error>> =
+            poll_fn(|context: &mut task::Context<'_>| send_stream.poll_capacity(context)).await;
+        match granted {
+            Some(Ok(capacity)) => {
+                if capacity > 0 {
+                    return Ok(capacity.min(wanted));
+                }
+            }
+            Some(Err(error)) => return Err(ResponseError::Send(error.to_string())),
+            None => return Err(ResponseError::Send(MISSING_SEND_CAPACITY.to_owned())),
+        }
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/response/mod.rs
+```rust
+mod r#fn;
+pub(crate) use r#fn::*;
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/pump/fn.rs
+```rust
+use super::*;
+pub(crate) async fn pump_response<F>(
+    framer: &mut F,
+    mut reader: DuplexStream,
+    max_head_size: usize,
+    is_head: bool,
+) -> Result<(), ResponseError>
+where
+    F: ResponseFramer,
+{
+    let mut pending: Vec<u8> = Vec::new();
+    let mut read_chunk: Vec<u8> = vec![0; PROTOCOL_BODY_CHUNK];
+    let mut head: Option<FramedHead> = None;
+    let mut body_len: usize = 0;
+    let mut suppress_body: bool = is_head;
+    let mut announced_len: Option<usize> = None;
+    loop {
+        let read: usize = tokio::io::AsyncReadExt::read(&mut reader, &mut read_chunk).await?;
+        if read == 0 {
+            break;
+        }
+        if head.is_none() {
+            pending.extend_from_slice(&read_chunk[..read]);
+            let Some(body_start) = find_head_end(&pending) else {
+                if pending.len() > max_head_size {
+                    return Err(ResponseError::Send(RESPONSE_HEAD_TOO_LONG.to_owned()));
+                }
+                continue;
+            };
+            if body_start > max_head_size {
+                return Err(ResponseError::Send(RESPONSE_HEAD_TOO_LONG.to_owned()));
+            }
+            let (status_code, mut headers): (usize, ProtocolHeaders) =
+                parse_response_head(&pending[..body_start])?;
+            validate_status_code(status_code)?;
+            if has_transfer_encoding(&headers) {
+                return Err(ResponseError::Send(
+                    UNSUPPORTED_TRANSFER_ENCODING.to_owned(),
+                ));
+            }
+            announced_len = parse_content_length(&headers)?;
+            suppress_body = is_bodyless_status(status_code, is_head);
+            if hides_entity_length(status_code, is_head) {
+                headers.remove(CONTENT_LENGTH);
+            }
+            let head_body: &[u8] = if suppress_body {
+                &[]
+            } else {
+                &pending[body_start..]
+            };
+            let parsed: FramedHead = FramedHead {
+                status_code,
+                headers,
+            };
+            framer.send_head(&parsed, suppress_body).await?;
+            if !head_body.is_empty() {
+                let overflowed: bool = check_body_budget(announced_len, body_len, head_body.len());
+                body_len += head_body.len();
+                if overflowed {
+                    return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
+                }
+                framer.send_data(head_body).await?;
+            }
+            head = Some(parsed);
+            pending.clear();
+            continue;
+        }
+        if suppress_body {
+            continue;
+        }
+        let overflowed: bool = check_body_budget(announced_len, body_len, read);
+        body_len += read;
+        if overflowed {
+            return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
+        }
+        framer.send_data(&read_chunk[..read]).await?;
+    }
+    let Some(head) = head else {
+        return Err(ResponseError::Send(MISSING_RESPONSE_HEAD.to_owned()));
+    };
+    if !suppress_body
+        && let Some(announced) = announced_len
+        && body_len != announced
+    {
+        return Err(ResponseError::Send(TRUNCATED_RESPONSE_BODY.to_owned()));
+    }
+    framer.finish().await?;
+    let _framed: FramedHead = head;
+    let _forwarded: usize = body_len;
+    Ok(())
+}
+pub(crate) fn hides_entity_length(status_code: usize, _is_head: bool) -> bool {
+    status_code < HttpStatus::Ok.code() || status_code == HttpStatus::NoContent.code()
+}
+pub(crate) fn check_body_budget(
+    announced_len: Option<usize>,
+    forwarded: usize,
+    incoming: usize,
+) -> bool {
+    match announced_len {
+        Some(announced) => forwarded.saturating_add(incoming) > announced,
+        None => false,
+    }
+}
+pub(crate) fn validate_status_code(status_code: usize) -> Result<(), ResponseError> {
+    let is_code: bool = (MIN_STATUS_CODE..=MAX_STATUS_CODE).contains(&status_code);
+    if !is_code {
+        return Err(ResponseError::Send(INVALID_RESPONSE_STATUS.to_owned()));
+    }
+    Ok(())
+}
+```
+# Path: hyperlane/core/src/protocol/pump/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, DisplayDebug)]
+pub(crate) struct FramedHead {
+    pub(crate) status_code: usize,
+    pub(crate) headers: ProtocolHeaders,
+}
+```
+# Path: hyperlane/core/src/protocol/pump/mod.rs
+```rust
+mod r#fn;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/framing/trait.rs
+```rust
+use super::*;
+pub(crate) trait ResponseFramer {
+    fn send_head<'a>(
+        &'a mut self,
+        head: &'a FramedHead,
+        bodyless: bool,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>>;
+    fn send_data<'a>(
+        &'a mut self,
+        data: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>>;
+    fn finish<'a>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>>;
+}
+```
+# Path: hyperlane/core/src/protocol/framing/mod.rs
+```rust
+mod r#trait;
+pub(crate) use r#trait::*;
+use super::*;
+```
+# Path: hyperlane/core/src/listener/const.rs
+```rust
+pub(crate) const QUIC_CLOSE_CODE: u32 = 0;
+pub(crate) const QUIC_CLOSE_REASON: &[u8] = b"hyperlane server shutdown";
+pub(crate) const SERVER_STOPPED: bool = true;
+pub(crate) const SERVER_RUNNING: bool = false;
+pub(crate) const H2_HANDSHAKE_TIMEOUT: &str = "http2 handshake exceeded the read timeout";
+pub(crate) const NO_TIMEOUT_MS: u64 = u64::MAX;
+```
+# Path: hyperlane/core/src/listener/fn.rs
+```rust
+use super::*;
+pub(crate) async fn tcp_accept(
+    env: ConnectionEnv,
+    stream_tls: Option<Arc<rustls::ServerConfig>>,
+    signal: AcceptSignal,
+) {
+    let AcceptSignal {
+        listener: tcp_listener,
+        mut shutdown_receiver,
+        running_sender,
+    } = signal;
+    loop {
+        let accepted: Option<(TcpStream, SocketAddr)> = tokio::select! {
+            biased;
+            _ = shutdown_receiver.changed() => None,
+            accepted = tcp_listener.accept() => accepted.ok(),
+        };
+        let Some((stream, remote)) = accepted else {
+            break;
+        };
+        let env: ConnectionEnv = env.clone();
+        let tls: Option<Arc<rustls::ServerConfig>> = stream_tls.clone();
+        spawn(async move {
+            serve_tcp_connection(env, tls, stream, remote).await;
+        });
+    }
+    drop(tcp_listener);
+    let _: Result<(), tokio::sync::watch::error::SendError<bool>> =
+        running_sender.send(SERVER_STOPPED);
+}
+pub(crate) async fn serve_tcp_connection(
+    env: ConnectionEnv,
+    stream_tls: Option<Arc<rustls::ServerConfig>>,
+    stream: TcpStream,
+    remote: SocketAddr,
+) {
+    let local: Option<SocketAddr> = stream.local_addr().ok();
+    configure_socket(&stream, &env.server);
+    let peers: StreamPeers = StreamPeers {
+        local: local.unwrap_or(remote),
+        remote,
+    };
+    let Some(tls) = stream_tls else {
+        serve_plain_tcp(env, peers, stream).await;
+        return;
+    };
+    let Ok(handshake) =
+        bounded_handshake(env.request_config, TlsAcceptor::from(tls).accept(stream)).await
+    else {
+        return;
+    };
+    let Ok(handshake) = handshake else {
+        return;
+    };
+    if !negotiated_protocol_matches(&handshake, &env.protocol) {
+        return;
+    }
+    serve_tls_stream(env, peers, TlsTransport::new(handshake)).await;
+}
+pub(crate) fn negotiated_protocol_matches(
+    session: &tokio_rustls::server::TlsStream<TcpStream>,
+    protocol: &ServerProtocol,
+) -> bool {
+    let (_, connection): (&TcpStream, &rustls::ServerConnection) = session.get_ref();
+    match connection.alpn_protocol() {
+        Some(negotiated) => negotiated == protocol.get_alpn_protocol(),
+        None => protocol != &ServerProtocol::Http2,
+    }
+}
+pub(crate) fn negotiated_quic_protocol_matches(connection: &quinn::Connection) -> bool {
+    let Some(handshake) = connection.handshake_data() else {
+        return false;
+    };
+    match handshake.downcast::<quinn::crypto::rustls::HandshakeData>() {
+        Ok(data) => data.protocol.as_deref() == Some(ServerProtocol::Http3.get_alpn_protocol()),
+        Err(_) => false,
+    }
+}
+pub(crate) async fn bounded_handshake<F, T>(
+    request_config: RequestConfig,
+    handshake: F,
+) -> Result<T, tokio::time::error::Elapsed>
+where
+    F: Future<Output = T>,
+{
+    let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
+    if read_timeout_ms == NO_TIMEOUT_MS {
+        return Ok(handshake.await);
+    }
+    timeout(Duration::from_millis(read_timeout_ms), handshake).await
+}
+pub(crate) fn configure_socket(stream: &TcpStream, server: &Arc<Server>) {
+    let server_config: &ServerConfig = server.get_server_config();
+    if let Some(nodelay) = server_config.get_nodelay() {
+        let _: Result<(), io::Error> = stream.set_nodelay(nodelay);
+    }
+    if let Some(ttl) = server_config.get_ttl() {
+        let _: Result<(), io::Error> = stream.set_ttl(ttl);
+    }
+}
+pub(crate) async fn serve_plain_tcp(env: ConnectionEnv, peers: StreamPeers, stream: TcpStream) {
+    match env.protocol {
+        ServerProtocol::Http2 => {
+            let handshake: Result<ConnectionH2<TcpStream>, String> =
+                bounded_handshake(env.request_config, h2::server::handshake(stream))
+                    .await
+                    .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
+                    .and_then(|connection: Result<_, H2Error>| {
+                        connection.map_err(|error: H2Error| error.to_string())
+                    });
+            serve_h2_connection(env, peers, handshake).await;
+        }
+        _ => {
+            serve_h1_connection(env.server, env.request_config, stream).await;
+        }
+    }
+}
+pub(crate) async fn serve_tls_stream(
+    env: ConnectionEnv,
+    peers: StreamPeers,
+    transport: TlsTransport,
+) {
+    match env.protocol {
+        ServerProtocol::Http2 => {
+            let session: TlsTransport = transport;
+            let handshake: Result<ConnectionH2<TlsTransport>, String> =
+                bounded_handshake(env.request_config, h2::server::handshake(session))
+                    .await
+                    .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
+                    .and_then(|connection: Result<_, H2Error>| {
+                        connection.map_err(|error: H2Error| error.to_string())
+                    });
+            serve_h2_connection(env, peers, handshake).await;
+        }
+        _ => {
+            serve_h1_transport(env.server, env.request_config, transport).await;
+        }
+    }
+}
+pub(crate) async fn quic_accept(
+    env: ConnectionEnv,
+    endpoint: Endpoint,
+    mut shutdown_receiver: Receiver<()>,
+    running_sender: Sender<bool>,
+) -> Result<(), Box<ServerError>> {
+    let local: SocketAddr = endpoint
+        .local_addr()
+        .map_err(|error: io::Error| ServerError::from(error))?;
+    loop {
+        let connecting: Option<Incoming> = tokio::select! {
+            biased;
+            _ = shutdown_receiver.changed() => None,
+            accepted = endpoint.accept() => accepted,
+        };
+        let Some(connecting) = connecting else {
+            break;
+        };
+        let remote: SocketAddr = connecting.remote_address();
+        let env: ConnectionEnv = env.clone();
+        spawn(async move {
+            let Ok(connection) = connecting.await else {
+                return;
+            };
+            if !negotiated_quic_protocol_matches(&connection) {
+                connection.close(VarInt::from_u32(QUIC_CLOSE_CODE), QUIC_CLOSE_REASON);
+                return;
+            }
+            let Ok(h3_connection) = h3::server::Connection::<h3_quinn::Connection, Bytes>::new(
+                h3_quinn::Connection::new(connection),
+            )
+            .await
+            else {
+                return;
+            };
+            serve_h3_connection(env, StreamPeers { local, remote }, h3_connection).await;
+        });
+    }
+    let close_code: VarInt = VarInt::from_u32(QUIC_CLOSE_CODE);
+    endpoint.close(close_code, QUIC_CLOSE_REASON);
+    endpoint.wait_idle().await;
+    drop(endpoint);
+    let _: Result<(), tokio::sync::watch::error::SendError<bool>> =
+        running_sender.send(SERVER_STOPPED);
+    Ok(())
+}
+pub(crate) async fn serve_h1_connection(
+    server: Arc<Server>,
+    request_config: RequestConfig,
+    stream: TcpStream,
+) {
+    let mut stream: Stream = Stream::new(stream, request_config, false);
+    serve_h1_stream(server, &mut stream).await;
+}
+pub(crate) async fn serve_h1_transport(
+    server: Arc<Server>,
+    request_config: RequestConfig,
+    transport: TlsTransport,
+) {
+    let mut stream: Stream = Stream::from_transport(transport, request_config, false);
+    serve_h1_stream(server, &mut stream).await;
+    let closed: Result<Result<(), io::Error>, tokio::time::error::Elapsed> =
+        bounded_handshake(request_config, stream.get_mut_stream().shutdown()).await;
+    match closed {
+        Ok(Ok(())) => {}
+        Ok(Err(_)) => {}
+        Err(_) => {}
+    }
+}
+pub(crate) async fn serve_h1_stream(server: Arc<Server>, stream: &mut Stream) {
+    server.serve_h1_connection_stream(stream).await;
+}
+pub(crate) async fn catch_connection_panic<F>(connection: F) -> Option<PanicData>
+where
+    F: Future<Output = ()>,
+{
+    match AssertUnwindSafe(connection).catch_unwind().await {
+        Ok(()) => None,
+        Err(payload) => Some(panic_data_from_payload(payload)),
+    }
+}
+pub(crate) fn panic_data_from_payload(payload: Box<dyn Any + Send>) -> PanicData {
+    match payload.downcast::<String>() {
+        Ok(message) => PanicData::new(Some(*message), None, None),
+        Err(payload) => match payload.downcast::<&'static str>() {
+            Ok(message) => PanicData::new(Some((*message).to_owned()), None, None),
+            Err(_) => PanicData::new(None, None, None),
+        },
+    }
+}
+```
+# Path: hyperlane/core/src/listener/struct.rs
+```rust
+use super::*;
+#[derive(Debug)]
+pub(crate) struct AcceptSignal {
+    pub(crate) listener: TcpListener,
+    pub(crate) shutdown_receiver: Receiver<()>,
+    pub(crate) running_sender: Sender<bool>,
+}
+```
+# Path: hyperlane/core/src/listener/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#struct;
+pub(crate) use {r#const::*, r#fn::*, r#struct::*};
 use super::*;
 ```
 # Path: hyperlane/plugin/websocket/README.md
@@ -14990,27 +21827,27 @@ pub enum BroadcastType<T: BroadcastTypeTrait> {
 use super::*;
 #[derive(Clone, Data, Debug, Default)]
 pub struct WebSocket {
-    pub(super) broadcast_map: BroadcastMap<Vec<u8>>,
+    pub broadcast_map: BroadcastMap<Vec<u8>>,
 }
 #[derive(Data)]
 pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
     #[set(skip)]
-    pub(super) stream: &'a mut Stream,
+    pub stream: &'a mut Stream,
     #[set(skip)]
-    pub(super) context: &'a mut Context,
+    pub context: &'a mut Context,
     #[get(type(copy))]
     #[set(skip)]
-    pub(super) capacity: Capacity,
+    pub capacity: Capacity,
     #[set(skip)]
-    pub(super) broadcast_type: BroadcastType<B>,
+    pub broadcast_type: BroadcastType<B>,
     #[set(skip)]
-    pub(super) connected_hook: ServerHookHandler,
+    pub connected_hook: ServerHookHandler,
     #[set(skip)]
-    pub(super) request_hook: ServerHookHandler,
+    pub request_hook: ServerHookHandler,
     #[set(skip)]
-    pub(super) sended_hook: ServerHookHandler,
+    pub sended_hook: ServerHookHandler,
     #[set(skip)]
-    pub(super) closed_hook: ServerHookHandler,
+    pub closed_hook: ServerHookHandler,
 }
 ```
 # Path: hyperlane/src/lib.rs
@@ -20144,19 +26981,26 @@ mod websocket_frame;
 use http_type::*;
 use std::{
     collections::VecDeque,
+    fmt::{self, Debug, Formatter},
     io::{self, ErrorKind},
     mem,
+    net::SocketAddr,
     num::ParseIntError,
+    pin::Pin,
     ptr,
     rc::Rc,
+    result::Result,
     sync::{
         Arc,
         atomic::{self, AtomicBool, AtomicUsize},
     },
+    task::{Context, Poll},
 };
 use {
     serde::Deserialize,
     tokio::{
+        io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf, duplex},
+        net::{TcpListener, TcpStream},
         runtime::Handle,
         spawn,
         sync::{RwLockReadGuard, RwLockWriteGuard},
@@ -22093,10 +28937,176 @@ fn test_socket_port_type_alias() {
     let socket_port: SocketPort = 8080;
     assert_eq!(socket_port, 8080_u16);
 }
+#[tokio::test]
+async fn test_from_transport_wraps_duplex_as_transport() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(64);
+    let config: RequestConfig = RequestConfig::default();
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    assert!(!stream.get_closed());
+    assert!(stream.is_keep_alive(true));
+    assert!(!stream.is_keep_alive(false));
+    let sent: Vec<u8> = b"ping".to_vec();
+    assert!(stream.try_send(&sent).await.is_ok());
+    assert!(stream.try_flush().await.is_ok());
+    let mut received: Vec<u8> = vec![0_u8; 4];
+    client.read_exact(&mut received).await.unwrap();
+    assert_eq!(received, b"ping".to_vec());
+}
+#[tokio::test]
+async fn test_from_transport_reads_http_request_over_duplex() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(1024);
+    let raw: Vec<u8> = b"GET /trans HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec();
+    client.write_all(&raw).await.unwrap();
+    let config: RequestConfig = RequestConfig::default();
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    let request: Request = stream.try_get_http_request().await.unwrap();
+    assert_eq!(*request.get_method(), RequestMethod::Get);
+    assert_eq!(*request.get_path(), "/trans");
+    assert_eq!(*request.get_version(), RequestVersion::Http1_1);
+    assert_eq!(*request.get_host(), "localhost");
+    assert!(request.get_body().is_empty());
+}
+#[tokio::test]
+async fn test_from_transport_send_list_over_duplex() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(64);
+    let config: RequestConfig = RequestConfig::default();
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    let parts: Vec<&[u8]> = vec![b"HTTP/1.1 200 OK\r\n", b"Content-Length: 0\r\n\r\n"];
+    assert!(stream.try_send_list(parts).await.is_ok());
+    assert!(stream.try_flush().await.is_ok());
+    let mut received: Vec<u8> = vec![0_u8; 38];
+    client.read_exact(&mut received).await.unwrap();
+    assert_eq!(&received[..4], b"HTTP");
+    assert_eq!(&received[36..], b"\r\n");
+}
+#[tokio::test]
+async fn test_from_transport_closed_rejects_writes() {
+    let (_client, server): (DuplexStream, DuplexStream) = duplex(64);
+    let config: RequestConfig = RequestConfig::default();
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, true);
+    assert!(stream.get_closed());
+    assert!(!stream.is_keep_alive(true));
+    assert!(stream.try_send(b"nope").await.is_err());
+    assert!(stream.try_send_list(vec![b"nope"]).await.is_err());
+    assert!(stream.try_flush().await.is_err());
+    assert!(stream.try_get_http_request().await.is_err());
+}
+#[tokio::test]
+async fn test_from_transport_transport_without_socket_address_reports_error() {
+    let (_client, server): (DuplexStream, DuplexStream) = duplex(64);
+    let config: RequestConfig = RequestConfig::default();
+    let stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    assert!(stream.get_peer_addr().is_err());
+    assert!(stream.get_local_addr().is_err());
+    assert!(stream.get_stream().peer_addr().is_err());
+    assert!(stream.get_stream().local_addr().is_err());
+}
+#[tokio::test]
+async fn test_new_tcp_stream_reports_peer_and_local_address() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let bound: SocketAddr = listener.local_addr().unwrap();
+    let client: TcpStream = TcpStream::connect(bound).await.unwrap();
+    let (server, peer): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+    assert_ne!(peer, bound);
+    let config: RequestConfig = RequestConfig::default();
+    let stream: Stream = Stream::new(server, config, false);
+    assert_eq!(stream.get_peer_addr().unwrap(), peer);
+    assert_eq!(stream.get_local_addr().unwrap(), bound);
+    assert_eq!(stream.get_stream().peer_addr().unwrap(), peer);
+    drop(client);
+}
+#[tokio::test]
+async fn test_new_tcp_stream_parses_request_over_socket() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let bound: SocketAddr = listener.local_addr().unwrap();
+    let mut client: TcpStream = TcpStream::connect(bound).await.unwrap();
+    let (server, peer): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+    let raw: Vec<u8> =
+        b"POST /tcp HTTP/1.1\r\nHost: localhost\r\nContent-Length: 4\r\n\r\nbody".to_vec();
+    client.write_all(&raw).await.unwrap();
+    let config: RequestConfig = RequestConfig::default();
+    let mut stream: Stream = Stream::new(server, config, false);
+    let request: Request = stream.try_get_http_request().await.unwrap();
+    assert_eq!(*request.get_method(), RequestMethod::Post);
+    assert_eq!(*request.get_path(), "/tcp");
+    assert_eq!(request.get_body(), b"body");
+    assert_eq!(stream.get_peer_addr().unwrap(), peer);
+    assert_eq!(stream.get_local_addr().unwrap(), bound);
+    let response: Vec<u8> = b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_vec();
+    assert!(stream.try_send(&response).await.is_ok());
+    assert!(stream.try_flush().await.is_ok());
+    let mut echoed: Vec<u8> = vec![0_u8; 38];
+    client.read_exact(&mut echoed).await.unwrap();
+    assert_eq!(&echoed[..4], b"HTTP");
+}
+#[tokio::test]
+async fn test_from_transport_keeps_pipelined_request_in_leftover() {
+    let (mut client, server): (DuplexStream, DuplexStream) = duplex(2048);
+    let first: Vec<u8> = b"GET /one HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec();
+    let second: Vec<u8> = b"GET /two HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec();
+    client.write_all(&[first, second].concat()).await.unwrap();
+    let config: RequestConfig = RequestConfig::default();
+    let mut stream: Stream = Stream::from_transport(TestTransport::new(server), config, false);
+    let one: Request = stream.try_get_http_request().await.unwrap();
+    assert_eq!(*one.get_path(), "/one");
+    let two: Request = stream.try_get_http_request().await.unwrap();
+    assert_eq!(*two.get_path(), "/two");
+}
+```
+# Path: hyperlane/type/tests/stream/struct.rs
+```rust
+use super::*;
+pub(crate) struct TestTransport {
+    stream: DuplexStream,
+}
+impl TestTransport {
+    pub(crate) fn new(stream: DuplexStream) -> Self {
+        Self { stream }
+    }
+}
+impl Transport for TestTransport {
+    fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        Err(ErrorKind::Unsupported.into())
+    }
+    fn local_addr(&self) -> Result<SocketAddr, io::Error> {
+        Err(ErrorKind::Unsupported.into())
+    }
+}
+impl AsyncRead for TestTransport {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().stream).poll_read(cx, buf)
+    }
+}
+impl AsyncWrite for TestTransport {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.get_mut().stream).poll_write(cx, buf)
+    }
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().stream).poll_flush(cx)
+    }
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().stream).poll_shutdown(cx)
+    }
+}
+impl Debug for TestTransport {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("TestTransport")
+    }
+}
 ```
 # Path: hyperlane/type/tests/stream/mod.rs
 ```rust
 mod r#fn;
+mod r#struct;
+use r#struct::*;
 use super::*;
 ```
 # Path: hyperlane/type/tests/http_version/fn.rs
@@ -23739,7 +30749,7 @@ use std::{
     hash::Hash,
     io::{self, ErrorKind},
     mem,
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     num::ParseIntError,
     pin::Pin,
     rc::Rc,
@@ -23758,7 +30768,10 @@ use {
     lombok_macros::*,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
     tokio::{
-        io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, ReadBuf},
+        io::{
+            AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+            ReadBuf,
+        },
         net::TcpStream,
         runtime::Handle,
         sync::{
@@ -25872,26 +32885,26 @@ use super::*;
 #[derive(Clone, Data, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CookieBuilder {
     #[set(type(AsRef<str>))]
-    pub(super) name: CookieKey,
+    pub name: CookieKey,
     #[set(type(AsRef<str>))]
-    pub(super) value: CookieValue,
+    pub value: CookieValue,
     #[set(skip)]
-    pub(super) expires: Option<String>,
+    pub expires: Option<String>,
     #[get(type(copy))]
     #[set(skip)]
-    pub(super) max_age: Option<i64>,
+    pub max_age: Option<i64>,
     #[set(skip)]
-    pub(super) domain: Option<String>,
+    pub domain: Option<String>,
     #[set(skip)]
-    pub(super) path: Option<String>,
+    pub path: Option<String>,
     #[get(type(copy))]
     #[set(skip)]
-    pub(super) secure: Option<bool>,
+    pub secure: Option<bool>,
     #[get(type(copy))]
     #[set(skip)]
-    pub(super) http_only: Option<bool>,
+    pub http_only: Option<bool>,
     #[set(skip)]
-    pub(super) same_site: Option<String>,
+    pub same_site: Option<String>,
 }
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Cookie;
@@ -26789,9 +33802,7 @@ pub struct RequestConfig {
     #[get(type(copy))]
     pub read_timeout_ms: u64,
 }
-#[derive(
-    Clone, Debug, Deserialize, DisplayDebug, Eq, Getter, GetterMut, PartialEq, Serialize, Setter,
-)]
+#[derive(Clone, Data, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub struct Request {
     pub method: RequestMethod,
     pub host: RequestHost,
@@ -26895,6 +33906,14 @@ impl Lifetime for Stream {
         address.into()
     }
 }
+impl Transport for TcpStream {
+    fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        TcpStream::peer_addr(self)
+    }
+    fn local_addr(&self) -> Result<SocketAddr, io::Error> {
+        TcpStream::local_addr(self)
+    }
+}
 impl Drop for PooledReader<'_> {
     fn drop(&mut self) {
         let buffer: Vec<u8> = mem::take(self.get_mut_buffer());
@@ -26908,11 +33927,11 @@ impl AsyncRead for PooledReader<'_> {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let this: &mut Self = self.get_mut();
-        if *this.get_start() < *this.get_end() {
-            let available: usize = *this.get_end() - *this.get_start();
+        if this.get_start() < this.get_end() {
+            let available: usize = this.get_end() - this.get_start();
             let amount: usize = available.min(buf.remaining());
-            let end: usize = *this.get_start() + amount;
-            buf.put_slice(&this.get_buffer()[*this.get_start()..end]);
+            let end: usize = this.get_start() + amount;
+            buf.put_slice(&this.get_buffer()[this.get_start()..end]);
             this.set_start(end);
             return Poll::Ready(Ok(()));
         }
@@ -26944,11 +33963,35 @@ impl AsyncBufRead for PooledReader<'_> {
     }
     fn consume(self: Pin<&mut Self>, amount: usize) {
         let this: &mut Self = self.get_mut();
-        let new_start: usize = (*this.get_start() + amount).min(*this.get_end());
+        let new_start: usize = (this.get_start() + amount).min(this.get_end());
         this.set_start(new_start);
     }
 }
 impl Stream {
+    pub fn from_transport<T>(transport: T, request_config: RequestConfig, closed: bool) -> Self
+    where
+        T: Transport + 'static,
+    {
+        Self {
+            stream: Box::new(transport),
+            request_config,
+            closed,
+            leftover: Vec::new(),
+            leftover_start: 0,
+            leftover_end: 0,
+        }
+    }
+    pub fn new(stream: TcpStream, request_config: RequestConfig, closed: bool) -> Self {
+        Self::from_transport(stream, request_config, closed)
+    }
+    #[inline(always)]
+    pub fn get_peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        self.get_stream().peer_addr()
+    }
+    #[inline(always)]
+    pub fn get_local_addr(&self) -> Result<SocketAddr, io::Error> {
+        self.get_stream().local_addr()
+    }
     #[inline(always)]
     pub fn is_keep_alive(&self, keep_alive: bool) -> bool {
         !self.get_closed() && keep_alive
@@ -26995,8 +34038,8 @@ impl Stream {
         request.set_method(method);
         request.set_version(version);
         Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
-        let reader_start: usize = *reader.get_start();
-        let reader_end: usize = *reader.get_end();
+        let reader_start: usize = reader.get_start();
+        let reader_end: usize = reader.get_end();
         let pending: Vec<u8> = if reader_start < reader_end {
             reader.get_buffer()[reader_start..reader_end].to_vec()
         } else {
@@ -27091,7 +34134,7 @@ impl Stream {
         duration_opt: Option<Duration>,
         is_client_response: &mut bool,
     ) -> Result<Option<usize>, RequestError> {
-        let stream: &mut TcpStream = self.get_mut_stream();
+        let stream: &mut Box<dyn Transport> = self.get_mut_stream();
         if let Some(duration) = duration_opt {
             return match timeout(duration, stream.read(buffer)).await {
                 Ok(result) => match result {
@@ -27136,7 +34179,7 @@ impl Stream {
         if self.get_closed() {
             return Err(ResponseError::ConnectionClosed);
         }
-        let stream: &mut TcpStream = self.get_mut_stream();
+        let stream: &mut Box<dyn Transport> = self.get_mut_stream();
         for data in data_iter {
             stream.write_all(data.as_ref()).await?;
         }
@@ -27158,6 +34201,14 @@ impl Stream {
     pub async fn flush(&mut self) {
         self.try_flush().await.unwrap();
     }
+}
+```
+# Path: hyperlane/type/src/stream/trait.rs
+```rust
+use super::*;
+pub trait Transport: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync {
+    fn peer_addr(&self) -> Result<SocketAddr, io::Error>;
+    fn local_addr(&self) -> Result<SocketAddr, io::Error>;
 }
 ```
 # Path: hyperlane/type/src/stream/fn.rs
@@ -27206,11 +34257,9 @@ thread_local! {
 # Path: hyperlane/type/src/stream/struct.rs
 ```rust
 use super::*;
-#[derive(CustomDebug, Data, DisplayDebug, New)]
+#[derive(CustomDebug, Data, DisplayDebug)]
 pub struct Stream {
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) stream: TcpStream,
+    pub stream: Box<dyn Transport>,
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) request_config: RequestConfig,
@@ -27219,17 +34268,14 @@ pub struct Stream {
     pub(super) closed: bool,
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    #[new(skip)]
     pub(super) leftover: Vec<u8>,
     #[get(type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    #[new(skip)]
     pub(super) leftover_start: usize,
     #[get(type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    #[new(skip)]
     pub(super) leftover_end: usize,
 }
 #[derive(Data, New)]
@@ -27237,17 +34283,17 @@ pub(crate) struct PooledReader<'a> {
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
-    pub(super) stream: &'a mut TcpStream,
+    pub(super) stream: &'a mut Box<dyn Transport>,
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) buffer: Vec<u8>,
-    #[get(pub(super))]
+    #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     #[new(skip)]
     pub(super) start: usize,
-    #[get(pub(super))]
+    #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     #[new(skip)]
@@ -27260,8 +34306,9 @@ mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
+mod r#trait;
 mod r#type;
-pub use {r#struct::*, r#type::*};
+pub use {r#struct::*, r#trait::*, r#type::*};
 pub(crate) use {r#fn::*, r#static::*};
 use super::*;
 ```
@@ -27824,9 +34871,9 @@ use super::*;
     Clone, CustomDebug, Default, Deserialize, DisplayDebug, Eq, Getter, PartialEq, Serialize, New,
 )]
 pub struct PanicData {
-    pub(super) message: Option<String>,
-    pub(super) location: Option<String>,
-    pub(super) payload: Option<String>,
+    pub message: Option<String>,
+    pub location: Option<String>,
+    pub payload: Option<String>,
 }
 ```
 # Path: hyperlane/type/src/panic/mod.rs
@@ -28243,9 +35290,7 @@ pub enum ResponseError {
 # Path: hyperlane/type/src/response/struct.rs
 ```rust
 use super::*;
-#[derive(
-    Clone, Debug, Deserialize, DisplayDebug, Eq, Getter, GetterMut, PartialEq, Serialize, Setter,
-)]
+#[derive(Clone, Data, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub struct Response {
     pub version: ResponseVersion,
     #[get(type(copy))]
@@ -28608,7 +35653,7 @@ impl WebSocketFrame {
     ) -> Result<Option<RequestBody>, RequestError> {
         let payload_data: &[u8] = self.get_payload_data();
         full_frame.extend_from_slice(payload_data);
-        if *self.get_fin() {
+        if self.get_fin() {
             return Ok(Some(full_frame.clone()));
         }
         Ok(None)
@@ -28635,8 +35680,10 @@ pub enum WebSocketOpcode {
 use super::*;
 #[derive(Clone, Debug, DisplayDebug, Eq, Getter, PartialEq)]
 pub struct WebSocketFrame {
+    #[get(type(copy))]
     pub fin: bool,
     pub opcode: WebSocketOpcode,
+    #[get(type(copy))]
     pub mask: bool,
     pub payload_data: Vec<u8>,
 }
