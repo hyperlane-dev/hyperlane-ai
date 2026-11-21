@@ -1,4 +1,4 @@
-<!--2026-11-21 06:18:31-->
+<!--2026-11-21 18:54:08-->
 # Path: hyperlane/README.md
 <p align="center">
 </p>
@@ -120,7 +120,7 @@ use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
 };
-use {core::hash::BuildHasherDefault, core::hash::Hasher};
+use {core::hash::BuildHasherDefault, core::hash::Hasher, twox_hash::xxhash3_64};
 ```
 # Path: hyperlane/compress/tests/compress/mod.rs
 ```rust
@@ -324,8 +324,7 @@ fn xx_hash3_64_matches_the_allocating_hasher() {
         let mut stack_hasher: XxHash3_64 = XxHash3_64::default();
         stack_hasher.write(sample.as_bytes());
         let stack_hash: u64 = stack_hasher.finish();
-        let mut allocating_hasher: twox_hash::xxhash3_64::Hasher =
-            twox_hash::xxhash3_64::Hasher::default();
+        let mut allocating_hasher: xxhash3_64::Hasher = xxhash3_64::Hasher::default();
         allocating_hasher.write(sample.as_bytes());
         let allocating_hash: u64 = allocating_hasher.finish();
         assert_eq!(
@@ -342,6 +341,30 @@ fn xx_hash3_64_does_not_allocate() {
     let mut reused: XxHash3_64 = XxHash3_64::default();
     reused.write(b"content-length");
     let _: u64 = reused.finish();
+}
+#[test]
+fn xx_hash3_64_preserves_every_prefix_and_write_partition() {
+    let bytes: Vec<u8> = (0..2048)
+        .map(|offset: usize| (offset % 251) as u8)
+        .collect();
+    for length in [0, 1, 7, 16, 64, 127, 128, 129, 240, 241, 1024, 2048] {
+        for width in [1, 7, 16, 63, 128, 129, 1024] {
+            let mut actual: XxHash3_64 = XxHash3_64::default();
+            let mut expected: xxhash3_64::Hasher = xxhash3_64::Hasher::default();
+            for chunk in bytes[..length].chunks(width) {
+                actual.write(chunk);
+                expected.write(chunk);
+                assert_eq!(actual.finish(), expected.finish());
+                assert_eq!(actual.clone().finish(), expected.finish());
+            }
+            actual.write(&[]);
+            expected.write(&[]);
+            assert_eq!(actual.finish(), expected.finish());
+            actual.write_u8(255);
+            expected.write_u8(255);
+            assert_eq!(actual.finish(), expected.finish());
+        }
+    }
 }
 #[test]
 fn xx_hash3_64_hashes_a_map() {
@@ -369,6 +392,8 @@ use std::{
     collections::HashMap,
     fmt,
     io::{self, BufReader, BufWriter, Read, prelude::*},
+    mem::MaybeUninit,
+    ptr, slice,
     str::FromStr,
 };
 use {
@@ -379,7 +404,7 @@ use {
         read::{DeflateDecoder, GzDecoder},
         write::{DeflateEncoder, GzEncoder},
     },
-    twox_hash::xxhash3_64::{DEFAULT_SECRET_LENGTH, RawHasher, SecretBuffer},
+    twox_hash::xxhash3_64::{self, DEFAULT_SECRET_LENGTH, RawHasher, SecretBuffer},
 };
 ```
 # Path: hyperlane/compress/src/compress/impl.rs
@@ -567,44 +592,134 @@ pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
 ```rust
 use super::*;
 impl Default for XxHash3_64 {
+    #[inline(always)]
     fn default() -> Self {
         Self {
-            inner: RawHasher::new(SecretBuffer::default()),
+            inner: None,
+            prefix: [const { MaybeUninit::uninit() }; HASH_PREFIX_CAPACITY],
+            prefix_len: 0,
         }
     }
 }
-impl XxHash3_64 {
-    pub(crate) fn get_inner(&self) -> &RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]> {
-        &self.inner
-    }
-    pub(crate) fn get_mut_inner(&mut self) -> &mut RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]> {
-        &mut self.inner
+impl Clone for XxHash3_64 {
+    #[inline(always)]
+    fn clone(&self) -> Self {
+        let Self {
+            inner,
+            prefix: src_prefix,
+            prefix_len,
+        } = self;
+        let mut prefix: [MaybeUninit<u8>; HASH_PREFIX_CAPACITY] =
+            [const { MaybeUninit::uninit() }; HASH_PREFIX_CAPACITY];
+        let len: usize = *prefix_len;
+        if inner.is_none() && len > 0 {
+            unsafe {
+                ptr::copy_nonoverlapping(src_prefix.as_ptr(), prefix.as_mut_ptr(), len);
+            }
+        }
+        Self {
+            inner: inner.clone(),
+            prefix,
+            prefix_len: len,
+        }
     }
 }
 impl core::hash::Hasher for XxHash3_64 {
-    #[inline]
+    #[inline(always)]
     fn write(&mut self, bytes: &[u8]) {
-        self.get_mut_inner().write(bytes);
+        let Self {
+            inner,
+            prefix,
+            prefix_len,
+        } = self;
+        if let Some(hasher) = inner {
+            hasher.write(bytes);
+            return;
+        }
+        let current_len: usize = *prefix_len;
+        let incoming_len: usize = bytes.len();
+        if incoming_len <= HASH_PREFIX_CAPACITY - current_len {
+            unsafe {
+                ptr::copy_nonoverlapping(
+                    bytes.as_ptr(),
+                    prefix.as_mut_ptr().add(current_len).cast::<u8>(),
+                    incoming_len,
+                );
+            }
+            *prefix_len = current_len + incoming_len;
+            return;
+        }
+        let mut hasher: RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]> =
+            RawHasher::new(SecretBuffer::default());
+        let initialized: &[u8] =
+            unsafe { slice::from_raw_parts(prefix.as_ptr().cast::<u8>(), current_len) };
+        hasher.write(initialized);
+        hasher.write(bytes);
+        *inner = Some(hasher);
     }
-    #[inline]
+    #[inline(always)]
+    fn write_u8(&mut self, value: u8) {
+        let Self {
+            inner,
+            prefix,
+            prefix_len,
+        } = self;
+        if let Some(hasher) = inner {
+            hasher.write_u8(value);
+            return;
+        }
+        let current_len: usize = *prefix_len;
+        if current_len < HASH_PREFIX_CAPACITY {
+            prefix[current_len].write(value);
+            *prefix_len = current_len + 1;
+            return;
+        }
+        let mut hasher: RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]> =
+            RawHasher::new(SecretBuffer::default());
+        let initialized: &[u8] =
+            unsafe { slice::from_raw_parts(prefix.as_ptr().cast::<u8>(), current_len) };
+        hasher.write(initialized);
+        hasher.write_u8(value);
+        *inner = Some(hasher);
+    }
+    #[inline(always)]
     fn finish(&self) -> u64 {
-        self.get_inner().finish()
+        let Self {
+            inner,
+            prefix,
+            prefix_len,
+        } = self;
+        match inner {
+            Some(hasher) => hasher.finish(),
+            None => {
+                let initialized: &[u8] =
+                    unsafe { slice::from_raw_parts(prefix.as_ptr().cast::<u8>(), *prefix_len) };
+                xxhash3_64::Hasher::oneshot(initialized)
+            }
+        }
     }
 }
 ```
+# Path: hyperlane/compress/src/xx_hash3_64/const.rs
+```rust
+pub(crate) const HASH_PREFIX_CAPACITY: usize = 128;
+```
 # Path: hyperlane/compress/src/xx_hash3_64/mod.rs
 ```rust
+mod r#const;
 mod r#impl;
 mod r#struct;
 pub use r#struct::*;
+pub(super) use r#const::*;
 use super::*;
 ```
 # Path: hyperlane/compress/src/xx_hash3_64/struct.rs
 ```rust
 use super::*;
-#[derive(Clone)]
 pub struct XxHash3_64 {
-    pub(super) inner: RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>,
+    pub(super) inner: Option<RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>>,
+    pub(super) prefix: [MaybeUninit<u8>; HASH_PREFIX_CAPACITY],
+    pub(super) prefix_len: usize,
 }
 ```
 # Path: hyperlane/performance/README.md
@@ -743,6 +858,46 @@ fn refuses_an_unknown_argument() {
 fn refuses_an_argument_with_a_bad_number() {
     let args: Vec<String> = vec!["--connections".to_owned(), "many".to_owned()];
     assert!(Config::from_args(&args).is_err());
+}
+#[tokio::test]
+async fn excludes_warmup_requests_from_throughput() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address: String = listener.local_addr().unwrap().to_string();
+    let server: JoinHandle<()> = spawn(async move {
+        let (mut stream, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        let mut buffer: [u8; 1024] = [0; 1024];
+        while let Ok(read) = stream.read(&mut buffer).await {
+            if read == 0 {
+                break;
+            }
+            sleep(Duration::from_millis(1)).await;
+            if stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 25\r\n\r\nhello hyperlane benchmark",
+                )
+                .await
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+    let cases: Vec<Case> = build_cases().into_iter().take(1).collect();
+    let warmup_until: Instant = Instant::now() + Duration::from_millis(150);
+    let stats: ConnStats = run_connection(
+        address,
+        cases,
+        Arc::new(Barrier::new(1)),
+        warmup_until,
+        warmup_until + Duration::from_millis(150),
+        Protocol::Http1,
+        None,
+    )
+    .await;
+    server.abort();
+    assert_eq!(stats.errors, 0);
+    assert!(stats.completed > 0);
+    assert_eq!(stats.completed as usize, stats.latencies_us.len());
 }
 ```
 # Path: hyperlane/performance/tests/context/mod.rs
@@ -1118,6 +1273,8 @@ use tokio::{
     time::sleep,
 };
 use tokio_rustls::{TlsConnector, client::TlsStream};
+#[cfg(test)]
+use tokio::net::TcpListener;
 pub(crate) type H2Error = h2::Error;
 pub(crate) type QuicClientConfig = quinn::ClientConfig;
 pub(crate) type QuicConnection = quinn::Connection;
@@ -1511,6 +1668,10 @@ async fn run_short(run: Run, cases: Vec<Case>) -> ConnStats {
             sleep(next_open - now).await;
         }
         next_open += interval;
+        let now: Instant = Instant::now();
+        if now >= run.deadline {
+            break;
+        }
         let transport: Box<dyn Transport> =
             match open_transport(&run.address, run.protocol, run.ca_path.as_deref()).await {
                 Ok(transport) => transport,
@@ -1535,7 +1696,9 @@ async fn run_short(run: Run, cases: Vec<Case>) -> ConnStats {
         match connection.read_response(&mut body).await {
             Ok(length) => {
                 if length == case.expect_len {
-                    stats.completed += 1;
+                    if now >= run.warmup_until {
+                        stats.completed += 1;
+                    }
                 } else {
                     stats.errors += 1;
                 }
@@ -1714,7 +1877,9 @@ async fn run_connection(
         match connection.read_response(&mut body).await {
             Ok(length) => {
                 if length == case.expect_len {
-                    stats.completed += 1;
+                    if now >= warmup_until {
+                        stats.completed += 1;
+                    }
                 } else {
                     stats.errors += 1;
                 }
@@ -2196,7 +2361,9 @@ pub(crate) async fn run_http2(run: Run) -> ConnStats {
             }
         };
         if length == case.expect_len {
-            stats.completed += 1;
+            if now >= run.warmup_until {
+                stats.completed += 1;
+            }
         } else {
             stats.errors += 1;
         }
@@ -2263,10 +2430,16 @@ pub(crate) async fn run_http2_short(run: Run) -> ConnStats {
             sleep(next_open - now).await;
         }
         next_open += interval;
+        let now: Instant = Instant::now();
+        if now >= run.deadline {
+            break;
+        }
         match send_one_http2(&run.address, case, run.protocol, run.ca_path.as_deref()).await {
             Ok(length) => {
                 if length == case.expect_len {
-                    stats.completed += 1;
+                    if now >= run.warmup_until {
+                        stats.completed += 1;
+                    }
                 } else {
                     stats.errors += 1;
                 }
@@ -2369,7 +2542,9 @@ pub(crate) async fn run_http3(run: Run) -> ConnStats {
             }
         }
         if length == case.expect_len {
-            stats.completed += 1;
+            if now >= run.warmup_until {
+                stats.completed += 1;
+            }
         } else {
             stats.errors += 1;
         }
@@ -2470,10 +2645,16 @@ pub(crate) async fn run_http3_short(run: Run) -> ConnStats {
             sleep(next_open - now).await;
         }
         next_open += interval;
+        let now: Instant = Instant::now();
+        if now >= run.deadline {
+            break;
+        }
         match send_one_http3(&run.address, case, run.ca_path.clone()).await {
             Ok(length) => {
                 if length == case.expect_len {
-                    stats.completed += 1;
+                    if now >= run.warmup_until {
+                        stats.completed += 1;
+                    }
                 } else {
                     stats.errors += 1;
                 }
@@ -5558,7 +5739,7 @@ pub fn import(attr: TokenStream, item: TokenStream) -> TokenStream {
 ```rust
 use super::*;
 impl Parse for SendData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let data: Expr = input.parse()?;
         Ok(SendData { data })
     }
@@ -5601,7 +5782,7 @@ pub(crate) fn try_send_macro(
     inject(
         position,
         item,
-        |context: &syn::Ident, stream: &syn::Ident| match data_expr {
+        |context: &Ident, stream: &Ident| match data_expr {
             Some(expr) => {
                 quote! {
                     let _: ::std::result::Result<(), ::hyperlane::ResponseError> = #stream.try_send(#expr).await;
@@ -5625,7 +5806,7 @@ pub(crate) fn send_macro(attr: TokenStream, item: TokenStream, position: Positio
     inject(
         position,
         item,
-        |context: &syn::Ident, stream: &syn::Ident| match data_expr {
+        |context: &Ident, stream: &Ident| match data_expr {
             Some(expr) => {
                 quote! {
                     #stream.send(#expr).await;
@@ -5729,23 +5910,19 @@ pub(crate) fn prologue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(
-        position,
-        item,
-        |context: &syn::Ident, stream: &syn::Ident| {
-            let hook_calls: Vec<proc_macro2::TokenStream> = functions
-                .iter()
-                .map(|function_expr: &syn::Expr| {
-                    quote! {
-                        let _ = #function_expr(#stream, #context).await;
-                    }
-                })
-                .collect();
-            quote! {
-                #(#hook_calls)*
-            }
-        },
-    )
+    inject(position, item, |context: &Ident, stream: &Ident| {
+        let hook_calls: Vec<proc_macro2::TokenStream> = functions
+            .iter()
+            .map(|function_expr: &Expr| {
+                quote! {
+                    let _ = #function_expr(#stream, #context).await;
+                }
+            })
+            .collect();
+        quote! {
+            #(#hook_calls)*
+        }
+    })
 }
 pub(crate) fn epilogue_hooks_macro(
     attr: TokenStream,
@@ -5754,23 +5931,19 @@ pub(crate) fn epilogue_hooks_macro(
 ) -> TokenStream {
     let functions: Punctuated<Expr, Token![,]> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
-    inject(
-        position,
-        item,
-        |context: &syn::Ident, stream: &syn::Ident| {
-            let hook_calls: Vec<proc_macro2::TokenStream> = functions
-                .iter()
-                .map(|function_expr: &syn::Expr| {
-                    quote! {
-                        let _ = #function_expr(#stream, #context).await;
-                    }
-                })
-                .collect();
-            quote! {
-                #(#hook_calls)*
-            }
-        },
-    )
+    inject(position, item, |context: &Ident, stream: &Ident| {
+        let hook_calls: Vec<proc_macro2::TokenStream> = functions
+            .iter()
+            .map(|function_expr: &Expr| {
+                quote! {
+                    let _ = #function_expr(#stream, #context).await;
+                }
+            })
+            .collect();
+        quote! {
+            #(#hook_calls)*
+        }
+    })
 }
 ```
 # Path: hyperlane/macros/src/request_middleware/mod.rs
@@ -5875,7 +6048,7 @@ pub(crate) fn hyperlane_macro(attr: TokenStream, item: TokenStream) -> TokenStre
 ```rust
 use super::*;
 impl Parse for ResponseHeaderData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let key: Expr = input.parse()?;
         let operation: HeaderOperation = if input.peek(Token![=>]) {
             input.parse::<Token![=>]>()?;
@@ -5884,7 +6057,7 @@ impl Parse for ResponseHeaderData {
             input.parse::<Token![,]>()?;
             HeaderOperation::Add
         } else {
-            return Err(syn::Error::new(input.span(), EXPECTED_ADD_OR_SET_OPERATION));
+            return Err(Error::new(input.span(), EXPECTED_ADD_OR_SET_OPERATION));
         };
         let value: Expr = input.parse()?;
         Ok(ResponseHeaderData {
@@ -5895,7 +6068,7 @@ impl Parse for ResponseHeaderData {
     }
 }
 impl Parse for ResponseBodyData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let body: Expr = input.parse()?;
         Ok(ResponseBodyData { body })
     }
@@ -6856,7 +7029,7 @@ where
                 };
                 let normalized_leading: Vec<proc_macro2::TokenStream> = leading_stmts
                     .iter()
-                    .map(|stmt: &syn::Stmt| match stmt {
+                    .map(|stmt: &Stmt| match stmt {
                         Stmt::Expr(expr, None) => quote! { #expr; },
                         _ => quote! { #stmt },
                     })
@@ -6900,7 +7073,7 @@ fn is_context_type(ty: &Type) -> bool {
     {
         let path: &Path = &type_path.path;
         if path.segments.len() >= 2 {
-            let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
+            let segments: Vec<&PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
                 if last_two[0].ident == HYPERLANE_CRATE_NAME
@@ -6922,7 +7095,7 @@ fn is_stream_type(ty: &Type) -> bool {
     {
         let path: &Path = &type_path.path;
         if path.segments.len() >= 2 {
-            let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
+            let segments: Vec<&PathSegment> = path.segments.iter().collect();
             if segments.len() >= 2 {
                 let last_two: &[&PathSegment] = &segments[segments.len() - 2..];
                 if last_two[0].ident == HYPERLANE_CRATE_NAME
@@ -6938,7 +7111,7 @@ fn is_stream_type(ty: &Type) -> bool {
     }
     false
 }
-pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident> {
+pub(crate) fn parse_context_from_signature(sig: &Signature) -> Result<Ident> {
     for arg in sig.inputs.iter() {
         if let FnArg::Typed(pat_type) = arg
             && is_context_type(&pat_type.ty)
@@ -6947,7 +7120,7 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
                 Pat::Ident(pat_ident) => pat_ident.ident.clone(),
                 Pat::Wild(_) => Ident::new("_", Span::call_site()),
                 _ => {
-                    return Err(syn::Error::new_spanned(
+                    return Err(Error::new_spanned(
                         &pat_type.pat,
                         EXPECTED_IDENTIFIER_FOR_CONTEXT_PARAMETER,
                     ));
@@ -6956,12 +7129,9 @@ pub(crate) fn parse_context_from_signature(sig: &Signature) -> syn::Result<Ident
             return Ok(ident);
         }
     }
-    Err(syn::Error::new_spanned(
-        &sig.inputs,
-        EXPECTED_CONTEXT_PARAMETER,
-    ))
+    Err(Error::new_spanned(&sig.inputs, EXPECTED_CONTEXT_PARAMETER))
 }
-pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident> {
+pub(crate) fn parse_stream_from_signature(sig: &Signature) -> Result<Ident> {
     for arg in sig.inputs.iter() {
         if let FnArg::Typed(pat_type) = arg
             && is_stream_type(&pat_type.ty)
@@ -6970,7 +7140,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
                 Pat::Ident(pat_ident) => pat_ident.ident.clone(),
                 Pat::Wild(_) => Ident::new("_", Span::call_site()),
                 _ => {
-                    return Err(syn::Error::new_spanned(
+                    return Err(Error::new_spanned(
                         &pat_type.pat,
                         EXPECTED_IDENTIFIER_FOR_STREAM_PARAMETER,
                     ));
@@ -6979,10 +7149,7 @@ pub(crate) fn parse_stream_from_signature(sig: &Signature) -> syn::Result<Ident>
             return Ok(ident);
         }
     }
-    Err(syn::Error::new_spanned(
-        &sig.inputs,
-        EXPECTED_STREAM_PARAMETER,
-    ))
+    Err(Error::new_spanned(&sig.inputs, EXPECTED_STREAM_PARAMETER))
 }
 pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream {
     match opt_expr {
@@ -7039,12 +7206,11 @@ use super::*;
 ```rust
 use super::*;
 pub(crate) fn create_protocol_check(
-    upgrade_type: &proc_macro2::Ident,
+    upgrade_type: &Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let upgrade_type_str: String = upgrade_type.to_string();
     move |context: &Ident, _: &Ident| {
-        let check_fn: proc_macro2::Ident =
-            Ident::new(&format!("is_{upgrade_type_str}"), context.span());
+        let check_fn: Ident = Ident::new(&format!("is_{upgrade_type_str}"), context.span());
         quote! {
             if !#context.get_request().get_upgrade_type().#check_fn() {
                 return ::hyperlane::Status::Continue;
@@ -7085,7 +7251,7 @@ use super::*;
 ```rust
 use super::*;
 pub(crate) fn create_method_check(
-    method: &proc_macro2::Ident,
+    method: &Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let method_str: String = method.to_string();
     move |context: &Ident, _: &Ident| {
@@ -7110,10 +7276,9 @@ pub(crate) fn methods_macro(
             let method_checks: Vec<proc_macro2::TokenStream> = methods
                 .methods
                 .iter()
-                .map(|method: &syn::Ident| {
+                .map(|method: &Ident| {
                     let method_str: String = method.to_string();
-                    let check_fn: proc_macro2::Ident =
-                        Ident::new(&format!("is_{method_str}"), method.span());
+                    let check_fn: Ident = Ident::new(&format!("is_{method_str}"), method.span());
                     quote! {
                         #context.get_request().get_method().#check_fn()
                     }
@@ -7210,7 +7375,7 @@ pub(crate) fn reject_macro(
 ```rust
 use super::*;
 impl Parse for MultiRefererData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut referer_values: Vec<Expr> = Vec::new();
         loop {
             let referer_value: Expr = input.parse()?;
@@ -7252,7 +7417,7 @@ pub(crate) fn referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &Expr| {
             quote! {
                 if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header != #referer_value) {
                     return ::hyperlane::Status::Continue;
@@ -7271,7 +7436,7 @@ pub(crate) fn reject_referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &syn::Expr| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &Expr| {
             quote! {
                 if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header == #referer_value) {
                     return ::hyperlane::Status::Continue;
@@ -7288,14 +7453,14 @@ pub(crate) fn reject_referer_macro(
 ```rust
 use super::*;
 impl Parse for RequestMethods {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         Ok(RequestMethods {
             methods: Punctuated::parse_separated_nonempty(input)?,
         })
     }
 }
 impl Parse for MultiRequestBodyData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7312,7 +7477,7 @@ impl Parse for MultiRequestBodyData {
     }
 }
 impl Parse for MultiRequestBodyJsonData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Ident, Type)> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7331,7 +7496,7 @@ impl Parse for MultiRequestBodyJsonData {
     }
 }
 impl Parse for MultiAttributeData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident, Type)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -7352,7 +7517,7 @@ impl Parse for MultiAttributeData {
     }
 }
 impl Parse for MultiAttributesData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7369,7 +7534,7 @@ impl Parse for MultiAttributesData {
     }
 }
 impl Parse for MultiRouteParamData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -7388,7 +7553,7 @@ impl Parse for MultiRouteParamData {
     }
 }
 impl Parse for MultiRouteParamsData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7405,7 +7570,7 @@ impl Parse for MultiRouteParamsData {
     }
 }
 impl Parse for MultiQueryData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -7424,7 +7589,7 @@ impl Parse for MultiQueryData {
     }
 }
 impl Parse for MultiQuerysData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7441,7 +7606,7 @@ impl Parse for MultiQuerysData {
     }
 }
 impl Parse for MultiHeaderData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -7460,7 +7625,7 @@ impl Parse for MultiHeaderData {
     }
 }
 impl Parse for MultiHeadersData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7477,7 +7642,7 @@ impl Parse for MultiHeadersData {
     }
 }
 impl Parse for MultiCookieData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut params: Vec<(Expr, Ident)> = Vec::new();
         loop {
             let key_name: Expr = input.parse()?;
@@ -7496,7 +7661,7 @@ impl Parse for MultiCookieData {
     }
 }
 impl Parse for MultiCookiesData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7513,7 +7678,7 @@ impl Parse for MultiCookiesData {
     }
 }
 impl Parse for MultiRequestVersionData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7530,7 +7695,7 @@ impl Parse for MultiRequestVersionData {
     }
 }
 impl Parse for MultiRequestPathData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7547,7 +7712,7 @@ impl Parse for MultiRequestPathData {
     }
 }
 impl Parse for MultiPanicData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7564,7 +7729,7 @@ impl Parse for MultiPanicData {
     }
 }
 impl Parse for MultiRequestErrorData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut variables: Vec<Ident> = Vec::new();
         loop {
             let variable: Ident = input.parse()?;
@@ -7655,7 +7820,7 @@ pub(crate) fn request_body_macro(
     let multi_body: MultiRequestBodyData = parse_macro_input!(attr as MultiRequestBodyData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements: Vec<proc_macro2::TokenStream> = multi_body.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body.variables.iter().map(|variable: &Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestBody = #new_context.get_request().get_body();
             }
@@ -7673,7 +7838,7 @@ pub(crate) fn request_body_json_result_macro(
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body_json.params.iter().map(|(variable, type_name): &(Ident, Type)| {
             quote! {
                 let #variable: Result<#type_name, ::hyperlane::serde_json::Error> = #context.get_request().try_get_body_json::<#type_name>();
             }
@@ -7691,7 +7856,7 @@ pub(crate) fn request_body_json_macro(
     let multi_body_json: MultiRequestBodyJsonData =
         parse_macro_input!(attr as MultiRequestBodyJsonData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_body_json.params.iter().map(|(variable, type_name): &(syn::Ident, syn::Type)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_body_json.params.iter().map(|(variable, type_name): &(Ident, Type)| {
             quote! {
                 let #variable: #type_name = #context.get_request().get_body_json::<#type_name>();
             }
@@ -7711,13 +7876,11 @@ pub(crate) fn try_get_attribute_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_attr
             .params
             .iter()
-            .map(
-                |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
-                    quote! {
-                        let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name);
-                    }
-                },
-            )
+            .map(|(key_name, variable, type_name): &(Expr, Ident, Type)| {
+                quote! {
+                    let #variable: Option<#type_name> = #context.try_get_attribute(&#key_name);
+                }
+            })
             .collect();
         quote! {
             #(#statements)*
@@ -7734,13 +7897,11 @@ pub(crate) fn attribute_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_attr
             .params
             .iter()
-            .map(
-                |(key_name, variable, type_name): &(syn::Expr, syn::Ident, syn::Type)| {
-                    quote! {
-                        let #variable: #type_name = #context.get_attribute(&#key_name);
-                    }
-                },
-            )
+            .map(|(key_name, variable, type_name): &(Expr, Ident, Type)| {
+                quote! {
+                    let #variable: #type_name = #context.get_attribute(&#key_name);
+                }
+            })
             .collect();
         quote! {
             #(#statements)*
@@ -7755,7 +7916,7 @@ pub(crate) fn attributes_macro(
     let multi_attrs: MultiAttributesData = parse_macro_input!(attr as MultiAttributesData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements: Vec<proc_macro2::TokenStream> = multi_attrs.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_attrs.variables.iter().map(|variable: &Ident| {
             quote! {
                 let #variable: &::hyperlane::ThreadSafeAttributeStore = #new_context.get_attributes();
             }
@@ -7772,7 +7933,7 @@ pub(crate) fn try_get_task_panic_data_macro(
 ) -> TokenStream {
     let multi_task_panic_data: MultiPanicData = parse_macro_input!(attr as MultiPanicData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_task_panic_data.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_task_panic_data.variables.iter().map(|variable: &Ident| {
             quote! {
                 let #variable: Option<::hyperlane::PanicData> = #context.try_get_task_panic_data();
             }
@@ -7792,7 +7953,7 @@ pub(crate) fn task_panic_data_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_task_panic_data
             .variables
             .iter()
-            .map(|variable: &syn::Ident| {
+            .map(|variable: &Ident| {
                 quote! {
                     let #variable: ::hyperlane::PanicData = #context.get_task_panic_data();
                 }
@@ -7810,7 +7971,7 @@ pub(crate) fn try_get_request_error_data_macro(
 ) -> TokenStream {
     let multi_error_data: MultiRequestErrorData = parse_macro_input!(attr as MultiRequestErrorData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_error_data.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_error_data.variables.iter().map(|variable: &Ident| {
             quote! {
                 let #variable: Option<::hyperlane::RequestError> = #context.try_get_request_error_data();
             }
@@ -7830,7 +7991,7 @@ pub(crate) fn request_error_data_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_error_data
             .variables
             .iter()
-            .map(|variable: &syn::Ident| {
+            .map(|variable: &Ident| {
                 quote! {
                     let #variable: ::hyperlane::RequestError = #context.get_request_error_data();
                 }
@@ -7851,7 +8012,7 @@ pub(crate) fn try_get_route_param_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_param
             .params
             .iter()
-            .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+            .map(|(key_name, variable): &(Expr, Ident)| {
                 quote! {
                     let #variable: Option<String> = #context.try_get_route_param(#key_name);
                 }
@@ -7872,7 +8033,7 @@ pub(crate) fn route_param_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_param
             .params
             .iter()
-            .map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+            .map(|(key_name, variable): &(Expr, Ident)| {
                 quote! {
                     let #variable: String = #context.get_route_param(#key_name);
                 }
@@ -7894,7 +8055,7 @@ pub(crate) fn route_params_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_route_params
             .variables
             .iter()
-            .map(|variable: &syn::Ident| {
+            .map(|variable: &Ident| {
                 quote! {
                     let #variable: &::hyperlane::RouteParams = #new_context.get_route_params();
                 }
@@ -7912,7 +8073,7 @@ pub(crate) fn try_get_request_query_macro(
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_query.params.iter().map(|(key_name, variable): &(Expr, Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::RequestQuerysValue> = #context.get_request().try_get_query(#key_name);
             }
@@ -7929,7 +8090,7 @@ pub(crate) fn request_query_macro(
 ) -> TokenStream {
     let multi_query: MultiQueryData = parse_macro_input!(attr as MultiQueryData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_query.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_query.params.iter().map(|(key_name, variable): &(Expr, Ident)| {
             quote! {
                 let #variable: ::hyperlane::RequestQuerysValue = #context.get_request().get_query(#key_name);
             }
@@ -7947,7 +8108,7 @@ pub(crate) fn request_querys_macro(
     let multi_querys: MultiQuerysData = parse_macro_input!(attr as MultiQuerysData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements: Vec<proc_macro2::TokenStream> = multi_querys.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_querys.variables.iter().map(|variable: &Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestQuerys = #new_context.get_request().get_querys();
             }
@@ -7964,7 +8125,7 @@ pub(crate) fn try_get_request_header_macro(
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_header.params.iter().map(|(key_name, variable): &(Expr, Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::RequestHeadersValueItem> = #context.get_request().try_get_header_back(#key_name);
             }
@@ -7981,7 +8142,7 @@ pub(crate) fn request_header_macro(
 ) -> TokenStream {
     let multi_header: MultiHeaderData = parse_macro_input!(attr as MultiHeaderData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_header.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_header.params.iter().map(|(key_name, variable): &(Expr, Ident)| {
             quote! {
                 let #variable: ::hyperlane::RequestHeadersValueItem = #context.get_request().get_header_back(#key_name);
             }
@@ -7999,7 +8160,7 @@ pub(crate) fn request_headers_macro(
     let multi_headers: MultiHeadersData = parse_macro_input!(attr as MultiHeadersData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements: Vec<proc_macro2::TokenStream> = multi_headers.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_headers.variables.iter().map(|variable: &Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestHeaders = #new_context.get_request().get_headers();
             }
@@ -8016,7 +8177,7 @@ pub(crate) fn try_get_request_cookie_macro(
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_cookie.params.iter().map(|(key_name, variable): &(Expr, Ident)| {
             quote! {
                 let #variable: Option<::hyperlane::CookieValue> = #context.get_request().try_get_cookie(#key_name);
             }
@@ -8033,7 +8194,7 @@ pub(crate) fn request_cookie_macro(
 ) -> TokenStream {
     let multi_cookie: MultiCookieData = parse_macro_input!(attr as MultiCookieData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_cookie.params.iter().map(|(key_name, variable): &(syn::Expr, syn::Ident)| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_cookie.params.iter().map(|(key_name, variable): &(Expr, Ident)| {
             quote! {
                 let #variable: ::hyperlane::CookieValue = #context.get_request().get_cookie(#key_name);
             }
@@ -8053,7 +8214,7 @@ pub(crate) fn request_cookies_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_cookies
             .variables
             .iter()
-            .map(|variable: &syn::Ident| {
+            .map(|variable: &Ident| {
                 quote! {
                     let #variable: ::hyperlane::Cookies = #context.get_request().get_cookies();
                 }
@@ -8073,7 +8234,7 @@ pub(crate) fn request_version_macro(
         parse_macro_input!(attr as MultiRequestVersionData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements: Vec<proc_macro2::TokenStream> = multi_version.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_version.variables.iter().map(|variable: &Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestVersion = #new_context.get_request().get_version();
             }
@@ -8091,7 +8252,7 @@ pub(crate) fn request_path_macro(
     let multi_path: MultiRequestPathData = parse_macro_input!(attr as MultiRequestPathData);
     inject(position, item, |context: &Ident, _: &Ident| {
         let new_context: proc_macro2::TokenStream = leak_context(false, context);
-        let statements: Vec<proc_macro2::TokenStream> = multi_path.variables.iter().map(|variable: &syn::Ident| {
+        let statements: Vec<proc_macro2::TokenStream> = multi_path.variables.iter().map(|variable: &Ident| {
             quote! {
                 let #variable: &::hyperlane::RequestPath = #new_context.get_request().get_path();
             }
@@ -8106,16 +8267,13 @@ pub(crate) fn request_path_macro(
 ```rust
 use super::*;
 impl Parse for FromStreamData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let variable_name: Option<Expr> = if input.is_empty() {
             None
         } else {
             let expr: Expr = input.parse()?;
             if !input.is_empty() {
-                return Err(syn::Error::new(
-                    input.span(),
-                    EXPECTED_AT_MOST_ONE_PARAMETER,
-                ));
+                return Err(Error::new(input.span(), EXPECTED_AT_MOST_ONE_PARAMETER));
             }
             Some(expr)
         };
@@ -8170,7 +8328,7 @@ pub(crate) fn flush_macro(item: TokenStream, position: Position) -> TokenStream 
 ```rust
 use super::*;
 impl Parse for MultiHostData {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> Result<Self> {
         let mut host_values: Vec<Expr> = Vec::new();
         loop {
             let host_value: Expr = input.parse()?;
@@ -8211,7 +8369,7 @@ pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Positio
         let statements: Vec<proc_macro2::TokenStream> = multi_host
             .host_values
             .iter()
-            .map(|host_value: &syn::Expr| {
+            .map(|host_value: &Expr| {
                 quote! {
                     if #context.get_request().get_host() != #host_value {
                         return ::hyperlane::Status::Continue;
@@ -8234,7 +8392,7 @@ pub(crate) fn reject_host_macro(
         let statements: Vec<proc_macro2::TokenStream> = multi_host
             .host_values
             .iter()
-            .map(|host_value: &syn::Expr| {
+            .map(|host_value: &Expr| {
                 quote! {
                     if #context.get_request().get_host() == #host_value {
                         return ::hyperlane::Status::Continue;
@@ -8258,7 +8416,7 @@ use super::*;
 ```rust
 use super::*;
 pub(crate) fn create_version_check(
-    version: &proc_macro2::Ident,
+    version: &Ident,
 ) -> impl FnOnce(&Ident, &Ident) -> proc_macro2::TokenStream {
     let version_str: String = version.to_string();
     move |context: &Ident, _: &Ident| {
@@ -8341,7 +8499,7 @@ mod response;
 mod url;
 use super::*;
 use http_type::{CHUNKED, CONTENT_ENCODING, TRANSFER_ENCODING};
-use serde_json::json;
+use serde_json::{Value, json, to_string};
 ```
 # Path: hyperlane/request/tests/parser/mod.rs
 ```rust
@@ -8728,7 +8886,7 @@ fn test_body_clone_is_equal_and_independent() {
 #[test]
 fn test_body_serializes_bytes_field() {
     let body: Body = Body::from_bytes("hi");
-    let encoded: String = serde_json::to_string(&body).unwrap_or_default();
+    let encoded: String = to_string(&body).unwrap_or_default();
     assert_eq!(encoded, "{\"bytes\":[104,105]}");
 }
 ```
@@ -9114,15 +9272,15 @@ fn test_builder_body_text_stores_utf8_bytes() {
 }
 #[test]
 fn test_builder_body_json_serialises_value() {
-    let body: serde_json::Value = json!({ "code": 1 });
+    let body: Value = json!({ "code": 1 });
     let mut builder: RequestBuilder = RequestBuilder::new();
     let request: HttpRequest = builder.post("http://a.test/").body_json(&body).build();
     assert_eq!(request.get_body().as_str(), Some("{\"code\":1}"));
 }
 #[test]
 fn test_builder_body_json_replaces_previous_body() {
-    let first: serde_json::Value = json!({ "a": 1 });
-    let second: serde_json::Value = json!({ "b": 2 });
+    let first: Value = json!({ "a": 1 });
+    let second: Value = json!({ "b": 2 });
     let mut builder: RequestBuilder = RequestBuilder::new();
     let request: HttpRequest = builder
         .post("http://a.test/")
@@ -9305,7 +9463,7 @@ async fn test_async_https_get_request() {
 }
 #[test]
 fn test_sync_post_json_request() {
-    let body = serde_json::json!({
+    let body = json!({
         "code": "fn main() {\r\n    println!(\"hello world\");\r\n}",
         "language": "rust",
     });
@@ -9434,30 +9592,30 @@ use super::*;
 fn test_url_components_parse_full_url() {
     let components: HttpUrlComponents =
         HttpUrlComponents::parse("https://host.test:8443/a/b?x=1&y=2#frag").unwrap_or_default();
-    assert_eq!(components.protocol, "https");
-    assert_eq!(components.host, Some("host.test".to_string()));
-    assert_eq!(components.port, Some(8443u16));
-    assert_eq!(components.path, Some("/a/b".to_string()));
-    assert_eq!(components.query, Some("x=1&y=2".to_string()));
-    assert_eq!(components.fragment, Some("frag".to_string()));
+    assert_eq!(components.get_protocol(), "https");
+    assert_eq!(components.get_host(), Some("host.test".to_string()));
+    assert_eq!(components.get_port(), Some(8443u16));
+    assert_eq!(components.get_path(), Some("/a/b".to_string()));
+    assert_eq!(components.get_query(), Some("x=1&y=2".to_string()));
+    assert_eq!(components.get_fragment(), Some("frag".to_string()));
 }
 #[test]
 fn test_url_components_parse_bare_host_uses_root_path() {
     let components: HttpUrlComponents =
         HttpUrlComponents::parse("http://host.test").unwrap_or_default();
-    assert_eq!(components.protocol, "http");
-    assert_eq!(components.host, Some("host.test".to_string()));
-    assert_eq!(components.port, None);
-    assert_eq!(components.path, Some("/".to_string()));
-    assert_eq!(components.query, None);
-    assert_eq!(components.fragment, None);
+    assert_eq!(components.get_protocol(), "http");
+    assert_eq!(components.get_host(), Some("host.test".to_string()));
+    assert_eq!(components.get_port(), None);
+    assert_eq!(components.get_path(), Some("/".to_string()));
+    assert_eq!(components.get_query(), None);
+    assert_eq!(components.get_fragment(), None);
 }
 #[test]
 fn test_url_components_parse_keeps_empty_query() {
     let components: HttpUrlComponents =
         HttpUrlComponents::parse("http://host.test/p?").unwrap_or_default();
-    assert_eq!(components.query, Some(String::new()));
-    assert_eq!(components.path, Some("/p".to_string()));
+    assert_eq!(components.get_query(), Some(String::new()));
+    assert_eq!(components.get_path(), Some("/p".to_string()));
 }
 #[test]
 fn test_url_components_parse_rejects_relative_url() {
@@ -9467,12 +9625,12 @@ fn test_url_components_parse_rejects_relative_url() {
 #[test]
 fn test_url_components_default_is_all_empty() {
     let components: HttpUrlComponents = HttpUrlComponents::default();
-    assert_eq!(components.protocol, "");
-    assert_eq!(components.host, None);
-    assert_eq!(components.port, None);
-    assert_eq!(components.path, None);
-    assert_eq!(components.query, None);
-    assert_eq!(components.fragment, None);
+    assert_eq!(components.get_protocol(), "");
+    assert_eq!(components.get_host(), None);
+    assert_eq!(components.get_port(), None);
+    assert_eq!(components.get_path(), None);
+    assert_eq!(components.get_query(), None);
+    assert_eq!(components.get_fragment(), None);
 }
 #[test]
 fn test_url_components_equality_and_clone() {
@@ -10137,11 +10295,12 @@ pub use std::{
 pub use {
     http_type::tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
     rustls::{
-        ClientConfig, ClientConnection, RootCertStore, StreamOwned,
+        ClientConfig, ClientConnection, Error, RootCertStore, StreamOwned,
         pki_types::{InvalidDnsNameError, ServerName},
     },
     serde::Serialize,
-    tokio_rustls::TlsConnector,
+    serde_json::to_vec,
+    tokio_rustls::{TlsConnector, client::TlsStream},
     webpki_roots::TLS_SERVER_ROOTS,
 };
 pub use common::*;
@@ -10317,14 +10476,14 @@ use super::*;
 use super::*;
 #[derive(Clone, Debug, Getter, Setter)]
 pub struct HttpResponse {
-    pub version: HttpVersion,
+    pub(crate) version: HttpVersion,
     #[get(type(copy))]
-    pub status_code: ResponseStatusCode,
+    pub(crate) status_code: ResponseStatusCode,
     #[set(type(AsRef<str>))]
-    pub reason_phrase: String,
-    pub headers: HttpResponseHeaders,
+    pub(crate) reason_phrase: String,
+    pub(crate) headers: HttpResponseHeaders,
     #[set(type(AsRef<[u8]>))]
-    pub body: ResponseBody,
+    pub(crate) body: ResponseBody,
 }
 ```
 # Path: hyperlane/request/src/response/fn.rs
@@ -10380,7 +10539,7 @@ use super::*;
 use super::*;
 #[derive(Clone, Debug, Default, Eq, Getter, PartialEq, Serialize)]
 pub struct Body {
-    pub bytes: Vec<u8>,
+    pub(crate) bytes: Vec<u8>,
 }
 ```
 # Path: hyperlane/request/src/utils/mod.rs
@@ -11052,14 +11211,14 @@ use super::*;
 use super::*;
 #[derive(Clone, Data, Debug, Eq, PartialEq)]
 pub struct Proxy {
-    pub proxy_type: ProxyType,
-    pub host: String,
+    pub(crate) proxy_type: ProxyType,
+    pub(crate) host: String,
     #[get(type(copy))]
-    pub port: u16,
+    pub(crate) port: u16,
     #[get(type(clone))]
-    pub username: Option<String>,
+    pub(crate) username: Option<String>,
     #[get(type(clone))]
-    pub password: Option<String>,
+    pub(crate) password: Option<String>,
 }
 #[derive(Data)]
 pub struct ProxyTunnelStream {
@@ -11096,18 +11255,18 @@ use super::*;
 #[derive(Clone, Data, Debug, Default, Eq, PartialEq)]
 pub struct RequestConfig {
     #[get(type(copy))]
-    pub buffer_size: usize,
+    pub(crate) buffer_size: usize,
     #[get(type(copy))]
-    pub timeout: u64,
+    pub(crate) timeout: u64,
     #[get(type(copy))]
-    pub max_redirect_times: usize,
-    pub http_version: HttpVersion,
+    pub(crate) max_redirect_times: usize,
+    pub(crate) http_version: HttpVersion,
     #[get(type(copy))]
-    pub redirect: bool,
+    pub(crate) redirect: bool,
     #[get(type(copy))]
-    pub decode: bool,
+    pub(crate) decode: bool,
     #[get(type(clone))]
-    pub proxy: Option<Proxy>,
+    pub(crate) proxy: Option<Proxy>,
 }
 ```
 # Path: hyperlane/request/src/request/request_builder/impl.rs
@@ -11166,8 +11325,8 @@ impl RequestBuilder {
             .set_body(Body::from_bytes(text.into().into_bytes()));
         self
     }
-    pub fn body_json<V: serde::Serialize>(&mut self, value: &V) -> &mut Self {
-        if let Ok(bytes) = serde_json::to_vec(value) {
+    pub fn body_json<V: Serialize>(&mut self, value: &V) -> &mut Self {
+        if let Ok(bytes) = to_vec(value) {
             self.get_mut_request().set_body(Body::from_bytes(bytes));
         }
         self
@@ -11241,7 +11400,7 @@ use super::*;
 use super::*;
 #[derive(Clone, Data, Debug, Default)]
 pub struct RequestBuilder {
-    pub request: HttpRequest,
+    pub(crate) request: HttpRequest,
 }
 ```
 # Path: hyperlane/request/src/request/http_request/type.rs
@@ -11448,7 +11607,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
-                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             Ok(Box::new(StreamOwned::new(session, tcp)))
         } else {
             Ok(Box::new(tcp))
@@ -11586,7 +11745,7 @@ impl HttpRequest {
             let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
             let dns: ServerName<'static> = ServerName::try_from(host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tls: tokio_rustls::client::TlsStream<http_type::tokio::net::TcpStream> = connector
+            let tls: TlsStream<http_type::tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -11750,7 +11909,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(proxy.get_host().clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
-                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             Box::new(StreamOwned::new(session, tcp))
         } else {
             Box::new(tcp)
@@ -11801,7 +11960,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(target_host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
-                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             let tunnel: SyncProxyTunnelStream = SyncProxyTunnelStream::new(proxy_stream, pre_read);
             return Ok(Box::new(StreamOwned::new(session, tunnel)));
         }
@@ -11906,7 +12065,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(target_host)
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
-                .map_err(|e: rustls::Error| RequestError::Request(e.to_string()))?;
+                .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             let proxy_box: BoxReadWrite = Box::new(tcp);
             let tunnel: SyncProxyTunnelStream = SyncProxyTunnelStream::new(proxy_box, Vec::new());
             return Ok(Box::new(StreamOwned::new(session, tunnel)));
@@ -11948,7 +12107,7 @@ impl HttpRequest {
             let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
             let dns: ServerName<'static> = ServerName::try_from(proxy.get_host().clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tls: tokio_rustls::client::TlsStream<http_type::tokio::net::TcpStream> = connector
+            let tls: TlsStream<http_type::tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -12006,7 +12165,7 @@ impl HttpRequest {
             let dns: ServerName<'static> = ServerName::try_from(target_host.clone())
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let tunnel: ProxyTunnelStream = ProxyTunnelStream::new(proxy_stream, pre_read);
-            let tls: tokio_rustls::client::TlsStream<ProxyTunnelStream> = connector
+            let tls: TlsStream<ProxyTunnelStream> = connector
                 .connect(dns, tunnel)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -12123,7 +12282,7 @@ impl HttpRequest {
                 .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
             let proxy_box: BoxAsyncReadWrite = Box::new(tcp);
             let tunnel: ProxyTunnelStream = ProxyTunnelStream::new(proxy_box, Vec::new());
-            let tls: tokio_rustls::client::TlsStream<ProxyTunnelStream> = connector
+            let tls: TlsStream<ProxyTunnelStream> = connector
                 .connect(dns, tunnel)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -12225,14 +12384,14 @@ use super::*;
 pub struct HttpRequest {
     #[get(type(clone))]
     #[get_mut(skip)]
-    pub method: Method,
+    pub(crate) method: Method,
     #[get_mut(skip)]
-    pub url: String,
-    pub headers: HashMap<String, String>,
+    pub(crate) url: String,
+    pub(crate) headers: HashMap<String, String>,
     #[get_mut(skip)]
-    pub body: Body,
-    pub config: RequestConfig,
-    pub tmp: Tmp,
+    pub(crate) body: Body,
+    pub(crate) config: RequestConfig,
+    pub(crate) tmp: Tmp,
 }
 ```
 # Path: hyperlane/request/src/request/http_request/trait.rs
@@ -12314,6 +12473,7 @@ use std::{
 };
 use {
     serde::Deserialize,
+    serde_json::{from_str, to_string},
     tokio::{
         io::{
             AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
@@ -12322,7 +12482,7 @@ use {
         net::{TcpListener, TcpStream},
         runtime::Handle,
         spawn,
-        sync::{RwLockReadGuard, RwLockWriteGuard},
+        sync::{MutexGuard, RwLockReadGuard, RwLockWriteGuard},
         task::{JoinError, JoinHandle, yield_now},
         time::{Duration, error::Elapsed, sleep},
     },
@@ -14372,23 +14532,23 @@ use super::*;
 #[tokio::test]
 async fn test_arc_mutex_creation() {
     let mutex: ArcMutex<i32> = arc_mutex(42);
-    let guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+    let guard: MutexGuard<'_, i32> = mutex.lock().await;
     assert_eq!(*guard, 42);
 }
 #[tokio::test]
 async fn test_arc_mutex_with_string() {
     let mutex: ArcMutex<String> = arc_mutex("hello".to_string());
-    let guard: tokio::sync::MutexGuard<'_, String> = mutex.lock().await;
+    let guard: MutexGuard<'_, String> = mutex.lock().await;
     assert_eq!(*guard, "hello");
 }
 #[tokio::test]
 async fn test_arc_mutex_mutation() {
     let mutex: ArcMutex<i32> = arc_mutex(0);
     {
-        let mut guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+        let mut guard: MutexGuard<'_, i32> = mutex.lock().await;
         *guard = 100;
     }
-    let guard: tokio::sync::MutexGuard<'_, i32> = mutex.lock().await;
+    let guard: MutexGuard<'_, i32> = mutex.lock().await;
     assert_eq!(*guard, 100);
 }
 #[tokio::test]
@@ -14396,20 +14556,20 @@ async fn test_arc_mutex_clone_shares_data() {
     let mutex1: ArcMutex<i32> = arc_mutex(42);
     let mutex2: ArcMutex<i32> = Arc::clone(&mutex1);
     {
-        let mut guard: tokio::sync::MutexGuard<'_, i32> = mutex2.lock().await;
+        let mut guard: MutexGuard<'_, i32> = mutex2.lock().await;
         *guard = 99;
     }
-    let guard: tokio::sync::MutexGuard<'_, i32> = mutex1.lock().await;
+    let guard: MutexGuard<'_, i32> = mutex1.lock().await;
     assert_eq!(*guard, 99);
 }
 #[tokio::test]
 async fn test_arc_mutex_with_vec() {
     let mutex: ArcMutex<Vec<i32>> = arc_mutex(vec![1, 2, 3]);
     {
-        let mut guard: tokio::sync::MutexGuard<'_, Vec<i32>> = mutex.lock().await;
+        let mut guard: MutexGuard<'_, Vec<i32>> = mutex.lock().await;
         guard.push(4);
     }
-    let guard: tokio::sync::MutexGuard<'_, Vec<i32>> = mutex.lock().await;
+    let guard: MutexGuard<'_, Vec<i32>> = mutex.lock().await;
     assert_eq!(*guard, vec![1, 2, 3, 4]);
 }
 #[test]
@@ -14480,6 +14640,30 @@ impl Debug for TestTransport {
 # Path: hyperlane/type/tests/stream/fn.rs
 ```rust
 use super::*;
+#[test]
+fn header_entry_pool_discards_oversized_retained_allocations() {
+    while take_header_entry().is_some() {}
+    let oversized: usize = MAX_POOLED_HEADER_STRING_CAPACITY + 1;
+    return_header_entry((String::with_capacity(oversized), VecDeque::new()));
+    assert!(take_header_entry().is_none());
+    return_header_entry((
+        String::new(),
+        VecDeque::from([String::with_capacity(oversized)]),
+    ));
+    assert!(take_header_entry().is_none());
+    return_header_entry((
+        String::new(),
+        VecDeque::with_capacity(MAX_POOLED_HEADER_VALUE_CAPACITY + 1),
+    ));
+    assert!(take_header_entry().is_none());
+    return_header_entry((
+        String::from("small"),
+        VecDeque::from([String::from("value")]),
+    ));
+    let (name, values): (String, VecDeque<String>) = take_header_entry().unwrap();
+    assert_eq!(name, "small");
+    assert_eq!(values, VecDeque::from([String::from("value")]));
+}
 #[tokio::test]
 async fn http1_chunked_decodes_binary_and_preserves_the_next_request() {
     let raw: &[u8] = b"POST /upload HTTP/1.1\r\nHost: localhost\r\n\
@@ -15563,15 +15747,15 @@ fn test_status_copy() {
 #[test]
 fn test_status_serialize_deserialize() {
     let status: Status = Status::Continue;
-    let json: String = serde_json::to_string(&status).unwrap();
-    let deserialized: Status = serde_json::from_str(&json).unwrap();
+    let json: String = to_string(&status).unwrap();
+    let deserialized: Status = from_str(&json).unwrap();
     assert_eq!(status, deserialized);
 }
 #[test]
 fn test_status_serialize_deserialize_reject() {
     let status: Status = Status::Reject;
-    let json: String = serde_json::to_string(&status).unwrap();
-    let deserialized: Status = serde_json::from_str(&json).unwrap();
+    let json: String = to_string(&status).unwrap();
+    let deserialized: Status = from_str(&json).unwrap();
     assert_eq!(status, deserialized);
 }
 #[test]
@@ -16210,8 +16394,8 @@ fn request_error_from_io_error() {
 }
 #[tokio::test]
 async fn request_error_from_elapsed() {
-    let elapsed: Elapsed = tokio::time::timeout(Duration::from_millis(0), async {
-        tokio::time::sleep(Duration::from_secs(10)).await;
+    let elapsed: Elapsed = timeout(Duration::from_millis(0), async {
+        sleep(Duration::from_secs(10)).await;
     })
     .await
     .unwrap_err();
@@ -17557,13 +17741,14 @@ use std::{
     future::{self, Future},
     hash::Hash,
     io::{self, ErrorKind},
-    mem,
+    mem::{self, MaybeUninit},
     net::{IpAddr, SocketAddr},
     num::ParseIntError,
     pin::{Pin, pin},
     rc::Rc,
     result::Result,
-    str::{FromStr, SplitWhitespace, from_utf8},
+    slice,
+    str::{FromStr, SplitWhitespace, from_utf8, from_utf8_unchecked},
     sync::{
         Arc, OnceLock,
         atomic::{self, AtomicBool, AtomicUsize},
@@ -17574,8 +17759,10 @@ use std::{
 };
 use {
     core::hash::BuildHasherDefault,
+    hex::encode,
     lombok_macros::*,
     serde::{Deserialize, Serialize, de::DeserializeOwned},
+    serde_json::{from_slice, from_str},
     tokio::{
         io::{
             AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
@@ -18483,11 +18670,11 @@ use super::*;
 #[derive(Clone, Debug, DisplayDebug, Eq, Getter, PartialEq)]
 pub struct WebSocketFrame {
     #[get(type(copy))]
-    pub fin: bool,
-    pub opcode: WebSocketOpcode,
+    pub(crate) fin: bool,
+    pub(crate) opcode: WebSocketOpcode,
     #[get(type(copy))]
-    pub mask: bool,
-    pub payload_data: Vec<u8>,
+    pub(crate) mask: bool,
+    pub(crate) payload_data: Vec<u8>,
 }
 ```
 # Path: hyperlane/type/src/lifetime/mod.rs
@@ -18546,9 +18733,9 @@ use super::*;
     Clone, CustomDebug, Default, Deserialize, DisplayDebug, Eq, Getter, PartialEq, Serialize, New,
 )]
 pub struct PanicData {
-    pub message: Option<String>,
-    pub location: Option<String>,
-    pub payload: Option<String>,
+    pub(crate) message: Option<String>,
+    pub(crate) location: Option<String>,
+    pub(crate) payload: Option<String>,
 }
 ```
 # Path: hyperlane/type/src/response/type.rs
@@ -18600,17 +18787,30 @@ impl Display for ResponseError {
 impl Default for Response {
     #[inline(always)]
     fn default() -> Self {
-        let http_status: HttpStatus = HttpStatus::default();
         Self {
             version: HttpVersion::Http1_1,
-            status_code: http_status.code(),
-            reason_phrase: http_status.to_string(),
+            status_code: HttpStatus::Ok.code(),
+            reason_phrase: OK.to_owned(),
             headers: hash_map_xx_hash3_64(),
             body: Vec::new(),
         }
     }
 }
 impl Response {
+    #[inline(always)]
+    pub fn set_reason_phrase(&mut self, val: impl AsRef<str>) -> &mut Self {
+        let text: &str = val.as_ref();
+        self.reason_phrase.clear();
+        self.reason_phrase.push_str(text);
+        self
+    }
+    #[inline(always)]
+    pub fn set_body(&mut self, val: impl AsRef<[u8]>) -> &mut Self {
+        let bytes: &[u8] = val.as_ref();
+        self.body.clear();
+        self.body.extend_from_slice(bytes);
+        self
+    }
     #[inline(always)]
     fn push_header(response_bytes: &mut Vec<u8>, key: &str, value: &str) {
         response_bytes.extend_from_slice(key.as_bytes());
@@ -18718,7 +18918,7 @@ impl Response {
     where
         T: DeserializeOwned,
     {
-        serde_json::from_slice(self.get_body())
+        from_slice(self.get_body())
     }
     pub fn get_body_json<T>(&self) -> T
     where
@@ -18836,9 +19036,7 @@ impl Response {
         if headers.is_empty() {
             return;
         }
-        for (key, values) in headers.drain() {
-            return_header_entry((key, values));
-        }
+        return_header_entries(headers.drain());
     }
     #[inline(always)]
     pub fn try_get_cookies(&self) -> Option<Cookies> {
@@ -18884,9 +19082,61 @@ impl Response {
         let status_code: ResponseStatusCode = self.get_status_code();
         if self.get_reason_phrase().is_empty() || self.get_reason_phrase().as_str() == OK {
             let phrase: &'static str = HttpStatus::phrase_ref(status_code);
-            let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
-            stored.clear();
-            stored.push_str(phrase);
+            if self.get_reason_phrase().as_str() != phrase {
+                let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
+                stored.clear();
+                stored.push_str(phrase);
+            }
+        }
+        if INCLUDE_BODY
+            && self.get_headers().is_empty()
+            && status_code >= HttpStatus::Ok.code()
+            && status_code != HttpStatus::NoContent.code()
+            && status_code != HttpStatus::ResetContent.code()
+            && status_code != HttpStatus::NotModified.code()
+        {
+            let content_type: &str = default_content_type();
+            let body_len: usize = self.get_body().len();
+            let mut digits: [u8; B_20] = [0; B_20];
+            let rendered_len: &str = render_length(body_len, &mut digits);
+            let mut code_digits: [u8; B_20] = [0; B_20];
+            let rendered_code: &str = render_length(status_code, &mut code_digits);
+            let version_str: &str = self.get_version().as_str();
+            let phrase_str: &str = self.get_reason_phrase().as_str();
+            let total_size: usize = version_str.len()
+                + 1
+                + rendered_code.len()
+                + 1
+                + phrase_str.len()
+                + HTTP_BR.len()
+                + CONNECTION.len()
+                + COLON.len()
+                + KEEP_ALIVE.len()
+                + HTTP_BR.len()
+                + CONTENT_TYPE.len()
+                + COLON.len()
+                + content_type.len()
+                + HTTP_BR.len()
+                + CONTENT_LENGTH.len()
+                + COLON.len()
+                + rendered_len.len()
+                + HTTP_BR.len()
+                + HTTP_BR.len()
+                + body_len;
+            let mut response_bytes: Vec<u8> = Vec::with_capacity(total_size);
+            response_bytes.extend_from_slice(version_str.as_bytes());
+            response_bytes.push(b' ');
+            response_bytes.extend_from_slice(rendered_code.as_bytes());
+            response_bytes.push(b' ');
+            response_bytes.extend_from_slice(phrase_str.as_bytes());
+            response_bytes.extend_from_slice(HTTP_BR.as_bytes());
+            Self::push_header(&mut response_bytes, CONTENT_LENGTH, rendered_len);
+            Self::push_header(&mut response_bytes, CONNECTION, KEEP_ALIVE);
+            Self::push_header(&mut response_bytes, CONTENT_TYPE, content_type);
+            response_bytes.extend_from_slice(HTTP_BR.as_bytes());
+            response_bytes.extend_from_slice(self.get_body().as_slice());
+            self.populate_default_headers_batch(content_type, rendered_len);
+            return response_bytes;
         }
         if self
             .get_headers()
@@ -18986,6 +19236,34 @@ impl Response {
         response_bytes.extend_from_slice(body);
         response_bytes
     }
+    fn populate_default_headers_batch(&mut self, content_type: &str, rendered_len: &str) {
+        let headers: &mut ResponseHeaders = self.get_mut_headers();
+        let pairs: [(&str, &str); 3] = [
+            (CONNECTION, KEEP_ALIVE),
+            (CONTENT_TYPE, content_type),
+            (CONTENT_LENGTH, rendered_len),
+        ];
+        HEADER_ENTRY_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
+            let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+            for (key, value) in pairs {
+                let (mut name, mut values): (String, VecDeque<String>) = pool
+                    .pop()
+                    .unwrap_or_else(|| (String::new(), VecDeque::new()));
+                name.clear();
+                name.push_str(key);
+                while values.len() > 1 {
+                    values.pop_back();
+                }
+                if let Some(slot) = values.front_mut() {
+                    slot.clear();
+                    slot.push_str(value);
+                } else {
+                    values.push_back(value.to_owned());
+                }
+                headers.insert(name, values);
+            }
+        });
+    }
     #[inline(always)]
     fn set_wire_content_length(&mut self, body_len: usize) {
         let mut digits: [u8; B_20] = [0; B_20];
@@ -19030,14 +19308,14 @@ use super::*;
 use super::*;
 #[derive(Clone, Data, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub struct Response {
-    pub version: ResponseVersion,
+    pub(crate) version: ResponseVersion,
     #[get(type(copy))]
-    pub status_code: ResponseStatusCode,
-    #[set(type(AsRef<str>))]
-    pub reason_phrase: ResponseReasonPhrase,
-    pub headers: ResponseHeaders,
-    #[set(type(AsRef<[u8]>))]
-    pub body: ResponseBody,
+    pub(crate) status_code: ResponseStatusCode,
+    #[set(skip)]
+    pub(crate) reason_phrase: ResponseReasonPhrase,
+    pub(crate) headers: ResponseHeaders,
+    #[set(skip)]
+    pub(crate) body: ResponseBody,
 }
 ```
 # Path: hyperlane/type/src/response/fn.rs
@@ -19409,26 +19687,26 @@ use super::*;
 #[derive(Clone, Data, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CookieBuilder {
     #[set(type(AsRef<str>))]
-    pub name: CookieKey,
+    pub(crate) name: CookieKey,
     #[set(type(AsRef<str>))]
-    pub value: CookieValue,
+    pub(crate) value: CookieValue,
     #[set(skip)]
-    pub expires: Option<String>,
+    pub(crate) expires: Option<String>,
     #[get(type(copy))]
     #[set(skip)]
-    pub max_age: Option<i64>,
+    pub(crate) max_age: Option<i64>,
     #[set(skip)]
-    pub domain: Option<String>,
+    pub(crate) domain: Option<String>,
     #[set(skip)]
-    pub path: Option<String>,
+    pub(crate) path: Option<String>,
     #[get(type(copy))]
     #[set(skip)]
-    pub secure: Option<bool>,
+    pub(crate) secure: Option<bool>,
     #[get(type(copy))]
     #[set(skip)]
-    pub http_only: Option<bool>,
+    pub(crate) http_only: Option<bool>,
     #[set(skip)]
-    pub same_site: Option<String>,
+    pub(crate) same_site: Option<String>,
 }
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Cookie;
@@ -19566,10 +19844,10 @@ use super::*;
 use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Task {
-    pub pool: Vec<UnboundedSender<AsyncTask>>,
-    pub counter: Arc<AtomicUsize>,
-    pub shutdown: Arc<AtomicBool>,
-    pub notifies: Vec<Arc<Notify>>,
+    pub(crate) pool: Vec<UnboundedSender<AsyncTask>>,
+    pub(crate) counter: Arc<AtomicUsize>,
+    pub(crate) shutdown: Arc<AtomicBool>,
+    pub(crate) notifies: Vec<Arc<Notify>>,
 }
 ```
 # Path: hyperlane/type/src/arc_rwlock/type.rs
@@ -19753,8 +20031,8 @@ impl Stream {
             leftover: Vec::new(),
             leftover_start: 0,
             leftover_end: 0,
-            line_buffer: String::with_capacity(REQUEST_LINE_BUFFER_CAPACITY),
-            header_line_buffer: String::with_capacity(HEADER_LINE_BUFFER_CAPACITY),
+            line_buffer: String::new(),
+            header_line_buffer: String::new(),
             websocket_state: None,
         }
     }
@@ -19768,6 +20046,10 @@ impl Stream {
     #[inline(always)]
     pub fn get_local_addr(&self) -> Result<SocketAddr, io::Error> {
         self.get_stream().local_addr()
+    }
+    #[inline(always)]
+    pub async fn shutdown(&mut self) -> Result<(), io::Error> {
+        self.get_mut_stream().shutdown().await
     }
     #[inline(always)]
     pub fn is_keep_alive(&self, keep_alive: bool) -> bool {
@@ -19793,32 +20075,65 @@ impl Stream {
         reader.set_start(start);
         reader.set_end(end);
         line_buffer.clear();
-        AsyncBufReadExt::read_line(&mut reader, line_buffer).await?;
-        let (method, path, version): (RequestMethod, &str, RequestVersion) =
-            Request::get_http_first_line(line_buffer)?;
-        Request::check_http_path_size(path, max_path_size)?;
-        let hash_index: Option<usize> = path.find(HASH);
-        let query_index: Option<usize> = path.find(QUERY);
-        let query: &str = Request::get_http_query(path, query_index, hash_index);
-        Request::fill_http_querys(query, request.get_mut_querys());
-        let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
-        request.get_mut_path().push_str(path_slice);
-        request.set_version(version);
-        let framing: RequestFraming = request
-            .get_http_headers(&mut reader, &config, header_line_buffer)
-            .await?;
-        request.set_method(method);
+        let filled_len: usize = future::poll_fn(|cx: &mut Context<'_>| {
+            Pin::new(&mut reader).poll_fill_buf(cx).map_ok(<[u8]>::len)
+        })
+        .await?;
+        let fast_framing: Option<RequestFraming> = if filled_len > 0 {
+            let slice: &[u8] = &reader.get_buffer()[reader.get_start()..reader.get_end()];
+            match request.parse_http_head_from_slice(slice, &config, line_buffer)? {
+                Some((framing, consumed)) => {
+                    Pin::new(&mut reader).consume(consumed);
+                    Some(framing)
+                }
+                None => None,
+            }
+        } else {
+            None
+        };
+        let framing: RequestFraming = match fast_framing {
+            Some(framing) => framing,
+            None => {
+                line_buffer.clear();
+                AsyncBufReadExt::read_line(&mut reader, line_buffer).await?;
+                let (method, path, version): (RequestMethod, &str, RequestVersion) =
+                    Request::get_http_first_line(line_buffer)?;
+                Request::check_http_path_size(path, max_path_size)?;
+                let hash_index: Option<usize> = path.find(HASH);
+                let query_index: Option<usize> = path.find(QUERY);
+                let query: &str = Request::get_http_query(path, query_index, hash_index);
+                Request::fill_http_querys(query, request.get_mut_querys());
+                let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
+                request.get_mut_path().push_str(path_slice);
+                request.set_version(version);
+                let framing: RequestFraming = request
+                    .get_http_headers(&mut reader, &config, header_line_buffer)
+                    .await?;
+                request.set_method(method);
+                framing
+            }
+        };
         match framing {
             RequestFraming::Fixed(0) => {}
             RequestFraming::Fixed(content_size) => {
-                if content_size > reader.get_end() - reader.get_start()
-                    && expects_http_continue(request)
-                {
-                    let transport: &mut Box<dyn Transport> = reader.get_mut_stream();
-                    transport.write_all(HTTP_CONTINUE_RESPONSE).await?;
-                    transport.flush().await?;
+                let buffered: usize = reader.get_end() - reader.get_start();
+                if content_size <= buffered {
+                    let body: &mut RequestBody = request.get_mut_body();
+                    body.clear();
+                    let body_start: usize = reader.get_start();
+                    body.extend_from_slice(
+                        &reader.get_buffer()[body_start..body_start + content_size],
+                    );
+                    reader.set_start(body_start + content_size);
+                } else {
+                    if expects_http_continue(request) {
+                        let transport: &mut Box<dyn Transport> = reader.get_mut_stream();
+                        transport.write_all(HTTP_CONTINUE_RESPONSE).await?;
+                        transport.flush().await?;
+                    }
+                    Request::fill_http_body(&mut reader, request.get_mut_body(), content_size)
+                        .await?;
                 }
-                Request::fill_http_body(&mut reader, request.get_mut_body(), content_size).await?;
             }
             RequestFraming::Chunked => {
                 Box::pin(fill_chunked_request(&mut reader, request, &config)).await?;
@@ -20079,8 +20394,14 @@ thread_local! {
 ```
 # Path: hyperlane/type/src/stream/const.rs
 ```rust
+use super::*;
+pub(crate) const HTTP_QUOTED_FIELD_QUOTE: u8 = b'"';
+pub(crate) const HTTP_QUOTED_FIELD_ESCAPE: u8 = b'\\';
 pub(crate) const WEBSOCKET_STATE_ERROR: &str = "WebSocket state must be initialized";
 pub(super) const HTTP_CONTINUE_RESPONSE: &[u8] = b"HTTP/1.1 100 Continue\r\n\r\n";
+pub(crate) const MAX_POOLED_HEADER_ENTRIES: usize = B_128;
+pub(crate) const MAX_POOLED_HEADER_STRING_CAPACITY: usize = 4 * 1024;
+pub(crate) const MAX_POOLED_HEADER_VALUE_CAPACITY: usize = B_4;
 ```
 # Path: hyperlane/type/src/stream/mod.rs
 ```rust
@@ -20100,7 +20421,7 @@ use super::*;
 use super::*;
 #[derive(CustomDebug, Data, DisplayDebug)]
 pub struct Stream {
-    pub stream: Box<dyn Transport>,
+    pub(crate) stream: Box<dyn Transport>,
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) request_config: RequestConfig,
@@ -20207,8 +20528,8 @@ fn contains_continue_member(value: &str) -> bool {
     for (offset, byte) in value.bytes().enumerate() {
         match byte {
             _ if escaped => escaped = false,
-            b'\\' if quoted => escaped = true,
-            b'"' => quoted = !quoted,
+            HTTP_QUOTED_FIELD_ESCAPE if quoted => escaped = true,
+            HTTP_QUOTED_FIELD_QUOTE => quoted = !quoted,
             COMMA_U8 if !quoted => {
                 if value[start..offset]
                     .trim_matches([' ', '\t'])
@@ -20225,15 +20546,52 @@ fn contains_continue_member(value: &str) -> bool {
         .trim_matches([' ', '\t'])
         .eq_ignore_ascii_case(CONTINUE_EXPECT)
 }
-pub(crate) const MAX_POOLED_HEADER_ENTRIES: usize = B_128;
 pub(crate) fn take_header_entry() -> Option<(String, VecDeque<String>)> {
     HEADER_ENTRY_POOL
         .with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| pool.borrow_mut().pop())
 }
 pub(crate) fn return_header_entry(entry: (String, VecDeque<String>)) {
+    if entry.0.capacity() > MAX_POOLED_HEADER_STRING_CAPACITY
+        || entry.1.capacity() > MAX_POOLED_HEADER_VALUE_CAPACITY
+    {
+        return;
+    }
+    if entry
+        .1
+        .iter()
+        .any(|value: &String| value.capacity() > MAX_POOLED_HEADER_STRING_CAPACITY)
+    {
+        return;
+    }
     HEADER_ENTRY_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
         let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
         if pool.len() < MAX_POOLED_HEADER_ENTRIES {
+            pool.push(entry);
+        }
+    });
+}
+pub(crate) fn return_header_entries<I>(entries: I)
+where
+    I: IntoIterator<Item = (String, VecDeque<String>)>,
+{
+    HEADER_ENTRY_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
+        let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+        for entry in entries {
+            if pool.len() >= MAX_POOLED_HEADER_ENTRIES {
+                break;
+            }
+            if entry.0.capacity() > MAX_POOLED_HEADER_STRING_CAPACITY
+                || entry.1.capacity() > MAX_POOLED_HEADER_VALUE_CAPACITY
+            {
+                continue;
+            }
+            if entry
+                .1
+                .iter()
+                .any(|value: &String| value.capacity() > MAX_POOLED_HEADER_STRING_CAPACITY)
+            {
+                continue;
+            }
             pool.push(entry);
         }
     });
@@ -20863,7 +21221,7 @@ impl RequestConfig {
     where
         C: AsRef<str>,
     {
-        serde_json::from_str(json.as_ref())
+        from_str(json.as_ref())
     }
     #[inline(always)]
     pub fn low_security() -> Self {
@@ -20910,55 +21268,138 @@ impl Request {
         self.get_mut_host().clear();
         self.set_version(HttpVersion::default());
         self.get_mut_path().clear();
-        self.get_mut_querys().clear();
+        self.recycle_querys();
         self.recycle_headers();
         self.get_mut_body().clear();
         self
+    }
+    fn recycle_querys(&mut self) {
+        let querys: &mut RequestQuerys = self.get_mut_querys();
+        if querys.is_empty() {
+            return;
+        }
+        return_header_entries(querys.drain());
     }
     fn recycle_headers(&mut self) {
         let headers: &mut RequestHeaders = self.get_mut_headers();
         if headers.is_empty() {
             return;
         }
-        for (key, values) in headers.drain() {
-            return_header_entry((key, values));
-        }
+        return_header_entries(headers.drain());
     }
     #[inline(always)]
     pub(crate) fn get_http_first_line(
         line: &str,
     ) -> Result<(RequestMethod, &str, RequestVersion), RequestError> {
-        let mut parts: SplitWhitespace<'_> = line.split_whitespace();
-        let method_str: &str = parts
-            .next()
-            .ok_or(RequestError::HttpRequestPartsInsufficient(
-                HttpStatus::BadRequest,
-            ))?;
-        let full_path: &str = parts
-            .next()
-            .ok_or(RequestError::HttpRequestPartsInsufficient(
-                HttpStatus::BadRequest,
-            ))?;
-        let version_str: &str = parts
-            .next()
-            .ok_or(RequestError::HttpRequestPartsInsufficient(
-                HttpStatus::BadRequest,
-            ))?;
-        if parts.next().is_some() {
-            return Err(RequestError::HttpRequestPartsInsufficient(
-                HttpStatus::BadRequest,
-            ));
-        }
-        let method: RequestMethod = method_str
-            .parse::<RequestMethod>()
-            .unwrap_or_else(|_: ()| Method::Unknown(method_str.to_owned()));
-        let version: RequestVersion = match version_str.parse::<RequestVersion>() {
-            Ok(RequestVersion::Unknown(_)) | Err(_) => {
+        let (method_str, full_path, version_str): (&str, &str, &str) = if line.is_ascii() {
+            let bytes: &[u8] = line.as_bytes();
+            let mut idx: usize = 0;
+            let len: usize = bytes.len();
+            while idx < len && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            let m_start: usize = idx;
+            while idx < len && !bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            if m_start == idx {
                 return Err(RequestError::HttpRequestPartsInsufficient(
                     HttpStatus::BadRequest,
                 ));
             }
-            Ok(version) => version,
+            let m_end: usize = idx;
+            while idx < len && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            let p_start: usize = idx;
+            while idx < len && !bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            if p_start == idx {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            let p_end: usize = idx;
+            while idx < len && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            let v_start: usize = idx;
+            while idx < len && !bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            if v_start == idx {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            let v_end: usize = idx;
+            while idx < len && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            if idx != len {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            (
+                &line[m_start..m_end],
+                &line[p_start..p_end],
+                &line[v_start..v_end],
+            )
+        } else {
+            let mut parts: SplitWhitespace<'_> = line.split_whitespace();
+            let method_str: &str =
+                parts
+                    .next()
+                    .ok_or(RequestError::HttpRequestPartsInsufficient(
+                        HttpStatus::BadRequest,
+                    ))?;
+            let full_path: &str =
+                parts
+                    .next()
+                    .ok_or(RequestError::HttpRequestPartsInsufficient(
+                        HttpStatus::BadRequest,
+                    ))?;
+            let version_str: &str =
+                parts
+                    .next()
+                    .ok_or(RequestError::HttpRequestPartsInsufficient(
+                        HttpStatus::BadRequest,
+                    ))?;
+            if parts.next().is_some() {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            (method_str, full_path, version_str)
+        };
+        let method: RequestMethod = match method_str.as_bytes() {
+            WIRE_METHOD_GET => Method::Get,
+            WIRE_METHOD_POST => Method::Post,
+            WIRE_METHOD_PUT => Method::Put,
+            WIRE_METHOD_DELETE => Method::Delete,
+            WIRE_METHOD_HEAD => Method::Head,
+            WIRE_METHOD_OPTIONS => Method::Options,
+            WIRE_METHOD_PATCH => Method::Patch,
+            WIRE_METHOD_CONNECT => Method::Connect,
+            WIRE_METHOD_TRACE => Method::Trace,
+            _ => Method::Unknown(method_str.to_owned()),
+        };
+        let version: RequestVersion = match version_str.as_bytes() {
+            WIRE_VERSION_1_1 => HttpVersion::Http1_1,
+            WIRE_VERSION_1_0 => HttpVersion::Http1_0,
+            WIRE_VERSION_0_9 => HttpVersion::Http0_9,
+            WIRE_VERSION_2 => HttpVersion::Http2,
+            WIRE_VERSION_3 => HttpVersion::Http3,
+            _ => match version_str.parse::<RequestVersion>() {
+                Ok(RequestVersion::Unknown(_)) | Err(_) => {
+                    return Err(RequestError::HttpRequestPartsInsufficient(
+                        HttpStatus::BadRequest,
+                    ));
+                }
+                Ok(version) => version,
+            },
         };
         Ok((method, full_path, version))
     }
@@ -21003,13 +21444,32 @@ impl Request {
         for pair in query.split(AND) {
             if let Some((key, value)) = pair.split_once(EQUAL) {
                 if !key.is_empty() {
-                    querys
-                        .entry(key.to_string())
-                        .or_default()
-                        .push_back(value.to_string());
+                    if let Some(existing) = querys.get_mut(key) {
+                        existing.push_back(value.to_owned());
+                    } else {
+                        let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
+                            take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+                        pooled_key.clear();
+                        pooled_key.push_str(key);
+                        while pooled_values.len() > 1 {
+                            pooled_values.pop_back();
+                        }
+                        if let Some(slot) = pooled_values.front_mut() {
+                            slot.clear();
+                            slot.push_str(value);
+                        } else {
+                            pooled_values.push_back(value.to_owned());
+                        }
+                        querys.insert(pooled_key, pooled_values);
+                    }
                 }
-            } else if !pair.is_empty() {
-                querys.entry(pair.to_string()).or_default();
+            } else if !pair.is_empty() && !querys.contains_key(pair) {
+                let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
+                    take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+                pooled_key.clear();
+                pooled_key.push_str(pair);
+                pooled_values.clear();
+                querys.insert(pooled_key, pooled_values);
             }
         }
     }
@@ -21064,6 +21524,176 @@ impl Request {
             ));
         }
         Ok(length)
+    }
+    pub(crate) fn parse_http_head_from_slice(
+        &mut self,
+        buffer: &[u8],
+        config: &RequestConfig,
+        line_buffer: &mut String,
+    ) -> Result<Option<(RequestFraming, usize)>, RequestError> {
+        let Some(first_lf) = buffer.iter().position(|byte: &u8| *byte == BR_U8) else {
+            return Ok(None);
+        };
+        let first_line_end: usize = first_lf + 1;
+        let first_line: &str = match from_utf8(&buffer[..first_line_end]) {
+            Ok(text) => text,
+            Err(_) => return Err(RequestError::ReadConnection(HttpStatus::BadRequest)),
+        };
+        line_buffer.clear();
+        line_buffer.push_str(first_line);
+        let (method, full_path, version): (RequestMethod, &str, RequestVersion) =
+            Self::get_http_first_line(first_line)?;
+        Self::check_http_path_size(full_path, config.get_max_path_size())?;
+        let hash_index: Option<usize> = full_path.find(HASH);
+        let query_index: Option<usize> = full_path.find(QUERY);
+        let query: &str = Self::get_http_query(full_path, query_index, hash_index);
+        Self::fill_http_querys(query, self.get_mut_querys());
+        let path_slice: &str = Self::get_http_path(full_path, query_index, hash_index);
+        self.get_mut_path().push_str(path_slice);
+        self.set_version(version);
+        self.set_method(method);
+        let Request {
+            headers,
+            host,
+            version,
+            ..
+        } = self;
+        let max_header_count: usize = config.get_max_header_count();
+        let max_header_key_size: usize = config.get_max_header_key_size();
+        let max_header_value_size: usize = config.get_max_header_value_size();
+        let max_body_size: usize = config.get_max_body_size();
+        let mut content_size: usize = 0;
+        let mut header_count: usize = 0;
+        let mut content_length_seen: bool = false;
+        let mut transfer_encoding_seen: bool = false;
+        let mut host_seen: bool = false;
+        let mut pos: usize = first_line_end;
+        let mut incomplete_head: bool = false;
+        let header_result: Result<(), RequestError> = HEADER_ENTRY_POOL.with(
+            |pool: &RefCell<Vec<(String, VecDeque<String>)>>| -> Result<(), RequestError> {
+                let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+                loop {
+                    let rest: &[u8] = &buffer[pos..];
+                    let Some(rel_lf) = rest.iter().position(|byte: &u8| *byte == BR_U8) else {
+                        incomplete_head = true;
+                        return Ok(());
+                    };
+                    let line_end: usize = pos + rel_lf;
+                    let raw_line: &[u8] = if line_end > pos && buffer[line_end - 1] == b'\r' {
+                        &buffer[pos..line_end - 1]
+                    } else {
+                        &buffer[pos..line_end]
+                    };
+                    pos = line_end + 1;
+                    if raw_line.is_empty() {
+                        break;
+                    }
+                    let first_byte: u8 = raw_line[0];
+                    if first_byte == SPACE_U8 || first_byte == TAB_U8 {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    header_count += 1;
+                    Self::check_http_header_count(header_count, max_header_count)?;
+                    let Some(colon_pos) = raw_line.iter().position(|byte: &u8| *byte == COLON_U8)
+                    else {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    };
+                    let key_bytes: &[u8] = &raw_line[..colon_pos];
+                    if key_bytes.is_empty() {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    let mut has_upper: bool = false;
+                    for &byte in key_bytes {
+                        if !HTTP_HEADER_TOKEN_TABLE[byte as usize] {
+                            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                        }
+                        if byte.is_ascii_uppercase() {
+                            has_upper = true;
+                        }
+                    }
+                    let key: &str = unsafe { from_utf8_unchecked(key_bytes) };
+                    Self::check_http_header_key_size(key, max_header_key_size)?;
+                    let raw_val: &[u8] = &raw_line[colon_pos + 1..];
+                    let mut val_non_ascii: u8 = 0;
+                    for &byte in raw_val {
+                        if !HTTP_HEADER_VALUE_VALID_TABLE[byte as usize] {
+                            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                        }
+                        val_non_ascii |= byte & 0x80;
+                    }
+                    let mut val_start: usize = 0;
+                    let mut val_end: usize = raw_val.len();
+                    while val_start < val_end
+                        && (raw_val[val_start] == SPACE_U8 || raw_val[val_start] == TAB_U8)
+                    {
+                        val_start += 1;
+                    }
+                    while val_end > val_start
+                        && (raw_val[val_end - 1] == SPACE_U8 || raw_val[val_end - 1] == TAB_U8)
+                    {
+                        val_end -= 1;
+                    }
+                    let value: &str = if val_non_ascii == 0 {
+                        unsafe { from_utf8_unchecked(&raw_val[val_start..val_end]) }
+                    } else {
+                        match from_utf8(&raw_val[val_start..val_end]) {
+                            Ok(text) => text,
+                            Err(_) => {
+                                return Err(RequestError::ReadConnection(HttpStatus::BadRequest));
+                            }
+                        }
+                    };
+                    Self::check_http_header_value_size(value, max_header_value_size)?;
+                    match key.len() {
+                        4 if key.eq_ignore_ascii_case(HOST) => {
+                            if host_seen {
+                                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                            }
+                            host_seen = true;
+                            host.clear();
+                            host.push_str(value);
+                        }
+                        14 if key.eq_ignore_ascii_case(CONTENT_LENGTH) => {
+                            if transfer_encoding_seen {
+                                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                            }
+                            if content_length_seen {
+                                return Err(RequestError::InvalidContentLength(
+                                    HttpStatus::BadRequest,
+                                ));
+                            }
+                            content_length_seen = true;
+                            content_size = Self::check_http_body_size(value, max_body_size)?;
+                        }
+                        17 if key.eq_ignore_ascii_case(HTTP_HEADER_TRANSFER_ENCODING) => {
+                            if *version != HTTP_HOST_REQUIRED_VERSION || content_length_seen {
+                                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                            }
+                            transfer_encoding_seen = true;
+                        }
+                        _ => {}
+                    }
+                    Self::insert_http_header_from_pool(headers, &mut pool, key, has_upper, value);
+                }
+                Ok(())
+            },
+        );
+        header_result?;
+        if incomplete_head {
+            self.reset();
+            line_buffer.clear();
+            return Ok(None);
+        }
+        if *version == HTTP_HOST_REQUIRED_VERSION && !host_seen {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+        if transfer_encoding_seen {
+            let values: &RequestHeadersValue = headers
+                .get(HTTP_HEADER_TRANSFER_ENCODING)
+                .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+            return Ok(Some((r#fn::parse_transfer_encoding(values)?, pos)));
+        }
+        Ok(Some((RequestFraming::Fixed(content_size), pos)))
     }
     pub(crate) async fn get_http_headers<R>(
         &mut self,
@@ -21173,6 +21803,100 @@ impl Request {
         headers.remove(HTTP_HEADER_TRAILER);
         Self::insert_http_header(headers, CONTENT_LENGTH, length);
     }
+    #[inline(always)]
+    fn insert_http_header_from_pool(
+        headers: &mut RequestHeaders,
+        pool: &mut Vec<(String, VecDeque<String>)>,
+        key: &str,
+        has_upper: bool,
+        value: &str,
+    ) {
+        if !has_upper {
+            if let Some(existing) = headers.get_mut(key) {
+                existing.push_back(value.to_owned());
+                return;
+            }
+            let (mut name, mut values): (String, VecDeque<String>) = pool
+                .pop()
+                .unwrap_or_else(|| (String::new(), VecDeque::new()));
+            name.clear();
+            name.push_str(key);
+            while values.len() > 1 {
+                values.pop_back();
+            }
+            if let Some(slot) = values.front_mut() {
+                slot.clear();
+                slot.push_str(value);
+            } else {
+                values.push_back(value.to_owned());
+            }
+            headers.insert(name, values);
+            return;
+        }
+        if key.len() <= STACK_HEADER_KEY_LIMIT {
+            let mut stack_buf: [MaybeUninit<u8>; STACK_HEADER_KEY_LIMIT] =
+                [const { MaybeUninit::uninit() }; STACK_HEADER_KEY_LIMIT];
+            let key_bytes: &[u8] = key.as_bytes();
+            let mut idx: usize = 0;
+            while idx < key_bytes.len() {
+                stack_buf[idx].write(key_bytes[idx].to_ascii_lowercase());
+                idx += 1;
+            }
+            let lower: &str = unsafe {
+                from_utf8_unchecked(slice::from_raw_parts(
+                    stack_buf.as_ptr().cast::<u8>(),
+                    key_bytes.len(),
+                ))
+            };
+            if let Some(existing) = headers.get_mut(lower) {
+                existing.push_back(value.to_owned());
+                return;
+            }
+            let (mut name, mut values): (String, VecDeque<String>) = pool
+                .pop()
+                .unwrap_or_else(|| (String::new(), VecDeque::new()));
+            name.clear();
+            name.push_str(lower);
+            while values.len() > 1 {
+                values.pop_back();
+            }
+            if let Some(slot) = values.front_mut() {
+                slot.clear();
+                slot.push_str(value);
+            } else {
+                values.push_back(value.to_owned());
+            }
+            headers.insert(name, values);
+            return;
+        }
+        let (mut name, mut values): (String, VecDeque<String>) = pool
+            .pop()
+            .unwrap_or_else(|| (String::new(), VecDeque::new()));
+        name.clear();
+        for ch in key.chars() {
+            name.push(ch.to_ascii_lowercase());
+        }
+        if let Some(existing) = headers.get_mut(&name) {
+            existing.push_back(value.to_owned());
+            if name.capacity() <= MAX_POOLED_HEADER_STRING_CAPACITY
+                && values.capacity() <= MAX_POOLED_HEADER_VALUE_CAPACITY
+                && pool.len() < MAX_POOLED_HEADER_ENTRIES
+            {
+                pool.push((name, values));
+            }
+            return;
+        }
+        while values.len() > 1 {
+            values.pop_back();
+        }
+        if let Some(slot) = values.front_mut() {
+            slot.clear();
+            slot.push_str(value);
+        } else {
+            values.push_back(value.to_owned());
+        }
+        headers.insert(name, values);
+    }
     fn insert_http_header(headers: &mut RequestHeaders, key: &str, value: &str) {
         let (mut name, mut values): (String, VecDeque<String>) =
             take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
@@ -21275,13 +21999,30 @@ impl Request {
         self.get_querys().len()
     }
     #[inline(always)]
+    fn get_header_ref(&self, key: &str) -> Option<&RequestHeadersValue> {
+        let bytes: &[u8] = key.as_bytes();
+        if !bytes.iter().any(|byte: &u8| byte.is_ascii_uppercase()) {
+            return self.get_headers().get(key);
+        }
+        if bytes.len() <= STACK_HEADER_KEY_LIMIT {
+            let mut stack_buf: [u8; STACK_HEADER_KEY_LIMIT] = [0; STACK_HEADER_KEY_LIMIT];
+            let mut idx: usize = 0;
+            while idx < bytes.len() {
+                stack_buf[idx] = bytes[idx].to_ascii_lowercase();
+                idx += 1;
+            }
+            if let Ok(lower) = from_utf8(&stack_buf[..bytes.len()]) {
+                return self.get_headers().get(lower);
+            }
+        }
+        self.get_headers().get(&key.to_ascii_lowercase())
+    }
+    #[inline(always)]
     pub fn try_get_header<K>(&self, key: K) -> Option<RequestHeadersValue>
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .get(&key.as_ref().to_ascii_lowercase())
-            .cloned()
+        self.get_header_ref(key.as_ref()).cloned()
     }
     #[inline(always)]
     pub fn get_header<K>(&self, key: K) -> RequestHeadersValue
@@ -21295,8 +22036,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .get(&key.as_ref().to_ascii_lowercase())
+        self.get_header_ref(key.as_ref())
             .and_then(|header_values: &VecDeque<String>| header_values.front().cloned())
     }
     #[inline(always)]
@@ -21311,8 +22051,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .get(&key.as_ref().to_ascii_lowercase())
+        self.get_header_ref(key.as_ref())
             .and_then(|header_values: &VecDeque<String>| header_values.back().cloned())
     }
     #[inline(always)]
@@ -21327,8 +22066,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .get(&key.as_ref().to_ascii_lowercase())
+        self.get_header_ref(key.as_ref())
             .map(|header_values: &VecDeque<String>| header_values.len())
     }
     #[inline(always)]
@@ -21354,8 +22092,7 @@ impl Request {
     where
         K: AsRef<str>,
     {
-        self.get_headers()
-            .contains_key(&key.as_ref().to_ascii_lowercase())
+        self.get_header_ref(key.as_ref()).is_some()
     }
     #[inline(always)]
     pub fn has_header_value<K, V>(&self, key: K, value: V) -> bool
@@ -21363,7 +22100,7 @@ impl Request {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        if let Some(values) = self.get_headers().get(&key.as_ref().to_ascii_lowercase()) {
+        if let Some(values) = self.get_header_ref(key.as_ref()) {
             values.iter().any(|data: &String| data == value.as_ref())
         } else {
             false
@@ -21466,7 +22203,7 @@ impl Request {
     where
         T: DeserializeOwned,
     {
-        serde_json::from_slice(self.get_body())
+        from_slice(self.get_body())
     }
     #[inline(always)]
     pub fn get_body_json<T>(&self) -> T
@@ -21633,6 +22370,20 @@ pub enum RequestError {
 # Path: hyperlane/type/src/request/const.rs
 ```rust
 use super::*;
+pub(crate) const WIRE_METHOD_GET: &[u8] = GET.as_bytes();
+pub(crate) const WIRE_METHOD_POST: &[u8] = POST.as_bytes();
+pub(crate) const WIRE_METHOD_PUT: &[u8] = PUT.as_bytes();
+pub(crate) const WIRE_METHOD_DELETE: &[u8] = DELETE.as_bytes();
+pub(crate) const WIRE_METHOD_HEAD: &[u8] = HEAD.as_bytes();
+pub(crate) const WIRE_METHOD_OPTIONS: &[u8] = OPTIONS.as_bytes();
+pub(crate) const WIRE_METHOD_PATCH: &[u8] = PATCH.as_bytes();
+pub(crate) const WIRE_METHOD_CONNECT: &[u8] = CONNECT.as_bytes();
+pub(crate) const WIRE_METHOD_TRACE: &[u8] = TRACE.as_bytes();
+pub(crate) const WIRE_VERSION_1_1: &[u8] = HTTP_VERSION_1_1.as_bytes();
+pub(crate) const WIRE_VERSION_1_0: &[u8] = HTTP_VERSION_1_0.as_bytes();
+pub(crate) const WIRE_VERSION_0_9: &[u8] = HTTP_VERSION_0_9.as_bytes();
+pub(crate) const WIRE_VERSION_2: &[u8] = HTTP_VERSION_2.as_bytes();
+pub(crate) const WIRE_VERSION_3: &[u8] = HTTP_VERSION_3.as_bytes();
 pub(crate) const HTTP_HEADER_TAB: u8 = b'\t';
 pub(crate) const ENTITY_TAG_QUOTE: u8 = b'"';
 pub(crate) const HTTP_HEADER_DELETE: u8 = 0x7f;
@@ -21649,6 +22400,47 @@ pub(crate) const HTTP_HEADER_TRANSFER_ENCODING: &str = "transfer-encoding";
 pub(super) const HTTP_HEADER_TRAILER: &str = "trailer";
 pub(crate) const ENTITY_TAG_OPTIONAL_WHITESPACE: &[u8] = b" \t";
 pub(crate) const HTTP_HEADER_OPTIONAL_WHITESPACE: [char; 2] = [' ', '\t'];
+pub(crate) const STACK_HEADER_KEY_LIMIT: usize = B_64;
+pub(crate) const HTTP_HEADER_TOKEN_TABLE: [bool; 256] = {
+    let mut table: [bool; 256] = [false; 256];
+    let mut idx: usize = 0;
+    while idx < 256 {
+        let byte: u8 = idx as u8;
+        let is_alnum: bool = byte.is_ascii_alphanumeric();
+        let is_punct: bool = matches!(
+            byte,
+            b'!' | b'#'
+                | b'$'
+                | b'%'
+                | b'&'
+                | b'\''
+                | b'*'
+                | b'+'
+                | b'-'
+                | b'.'
+                | b'^'
+                | b'_'
+                | b'`'
+                | b'|'
+                | b'~'
+        );
+        table[idx] = is_alnum || is_punct;
+        idx += 1;
+    }
+    table
+};
+pub(crate) const HTTP_HEADER_VALUE_VALID_TABLE: [bool; 256] = {
+    let mut table: [bool; 256] = [false; 256];
+    let mut idx: usize = 0;
+    while idx < 256 {
+        let byte: u8 = idx as u8;
+        let is_invalid: bool = (byte < HTTP_HEADER_CONTROL_LIMIT && byte != HTTP_HEADER_TAB)
+            || byte == HTTP_HEADER_DELETE;
+        table[idx] = !is_invalid;
+        idx += 1;
+    }
+    table
+};
 ```
 # Path: hyperlane/type/src/request/mod.rs
 ```rust
@@ -21668,29 +22460,29 @@ use super::*;
 #[derive(Clone, Copy, Data, Debug, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct RequestConfig {
     #[get(type(copy))]
-    pub buffer_size: usize,
+    pub(crate) buffer_size: usize,
     #[get(type(copy))]
-    pub max_path_size: usize,
+    pub(crate) max_path_size: usize,
     #[get(type(copy))]
-    pub max_header_count: usize,
+    pub(crate) max_header_count: usize,
     #[get(type(copy))]
-    pub max_header_key_size: usize,
+    pub(crate) max_header_key_size: usize,
     #[get(type(copy))]
-    pub max_header_value_size: usize,
+    pub(crate) max_header_value_size: usize,
     #[get(type(copy))]
-    pub max_body_size: usize,
+    pub(crate) max_body_size: usize,
     #[get(type(copy))]
-    pub read_timeout_ms: u64,
+    pub(crate) read_timeout_ms: u64,
 }
 #[derive(Clone, Data, Debug, Deserialize, DisplayDebug, Eq, PartialEq, Serialize)]
 pub struct Request {
-    pub method: RequestMethod,
-    pub host: RequestHost,
-    pub version: RequestVersion,
-    pub path: RequestPath,
-    pub querys: RequestQuerys,
-    pub headers: RequestHeaders,
-    pub body: RequestBody,
+    pub(crate) method: RequestMethod,
+    pub(crate) host: RequestHost,
+    pub(crate) version: RequestVersion,
+    pub(crate) path: RequestPath,
+    pub(crate) querys: RequestQuerys,
+    pub(crate) headers: RequestHeaders,
+    pub(crate) body: RequestBody,
 }
 ```
 # Path: hyperlane/type/src/request/fn.rs
@@ -21807,7 +22599,7 @@ impl ContentType {
     where
         T: Serialize + Debug + Clone + Default + Display,
     {
-        hex::encode(data.to_string())
+        encode(data.to_string())
     }
     pub fn get_body_string<T>(&self, data: &T) -> String
     where
@@ -23685,29 +24477,17 @@ use super::*;
 use super::*;
 #[derive(Clone, Data, Debug, Default, Eq, PartialEq)]
 pub struct HttpUrlComponents {
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub protocol: String,
+    pub(crate) protocol: String,
     #[get(type(clone))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub host: Option<String>,
+    pub(crate) host: Option<String>,
     #[get(type(clone))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub port: Option<u16>,
+    pub(crate) port: Option<u16>,
     #[get(type(clone))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub path: Option<String>,
+    pub(crate) path: Option<String>,
     #[get(type(clone))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub query: Option<String>,
+    pub(crate) query: Option<String>,
     #[get(type(clone))]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub fragment: Option<String>,
+    pub(crate) fragment: Option<String>,
 }
 ```
 # Path: hyperlane/cli/README.md
@@ -23736,6 +24516,7 @@ mod template;
 mod version;
 use super::*;
 use std::{env::args, io};
+use log::{Level, LevelFilter, Log, Metadata, max_level, set_max_level};
 ```
 # Path: hyperlane/cli/tests/command/mod.rs
 ```rust
@@ -23913,39 +24694,39 @@ use super::*;
 fn test_logger_unit_value_is_constructible() {
     let logger: Logger = Logger;
     let other: Logger = Logger;
-    log::Log::flush(&logger);
-    log::Log::flush(&other);
+    Log::flush(&logger);
+    Log::flush(&other);
 }
 #[test]
 fn test_logger_flush_is_a_noop() {
     let logger: Logger = Logger;
-    log::Log::flush(&logger);
+    Log::flush(&logger);
 }
 #[test]
 fn test_logger_enabled_follows_max_level() {
-    log::set_max_level(log::LevelFilter::Info);
+    set_max_level(LevelFilter::Info);
     let logger: Logger = Logger;
-    let error_metadata: log::Metadata<'_> = log::Metadata::builder()
-        .level(log::Level::Error)
+    let error_metadata: Metadata<'_> = Metadata::builder()
+        .level(Level::Error)
         .target("hyperlane-cli")
         .build();
-    let trace_metadata: log::Metadata<'_> = log::Metadata::builder()
-        .level(log::Level::Trace)
+    let trace_metadata: Metadata<'_> = Metadata::builder()
+        .level(Level::Trace)
         .target("hyperlane-cli")
         .build();
-    assert!(log::Log::enabled(&logger, &error_metadata));
-    assert!(!log::Log::enabled(&logger, &trace_metadata));
+    assert!(Log::enabled(&logger, &error_metadata));
+    assert!(!Log::enabled(&logger, &trace_metadata));
 }
 #[test]
 fn test_logger_init_sets_max_level() {
-    Logger::init(log::LevelFilter::Warn);
-    assert_eq!(log::max_level(), log::LevelFilter::Warn);
-    log::set_max_level(log::LevelFilter::Info);
+    Logger::init(LevelFilter::Warn);
+    assert_eq!(max_level(), LevelFilter::Warn);
+    set_max_level(LevelFilter::Info);
 }
 #[test]
 fn test_logger_new_constructs_instance() {
     let logger: Logger = Logger::new();
-    log::Log::flush(&logger);
+    Log::flush(&logger);
 }
 ```
 # Path: hyperlane/cli/tests/template/mod.rs
@@ -24373,14 +25154,18 @@ pub(crate) use std::{
     str::FromStr,
 };
 pub(crate) use {
-    log::SetLoggerError,
+    log::{
+        Level, LevelFilter, Metadata, Record, SetLoggerError, max_level, set_logger, set_max_level,
+    },
     lombok_macros::*,
-    notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher},
+    notify::{
+        Error, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher,
+    },
     std::ffi::OsStr,
     tokio::{
         fs::{create_dir_all, write},
         process::Command,
-        sync::watch::{Receiver, Sender, channel},
+        sync::watch::{Receiver, Sender, channel, error::SendError},
         time::{Duration, Interval, interval, sleep},
     },
 };
@@ -24458,8 +25243,8 @@ use super::*;
 use super::*;
 #[derive(Clone, Data, Debug)]
 pub struct NewProjectConfig {
-    pub project_name: String,
-    pub template_url: String,
+    pub(crate) project_name: String,
+    pub(crate) template_url: String,
 }
 ```
 # Path: hyperlane/cli/src/new/fn.rs
@@ -24535,15 +25320,15 @@ pub async fn execute_new(project_name: &str) -> Result<(), NewError> {
 ```rust
 use super::*;
 impl log::Log for Logger {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= log::max_level()
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= max_level()
     }
-    fn log(&self, record: &log::Record) {
+    fn log(&self, record: &Record) {
         if !self.enabled(record.metadata()) {
             return;
         }
-        let now_time: String = color_output::time();
-        let level: log::Level = record.level();
+        let now_time: String = time();
+        let level: Level = record.level();
         let args: &Arguments<'_> = record.args();
         let file: Option<&str> = record.file();
         let module_path: Option<&str> = record.module_path();
@@ -24555,11 +25340,11 @@ impl log::Log for Logger {
         let args_text: String = format!("{args}{LOG_SPACE}");
         let location_text: String = format!("{LOG_SPACE}{location}{LOG_COLON}{line}{LOG_SPACE}");
         let color: ColorType = match record.level() {
-            log::Level::Trace => ColorType::Use(Color::Magenta),
-            log::Level::Debug => ColorType::Use(Color::Cyan),
-            log::Level::Info => ColorType::Use(Color::Green),
-            log::Level::Warn => ColorType::Use(Color::Yellow),
-            log::Level::Error => ColorType::Use(Color::Red),
+            Level::Trace => ColorType::Use(Color::Magenta),
+            Level::Debug => ColorType::Use(Color::Cyan),
+            Level::Info => ColorType::Use(Color::Green),
+            Level::Warn => ColorType::Use(Color::Yellow),
+            Level::Error => ColorType::Use(Color::Red),
         };
         let mut time_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
         let mut level_output_builder: ColorOutputBuilder<'_> = ColorOutputBuilder::new();
@@ -24598,9 +25383,9 @@ impl log::Log for Logger {
     fn flush(&self) {}
 }
 impl Logger {
-    pub fn init(level_filter: log::LevelFilter) {
-        let _: Result<(), SetLoggerError> = log::set_logger(&LOGGER);
-        log::set_max_level(level_filter);
+    pub fn init(level_filter: LevelFilter) {
+        let _: Result<(), SetLoggerError> = set_logger(&LOGGER);
+        set_max_level(level_filter);
     }
 }
 ```
@@ -24759,10 +25544,10 @@ use super::*;
 use super::*;
 #[derive(Clone, Data, Debug)]
 pub struct TemplateConfig {
-    pub template_type: TemplateType,
-    pub component_name: String,
-    pub model_sub_type: Option<ModelSubType>,
-    pub base_directory: String,
+    pub(crate) template_type: TemplateType,
+    pub(crate) component_name: String,
+    pub(crate) model_sub_type: Option<ModelSubType>,
+    pub(crate) base_directory: String,
 }
 ```
 # Path: hyperlane/cli/src/template/fn.rs
@@ -25234,15 +26019,15 @@ pub async fn execute_watch() -> Result<(), io::Error> {
     run_cargo_run().await?;
     let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));
     let mut watcher: RecommendedWatcher =
-        recommended_watcher(move |result: Result<Event, notify::Error>| {
+        recommended_watcher(move |result: Result<Event, Error>| {
             if let Ok(event) = result {
-                let _: Result<(), tokio::sync::watch::error::SendError<Event>> = tx.send(event);
+                let _: Result<(), SendError<Event>> = tx.send(event);
             }
         })
-        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
+        .map_err(|error: Error| io::Error::other(error.to_string()))?;
     watcher
         .watch(&src_path, RecursiveMode::Recursive)
-        .map_err(|error: notify::Error| io::Error::other(error.to_string()))?;
+        .map_err(|error: Error| io::Error::other(error.to_string()))?;
     log::info!("Watching src/ for changes...");
     let mut debounce: Interval = interval(Duration::from_millis(500));
     debounce.tick().await;
@@ -25505,10 +26290,10 @@ impl Default for LoggerConfig {
     }
 }
 impl log::Log for LoggerPlugin {
-    fn enabled(&self, _: &log::Metadata<'_>) -> bool {
+    fn enabled(&self, _: &Metadata<'_>) -> bool {
         true
     }
-    fn log(&self, record: &log::Record<'_>) {
+    fn log(&self, record: &Record<'_>) {
         let line: String = format!("{} {}", record.level(), record.args());
         if let Some(file) = FILE.get()
             && let Ok(mut file) = file.lock()
@@ -25541,9 +26326,9 @@ impl LoggerPlugin {
             .map_err(|_: LoggerConfig| "the logger configuration was already set".to_owned())?;
         FILE.set(Mutex::new(file))
             .map_err(|_: Mutex<Option<File>>| "the log file was already set".to_owned())?;
-        log::set_logger(&LoggerPlugin)
-            .map_err(|_: log::SetLoggerError| "a logger was already installed".to_owned())?;
-        log::set_max_level(
+        set_logger(&LoggerPlugin)
+            .map_err(|_: SetLoggerError| "a logger was already installed".to_owned())?;
+        set_max_level(
             CONFIG
                 .get()
                 .map(|config: &LoggerConfig| config.level)
@@ -25649,8 +26434,8 @@ pub(crate) const METHOD_UNKNOWN: &str = "-";
 use super::*;
 #[derive(Clone, Debug)]
 pub struct LoggerConfig {
-    pub level: LevelFilter,
-    pub file: Option<String>,
+    pub(crate) level: LevelFilter,
+    pub(crate) file: Option<String>,
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LoggerPlugin;
@@ -25680,6 +26465,7 @@ use std::{
     time::Instant,
 };
 use hyperlane::{Context, ServerHook, Status, Stream};
+use log::{Metadata, Record, SetLoggerError, set_logger, set_max_level};
 ```
 # Path: hyperlane/plugin/websocket/README.md
 ## hyperlane-plugin-websocket
@@ -26771,6 +27557,13 @@ where
             closed_hook: Hook::default_handler(),
         }
     }
+    #[inline(always)]
+    pub fn take_parts(self) -> (&'a mut Stream, &'a mut Context) {
+        let Self {
+            stream, context, ..
+        } = self;
+        (stream, context)
+    }
 }
 impl<'a, B> WebSocketConfig<'a, B>
 where
@@ -26987,27 +27780,27 @@ pub(crate) const POINT_TO_GROUP_KEY: &str = "ptg-";
 use super::*;
 #[derive(Clone, Data, Debug, Default)]
 pub struct WebSocket {
-    pub broadcast_map: BroadcastMap<Vec<u8>>,
+    pub(crate) broadcast_map: BroadcastMap<Vec<u8>>,
 }
 #[derive(Data)]
 pub struct WebSocketConfig<'a, B: BroadcastTypeTrait> {
     #[set(skip)]
-    pub stream: &'a mut Stream,
+    pub(crate) stream: &'a mut Stream,
     #[set(skip)]
-    pub context: &'a mut Context,
+    pub(crate) context: &'a mut Context,
     #[get(type(copy))]
     #[set(skip)]
-    pub capacity: Capacity,
+    pub(crate) capacity: Capacity,
     #[set(skip)]
-    pub broadcast_type: BroadcastType<B>,
+    pub(crate) broadcast_type: BroadcastType<B>,
     #[set(skip)]
-    pub connected_hook: ServerHookHandler,
+    pub(crate) connected_hook: ServerHookHandler,
     #[set(skip)]
-    pub request_hook: ServerHookHandler,
+    pub(crate) request_hook: ServerHookHandler,
     #[set(skip)]
-    pub sended_hook: ServerHookHandler,
+    pub(crate) sended_hook: ServerHookHandler,
     #[set(skip)]
-    pub closed_hook: ServerHookHandler,
+    pub(crate) closed_hook: ServerHookHandler,
 }
 ```
 # Path: hyperlane/plugin/websocket/src/trait.rs
@@ -34910,6 +35703,8 @@ mod framing;
 mod protocol;
 mod route;
 mod server;
+#[cfg(target_os = "linux")]
+mod uring;
 use super::*;
 use std::{
     any::Any,
@@ -34920,21 +35715,497 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
     time::{Duration, Instant},
 };
+#[cfg(target_os = "linux")]
+use std::{
+    future::pending,
+    panic::{catch_unwind, resume_unwind},
+};
 use bytes::{Buf, Bytes};
-use h3::error::Code;
+use h2::{Error, RecvStream, SendStream, client::ResponseFuture, client::handshake};
+use h3::{
+    client::RequestStream,
+    client::new,
+    error::{Code, StreamError},
+};
+use h3_quinn::{BidiStream, OpenStreams};
+use http::{HeaderMap, HeaderValue, Uri, Version, request::Builder};
+use quinn::{
+    ConnectError, Connecting, Endpoint, crypto::rustls::HandshakeData,
+    crypto::rustls::QuicClientConfig,
+};
 use rustls::{
     ClientConfig, RootCertStore,
-    pki_types::{CertificateDer, ServerName, pem::PemObject},
+    pki_types::{CertificateDer, InvalidDnsNameError, ServerName, pem::PemObject},
 };
+use socket2::SockRef;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
     spawn,
+    sync::MutexGuard,
     sync::Notify,
+    sync::oneshot::Receiver,
+    sync::oneshot::Sender,
     task::JoinHandle,
+    time::error::Elapsed,
     time::{sleep, timeout},
 };
-pub(crate) type ClientTlsStream = tokio_rustls::client::TlsStream<TcpStream>;
+use tokio_rustls::{Connect, TlsConnector, client::TlsStream};
+pub(crate) type ClientTlsStream = TlsStream<TcpStream>;
+```
+# Path: hyperlane/core/tests/uring/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/core/tests/uring/fn.rs
+```rust
+use super::*;
+fn with_uring_slot(check: impl FnOnce(&mut UringTcpTransport)) -> bool {
+    let Ok(ring) = IoUring::new(16) else {
+        assert!(!uring_is_available());
+        eprintln!("io_uring unavailable; the missing-reactor regression remains active");
+        return false;
+    };
+    let listener: StdTcpListener = StdTcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let client: net::TcpStream = net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    let (server, remote): (net::TcpStream, SocketAddr) = listener.accept().unwrap();
+    server.set_nonblocking(true).unwrap();
+    let peers: StreamPeers = StreamPeers {
+        local: server.local_addr().unwrap(),
+        remote,
+    };
+    let wake_state: Arc<UringWakeState> = Arc::new(UringWakeState {
+        eventfd: -1,
+        ready: Mutex::new(Vec::new()),
+        signaled: AtomicBool::new(false),
+        shutdown: AtomicBool::new(false),
+    });
+    let slot: UringConnSlot = UringConnSlot {
+        fd: server.as_raw_fd(),
+        connection_id: 1,
+        read_buf: vec![0; URING_IO_BUF_SIZE].into_boxed_slice(),
+        read_pos: 0,
+        read_len: 0,
+        write_buf: vec![0; URING_IO_BUF_SIZE].into_boxed_slice(),
+        write_pos: 0,
+        write_len: 0,
+        pending_write: Vec::new(),
+        send_staged: false,
+        recv_inflight: false,
+        send_inflight: false,
+        close_inflight: false,
+        flush_pending: false,
+        cancel_inflight: false,
+        eof: false,
+        write_shutdown: false,
+        shutdown_inflight: false,
+        shutdown_done: false,
+        closing: false,
+        read_err: None,
+        write_err: None,
+        waker: Waker::noop().clone(),
+        task: None,
+        in_local_ready: false,
+    };
+    let reactor: UringReactor = UringReactor {
+        ring,
+        pending_submissions: VecDeque::new(),
+        slots: vec![Some(slot)],
+        free_slots: Vec::new(),
+        buf_pool: Vec::new(),
+        waker_cache: vec![None],
+        local_ready: Vec::new(),
+        wake_state,
+        active_slots: 1,
+        next_connection_id: 2,
+        owner_thread: thread::current().id(),
+    };
+    URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+        assert!(cell.borrow().is_none());
+        *cell.borrow_mut() = Some(reactor);
+    });
+    let mut transport: UringTcpTransport = UringTcpTransport {
+        slot_id: 0,
+        connection_id: 1,
+        owner_thread: thread::current().id(),
+        peers,
+    };
+    let outcome: Result<(), Box<dyn Any + Send>> =
+        catch_unwind(AssertUnwindSafe(|| check(&mut transport)));
+    let reactor: Option<UringReactor> =
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| cell.borrow_mut().take());
+    drop(reactor);
+    drop(server);
+    drop(client);
+    drop(listener);
+    if let Err(panic) = outcome {
+        resume_unwind(panic);
+    }
+    true
+}
+#[test]
+fn uring_flush_without_a_reactor_reports_broken_pipe() {
+    let address: SocketAddr = SocketAddr::from((Ipv4Addr::LOCALHOST, 0));
+    let mut transport: UringTcpTransport = UringTcpTransport {
+        slot_id: 0,
+        connection_id: 1,
+        owner_thread: thread::current().id(),
+        peers: StreamPeers {
+            local: address,
+            remote: address,
+        },
+    };
+    let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+    let outcome: Poll<io::Result<()>> = Pin::new(&mut transport).poll_flush(&mut context);
+    assert!(
+        matches!(outcome, Poll::Ready(Err(error)) if error.kind() == io::ErrorKind::BrokenPipe)
+    );
+}
+#[test]
+fn uring_flush_waits_for_an_inflight_send() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.write_len = 4;
+            slot.send_inflight = true;
+        });
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        assert!(Pin::new(transport).poll_flush(&mut context).is_pending());
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_flush_propagates_a_completed_send_error() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.write_err = Some(EPIPE);
+        });
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        let outcome: Poll<io::Result<()>> = Pin::new(transport).poll_flush(&mut context);
+        assert!(matches!(outcome, Poll::Ready(Err(error)) if error.raw_os_error() == Some(EPIPE)));
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_linked_close_retains_the_fd_until_completion() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &mut UringConnSlot = reactor.slots[0].as_mut().unwrap();
+            let fd: RawFd = slot.fd;
+            slot.write_buf[..4].copy_from_slice(b"test");
+            slot.write_len = 4;
+            slot.send_staged = true;
+            slot.closing = true;
+            reactor.flush_staged_send(0, true);
+            assert_eq!(reactor.slots[0].as_ref().unwrap().fd, fd);
+            assert!(reactor.slots[0].as_ref().unwrap().close_inflight);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_partial_linked_send_survives_a_cancelled_close() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &mut UringConnSlot = reactor.slots[0].as_mut().unwrap();
+            let fd: RawFd = slot.fd;
+            slot.write_buf[..8].copy_from_slice(b"abcdefgh");
+            slot.write_len = 8;
+            slot.send_inflight = true;
+            slot.close_inflight = true;
+            slot.closing = true;
+            reactor.complete_send(0, 3);
+            assert_eq!(reactor.slots[0].as_ref().unwrap().write_pos, 3);
+            assert_eq!(reactor.slots[0].as_ref().unwrap().write_len, 8);
+            assert!(reactor.free_slots.is_empty());
+            reactor.complete_close(0, -ECANCELED);
+            let slot: &UringConnSlot = reactor.slots[0].as_ref().unwrap();
+            assert_eq!(slot.fd, fd);
+            assert_eq!(slot.write_pos, 3);
+            assert!(slot.send_inflight && slot.close_inflight);
+            assert_eq!(reactor.active_slots, 1);
+            assert!(reactor.free_slots.is_empty());
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_failed_linked_send_retries_only_the_cancelled_close() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &mut UringConnSlot = reactor.slots[0].as_mut().unwrap();
+            let fd: RawFd = slot.fd;
+            slot.write_len = 4;
+            slot.send_inflight = true;
+            slot.close_inflight = true;
+            slot.closing = true;
+            reactor.complete_send(0, -EPIPE);
+            reactor.complete_close(0, -ECANCELED);
+            let slot: &UringConnSlot = reactor.slots[0].as_ref().unwrap();
+            assert_eq!(slot.fd, fd);
+            assert_eq!(slot.write_err, Some(EPIPE));
+            assert!(!slot.send_inflight);
+            assert!(slot.close_inflight);
+            assert_eq!(reactor.active_slots, 1);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_full_sq_retains_a_complete_linked_group() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let capacity: usize = reactor.ring.submission().capacity();
+            for _ in 0..capacity - 1 {
+                reactor.push_sqe(opcode::Nop::new().build());
+            }
+            let slot: &mut UringConnSlot = reactor.slots[0].as_mut().unwrap();
+            slot.write_len = 4;
+            slot.send_staged = true;
+            slot.closing = true;
+            reactor.flush_staged_send(0, true);
+            assert_eq!(reactor.ring.submission().len(), capacity - 1);
+            assert_eq!(reactor.pending_submissions.len(), 1);
+            assert!(matches!(
+                reactor.pending_submissions.front(),
+                Some(UringSubmission::Linked(_))
+            ));
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_full_sq_does_not_lose_a_standalone_operation() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let capacity: usize = reactor.ring.submission().capacity();
+            for _ in 0..capacity + 1 {
+                reactor.push_sqe(opcode::Nop::new().build());
+            }
+            assert_eq!(reactor.pending_submissions.len(), 1);
+            let mut completed: usize = 0;
+            while completed < capacity + 1 {
+                reactor.submit_io().unwrap();
+                completed += reactor.ring.completion().count();
+            }
+            assert!(reactor.pending_submissions.is_empty());
+            assert_eq!(completed, capacity + 1);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_shutdown_propagates_a_completed_send_error() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.write_err = Some(EPIPE);
+        });
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        let outcome: Poll<io::Result<()>> = Pin::new(transport).poll_shutdown(&mut context);
+        assert!(matches!(outcome, Poll::Ready(Err(error)) if error.raw_os_error() == Some(EPIPE)));
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_flush_prefetches_receive_without_reporting_early_success() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.write_buf[..4].copy_from_slice(b"test");
+            slot.write_len = 4;
+            slot.send_staged = true;
+        });
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        assert!(Pin::new(transport).poll_flush(&mut context).is_pending());
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &UringConnSlot = reactor.slots[0].as_ref().unwrap();
+            assert!(slot.send_inflight && slot.recv_inflight);
+            assert!(slot.flush_pending);
+            assert_eq!(reactor.ring.submission().len(), 2);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_shutdown_does_not_start_receive_prefetch() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.write_len = 4;
+            slot.send_staged = true;
+        });
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        assert!(Pin::new(transport).poll_shutdown(&mut context).is_pending());
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &UringConnSlot = guard.as_ref().unwrap().slots[0].as_ref().unwrap();
+            assert!(slot.send_inflight);
+            assert!(slot.shutdown_inflight);
+            assert!(!slot.recv_inflight);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_close_before_cancel_cqe_cannot_reuse_a_slot() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &mut UringConnSlot = reactor.slots[0].as_mut().unwrap();
+            slot.closing = true;
+            slot.close_inflight = true;
+            slot.cancel_inflight = true;
+            reactor.complete_close(0, 0);
+            assert_eq!(reactor.active_slots, 1);
+            assert!(reactor.free_slots.is_empty());
+            reactor.complete_cancel(0);
+            assert_eq!(reactor.active_slots, 0);
+            assert_eq!(reactor.free_slots, vec![0]);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_cancel_before_close_cqe_cannot_reuse_a_slot() {
+    let exercised: bool = with_uring_slot(|_: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let reactor: &mut UringReactor = guard.as_mut().unwrap();
+            let slot: &mut UringConnSlot = reactor.slots[0].as_mut().unwrap();
+            slot.closing = true;
+            slot.close_inflight = true;
+            slot.cancel_inflight = true;
+            reactor.complete_cancel(0);
+            assert_eq!(reactor.active_slots, 1);
+            assert!(reactor.free_slots.is_empty());
+            reactor.complete_close(0, 0);
+            assert_eq!(reactor.active_slots, 0);
+            assert_eq!(reactor.free_slots, vec![0]);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_reused_slot_rejects_a_retained_connection_identity() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &mut UringConnSlot = guard.as_mut().unwrap().slots[0].as_mut().unwrap();
+            slot.read_buf[..4].copy_from_slice(b"hide");
+            slot.read_len = 4;
+        });
+        let mut stale: UringTcpTransport = UringTcpTransport {
+            slot_id: transport.slot_id,
+            connection_id: 99,
+            owner_thread: transport.owner_thread,
+            peers: transport.peers,
+        };
+        let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+        let mut bytes: [u8; 4] = [0; 4];
+        let mut buffer: ReadBuf<'_> = ReadBuf::new(&mut bytes);
+        assert!(matches!(
+            Pin::new(&mut stale).poll_read(&mut context, &mut buffer),
+            Poll::Ready(Err(_))
+        ));
+        assert!(buffer.filled().is_empty());
+        assert!(matches!(
+            Pin::new(&mut stale).poll_write(&mut context, b"write"),
+            Poll::Ready(Err(_))
+        ));
+        assert!(matches!(
+            Pin::new(&mut stale).poll_write_vectored(&mut context, &[IoSlice::new(b"write")]),
+            Poll::Ready(Err(_))
+        ));
+        assert!(matches!(
+            Pin::new(&mut stale).poll_flush(&mut context),
+            Poll::Ready(Err(_))
+        ));
+        assert!(matches!(
+            Pin::new(&mut stale).poll_shutdown(&mut context),
+            Poll::Ready(Err(_))
+        ));
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let slot: &UringConnSlot = guard.as_ref().unwrap().slots[0].as_ref().unwrap();
+            assert_eq!(slot.read_pos, 0);
+            assert_eq!(slot.write_len, 0);
+            assert!(!slot.write_shutdown);
+            assert!(!slot.send_inflight && !slot.recv_inflight);
+        });
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
+#[test]
+fn uring_handle_cannot_access_another_workers_matching_slab_index() {
+    let exercised: bool = with_uring_slot(|transport: &mut UringTcpTransport| {
+        let mut moved: UringTcpTransport = UringTcpTransport {
+            slot_id: transport.slot_id,
+            connection_id: transport.connection_id,
+            owner_thread: transport.owner_thread,
+            peers: transport.peers,
+        };
+        let worker: ThreadJoinHandle<bool> = thread::spawn(move || {
+            with_uring_slot(|_: &mut UringTcpTransport| {
+                let mut context: task::Context<'_> = task::Context::from_waker(Waker::noop());
+                let outcome: Poll<io::Result<()>> = Pin::new(&mut moved).poll_flush(&mut context);
+                assert!(
+                    matches!(outcome, Poll::Ready(Err(error)) if error.raw_os_error() == Some(EPIPE))
+                );
+            })
+        });
+        assert!(worker.join().unwrap());
+    });
+    if !exercised {
+        assert!(!uring_is_available());
+    }
+}
 ```
 # Path: hyperlane/core/tests/context/mod.rs
 ```rust
@@ -36201,7 +37472,7 @@ async fn an_http1_listener_refuses_a_prior_knowledge_http2_client() {
         .await
         .expect("the client handshake future resolves before the wire is settled");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
     let outcome: Result<H2Reply, String> = h2_request(&mut sender, "GET", &target, &[]).await;
@@ -36260,9 +37531,9 @@ async fn http2_strips_every_hop_by_hop_header_but_keeps_end_to_end_ones() {
         .await
         .expect("h2 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
-    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_request_with_headers(
+    let (status, headers, body): (u16, HeaderMap, Vec<u8>) = h2_request_with_headers(
         &mut sender,
         "GET",
         &format!("http://{TLS_SERVER_NAME}:{port}{HOP_BY_HOP_CLEAN_ROUTE_PATH}"),
@@ -36291,7 +37562,7 @@ async fn http2_strips_every_hop_by_hop_header_but_keeps_end_to_end_ones() {
         "an end-to-end header must survive the stripping, got: {headers:?}"
     );
     assert_eq!(String::from_utf8_lossy(&body), HOP_BY_HOP_SENT_BODY);
-    let (status, _version, body): (u16, http::Version, Vec<u8>) = h2_request(
+    let (status, _version, body): (u16, Version, Vec<u8>) = h2_request(
         &mut sender,
         "GET",
         &format!("http://{TLS_SERVER_NAME}:{port}{HOP_BY_HOP_CLEAN_ROUTE_PATH}"),
@@ -36315,7 +37586,7 @@ async fn http2_refuses_a_response_announcing_a_chunked_transfer_encoding() {
         .await
         .expect("h2 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let outcome: Result<H2Reply, String> = h2_request(
         &mut sender,
@@ -36397,10 +37668,75 @@ async fn http1_split_writes_reassemble_into_one_body_across_several_writes() {
 mod r#assert;
 use super::*;
 ```
+# Path: hyperlane/core/tests/protocol/runtime/impl.rs
+```rust
+use super::*;
+impl Drop for UringDropProbe {
+    fn drop(&mut self) {
+        let Self { state } = self;
+        let available: bool =
+            URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| cell.try_borrow().is_ok());
+        state
+            .borrow_available
+            .store(available, AtomicOrdering::Release);
+        state.dropped.store(true, AtomicOrdering::Release);
+    }
+}
+impl ServerHook for UringPendingDropRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        let state: Arc<UringDropState> =
+            Arc::clone(URING_DROP_STATE.get_or_init(|| Arc::new(UringDropState::default())));
+        Self {
+            probe: UringDropProbe { state },
+        }
+    }
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        let Self { probe } = self;
+        let UringDropProbe { state } = &probe;
+        let entered: bool =
+            URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| cell.borrow().is_some());
+        state.entered_uring.store(entered, AtomicOrdering::Release);
+        state.started.notify_one();
+        pending::<()>().await;
+        drop(probe);
+        Status::Reject
+    }
+}
+```
+# Path: hyperlane/core/tests/protocol/runtime/static.rs
+```rust
+use super::*;
+pub(crate) static URING_DROP_STATE: OnceLock<Arc<UringDropState>> = OnceLock::new();
+```
 # Path: hyperlane/core/tests/protocol/runtime/mod.rs
 ```rust
 mod r#fn;
+#[cfg(target_os = "linux")]
+mod r#impl;
+#[cfg(target_os = "linux")]
+mod r#static;
+#[cfg(target_os = "linux")]
+mod r#struct;
+#[cfg(target_os = "linux")]
+use {r#static::*, r#struct::*};
 use super::*;
+```
+# Path: hyperlane/core/tests/protocol/runtime/struct.rs
+```rust
+use super::*;
+#[derive(Default)]
+pub(crate) struct UringDropState {
+    pub(super) started: Notify,
+    pub(super) entered_uring: AtomicBool,
+    pub(super) dropped: AtomicBool,
+    pub(super) borrow_available: AtomicBool,
+}
+pub(crate) struct UringDropProbe {
+    pub(super) state: Arc<UringDropState>,
+}
+pub(crate) struct UringPendingDropRoute {
+    pub(super) probe: UringDropProbe,
+}
 ```
 # Path: hyperlane/core/tests/protocol/runtime/fn.rs
 ```rust
@@ -36501,6 +37837,170 @@ async fn unreadable_tls_material_is_rejected_before_binding() {
     );
     let rebound: io::Result<TcpListener> = TcpListener::bind(&address);
     assert!(rebound.is_ok(), "the rejected run must leave the port free");
+}
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn uring_shutdown_drops_user_futures_outside_reactor_borrows() {
+    if !uring_is_available() {
+        eprintln!(
+            "io_uring unavailable; shutdown reentrancy requires the permitted-kernel test run"
+        );
+        return;
+    }
+    let state: Arc<UringDropState> =
+        Arc::clone(URING_DROP_STATE.get_or_init(|| Arc::new(UringDropState::default())));
+    let mut server: Server = Server::default();
+    server.server_config(protocol_config(
+        PLACEHOLDER_ADDRESS,
+        ServerProtocol::Http1,
+        None,
+    ));
+    server.route::<UringPendingDropRoute>(VERSION_ROUTE_PATH);
+    let (control, port): (ServerControlHook, u16) =
+        run_on_reserved_port(&mut server).await.unwrap();
+    let mut client: TcpStream = connect_tcp(port).await.unwrap();
+    client
+        .write_all(&http1_close_request("GET", VERSION_ROUTE_PATH))
+        .await
+        .unwrap();
+    timeout(Duration::from_secs(3), state.started.notified())
+        .await
+        .unwrap();
+    assert!(state.entered_uring.load(AtomicOrdering::Acquire));
+    timeout(Duration::from_secs(3), control.shutdown())
+        .await
+        .unwrap();
+    timeout(Duration::from_secs(3), control.wait())
+        .await
+        .unwrap();
+    assert!(state.dropped.load(AtomicOrdering::Acquire));
+    assert!(state.borrow_available.load(AtomicOrdering::Acquire));
+}
+```
+# Path: hyperlane/core/tests/protocol/codec/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/core/tests/protocol/codec/fn.rs
+```rust
+use super::*;
+fn literal_block(fields: &[(&str, &str)]) -> Vec<u8> {
+    let mut output: Vec<u8> = vec![0, 0];
+    for &(name, value) in fields {
+        let len: usize = name.len();
+        assert!(len < 127 && value.len() < 127);
+        if len < 7 {
+            output.push(0x20 | len as u8);
+        } else {
+            output.push(0x27);
+            output.push((len - 7) as u8);
+        }
+        output.extend_from_slice(name.as_bytes());
+        output.push(value.len() as u8);
+        output.extend_from_slice(value.as_bytes());
+    }
+    output
+}
+fn decode_test_request(payload: &[u8]) -> Result<Request, RequestError> {
+    let mut request: Request = Request::default();
+    let mut target: String = String::new();
+    decode_qpack_request(
+        payload,
+        &RequestConfig::default(),
+        &mut request,
+        &mut target,
+    )?;
+    Ok(request)
+}
+#[test]
+fn huffman_rfc_examples_decode_exactly() {
+    let examples: [(&[u8], &[u8]); 3] = [
+        (
+            &[
+                0xf1, 0xe3, 0xc2, 0xe5, 0xf2, 0x3a, 0x6b, 0xa0, 0xab, 0x90, 0xf4, 0xff,
+            ],
+            b"www.example.com",
+        ),
+        (&[0xa8, 0xeb, 0x10, 0x64, 0x9c, 0xbf], b"no-cache"),
+        (
+            &[0x25, 0xa8, 0x49, 0xe9, 0x5b, 0xa9, 0x7d, 0x7f],
+            b"custom-key",
+        ),
+    ];
+    for (encoded, expected) in examples {
+        let mut output: Vec<u8> = Vec::new();
+        decode_huffman(encoded, &mut output).unwrap();
+        assert_eq!(output, expected);
+    }
+}
+#[test]
+fn huffman_all_octets_and_padding_boundaries_round_trip() {
+    for length in [1usize, 2, 3, 7, 8, 9, 15, 16, 31, 32, 255, 256] {
+        let input: Vec<u8> = (0..length).map(|idx: usize| (idx % 256) as u8).collect();
+        let mut encoded: Vec<u8> = Vec::new();
+        let mut current: u8 = 0;
+        let mut filled: u8 = 0;
+        for &byte in &input {
+            let bits: u8 = HUFFMAN_LENGTHS[usize::from(byte)];
+            let code: u32 = HUFFMAN_CODES[usize::from(byte)];
+            for shift in (0..bits).rev() {
+                current = (current << 1) | ((code >> shift) & 1) as u8;
+                filled += 1;
+                if filled == 8 {
+                    encoded.push(current);
+                    current = 0;
+                    filled = 0;
+                }
+            }
+        }
+        if filled > 0 {
+            let padding: u8 = 8 - filled;
+            encoded.push((current << padding) | ((1u8 << padding) - 1));
+        }
+        let mut output: Vec<u8> = Vec::new();
+        decode_huffman(&encoded, &mut output).unwrap();
+        assert_eq!(output, input, "length={length}");
+    }
+    for invalid in [&[0xff][..], &[0xff, 0xff, 0xff, 0xff][..], &[0x00][..]] {
+        assert!(decode_huffman(invalid, &mut Vec::new()).is_err());
+    }
+}
+#[test]
+fn qpack_rejects_negative_base_and_malformed_request_targets() {
+    let normal: [(&str, &str); 4] = [
+        (":method", "GET"),
+        (":scheme", "https"),
+        (":path", "/"),
+        (":authority", "localhost"),
+    ];
+    let mut negative_base: Vec<u8> = literal_block(&normal);
+    negative_base[1] = 0x80;
+    assert!(decode_test_request(&negative_base).is_err());
+    let invalid: [(usize, &str); 6] = [
+        (0, "GE T"),
+        (1, "1https"),
+        (1, "ht tp"),
+        (2, "relative"),
+        (2, "/path#fragment"),
+#[test]
+fn qpack_accepts_standard_connect_without_scheme_or_path() {
+    let payload: Vec<u8> =
+        literal_block(&[(":method", "CONNECT"), (":authority", "localhost:443")]);
+    let request: Request = decode_test_request(&payload).unwrap();
+    assert_eq!(request.get_method(), &Method::Connect);
+    assert_eq!(request.get_host(), "localhost:443");
+}
+#[test]
+fn native_response_encoder_rejects_the_same_invalid_fields_as_the_shared_parser() {
+    for bytes in [
+        &b"HTTP/1.1 200 OK\r\nbad name: x\r\n\r\n"[..],
+        &b"HTTP/1.1 200 OK\r\nx-test: \x01\r\n\r\n"[..],
+        &b"HTTP/1.1 200 OK\r\nx-test: \0\r\n\r\n"[..],
+    ] {
+        assert!(parse_response_head(bytes).is_err());
+        assert!(encode_h3_response_head(bytes, false, &mut Vec::new()).is_err());
+    }
 }
 ```
 # Path: hyperlane/core/tests/protocol/middleware/impl.rs
@@ -36830,6 +38330,24 @@ impl ServerHook for SocketMetadataRoute {
         Status::Continue
     }
 }
+impl ServerHook for CancelledWriteRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, _: &mut Context) -> Status {
+        stream
+            .try_send(CANCELLED_WRITE_RESPONSE_HEAD)
+            .await
+            .unwrap();
+        let body: Vec<u8> = vec![b'x'; CANCELLED_WRITE_BYTES];
+        let cancelled: bool = timeout(Duration::from_millis(20), stream.try_send(&body))
+            .await
+            .is_err();
+        assert!(cancelled, "the stalled receiver must apply backpressure");
+        stream.try_send(b"!").await.unwrap();
+        Status::Reject
+    }
+}
 impl ServerHook for UnframedBodyRoute {
     async fn new(_: &mut Stream, _: &mut Context) -> Self {
         Self
@@ -36883,6 +38401,7 @@ pub(crate) struct HopByHopStrippingMiddleware;
 pub(crate) struct HopByHopStrippingRoute;
 pub(crate) struct SocketMetadataRoute;
 pub(crate) struct UnframedBodyRoute;
+pub(crate) struct CancelledWriteRoute;
 ```
 # Path: hyperlane/core/tests/protocol/middleware/fn.rs
 ```rust
@@ -36905,6 +38424,7 @@ pub(crate) fn register_probe_hooks(server: &mut Server) -> &mut Server {
     server.route::<HopByHopStrippingRoute>(HOP_BY_HOP_CLEAN_ROUTE_PATH);
     server.route::<SocketMetadataRoute>(SOCKET_METADATA_ROUTE_PATH);
     server.route::<UnframedBodyRoute>(UNFRAMED_BODY_ROUTE_PATH);
+    server.route::<CancelledWriteRoute>(CANCELLED_WRITE_ROUTE_PATH);
     server
 }
 ```
@@ -37031,7 +38551,7 @@ async fn http2_prior_knowledge_keeps_the_exact_request_target_bytes() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     for (name, target) in TARGET_CASES {
         let uri: String = format!("http://{TLS_SERVER_NAME}:{port}{target}");
@@ -37064,7 +38584,7 @@ async fn http2_prior_knowledge_preserves_a_trailing_question_mark() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let uri: String = format!("http://{TLS_SERVER_NAME}:{port}{TRAILING_QUESTION_TARGET}");
     let (status, headers, body): H2HeadReply =
@@ -37105,7 +38625,7 @@ async fn http2_next_stream_replaces_the_previous_target() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let first_uri: String = format!("http://{TLS_SERVER_NAME}:{port}{}", TARGET_CASES[0].1);
     let second_uri: String = format!("http://{TLS_SERVER_NAME}:{port}{}", TARGET_CASES[5].1);
@@ -37202,7 +38722,7 @@ async fn http3_next_stream_on_one_connection_replaces_the_previous_target() {
         start_target_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("the http3 target server must start");
-    let replies: Vec<(u16, http::Version, Vec<u8>)> =
+    let replies: Vec<(u16, Version, Vec<u8>)> =
         h3_targets_on_one_connection(port, [TARGET_CASES[0].1, TARGET_CASES[5].1])
             .await
             .expect("the h3 target requests must complete on one connection");
@@ -37299,16 +38819,16 @@ pub(crate) async fn http1_target_reply(stream: &mut TcpStream, target: &str) -> 
 pub(crate) async fn h3_targets_on_one_connection(
     port: u16,
     targets: [&str; 2],
-) -> Result<Vec<(u16, http::Version, Vec<u8>)>, String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+) -> Result<Vec<(u16, Version, Vec<u8>)>, String> {
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
     let driving: JoinHandle<()> = spawn(async move {
         let _final: h3::error::ConnectionError = driver.wait_idle().await;
     });
-    let mut replies: Vec<(u16, http::Version, Vec<u8>)> = Vec::new();
+    let mut replies: Vec<(u16, Version, Vec<u8>)> = Vec::new();
     for target in targets {
         let uri: String = format!("https://{TLS_SERVER_NAME}:{port}{target}");
         let request: http::Request<()> = http::Request::builder()
@@ -37317,23 +38837,23 @@ pub(crate) async fn h3_targets_on_one_connection(
             .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
             .body(())
             .map_err(|error: http::Error| format!("request build failed: {error}"))?;
-        let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+        let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
             .send_request(request)
             .await
-            .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
+            .map_err(|error: StreamError| format!("send_request failed: {error}"))?;
         stream
             .finish()
             .await
-            .map_err(|error: h3::error::StreamError| format!("finish failed: {error}"))?;
+            .map_err(|error: StreamError| format!("finish failed: {error}"))?;
         let response: http::Response<()> = timeout(
             Duration::from_secs(REQUEST_TIMEOUT_SECS),
             stream.recv_response(),
         )
         .await
-        .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
-        .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
+        .map_err(|_: Elapsed| "h3 response timed out".to_string())?
+        .map_err(|error: StreamError| format!("recv_response failed: {error}"))?;
         let status: u16 = response.status().as_u16();
-        let version: http::Version = response.version();
+        let version: Version = response.version();
         let mut collected: Vec<u8> = Vec::new();
         let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
         loop {
@@ -37414,6 +38934,10 @@ pub(crate) const HOP_BY_HOP_ROUTE_PATH: &str = "/hop-by-hop";
 pub(crate) const HOP_BY_HOP_CLEAN_ROUTE_PATH: &str = "/hop-by-hop-clean";
 pub(crate) const SOCKET_METADATA_ROUTE_PATH: &str = "/socket-metadata";
 pub(crate) const UNFRAMED_BODY_ROUTE_PATH: &str = "/unframed";
+pub(crate) const CANCELLED_WRITE_ROUTE_PATH: &str = "/cancelled-write";
+pub(crate) const CANCELLED_WRITE_RESPONSE_HEAD: &[u8] =
+    b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n";
+pub(crate) const CANCELLED_WRITE_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const SLOW_DONE_BODY: &str = "slow-done";
 pub(crate) const COOKIE_SENT_BODY: &str = "cookie-sent";
 pub(crate) const HOP_BY_HOP_SENT_BODY: &str = "hop-by-hop-sent";
@@ -37539,7 +39063,7 @@ pub(crate) async fn assert_wait_pending_then_complete(control: &ServerControlHoo
     let pending: JoinHandle<()> = spawn(async move {
         probe.wait().await;
     });
-    tokio::time::sleep(Duration::from_millis(SHUTDOWN_PROBE_MILLIS)).await;
+    sleep(Duration::from_millis(SHUTDOWN_PROBE_MILLIS)).await;
     assert!(
         !pending.is_finished(),
         "wait must still be pending before shutdown is requested"
@@ -37628,7 +39152,7 @@ pub(crate) async fn read_http1_head<T>(
     expected_body: usize,
 ) -> io::Result<(String, Vec<u8>)>
 where
-    T: tokio::io::AsyncRead + Unpin,
+    T: AsyncRead + Unpin,
 {
     let mut collected: Vec<u8> = Vec::new();
     let mut chunk: [u8; 16 * 1024] = [0; 16 * 1024];
@@ -37658,16 +39182,14 @@ where
 }
 pub(crate) async fn write_bounded<T>(stream: &mut T, data: &[u8]) -> io::Result<()>
 where
-    T: tokio::io::AsyncWrite + Unpin,
+    T: AsyncWrite + Unpin,
 {
     timeout(
         Duration::from_secs(REQUEST_TIMEOUT_SECS),
         stream.write_all(data),
     )
     .await
-    .map_err(|_: tokio::time::error::Elapsed| {
-        io::Error::new(io::ErrorKind::TimedOut, "socket write timed out")
-    })?
+    .map_err(|_: Elapsed| io::Error::new(io::ErrorKind::TimedOut, "socket write timed out"))?
 }
 pub(crate) async fn exchange_on(stream: &mut TcpStream, request: &[u8]) -> Vec<u8> {
     write_bounded(stream, request)
@@ -37814,7 +39336,7 @@ pub(crate) async fn read_more(stream: &mut TcpStream, sink: &mut Vec<u8>) {
 }
 pub(crate) async fn http1_head_until<T>(stream: &mut T, delimiter: &str) -> String
 where
-    T: tokio::io::AsyncRead + Unpin,
+    T: AsyncRead + Unpin,
 {
     let mut collected: Vec<u8> = Vec::new();
     let mut chunk: [u8; 8192] = [0; 8192];
@@ -37871,15 +39393,13 @@ pub(crate) async fn tls_exchange(
     Ok(received)
 }
 pub(crate) async fn connect_tls(port: u16, alpn: &[u8]) -> io::Result<ClientTlsStream> {
-    let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME).map_err(
-        |error: rustls::pki_types::InvalidDnsNameError| {
+    let name: ServerName<'static> =
+        ServerName::try_from(TLS_SERVER_NAME).map_err(|error: InvalidDnsNameError| {
             io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
-        },
-    )?;
-    let connector: tokio_rustls::TlsConnector =
-        tokio_rustls::TlsConnector::from(alpn_client_config(alpn));
+        })?;
+    let connector: TlsConnector = TlsConnector::from(alpn_client_config(alpn));
     let socket: TcpStream = connect_tcp(port).await?;
-    let handshake: tokio_rustls::Connect<TcpStream> = connector.connect(name, socket);
+    let handshake: Connect<TcpStream> = connector.connect(name, socket);
     let bound: Duration = Duration::from_secs(CONNECT_TIMEOUT_SECS);
     match timeout(bound, handshake).await {
         Ok(outcome) => outcome,
@@ -37891,9 +39411,8 @@ pub(crate) async fn connect_tls(port: u16, alpn: &[u8]) -> io::Result<ClientTlsS
 }
 pub(crate) async fn connect_tls_untrusted(port: u16) -> Result<(), String> {
     let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME)
-        .map_err(|error: rustls::pki_types::InvalidDnsNameError| error.to_string())?;
-    let connector: tokio_rustls::TlsConnector =
-        tokio_rustls::TlsConnector::from(untrusted_client_config(ALPN_HTTP2));
+        .map_err(|error: InvalidDnsNameError| error.to_string())?;
+    let connector: TlsConnector = TlsConnector::from(untrusted_client_config(ALPN_HTTP2));
     let socket: TcpStream = connect_tcp(port)
         .await
         .map_err(|error: io::Error| error.to_string())?;
@@ -37915,15 +39434,13 @@ fn untrusted_client_config(alpn: &[u8]) -> Arc<ClientConfig> {
     Arc::new(config)
 }
 pub(crate) async fn connect_tls_without_alpn(port: u16) -> io::Result<ClientTlsStream> {
-    let name: ServerName<'static> = ServerName::try_from(TLS_SERVER_NAME).map_err(
-        |error: rustls::pki_types::InvalidDnsNameError| {
+    let name: ServerName<'static> =
+        ServerName::try_from(TLS_SERVER_NAME).map_err(|error: InvalidDnsNameError| {
             io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
-        },
-    )?;
-    let connector: tokio_rustls::TlsConnector =
-        tokio_rustls::TlsConnector::from(no_alpn_client_config());
+        })?;
+    let connector: TlsConnector = TlsConnector::from(no_alpn_client_config());
     let socket: TcpStream = connect_tcp(port).await?;
-    let handshake: tokio_rustls::Connect<TcpStream> = connector.connect(name, socket);
+    let handshake: Connect<TcpStream> = connector.connect(name, socket);
     let bound: Duration = Duration::from_secs(CONNECT_TIMEOUT_SECS);
     match timeout(bound, handshake).await {
         Ok(outcome) => outcome,
@@ -37975,7 +39492,7 @@ pub(crate) fn route_gate(slot: GateSlot) -> &'static RouteGate {
         GateSlot::SseHttp3 => SSE_HTTP3.get_or_init(RouteGate::new),
     }
 }
-pub(crate) type GateLease = tokio::sync::MutexGuard<'static, ()>;
+pub(crate) type GateLease = MutexGuard<'static, ()>;
 pub(crate) async fn gate_lease(slot: GateSlot) -> GateLease {
     slot_mutex(slot).lock().await
 }
@@ -38066,8 +39583,9 @@ pub(crate) fn fragment_writes(data: &[u8]) -> Vec<Vec<u8>> {
 ```
 # Path: hyperlane/core/tests/protocol/http3/type.rs
 ```rust
-pub(crate) type H3Reply = (u16, http::Version, Vec<u8>, Option<Vec<u8>>);
-pub(crate) type H3HeadReply = (u16, http::HeaderMap, Vec<u8>, Option<Vec<u8>>);
+use super::*;
+pub(crate) type H3Reply = (u16, Version, Vec<u8>, Option<Vec<u8>>);
+pub(crate) type H3HeadReply = (u16, HeaderMap, Vec<u8>, Option<Vec<u8>>);
 pub(crate) struct H3Exchange<'a> {
     pub(crate) connection: quinn::Connection,
     pub(crate) alpn: Option<Vec<u8>>,
@@ -38080,15 +39598,209 @@ pub(crate) struct H3Exchange<'a> {
 ```rust
 use super::*;
 #[tokio::test]
+async fn http3_rejects_a_second_control_stream_before_the_first_closes() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .unwrap();
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut first: QuicSendStream = connection.open_uni().await.unwrap();
+    first.write_all(&[0, 4, 0]).await.unwrap();
+    let mut second: QuicSendStream = connection.open_uni().await.unwrap();
+    second.write_all(&[0, 4, 0]).await.unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    control.shutdown().await;
+    assert!(
+        closed.is_ok(),
+        "duplicate control streams must close the connection"
+    );
+    match closed.unwrap() {
+        quinn::ConnectionError::ApplicationClosed(error) => {
+            assert_eq!(error.error_code, quinn::VarInt::from_u32(0x103));
+        }
+        other => panic!("expected H3_STREAM_CREATION_ERROR, got {other:?}"),
+    }
+}
+#[tokio::test]
+async fn http3_rejects_eof_on_the_peer_control_stream() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .unwrap();
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
+    stream.write_all(&[0, 4, 0]).await.unwrap();
+    stream.finish().unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    control.shutdown().await;
+    assert!(
+        closed.is_ok(),
+        "closing a critical stream must close the connection"
+    );
+    match closed.unwrap() {
+        quinn::ConnectionError::ApplicationClosed(error) => {
+            assert_eq!(error.error_code, quinn::VarInt::from_u32(0x104));
+        }
+        other => panic!("expected H3_CLOSED_CRITICAL_STREAM, got {other:?}"),
+    }
+}
+#[tokio::test]
+async fn http3_rejects_eof_on_qpack_critical_streams() {
+    for stream_type in [2u8, 3u8] {
+        let (control, port): (ServerControlHook, u16) =
+            start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+                .await
+                .unwrap();
+        let (_endpoint, connection): (Endpoint, quinn::Connection) =
+            connect_quic(port, ALPN_HTTP3).await.unwrap();
+        let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
+        stream.write_all(&[stream_type]).await.unwrap();
+        stream.finish().unwrap();
+        let closed: Result<quinn::ConnectionError, Elapsed> =
+            timeout(Duration::from_secs(2), connection.closed()).await;
+        control.shutdown().await;
+        assert!(
+            closed.is_ok(),
+            "closing QPACK critical stream must close the connection"
+        );
+        match closed.unwrap() {
+            quinn::ConnectionError::ApplicationClosed(error) => {
+                assert_eq!(error.error_code, quinn::VarInt::from_u32(0x104));
+            }
+            other => panic!("expected H3_CLOSED_CRITICAL_STREAM, got {other:?}"),
+        }
+    }
+}
+#[tokio::test]
+async fn http3_rejects_missing_or_duplicate_or_invalid_settings_on_control_stream() {
+    let cases: [(&[u8], u32); 4] = [
+        (&[0, 7, 1, 0], 0x10a),
+        (&[0, 4, 0, 4, 0], 0x105),
+        (&[0, 4, 0, 0, 0], 0x105),
+        (&[0, 4, 2, 2, 0], 0x109),
+    ];
+    for (bytes, expected_code) in cases {
+        let (control, port): (ServerControlHook, u16) =
+            start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+                .await
+                .unwrap();
+        let (_endpoint, connection): (Endpoint, quinn::Connection) =
+            connect_quic(port, ALPN_HTTP3).await.unwrap();
+        let mut stream: QuicSendStream = connection.open_uni().await.unwrap();
+        stream.write_all(bytes).await.unwrap();
+        let closed: Result<quinn::ConnectionError, Elapsed> =
+            timeout(Duration::from_secs(2), connection.closed()).await;
+        control.shutdown().await;
+        assert!(
+            closed.is_ok(),
+            "invalid control stream must close connection"
+        );
+        match closed.unwrap() {
+            quinn::ConnectionError::ApplicationClosed(error) => {
+                assert_eq!(error.error_code, quinn::VarInt::from_u32(expected_code));
+            }
+            other => panic!("expected error {expected_code:#x}, got {other:?}"),
+        }
+    }
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn http3_multi_worker_connection_migration_preserves_session() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .unwrap();
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut driver, mut send_request) = new(h3_quinn::Connection::new(connection)).await.unwrap();
+    let drive: JoinHandle<()> = spawn(async move {
+        let _: h3::error::ConnectionError =
+            poll_fn(|cx: &mut task::Context<'_>| driver.poll_close(cx)).await;
+    });
+    for migrated in [false, true] {
+        if migrated {
+            let new_socket: StdUdpSocket = StdUdpSocket::bind((LOOPBACK_HOST, 0)).unwrap();
+            endpoint.rebind(new_socket).unwrap();
+        }
+        let req: ProtocolRequest<()> = ProtocolRequest::builder()
+            .method("GET")
+            .uri(format!(
+                "https://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}"
+            ))
+            .body(())
+            .unwrap();
+        let mut stream: RequestStream<BidiStream<Bytes>, Bytes> =
+            send_request.send_request(req).await.unwrap();
+        stream.finish().await.unwrap();
+        let resp: ProtocolResponse<()> = stream.recv_response().await.unwrap();
+        assert_eq!(resp.status(), 200);
+        let mut body: Vec<u8> = Vec::new();
+        while let Some(chunk) = stream.recv_data().await.unwrap() {
+            body.extend_from_slice(chunk.chunk());
+        }
+        assert_eq!(
+            String::from_utf8_lossy(&body),
+            format!("{:?}", HttpVersion::Http3)
+        );
+    }
+    drop(send_request);
+    drive.abort();
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_cancelled_backpressured_write_can_be_followed_by_a_smaller_write() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("http3 server must start");
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
+        .await
+        .unwrap();
+    let driving: JoinHandle<()> = spawn(async move {
+        let _: h3::error::ConnectionError = driver.wait_idle().await;
+    });
+    let target: String = format!("https://{TLS_SERVER_NAME}:{port}{CANCELLED_WRITE_ROUTE_PATH}");
+    let request: http::Request<()> = http::Request::builder().uri(target).body(()).unwrap();
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> =
+        client.send_request(request).await.unwrap();
+    stream.finish().await.unwrap();
+    let response: http::Response<()> = stream.recv_response().await.unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+    sleep(Duration::from_millis(150)).await;
+    let mut body: Vec<u8> = Vec::new();
+    loop {
+        let chunk: Option<_> = timeout(
+            Duration::from_secs(REQUEST_TIMEOUT_SECS),
+            stream.recv_data(),
+        )
+        .await
+        .expect("the writer must resume when receive capacity is released")
+        .expect("cancelling a write must not reset the stream");
+        let Some(chunk) = chunk else { break };
+        body.extend_from_slice(chunk.chunk());
+    }
+    assert!(!body.is_empty());
+    assert!(body.len() < CANCELLED_WRITE_BYTES);
+    assert_eq!(body.last(), Some(&b'!'));
+    assert!(body[..body.len() - 1].iter().all(|byte: &u8| *byte == b'x'));
+    driving.abort();
+    connection.close(quinn::VarInt::from_u32(0), b"done");
+    control.shutdown().await;
+}
+#[tokio::test]
 async fn http3_over_quic_reports_the_real_local_and_peer_addresses_of_the_connection() {
     let (control, port): (ServerControlHook, u16) =
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("http3 quic server must start");
-    let (endpoint, connection): (quinn::Endpoint, quinn::Connection) =
-        connect_quic(port, ALPN_HTTP3)
-            .await
-            .expect("a quic client must connect");
+    let (endpoint, connection): (Endpoint, quinn::Connection) = connect_quic(port, ALPN_HTTP3)
+        .await
+        .expect("a quic client must connect");
     let client_local: SocketAddr = endpoint
         .local_addr()
         .expect("the client endpoint must report its own udp address");
@@ -38264,7 +39976,7 @@ async fn http3_over_quic_rejects_a_client_offering_only_h2() {
         start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
             .await
             .expect("http3 quic server must start");
-    let outcome: Result<(quinn::Endpoint, quinn::Connection), String> =
+    let outcome: Result<(Endpoint, quinn::Connection), String> =
         connect_quic(port, ALPN_HTTP2).await;
     assert!(
         outcome.is_err(),
@@ -38359,6 +40071,167 @@ async fn http3_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
     assert_eq!(*order.lock().expect("order lock"), vec!["fast", "slow"]);
     control.shutdown().await;
 }
+#[tokio::test]
+async fn http3_rejects_data_frame_before_headers_on_request_stream() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut send, _recv): (QuicSendStream, QuicRecvStream) = connection.open_bi().await.unwrap();
+    send.write_all(&[0x00, 0x02, b'h', b'i']).await.unwrap();
+    let _: Result<(), _> = send.finish();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x105)
+        ),
+        "DATA before HEADERS must close with H3_FRAME_UNEXPECTED (0x105), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_rejects_reserved_http2_frame_on_control_stream() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut ctrl: QuicSendStream = connection.open_uni().await.unwrap();
+    ctrl.write_all(&[0x00, 0x04, 0x00, 0x02, 0x00])
+        .await
+        .unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x105)
+        ),
+        "reserved HTTP/2 frame on control stream must close with H3_FRAME_UNEXPECTED (0x105), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_rejects_data_frame_after_trailing_headers() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut send, _recv): (QuicSendStream, QuicRecvStream) = connection.open_bi().await.unwrap();
+    let mut qpack_get: Vec<u8> = vec![0x00, 0x00, 0xd1, 0xd7, 0xc1, 0x50, 9];
+    qpack_get.extend_from_slice(b"localhost");
+    let mut frame: Vec<u8> = Vec::new();
+    frame.push(0x01);
+    frame.push(qpack_get.len() as u8);
+    frame.extend_from_slice(&qpack_get);
+    frame.extend_from_slice(&[0x01, 0x02, 0x00, 0x00]);
+    frame.extend_from_slice(&[0x00, 0x01, b'x']);
+    send.write_all(&frame).await.unwrap();
+    let _: Result<(), _> = send.finish();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x105)
+        ),
+        "DATA after trailers must close with H3_FRAME_UNEXPECTED (0x105), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_rejects_dynamic_qpack_encoder_instruction_when_capacity_is_zero() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut encoder: QuicSendStream = connection.open_uni().await.unwrap();
+    encoder.write_all(&[0x02, 0x21]).await.unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x201)
+        ),
+        "dynamic QPACK encoder instruction when capacity is zero must close with QPACK_ENCODER_STREAM_ERROR (0x201), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_ignores_an_unknown_non_grease_frame_before_request_headers() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .unwrap();
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let (mut send, mut recv): (QuicSendStream, QuicRecvStream) =
+        connection.open_bi().await.unwrap();
+    let mut block: Vec<u8> = vec![0, 0, 0xd1, 0xd7, 0x50, 9];
+    block.extend_from_slice(b"localhost");
+    block.push(0x51);
+    block.push(VERSION_ROUTE_PATH.len() as u8);
+    block.extend_from_slice(VERSION_ROUTE_PATH.as_bytes());
+    assert!(block.len() < 64);
+    let mut frames: Vec<u8> = vec![0x20, 0, 1, block.len() as u8];
+    frames.extend_from_slice(&block);
+    send.write_all(&frames).await.unwrap();
+    send.finish().unwrap();
+    let response: Vec<u8> = timeout(Duration::from_secs(2), recv.read_to_end(64 * 1024))
+        .await
+        .unwrap()
+        .unwrap();
+    let (frame_type, type_len): (u64, usize) = decode_varint(&response).unwrap();
+    let (_, length_len): (u64, usize) = decode_varint(&response[type_len..]).unwrap();
+    let start: usize = type_len + length_len;
+    assert_eq!(frame_type, 1);
+    assert_eq!(response.get(start..start + 3), Some(&[0, 0, 0xd9][..]));
+    assert!(connection.close_reason().is_none());
+    connection.close(VarInt::from_u32(H3_NO_ERROR), b"done");
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
+#[tokio::test]
+async fn http3_rejects_qpack_decoder_insert_count_increment_when_capacity_is_zero() {
+    let (control, port): (ServerControlHook, u16) =
+        start_protocol_server(ServerProtocol::Http3, Some(trusted_tls_config()))
+            .await
+            .expect("the HTTP/3 server must start");
+    let (endpoint, connection): (Endpoint, quinn::Connection) =
+        connect_quic(port, ALPN_HTTP3).await.unwrap();
+    let mut decoder: QuicSendStream = connection.open_uni().await.unwrap();
+    decoder.write_all(&[0x03, 0x01]).await.unwrap();
+    let closed: Result<quinn::ConnectionError, Elapsed> =
+        timeout(Duration::from_secs(2), connection.closed()).await;
+    assert!(
+        matches!(
+            closed,
+            Ok(quinn::ConnectionError::ApplicationClosed(ref frame))
+                if frame.error_code == VarInt::from_u32(0x202)
+        ),
+        "QPACK decoder insert-count increment when capacity is zero must close with QPACK_DECODER_STREAM_ERROR (0x202), got: {closed:?}"
+    );
+    endpoint.wait_idle().await;
+    control.shutdown().await;
+}
 ```
 # Path: hyperlane/core/tests/protocol/http3/mod.rs
 ```rust
@@ -38379,37 +40252,37 @@ fn quic_client_config(alpn: &[u8]) -> quinn::ClientConfig {
         .with_no_client_auth();
     config.alpn_protocols = vec![alpn.to_vec()];
     quinn::ClientConfig::new(Arc::new(
-        quinn::crypto::rustls::QuicClientConfig::try_from(config)
+        QuicClientConfig::try_from(config)
             .expect("the ring provider supports the QUIC initial cipher suite"),
     ))
 }
 pub(crate) async fn connect_quic(
     port: u16,
     alpn: &[u8],
-) -> Result<(quinn::Endpoint, quinn::Connection), String> {
+) -> Result<(Endpoint, quinn::Connection), String> {
     let bind: SocketAddr = format!("{LOOPBACK_HOST}:0")
         .parse()
         .map_err(|error: AddrParseError| format!("loopback bind address is invalid: {error}"))?;
-    let mut endpoint: quinn::Endpoint = quinn::Endpoint::client(bind)
+    let mut endpoint: Endpoint = quinn::Endpoint::client(bind)
         .map_err(|error: io::Error| format!("quic endpoint bind failed: {error}"))?;
     endpoint.set_default_client_config(quic_client_config(alpn));
     let address: SocketAddr = format!("{LOOPBACK_HOST}:{port}")
         .parse()
         .map_err(|error: AddrParseError| format!("loopback address is invalid: {error}"))?;
-    let connecting: quinn::Connecting = endpoint
+    let connecting: Connecting = endpoint
         .connect(address, TLS_SERVER_NAME)
-        .map_err(|error: quinn::ConnectError| format!("quic connect failed: {error}"))?;
+        .map_err(|error: ConnectError| format!("quic connect failed: {error}"))?;
     let connection: quinn::Connection =
         timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), connecting)
             .await
-            .map_err(|_: tokio::time::error::Elapsed| "quic connect timed out".to_string())?
+            .map_err(|_: Elapsed| "quic connect timed out".to_string())?
             .map_err(|error: quinn::ConnectionError| format!("quic connect failed: {error}"))?;
     Ok((endpoint, connection))
 }
 fn negotiated_quic_alpn(connection: &quinn::Connection) -> Option<Vec<u8>> {
     let data: Option<Box<dyn Any>> = connection.handshake_data();
     match data {
-        Some(data) => match data.downcast::<quinn::crypto::rustls::HandshakeData>() {
+        Some(data) => match data.downcast::<HandshakeData>() {
             Ok(handshake) => handshake.protocol,
             Err(_) => None,
         },
@@ -38422,7 +40295,7 @@ pub(crate) async fn h3_request_with_headers(
     target: &str,
     body: &[u8],
 ) -> Result<H3HeadReply, String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let alpn: Option<Vec<u8>> = negotiated_quic_alpn(&connection);
     h3_exchange_on(H3Exchange {
@@ -38442,7 +40315,7 @@ pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadRep
         target,
         body,
     } = exchange;
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
     let driving: JoinHandle<()> = spawn(async move {
@@ -38454,29 +40327,29 @@ pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadRep
         .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
         .body(())
         .map_err(|error: http::Error| format!("request build failed: {error}"))?;
-    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(request)
         .await
-        .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
+        .map_err(|error: StreamError| format!("send_request failed: {error}"))?;
     if !body.is_empty() {
         stream
             .send_data(Bytes::copy_from_slice(body))
             .await
-            .map_err(|error: h3::error::StreamError| format!("send_data failed: {error}"))?;
+            .map_err(|error: StreamError| format!("send_data failed: {error}"))?;
     }
     stream
         .finish()
         .await
-        .map_err(|error: h3::error::StreamError| format!("finish failed: {error}"))?;
+        .map_err(|error: StreamError| format!("finish failed: {error}"))?;
     let response: http::Response<()> = timeout(
         Duration::from_secs(REQUEST_TIMEOUT_SECS),
         stream.recv_response(),
     )
     .await
-    .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
-    .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
+    .map_err(|_: Elapsed| "h3 response timed out".to_string())?
+    .map_err(|error: StreamError| format!("recv_response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
-    let headers: http::HeaderMap = response.headers().clone();
+    let headers: HeaderMap = response.headers().clone();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -38497,11 +40370,10 @@ pub(crate) async fn h3_exchange_on(exchange: H3Exchange<'_>) -> Result<H3HeadRep
     Ok((status, headers, collected, alpn))
 }
 pub(crate) async fn h3_stream_until(port: u16, target: &str, needle: &str) -> (Vec<u8>, bool) {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
-        connect_quic(port, ALPN_HTTP3)
-            .await
-            .expect("quic connect must succeed");
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (_endpoint, connection): (Endpoint, quinn::Connection) = connect_quic(port, ALPN_HTTP3)
+        .await
+        .expect("quic connect must succeed");
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .expect("h3 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
@@ -38512,7 +40384,7 @@ pub(crate) async fn h3_stream_until(port: u16, target: &str, needle: &str) -> (V
         .uri(target)
         .body(())
         .expect("request must build");
-    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(request)
         .await
         .expect("h3 request must be accepted");
@@ -38524,7 +40396,7 @@ pub(crate) async fn h3_stream_until(port: u16, target: &str, needle: &str) -> (V
     .await
     .expect("the h3 response head must arrive inside its timeout")
     .expect("the h3 response head must not fail");
-    let mut body: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = stream;
+    let mut body: RequestStream<BidiStream<Bytes>, Bytes> = stream;
     let mut collected: Vec<u8> = Vec::new();
     let mut matched: bool = false;
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
@@ -38557,10 +40429,10 @@ pub(crate) async fn h3_request(
     target: &str,
     body: &[u8],
 ) -> Result<H3Reply, String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let alpn: Option<Vec<u8>> = negotiated_quic_alpn(&connection);
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
     let driving: JoinHandle<()> = spawn(async move {
@@ -38572,29 +40444,29 @@ pub(crate) async fn h3_request(
         .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE)
         .body(())
         .map_err(|error: http::Error| format!("request build failed: {error}"))?;
-    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(request)
         .await
-        .map_err(|error: h3::error::StreamError| format!("send_request failed: {error}"))?;
+        .map_err(|error: StreamError| format!("send_request failed: {error}"))?;
     if !body.is_empty() {
         stream
             .send_data(Bytes::copy_from_slice(body))
             .await
-            .map_err(|error: h3::error::StreamError| format!("send_data failed: {error}"))?;
+            .map_err(|error: StreamError| format!("send_data failed: {error}"))?;
     }
     stream
         .finish()
         .await
-        .map_err(|error: h3::error::StreamError| format!("finish failed: {error}"))?;
+        .map_err(|error: StreamError| format!("finish failed: {error}"))?;
     let response: http::Response<()> = timeout(
         Duration::from_secs(REQUEST_TIMEOUT_SECS),
         stream.recv_response(),
     )
     .await
-    .map_err(|_: tokio::time::error::Elapsed| "h3 response timed out".to_string())?
-    .map_err(|error: h3::error::StreamError| format!("recv_response failed: {error}"))?;
+    .map_err(|_: Elapsed| "h3 response timed out".to_string())?
+    .map_err(|error: StreamError| format!("recv_response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
-    let version: http::Version = response.version();
+    let version: Version = response.version();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -38622,8 +40494,8 @@ pub(crate) type H2TlsSession = (
     h2::client::SendRequest<Bytes>,
     h2::client::Connection<ClientTlsStream, Bytes>,
 );
-pub(crate) type H2Reply = (u16, http::Version, Vec<u8>);
-pub(crate) type H2HeadReply = (u16, http::HeaderMap, Vec<u8>);
+pub(crate) type H2Reply = (u16, Version, Vec<u8>);
+pub(crate) type H2HeadReply = (u16, HeaderMap, Vec<u8>);
 ```
 # Path: hyperlane/core/tests/protocol/http2/assert.rs
 ```rust
@@ -38638,15 +40510,13 @@ async fn http2_plaintext_reports_the_real_local_and_peer_addresses_of_the_connec
     let client_local: SocketAddr = socket
         .local_addr()
         .expect("a connected socket must report its local address");
-    let (mut sender, connection) = timeout(
-        Duration::from_secs(CONNECT_TIMEOUT_SECS),
-        h2::client::handshake(socket),
-    )
-    .await
-    .expect("h2 prior-knowledge handshake must not time out")
-    .expect("h2 prior-knowledge handshake must succeed");
+    let (mut sender, connection) =
+        timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), handshake(socket))
+            .await
+            .expect("h2 prior-knowledge handshake must not time out")
+            .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, _version, body): H2Reply = h2_request(
         &mut sender,
@@ -38690,7 +40560,7 @@ async fn http2_streams_a_body_that_never_announced_a_content_length() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, headers, body): H2HeadReply = h2_request_with_headers(
         &mut sender,
@@ -38724,7 +40594,7 @@ async fn http2_plaintext_prior_knowledge_serves_http2_over_tcp() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, version, body): H2Reply = h2_request(
         &mut sender,
@@ -38758,7 +40628,7 @@ async fn http2_plaintext_prior_knowledge_reads_path_query_and_header() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let target: String = format!(
         "http://{TLS_SERVER_NAME}:{port}{PROBE_PATH}?{}",
@@ -38787,7 +40657,7 @@ async fn http2_tls_negotiates_h2_alpn_against_validated_chain() {
         "the server must select the h2 ALPN identifier"
     );
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let (status, version, body): H2Reply = h2_request(
         &mut sender,
@@ -38835,7 +40705,7 @@ async fn http2_plaintext_binary_post_round_trips_hostile_bytes() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let payload: Vec<u8> = hostile_binary_payload();
     let (status, version, body): H2Reply = h2_request(
@@ -38866,7 +40736,7 @@ async fn http2_plaintext_delivers_a_response_above_the_flow_control_window() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let expected: Vec<u8> = large_binary_payload();
     let (status, _version, body): H2Reply = h2_request(
@@ -38901,7 +40771,7 @@ async fn http2_one_connection_answers_a_fast_stream_while_a_slow_stream_is_block
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let _lease: GateLease = gate_lease(GateSlot::SlowHttp2).await;
     let order: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
@@ -39007,7 +40877,7 @@ async fn http2_rejects_a_host_header_that_disagrees_with_the_authority() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
     let outcome: Option<(u16, Vec<u8>)> =
@@ -39036,7 +40906,7 @@ async fn http2_accepts_a_host_header_that_agrees_with_the_authority() {
         .await
         .expect("h2 prior-knowledge handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let target: String = format!("http://{TLS_SERVER_NAME}:{port}{VERSION_ROUTE_PATH}");
     let outcome: Option<(u16, Vec<u8>)> = h2_request_with_host_header(
@@ -39081,26 +40951,20 @@ pub(crate) async fn h2_plaintext_session(
     let socket: TcpStream = connect_tcp(port)
         .await
         .map_err(|error: io::Error| format!("h2 plaintext connect failed: {error}"))?;
-    timeout(
-        Duration::from_secs(CONNECT_TIMEOUT_SECS),
-        h2::client::handshake(socket),
-    )
-    .await
-    .map_err(|_| "h2 plaintext handshake timed out".to_string())?
-    .map_err(|error: h2::Error| format!("h2 plaintext handshake failed: {error}"))
+    timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), handshake(socket))
+        .await
+        .map_err(|_| "h2 plaintext handshake timed out".to_string())?
+        .map_err(|error: Error| format!("h2 plaintext handshake failed: {error}"))
 }
 pub(crate) async fn h2_tls_alpn(port: u16) -> Result<(Option<Vec<u8>>, H2TlsSession), String> {
     let stream: ClientTlsStream = connect_tls(port, ALPN_HTTP2)
         .await
         .map_err(|error: io::Error| format!("h2 tls connect failed: {error}"))?;
     let alpn: Option<Vec<u8>> = negotiated_alpn(&stream);
-    let (send, connection) = timeout(
-        Duration::from_secs(CONNECT_TIMEOUT_SECS),
-        h2::client::handshake(stream),
-    )
-    .await
-    .map_err(|_| "h2 tls handshake timed out".to_string())?
-    .map_err(|error: h2::Error| format!("h2 tls handshake failed: {error}"))?;
+    let (send, connection) = timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), handshake(stream))
+        .await
+        .map_err(|_| "h2 tls handshake timed out".to_string())?
+        .map_err(|error: Error| format!("h2 tls handshake failed: {error}"))?;
     Ok((alpn, (send, connection)))
 }
 pub(crate) async fn h2_request(
@@ -39117,20 +40981,20 @@ pub(crate) async fn h2_request(
         .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
     let (response, mut send_stream) = sender
         .send_request(request, body.is_empty())
-        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
+        .map_err(|error: Error| format!("h2 send_request failed: {error}"))?;
     if !body.is_empty() {
         send_stream
             .send_data(Bytes::copy_from_slice(body), true)
-            .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))?;
+            .map_err(|error: Error| format!("h2 send_data failed: {error}"))?;
     }
-    let response: http::Response<h2::RecvStream> =
+    let response: http::Response<RecvStream> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
             .await
             .map_err(|_| "h2 response timed out".to_string())?
-            .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
+            .map_err(|error: Error| format!("h2 response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
-    let version: http::Version = response.version();
-    let mut received: h2::RecvStream = response.into_body();
+    let version: Version = response.version();
+    let mut received: RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -39140,7 +41004,7 @@ pub(crate) async fn h2_request(
         }
         match timeout(remaining, received.data()).await {
             Ok(Some(Ok(chunk))) => {
-                let _released: Result<(), h2::Error> =
+                let _released: Result<(), Error> =
                     received.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
             }
@@ -39165,20 +41029,20 @@ pub(crate) async fn h2_request_with_headers(
         .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
     let (response, mut send_stream) = sender
         .send_request(request, body.is_empty())
-        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
+        .map_err(|error: Error| format!("h2 send_request failed: {error}"))?;
     if !body.is_empty() {
         send_stream
             .send_data(Bytes::copy_from_slice(body), true)
-            .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))?;
+            .map_err(|error: Error| format!("h2 send_data failed: {error}"))?;
     }
-    let response: http::Response<h2::RecvStream> =
+    let response: http::Response<RecvStream> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
             .await
             .map_err(|_| "h2 response timed out".to_string())?
-            .map_err(|error: h2::Error| format!("h2 response failed: {error}"))?;
+            .map_err(|error: Error| format!("h2 response failed: {error}"))?;
     let status: u16 = response.status().as_u16();
-    let headers: http::HeaderMap = response.headers().clone();
-    let mut received: h2::RecvStream = response.into_body();
+    let headers: HeaderMap = response.headers().clone();
+    let mut received: RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -39188,7 +41052,7 @@ pub(crate) async fn h2_request_with_headers(
         }
         match timeout(remaining, received.data()).await {
             Ok(Some(Ok(chunk))) => {
-                let _released: Result<(), h2::Error> =
+                let _released: Result<(), Error> =
                     received.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
             }
@@ -39204,7 +41068,7 @@ pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (V
         .await
         .expect("h2 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> = http::Request::builder()
         .method("GET")
@@ -39214,12 +41078,12 @@ pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (V
     let (response, _send_stream) = sender
         .send_request(request, true)
         .expect("h2 request must be accepted");
-    let response: http::Response<h2::RecvStream> =
+    let response: http::Response<RecvStream> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response)
             .await
             .expect("h2 response head must arrive")
             .expect("h2 response must not fail");
-    let mut body: h2::RecvStream = response.into_body();
+    let mut body: RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let mut matched: bool = false;
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
@@ -39234,7 +41098,7 @@ pub(crate) async fn h2_stream_until(port: u16, target: &str, needle: &str) -> (V
         }
         match timeout(remaining, body.data()).await {
             Ok(Some(Ok(chunk))) => {
-                let _released: Result<(), h2::Error> =
+                let _released: Result<(), Error> =
                     body.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
             }
@@ -39261,15 +41125,15 @@ pub(crate) async fn h2_request_with_host_header(
         .map_err(|error: http::Error| format!("h2 request build failed: {error}"))?;
     let (response, _send_stream) = sender
         .send_request(request, true)
-        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))?;
-    let response: http::Response<h2::RecvStream> =
+        .map_err(|error: Error| format!("h2 send_request failed: {error}"))?;
+    let response: http::Response<RecvStream> =
         match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response).await {
             Ok(Ok(response)) => response,
             Ok(Err(_error)) => return Ok(None),
             Err(_) => return Err("h2 response timed out".to_string()),
         };
     let status: u16 = response.status().as_u16();
-    let mut received: h2::RecvStream = response.into_body();
+    let mut received: RecvStream = response.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -39279,7 +41143,7 @@ pub(crate) async fn h2_request_with_host_header(
         }
         match timeout(remaining, received.data()).await {
             Ok(Some(Ok(chunk))) => {
-                let _released: Result<(), h2::Error> =
+                let _released: Result<(), Error> =
                     received.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
             }
@@ -40086,9 +41950,10 @@ async fn an_infinite_read_timeout_tls_close_still_delivers_close_notify() {
             ServerProtocol::Http1,
             Some(trusted_tls_config()),
         ))
-        .request_config(RequestConfig {
-            read_timeout_ms: u64::MAX,
-            ..RequestConfig::default()
+        .request_config({
+            let mut config: RequestConfig = RequestConfig::default();
+            config.set_read_timeout_ms(u64::MAX);
+            config
         });
     register_probe_hooks(&mut server);
     let (control, port): (ServerControlHook, u16) = run_on_reserved_port(&mut server)
@@ -40119,10 +41984,156 @@ async fn an_infinite_read_timeout_tls_close_still_delivers_close_notify() {
     );
     control.shutdown().await;
 }
+#[tokio::test]
+async fn tls_pending_output_is_flushed_before_waiting_for_more_input() {
+    let listener: tokio::net::TcpListener = tokio::net::TcpListener::bind((LOOPBACK_HOST, 0))
+        .await
+        .unwrap();
+    let port: u16 = listener.local_addr().unwrap().port();
+    let config: Arc<TlsServerConfig> =
+        build_stream_tls_config(&trusted_tls_config(), &ServerProtocol::Http1).unwrap();
+    let (ready, waiting): (Sender<usize>, Receiver<usize>) = tokio::sync::oneshot::channel();
+    let serving: JoinHandle<()> = spawn(async move {
+        let (tcp, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        SockRef::from(&tcp).set_send_buffer_size(4096).unwrap();
+        let mut transport: TlsTransport = accept_unbuffered_tls(config, tcp).await.unwrap();
+        let block: Vec<u8> = vec![b'x'; 16 * 1024];
+        let mut accepted: usize = 0;
+        loop {
+            transport.write_all(&block).await.unwrap();
+            accepted += block.len();
+            let blocked: bool = poll_fn(|cx: &mut task::Context<'_>| {
+                Poll::Ready(Pin::new(&mut transport).poll_flush(cx).is_pending())
+            })
+            .await;
+            if blocked {
+                break;
+            }
+            assert!(
+                accepted < 8 * 1024 * 1024,
+                "the constrained socket must exert backpressure"
+            );
+        }
+        ready.send(accepted).unwrap();
+        let mut ack: [u8; 1] = [0];
+        transport.read_exact(&mut ack).await.unwrap();
+        assert_eq!(ack, [b'!']);
+        transport.shutdown().await.unwrap();
+    });
+    let mut client: ClientTlsStream = connect_tls(port, ALPN_HTTP1).await.unwrap();
+    let expected: usize = waiting.await.unwrap();
+    let result: Result<(), Elapsed> = timeout(Duration::from_secs(3), async {
+        let mut received: Vec<u8> = vec![0; expected];
+        client.read_exact(&mut received).await.unwrap();
+        assert!(received.iter().all(|&byte: &u8| byte == b'x'));
+        client.write_all(b"!").await.unwrap();
+        let mut tail: Vec<u8> = Vec::new();
+        client.read_to_end(&mut tail).await.unwrap();
+        assert!(tail.is_empty());
+    })
+    .await;
+    if result.is_err() {
+        serving.abort();
+    } else {
+        serving.await.unwrap();
+    }
+    assert!(
+        result.is_ok(),
+        "accepted TLS bytes must not be stranded when the caller switches to reading"
+    );
+}
+#[tokio::test]
+async fn tls_key_updates_and_fragmented_reads_preserve_record_boundaries() {
+    let listener: tokio::net::TcpListener = tokio::net::TcpListener::bind((LOOPBACK_HOST, 0))
+        .await
+        .unwrap();
+    let port: u16 = listener.local_addr().unwrap().port();
+    let config: Arc<TlsServerConfig> =
+        build_stream_tls_config(&trusted_tls_config(), &ServerProtocol::Http1).unwrap();
+    let serving: JoinHandle<()> = spawn(async move {
+        let (tcp, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        let mut transport: TlsTransport = accept_unbuffered_tls(config, tcp).await.unwrap();
+        for size in [63usize, 16384, 32769, 4097, 65537] {
+            let mut data: Vec<u8> = vec![0; size];
+            transport.read_exact(&mut data).await.unwrap();
+            transport.write_all(&data).await.unwrap();
+            transport.flush().await.unwrap();
+        }
+        transport.shutdown().await.unwrap();
+        assert!(transport.write_all(b"after-close").await.is_err());
+    });
+    let mut client: ClientTlsStream = connect_tls(port, ALPN_HTTP1).await.unwrap();
+    let result: Result<(), Elapsed> = timeout(Duration::from_secs(5), async {
+        for size in [63usize, 16384, 32769, 4097, 65537] {
+            client.get_mut().1.refresh_traffic_keys().unwrap();
+            let data: Vec<u8> = (0..size).map(|index: usize| (index % 251) as u8).collect();
+            client.write_all(&data).await.unwrap();
+            client.flush().await.unwrap();
+            let mut received: Vec<u8> = vec![0; size];
+            for fragment in received.chunks_mut(37) {
+                client.read_exact(fragment).await.unwrap();
+            }
+            assert_eq!(received, data);
+        }
+        let mut tail: Vec<u8> = Vec::new();
+        client.read_to_end(&mut tail).await.unwrap();
+        assert!(tail.is_empty());
+    })
+    .await;
+    if result.is_err() {
+        serving.abort();
+    } else {
+        serving.await.unwrap();
+    }
+    assert!(
+        result.is_ok(),
+        "post-handshake records must not stall buffered traffic"
+    );
+}
+#[tokio::test]
+async fn tcp_nodelay_configuration_is_inherited_for_hostname_bind_addresses() {
+    for enabled in [false, true] {
+        let mut listeners: Vec<tokio::net::TcpListener> =
+            bind_tcp_listeners("localhost:0", enabled).await.unwrap();
+        let listener: tokio::net::TcpListener = listeners.pop().unwrap();
+        let address: SocketAddr = listener.local_addr().unwrap();
+        let client: TcpStream = TcpStream::connect(address).await.unwrap();
+        let (accepted, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        assert_eq!(accepted.nodelay().unwrap(), enabled);
+        drop(client);
+    }
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_second_server_cannot_join_an_existing_tcp_or_quic_listener() {
+    for protocol in [ServerProtocol::Http1, ServerProtocol::Http3] {
+        let (control, port): (ServerControlHook, u16) =
+            start_protocol_server(protocol, Some(trusted_tls_config()))
+                .await
+                .unwrap();
+        let address: String = format!("{LOOPBACK_HOST}:{port}");
+        let mut second: Server = Server::default();
+        second.server_config(protocol_config(
+            &address,
+            protocol,
+            Some(trusted_tls_config()),
+        ));
+        let result: Result<ServerControlHook, Box<ServerError>> = second.run().await;
+        let unexpectedly_bound: bool = result.is_ok();
+        if let Ok(handle) = result {
+            handle.shutdown().await;
+        }
+        control.shutdown().await;
+        assert!(
+            !unexpectedly_bound,
+            "server startup must retain exclusive port ownership"
+        );
+    }
+}
 ```
 # Path: hyperlane/core/tests/protocol/limits/type.rs
 ```rust
-pub(super) type DefaultErrorReply = Result<(u16, http::HeaderMap, Vec<u8>), String>;
+use super::*;
+pub(super) type DefaultErrorReply = Result<(u16, HeaderMap, Vec<u8>), String>;
 ```
 # Path: hyperlane/core/tests/protocol/limits/impl.rs
 ```rust
@@ -40297,7 +42308,7 @@ async fn http1_default_request_error_sends_nothing_on_clean_eof() {
         start_default_request_error_server(ServerProtocol::Http1, HTTP1_BODY_LIMIT)
             .await
             .expect("http1 server without a request error hook must start");
-    let result: Result<io::Result<()>, tokio::time::error::Elapsed> =
+    let result: Result<io::Result<()>, Elapsed> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
             for after_request in [false, true] {
                 let mut stream: TcpStream = connect_tcp(port).await?;
@@ -40338,7 +42349,7 @@ async fn assert_multiplexed_default_request_error(protocol: ServerProtocol) {
         start_default_request_error_server(protocol, MAX_BODY_SIZE)
             .await
             .expect("server without a request error hook must start");
-    let reply: Result<DefaultErrorReply, tokio::time::error::Elapsed> =
+    let reply: Result<DefaultErrorReply, Elapsed> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
             match protocol {
                 ServerProtocol::Http2 => h2_oversized_body_then_get(port).await,
@@ -40348,7 +42359,7 @@ async fn assert_multiplexed_default_request_error(protocol: ServerProtocol) {
         })
         .await;
     control.shutdown().await;
-    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = reply
+    let (status, headers, body): (u16, HeaderMap, Vec<u8>) = reply
         .expect("oversized POST and the subsequent GET must not time out")
         .expect("both requests must receive complete HTTP responses on the same connection");
     assert_eq!(status, TOO_LARGE_STATUS as u16);
@@ -40358,7 +42369,7 @@ async fn assert_multiplexed_default_request_error(protocol: ServerProtocol) {
 }
 #[tokio::test]
 async fn default_request_error_does_not_override_the_existing_http1_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http1,
@@ -40392,14 +42403,14 @@ fn http1_reply_header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
 async fn http1_expect_continue_releases_the_waiting_request_body() {
     const CONTINUE_RESPONSE: &[u8] = b"HTTP/1.1 100 Continue\r\n\r\n";
     const BODY: &[u8] = b"continue-payload";
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http1,
         limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
     )
     .await
     .expect("http1 limits server must start");
-    let result: Result<io::Result<Vec<u8>>, tokio::time::error::Elapsed> =
+    let result: Result<io::Result<Vec<u8>>, Elapsed> =
         timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), async {
             let mut stream: TcpStream = connect_tcp(port).await?;
             let head: String = format!(
@@ -40436,7 +42447,7 @@ async fn http1_expect_continue_releases_the_waiting_request_body() {
 }
 #[tokio::test]
 async fn http1_no_content_and_not_modified_end_at_the_next_response() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http1,
         limits_request_config(MAX_BODY_SIZE, READ_TIMEOUT_MS),
@@ -40495,7 +42506,7 @@ async fn http3_expect_oversized_body_is_rejected_without_continue() {
 }
 #[tokio::test]
 async fn http2_head_response_carries_headers_without_a_body() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -40507,14 +42518,14 @@ async fn http2_head_response_carries_headers_without_a_body() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("HEAD", &h2_target(port, HEAD_ROUTE_PATH), None)
             .expect("h2 head request must build");
     let (response, _send_stream) =
         h2_open_stream(&mut sender, request, true).expect("h2 head stream must open");
-    let (status, _headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_await_response(response)
+    let (status, _headers, body): (u16, HeaderMap, Vec<u8>) = h2_await_response(response)
         .await
         .unwrap_or_else(|error: String| panic!("h2 HEAD response failed: {error}"));
     assert_eq!(status, WIRE_OK_STATUS);
@@ -40523,7 +42534,7 @@ async fn http2_head_response_carries_headers_without_a_body() {
         "a HEAD response must carry no body bytes, got {} bytes",
         body.len()
     );
-    let after: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+    let after: (u16, HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
         .await
         .expect("the same connection must serve a later valid request");
     assert_eq!(after.0, WIRE_OK_STATUS);
@@ -40533,7 +42544,7 @@ async fn http2_head_response_carries_headers_without_a_body() {
 }
 #[tokio::test]
 async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -40545,7 +42556,7 @@ async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     for (path, expected) in [
         (NO_CONTENT_ROUTE_PATH, WIRE_NO_CONTENT_STATUS),
@@ -40555,7 +42566,7 @@ async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
             h2_build_request("GET", &h2_target(port, path), None).expect("h2 request must build");
         let (response, _send_stream) =
             h2_open_stream(&mut sender, request, true).expect("h2 stream must open");
-        let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = h2_await_response(response)
+        let (status, headers, body): (u16, HeaderMap, Vec<u8>) = h2_await_response(response)
             .await
             .unwrap_or_else(|error: String| panic!("h2 {expected} response failed: {error}"));
         assert_eq!(status, expected);
@@ -40577,7 +42588,7 @@ async fn http2_no_content_and_not_modified_strip_the_body_bytes() {
 }
 #[tokio::test]
 async fn http3_head_and_no_body_statuses_carry_no_body() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -40590,7 +42601,7 @@ async fn http3_head_and_no_body_statuses_carry_no_body() {
         ("GET", NO_CONTENT_ROUTE_PATH, WIRE_NO_CONTENT_STATUS),
         ("GET", NOT_MODIFIED_ROUTE_PATH, WIRE_NOT_MODIFIED_STATUS),
     ] {
-        let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) =
+        let (status, headers, body): (u16, HeaderMap, Vec<u8>) =
             h3_exchange(port, method, &h3_target(port, path), &[])
                 .await
                 .unwrap_or_else(|error: String| panic!("h3 {method} {path} failed: {error}"));
@@ -40611,7 +42622,7 @@ async fn http3_head_and_no_body_statuses_carry_no_body() {
 }
 #[tokio::test]
 async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -40623,7 +42634,7 @@ async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("GET", &h2_target(port, RAW_CHUNKED_ROUTE_PATH), None)
@@ -40662,7 +42673,7 @@ async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
             panic!("the raw chunked request must reach the server, never fail in the fixture");
         }
     }
-    let after: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+    let after: (u16, HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
         .await
         .expect("the same connection must serve a later valid request");
     assert_eq!(after.0, WIRE_OK_STATUS);
@@ -40672,7 +42683,7 @@ async fn http2_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
 }
 #[tokio::test]
 async fn http3_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -40712,7 +42723,7 @@ async fn http3_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
             panic!("the raw chunked request must reach the server, never fail in the fixture");
         }
     }
-    let after: (u16, http::HeaderMap, Vec<u8>) =
+    let after: (u16, HeaderMap, Vec<u8>) =
         h3_exchange(port, "GET", &h3_target(port, BODY_ECHO_ROUTE_PATH), &[])
             .await
             .unwrap_or_else(|error: String| panic!("the later valid request failed: {error}"));
@@ -40721,7 +42732,7 @@ async fn http3_raw_chunked_framing_decodes_or_is_rejected_explicitly() {
 }
 #[tokio::test]
 async fn http2_oversized_body_hits_max_body_size_and_the_request_error_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -40733,9 +42744,9 @@ async fn http2_oversized_body_hits_max_body_size_and_the_request_error_hook() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
-    let before: (u16, http::HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
+    let before: (u16, HeaderMap, Vec<u8>) = h2_get(&mut sender, port, BODY_ECHO_ROUTE_PATH)
         .await
         .expect("a valid request before the oversized one must succeed");
     assert_eq!(before.0, WIRE_OK_STATUS);
@@ -40779,7 +42790,7 @@ async fn http2_oversized_body_hits_max_body_size_and_the_request_error_hook() {
 }
 #[tokio::test]
 async fn http3_oversized_body_hits_max_body_size_and_the_request_error_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -40787,13 +42798,13 @@ async fn http3_oversized_body_hits_max_body_size_and_the_request_error_hook() {
     )
     .await
     .expect("http3 limits server must start");
-    let before: (u16, http::HeaderMap, Vec<u8>) =
+    let before: (u16, HeaderMap, Vec<u8>) =
         h3_exchange(port, "GET", &h3_target(port, BODY_ECHO_ROUTE_PATH), &[])
             .await
             .unwrap_or_else(|error: String| panic!("the baseline h3 request failed: {error}"));
     assert_eq!(before.0, WIRE_OK_STATUS);
     let payload: Vec<u8> = oversized_payload();
-    let outcome: Result<(u16, http::HeaderMap, Vec<u8>), String> = h3_exchange(
+    let outcome: Result<(u16, HeaderMap, Vec<u8>), String> = h3_exchange(
         port,
         "POST",
         &h3_target(port, BODY_ECHO_ROUTE_PATH),
@@ -40820,7 +42831,7 @@ async fn http3_oversized_body_hits_max_body_size_and_the_request_error_hook() {
 }
 #[tokio::test]
 async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_request() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -40832,7 +42843,7 @@ async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let payload: Vec<u8> = declared_short_payload();
     let stalled: http::Request<()> = h2_build_request(
@@ -40853,14 +42864,12 @@ async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
             .expect("h2 valid request must build");
     let (valid_response, _valid_send) =
         h2_open_stream(&mut sender, valid, true).expect("valid stream must open");
-    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = timeout(
+    let (status, headers, body): (u16, HeaderMap, Vec<u8>) = timeout(
         Duration::from_millis(CONCURRENT_BUDGET_MS),
         h2_await_response(valid_response),
     )
     .await
-    .unwrap_or_else(|_: tokio::time::error::Elapsed| {
-        panic!("the valid request was blocked by the stalled one")
-    })
+    .unwrap_or_else(|_: Elapsed| panic!("the valid request was blocked by the stalled one"))
     .expect("the valid request must complete");
     assert_eq!(status, WIRE_OK_STATUS);
     assert!(body.is_empty());
@@ -40876,7 +42885,7 @@ async fn http2_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
 }
 #[tokio::test]
 async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_request() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -40884,11 +42893,10 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
     )
     .await
     .expect("http3 limits server must start");
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
-        connect_quic(port, ALPN_HTTP3)
-            .await
-            .expect("quic connect must succeed");
-    let (mut driver, mut client) = h3::client::new(h3_quinn::Connection::new(connection.clone()))
+    let (_endpoint, connection): (Endpoint, quinn::Connection) = connect_quic(port, ALPN_HTTP3)
+        .await
+        .expect("quic connect must succeed");
+    let (mut driver, mut client) = new(h3_quinn::Connection::new(connection.clone()))
         .await
         .expect("h3 handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
@@ -40901,7 +42909,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .header(CONTENT_LENGTH, WRONG_CONTENT_LENGTH.to_string())
         .body(())
         .expect("h3 incomplete request must build");
-    let mut stalled_stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut stalled_stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(stalled)
         .await
         .expect("stalled stream must open");
@@ -40924,7 +42932,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .uri(h3_target(port, BODY_ECHO_ROUTE_PATH))
         .body(())
         .expect("h3 valid request must build");
-    let mut valid_stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> = client
+    let mut valid_stream: RequestStream<BidiStream<Bytes>, Bytes> = client
         .send_request(valid)
         .await
         .expect("valid stream must open");
@@ -40932,14 +42940,12 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
         .finish()
         .await
         .expect("the valid request must finish");
-    let (status, headers, body): (u16, http::HeaderMap, Vec<u8>) = timeout(
+    let (status, headers, body): (u16, HeaderMap, Vec<u8>) = timeout(
         Duration::from_millis(CONCURRENT_BUDGET_MS),
         h3_collect(&mut valid_stream),
     )
     .await
-    .unwrap_or_else(|_: tokio::time::error::Elapsed| {
-        panic!("the valid request was blocked by the stalled one")
-    })
+    .unwrap_or_else(|_: Elapsed| panic!("the valid request was blocked by the stalled one"))
     .expect("the valid request must complete");
     assert_eq!(status, WIRE_OK_STATUS);
     assert!(body.is_empty());
@@ -40954,7 +42960,7 @@ async fn http3_incomplete_body_hits_the_read_timeout_without_blocking_a_valid_re
 }
 #[tokio::test]
 async fn http2_wrong_declared_content_length_never_yields_a_truncated_success() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -40966,7 +42972,7 @@ async fn http2_wrong_declared_content_length_never_yields_a_truncated_success() 
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let payload: Vec<u8> = declared_short_payload();
     let request: http::Request<()> = h2_build_request(
@@ -41001,7 +43007,7 @@ async fn http2_wrong_declared_content_length_never_yields_a_truncated_success() 
 }
 #[tokio::test]
 async fn http2_panicking_route_reaches_the_task_panic_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http2,
@@ -41013,7 +43019,7 @@ async fn http2_panicking_route_reaches_the_task_panic_hook() {
         .await
         .expect("h2 plaintext handshake must succeed");
     let driving: JoinHandle<()> = spawn(async move {
-        let _result: Result<(), h2::Error> = connection.await;
+        let _result: Result<(), Error> = connection.await;
     });
     let request: http::Request<()> =
         h2_build_request("GET", &h2_target(port, PANIC_ROUTE_PATH), None)
@@ -41041,7 +43047,7 @@ async fn http2_panicking_route_reaches_the_task_panic_hook() {
 }
 #[tokio::test]
 async fn http3_panicking_route_reaches_the_task_panic_hook() {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     reset_signals();
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         ServerProtocol::Http3,
@@ -41133,9 +43139,9 @@ pub(crate) struct LimitsResponseSender;
 pub(crate) struct RequestErrorRecorder;
 pub(crate) struct TaskPanicRecorder;
 pub(crate) enum LimitsOutcome {
-    Replied(u16, http::HeaderMap, Vec<u8>),
-    H2Reset(h2::Error),
-    H3Reset(h3::error::StreamError),
+    Replied(u16, HeaderMap, Vec<u8>),
+    H2Reset(Error),
+    H3Reset(StreamError),
     TimedOut,
     SetupFailed,
 }
@@ -41191,11 +43197,10 @@ pub(crate) fn limits_test_lock() -> &'static tokio::sync::Mutex<()> {
 ```rust
 use super::*;
 pub(crate) fn limits_request_config(max_body_size: usize, read_timeout_ms: u64) -> RequestConfig {
-    RequestConfig {
-        max_body_size,
-        read_timeout_ms,
-        ..RequestConfig::default()
-    }
+    let mut config: RequestConfig = RequestConfig::low_security();
+    config.set_max_body_size(max_body_size);
+    config.set_read_timeout_ms(read_timeout_ms);
+    config
 }
 fn register_limits_hooks(server: &mut Server) -> &mut Server {
     server.route::<HeadBodyRoute>(HEAD_ROUTE_PATH);
@@ -41260,7 +43265,7 @@ pub(super) fn http1_body_request(payload: &[u8]) -> Vec<u8> {
 }
 pub(super) async fn h2_oversized_body_then_get(
     port: u16,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     let (mut sender, connection): (
         h2::client::SendRequest<Bytes>,
         h2::client::Connection<TcpStream, Bytes>,
@@ -41286,13 +43291,13 @@ pub(super) async fn h2_oversized_body_then_get(
 }
 pub(super) async fn h3_oversized_body_then_get(
     port: u16,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let (mut driver, mut client): (
         h3::client::Connection<h3_quinn::Connection, Bytes>,
-        h3::client::SendRequest<h3_quinn::OpenStreams, Bytes>,
-    ) = h3::client::new(h3_quinn::Connection::new(connection))
+        h3::client::SendRequest<OpenStreams, Bytes>,
+    ) = new(h3_quinn::Connection::new(connection))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
     let target: String = h3_target(port, BODY_ECHO_ROUTE_PATH);
@@ -41316,14 +43321,14 @@ pub(super) async fn expect_exchange(
     content_length: usize,
     upload: Option<&[u8]>,
 ) -> (u16, Vec<u8>) {
-    let _guard: tokio::sync::MutexGuard<'_, ()> = limits_test_lock().lock().await;
+    let _guard: MutexGuard<'_, ()> = limits_test_lock().lock().await;
     let (control, port): (ServerControlHook, u16) = start_limits_server(
         protocol,
         limits_request_config(MAX_BODY_SIZE, DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS),
     )
     .await
     .expect("Expect test server must start");
-    let result: Result<Result<(u16, Vec<u8>), String>, tokio::time::error::Elapsed> =
+    let result: Result<Result<(u16, Vec<u8>), String>, Elapsed> =
         timeout(Duration::from_secs(EXPECT_EXCHANGE_TIMEOUT_SECS), async {
             match protocol {
                 ServerProtocol::Http2 => h2_expect_exchange(port, content_length, upload).await,
@@ -41390,24 +43395,24 @@ async fn h2_expect_exchange(
     }
 }
 async fn h2_next_informational(
-    response: &mut h2::client::ResponseFuture,
+    response: &mut ResponseFuture,
 ) -> Result<Option<http::Response<()>>, String> {
     poll_fn(|context: &mut task::Context<'_>| response.poll_informational(context))
         .await
         .transpose()
-        .map_err(|error: h2::Error| format!("h2 informational response failed: {error}"))
+        .map_err(|error: Error| format!("h2 informational response failed: {error}"))
 }
 async fn h3_expect_exchange(
     port: u16,
     content_length: usize,
     upload: Option<&[u8]>,
 ) -> Result<(u16, Vec<u8>), String> {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         connect_quic(port, ALPN_HTTP3).await?;
     let (mut driver, mut client): (
         h3::client::Connection<h3_quinn::Connection, Bytes>,
-        h3::client::SendRequest<h3_quinn::OpenStreams, Bytes>,
-    ) = h3::client::new(h3_quinn::Connection::new(connection))
+        h3::client::SendRequest<OpenStreams, Bytes>,
+    ) = new(h3_quinn::Connection::new(connection))
         .await
         .map_err(|error: h3::error::ConnectionError| format!("h3 handshake failed: {error}"))?;
     tokio::select! {
@@ -41439,7 +43444,7 @@ pub(crate) fn h2_build_request(
     target: &str,
     content_length: Option<usize>,
 ) -> Result<http::Request<()>, String> {
-    let mut builder: http::request::Builder = http::Request::builder()
+    let mut builder: Builder = http::Request::builder()
         .method(method)
         .uri(target)
         .header(PROBE_HEADER_KEY, PROBE_HEADER_VALUE);
@@ -41454,30 +43459,30 @@ pub(crate) fn h2_open_stream(
     sender: &mut h2::client::SendRequest<Bytes>,
     request: http::Request<()>,
     end_of_stream: bool,
-) -> Result<(h2::client::ResponseFuture, h2::SendStream<Bytes>), String> {
+) -> Result<(ResponseFuture, SendStream<Bytes>), String> {
     sender
         .send_request(request, end_of_stream)
-        .map_err(|error: h2::Error| format!("h2 send_request failed: {error}"))
+        .map_err(|error: Error| format!("h2 send_request failed: {error}"))
 }
 pub(crate) fn h2_push_body(
-    send_stream: &mut h2::SendStream<Bytes>,
+    send_stream: &mut SendStream<Bytes>,
     body: &[u8],
     end_of_stream: bool,
 ) -> Result<(), String> {
     send_stream
         .send_data(Bytes::copy_from_slice(body), end_of_stream)
-        .map_err(|error: h2::Error| format!("h2 send_data failed: {error}"))
+        .map_err(|error: Error| format!("h2 send_data failed: {error}"))
 }
 pub(crate) fn h2_push_body_typed(
-    send_stream: &mut h2::SendStream<Bytes>,
+    send_stream: &mut SendStream<Bytes>,
     body: &[u8],
     end_of_stream: bool,
-) -> Result<(), h2::Error> {
+) -> Result<(), Error> {
     send_stream.send_data(Bytes::copy_from_slice(body), end_of_stream)
 }
 pub(crate) async fn h2_await_response(
-    response: h2::client::ResponseFuture,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    response: ResponseFuture,
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     match h2_await_outcome(response).await {
         LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
         LimitsOutcome::H2Reset(error) => Err(format!("h2 stream reset: {error:?}")),
@@ -41486,51 +43491,49 @@ pub(crate) async fn h2_await_response(
         LimitsOutcome::SetupFailed => Err("h2 response future must resolve".to_string()),
     }
 }
-pub(crate) async fn h2_await_outcome(response: h2::client::ResponseFuture) -> LimitsOutcome {
-    let received: Result<http::Response<h2::RecvStream>, h2::Error> =
+pub(crate) async fn h2_await_outcome(response: ResponseFuture) -> LimitsOutcome {
+    let received: Result<http::Response<RecvStream>, Error> =
         match timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS), response).await {
             Ok(received) => received,
             Err(_) => return LimitsOutcome::TimedOut,
         };
-    let received: http::Response<h2::RecvStream> = match received {
+    let received: http::Response<RecvStream> = match received {
         Ok(received) => received,
         Err(error) => return LimitsOutcome::H2Reset(error),
     };
     let status: u16 = received.status().as_u16();
-    let headers: http::HeaderMap = received.headers().clone();
-    let mut body_stream: h2::RecvStream = received.into_body();
+    let headers: HeaderMap = received.headers().clone();
+    let mut body_stream: RecvStream = received.into_body();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
         let remaining: Duration = deadline.saturating_duration_since(Instant::now());
-        let chunk: Result<Option<Result<Bytes, h2::Error>>, tokio::time::error::Elapsed> =
+        let chunk: Result<Option<Result<Bytes, Error>>, Elapsed> =
             timeout(remaining, body_stream.data()).await;
         match chunk {
             Err(_) => return LimitsOutcome::TimedOut,
             Ok(None) => break,
             Ok(Some(Err(error))) => return LimitsOutcome::H2Reset(error),
             Ok(Some(Ok(chunk))) => {
-                let released: Result<(), h2::Error> =
+                let released: Result<(), Error> =
                     body_stream.flow_control().release_capacity(chunk.len());
                 collected.extend_from_slice(&chunk);
-                let _: Result<(), h2::Error> = released;
+                let _: Result<(), Error> = released;
             }
         }
     }
     LimitsOutcome::Replied(status, headers, collected)
 }
-pub(crate) async fn h2_still_pending(response: h2::client::ResponseFuture, budget_ms: u64) -> bool {
-    let outcome: Result<
-        Result<http::Response<h2::RecvStream>, h2::Error>,
-        tokio::time::error::Elapsed,
-    > = timeout(Duration::from_millis(budget_ms), response).await;
+pub(crate) async fn h2_still_pending(response: ResponseFuture, budget_ms: u64) -> bool {
+    let outcome: Result<Result<http::Response<RecvStream>, Error>, Elapsed> =
+        timeout(Duration::from_millis(budget_ms), response).await;
     outcome.is_err()
 }
 pub(crate) async fn h2_get(
     sender: &mut h2::client::SendRequest<Bytes>,
     port: u16,
     path: &str,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     let request: http::Request<()> =
         h2_build_request("GET", &h2_target(port, path), None).map_err(|error: String| error)?;
     let (response, _send_stream) =
@@ -41543,17 +43546,17 @@ pub(crate) fn h2_target(port: u16, path: &str) -> String {
 pub(crate) fn h3_target(port: u16, path: &str) -> String {
     format!("https://{TLS_SERVER_NAME}:{port}{path}")
 }
-pub(crate) fn h3_reset_is_internal(error: &h3::error::StreamError) -> bool {
+pub(crate) fn h3_reset_is_internal(error: &StreamError) -> bool {
     match error {
         h3::error::StreamError::StreamError { code, .. } => *code == Code::H3_INTERNAL_ERROR,
         h3::error::StreamError::RemoteTerminate { code, .. } => *code == Code::H3_INTERNAL_ERROR,
         _ => false,
     }
 }
-pub(crate) fn header_value(headers: &http::HeaderMap, key: &str) -> Option<String> {
+pub(crate) fn header_value(headers: &HeaderMap, key: &str) -> Option<String> {
     headers
         .get(key)
-        .map(|value: &http::HeaderValue| value.to_str().unwrap_or_default().to_owned())
+        .map(|value: &HeaderValue| value.to_str().unwrap_or_default().to_owned())
 }
 pub(crate) fn oversized_payload() -> Vec<u8> {
     let mut payload: Vec<u8> = Vec::with_capacity(OVERSIZED_BODY_LEN);
@@ -41571,8 +43574,8 @@ pub(crate) fn declared_short_payload() -> Vec<u8> {
     payload
 }
 pub(crate) async fn h3_collect(
-    stream: &mut h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>,
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+    stream: &mut RequestStream<BidiStream<Bytes>, Bytes>,
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     match h3_collect_outcome(stream).await {
         LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
         LimitsOutcome::H3Reset(error) => Err(format!("h3 stream reset: {error:?}")),
@@ -41581,10 +43584,8 @@ pub(crate) async fn h3_collect(
         LimitsOutcome::SetupFailed => Err("h3 response must resolve".to_string()),
     }
 }
-async fn h3_collect_outcome(
-    stream: &mut h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>,
-) -> LimitsOutcome {
-    let received: Result<http::Response<()>, h3::error::StreamError> = match timeout(
+async fn h3_collect_outcome(stream: &mut RequestStream<BidiStream<Bytes>, Bytes>) -> LimitsOutcome {
+    let received: Result<http::Response<()>, StreamError> = match timeout(
         Duration::from_secs(REQUEST_TIMEOUT_SECS),
         stream.recv_response(),
     )
@@ -41598,7 +43599,7 @@ async fn h3_collect_outcome(
         Err(error) => return LimitsOutcome::H3Reset(error),
     };
     let status: u16 = received.status().as_u16();
-    let headers: http::HeaderMap = received.headers().clone();
+    let headers: HeaderMap = received.headers().clone();
     let mut collected: Vec<u8> = Vec::new();
     let deadline: Instant = Instant::now() + Duration::from_secs(REQUEST_TIMEOUT_SECS);
     loop {
@@ -41619,10 +43620,10 @@ pub(crate) async fn h3_exchange(
     method: &str,
     target: &str,
     body: &[u8],
-) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     h3_outcome_to_reply(h3_exchange_outcome(port, method, target, body).await)
 }
-fn h3_outcome_to_reply(outcome: LimitsOutcome) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+fn h3_outcome_to_reply(outcome: LimitsOutcome) -> Result<(u16, HeaderMap, Vec<u8>), String> {
     match outcome {
         LimitsOutcome::Replied(status, headers, body) => Ok((status, headers, body)),
         LimitsOutcome::H3Reset(error) => Err(format!("h3 stream reset: {error:?}")),
@@ -41637,16 +43638,15 @@ pub(crate) async fn h3_exchange_outcome(
     target: &str,
     body: &[u8],
 ) -> LimitsOutcome {
-    let (_endpoint, connection): (quinn::Endpoint, quinn::Connection) =
+    let (_endpoint, connection): (Endpoint, quinn::Connection) =
         match connect_quic(port, ALPN_HTTP3).await {
             Ok(pair) => pair,
             Err(_) => return LimitsOutcome::SetupFailed,
         };
-    let (mut driver, mut client) =
-        match h3::client::new(h3_quinn::Connection::new(connection.clone())).await {
-            Ok(pair) => pair,
-            Err(_) => return LimitsOutcome::SetupFailed,
-        };
+    let (mut driver, mut client) = match new(h3_quinn::Connection::new(connection.clone())).await {
+        Ok(pair) => pair,
+        Err(_) => return LimitsOutcome::SetupFailed,
+    };
     let driving: JoinHandle<()> = spawn(async move {
         let _final: h3::error::ConnectionError = driver.wait_idle().await;
     });
@@ -41657,7 +43657,7 @@ pub(crate) async fn h3_exchange_outcome(
     outcome
 }
 async fn h3_drive(
-    client: &mut h3::client::SendRequest<h3_quinn::OpenStreams, Bytes>,
+    client: &mut h3::client::SendRequest<OpenStreams, Bytes>,
     method: &str,
     target: &str,
     body: &[u8],
@@ -41671,7 +43671,7 @@ async fn h3_drive(
         Ok(request) => request,
         Err(_) => return LimitsOutcome::SetupFailed,
     };
-    let mut stream: h3::client::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes> =
+    let mut stream: RequestStream<BidiStream<Bytes>, Bytes> =
         match client.send_request(request).await {
             Ok(stream) => stream,
             Err(error) => return LimitsOutcome::H3Reset(error),
@@ -42232,13 +44232,13 @@ fn authority_headers(pairs: &[(&str, &str)]) -> ProtocolHeaders {
     }
     headers
 }
-fn authority_uri(authority: &str) -> http::Uri {
+fn authority_uri(authority: &str) -> Uri {
     http::Uri::try_from(format!("http://{authority}/path")).expect("the authority must build")
 }
 #[test]
 fn an_authority_that_disagrees_with_the_host_header_is_rejected() {
     let headers: ProtocolHeaders = authority_headers(&[("host", "other.example")]);
-    let uri: http::Uri = authority_uri("authority.example");
+    let uri: Uri = authority_uri("authority.example");
     assert!(matches!(
         check_request_authority(&headers, &uri),
         Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
@@ -42247,19 +44247,19 @@ fn an_authority_that_disagrees_with_the_host_header_is_rejected() {
 #[test]
 fn an_authority_that_agrees_with_the_host_header_is_accepted() {
     let headers: ProtocolHeaders = authority_headers(&[("host", "authority.example")]);
-    let uri: http::Uri = authority_uri("authority.example");
+    let uri: Uri = authority_uri("authority.example");
     assert!(check_request_authority(&headers, &uri).is_ok());
 }
 #[test]
 fn an_authority_that_differs_from_the_host_header_only_by_case_is_accepted() {
     let headers: ProtocolHeaders = authority_headers(&[("host", "AUTHORITY.example")]);
-    let uri: http::Uri = authority_uri("authority.example");
+    let uri: Uri = authority_uri("authority.example");
     assert!(check_request_authority(&headers, &uri).is_ok());
 }
 #[test]
 fn an_authority_and_a_host_header_that_name_different_ports_are_rejected() {
     let headers: ProtocolHeaders = authority_headers(&[("host", "authority.example:8080")]);
-    let uri: http::Uri = authority_uri("authority.example");
+    let uri: Uri = authority_uri("authority.example");
     assert!(matches!(
         check_request_authority(&headers, &uri),
         Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest))
@@ -42268,7 +44268,7 @@ fn an_authority_and_a_host_header_that_name_different_ports_are_rejected() {
 #[test]
 fn a_default_port_matches_an_authority_that_carries_no_port() {
     let headers: ProtocolHeaders = authority_headers(&[("host", "authority.example:443")]);
-    let uri: http::Uri =
+    let uri: Uri =
         http::Uri::try_from("https://authority.example/path").expect("the uri must build");
     assert!(check_request_authority(&headers, &uri).is_ok());
 }
@@ -42276,10 +44276,10 @@ fn a_default_port_matches_an_authority_that_carries_no_port() {
 fn an_authority_that_carries_userinfo_is_rejected() {
 #[test]
 fn a_host_header_that_carries_userinfo_is_rejected() {
-    let uri: http::Uri = authority_uri("authority.example");
+    let uri: Uri = authority_uri("authority.example");
 #[test]
 fn two_host_headers_are_rejected() {
-    let uri: http::Uri = authority_uri("authority.example");
+    let uri: Uri = authority_uri("authority.example");
     let headers: ProtocolHeaders =
         authority_headers(&[("host", "authority.example"), ("host", "authority.example")]);
     assert!(matches!(
@@ -42289,7 +44289,7 @@ fn two_host_headers_are_rejected() {
 }
 #[test]
 fn a_request_without_a_host_header_is_accepted() {
-    let uri: http::Uri = authority_uri("authority.example");
+    let uri: Uri = authority_uri("authority.example");
     let headers: ProtocolHeaders = ProtocolHeaders::new();
     assert!(check_request_authority(&headers, &uri).is_ok());
 }
@@ -42349,45 +44349,104 @@ use std::{
     any::Any,
     cell::{RefCell, RefMut},
     cmp::Ordering,
-    collections::HashSet,
+    collections::{HashMap, HashSet, VecDeque},
+    fmt,
     future::{Future, poll_fn},
     hash::{Hash, Hasher},
-    io::{self, Write, stderr, stdout},
-    mem,
-    net::{AddrParseError, SocketAddr},
+    io::{self, IoSlice, IoSliceMut, Write, stderr, stdout},
+    marker::PhantomPinned,
+    mem::{self, MaybeUninit},
+    net::{self, AddrParseError, SocketAddr},
     num::ParseIntError,
     panic::AssertUnwindSafe,
-    pin::Pin,
-    ptr,
+    pin::{Pin, pin},
+    process::abort,
+    ptr, slice,
     str::{Split, SplitWhitespace, Utf8Error, from_utf8},
-    sync::Arc,
-    task::{self, Poll},
+    sync::{
+        self, Arc, Mutex, MutexGuard, OnceLock,
+        atomic::{AtomicBool, AtomicUsize},
+    },
+    task::{self, Poll, Waker},
+    thread,
     time::Duration,
 };
 use {
     bytes::Bytes,
-    futures::FutureExt,
-    h3::error::{Code, StreamError},
-    http::{HeaderValue, StatusCode},
+    futures::{FutureExt, StreamExt, stream::FuturesUnordered},
+    h2::{
+        Reason,
+        server::{Builder, SendResponse},
+    },
+    http::{
+        HeaderMap, HeaderName, HeaderValue, StatusCode, Uri,
+        request::Parts,
+        status::InvalidStatusCode,
+        uri::{Authority, Scheme},
+    },
     inventory::collect,
     lombok_macros::*,
-    quinn::{self, Endpoint, Incoming, VarInt},
-    regex::Regex,
-    rustls::pki_types::{
-        CertificateDer, PrivateKeyDer,
-        pem::{self, PemObject},
+    quinn::{
+        self, AsyncUdpSocket, Connection, ConnectionId, ConnectionIdGenerator, Endpoint,
+        EndpointConfig, Incoming, RecvStream, Runtime, SendStream, TokioRuntime, UdpPoller, VarInt,
+        WriteError,
+        crypto::rustls::{HandshakeData, NoInitialCipherSuite, QuicServerConfig},
+        udp::{BATCH_SIZE, RecvMeta, Transmit},
+    },
+    regex::{Match, Regex},
+    rustls::{
+        SupportedCipherSuite,
+        crypto::{
+            CryptoProvider, SecureRandom,
+            ring::{
+                cipher_suite::{
+                    TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+                    TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+                    TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+                    TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+                    TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS13_AES_128_GCM_SHA256,
+                    TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256,
+                },
+                default_provider,
+            },
+        },
+        pki_types::{
+            CertificateDer, PrivateKeyDer,
+            pem::{self, PemObject},
+        },
+        server::UnbufferedServerConnection,
+        unbuffered::{ConnectionState, EncodeError, EncryptError, UnbufferedStatus},
+        version::{TLS12, TLS13},
     },
     serde::{Deserialize, Serialize},
+    socket2::{Domain, SockRef, Socket, Type},
     tokio::{
-        io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf},
-        join,
+        io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
         net::{TcpListener, TcpStream},
-        spawn,
-        sync::watch::{Receiver, Sender, channel},
-        task::JoinHandle,
-        time::timeout,
+        runtime, spawn,
+        sync::watch::{Receiver, Sender, channel, error::RecvError, error::SendError},
+        task::{JoinError, JoinHandle, spawn_blocking},
+        time::{error::Elapsed, timeout},
     },
-    tokio_rustls::TlsAcceptor,
+};
+#[cfg(not(target_os = "linux"))]
+use tokio::runtime::Handle;
+#[cfg(target_os = "linux")]
+use {
+    io_uring::{IoUring, opcode, squeue, types},
+    libc::{
+        AF_INET, AF_INET6, EAGAIN, EBUSY, ECANCELED, EFD_CLOEXEC, EFD_NONBLOCK, EINTR, EPIPE,
+        IP_TTL, IPPROTO_IP, IPPROTO_IPV6, IPV6_UNICAST_HOPS, MSG_MORE, MSG_WAITALL, POLLIN,
+        SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK, c_int, c_void, close, eventfd, read, setsockopt,
+        shutdown, sockaddr, sockaddr_in, sockaddr_in6, sockaddr_storage, socklen_t, write,
+    },
+    std::{
+        net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
+        os::fd::{AsRawFd, RawFd},
+        sync::mpsc::{SyncSender, sync_channel},
+        task::Wake,
+    },
+    tokio::runtime::{EnterGuard, Handle},
 };
 ```
 # Path: hyperlane/core/src/hook/type.rs
@@ -42451,8 +44510,13 @@ impl Hook {
     where
         R: ServerHook,
     {
-        Arc::new(
+        let key_slot: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+        let guard: InlineHookGuard = InlineHookGuard {
+            key: Arc::clone(&key_slot),
+        };
+        let handler: ServerHookHandler = Arc::new(
             move |stream: &mut Stream, ctx: &mut Context| -> FutureBox<Status> {
+                let _guard: &InlineHookGuard = &guard;
                 let ctx_address: usize = ctx.into();
                 let stream_address: usize = stream.into();
                 Box::pin(async move {
@@ -42461,7 +44525,11 @@ impl Hook {
                     R::new(stream, ctx).await.handle(stream, ctx).await
                 })
             },
-        )
+        );
+        let key: usize = Arc::as_ptr(&handler) as *const () as usize;
+        key_slot.store(key, AtomicOrdering::Relaxed);
+        register_inline_hook(key, inline_init_hook::<R>);
+        handler
     }
 }
 impl PartialEq for HookType {
@@ -42738,7 +44806,12 @@ impl Context {
     }
     #[inline(always)]
     pub(crate) fn clear_route_params(&mut self) -> &mut Self {
-        self.get_mut_route_params().clear();
+        let params: &mut RouteParams = self.get_mut_route_params();
+        if !params.is_empty() {
+            for pair in params.drain() {
+                return_route_param_entry(pair);
+            }
+        }
         self
     }
     #[inline(always)]
@@ -42760,6 +44833,10 @@ impl Context {
     }
     pub(crate) fn get_request_target_ref(&self) -> Option<&String> {
         self.original_target.as_ref()
+    }
+    #[inline(always)]
+    pub(crate) fn take_original_target(&mut self) -> Option<String> {
+        self.get_mut_original_target().take()
     }
     pub(crate) fn set_request_target<T>(&mut self, target: T) -> &mut Self
     where
@@ -42903,9 +44980,9 @@ use super::*;
 use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Context {
-    pub request: Request,
-    pub response: Response,
-    pub route_params: RouteParams,
+    pub(crate) request: Request,
+    pub(crate) response: Response,
+    pub(crate) route_params: RouteParams,
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) original_target: Option<String>,
@@ -42913,7 +44990,7 @@ pub struct Context {
     #[get_mut(skip)]
     #[set(pub(crate))]
     pub(crate) original_head: Option<bool>,
-    pub attributes: ThreadSafeAttributeStore,
+    pub(crate) attributes: ThreadSafeAttributeStore,
 }
 ```
 # Path: hyperlane/core/src/server/impl.rs
@@ -43157,43 +45234,6 @@ impl Server {
         Self::flush_stdout();
         Self::flush_stderr();
     }
-    pub(super) async fn handle_request_middleware(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-    ) -> bool {
-        for hook in self.get_request_middleware().iter() {
-            if hook(stream, ctx).await.is_reject() {
-                return true;
-            }
-        }
-        false
-    }
-    pub(super) async fn handle_route_matcher(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-        path: &str,
-    ) -> bool {
-        if let Some(hook) = self.get_route_matcher().try_resolve_route(ctx, path)
-            && hook(stream, ctx).await.is_reject()
-        {
-            return true;
-        }
-        false
-    }
-    pub(super) async fn handle_response_middleware(
-        &self,
-        stream: &mut Stream,
-        ctx: &mut Context,
-    ) -> bool {
-        for hook in self.get_response_middleware().iter() {
-            if hook(stream, ctx).await.is_reject() {
-                return true;
-            }
-        }
-        false
-    }
     pub async fn handle_request_error(
         &self,
         stream: &mut Stream,
@@ -43208,69 +45248,26 @@ impl Server {
             }
         }
     }
-    pub(crate) async fn request_hook(
+    async fn handle_connection(
         &self,
+        pipeline: &CompiledPipeline,
         stream: &mut Stream,
         ctx: &mut Context,
-        request: Request,
-        target: Option<String>,
-    ) -> bool {
-        let keep_alive: bool = request.is_enable_keep_alive();
-        let version: RequestVersion = request.get_version().clone();
-        ctx.set_original_head(Some(request.get_method().is_head()));
-        ctx.set_request(request);
-        ctx.get_mut_response().reset().set_version(version);
-        ctx.clear_route_params();
-        ctx.reset_request_attributes();
-        match target {
-            Some(target) => {
-                ctx.set_request_target(target);
-            }
-            None => {
-                if let Some(target) = stream.get_line_buffer().split_ascii_whitespace().nth(1) {
-                    ctx.set_request_target(target);
-                } else {
-                    ctx.clear_attribute();
-                }
-            }
-        }
-        stream.set_closed(false);
-        if self.handle_request_middleware(stream, ctx).await {
-            return stream.is_keep_alive(keep_alive);
-        }
-        let static_hook: Option<&ServerHookHandler> = {
-            let path: &str = ctx.get_request().get_path().as_str();
-            self.get_route_matcher().try_resolve_static_route(path)
-        };
-        if let Some(hook) = static_hook {
-            if hook(stream, ctx).await.is_reject() {
-                return stream.is_keep_alive(keep_alive);
-            }
-        } else {
-            let route: RequestPath = ctx.get_request().get_path().clone();
-            if self.handle_route_matcher(stream, ctx, &route).await {
-                return stream.is_keep_alive(keep_alive);
-            }
-        }
-        if self.handle_response_middleware(stream, ctx).await {
-            return stream.is_keep_alive(keep_alive);
-        }
-        stream.is_keep_alive(keep_alive)
-    }
-    async fn handle_http_requests(&self, stream: &mut Stream, ctx: &mut Context, request: Request) {
-        if !self.request_hook(stream, ctx, request, None).await {
-            return;
-        }
+    ) {
         loop {
-            let mut reused_request: Request = mem::take(ctx.get_mut_request());
-            match stream.try_fill_http_request(&mut reused_request).await {
+            match stream.try_fill_http_request(ctx.get_mut_request()).await {
                 Ok(()) => {
-                    if !self.request_hook(stream, ctx, reused_request, None).await {
+                    if !pipeline.run_request(stream, ctx, None).await {
                         return;
                     }
                 }
+                Err(RequestError::ClientClosedConnection(_))
+                    if self.get_request_error().is_empty() =>
+                {
+                    return;
+                }
                 Err(error) => {
-                    ctx.set_original_head(None).set_request(reused_request);
+                    ctx.set_original_head(None);
                     let version: Option<HttpVersion> = h1_error_response_version(stream, &error);
                     Box::pin(reply_to_request_error(self, stream, ctx, &error, version)).await;
                     return;
@@ -43278,43 +45275,36 @@ impl Server {
             }
         }
     }
-    async fn handle_connection(&self, stream: &mut Stream, ctx: &mut Context) {
-        match stream.try_get_http_request().await {
-            Ok(request) => {
-                self.handle_http_requests(stream, ctx, request).await;
-            }
-            Err(error) => {
-                let version: Option<HttpVersion> = h1_error_response_version(stream, &error);
-                Box::pin(reply_to_request_error(self, stream, ctx, &error, version)).await;
-            }
-        }
-    }
-    pub(crate) async fn serve_h1_connection_stream(&self, stream: &mut Stream) {
-        let mut ctx: Context = Context::default();
-        let panicked: Option<PanicData> =
-            catch_connection_panic(self.handle_connection(stream, &mut ctx)).await;
-        let Some(panic) = panicked else {
-            return;
-        };
-        ctx.set_task_panic(panic)
-            .get_mut_response()
-            .set_status_code(HttpStatus::InternalServerError.code());
-        stream.set_closed(false);
-        for hook in self.get_task_panic().iter() {
-            if hook(stream, &mut ctx).await.is_reject() {
-                break;
-            }
-        }
-    }
-    pub(crate) async fn run_protocol_lifecycle(
+    pub(crate) async fn serve_h1_connection_stream(
         &self,
+        pipeline: &CompiledPipeline,
+        stream: &mut Stream,
+    ) {
+        let mut ctx: Context = take_pooled_context();
+        let panicked: Option<PanicData> =
+            catch_connection_panic(self.handle_connection(pipeline, stream, &mut ctx)).await;
+        if let Some(panic) = panicked {
+            ctx.set_task_panic(panic)
+                .get_mut_response()
+                .set_status_code(HttpStatus::InternalServerError.code());
+            stream.set_closed(false);
+            for hook in self.get_task_panic().iter() {
+                if hook(stream, &mut ctx).await.is_reject() {
+                    break;
+                }
+            }
+        }
+        return_pooled_context(ctx);
+    }
+    pub(crate) async fn run_protocol_lifecycle_in_place(
+        &self,
+        pipeline: &CompiledPipeline,
         stream: &mut Stream,
         ctx: &mut Context,
-        request: Request,
         target: String,
     ) {
         let panicked: Option<PanicData> = catch_connection_panic(async {
-            let _keep_alive: bool = self.request_hook(stream, ctx, request, Some(target)).await;
+            let _keep_alive: bool = pipeline.run_request(stream, ctx, Some(target)).await;
         })
         .await;
         let Some(panic) = panicked else {
@@ -43343,7 +45333,8 @@ impl Server {
             None => None,
         };
         let bind_address: &String = server_config.get_address();
-        let server: Arc<Server> = Arc::new(Self::clone(self));
+        let server: Server = Self::clone(self);
+        let pipeline: CompiledPipeline = CompiledPipeline::from_server(&server);
         let request_config: RequestConfig = *self.get_request_config();
         let (shutdown_sender, shutdown_receiver) = channel(());
         let (running_sender, running_receiver) = channel(SERVER_RUNNING);
@@ -43352,12 +45343,9 @@ impl Server {
                 let Some(config) = tls_config.clone() else {
                     return Err(Box::new(ServerError::MissingTlsForHttp3));
                 };
-                let quic_config: Arc<quinn::crypto::rustls::QuicServerConfig> = Arc::new(
-                    quinn::crypto::rustls::QuicServerConfig::try_from(build_quic_tls_config(
-                        &config,
-                    )?)
-                    .map_err(
-                        |error: quinn::crypto::rustls::NoInitialCipherSuite| {
+                let quic_config: Arc<QuicServerConfig> = Arc::new(
+                    QuicServerConfig::try_from(build_quic_tls_config(&config)?).map_err(
+                        |error: NoInitialCipherSuite| {
                             Box::new(ServerError::Tls(format!(
                                 "no compatible cipher suite for quic: {}",
                                 error
@@ -43374,39 +45362,35 @@ impl Server {
                                 bind_address, error
                             )))
                         })?;
-                let endpoint: Endpoint =
-                    Endpoint::server(quinn::ServerConfig::with_crypto(quic_config), bind_addr)
-                        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let endpoints: QuicEndpointSet = bind_quic_endpoints(quic_config, bind_addr)?;
                 let env: ConnectionEnv = ConnectionEnv {
-                    server,
-                    request_config,
-                    protocol,
+                    shared: Arc::new(ConnectionShared {
+                        server,
+                        pipeline,
+                        request_config,
+                        protocol,
+                        tls_config: None,
+                    }),
                 };
                 spawn(async move {
-                    let _: Result<(), Box<ServerError>> =
-                        quic_accept(env, endpoint, shutdown_receiver, running_sender).await;
+                    quic_accept_all(env, endpoints, shutdown_receiver, running_sender).await;
                 })
             }
             _ => {
-                let tcp_listener: TcpListener = TcpListener::bind(&bind_address)
-                    .await
-                    .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+                let nodelay: bool = server_config.get_nodelay().unwrap_or(true);
+                let tcp_listeners: Vec<TcpListener> =
+                    bind_tcp_listeners(bind_address, nodelay).await?;
                 let env: ConnectionEnv = ConnectionEnv {
-                    server,
-                    request_config,
-                    protocol,
+                    shared: Arc::new(ConnectionShared {
+                        server,
+                        pipeline,
+                        request_config,
+                        protocol,
+                        tls_config: stream_tls,
+                    }),
                 };
                 spawn(async move {
-                    tcp_accept(
-                        env,
-                        stream_tls,
-                        AcceptSignal {
-                            listener: tcp_listener,
-                            shutdown_receiver,
-                            running_sender,
-                        },
-                    )
-                    .await;
+                    tcp_accept_all(env, tcp_listeners, shutdown_receiver, running_sender).await;
                 })
             }
         };
@@ -43414,16 +45398,14 @@ impl Server {
             let mut running_receiver_clone: Receiver<bool> = running_receiver.clone();
             Box::pin(async move {
                 while !*running_receiver_clone.borrow_and_update() {
-                    let _: Result<(), tokio::sync::watch::error::RecvError> =
-                        running_receiver_clone.changed().await;
+                    let _: Result<(), RecvError> = running_receiver_clone.changed().await;
                 }
             })
         });
         let shutdown_hook: ServerControlHookHandler<()> = Arc::new(move || {
             let shutdown_sender_clone: Sender<()> = shutdown_sender.clone();
             Box::pin(async move {
-                let _: Result<(), tokio::sync::watch::error::SendError<()>> =
-                    shutdown_sender_clone.send(());
+                let _: Result<(), SendError<()>> = shutdown_sender_clone.send(());
             })
         });
         let mut server_control_hook: ServerControlHook = ServerControlHook::default();
@@ -43445,22 +45427,22 @@ use super::*;
 use super::*;
 #[derive(Clone, CustomDebug, Data, DisplayDebug)]
 pub struct Server {
-    pub server_config: ServerConfig,
-    pub request_config: RequestConfig,
+    pub(crate) server_config: ServerConfig,
+    pub(crate) request_config: RequestConfig,
     #[set(skip)]
-    pub route_matcher: RouteMatcher,
+    pub(crate) route_matcher: RouteMatcher,
     #[debug(skip)]
     #[set(skip)]
-    pub request_error: ServerHookList,
+    pub(crate) request_error: ServerHookList,
     #[debug(skip)]
     #[set(skip)]
-    pub task_panic: ServerHookList,
+    pub(crate) task_panic: ServerHookList,
     #[debug(skip)]
     #[set(skip)]
-    pub request_middleware: ServerHookList,
+    pub(crate) request_middleware: ServerHookList,
     #[debug(skip)]
     #[set(skip)]
-    pub response_middleware: ServerHookList,
+    pub(crate) response_middleware: ServerHookList,
 }
 ```
 # Path: hyperlane/core/src/listener/const.rs
@@ -43471,38 +45453,69 @@ pub(crate) const SERVER_STOPPED: bool = true;
 pub(crate) const SERVER_RUNNING: bool = false;
 pub(crate) const H2_HANDSHAKE_TIMEOUT: &str = "http2 handshake exceeded the read timeout";
 pub(crate) const NO_TIMEOUT_MS: u64 = u64::MAX;
+pub(crate) const TCP_LISTEN_BACKLOG: i32 = 1024;
 ```
 # Path: hyperlane/core/src/listener/mod.rs
 ```rust
 mod r#const;
 mod r#fn;
-mod r#struct;
-pub(crate) use {r#const::*, r#fn::*, r#struct::*};
+pub(crate) use {r#const::*, r#fn::*};
 use super::*;
-```
-# Path: hyperlane/core/src/listener/struct.rs
-```rust
-use super::*;
-#[derive(Debug)]
-pub(crate) struct AcceptSignal {
-    pub(crate) listener: TcpListener,
-    pub(crate) shutdown_receiver: Receiver<()>,
-    pub(crate) running_sender: Sender<bool>,
-}
 ```
 # Path: hyperlane/core/src/listener/fn.rs
 ```rust
 use super::*;
-pub(crate) async fn tcp_accept(
+pub(crate) fn bind_quic_endpoints(
+    quic_config: Arc<QuicServerConfig>,
+    bind_addr: SocketAddr,
+) -> Result<QuicEndpointSet, Box<ServerError>> {
+    create_quic_endpoint_set(quic_config, bind_addr)
+}
+pub(crate) async fn bind_tcp_listeners(
+    bind_address: &str,
+    nodelay: bool,
+) -> Result<Vec<TcpListener>, Box<ServerError>> {
+    let Ok(bind_addr) = bind_address.parse::<SocketAddr>() else {
+        let listener: TcpListener = TcpListener::bind(bind_address)
+            .await
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        SockRef::from(&listener)
+            .set_tcp_nodelay(nodelay)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        return Ok(vec![listener]);
+    };
+    let shard_count: usize = 1;
+    let mut listeners: Vec<TcpListener> = Vec::with_capacity(shard_count);
+    for _ in 0..shard_count {
+        let socket: Socket = Socket::new(Domain::for_address(bind_addr), Type::STREAM, None)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        if bind_addr.port() != 0 {
+            socket
+                .set_reuse_address(true)
+                .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        }
+        let _: Result<(), io::Error> = socket.set_tcp_nodelay(nodelay);
+        socket
+            .set_nonblocking(true)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        socket
+            .bind(&bind_addr.into())
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        socket
+            .listen(TCP_LISTEN_BACKLOG)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        let std_listener: StdTcpListener = socket.into();
+        let listener: TcpListener = TcpListener::from_std(std_listener)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        listeners.push(listener);
+    }
+    Ok(listeners)
+}
+async fn tcp_accept_loop(
     env: ConnectionEnv,
-    stream_tls: Option<Arc<rustls::ServerConfig>>,
-    signal: AcceptSignal,
+    tcp_listener: Arc<TcpListener>,
+    mut shutdown_receiver: Receiver<()>,
 ) {
-    let AcceptSignal {
-        listener: tcp_listener,
-        mut shutdown_receiver,
-        running_sender,
-    } = signal;
     loop {
         let accepted: Option<(TcpStream, SocketAddr)> = tokio::select! {
             biased;
@@ -43513,129 +45526,16 @@ pub(crate) async fn tcp_accept(
             break;
         };
         let env: ConnectionEnv = env.clone();
-        let tls: Option<Arc<rustls::ServerConfig>> = stream_tls.clone();
         spawn(async move {
-            serve_tcp_connection(env, tls, stream, remote).await;
+            serve_tcp_connection(env, stream, remote).await;
         });
     }
     drop(tcp_listener);
-    let _: Result<(), tokio::sync::watch::error::SendError<bool>> =
-        running_sender.send(SERVER_STOPPED);
 }
-pub(crate) async fn serve_tcp_connection(
-    env: ConnectionEnv,
-    stream_tls: Option<Arc<rustls::ServerConfig>>,
-    stream: TcpStream,
-    remote: SocketAddr,
-) {
-    let local: Option<SocketAddr> = stream.local_addr().ok();
-    configure_socket(&stream, &env.server);
-    let peers: StreamPeers = StreamPeers {
-        local: local.unwrap_or(remote),
-        remote,
-    };
-    let Some(tls) = stream_tls else {
-        serve_plain_tcp(env, peers, stream).await;
-        return;
-    };
-    let Ok(handshake) =
-        bounded_handshake(env.request_config, TlsAcceptor::from(tls).accept(stream)).await
-    else {
-        return;
-    };
-    let Ok(handshake) = handshake else {
-        return;
-    };
-    if !negotiated_protocol_matches(&handshake, &env.protocol) {
-        return;
-    }
-    serve_tls_stream(env, peers, TlsTransport::new(handshake)).await;
-}
-pub(crate) fn negotiated_protocol_matches(
-    session: &tokio_rustls::server::TlsStream<TcpStream>,
-    protocol: &ServerProtocol,
-) -> bool {
-    let (_, connection): (&TcpStream, &rustls::ServerConnection) = session.get_ref();
-    match connection.alpn_protocol() {
-        Some(negotiated) => negotiated == protocol.get_alpn_protocol(),
-        None => protocol != &ServerProtocol::Http2,
-    }
-}
-pub(crate) fn negotiated_quic_protocol_matches(connection: &quinn::Connection) -> bool {
-    let Some(handshake) = connection.handshake_data() else {
-        return false;
-    };
-    match handshake.downcast::<quinn::crypto::rustls::HandshakeData>() {
-        Ok(data) => data.protocol.as_deref() == Some(ServerProtocol::Http3.get_alpn_protocol()),
-        Err(_) => false,
-    }
-}
-pub(crate) async fn bounded_handshake<F, T>(
-    request_config: RequestConfig,
-    handshake: F,
-) -> Result<T, tokio::time::error::Elapsed>
-where
-    F: Future<Output = T>,
-{
-    let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
-    if read_timeout_ms == NO_TIMEOUT_MS {
-        return Ok(handshake.await);
-    }
-    timeout(Duration::from_millis(read_timeout_ms), handshake).await
-}
-pub(crate) fn configure_socket(stream: &TcpStream, server: &Arc<Server>) {
-    let server_config: &ServerConfig = server.get_server_config();
-    if let Some(nodelay) = server_config.get_nodelay() {
-        let _: Result<(), io::Error> = stream.set_nodelay(nodelay);
-    }
-    if let Some(ttl) = server_config.get_ttl() {
-        let _: Result<(), io::Error> = stream.set_ttl(ttl);
-    }
-}
-pub(crate) async fn serve_plain_tcp(env: ConnectionEnv, peers: StreamPeers, stream: TcpStream) {
-    match env.protocol {
-        ServerProtocol::Http2 => {
-            let handshake: Result<ConnectionH2<TcpStream>, String> =
-                bounded_handshake(env.request_config, h2::server::handshake(stream))
-                    .await
-                    .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
-                    .and_then(|connection: Result<_, H2Error>| {
-                        connection.map_err(|error: H2Error| error.to_string())
-                    });
-            serve_h2_connection(env, peers, handshake).await;
-        }
-        _ => {
-            serve_h1_connection(env.server, env.request_config, stream).await;
-        }
-    }
-}
-pub(crate) async fn serve_tls_stream(
-    env: ConnectionEnv,
-    peers: StreamPeers,
-    transport: TlsTransport,
-) {
-    match env.protocol {
-        ServerProtocol::Http2 => {
-            let session: TlsTransport = transport;
-            let handshake: Result<ConnectionH2<TlsTransport>, String> =
-                bounded_handshake(env.request_config, h2::server::handshake(session))
-                    .await
-                    .map_err(|_: tokio::time::error::Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
-                    .and_then(|connection: Result<_, H2Error>| {
-                        connection.map_err(|error: H2Error| error.to_string())
-                    });
-            serve_h2_connection(env, peers, handshake).await;
-        }
-        _ => {
-            serve_h1_transport(env.server, env.request_config, transport).await;
-        }
-    }
-}
-pub(crate) async fn quic_accept(
+async fn quic_accept_loop(
     env: ConnectionEnv,
     endpoint: Endpoint,
     mut shutdown_receiver: Receiver<()>,
-    running_sender: Sender<bool>,
 ) -> Result<(), Box<ServerError>> {
     let local: SocketAddr = endpoint
         .local_addr()
@@ -43659,40 +45559,259 @@ pub(crate) async fn quic_accept(
                 connection.close(VarInt::from_u32(QUIC_CLOSE_CODE), QUIC_CLOSE_REASON);
                 return;
             }
-            let Ok(h3_connection) = h3::server::Connection::<h3_quinn::Connection, Bytes>::new(
-                h3_quinn::Connection::new(connection),
-            )
-            .await
-            else {
-                return;
-            };
-            serve_h3_connection(env, StreamPeers { local, remote }, h3_connection).await;
+            serve_h3_connection(env, StreamPeers { local, remote }, connection).await;
         });
     }
     let close_code: VarInt = VarInt::from_u32(QUIC_CLOSE_CODE);
     endpoint.close(close_code, QUIC_CLOSE_REASON);
     endpoint.wait_idle().await;
     drop(endpoint);
-    let _: Result<(), tokio::sync::watch::error::SendError<bool>> =
-        running_sender.send(SERVER_STOPPED);
     Ok(())
 }
-pub(crate) async fn serve_h1_connection(
-    server: Arc<Server>,
-    request_config: RequestConfig,
-    stream: TcpStream,
+pub(crate) async fn tcp_accept_all(
+    env: ConnectionEnv,
+    mut listeners: Vec<TcpListener>,
+    shutdown_receiver: Receiver<()>,
+    running_sender: Sender<bool>,
 ) {
-    let mut stream: Stream = Stream::new(stream, request_config, false);
-    serve_h1_stream(server, &mut stream).await;
+    #[cfg(target_os = "linux")]
+    {
+        match try_serve_uring_tcp(
+            env.clone(),
+            listeners,
+            shutdown_receiver.clone(),
+            running_sender.clone(),
+        )
+        .await
+        {
+            Ok(()) => return,
+            Err(remaining) => listeners = remaining,
+        }
+    }
+    let workers: usize = Handle::current().metrics().num_workers();
+    if listeners.len() == 1 && workers <= 1 {
+        let listener: Arc<TcpListener> = Arc::new(listeners.remove(0));
+        tcp_accept_loop(env, listener, shutdown_receiver).await;
+    } else if listeners.len() == 1 {
+        let listener: Arc<TcpListener> = Arc::new(listeners.remove(0));
+        let task_count: usize = workers.clamp(1, 8);
+        let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(task_count);
+        for _ in 0..task_count {
+            let shard_env: ConnectionEnv = env.clone();
+            let shard_listener: Arc<TcpListener> = Arc::clone(&listener);
+            let shard_shutdown: Receiver<()> = shutdown_receiver.clone();
+            handles.push(spawn(async move {
+                tcp_accept_loop(shard_env, shard_listener, shard_shutdown).await;
+            }));
+        }
+        drop(listener);
+        for handle in handles {
+            let _: Result<(), JoinError> = handle.await;
+        }
+    } else {
+        let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(listeners.len());
+        for listener in listeners {
+            let shard_env: ConnectionEnv = env.clone();
+            let shard_listener: Arc<TcpListener> = Arc::new(listener);
+            let shard_shutdown: Receiver<()> = shutdown_receiver.clone();
+            handles.push(spawn(async move {
+                tcp_accept_loop(shard_env, shard_listener, shard_shutdown).await;
+            }));
+        }
+        for handle in handles {
+            let _: Result<(), JoinError> = handle.await;
+        }
+    }
+    let _: Result<(), SendError<bool>> = running_sender.send(SERVER_STOPPED);
 }
-pub(crate) async fn serve_h1_transport(
-    server: Arc<Server>,
+pub(crate) async fn quic_accept_all(
+    env: ConnectionEnv,
+    endpoint_set: QuicEndpointSet,
+    shutdown_receiver: Receiver<()>,
+    running_sender: Sender<bool>,
+) {
+    let QuicEndpointSet {
+        mut endpoints,
+        dispatcher,
+        dispatcher_stop,
+    } = endpoint_set;
+    if endpoints.len() == 1 {
+        let endpoint: Endpoint = endpoints.remove(0);
+        let _: Result<(), Box<ServerError>> =
+            quic_accept_loop(env, endpoint, shutdown_receiver).await;
+    } else {
+        let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(endpoints.len());
+        for endpoint in endpoints {
+            let shard_env: ConnectionEnv = env.clone();
+            let shard_shutdown: Receiver<()> = shutdown_receiver.clone();
+            handles.push(spawn(async move {
+                let _: Result<(), Box<ServerError>> =
+                    quic_accept_loop(shard_env, endpoint, shard_shutdown).await;
+            }));
+        }
+        for handle in handles {
+            let _: Result<(), JoinError> = handle.await;
+        }
+    }
+    if let Some(stop_tx) = dispatcher_stop {
+        let _: Result<(), SendError<()>> = stop_tx.send(());
+    }
+    if let Some(handle) = dispatcher {
+        let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+            spawn_blocking(move || handle.join()).await;
+    }
+    let _: Result<(), SendError<bool>> = running_sender.send(SERVER_STOPPED);
+}
+pub(crate) async fn serve_tcp_connection(
+    env: ConnectionEnv,
+    stream: TcpStream,
+    remote: SocketAddr,
+) {
+    let shared: &ConnectionShared = &env.shared;
+    configure_socket(&stream, &shared.server);
+    let Some(tls_config) = shared.tls_config.as_ref() else {
+        if shared.protocol == ServerProtocol::Http2 {
+            let local: SocketAddr = stream.local_addr().unwrap_or(remote);
+            serve_plain_tcp(env, StreamPeers { local, remote }, stream).await;
+        } else {
+            serve_h1_connection(env, stream).await;
+        }
+        return;
+    };
+    let local: Option<SocketAddr> = if shared.protocol == ServerProtocol::Http2 {
+        stream.local_addr().ok()
+    } else {
+        None
+    };
+    let Ok(handshake) = bounded_handshake(
+        shared.request_config,
+        accept_unbuffered_tls(Arc::clone(tls_config), stream),
+    )
+    .await
+    else {
+        return;
+    };
+    let Ok(transport) = handshake else {
+        return;
+    };
+    if !negotiated_protocol_matches(&transport, &shared.protocol) {
+        return;
+    }
+    if shared.protocol == ServerProtocol::Http2 {
+        let peers: StreamPeers = StreamPeers {
+            local: local.unwrap_or(remote),
+            remote,
+        };
+        serve_tls_stream(env, peers, transport).await;
+    } else {
+        serve_h1_transport(env, transport).await;
+    }
+}
+pub(crate) fn negotiated_protocol_matches<T>(
+    transport: &TlsTransport<T>,
+    protocol: &ServerProtocol,
+) -> bool
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    match transport.alpn_protocol() {
+        Some(negotiated) => negotiated == protocol.get_alpn_protocol(),
+        None => protocol != &ServerProtocol::Http2,
+    }
+}
+pub(crate) fn negotiated_quic_protocol_matches(connection: &quinn::Connection) -> bool {
+    let Some(handshake) = connection.handshake_data() else {
+        return false;
+    };
+    match handshake.downcast::<HandshakeData>() {
+        Ok(data) => data.protocol.as_deref() == Some(ServerProtocol::Http3.get_alpn_protocol()),
+        Err(_) => false,
+    }
+}
+pub(crate) async fn bounded_handshake<F, T>(
     request_config: RequestConfig,
+    handshake: F,
+) -> Result<T, Elapsed>
+where
+    F: Future<Output = T>,
+{
+    let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
+    if read_timeout_ms == NO_TIMEOUT_MS {
+        return Ok(handshake.await);
+    }
+    timeout(Duration::from_millis(read_timeout_ms), handshake).await
+}
+pub(crate) fn configure_socket(stream: &TcpStream, server: &Server) {
+    let server_config: &ServerConfig = server.get_server_config();
+    #[cfg(not(unix))]
+    {
+        let nodelay: bool = server_config.get_nodelay().unwrap_or(true);
+        let _: Result<(), io::Error> = stream.set_nodelay(nodelay);
+    }
+    if let Some(ttl) = server_config.get_ttl() {
+        let _: Result<(), io::Error> = stream.set_ttl(ttl);
+    }
+}
+fn h2_server_builder() -> H2ServerBuilder {
+    let mut builder: H2ServerBuilder = H2ServerBuilder::new();
+    builder
+        .initial_window_size(1024 * 1024)
+        .initial_connection_window_size(4 * 1024 * 1024)
+        .max_concurrent_streams(1024);
+    builder
+}
+pub(crate) async fn serve_plain_tcp(env: ConnectionEnv, peers: StreamPeers, stream: TcpStream) {
+    match env.shared.protocol {
+        ServerProtocol::Http2 => {
+            let handshake: Result<ConnectionH2<TcpStream>, String> = bounded_handshake(
+                env.shared.request_config,
+                h2_server_builder().handshake(stream),
+            )
+            .await
+            .map_err(|_: Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
+            .and_then(|connection: Result<_, H2Error>| {
+                connection.map_err(|error: H2Error| error.to_string())
+            });
+            serve_h2_connection(env, peers, handshake).await;
+        }
+        _ => {
+            serve_h1_connection(env, stream).await;
+        }
+    }
+}
+pub(crate) async fn serve_tls_stream(
+    env: ConnectionEnv,
+    peers: StreamPeers,
     transport: TlsTransport,
 ) {
+    match env.shared.protocol {
+        ServerProtocol::Http2 => {
+            let session: TlsTransport = transport;
+            let handshake: Result<ConnectionH2<TlsTransport>, String> = bounded_handshake(
+                env.shared.request_config,
+                h2_server_builder().handshake(session),
+            )
+            .await
+            .map_err(|_: Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
+            .and_then(|connection: Result<_, H2Error>| {
+                connection.map_err(|error: H2Error| error.to_string())
+            });
+            serve_h2_connection(env, peers, handshake).await;
+        }
+        _ => {
+            serve_h1_transport(env, transport).await;
+        }
+    }
+}
+pub(crate) async fn serve_h1_connection(env: ConnectionEnv, stream: TcpStream) {
+    let mut stream: Stream = Stream::new(stream, env.shared.request_config, false);
+    serve_h1_stream(env, &mut stream).await;
+}
+pub(crate) async fn serve_h1_transport(env: ConnectionEnv, transport: TlsTransport) {
+    let request_config: RequestConfig = env.shared.request_config;
     let mut stream: Stream = Stream::from_transport(transport, request_config, false);
-    serve_h1_stream(server, &mut stream).await;
-    let closed: Result<Result<(), io::Error>, tokio::time::error::Elapsed> =
+    serve_h1_stream(env, &mut stream).await;
+    let closed: Result<Result<(), io::Error>, Elapsed> =
         bounded_handshake(request_config, stream.get_mut_stream().shutdown()).await;
     match closed {
         Ok(Ok(())) => {}
@@ -43700,8 +45819,11 @@ pub(crate) async fn serve_h1_transport(
         Err(_) => {}
     }
 }
-pub(crate) async fn serve_h1_stream(server: Arc<Server>, stream: &mut Stream) {
-    server.serve_h1_connection_stream(stream).await;
+pub(crate) async fn serve_h1_stream(env: ConnectionEnv, stream: &mut Stream) {
+    env.shared
+        .server
+        .serve_h1_connection_stream(&env.shared.pipeline, stream)
+        .await;
 }
 pub(crate) async fn catch_connection_panic<F>(connection: F) -> Option<PanicData>
 where
@@ -43805,25 +45927,25 @@ use super::*;
 use super::*;
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct TlsConfig {
-    pub certificate_path: String,
-    pub private_key_path: String,
+    pub(crate) certificate_path: String,
+    pub(crate) private_key_path: String,
 }
 #[derive(Clone, CustomDebug, Data, Deserialize, DisplayDebug, Eq, New, PartialEq, Serialize)]
 pub struct ServerConfig {
     #[set(type(AsRef<str>))]
-    pub address: String,
+    pub(crate) address: String,
     #[get(type(copy))]
-    pub nodelay: Option<bool>,
+    pub(crate) nodelay: Option<bool>,
     #[get(type(copy))]
-    pub ttl: Option<u32>,
+    pub(crate) ttl: Option<u32>,
     #[get(type(copy))]
     #[new(skip)]
     #[serde(default)]
-    pub protocol: ServerProtocol,
+    pub(crate) protocol: ServerProtocol,
     #[get(type(clone))]
     #[new(skip)]
     #[serde(default)]
-    pub tls: Option<TlsConfig>,
+    pub(crate) tls: Option<TlsConfig>,
 }
 ```
 # Path: hyperlane/core/src/route/type.rs
@@ -44062,6 +46184,73 @@ impl RoutePattern {
             None
         }
     }
+    pub(crate) fn try_match_path_into(&self, path: &str, params: &mut RouteParams) -> bool {
+        let trimmed: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let route_segments: &[RouteSegment] = self.get_0().as_slice();
+        let route_segments_len: usize = route_segments.len();
+        if trimmed.is_empty() {
+            return route_segments_len == 0;
+        }
+        if self.is_static() {
+            return self.try_match_static_path(trimmed).is_some();
+        }
+        let is_tail_regex: bool = matches!(route_segments.last(), Some(RouteSegment::Regex(_, _)));
+        if !is_tail_regex {
+            let mut seg_idx: usize = 0;
+            for part in trimmed.split(DEFAULT_HTTP_PATH) {
+                if part.is_empty() {
+                    continue;
+                }
+                let Some(expected) = route_segments.get(seg_idx) else {
+                    return false;
+                };
+                match expected {
+                    RouteSegment::Static(literal) => {
+                        if part != literal.as_str() {
+                            return false;
+                        }
+                    }
+                    RouteSegment::Dynamic(_) => {}
+                    RouteSegment::Regex(_, regex) => {
+                        let Some(mat) = regex.find(part) else {
+                            return false;
+                        };
+                        if mat.start() != 0 || mat.end() != part.len() {
+                            return false;
+                        }
+                    }
+                }
+                seg_idx += 1;
+            }
+            if seg_idx != route_segments_len {
+                return false;
+            }
+            let mut write_idx: usize = 0;
+            for part in trimmed.split(DEFAULT_HTTP_PATH) {
+                if part.is_empty() {
+                    continue;
+                }
+                match &route_segments[write_idx] {
+                    RouteSegment::Static(_) => {}
+                    RouteSegment::Dynamic(param_name) | RouteSegment::Regex(param_name, _) => {
+                        let (mut key, mut val): (String, String) = take_route_param_entry();
+                        key.push_str(param_name);
+                        val.push_str(part);
+                        params.insert(key, val);
+                    }
+                }
+                write_idx += 1;
+            }
+            return true;
+        }
+        match self.try_match_path(path) {
+            Some(matched) => {
+                *params = matched;
+                true
+            }
+            None => false,
+        }
+    }
     pub(crate) fn try_match_path(&self, path: &str) -> Option<RouteParams> {
         let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
         let route_segments_len: usize = self.get_0().len();
@@ -44117,7 +46306,7 @@ impl RoutePattern {
                         }
                     };
                     {
-                        let mat: regex::Match<'_> = regex.find(&segment_value)?;
+                        let mat: Match<'_> = regex.find(&segment_value)?;
                         if mat.start() != 0 || mat.end() != segment_value.len() {
                             return None;
                         }
@@ -44195,12 +46384,6 @@ impl RouteMatcher {
         }
         Ok(())
     }
-    pub(crate) fn try_resolve_static_route<'a>(
-        &'a self,
-        path: &str,
-    ) -> Option<&'a ServerHookHandler> {
-        self.get_static_route().get(path)
-    }
     pub fn try_resolve_route<'a>(
         &'a self,
         ctx: &mut Context,
@@ -44273,13 +46456,13 @@ pub struct RoutePattern(
 pub struct RouteMatcher {
     #[set(skip)]
     #[debug(skip)]
-    pub static_route: ServerHookMap,
+    pub(crate) static_route: ServerHookMap,
     #[set(skip)]
     #[debug(skip)]
-    pub dynamic_route: ServerHookPatternRoute,
+    pub(crate) dynamic_route: ServerHookPatternRoute,
     #[set(skip)]
     #[debug(skip)]
-    pub regex_route: ServerHookPatternRoute,
+    pub(crate) regex_route: ServerHookPatternRoute,
 }
 ```
 # Path: hyperlane/core/src/error/impl.rs
@@ -44321,154 +46504,589 @@ use super::*;
 ```
 # Path: hyperlane/core/src/protocol/mod.rs
 ```rust
-mod r#aliases;
-mod r#constants;
-mod r#framing;
-mod r#http2;
-mod r#http3;
-mod r#lifecycle;
-mod r#pump;
-mod r#request;
-mod r#response;
-mod r#transport;
+mod aliases;
+mod constants;
+mod http2;
+mod http3;
+mod inline;
+mod pump;
+mod request;
+mod response;
+mod transport;
+#[cfg(target_os = "linux")]
+mod uring;
+#[cfg(target_os = "linux")]
+pub(crate) use uring::*;
 pub(crate) use {
-    r#aliases::*, r#constants::*, r#framing::*, r#http2::*, r#http3::*, r#lifecycle::*, r#pump::*,
-    r#request::*, r#response::*, r#transport::*,
+    aliases::*, constants::*, http2::*, http3::*, inline::*, pump::*, request::*, response::*,
+    transport::*,
 };
 use super::*;
 ```
 # Path: hyperlane/core/src/protocol/transport/impl.rs
 ```rust
 use super::*;
-impl Transport for DuplexTransport {
-    fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
-        self.get_remote()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Unsupported, NO_ADDRESS))
+impl<T> TlsTransport<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    #[inline(always)]
+    pub(crate) fn alpn_protocol(&self) -> Option<&[u8]> {
+        let Self { conn, .. } = self;
+        conn.alpn_protocol()
     }
-    fn local_addr(&self) -> Result<SocketAddr, io::Error> {
-        self.get_local()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Unsupported, NO_ADDRESS))
+    #[inline(always)]
+    fn discard_incoming(&mut self, count: usize) {
+        if count == 0 {
+            return;
+        }
+        let Self { in_buf, in_len, .. } = self;
+        if count >= *in_len {
+            *in_len = 0;
+        } else {
+            in_buf.copy_within(count..*in_len, 0);
+            *in_len -= count;
+        }
     }
-}
-impl AsyncRead for DuplexTransport {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        _context: &mut task::Context<'_>,
-        buffer: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        buffer.advance(0);
+    #[inline(always)]
+    fn poll_flush_out(&mut self, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+        let Self {
+            tcp,
+            out_buf,
+            out_pos,
+            out_len,
+            ..
+        } = self;
+        while *out_pos < *out_len {
+            match Pin::new(&mut *tcp).poll_write(context, &out_buf[*out_pos..*out_len]) {
+                Poll::Ready(Ok(0)) => {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::WriteZero,
+                        "tcp write zero during tls flush",
+                    )));
+                }
+                Poll::Ready(Ok(written)) => {
+                    *out_pos += written;
+                }
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        *out_pos = 0;
+        *out_len = 0;
         Poll::Ready(Ok(()))
     }
-}
-impl AsyncWrite for DuplexTransport {
-    fn poll_write(
-        self: Pin<&mut Self>,
+    #[inline(always)]
+    fn poll_encrypt_and_write(
+        &mut self,
         context: &mut task::Context<'_>,
-        bytes: &[u8],
+        plaintext: &[u8],
+        close_notify: bool,
     ) -> Poll<io::Result<usize>> {
-        let this: &mut Self = self.get_mut();
-        Pin::new(&mut this.get_mut_pipe()).poll_write(context, bytes)
-    }
-    fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        let this: &mut Self = self.get_mut();
-        Pin::new(&mut this.get_mut_pipe()).poll_flush(context)
-    }
-    fn poll_shutdown(
-        self: Pin<&mut Self>,
-        context: &mut task::Context<'_>,
-    ) -> Poll<io::Result<()>> {
-        let this: &mut Self = self.get_mut();
-        Pin::new(&mut this.get_mut_pipe()).poll_shutdown(context)
+        let Self { write_closed, .. } = self;
+        if *write_closed {
+            return Poll::Ready(Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "tls write side closed",
+            )));
+        }
+        match self.poll_flush_out(context) {
+            Poll::Ready(Ok(())) => {}
+            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+            Poll::Pending => return Poll::Pending,
+        }
+        if plaintext.is_empty() && !close_notify {
+            return Poll::Ready(Ok(0));
+        }
+        let chunk: &[u8] = &plaintext[..plaintext.len().min(TLS_MAX_PLAINTEXT_CHUNK)];
+        loop {
+            let Self {
+                tcp,
+                conn,
+                plain_buf,
+                out_buf,
+                out_pos,
+                out_len,
+                peer_closed,
+                write_closed,
+                ..
+            } = self;
+            let UnbufferedStatus { state, .. } = conn.process_tls_records(&mut []);
+            match state {
+                Ok(ConnectionState::WriteTraffic(mut wt)) => {
+                    let encrypted_len: usize = loop {
+                        let encoded: Result<usize, EncryptError> = if close_notify {
+                            wt.queue_close_notify(&mut out_buf[*out_len..])
+                        } else {
+                            wt.encrypt(chunk, &mut out_buf[*out_len..])
+                        };
+                        match encoded {
+                            Ok(n) => break n,
+                            Err(EncryptError::InsufficientSize(need)) => {
+                                out_buf.resize(*out_len + need.required_size, 0);
+                            }
+                            Err(error) => {
+                                return Poll::Ready(Err(io::Error::other(format!("{error:?}"))));
+                            }
+                        }
+                    };
+                    *out_len += encrypted_len;
+                    *write_closed = close_notify;
+                    match Pin::new(&mut *tcp).poll_write(context, &out_buf[*out_pos..*out_len]) {
+                        Poll::Ready(Ok(0)) => {
+                            return Poll::Ready(Err(io::Error::new(
+                                io::ErrorKind::WriteZero,
+                                TLS_TRANSMIT_WRITE_ZERO,
+                            )));
+                        }
+                        Poll::Ready(Ok(written)) => {
+                            *out_pos += written;
+                            if *out_pos >= *out_len {
+                                *out_pos = 0;
+                                *out_len = 0;
+                            }
+                            return Poll::Ready(Ok(chunk.len()));
+                        }
+                        Poll::Pending => return Poll::Ready(Ok(chunk.len())),
+                        Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                    }
+                }
+                Ok(ConnectionState::EncodeTlsData(mut enc)) => loop {
+                    match enc.encode(&mut out_buf[*out_len..]) {
+                        Ok(n) => {
+                            *out_len += n;
+                            break;
+                        }
+                        Err(EncodeError::InsufficientSize(need)) => {
+                            out_buf.resize(*out_len + need.required_size, 0);
+                        }
+                        Err(error) => {
+                            return Poll::Ready(Err(io::Error::other(format!("{error:?}"))));
+                        }
+                    }
+                },
+                Ok(ConnectionState::TransmitTlsData(transmit)) => {
+                    while *out_pos < *out_len {
+                        match Pin::new(&mut *tcp).poll_write(context, &out_buf[*out_pos..*out_len])
+                        {
+                            Poll::Ready(Ok(0)) => {
+                                transmit.done();
+                                return Poll::Ready(Err(io::Error::new(
+                                    io::ErrorKind::WriteZero,
+                                    TLS_TRANSMIT_WRITE_ZERO,
+                                )));
+                            }
+                            Poll::Ready(Ok(written)) => {
+                                *out_pos += written;
+                            }
+                            Poll::Ready(Err(error)) => {
+                                transmit.done();
+                                return Poll::Ready(Err(error));
+                            }
+                            Poll::Pending => return Poll::Pending,
+                        }
+                    }
+                    *out_pos = 0;
+                    *out_len = 0;
+                    transmit.done();
+                }
+                Ok(ConnectionState::ReadTraffic(mut rt)) => {
+                    while let Some(rec) = rt.next_record() {
+                        match rec {
+                            Ok(app) => plain_buf.extend_from_slice(app.payload),
+                            Err(error) => return Poll::Ready(Err(io::Error::other(error))),
+                        }
+                    }
+                }
+                Ok(ConnectionState::PeerClosed) => {
+                    *peer_closed = true;
+                }
+                Ok(ConnectionState::Closed) if close_notify => return Poll::Ready(Ok(0)),
+                Ok(ConnectionState::Closed) => {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::BrokenPipe,
+                        "tls connection closed",
+                    )));
+                }
+                Err(error) => return Poll::Ready(Err(io::Error::other(error))),
+                Ok(_) => {
+                    return Poll::Ready(Err(io::Error::other("unexpected tls state on write")));
+                }
+            }
+        }
     }
 }
-impl TlsTransport {
-    pub(crate) fn new(session: tokio_rustls::server::TlsStream<TcpStream>) -> Self {
-        Self { session }
+impl<T> fmt::Debug for TlsTransport<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            in_len,
+            out_len,
+            peer_closed,
+            ..
+        } = self;
+        formatter
+            .debug_struct("TlsTransport")
+            .field("in_len", in_len)
+            .field("out_len", out_len)
+            .field("peer_closed", peer_closed)
+            .finish()
     }
 }
-impl TlsTransport {
-    pub(crate) fn get_session_ref(&self) -> &tokio_rustls::server::TlsStream<TcpStream> {
-        &self.session
+impl<T> Drop for TlsTransport<T> {
+    fn drop(&mut self) {
+        let Self {
+            in_buf, out_buf, ..
+        } = self;
+        return_tls_buffer(mem::take(in_buf));
+        return_tls_buffer(mem::take(out_buf));
     }
 }
-impl Transport for TlsTransport {
+impl<T> Transport for TlsTransport<T>
+where
+    T: AsyncRead + AsyncWrite + Transport + Unpin + Send + Sync + 'static,
+{
     fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
-        TcpStream::peer_addr(self.get_session_ref().get_ref().0)
+        let Self { tcp, .. } = self;
+        tcp.peer_addr()
     }
     fn local_addr(&self) -> Result<SocketAddr, io::Error> {
-        TcpStream::local_addr(self.get_session_ref().get_ref().0)
+        let Self { tcp, .. } = self;
+        tcp.local_addr()
     }
 }
-impl AsyncRead for TlsTransport {
+impl<T> AsyncRead for TlsTransport<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
     fn poll_read(
         self: Pin<&mut Self>,
         context: &mut task::Context<'_>,
         buffer: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let this: &mut Self = self.get_mut();
-        Pin::new(&mut this.get_mut_session()).poll_read(context, buffer)
+        match this.poll_flush_out(context) {
+            Poll::Ready(Ok(())) => {}
+            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+            Poll::Pending => return Poll::Pending,
+        }
+        {
+            let Self {
+                plain_buf,
+                plain_pos,
+                peer_closed,
+                ..
+            } = this;
+            if *plain_pos < plain_buf.len() {
+                let avail: usize = plain_buf.len() - *plain_pos;
+                let take: usize = avail.min(buffer.remaining());
+                buffer.put_slice(&plain_buf[*plain_pos..*plain_pos + take]);
+                *plain_pos += take;
+                if *plain_pos >= plain_buf.len() {
+                    plain_buf.clear();
+                    *plain_pos = 0;
+                }
+                return Poll::Ready(Ok(()));
+            }
+            if *peer_closed {
+                return Poll::Ready(Ok(()));
+            }
+        }
+        if buffer.remaining() == 0 {
+            return Poll::Ready(Ok(()));
+        }
+        let initial_filled: usize = buffer.filled().len();
+        loop {
+            {
+                let (discard, action): (usize, Result<u8, io::Error>) = {
+                    let Self {
+                        conn,
+                        in_buf,
+                        in_len,
+                        plain_buf,
+                        out_buf,
+                        out_len,
+                        peer_closed,
+                        ..
+                    } = this;
+                    let UnbufferedStatus { discard, state } =
+                        conn.process_tls_records(&mut in_buf[..*in_len]);
+                    let step: Result<u8, io::Error> = match state {
+                        Ok(ConnectionState::ReadTraffic(mut rt)) => {
+                            let mut err: Option<io::Error> = None;
+                            while let Some(rec) = rt.next_record() {
+                                match rec {
+                                    Ok(app) => {
+                                        let payload: &[u8] = app.payload;
+                                        if plain_buf.is_empty() && buffer.remaining() > 0 {
+                                            let direct: usize =
+                                                payload.len().min(buffer.remaining());
+                                            buffer.put_slice(&payload[..direct]);
+                                            if direct < payload.len() {
+                                                plain_buf.extend_from_slice(&payload[direct..]);
+                                            }
+                                        } else {
+                                            plain_buf.extend_from_slice(payload);
+                                        }
+                                    }
+                                    Err(error) => {
+                                        err = Some(io::Error::other(error));
+                                        break;
+                                    }
+                                }
+                            }
+                            match err {
+                                Some(error) => Err(error),
+                                None => Ok(1),
+                            }
+                        }
+                        Ok(ConnectionState::EncodeTlsData(mut enc)) => loop {
+                            match enc.encode(&mut out_buf[*out_len..]) {
+                                Ok(n) => {
+                                    *out_len += n;
+                                    break Ok(2);
+                                }
+                                Err(EncodeError::InsufficientSize(need)) => {
+                                    out_buf.resize(*out_len + need.required_size, 0);
+                                }
+                                Err(error) => {
+                                    break Err(io::Error::other(format!("{error:?}")));
+                                }
+                            }
+                        },
+                        Ok(ConnectionState::TransmitTlsData(transmit)) => {
+                            if *out_len == 0 {
+                                transmit.done();
+                                Ok(2)
+                            } else {
+                                Ok(3)
+                            }
+                        }
+                        Ok(ConnectionState::PeerClosed | ConnectionState::Closed) => {
+                            *peer_closed = true;
+                            Ok(4)
+                        }
+                        Ok(ConnectionState::WriteTraffic(_)) => Ok(0),
+                        Ok(ConnectionState::ReadEarlyData(mut red)) => {
+                            while red.next_record().is_some() {}
+                            Ok(2)
+                        }
+                        Ok(_) => Ok(0),
+                        Err(error) => Err(io::Error::other(error)),
+                    };
+                    (discard, step)
+                };
+                this.discard_incoming(discard);
+                match action {
+                    Ok(1) => {
+                        if buffer.filled().len() > initial_filled {
+                            return Poll::Ready(Ok(()));
+                        }
+                        continue;
+                    }
+                    Ok(2) => continue,
+                    Ok(3) => match this.poll_flush_out(context) {
+                        Poll::Ready(Ok(())) => continue,
+                        Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                        Poll::Pending => return Poll::Pending,
+                    },
+                    Ok(4) => return Poll::Ready(Ok(())),
+                    Ok(_) => {}
+                    Err(error) => return Poll::Ready(Err(error)),
+                }
+            }
+            let Self {
+                tcp,
+                in_buf,
+                in_len,
+                ..
+            } = this;
+            if *in_len == in_buf.len() {
+                if in_buf.len() >= TLS_MAX_INCOMING_BUFFER {
+                    return Poll::Ready(Err(io::Error::other("tls incoming record exceeds limit")));
+                }
+                let next_len: usize = (in_buf.len() * 2).min(TLS_MAX_INCOMING_BUFFER);
+                in_buf.resize(next_len, 0);
+            }
+            let mut tcp_buf: ReadBuf<'_> = ReadBuf::new(&mut in_buf[*in_len..]);
+            match Pin::new(&mut *tcp).poll_read(context, &mut tcp_buf) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Ready(Ok(())) => {
+                    let read_len: usize = tcp_buf.filled().len();
+                    if read_len == 0 {
+                        return Poll::Ready(Err(io::Error::new(
+                            io::ErrorKind::UnexpectedEof,
+                            "tls peer closed connection without close_notify",
+                        )));
+                    }
+                    *in_len += read_len;
+                }
+            }
+        }
     }
 }
-impl AsyncWrite for TlsTransport {
+impl<T> AsyncWrite for TlsTransport<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
     fn poll_write(
         self: Pin<&mut Self>,
         context: &mut task::Context<'_>,
         bytes: &[u8],
     ) -> Poll<io::Result<usize>> {
+        self.get_mut().poll_encrypt_and_write(context, bytes, false)
+    }
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+        buffers: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
         let this: &mut Self = self.get_mut();
-        Pin::new(&mut this.get_mut_session()).poll_write(context, bytes)
+        let mut first_non_empty: Option<&[u8]> = None;
+        let mut non_empty_count: usize = 0;
+        let mut total_len: usize = 0;
+        for slice in buffers {
+            let bytes: &[u8] = slice.as_ref();
+            if !bytes.is_empty() {
+                if first_non_empty.is_none() {
+                    first_non_empty = Some(bytes);
+                }
+                non_empty_count += 1;
+                total_len = total_len.saturating_add(bytes.len());
+            }
+        }
+        let Some(first) = first_non_empty else {
+            return Poll::Ready(Ok(0));
+        };
+        if non_empty_count == 1 || first.len() >= TLS_MAX_PLAINTEXT_CHUNK {
+            return this.poll_encrypt_and_write(context, first, false);
+        }
+        let cap: usize = total_len.min(TLS_MAX_PLAINTEXT_CHUNK);
+        let mut scratch: [MaybeUninit<u8>; TLS_MAX_PLAINTEXT_CHUNK] =
+            [const { MaybeUninit::uninit() }; TLS_MAX_PLAINTEXT_CHUNK];
+        let mut filled: usize = 0;
+        for slice_item in buffers {
+            let bytes: &[u8] = slice_item.as_ref();
+            if bytes.is_empty() {
+                continue;
+            }
+            let take: usize = bytes.len().min(cap - filled);
+            if take == 0 {
+                break;
+            }
+            unsafe {
+                ptr::copy_nonoverlapping(
+                    bytes.as_ptr(),
+                    scratch.as_mut_ptr().add(filled).cast::<u8>(),
+                    take,
+                );
+            }
+            filled += take;
+            if filled == cap {
+                break;
+            }
+        }
+        let coalesced: &[u8] =
+            unsafe { slice::from_raw_parts(scratch.as_ptr().cast::<u8>(), filled) };
+        this.poll_encrypt_and_write(context, coalesced, false)
+    }
+    fn is_write_vectored(&self) -> bool {
+        true
     }
     fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
         let this: &mut Self = self.get_mut();
-        Pin::new(&mut this.get_mut_session()).poll_flush(context)
+        match this.poll_flush_out(context) {
+            Poll::Ready(Ok(())) => {
+                let Self { tcp, .. } = this;
+                Pin::new(&mut *tcp).poll_flush(context)
+            }
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+            Poll::Pending => Poll::Pending,
+        }
     }
     fn poll_shutdown(
         self: Pin<&mut Self>,
         context: &mut task::Context<'_>,
     ) -> Poll<io::Result<()>> {
         let this: &mut Self = self.get_mut();
-        Pin::new(&mut this.get_mut_session()).poll_shutdown(context)
+        match this.poll_flush_out(context) {
+            Poll::Ready(Ok(())) => {}
+            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+            Poll::Pending => return Poll::Pending,
+        }
+        let needs_close: bool = {
+            let Self { write_closed, .. } = this;
+            !*write_closed
+        };
+        if needs_close {
+            match this.poll_encrypt_and_write(context, &[], true) {
+                Poll::Ready(Ok(_)) => {}
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        match this.poll_flush_out(context) {
+            Poll::Ready(Ok(())) => {
+                let Self { tcp, .. } = this;
+                Pin::new(&mut *tcp).poll_shutdown(context)
+            }
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 ```
+# Path: hyperlane/core/src/protocol/transport/static.rs
+```rust
+use super::*;
+thread_local! {
+    pub(crate) static TLS_BUFFER_POOL: RefCell<Vec<Vec<u8>>> = const { RefCell::new(Vec::new()) };
+}
+```
+# Path: hyperlane/core/src/protocol/transport/const.rs
+```rust
+pub(crate) const TLS_RECORD_BUFFER_SIZE: usize = 18 * 1024;
+pub(crate) const TLS_MAX_PLAINTEXT_CHUNK: usize = 16 * 1024;
+pub(crate) const TLS_MAX_INCOMING_BUFFER: usize = 64 * 1024;
+pub(crate) const MAX_POOLED_TLS_BUFFERS: usize = 64;
+pub(crate) const TLS_TRANSMIT_WRITE_ZERO: &str = "tcp write zero during tls transmit";
+```
 # Path: hyperlane/core/src/protocol/transport/mod.rs
 ```rust
+mod r#const;
 mod r#fn;
 mod r#impl;
+mod r#static;
 mod r#struct;
-pub(crate) use {r#fn::*, r#struct::*};
+pub(crate) use {r#const::*, r#fn::*, r#static::*, r#struct::*};
 use super::*;
 ```
 # Path: hyperlane/core/src/protocol/transport/struct.rs
 ```rust
 use super::*;
-#[derive(Data, Debug)]
-pub(crate) struct DuplexTransport {
-    #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) pipe: DuplexStream,
-    #[get(type(copy), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
-    pub(super) local: Option<SocketAddr>,
-    #[get(type(copy), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
-    pub(super) remote: Option<SocketAddr>,
+pub(crate) struct TlsTransport<T = TcpStream> {
+    pub(super) tcp: T,
+    pub(super) conn: UnbufferedServerConnection,
+    pub(super) in_buf: Vec<u8>,
+    pub(super) in_len: usize,
+    pub(super) plain_buf: Vec<u8>,
+    pub(super) plain_pos: usize,
+    pub(super) out_buf: Vec<u8>,
+    pub(super) out_pos: usize,
+    pub(super) out_len: usize,
+    pub(super) peer_closed: bool,
+    pub(super) write_closed: bool,
 }
-#[derive(Data, Debug)]
-pub(crate) struct TlsTransport {
-    #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) session: tokio_rustls::server::TlsStream<TcpStream>,
-}
-#[derive(Clone, Debug)]
-pub(crate) struct ConnectionEnv {
-    pub(crate) server: Arc<Server>,
+pub(crate) struct ConnectionShared {
+    pub(crate) server: Server,
+    pub(crate) pipeline: CompiledPipeline,
     pub(crate) request_config: RequestConfig,
     pub(crate) protocol: ServerProtocol,
+    pub(crate) tls_config: Option<Arc<TlsServerConfig>>,
+}
+#[derive(Clone)]
+pub(crate) struct ConnectionEnv {
+    pub(crate) shared: Arc<ConnectionShared>,
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct StreamPeers {
@@ -44479,36 +47097,188 @@ pub(crate) struct StreamPeers {
 # Path: hyperlane/core/src/protocol/transport/fn.rs
 ```rust
 use super::*;
-pub(crate) fn build_duplex_transport(
-    request_config: RequestConfig,
-    peers: StreamPeers,
-) -> (Stream, DuplexStream) {
-    let (pipe, peer): (DuplexStream, DuplexStream) = tokio::io::duplex(PROTOCOL_STREAM_CAPACITY);
-    let transport: DuplexTransport = DuplexTransport {
-        pipe,
-        local: Some(peers.local),
-        remote: Some(peers.remote),
+#[inline(always)]
+pub(crate) fn take_tls_buffer(size: usize) -> Vec<u8> {
+    TLS_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut buf: Vec<u8> = pool.borrow_mut().pop().unwrap_or_else(|| vec![0; size]);
+        if buf.len() < size {
+            buf.resize(size, 0);
+        }
+        buf
+    })
+}
+#[inline(always)]
+pub(crate) fn return_tls_buffer(buf: Vec<u8>) {
+    if buf.capacity() == 0 || buf.capacity() > TLS_MAX_INCOMING_BUFFER {
+        return;
+    }
+    TLS_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut pool: RefMut<'_, Vec<Vec<u8>>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_TLS_BUFFERS {
+            pool.push(buf);
+        }
+    });
+}
+pub(crate) async fn accept_unbuffered_tls<T>(
+    config: Arc<TlsServerConfig>,
+    mut tcp: T,
+) -> Result<TlsTransport<T>, io::Error>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    let mut conn: UnbufferedServerConnection =
+        UnbufferedServerConnection::new(config).map_err(io::Error::other)?;
+    let mut in_buf: Vec<u8> = take_tls_buffer(TLS_RECORD_BUFFER_SIZE);
+    let mut in_len: usize = 0;
+    let mut out_buf: Vec<u8> = take_tls_buffer(TLS_RECORD_BUFFER_SIZE);
+    let mut out_len: usize = 0;
+    let mut plain_buf: Vec<u8> = Vec::new();
+    let result: Result<(), io::Error> = loop {
+        let UnbufferedStatus { discard, state } = conn.process_tls_records(&mut in_buf[..in_len]);
+        let outcome: Result<bool, io::Error> = match state {
+            Ok(ConnectionState::EncodeTlsData(mut enc)) => loop {
+                match enc.encode(&mut out_buf[out_len..]) {
+                    Ok(written) => {
+                        out_len += written;
+                        break Ok(false);
+                    }
+                    Err(EncodeError::InsufficientSize(need)) => {
+                        let required: usize = out_len + need.required_size;
+                        if required > TLS_MAX_INCOMING_BUFFER * 2 {
+                            break Err(io::Error::other("tls handshake output too large"));
+                        }
+                        out_buf.resize(required, 0);
+                    }
+                    Err(error) => break Err(io::Error::other(format!("{error:?}"))),
+                }
+            },
+            Ok(ConnectionState::TransmitTlsData(transmit)) => {
+                let write_res: Result<(), io::Error> = tcp.write_all(&out_buf[..out_len]).await;
+                out_len = 0;
+                transmit.done();
+                write_res.map(|()| false)
+            }
+            Ok(ConnectionState::BlockedHandshake) => {
+                if discard > 0 {
+                    in_buf.copy_within(discard..in_len, 0);
+                    in_len -= discard;
+                }
+                if in_len == in_buf.len() {
+                    if in_buf.len() >= TLS_MAX_INCOMING_BUFFER {
+                        break Err(io::Error::other("tls handshake record too large"));
+                    }
+                    in_buf.resize((in_buf.len() * 2).min(TLS_MAX_INCOMING_BUFFER), 0);
+                }
+                match tcp.read(&mut in_buf[in_len..]).await {
+                    Ok(0) => {
+                        break Err(io::Error::new(
+                            io::ErrorKind::UnexpectedEof,
+                            "tls handshake eof",
+                        ));
+                    }
+                    Ok(n) => {
+                        in_len += n;
+                        continue;
+                    }
+                    Err(error) => break Err(error),
+                }
+            }
+            Ok(ConnectionState::WriteTraffic(_)) => Ok(true),
+            Ok(ConnectionState::ReadTraffic(mut rt)) => {
+                let mut err: Option<io::Error> = None;
+                while let Some(rec) = rt.next_record() {
+                    match rec {
+                        Ok(app) => plain_buf.extend_from_slice(app.payload),
+                        Err(error) => {
+                            err = Some(io::Error::other(error));
+                            break;
+                        }
+                    }
+                }
+                match err {
+                    Some(error) => Err(error),
+                    None => Ok(true),
+                }
+            }
+            Ok(ConnectionState::ReadEarlyData(mut red)) => {
+                while red.next_record().is_some() {}
+                Ok(false)
+            }
+            Ok(ConnectionState::PeerClosed | ConnectionState::Closed) => Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "tls closed during handshake",
+            )),
+            Err(error) => {
+                if discard > 0 {
+                    in_buf.copy_within(discard..in_len, 0);
+                    in_len -= discard;
+                }
+                let UnbufferedStatus {
+                    state: alert_state, ..
+                } = conn.process_tls_records(&mut []);
+                if let Ok(ConnectionState::EncodeTlsData(mut enc)) = alert_state
+                    && let Ok(n) = enc.encode(&mut out_buf[out_len..])
+                {
+                    out_len += n;
+                    let _: Result<(), io::Error> = tcp.write_all(&out_buf[..out_len]).await;
+                }
+                break Err(io::Error::other(error));
+            }
+            Ok(_) => Err(io::Error::other("unsupported tls handshake state")),
+        };
+        if discard > 0 {
+            in_buf.copy_within(discard..in_len, 0);
+            in_len -= discard;
+        }
+        match outcome {
+            Ok(true) => break Ok(()),
+            Ok(false) => {}
+            Err(error) => break Err(error),
+        }
     };
-    (
-        Stream::from_transport(transport, request_config, false),
-        peer,
-    )
+    if let Err(error) = result {
+        return_tls_buffer(in_buf);
+        return_tls_buffer(out_buf);
+        return Err(error);
+    }
+    Ok(TlsTransport {
+        tcp,
+        conn,
+        in_buf,
+        in_len,
+        plain_buf,
+        plain_pos: 0,
+        out_buf,
+        out_pos: 0,
+        out_len,
+        peer_closed: false,
+        write_closed: false,
+    })
 }
 ```
 # Path: hyperlane/core/src/protocol/aliases/type.rs
 ```rust
 use super::*;
-pub(crate) type DuplexStream = tokio::io::DuplexStream;
-pub(crate) type ProtocolHeaders = http::HeaderMap;
-pub(crate) type RequestH3Stream = h3::server::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>;
-pub(crate) type RequestResolverH3 = h3::server::RequestResolver<h3_quinn::Connection, Bytes>;
+pub(crate) type ProtocolHeaders = HeaderMap;
 pub(crate) type ConnectionH2<T> = h2::server::Connection<T, Bytes>;
 pub(crate) type H2Error = h2::Error;
 pub(crate) type H2RecvStream = h2::RecvStream;
 pub(crate) type H2SendStream = h2::SendStream<Bytes>;
+pub(crate) type H2SendResponse = SendResponse<Bytes>;
+pub(crate) type H2ServerBuilder = Builder;
+pub(crate) type StdTcpListener = net::TcpListener;
+pub(crate) type StdUdpSocket = net::UdpSocket;
+pub(crate) type QuicConnection = Connection;
+pub(crate) type QuicRecvStream = RecvStream;
+pub(crate) type QuicSendStream = SendStream;
+pub(crate) type QuicWriteError = WriteError;
+pub(crate) type ThreadBuilder = thread::Builder;
+pub(crate) type ThreadJoinHandle<T> = thread::JoinHandle<T>;
+pub(crate) type RuntimeBuilder = runtime::Builder;
+pub(crate) type StdRwLock<T> = sync::RwLock<T>;
+pub(crate) type AtomicOrdering = sync::atomic::Ordering;
 pub(crate) type ProtocolRequest<T> = http::Request<T>;
 pub(crate) type ProtocolResponse<T> = http::Response<T>;
-pub(crate) type ProtocolBuildError = http::Error;
 pub(crate) type ProtocolMethod = http::Method;
 pub(crate) const LF_U8: u8 = b'\n';
 pub(crate) const CR_U8: u8 = b'\r';
@@ -44519,7 +47289,6 @@ pub(crate) const COMMA_STR: &str = ",";
 pub(crate) const LF_CHAR: char = '\n';
 pub(crate) const MISSING_RESPONSE_VERSION: &str = "response head has no version line";
 pub(crate) const MISSING_RESPONSE_STATUS: &str = "response head has no status code";
-pub(crate) const NO_ADDRESS: &str = "transport has no socket address";
 pub(crate) const CONTENT_LENGTH_MISMATCH: &str =
     "request body length does not match its content-length";
 ```
@@ -44529,11 +47298,1858 @@ mod r#type;
 pub(crate) use r#type::*;
 use super::*;
 ```
+# Path: hyperlane/core/src/protocol/uring/type.rs
+```rust
+use super::*;
+pub(crate) type UringTaskFuture = Pin<Box<dyn Future<Output = ()> + 'static>>;
+```
+# Path: hyperlane/core/src/protocol/uring/impl.rs
+```rust
+use super::*;
+impl UringWakeState {
+    #[inline(always)]
+    pub(crate) fn notify_eventfd(&self) {
+        let Self {
+            eventfd, signaled, ..
+        } = self;
+        if !signaled.swap(true, AtomicOrdering::AcqRel) {
+            let val: u64 = 1;
+            let _: isize = unsafe {
+                write(
+                    *eventfd,
+                    (&val as *const u64).cast::<c_void>(),
+                    mem::size_of::<u64>(),
+                )
+            };
+        }
+    }
+    #[inline(always)]
+    pub(crate) fn wake_slot(&self, slot_id: usize) {
+        let Self { ready, .. } = self;
+        if let Ok(mut list) = ready.lock() {
+            list.push(slot_id);
+        }
+        self.notify_eventfd();
+    }
+    pub(crate) fn trigger_shutdown(&self) {
+        let Self { shutdown, .. } = self;
+        shutdown.store(true, AtomicOrdering::Release);
+        self.notify_eventfd();
+    }
+}
+impl Drop for UringWakeState {
+    fn drop(&mut self) {
+        let Self { eventfd, .. } = self;
+        if *eventfd >= 0 {
+            let _: c_int = unsafe { close(*eventfd) };
+            *eventfd = -1;
+        }
+    }
+}
+impl Wake for UringSlotWaker {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+    fn wake_by_ref(self: &Arc<Self>) {
+        let Self {
+            slot_id,
+            wake_state,
+        } = &**self;
+        wake_state.wake_slot(*slot_id);
+    }
+}
+impl UringReactor {
+    #[inline(always)]
+    pub(crate) fn take_buf(&mut self) -> Box<[u8]> {
+        let Self { buf_pool, .. } = self;
+        buf_pool
+            .pop()
+            .unwrap_or_else(|| vec![0u8; URING_IO_BUF_SIZE].into_boxed_slice())
+    }
+    #[inline(always)]
+    pub(crate) fn return_buf(&mut self, buf: Box<[u8]>) {
+        let Self { buf_pool, .. } = self;
+        if buf.len() == URING_IO_BUF_SIZE && buf_pool.len() < URING_MAX_POOLED_BUFS {
+            buf_pool.push(buf);
+        }
+    }
+    #[inline(always)]
+    pub(crate) fn push_sqe(&mut self, entry: squeue::Entry) {
+        let Self {
+            ring,
+            pending_submissions,
+            ..
+        } = self;
+        if pending_submissions.is_empty() {
+            if unsafe { ring.submission().push(&entry) }.is_ok() {
+                return;
+            }
+        }
+        pending_submissions.push_back(UringSubmission::Single(entry));
+    }
+    fn push_linked_pair(&mut self, entries: [squeue::Entry; 2]) {
+        let Self {
+            ring,
+            pending_submissions,
+            ..
+        } = self;
+        if pending_submissions.is_empty() {
+            if unsafe { ring.submission().push_multiple(&entries) }.is_ok() {
+                return;
+            }
+        }
+        pending_submissions.push_back(UringSubmission::Linked(entries));
+    }
+    pub(crate) fn submit_io(&mut self) -> io::Result<usize> {
+        let Self {
+            ring,
+            pending_submissions,
+            ..
+        } = self;
+        while let Some(group) = pending_submissions.front() {
+            let entries: &[squeue::Entry] = match group {
+                UringSubmission::Single(entry) => slice::from_ref(entry),
+                UringSubmission::Linked(pair) => pair,
+            };
+            if unsafe { ring.submission().push_multiple(entries) }.is_err() {
+                return ring.submit();
+            }
+            pending_submissions.pop_front();
+        }
+        ring.submit_and_wait(1)
+    }
+    #[inline(always)]
+    pub(crate) fn schedule_local(&mut self, slot_id: usize) {
+        let Self {
+            slots, local_ready, ..
+        } = self;
+        if let Some(Some(slot)) = slots.get_mut(slot_id)
+            && !slot.closing
+            && !slot.in_local_ready
+        {
+            slot.in_local_ready = true;
+            local_ready.push(slot_id);
+        }
+    }
+    pub(crate) fn flush_staged_send(&mut self, slot_id: usize, link_close: bool) {
+        let mut send_sqe: Option<squeue::Entry> = None;
+        let mut close_sqe: Option<squeue::Entry> = None;
+        {
+            let Self { slots, .. } = self;
+            if let Some(Some(slot)) = slots.get_mut(slot_id)
+                && slot.send_staged
+                && !slot.send_inflight
+                && !slot.close_inflight
+                && slot.fd >= 0
+            {
+                slot.send_staged = false;
+                let len: usize = slot.write_len.saturating_sub(slot.write_pos);
+                if len == 0 {
+                    return;
+                }
+                let can_link_close: bool = link_close
+                    && !slot.recv_inflight
+                    && slot.pending_write.is_empty()
+                    && len <= URING_LINKED_SEND_LIMIT;
+                slot.send_inflight = true;
+                let data: *const u8 = unsafe { slot.write_buf.as_ptr().add(slot.write_pos) };
+                let mut send_op: opcode::Send =
+                    opcode::Send::new(types::Fd(slot.fd), data, len as u32);
+                if can_link_close {
+                    send_op = send_op.flags(MSG_MORE | MSG_WAITALL);
+                }
+                let mut entry: squeue::Entry = send_op
+                    .build()
+                    .user_data(encode_uring_user_data(URING_TAG_SEND, slot_id));
+                if can_link_close {
+                    entry = entry.flags(squeue::Flags::IO_LINK);
+                    slot.close_inflight = true;
+                    close_sqe = Some(
+                        opcode::Close::new(types::Fd(slot.fd))
+                            .build()
+                            .user_data(encode_uring_user_data(URING_TAG_CLOSE, slot_id)),
+                    );
+                }
+                send_sqe = Some(entry);
+            }
+        }
+        match (send_sqe, close_sqe) {
+            (Some(send), Some(close)) => self.push_linked_pair([send, close]),
+            (Some(send), None) => self.push_sqe(send),
+            _ => {}
+        }
+    }
+    pub(crate) fn complete_send(&mut self, slot_id: usize, result: i32) {
+        let closing: bool;
+        let mut staged: bool = false;
+        let mut wake: bool = false;
+        {
+            let Self { slots, .. } = self;
+            let Some(Some(slot)) = slots.get_mut(slot_id) else {
+                return;
+            };
+            slot.send_inflight = false;
+            if result > 0 {
+                slot.write_pos += result as usize;
+            } else {
+                slot.write_err = Some(if result == 0 { EPIPE } else { -result });
+                slot.write_pos = 0;
+                slot.write_len = 0;
+                slot.pending_write.clear();
+                slot.send_staged = false;
+                wake = true;
+            }
+            if slot.close_inflight || slot.shutdown_inflight {
+                return;
+            }
+            closing = slot.closing;
+            if slot.write_err.is_none() && slot.fd >= 0 {
+                if slot.write_pos < slot.write_len {
+                    slot.send_staged = true;
+                    staged = true;
+                } else {
+                    slot.write_pos = 0;
+                    slot.write_len = 0;
+                    if !slot.pending_write.is_empty() {
+                        let count: usize = slot.pending_write.len().min(slot.write_buf.len());
+                        slot.write_buf[..count].copy_from_slice(&slot.pending_write[..count]);
+                        slot.pending_write.drain(..count);
+                        slot.write_len = count;
+                        slot.send_staged = true;
+                        staged = true;
+                        wake = true;
+                    } else {
+                        wake |= slot.flush_pending || slot.write_shutdown;
+                    }
+                }
+            }
+        }
+        if staged {
+            self.flush_staged_send(slot_id, closing);
+        }
+        if closing {
+            self.advance_close(slot_id);
+        } else if wake {
+            self.schedule_local(slot_id);
+        }
+    }
+    pub(crate) fn complete_close(&mut self, slot_id: usize, result: i32) {
+        let mut recycle: bool = false;
+        let mut retry: bool = false;
+        {
+            let Self { slots, .. } = self;
+            if let Some(Some(slot)) = slots.get_mut(slot_id) {
+                slot.close_inflight = false;
+                if result == -ECANCELED {
+                    retry = true;
+                } else {
+                    slot.fd = -1;
+                    recycle = !slot.send_inflight
+                        && !slot.recv_inflight
+                        && !slot.cancel_inflight
+                        && !slot.shutdown_inflight;
+                }
+            }
+        }
+        if recycle {
+            self.recycle_slot(slot_id);
+        } else if retry {
+            self.advance_close(slot_id);
+        }
+    }
+    pub(crate) fn complete_cancel(&mut self, slot_id: usize) {
+        let closing: bool = {
+            let Self { slots, .. } = self;
+            let Some(Some(slot)) = slots.get_mut(slot_id) else {
+                return;
+            };
+            if !slot.cancel_inflight {
+                return;
+            }
+            slot.cancel_inflight = false;
+            slot.closing
+        };
+        if closing {
+            self.advance_close(slot_id);
+        }
+    }
+    pub(crate) fn complete_shutdown(&mut self, slot_id: usize, result: i32) {
+        let closing: bool;
+        let mut staged: bool = false;
+        let mut wake: bool = false;
+        {
+            let Self { slots, .. } = self;
+            let Some(Some(slot)) = slots.get_mut(slot_id) else {
+                return;
+            };
+            slot.shutdown_inflight = false;
+            if result == 0 {
+                slot.shutdown_done = true;
+            } else if result != -ECANCELED && slot.write_err.is_none() {
+                slot.write_err = Some(-result);
+            }
+            closing = slot.closing;
+            if !closing && slot.write_err.is_none() && slot.fd >= 0 {
+                if slot.write_pos < slot.write_len && !slot.send_inflight {
+                    slot.send_staged = true;
+                    staged = true;
+                } else {
+                    wake = true;
+                }
+            } else if !closing {
+                wake = true;
+            }
+        }
+        if staged {
+            self.flush_staged_send_for_shutdown(slot_id);
+        }
+        if closing {
+            self.advance_close(slot_id);
+        } else if wake {
+            self.schedule_local(slot_id);
+        }
+    }
+    pub(crate) fn flush_staged_send_for_shutdown(&mut self, slot_id: usize) {
+        let mut send_sqe: Option<squeue::Entry> = None;
+        let mut shutdown_sqe: Option<squeue::Entry> = None;
+        {
+            let Self { slots, .. } = self;
+            if let Some(Some(slot)) = slots.get_mut(slot_id)
+                && slot.send_staged
+                && !slot.send_inflight
+                && !slot.close_inflight
+                && !slot.shutdown_inflight
+                && slot.fd >= 0
+            {
+                slot.send_staged = false;
+                let len: usize = slot.write_len.saturating_sub(slot.write_pos);
+                if len == 0 {
+                    return;
+                }
+                let can_link_shutdown: bool = !slot.shutdown_done
+                    && slot.pending_write.is_empty()
+                    && len <= URING_LINKED_SEND_LIMIT;
+                slot.send_inflight = true;
+                let data: *const u8 = unsafe { slot.write_buf.as_ptr().add(slot.write_pos) };
+                let mut send_op: opcode::Send =
+                    opcode::Send::new(types::Fd(slot.fd), data, len as u32);
+                if can_link_shutdown {
+                    send_op = send_op.flags(MSG_MORE | MSG_WAITALL);
+                }
+                let mut entry: squeue::Entry = send_op
+                    .build()
+                    .user_data(encode_uring_user_data(URING_TAG_SEND, slot_id));
+                if can_link_shutdown {
+                    entry = entry.flags(squeue::Flags::IO_LINK);
+                    slot.shutdown_inflight = true;
+                    shutdown_sqe = Some(
+                        opcode::Shutdown::new(types::Fd(slot.fd), SHUT_WR)
+                            .build()
+                            .user_data(encode_uring_user_data(URING_TAG_SHUTDOWN, slot_id)),
+                    );
+                }
+                send_sqe = Some(entry);
+            }
+        }
+        match (send_sqe, shutdown_sqe) {
+            (Some(send), Some(shut)) => self.push_linked_pair([send, shut]),
+            (Some(send), None) => self.push_sqe(send),
+            _ => {}
+        }
+    }
+    pub(crate) fn advance_close(&mut self, slot_id: usize) {
+        let mut next_sqe: Option<squeue::Entry> = None;
+        let mut staged: bool = false;
+        let mut recycle: bool = false;
+        {
+            let Self { slots, .. } = self;
+            if let Some(Some(slot)) = slots.get_mut(slot_id) {
+                let active_close: bool = slot.close_inflight || slot.shutdown_inflight;
+                if active_close || slot.send_inflight {
+                    return;
+                }
+                if slot.write_err.is_none() && slot.write_pos < slot.write_len {
+                    slot.send_staged = true;
+                    staged = true;
+                } else if slot.write_err.is_none() && !slot.pending_write.is_empty() {
+                    let count: usize = slot.pending_write.len().min(slot.write_buf.len());
+                    slot.write_buf[..count].copy_from_slice(&slot.pending_write[..count]);
+                    slot.pending_write.drain(..count);
+                    slot.write_pos = 0;
+                    slot.write_len = count;
+                    slot.send_staged = true;
+                    staged = true;
+                } else if slot.recv_inflight {
+                    if slot.cancel_inflight {
+                        return;
+                    }
+                    slot.cancel_inflight = true;
+                    next_sqe = Some(
+                        opcode::AsyncCancel::new(encode_uring_user_data(URING_TAG_RECV, slot_id))
+                            .build()
+                            .user_data(encode_uring_user_data(URING_TAG_CANCEL, slot_id)),
+                    );
+                } else if slot.cancel_inflight {
+                    return;
+                } else if slot.fd >= 0 {
+                    slot.close_inflight = true;
+                    next_sqe = Some(
+                        opcode::Close::new(types::Fd(slot.fd))
+                            .build()
+                            .user_data(encode_uring_user_data(URING_TAG_CLOSE, slot_id)),
+                    );
+                } else {
+                    recycle = true;
+                }
+            }
+        }
+        if staged {
+            self.flush_staged_send(slot_id, true);
+        }
+        if let Some(entry) = next_sqe {
+            self.push_sqe(entry);
+        }
+        if recycle {
+            self.recycle_slot(slot_id);
+        }
+    }
+    pub(crate) fn recycle_slot(&mut self, slot_id: usize) {
+        let taken: Option<UringConnSlot> = {
+            let Self {
+                slots,
+                active_slots,
+                free_slots,
+                ..
+            } = self;
+            if let Some(slot_opt) = slots.get_mut(slot_id)
+                && let Some(slot) = slot_opt.take()
+            {
+                *active_slots = active_slots.saturating_sub(1);
+                free_slots.push(slot_id);
+                Some(slot)
+            } else {
+                None
+            }
+        };
+        if let Some(slot) = taken {
+            self.return_buf(slot.read_buf);
+            self.return_buf(slot.write_buf);
+        }
+    }
+}
+impl Transport for UringTcpTransport {
+    fn peer_addr(&self) -> io::Result<SocketAddr> {
+        let Self { peers, .. } = self;
+        Ok(peers.remote)
+    }
+    fn local_addr(&self) -> io::Result<SocketAddr> {
+        let Self { peers, .. } = self;
+        Ok(peers.local)
+    }
+}
+impl AsyncRead for UringTcpTransport {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut task::Context<'_>,
+        output: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
+        if output.remaining() == 0 {
+            return Poll::Ready(Ok(()));
+        }
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let Some(reactor) = guard.as_mut() else {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    URING_REACTOR_UNAVAILABLE,
+                )));
+            };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
+            let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
+                return Poll::Ready(Ok(()));
+            };
+            if slot.connection_id != connection_id {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
+            if slot.read_pos < slot.read_len {
+                let avail: usize = slot.read_len - slot.read_pos;
+                let take: usize = avail.min(output.remaining());
+                output.put_slice(&slot.read_buf[slot.read_pos..slot.read_pos + take]);
+                slot.read_pos += take;
+                if slot.read_pos == slot.read_len {
+                    slot.read_pos = 0;
+                    slot.read_len = 0;
+                }
+                return Poll::Ready(Ok(()));
+            }
+            if let Some(errno) = slot.read_err.take() {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(errno)));
+            }
+            let closed_or_eof: bool = slot.eof || slot.fd < 0;
+            if closed_or_eof || slot.closing {
+                return Poll::Ready(Ok(()));
+            }
+            if !slot.recv_inflight {
+                slot.recv_inflight = true;
+                let entry: squeue::Entry = opcode::Recv::new(
+                    types::Fd(slot.fd),
+                    slot.read_buf.as_mut_ptr(),
+                    slot.read_buf.len() as u32,
+                )
+                .build()
+                .user_data(encode_uring_user_data(URING_TAG_RECV, slot_id));
+                reactor.push_sqe(entry);
+            }
+            Poll::Pending
+        })
+    }
+}
+impl AsyncWrite for UringTcpTransport {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut task::Context<'_>,
+        bytes: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
+        if bytes.is_empty() {
+            return Poll::Ready(Ok(0));
+        }
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let Some(reactor) = guard.as_mut() else {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    URING_REACTOR_UNAVAILABLE,
+                )));
+            };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
+            let mut flush_entry: Option<squeue::Entry> = None;
+            let result: Poll<io::Result<usize>> = {
+                let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                };
+                if slot.connection_id != connection_id {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
+                if let Some(errno) = slot.write_err.take() {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(errno)));
+                }
+                let closed: bool = slot.fd < 0 || slot.closing;
+                if closed || slot.write_shutdown {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
+                if !slot.send_inflight {
+                    let space: usize = slot.write_buf.len().saturating_sub(slot.write_len);
+                    if space > 0 {
+                        let take: usize = bytes.len().min(space);
+                        slot.write_buf[slot.write_len..slot.write_len + take]
+                            .copy_from_slice(&bytes[..take]);
+                        slot.write_len += take;
+                        slot.send_staged = true;
+                        return Poll::Ready(Ok(take));
+                    }
+                    let len: usize = slot.write_len;
+                    slot.send_staged = false;
+                    slot.send_inflight = true;
+                    flush_entry = Some(
+                        opcode::Send::new(types::Fd(slot.fd), slot.write_buf.as_ptr(), len as u32)
+                            .build()
+                            .user_data(encode_uring_user_data(URING_TAG_SEND, slot_id)),
+                    );
+                }
+                let room: usize =
+                    URING_PENDING_WRITE_LIMIT.saturating_sub(slot.pending_write.len());
+                if room == 0 {
+                    Poll::Pending
+                } else {
+                    let take: usize = bytes.len().min(room);
+                    slot.pending_write.extend_from_slice(&bytes[..take]);
+                    Poll::Ready(Ok(take))
+                }
+            };
+            if let Some(entry) = flush_entry {
+                reactor.push_sqe(entry);
+            }
+            result
+        })
+    }
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        _cx: &mut task::Context<'_>,
+        slices: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
+        let total: usize = slices.iter().map(|s: &IoSlice<'_>| s.len()).sum();
+        if total == 0 {
+            return Poll::Ready(Ok(0));
+        }
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let Some(reactor) = guard.as_mut() else {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    URING_REACTOR_UNAVAILABLE,
+                )));
+            };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
+            let mut flush_entry: Option<squeue::Entry> = None;
+            let result: Poll<io::Result<usize>> = {
+                let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                };
+                if slot.connection_id != connection_id {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
+                if let Some(errno) = slot.write_err.take() {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(errno)));
+                }
+                let closed: bool = slot.fd < 0 || slot.closing;
+                if closed || slot.write_shutdown {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
+                if !slot.send_inflight {
+                    let cap: usize = slot.write_buf.len();
+                    let mut copied: usize = 0;
+                    for slice_item in slices {
+                        let data: &[u8] = slice_item.as_ref();
+                        if data.is_empty() {
+                            continue;
+                        }
+                        let space: usize = cap.saturating_sub(slot.write_len);
+                        let take: usize = data.len().min(space);
+                        if take == 0 {
+                            break;
+                        }
+                        slot.write_buf[slot.write_len..slot.write_len + take]
+                            .copy_from_slice(&data[..take]);
+                        slot.write_len += take;
+                        copied += take;
+                        if slot.write_len == cap {
+                            break;
+                        }
+                    }
+                    if copied > 0 {
+                        slot.send_staged = true;
+                        return Poll::Ready(Ok(copied));
+                    }
+                    let len: usize = slot.write_len;
+                    slot.send_staged = false;
+                    slot.send_inflight = true;
+                    flush_entry = Some(
+                        opcode::Send::new(types::Fd(slot.fd), slot.write_buf.as_ptr(), len as u32)
+                            .build()
+                            .user_data(encode_uring_user_data(URING_TAG_SEND, slot_id)),
+                    );
+                }
+                let room: usize =
+                    URING_PENDING_WRITE_LIMIT.saturating_sub(slot.pending_write.len());
+                if room == 0 {
+                    Poll::Pending
+                } else {
+                    let mut copied: usize = 0;
+                    for slice_item in slices {
+                        let data: &[u8] = slice_item.as_ref();
+                        if data.is_empty() {
+                            continue;
+                        }
+                        let take: usize = data.len().min(room - copied);
+                        if take == 0 {
+                            break;
+                        }
+                        slot.pending_write.extend_from_slice(&data[..take]);
+                        copied += take;
+                        if copied == room {
+                            break;
+                        }
+                    }
+                    Poll::Ready(Ok(copied))
+                }
+            };
+            if let Some(entry) = flush_entry {
+                reactor.push_sqe(entry);
+            }
+            result
+        })
+    }
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+        let Self {
+            slot_id,
+            connection_id,
+            owner_thread,
+            ..
+        } = *self;
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let Some(reactor) = guard.as_mut() else {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    URING_REACTOR_UNAVAILABLE,
+                )));
+            };
+            if reactor.owner_thread != owner_thread {
+                return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+            }
+            let mut read_ahead: Option<squeue::Entry> = None;
+            let pending: bool = {
+                let Some(Some(slot)) = reactor.slots.get_mut(slot_id) else {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                };
+                if slot.connection_id != connection_id {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
+                if let Some(errno) = slot.write_err {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(errno)));
+                }
+                if slot.fd < 0 || slot.close_inflight {
+                    return Poll::Ready(Err(io::Error::from_raw_os_error(EPIPE)));
+                }
+                let active: bool = slot.send_staged || slot.send_inflight;
+                let buffered: bool =
+                    slot.write_pos < slot.write_len || !slot.pending_write.is_empty();
+                let pending: bool = active || buffered;
+                slot.flush_pending = pending;
+                if pending
+                    && !slot.recv_inflight
+                    && !slot.eof
+                    && !slot.closing
+                    && !slot.write_shutdown
+                    && slot.read_err.is_none()
+                    && slot.read_pos == slot.read_len
+                {
+                    slot.recv_inflight = true;
+                    read_ahead = Some(
+                        opcode::Recv::new(
+                            types::Fd(slot.fd),
+                            slot.read_buf.as_mut_ptr(),
+                            slot.read_buf.len() as u32,
+                        )
+                        .build()
+                        .user_data(encode_uring_user_data(URING_TAG_RECV, slot_id)),
+                    );
+                }
+                pending
+            };
+            if pending {
+                reactor.flush_staged_send(slot_id, false);
+                if let Some(entry) = read_ahead {
+                    reactor.push_sqe(entry);
+                }
+                Poll::Pending
+            } else {
+                Poll::Ready(Ok(()))
+            }
+        })
+    }
+```
+# Path: hyperlane/core/src/protocol/uring/enum.rs
+```rust
+use super::*;
+pub(crate) enum UringSubmission {
+    Single(squeue::Entry),
+    Linked([squeue::Entry; 2]),
+}
+```
+# Path: hyperlane/core/src/protocol/uring/static.rs
+```rust
+use super::*;
+thread_local! {
+    pub(crate) static URING_REACTOR: RefCell<Option<UringReactor>> = const { RefCell::new(None) };
+}
+```
+# Path: hyperlane/core/src/protocol/uring/const.rs
+```rust
+pub(crate) const URING_RING_ENTRY_CANDIDATES: [u32; 3] = [2048, 512, 128];
+pub(crate) const URING_SINGLE_WORKER_ACCEPT_SLOTS: usize = 8;
+pub(crate) const URING_MULTI_WORKER_ACCEPT_SLOTS: usize = 2;
+pub(crate) const URING_IO_BUF_SIZE: usize = 16 * 1024;
+pub(crate) const URING_LINKED_SEND_LIMIT: usize = 4 * 1024;
+pub(crate) const URING_PENDING_WRITE_LIMIT: usize = 64 * 1024;
+pub(crate) const URING_MAX_POOLED_BUFS: usize = 512;
+pub(crate) const URING_TAG_SHIFT: u32 = 56;
+pub(crate) const URING_INDEX_MASK: u64 = (1u64 << URING_TAG_SHIFT) - 1;
+pub(crate) const URING_TAG_ACCEPT: u64 = 1;
+pub(crate) const URING_TAG_EVENTFD: u64 = 2;
+pub(crate) const URING_TAG_RECV: u64 = 3;
+pub(crate) const URING_TAG_SEND: u64 = 4;
+pub(crate) const URING_TAG_CLOSE: u64 = 5;
+pub(crate) const URING_TAG_CANCEL: u64 = 6;
+pub(crate) const URING_TAG_ACCEPT_CANCEL: u64 = 7;
+pub(crate) const URING_TAG_SHUTDOWN: u64 = 8;
+pub(crate) const URING_THREAD_NAME_PREFIX: &str = "hyperlane-uring-";
+pub(crate) const URING_REACTOR_UNAVAILABLE: &str = "io_uring reactor unavailable";
+```
+# Path: hyperlane/core/src/protocol/uring/mod.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+mod r#type;
+pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#static::*, r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/uring/struct.rs
+```rust
+use super::*;
+pub(crate) struct UringWakeState {
+    pub(crate) eventfd: RawFd,
+    pub(crate) ready: Mutex<Vec<usize>>,
+    pub(crate) signaled: AtomicBool,
+    pub(crate) shutdown: AtomicBool,
+}
+pub(crate) struct UringSlotWaker {
+    pub(crate) slot_id: usize,
+    pub(crate) wake_state: Arc<UringWakeState>,
+}
+pub(crate) struct UringAcceptSlot {
+    pub(crate) addr: Box<sockaddr_storage>,
+    pub(crate) addr_len: Box<socklen_t>,
+    pub(crate) inflight: bool,
+}
+pub(crate) struct UringConnSlot {
+    pub(crate) fd: RawFd,
+    pub(crate) connection_id: u64,
+    pub(crate) read_buf: Box<[u8]>,
+    pub(crate) read_pos: usize,
+    pub(crate) read_len: usize,
+    pub(crate) write_buf: Box<[u8]>,
+    pub(crate) write_pos: usize,
+    pub(crate) write_len: usize,
+    pub(crate) pending_write: Vec<u8>,
+    pub(crate) send_staged: bool,
+    pub(crate) recv_inflight: bool,
+    pub(crate) send_inflight: bool,
+    pub(crate) close_inflight: bool,
+    pub(crate) flush_pending: bool,
+    pub(crate) cancel_inflight: bool,
+    pub(crate) eof: bool,
+    pub(crate) write_shutdown: bool,
+    pub(crate) shutdown_inflight: bool,
+    pub(crate) shutdown_done: bool,
+    pub(crate) closing: bool,
+    pub(crate) read_err: Option<i32>,
+    pub(crate) write_err: Option<i32>,
+    pub(crate) waker: Waker,
+    pub(crate) task: Option<UringTaskFuture>,
+    pub(crate) in_local_ready: bool,
+}
+pub(crate) struct UringReactor {
+#[derive(Debug)]
+pub(crate) struct UringTcpTransport {
+    pub(crate) slot_id: usize,
+    pub(crate) connection_id: u64,
+    pub(crate) owner_thread: thread::ThreadId,
+    pub(crate) peers: StreamPeers,
+}
+```
+# Path: hyperlane/core/src/protocol/uring/fn.rs
+```rust
+use super::*;
+#[inline(always)]
+pub(crate) fn encode_uring_user_data(tag: u64, index: usize) -> u64 {
+    (tag << URING_TAG_SHIFT) | ((index as u64) & URING_INDEX_MASK)
+}
+#[inline(always)]
+pub(crate) fn decode_uring_user_data(user_data: u64) -> (u64, usize) {
+    (
+        user_data >> URING_TAG_SHIFT,
+        (user_data & URING_INDEX_MASK) as usize,
+    )
+}
+pub(crate) fn try_create_uring() -> Option<IoUring> {
+    for entries in URING_RING_ENTRY_CANDIDATES {
+        if let Ok(ring) = IoUring::builder()
+#[inline(always)]
+fn decode_sockaddr(storage: &sockaddr_storage, fallback: SocketAddr) -> SocketAddr {
+    let family: c_int = c_int::from(storage.ss_family);
+    if family == AF_INET {
+        let addr_in: sockaddr_in =
+            unsafe { ptr::read((storage as *const sockaddr_storage).cast::<sockaddr_in>()) };
+        let ip: Ipv4Addr = Ipv4Addr::from(u32::from_be(addr_in.sin_addr.s_addr));
+        let port: u16 = u16::from_be(addr_in.sin_port);
+        return SocketAddr::V4(SocketAddrV4::new(ip, port));
+    }
+    if family == AF_INET6 {
+        let addr_in6: sockaddr_in6 =
+            unsafe { ptr::read((storage as *const sockaddr_storage).cast::<sockaddr_in6>()) };
+        let ip: Ipv6Addr = Ipv6Addr::from(addr_in6.sin6_addr.s6_addr);
+        let port: u16 = u16::from_be(addr_in6.sin6_port);
+        return SocketAddr::V6(SocketAddrV6::new(
+            ip,
+            port,
+            addr_in6.sin6_flowinfo,
+            addr_in6.sin6_scope_id,
+        ));
+    }
+    fallback
+}
+#[inline(always)]
+fn apply_socket_ttl(fd: RawFd, ttl: u32, is_v6: bool) {
+    let val: c_int = ttl as c_int;
+    let (level, opt): (c_int, c_int) = if is_v6 {
+        (IPPROTO_IPV6, IPV6_UNICAST_HOPS)
+    } else {
+        (IPPROTO_IP, IP_TTL)
+    };
+    let _: c_int = unsafe {
+        setsockopt(
+            fd,
+            level,
+            opt,
+            (&val as *const c_int).cast::<c_void>(),
+            mem::size_of::<c_int>() as socklen_t,
+        )
+    };
+}
+#[inline(always)]
+fn arm_accept_slot(
+    reactor: &mut UringReactor,
+    listener_fd: RawFd,
+    slot: &mut UringAcceptSlot,
+    idx: usize,
+) {
+    *slot.addr_len = mem::size_of::<sockaddr_storage>() as socklen_t;
+    slot.inflight = true;
+    let entry: squeue::Entry = opcode::Accept::new(
+        types::Fd(listener_fd),
+        (&mut *slot.addr as *mut sockaddr_storage).cast::<sockaddr>(),
+        &mut *slot.addr_len as *mut socklen_t,
+    )
+    .flags(SOCK_NONBLOCK | SOCK_CLOEXEC)
+    .build()
+    .user_data(encode_uring_user_data(URING_TAG_ACCEPT, idx));
+    reactor.push_sqe(entry);
+}
+#[inline(always)]
+fn arm_eventfd_poll(reactor: &mut UringReactor) {
+    let entry: squeue::Entry =
+        opcode::PollAdd::new(types::Fd(reactor.wake_state.eventfd), POLLIN as u32)
+            .build()
+            .user_data(encode_uring_user_data(URING_TAG_EVENTFD, 0));
+    reactor.push_sqe(entry);
+}
+async fn run_uring_h1(env: ConnectionEnv, transport: UringTcpTransport) {
+    let mut stream: Stream = Stream::from_transport(transport, env.shared.request_config, false);
+    env.shared
+        .server
+        .serve_h1_connection_stream(&env.shared.pipeline, &mut stream)
+        .await;
+}
+async fn run_uring_h1_tls(env: ConnectionEnv, transport: UringTcpTransport) {
+    let Some(tls_config) = env.shared.tls_config.as_ref() else {
+        return;
+    };
+    let Ok(Ok(tls_stream)) = bounded_handshake(
+        env.shared.request_config,
+        accept_unbuffered_tls(Arc::clone(tls_config), transport),
+    )
+    .await
+    else {
+        return;
+    };
+    if !negotiated_protocol_matches(&tls_stream, &env.shared.protocol) {
+        return;
+    }
+    let mut stream: Stream = Stream::from_transport(tls_stream, env.shared.request_config, false);
+    env.shared
+        .server
+        .serve_h1_connection_stream(&env.shared.pipeline, &mut stream)
+        .await;
+    let _: Result<(), io::Error> = stream.shutdown().await;
+}
+fn poll_local_ready_slots() {
+    loop {
+        let next: Option<(usize, UringTaskFuture, Waker)> =
+            URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+                let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+                let reactor: &mut UringReactor = guard.as_mut()?;
+                while let Some(slot_id) = reactor.local_ready.pop() {
+                    if let Some(Some(slot)) = reactor.slots.get_mut(slot_id) {
+                        slot.in_local_ready = false;
+                        if !slot.closing
+                            && let Some(task) = slot.task.take()
+                        {
+                            let waker: Waker = slot.waker.clone();
+                            return Some((slot_id, task, waker));
+                        }
+                    }
+                }
+                None
+            });
+        let Some((slot_id, mut task, waker)) = next else {
+            break;
+        };
+        let mut cx: task::Context<'_> = task::Context::from_waker(&waker);
+        let poll_res: Poll<()> = task.as_mut().poll(&mut cx);
+        let mut pending_task: Option<UringTaskFuture> = match poll_res {
+            Poll::Pending => Some(task),
+            Poll::Ready(()) => {
+                drop(task);
+                None
+            }
+        };
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let Some(reactor) = guard.as_mut() else {
+                return;
+            };
+            match poll_res {
+                Poll::Pending => {
+                    let is_closing: bool = reactor
+                        .slots
+                        .get_mut(slot_id)
+                        .and_then(|opt: &mut Option<UringConnSlot>| opt.as_mut())
+                        .is_some_and(|slot: &mut UringConnSlot| {
+                            if slot.closing {
+                                true
+                            } else {
+                                slot.task = pending_task.take();
+                                false
+                            }
+                        });
+                    reactor.flush_staged_send(slot_id, is_closing);
+                    if is_closing {
+                        reactor.advance_close(slot_id);
+                    }
+                }
+                Poll::Ready(()) => {
+                    if let Some(Some(slot)) = reactor.slots.get_mut(slot_id) {
+                        slot.closing = true;
+                    }
+                    reactor.flush_staged_send(slot_id, true);
+                    reactor.advance_close(slot_id);
+                }
+            }
+        });
+        drop(pending_task);
+    }
+}
+fn run_uring_worker_thread(
+    env: ConnectionEnv,
+    listener_fd: RawFd,
+    local_addr: SocketAddr,
+    wake_state: Arc<UringWakeState>,
+    tokio_handle: Handle,
+    accept_slot_count: usize,
+    ready_tx: SyncSender<bool>,
+) {
+    let _tokio_guard: EnterGuard<'_> = tokio_handle.enter();
+    let Some(ring) = try_create_uring() else {
+        let _: Result<(), _> = ready_tx.send(false);
+        return;
+    };
+    let _: Result<(), _> = ready_tx.send(true);
+    let configured_ttl: Option<u32> = env.shared.server.get_server_config().get_ttl();
+    let is_v6: bool = local_addr.is_ipv6();
+    let is_tls: bool = env.shared.tls_config.is_some();
+    let owner_thread: thread::ThreadId = thread::current().id();
+    let mut accept_slots: Vec<UringAcceptSlot> = (0..accept_slot_count)
+        .map(|_: usize| UringAcceptSlot {
+            addr: Box::new(unsafe { mem::zeroed() }),
+            addr_len: Box::new(mem::size_of::<sockaddr_storage>() as socklen_t),
+            inflight: false,
+        })
+        .collect();
+    URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+        let mut reactor: UringReactor = UringReactor {
+            ring,
+            pending_submissions: VecDeque::new(),
+            slots: Vec::with_capacity(256),
+            free_slots: Vec::with_capacity(256),
+            buf_pool: Vec::with_capacity(URING_MAX_POOLED_BUFS),
+            waker_cache: Vec::with_capacity(256),
+            local_ready: Vec::with_capacity(256),
+            wake_state: Arc::clone(&wake_state),
+            active_slots: 0,
+            next_connection_id: 1,
+            owner_thread,
+        };
+        arm_eventfd_poll(&mut reactor);
+        for (idx, slot) in accept_slots.iter_mut().enumerate() {
+            arm_accept_slot(&mut reactor, listener_fd, slot, idx);
+        }
+        *cell.borrow_mut() = Some(reactor);
+    });
+    let mut cqe_batch: Vec<(u64, i32)> = Vec::with_capacity(512);
+    let mut shutdown_initiated: bool = false;
+    loop {
+        let should_exit: bool = URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let Some(reactor) = guard.as_mut() else {
+                return true;
+            };
+            if shutdown_initiated
+                && reactor.active_slots == 0
+                && accept_slots.iter().all(|s: &UringAcceptSlot| !s.inflight)
+            {
+                return true;
+            }
+            if let Err(err) = reactor.submit_io() {
+                let raw: Option<i32> = err.raw_os_error();
+                let retryable_io: bool = raw == Some(EINTR) || raw == Some(EAGAIN);
+                if !retryable_io && raw != Some(EBUSY) {
+                    return true;
+                }
+            }
+            cqe_batch.clear();
+            for cqe in reactor.ring.completion() {
+                cqe_batch.push((cqe.user_data(), cqe.result()));
+            }
+            false
+        });
+        if should_exit {
+            break;
+        }
+        let mut shutdown_now: bool = false;
+        let mut retired_tasks: Vec<UringTaskFuture> = Vec::new();
+        URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+            let mut guard: RefMut<'_, Option<UringReactor>> = cell.borrow_mut();
+            let Some(reactor) = guard.as_mut() else {
+                return;
+            };
+            for &(user_data, res) in &cqe_batch {
+                let (tag, idx): (u64, usize) = decode_uring_user_data(user_data);
+                match tag {
+                    URING_TAG_ACCEPT => {
+                        if let Some(acc) = accept_slots.get_mut(idx) {
+                            acc.inflight = false;
+                            if res >= 0 && !shutdown_initiated {
+                                let fd: RawFd = res;
+                                if reactor.next_connection_id == 0 {
+                                    let _: c_int = unsafe { close(fd) };
+                                    arm_accept_slot(reactor, listener_fd, acc, idx);
+                                    continue;
+                                }
+                                let connection_id: u64 = reactor.next_connection_id;
+                                reactor.next_connection_id =
+                                    connection_id.checked_add(1).unwrap_or(0);
+                                if let Some(ttl) = configured_ttl {
+                                    apply_socket_ttl(fd, ttl, is_v6);
+                                }
+                                let remote: SocketAddr = decode_sockaddr(&acc.addr, local_addr);
+                                let peers: StreamPeers = StreamPeers {
+                                    local: local_addr,
+                                    remote,
+                                };
+                                let slot_id: usize = match reactor.free_slots.pop() {
+                                    Some(id) => id,
+                                    None => {
+                                        let id: usize = reactor.slots.len();
+                                        reactor.slots.push(None);
+                                        reactor.waker_cache.push(None);
+                                        id
+                                    }
+                                };
+                                let read_buf: Box<[u8]> = reactor.take_buf();
+                                let write_buf: Box<[u8]> = reactor.take_buf();
+                                let waker: Waker = reactor.waker_cache[slot_id]
+                                    .get_or_insert_with(|| {
+                                        Waker::from(Arc::new(UringSlotWaker {
+                                            slot_id,
+                                            wake_state: Arc::clone(&reactor.wake_state),
+                                        }))
+                                    })
+                                    .clone();
+                                let transport: UringTcpTransport = UringTcpTransport {
+                                    slot_id,
+                                    connection_id,
+                                    owner_thread,
+                                    peers,
+                                };
+                                let task: UringTaskFuture = if is_tls {
+                                    Box::pin(run_uring_h1_tls(env.clone(), transport))
+                                } else {
+                                    Box::pin(run_uring_h1(env.clone(), transport))
+                                };
+                                reactor.slots[slot_id] = Some(UringConnSlot {
+                                    fd,
+                                    connection_id,
+                                    read_buf,
+                                    read_pos: 0,
+                                    read_len: 0,
+                                    write_buf,
+                                    write_pos: 0,
+                                    write_len: 0,
+                                    pending_write: Vec::new(),
+                                    send_staged: false,
+                                    recv_inflight: false,
+                                    send_inflight: false,
+                                    close_inflight: false,
+                                    flush_pending: false,
+                                    cancel_inflight: false,
+                                    eof: false,
+                                    write_shutdown: false,
+                                    shutdown_inflight: false,
+                                    shutdown_done: false,
+                                    closing: false,
+                                    read_err: None,
+                                    write_err: None,
+                                    waker,
+                                    task: Some(task),
+                                    in_local_ready: false,
+                                });
+                                reactor.active_slots += 1;
+                                reactor.schedule_local(slot_id);
+                            } else if res >= 0 {
+                                let _: c_int = unsafe { close(res) };
+                            }
+                            if !shutdown_initiated {
+                                arm_accept_slot(reactor, listener_fd, acc, idx);
+                            }
+                        }
+                    }
+                    URING_TAG_RECV => {
+                        let mut should_close: bool = false;
+                        if let Some(Some(slot)) = reactor.slots.get_mut(idx) {
+                            slot.recv_inflight = false;
+                            if res > 0 {
+                                slot.read_pos = 0;
+                                slot.read_len = res as usize;
+                            } else if res == 0 {
+                                slot.eof = true;
+                            } else if res != -ECANCELED {
+                                slot.read_err = Some(-res);
+                            }
+                            should_close = slot.closing;
+                        }
+                        if should_close {
+                            reactor.advance_close(idx);
+                        } else {
+                            reactor.schedule_local(idx);
+                        }
+                    }
+                    URING_TAG_SEND => reactor.complete_send(idx, res),
+                    URING_TAG_CLOSE => reactor.complete_close(idx, res),
+                    URING_TAG_CANCEL => reactor.complete_cancel(idx),
+                    URING_TAG_SHUTDOWN => reactor.complete_shutdown(idx, res),
+                    URING_TAG_EVENTFD => {
+                        let mut counter: u64 = 0;
+                        let _: isize = unsafe {
+                            read(
+                                reactor.wake_state.eventfd,
+                                (&mut counter as *mut u64).cast::<c_void>(),
+                                mem::size_of::<u64>(),
+                            )
+                        };
+                        reactor
+                            .wake_state
+                            .signaled
+                            .store(false, AtomicOrdering::Release);
+                        let mut external: Vec<usize> = Vec::new();
+                        if let Ok(mut ready_list) = reactor.wake_state.ready.lock() {
+                            mem::swap(&mut *ready_list, &mut external);
+                        }
+                        for slot_id in external {
+                            reactor.schedule_local(slot_id);
+                        }
+                        if reactor.wake_state.shutdown.load(AtomicOrdering::Acquire) {
+                            shutdown_now = true;
+                        } else {
+                            arm_eventfd_poll(reactor);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if !shutdown_initiated
+                && (shutdown_now || reactor.wake_state.shutdown.load(AtomicOrdering::Acquire))
+            {
+                shutdown_initiated = true;
+                for (acc_idx, acc) in accept_slots.iter().enumerate() {
+                    if acc.inflight {
+                        let cancel: squeue::Entry = opcode::AsyncCancel::new(
+                            encode_uring_user_data(URING_TAG_ACCEPT, acc_idx),
+                        )
+                        .build()
+                        .user_data(encode_uring_user_data(URING_TAG_ACCEPT_CANCEL, acc_idx));
+                        reactor.push_sqe(cancel);
+                    }
+                }
+                let total_slots: usize = reactor.slots.len();
+                for slot_id in 0..total_slots {
+                    let needs_close: bool = if let Some(Some(slot)) = reactor.slots.get_mut(slot_id)
+                    {
+                        if let Some(task) = slot.task.take() {
+                            retired_tasks.push(task);
+                        }
+                        slot.closing = true;
+                        true
+                    } else {
+                        false
+                    };
+                    if needs_close {
+                        reactor.advance_close(slot_id);
+                    }
+                }
+            }
+        });
+        drop(retired_tasks);
+        if !shutdown_initiated {
+            poll_local_ready_slots();
+        }
+    }
+    URING_REACTOR.with(|cell: &RefCell<Option<UringReactor>>| {
+        *cell.borrow_mut() = None;
+    });
+}
+pub(crate) async fn try_serve_uring_tcp(
+    env: ConnectionEnv,
+    mut listeners: Vec<TcpListener>,
+    mut shutdown_receiver: Receiver<()>,
+    running_sender: Sender<bool>,
+) -> Result<(), Vec<TcpListener>> {
+    if env.shared.protocol != ServerProtocol::Http1 || listeners.len() != 1 || !uring_is_available()
+    {
+        return Err(listeners);
+    }
+    let listener: TcpListener = listeners.remove(0);
+    let Ok(local_addr) = listener.local_addr() else {
+        return Err(vec![listener]);
+    };
+    let std_listener: StdTcpListener = match listener.into_std() {
+        Ok(std_l) => std_l,
+        Err(_) => return Ok(()),
+    };
+    let listener_fd: RawFd = std_listener.as_raw_fd();
+    let tokio_handle: Handle = Handle::current();
+    let worker_count: usize = tokio_handle.metrics().num_workers().clamp(1, 64);
+    let accept_slot_count: usize = if worker_count > 1 {
+        URING_MULTI_WORKER_ACCEPT_SLOTS
+    } else {
+        URING_SINGLE_WORKER_ACCEPT_SLOTS
+    };
+    let mut wake_states: Vec<Arc<UringWakeState>> = Vec::with_capacity(worker_count);
+    let mut handles: Vec<ThreadJoinHandle<()>> = Vec::with_capacity(worker_count);
+    for worker_idx in 0..worker_count {
+        let efd: RawFd = unsafe { eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC) };
+        if efd < 0 {
+            for wake in &wake_states {
+                wake.trigger_shutdown();
+            }
+            for handle in handles {
+                let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+                    spawn_blocking(move || handle.join()).await;
+            }
+            if let Ok(tokio_l) = TcpListener::from_std(std_listener) {
+                return Err(vec![tokio_l]);
+            }
+            return Ok(());
+        }
+        let wake_state: Arc<UringWakeState> = Arc::new(UringWakeState {
+            eventfd: efd,
+            ready: Mutex::new(Vec::with_capacity(64)),
+            signaled: AtomicBool::new(false),
+            shutdown: AtomicBool::new(false),
+        });
+        let worker_env: ConnectionEnv = env.clone();
+        let worker_wake: Arc<UringWakeState> = Arc::clone(&wake_state);
+        let worker_tokio: Handle = tokio_handle.clone();
+        let (ready_tx, ready_rx) = sync_channel::<bool>(1);
+        let thread_name: String = format!("{URING_THREAD_NAME_PREFIX}{worker_idx}");
+        let spawned: io::Result<ThreadJoinHandle<()>> =
+            ThreadBuilder::new().name(thread_name).spawn(move || {
+                run_uring_worker_thread(
+                    worker_env,
+                    listener_fd,
+                    local_addr,
+                    worker_wake,
+                    worker_tokio,
+                    accept_slot_count,
+                    ready_tx,
+                );
+            });
+        match spawned {
+            Ok(handle) => {
+                let initialized: bool =
+                    matches!(spawn_blocking(move || ready_rx.recv()).await, Ok(Ok(true)));
+                if initialized {
+                    wake_states.push(wake_state);
+                    handles.push(handle);
+                } else {
+                    wake_state.trigger_shutdown();
+                    let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+                        spawn_blocking(move || handle.join()).await;
+                    for wake in &wake_states {
+                        wake.trigger_shutdown();
+                    }
+                    for prev in handles {
+                        let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+                            spawn_blocking(move || prev.join()).await;
+                    }
+                    if let Ok(tokio_l) = TcpListener::from_std(std_listener) {
+                        return Err(vec![tokio_l]);
+                    }
+                    return Ok(());
+                }
+            }
+            Err(_) => {
+                for wake in &wake_states {
+                    wake.trigger_shutdown();
+                }
+                for handle in handles {
+                    let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+                        spawn_blocking(move || handle.join()).await;
+                }
+                if let Ok(tokio_l) = TcpListener::from_std(std_listener) {
+                    return Err(vec![tokio_l]);
+                }
+                return Ok(());
+            }
+        }
+    }
+    let _: Result<(), _> = shutdown_receiver.changed().await;
+    for wake in &wake_states {
+        wake.trigger_shutdown();
+    }
+    for handle in handles {
+        let _: Result<Result<(), Box<dyn Any + Send>>, JoinError> =
+            spawn_blocking(move || handle.join()).await;
+    }
+    drop(std_listener);
+    let _: Result<(), SendError<bool>> = running_sender.send(SERVER_STOPPED);
+    Ok(())
+}
+```
+# Path: hyperlane/core/src/protocol/inline/type.rs
+```rust
+use super::*;
+pub(crate) type InlinePollFn = unsafe fn(*mut u8, &mut task::Context<'_>) -> Poll<Status>;
+pub(crate) type InlineDropFn = unsafe fn(*mut u8);
+pub(crate) type InlineInitFn = fn(usize, usize, *mut u8, usize) -> InlinePollState;
+pub(crate) type CompiledHookMap = HashMapXxHash3_64<String, CompiledHook>;
+pub(crate) type CompiledPatternRoutes = HashMapXxHash3_64<usize, Vec<(RoutePattern, CompiledHook)>>;
+```
+# Path: hyperlane/core/src/protocol/inline/impl.rs
+```rust
+use super::*;
+impl Drop for InlineHookGuard {
+    fn drop(&mut self) {
+        let Self { key } = self;
+        let value: usize = key.load(AtomicOrdering::Relaxed);
+        unregister_inline_hook(value);
+    }
+}
+unsafe impl Send for InlineHookCall<'_> {}
+impl<'a> InlineHookCall<'a> {
+    #[inline(always)]
+    pub(crate) fn new(stream: &'a mut Stream, ctx: &'a mut Context, init: InlineInitFn) -> Self {
+        Self {
+            stream,
+            ctx,
+            init,
+            state: InlinePollState::Uninit,
+            storage: MaybeUninit::uninit(),
+            _pinned: PhantomPinned,
+        }
+    }
+}
+impl Drop for InlineHookCall<'_> {
+    fn drop(&mut self) {
+        let Self { state, storage, .. } = self;
+        let previous: InlinePollState = mem::replace(state, InlinePollState::Done);
+        if let InlinePollState::Inline { drop_fn, .. } = previous {
+            let ptr: *mut u8 = storage.as_mut_ptr().cast::<u8>();
+            unsafe {
+                drop_fn(ptr);
+            }
+        }
+    }
+}
+impl Future for InlineHookCall<'_> {
+    type Output = Status;
+    #[inline(always)]
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        let Self {
+            stream,
+            ctx,
+            init,
+            state,
+            storage,
+            ..
+        } = unsafe { self.get_unchecked_mut() };
+        if matches!(state, InlinePollState::Uninit) {
+            let stream_addr: usize = (&mut **stream).into();
+            let ctx_addr: usize = (&mut **ctx).into();
+            let slot: *mut u8 = storage.as_mut_ptr().cast::<u8>();
+            let slot_len: usize = mem::size_of::<[usize; INLINE_FUTURE_WORDS]>();
+            *state = (*init)(stream_addr, ctx_addr, slot, slot_len);
+        }
+        match state {
+            InlinePollState::Inline { poll_fn, drop_fn } => {
+                let poll_entry: InlinePollFn = *poll_fn;
+                let drop_entry: InlineDropFn = *drop_fn;
+                let ptr: *mut u8 = storage.as_mut_ptr().cast::<u8>();
+                match unsafe { poll_entry(ptr, cx) } {
+                    Poll::Ready(status) => {
+                        *state = InlinePollState::Done;
+                        unsafe {
+                            drop_entry(ptr);
+                        }
+                        Poll::Ready(status)
+                    }
+                    Poll::Pending => Poll::Pending,
+                }
+            }
+            InlinePollState::Boxed(future) => match future.as_mut().poll(cx) {
+                Poll::Ready(status) => {
+                    *state = InlinePollState::Done;
+                    Poll::Ready(status)
+                }
+                Poll::Pending => Poll::Pending,
+            },
+            InlinePollState::Uninit | InlinePollState::Done => Poll::Ready(Status::default()),
+        }
+    }
+}
+impl CompiledHook {
+    #[inline(always)]
+    pub(crate) async fn call(&self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        match self {
+            Self::Inline(init) => InlineHookCall::new(stream, ctx, *init).await,
+            Self::Dynamic(handler) => handler(stream, ctx).await,
+        }
+    }
+}
+impl CompiledPipeline {
+    pub(crate) fn from_server(server: &Server) -> Self {
+        let matcher: &RouteMatcher = server.get_route_matcher();
+        let mut static_routes: CompiledHookMap = hash_map_xx_hash3_64();
+        for (path, handler) in matcher.get_static_route().iter() {
+            static_routes.insert(path.clone(), lookup_inline_hook(handler));
+        }
+        let mut dynamic_routes: CompiledPatternRoutes = hash_map_xx_hash3_64();
+        for (&count, list) in matcher.get_dynamic_route().iter() {
+            let compiled: Vec<(RoutePattern, CompiledHook)> = list
+                .iter()
+                .map(|(pattern, handler): &(RoutePattern, ServerHookHandler)| {
+                    (pattern.clone(), lookup_inline_hook(handler))
+                })
+                .collect();
+            dynamic_routes.insert(count, compiled);
+        }
+        let mut regex_routes: CompiledPatternRoutes = hash_map_xx_hash3_64();
+        for (&count, list) in matcher.get_regex_route().iter() {
+            let compiled: Vec<(RoutePattern, CompiledHook)> = list
+                .iter()
+                .map(|(pattern, handler): &(RoutePattern, ServerHookHandler)| {
+                    (pattern.clone(), lookup_inline_hook(handler))
+                })
+                .collect();
+            regex_routes.insert(count, compiled);
+        }
+        let request_middleware: Vec<CompiledHook> = server
+            .get_request_middleware()
+            .iter()
+            .map(lookup_inline_hook)
+            .collect();
+        let response_middleware: Vec<CompiledHook> = server
+            .get_response_middleware()
+            .iter()
+            .map(lookup_inline_hook)
+            .collect();
+        Self {
+            static_routes,
+            dynamic_routes,
+            regex_routes,
+            request_middleware,
+            response_middleware,
+        }
+    }
+    #[inline(always)]
+    pub(crate) fn resolve_route(
+        &self,
+        params: &mut RouteParams,
+        path: &str,
+    ) -> Option<&CompiledHook> {
+        let Self {
+            static_routes,
+            dynamic_routes,
+            regex_routes,
+            ..
+        } = self;
+        if let Some(hook) = static_routes.get(path) {
+            return Some(hook);
+        }
+        if dynamic_routes.is_empty() && regex_routes.is_empty() {
+            return None;
+        }
+        let trimmed: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let segment_count: usize = if trimmed.is_empty() {
+            0
+        } else {
+            trimmed.split(DEFAULT_HTTP_PATH).count()
+        };
+        if let Some(routes) = dynamic_routes.get(&segment_count) {
+            for (pattern, hook) in routes.iter() {
+                if pattern.try_match_path_into(path, params) {
+                    return Some(hook);
+                }
+            }
+        }
+        if !regex_routes.is_empty() {
+            if let Some(routes) = regex_routes.get(&segment_count) {
+                for (pattern, hook) in routes.iter() {
+                    if pattern.try_match_path_into(path, params) {
+                        return Some(hook);
+                    }
+                }
+            }
+            for (&pattern_seg_count, routes) in regex_routes.iter() {
+                if pattern_seg_count != segment_count {
+                    for (pattern, hook) in routes.iter() {
+                        if pattern.has_tail_regex() && pattern.try_match_path_into(path, params) {
+                            return Some(hook);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+    #[inline(always)]
+    pub(crate) async fn run_request(
+        &self,
+        stream: &mut Stream,
+        ctx: &mut Context,
+        target: Option<String>,
+    ) -> bool {
+        let Self {
+            request_middleware,
+            response_middleware,
+            ..
+        } = self;
+        let keep_alive: bool = ctx.get_request().is_enable_keep_alive();
+        let version: RequestVersion = ctx.get_request().get_version().clone();
+        ctx.set_original_head(Some(ctx.get_request().get_method().is_head()));
+        ctx.get_mut_response().reset().set_version(version);
+        ctx.clear_route_params();
+        ctx.reset_request_attributes();
+        match target {
+            Some(target) => {
+                ctx.set_request_target(target);
+            }
+            None => {
+                if let Some(target) = stream.get_line_buffer().split_ascii_whitespace().nth(1) {
+                    ctx.set_request_target(target);
+                } else {
+                    ctx.clear_attribute();
+                }
+            }
+        }
+        stream.set_closed(false);
+        for hook in request_middleware.iter() {
+            if hook.call(stream, ctx).await.is_reject() {
+                return stream.is_keep_alive(keep_alive);
+            }
+        }
+        let matched_hook: Option<&CompiledHook> = {
+            let path: &str = ctx.request.get_path().as_str();
+            self.resolve_route(&mut ctx.route_params, path)
+        };
+        if let Some(hook) = matched_hook
+            && hook.call(stream, ctx).await.is_reject()
+        {
+            return stream.is_keep_alive(keep_alive);
+        }
+        for hook in response_middleware.iter() {
+            if hook.call(stream, ctx).await.is_reject() {
+                return stream.is_keep_alive(keep_alive);
+            }
+        }
+        stream.is_keep_alive(keep_alive)
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/inline/enum.rs
+```rust
+use super::*;
+pub(crate) enum InlinePollState {
+    Uninit,
+    Inline {
+        poll_fn: InlinePollFn,
+        drop_fn: InlineDropFn,
+    },
+    Boxed(FutureBox<Status>),
+    Done,
+}
+#[derive(Clone)]
+pub(crate) enum CompiledHook {
+    Inline(InlineInitFn),
+    Dynamic(ServerHookHandler),
+}
+```
+# Path: hyperlane/core/src/protocol/inline/static.rs
+```rust
+use super::*;
+pub(crate) static INLINE_HOOK_REGISTRY: OnceLock<StdRwLock<HashMap<usize, InlineInitFn>>> =
+    OnceLock::new();
+```
+# Path: hyperlane/core/src/protocol/inline/const.rs
+```rust
+pub(crate) const INLINE_FUTURE_WORDS: usize = 32;
+```
+# Path: hyperlane/core/src/protocol/inline/mod.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+mod r#type;
+pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#static::*, r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/inline/struct.rs
+```rust
+use super::*;
+pub(crate) struct InlineHookGuard {
+    pub(crate) key: Arc<AtomicUsize>,
+}
+pub(crate) struct InlineHookCall<'a> {
+    pub(super) stream: &'a mut Stream,
+    pub(super) ctx: &'a mut Context,
+    pub(super) init: InlineInitFn,
+    pub(super) state: InlinePollState,
+    pub(super) storage: MaybeUninit<[usize; INLINE_FUTURE_WORDS]>,
+    pub(super) _pinned: PhantomPinned,
+}
+#[derive(Clone)]
+pub(crate) struct CompiledPipeline {
+    pub(super) static_routes: CompiledHookMap,
+    pub(super) dynamic_routes: CompiledPatternRoutes,
+    pub(super) regex_routes: CompiledPatternRoutes,
+    pub(super) request_middleware: Vec<CompiledHook>,
+    pub(super) response_middleware: Vec<CompiledHook>,
+}
+```
+# Path: hyperlane/core/src/protocol/inline/fn.rs
+```rust
+use super::*;
+fn registry() -> &'static StdRwLock<HashMap<usize, InlineInitFn>> {
+    INLINE_HOOK_REGISTRY.get_or_init(|| StdRwLock::new(HashMap::new()))
+}
+pub(crate) fn register_inline_hook(key: usize, init: InlineInitFn) {
+    if let Ok(mut map) = registry().write() {
+        map.insert(key, init);
+    }
+}
+pub(crate) fn unregister_inline_hook(key: usize) {
+    if key == 0 {
+        return;
+    }
+    if let Ok(mut map) = registry().write() {
+        map.remove(&key);
+    }
+}
+pub(crate) fn lookup_inline_hook(handler: &ServerHookHandler) -> CompiledHook {
+    let key: usize = Arc::as_ptr(handler) as *const () as usize;
+    if let Ok(map) = registry().read()
+        && let Some(&init) = map.get(&key)
+    {
+        return CompiledHook::Inline(init);
+    }
+    CompiledHook::Dynamic(Arc::clone(handler))
+}
+async fn execute_server_hook<R>(stream_addr: usize, ctx_addr: usize) -> Status
+where
+    R: ServerHook,
+{
+    let stream: &mut Stream = stream_addr.into();
+    let ctx: &mut Context = ctx_addr.into();
+    R::new(stream, ctx).await.handle(stream, ctx).await
+}
+unsafe fn poll_inline_future<F>(ptr: *mut u8, cx: &mut task::Context<'_>) -> Poll<Status>
+where
+    F: Future<Output = Status> + Send,
+{
+    let future: Pin<&mut F> = unsafe { Pin::new_unchecked(&mut *ptr.cast::<F>()) };
+    future.poll(cx)
+}
+unsafe fn drop_inline_future<F>(ptr: *mut u8)
+where
+    F: Future<Output = Status> + Send,
+{
+    unsafe {
+        ptr::drop_in_place(ptr.cast::<F>());
+    }
+}
+#[inline(always)]
+fn place_inline_future<F>(future: F, slot: *mut u8, slot_len: usize) -> InlinePollState
+where
+    F: Future<Output = Status> + Send + 'static,
+{
+    if mem::size_of::<F>() <= slot_len && mem::align_of::<F>() <= mem::align_of::<usize>() {
+        unsafe {
+            ptr::write(slot.cast::<F>(), future);
+        }
+        InlinePollState::Inline {
+            poll_fn: poll_inline_future::<F>,
+            drop_fn: drop_inline_future::<F>,
+        }
+    } else {
+        InlinePollState::Boxed(Box::pin(future))
+    }
+}
+pub(crate) fn inline_init_hook<R>(
+    stream_addr: usize,
+    ctx_addr: usize,
+    slot: *mut u8,
+    slot_len: usize,
+) -> InlinePollState
+where
+    R: ServerHook,
+{
+    place_inline_future(
+        execute_server_hook::<R>(stream_addr, ctx_addr),
+        slot,
+        slot_len,
+    )
+}
+```
 # Path: hyperlane/core/src/protocol/response/mod.rs
 ```rust
 mod r#fn;
-pub(crate) use r#fn::*;
+mod r#struct;
+pub(crate) use {r#fn::*, r#struct::*};
 use super::*;
+```
+# Path: hyperlane/core/src/protocol/response/struct.rs
+```rust
+use super::*;
+#[derive(Debug)]
+pub(crate) struct ParsedProtocolHead {
+    pub(crate) response: ProtocolResponse<()>,
+    pub(crate) announced_len: Option<usize>,
+    pub(crate) suppress_body: bool,
+}
 ```
 # Path: hyperlane/core/src/protocol/response/fn.rs
 ```rust
@@ -44619,6 +49235,129 @@ pub fn find_line_end(bytes: &[u8]) -> Option<usize> {
         .position(|byte: &u8| *byte == LF_U8)
         .map(|index: usize| index + 1)
 }
+pub(crate) fn parse_protocol_response_head(
+    head: &[u8],
+    is_head: bool,
+) -> Result<ParsedProtocolHead, ResponseError> {
+    let text: &str =
+        from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
+    let mut lines: SplitLines<'_> = text.split(CRLF);
+    let status_line: &str = lines.next().unwrap_or(EMPTY_STR);
+    let mut fields: SplitWhitespace<'_> = status_line.split_whitespace();
+    let version: &str = fields.next().unwrap_or(EMPTY_STR);
+    if !version.starts_with(HTTP_VERSION_PREFIX) {
+        return Err(ResponseError::Send(MISSING_RESPONSE_VERSION.to_owned()));
+    }
+    let status_text: &str = fields.next().unwrap_or(EMPTY_STR);
+    if status_text.is_empty() {
+        return Err(ResponseError::Send(MISSING_RESPONSE_STATUS.to_owned()));
+    }
+    let status_code: usize = status_text
+        .parse::<usize>()
+        .map_err(|error: ParseIntError| ResponseError::Send(error.to_string()))?;
+    validate_status_code(status_code)?;
+    let status: StatusCode = StatusCode::from_u16(status_code as u16)
+        .map_err(|error: InvalidStatusCode| ResponseError::Send(error.to_string()))?;
+    let mut response: ProtocolResponse<()> = ProtocolResponse::new(());
+    *response.status_mut() = status;
+    let headers: &mut ProtocolHeaders = response.headers_mut();
+    let suppress_body: bool = is_bodyless_status(status_code, is_head);
+    let hide_length: bool = hides_entity_length(status_code, is_head);
+    let mut announced_len: Option<usize> = None;
+    let mut nominated: Option<Vec<&str>> = None;
+    for line in lines {
+        let line: &str = line.trim_end_matches(LF_CHAR);
+        if line.is_empty() {
+            continue;
+        }
+        let Some((name, value)) = line.split_once(COLON) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let name: &str = name.trim();
+        if name.is_empty() {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        }
+        let trimmed_value: &str = value.trim();
+        if name.eq_ignore_ascii_case(CONNECTION) {
+            if HeaderValue::from_bytes(trimmed_value.as_bytes()).is_err() {
+                return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+            }
+            for token in trimmed_value.split(COMMA_STR) {
+                let token: &str = token.trim();
+                if !token.is_empty()
+                    && !token.eq_ignore_ascii_case(KEEP_ALIVE)
+                    && !token.eq_ignore_ascii_case(CLOSE)
+                {
+                    nominated.get_or_insert_with(Vec::new).push(token);
+                }
+            }
+            continue;
+        }
+        if name.eq_ignore_ascii_case(TRANSFER_ENCODING) {
+            return Err(ResponseError::Send(
+                UNSUPPORTED_TRANSFER_ENCODING.to_owned(),
+            ));
+        }
+        if name.eq_ignore_ascii_case(CONTENT_TYPE) {
+            let header_value: HeaderValue = match trimmed_value {
+                STATIC_CT_HTML_UTF8 => HeaderValue::from_static(STATIC_CT_HTML_UTF8),
+                STATIC_CT_PLAIN => HeaderValue::from_static(STATIC_CT_PLAIN),
+                STATIC_CT_PLAIN_UTF8 => HeaderValue::from_static(STATIC_CT_PLAIN_UTF8),
+                STATIC_CT_JSON => HeaderValue::from_static(STATIC_CT_JSON),
+                _ => match HeaderValue::from_bytes(trimmed_value.as_bytes()) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+                    }
+                },
+            };
+            headers.append(HeaderName::from_static(CONTENT_TYPE), header_value);
+            continue;
+        }
+        if name.eq_ignore_ascii_case(CONTENT_LENGTH) {
+            let length: usize = parse_ascii_length(trimmed_value)
+                .map_err(|error: RequestError| ResponseError::Send(error.to_string()))?;
+            match announced_len {
+                Some(previous) if previous != length => {
+                    return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
+                }
+                _ => announced_len = Some(length),
+            }
+            if hide_length {
+                continue;
+            }
+            let Ok(header_value) = HeaderValue::from_bytes(trimmed_value.as_bytes()) else {
+                return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+            };
+            headers.append(HeaderName::from_static(CONTENT_LENGTH), header_value);
+            continue;
+        }
+        let Ok(header_name) = HeaderName::from_bytes(name.as_bytes()) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let Ok(header_value) = HeaderValue::from_bytes(trimmed_value.as_bytes()) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let key: &str = header_name.as_str();
+        if key.starts_with(PSEUDO_HEADER_PREFIX) || is_hop_by_hop(key) {
+            continue;
+        }
+        headers.append(header_name, header_value);
+    }
+    if let Some(tokens) = nominated {
+        for token in tokens {
+            if let Ok(name) = HeaderName::from_bytes(token.as_bytes()) {
+                headers.remove(name);
+            }
+        }
+    }
+    Ok(ParsedProtocolHead {
+        response,
+        announced_len,
+        suppress_body,
+    })
+}
+#[cfg(test)]
 pub fn parse_response_head(head: &[u8]) -> Result<(usize, ProtocolHeaders), ResponseError> {
     let text: &str =
         from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
@@ -44636,7 +49375,7 @@ pub fn parse_response_head(head: &[u8]) -> Result<(usize, ProtocolHeaders), Resp
     let status_code: usize = status_text
         .parse::<usize>()
         .map_err(|error: ParseIntError| ResponseError::Send(error.to_string()))?;
-    let mut headers: ProtocolHeaders = http::HeaderMap::new();
+    let mut headers: ProtocolHeaders = HeaderMap::new();
     for line in lines {
         let line: &str = line.trim_end_matches(LF_CHAR);
         if line.is_empty() {
@@ -44649,19 +49388,21 @@ pub fn parse_response_head(head: &[u8]) -> Result<(usize, ProtocolHeaders), Resp
         if name.is_empty() {
             return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
         }
-        let Ok(header_name) = http::HeaderName::from_bytes(name.as_bytes()) else {
+        let Ok(header_name) = HeaderName::from_bytes(name.as_bytes()) else {
             return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
         };
-        let Ok(header_value) = http::HeaderValue::from_bytes(value.trim().as_bytes()) else {
+        let Ok(header_value) = HeaderValue::from_bytes(value.trim().as_bytes()) else {
             return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
         };
         headers.append(header_name, header_value);
     }
     Ok((status_code, headers))
 }
+#[cfg(test)]
 pub fn has_transfer_encoding(headers: &ProtocolHeaders) -> bool {
     headers.contains_key(TRANSFER_ENCODING)
 }
+#[cfg(test)]
 pub fn parse_content_length(headers: &ProtocolHeaders) -> Result<Option<usize>, ResponseError> {
     let mut announced: Option<usize> = None;
     for value in headers.get_all(CONTENT_LENGTH).iter() {
@@ -44679,6 +49420,7 @@ pub fn parse_content_length(headers: &ProtocolHeaders) -> Result<Option<usize>, 
     }
     Ok(announced)
 }
+#[cfg(test)]
 pub fn connection_nominates(headers: &ProtocolHeaders, name: &str) -> bool {
     if name.eq_ignore_ascii_case(CONNECTION) {
         return true;
@@ -44695,30 +49437,12 @@ pub fn connection_nominates(headers: &ProtocolHeaders, name: &str) -> bool {
     }
     false
 }
-pub(crate) async fn next_h2_capacity(
-    send_stream: &mut h2::SendStream<Bytes>,
-    wanted: usize,
-) -> Result<usize, ResponseError> {
-    send_stream.reserve_capacity(wanted);
-    loop {
-        let granted: Option<Result<usize, h2::Error>> =
-            poll_fn(|context: &mut task::Context<'_>| send_stream.poll_capacity(context)).await;
-        match granted {
-            Some(Ok(capacity)) => {
-                if capacity > 0 {
-                    return Ok(capacity.min(wanted));
-                }
-            }
-            Some(Err(error)) => return Err(ResponseError::Send(error.to_string())),
-            None => return Err(ResponseError::Send(MISSING_SEND_CAPACITY.to_owned())),
-        }
-    }
-}
 ```
 # Path: hyperlane/core/src/protocol/constants/const.rs
 ```rust
+pub(crate) const HTTP_QUOTED_FIELD_QUOTE: u8 = b'"';
+pub(crate) const HTTP_QUOTED_FIELD_ESCAPE: u8 = b'\\';
 pub(crate) const PSEUDO_HEADER_PREFIX: &str = ":";
-pub(crate) const PROTOCOL_BODY_CHUNK: usize = 8 * 1024;
 pub(crate) const QUESTION_MARK: char = '?';
 ```
 # Path: hyperlane/core/src/protocol/constants/mod.rs
@@ -44726,320 +49450,2723 @@ pub(crate) const QUESTION_MARK: char = '?';
 mod r#const;
 pub(crate) use r#const::*;
 ```
-# Path: hyperlane/core/src/protocol/http3/impl.rs
-```rust
-use super::*;
-impl H3Framer {
-    pub(crate) fn new(request_stream: RequestH3Stream) -> Self {
-        Self {
-            request_stream: Some(request_stream),
-            finished: false,
-        }
-    }
-    pub(crate) fn reset(&mut self) {
-        let Some(mut request_stream) = self.get_mut_request_stream().take() else {
-            return;
-        };
-        request_stream.stop_stream(Code::H3_INTERNAL_ERROR);
-    }
-}
-impl ResponseFramer for H3Framer {
-    fn send_head<'a>(
-        &'a mut self,
-        head: &'a FramedHead,
-        _bodyless: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
-        Box::pin(async move {
-            let mut builder: http::response::Builder =
-                http::Response::builder().status(head.status_code as u16);
-            for (name, value) in head.headers.iter() {
-                let key: &str = name.as_str();
-                if key.starts_with(PSEUDO_HEADER_PREFIX)
-                    || is_hop_by_hop(key)
-                    || connection_nominates(&head.headers, key)
-                {
-                    continue;
-                }
-                builder = builder.header(name.clone(), value.clone());
-            }
-            let response: ProtocolResponse<()> = builder
-                .body(())
-                .map_err(|error: ProtocolBuildError| ResponseError::Send(error.to_string()))?;
-            let Some(mut request_stream) = self.get_mut_request_stream().take() else {
-                return Err(ResponseError::Terminated);
-            };
-            request_stream
-                .send_response(response)
-                .await
-                .map_err(|error: h3::error::StreamError| ResponseError::Send(error.to_string()))?;
-            self.set_request_stream(Some(request_stream));
-            Ok(())
-        })
-    }
-    fn send_data<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
-        Box::pin(async move {
-            if data.is_empty() || self.get_finished() {
-                return Ok(());
-            }
-            let Some(mut request_stream) = self.get_mut_request_stream().take() else {
-                return Err(ResponseError::Terminated);
-            };
-            request_stream
-                .send_data(Bytes::copy_from_slice(data))
-                .await
-                .map_err(|error: h3::error::StreamError| ResponseError::Send(error.to_string()))?;
-            self.set_request_stream(Some(request_stream));
-            Ok(())
-        })
-    }
-    fn finish<'a>(
-        &'a mut self,
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
-        Box::pin(async move {
-            if self.get_finished() {
-                return Ok(());
-            }
-            self.set_finished(true);
-            let Some(mut request_stream) = self.get_mut_request_stream().take() else {
-                return Ok(());
-            };
-            request_stream
-                .finish()
-                .await
-                .map_err(|error: h3::error::StreamError| ResponseError::Send(error.to_string()))?;
-            Ok(())
-        })
-    }
-}
-```
 # Path: hyperlane/core/src/protocol/http3/mod.rs
 ```rust
-mod r#fn;
-mod r#impl;
-mod r#struct;
-pub(crate) use {r#fn::*, r#struct::*};
+mod qpack;
+mod shard;
+mod stream;
+pub(crate) use {qpack::*, shard::*, stream::*};
 use super::*;
 ```
-# Path: hyperlane/core/src/protocol/http3/struct.rs
+# Path: hyperlane/core/src/protocol/http3/shard/impl.rs
+```rust
+use super::*;
+impl ConnectionIdGenerator for ShardCidGenerator {
+    fn generate_cid(&mut self) -> ConnectionId {
+        let Self {
+            shard_id,
+            shard_count,
+        } = self;
+        let mut bytes: [u8; QUIC_SHARD_CID_LEN] = [0; QUIC_SHARD_CID_LEN];
+        let secure_random: &dyn SecureRandom =
+            *SHARD_SECURE_RANDOM.get_or_init(|| default_provider().secure_random);
+        if secure_random.fill(&mut bytes).is_err() {
+            abort();
+        }
+        let count: u16 = u16::from((*shard_count).max(1));
+        let buckets: u16 = 256 / count;
+        let bucket: u16 = u16::from(bytes[0]) % buckets;
+        bytes[0] = (bucket * count + u16::from(*shard_id)) as u8;
+        ConnectionId::new(&bytes)
+    }
+    fn cid_len(&self) -> usize {
+        QUIC_SHARD_CID_LEN
+    }
+    fn cid_lifetime(&self) -> Option<Duration> {
+        None
+    }
+}
+impl fmt::Debug for ShardUdpSocket {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("ShardUdpSocket").finish()
+    }
+}
+impl AsyncUdpSocket for ShardUdpSocket {
+    fn create_io_poller(self: Arc<Self>) -> Pin<Box<dyn UdpPoller>> {
+        let Self { real_socket, .. } = &*self;
+        Arc::clone(real_socket).create_io_poller()
+    }
+    fn try_send(&self, transmit: &Transmit<'_>) -> io::Result<()> {
+        let Self { real_socket, .. } = self;
+        real_socket.try_send(transmit)
+    }
+    fn poll_recv(
+        &self,
+        cx: &mut task::Context<'_>,
+        bufs: &mut [IoSliceMut<'_>],
+        meta: &mut [RecvMeta],
+    ) -> Poll<io::Result<usize>> {
+        let Self { queue, .. } = self;
+        let max_take: usize = bufs.len().min(meta.len());
+        if max_take == 0 {
+            return Poll::Ready(Ok(0));
+        }
+        let Ok(mut state) = queue.lock() else {
+            return Poll::Ready(Err(io::Error::other("quic shard queue poisoned")));
+        };
+        let mut delivered: usize = 0;
+        while delivered < max_take {
+            let Some(mut datagram) = state.queue.pop_front() else {
+                break;
+            };
+            let copy_len: usize = datagram.data.len().min(bufs[delivered].len());
+            bufs[delivered][..copy_len].copy_from_slice(&datagram.data[..copy_len]);
+            let mut item_meta: RecvMeta = datagram.meta;
+            item_meta.len = copy_len;
+            item_meta.stride = copy_len;
+            meta[delivered] = item_meta;
+            delivered += 1;
+            if state.pool.len() < QUIC_SHARD_POOL_CAP
+                && datagram.data.capacity() <= QUIC_DATAGRAM_INIT_CAP * 4
+            {
+                datagram.data.clear();
+                state.pool.push(datagram.data);
+            }
+        }
+        if delivered == 0 {
+            if state.closed {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::ConnectionAborted,
+                    "quic shard dispatcher stopped",
+                )));
+            }
+            state.waker = Some(cx.waker().clone());
+            return Poll::Pending;
+        }
+        Poll::Ready(Ok(delivered))
+    }
+    fn local_addr(&self) -> io::Result<SocketAddr> {
+        let Self { real_socket, .. } = self;
+        real_socket.local_addr()
+    }
+    fn max_transmit_segments(&self) -> usize {
+        let Self { real_socket, .. } = self;
+        real_socket.max_transmit_segments()
+    }
+    fn max_receive_segments(&self) -> usize {
+        1
+    }
+    fn may_fragment(&self) -> bool {
+        let Self { real_socket, .. } = self;
+        real_socket.may_fragment()
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/http3/shard/static.rs
+```rust
+use super::*;
+pub(crate) static SHARD_SECURE_RANDOM: OnceLock<&'static dyn SecureRandom> = OnceLock::new();
+```
+# Path: hyperlane/core/src/protocol/http3/shard/const.rs
+```rust
+pub(crate) const QUIC_SHARD_CID_LEN: usize = 8;
+pub(crate) const QUIC_SHARD_QUEUE_CAP: usize = 4096;
+pub(crate) const QUIC_SHARD_POOL_CAP: usize = 1024;
+pub(crate) const QUIC_DATAGRAM_INIT_CAP: usize = 2048;
+pub(crate) const QUIC_SHARD_SOCKET_BUF_SIZE: usize = 2 * 1024 * 1024;
+pub(crate) const QUIC_DISPATCHER_THREAD_NAME: &str = "hyperlane-quic-rx";
+```
+# Path: hyperlane/core/src/protocol/http3/shard/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub(crate) use {r#const::*, r#fn::*, r#static::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/http3/shard/struct.rs
+```rust
+use super::*;
+pub(crate) struct ShardCidGenerator {
+    pub(super) shard_id: u8,
+    pub(super) shard_count: u8,
+}
+pub(crate) struct ShardDatagram {
+    pub(super) data: Vec<u8>,
+    pub(super) meta: RecvMeta,
+}
+pub(crate) struct ShardQueueState {
+    pub(super) queue: VecDeque<ShardDatagram>,
+    pub(super) pool: Vec<Vec<u8>>,
+    pub(super) waker: Option<Waker>,
+    pub(super) closed: bool,
+}
+pub(crate) struct ShardUdpSocket {
+    pub(super) real_socket: Arc<dyn AsyncUdpSocket>,
+    pub(super) queue: Arc<Mutex<ShardQueueState>>,
+}
+pub(crate) struct QuicEndpointSet {
+    pub(crate) endpoints: Vec<Endpoint>,
+    pub(crate) dispatcher: Option<ThreadJoinHandle<()>>,
+    pub(crate) dispatcher_stop: Option<Sender<()>>,
+}
+```
+# Path: hyperlane/core/src/protocol/http3/shard/fn.rs
+```rust
+use super::*;
+#[inline(always)]
+pub(crate) fn route_quic_datagram(packet: &[u8], shard_count: usize) -> usize {
+    if shard_count <= 1 || packet.is_empty() {
+        return 0;
+    }
+    let first_cid_byte: u8 = if (packet[0] & 0x80) != 0 {
+        let dcid_len: usize = packet.get(5).copied().unwrap_or(0) as usize;
+        if dcid_len > 0 {
+            packet.get(6).copied().unwrap_or(0)
+        } else {
+            0
+        }
+    } else {
+        packet.get(1).copied().unwrap_or(0)
+    };
+    usize::from(first_cid_byte) % shard_count
+}
+async fn recv_udp_batch(
+    real_socket: &Arc<dyn AsyncUdpSocket>,
+    buffers: &mut [Vec<u8>],
+    metas: &mut [RecvMeta],
+) -> io::Result<usize> {
+    poll_fn(|cx: &mut task::Context<'_>| {
+        let mut slices: [MaybeUninit<IoSliceMut<'_>>; BATCH_SIZE] =
+            [const { MaybeUninit::uninit() }; BATCH_SIZE];
+        let count: usize = buffers.len().min(BATCH_SIZE).min(metas.len());
+        for (idx, buf) in buffers[..count].iter_mut().enumerate() {
+            slices[idx].write(IoSliceMut::new(buf.as_mut_slice()));
+        }
+        let slice_refs: &mut [IoSliceMut<'_>] = unsafe {
+            slice::from_raw_parts_mut(slices.as_mut_ptr().cast::<IoSliceMut<'_>>(), count)
+        };
+        real_socket.poll_recv(cx, slice_refs, &mut metas[..count])
+    })
+    .await
+}
+async fn run_quic_shard_dispatcher(
+    real_socket: Arc<dyn AsyncUdpSocket>,
+    queues: Vec<Arc<Mutex<ShardQueueState>>>,
+    mut shutdown_rx: Receiver<()>,
+) {
+    let seg_count: usize = real_socket.max_receive_segments().max(1);
+    let buf_size: usize = (seg_count * 1500).max(64 * 1024);
+    let mut buffers: Vec<Vec<u8>> = (0..BATCH_SIZE).map(|_: usize| vec![0; buf_size]).collect();
+    let mut metas: Vec<RecvMeta> = vec![RecvMeta::default(); BATCH_SIZE];
+    let shard_count: usize = queues.len();
+    let mut wakers_to_wake: [Option<Waker>; 64] = [const { None }; 64];
+    let mut staged: Vec<Vec<(usize, usize, usize, RecvMeta)>> = (0..shard_count)
+        .map(|_: usize| Vec::with_capacity(BATCH_SIZE))
+        .collect();
+    loop {
+        let batch_res: Option<io::Result<usize>> = tokio::select! {
+            biased;
+            _ = shutdown_rx.changed() => None,
+            received = recv_udp_batch(&real_socket, &mut buffers, &mut metas) => Some(received),
+        };
+        let Some(received) = batch_res else {
+            break;
+        };
+        let Ok(count) = received else {
+            continue;
+        };
+        let mut touched_mask: u64 = 0;
+        for idx in 0..count {
+            let meta: RecvMeta = metas[idx];
+            let total_len: usize = meta.len.min(buffers[idx].len());
+            if total_len == 0 {
+                continue;
+            }
+            let stride: usize = meta.stride.max(1);
+            let mut offset: usize = 0;
+            while offset < total_len {
+                let end: usize = (offset + stride).min(total_len);
+                let slice: &[u8] = &buffers[idx][offset..end];
+                let shard_idx: usize = route_quic_datagram(slice, shard_count);
+                let mut seg_meta: RecvMeta = meta;
+                seg_meta.len = slice.len();
+                seg_meta.stride = slice.len();
+                staged[shard_idx].push((idx, offset, end, seg_meta));
+                if shard_idx < 64 {
+                    touched_mask |= 1u64 << shard_idx;
+                }
+                offset = end;
+            }
+        }
+        let mut wake_mask: u64 = 0;
+        let mut iter_mask: u64 = touched_mask;
+        while iter_mask != 0 {
+            let shard_idx: usize = iter_mask.trailing_zeros() as usize;
+            iter_mask &= iter_mask - 1;
+            let batch: &mut Vec<(usize, usize, usize, RecvMeta)> = &mut staged[shard_idx];
+            if batch.is_empty() {
+                continue;
+            }
+            if let Ok(mut q) = queues[shard_idx].lock() {
+                for &(buf_idx, start, end, seg_meta) in batch.iter() {
+                    if q.queue.len() >= QUIC_SHARD_QUEUE_CAP {
+                        break;
+                    }
+                    let slice: &[u8] = &buffers[buf_idx][start..end];
+                    let mut payload: Vec<u8> = q.pool.pop().unwrap_or_else(|| {
+                        Vec::with_capacity(slice.len().max(QUIC_DATAGRAM_INIT_CAP))
+                    });
+                    payload.clear();
+                    payload.extend_from_slice(slice);
+                    q.queue.push_back(ShardDatagram {
+                        data: payload,
+                        meta: seg_meta,
+                    });
+                }
+                if let Some(waker) = q.waker.take() {
+                    wakers_to_wake[shard_idx] = Some(waker);
+                    wake_mask |= 1u64 << shard_idx;
+                }
+            }
+            batch.clear();
+        }
+        let mut mask: u64 = wake_mask;
+        while mask != 0 {
+            let bit: usize = mask.trailing_zeros() as usize;
+            mask &= mask - 1;
+            if let Some(waker) = wakers_to_wake[bit].take() {
+                waker.wake();
+            }
+        }
+    }
+    for queue in queues {
+        let waker: Option<Waker> =
+            queue
+                .lock()
+                .ok()
+                .and_then(|mut q: MutexGuard<'_, ShardQueueState>| {
+                    q.closed = true;
+                    q.waker.take()
+                });
+        if let Some(waker) = waker {
+            waker.wake();
+        }
+    }
+}
+pub(crate) fn create_quic_endpoint_set(
+    quic_config: Arc<QuicServerConfig>,
+    bind_addr: SocketAddr,
+) -> Result<QuicEndpointSet, Box<ServerError>> {
+    let workers: usize = Handle::current().metrics().num_workers();
+    if workers <= 1 {
+        let domain: Domain = if bind_addr.is_ipv6() {
+            Domain::IPV6
+        } else {
+            Domain::IPV4
+        };
+        let socket: Socket = Socket::new(domain, Type::DGRAM, None)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        let _: io::Result<()> = socket.set_recv_buffer_size(QUIC_SHARD_SOCKET_BUF_SIZE);
+        let _: io::Result<()> = socket.set_send_buffer_size(QUIC_SHARD_SOCKET_BUF_SIZE);
+        socket
+            .bind(&bind_addr.into())
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        socket
+            .set_nonblocking(true)
+            .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        let std_udp: StdUdpSocket = StdUdpSocket::from(socket);
+        let endpoint: Endpoint = Endpoint::new(
+            EndpointConfig::default(),
+            Some(quinn::ServerConfig::with_crypto(quic_config)),
+            std_udp,
+            Arc::new(TokioRuntime),
+        )
+        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        return Ok(QuicEndpointSet {
+            endpoints: vec![endpoint],
+            dispatcher: None,
+            dispatcher_stop: None,
+        });
+    }
+    let shard_count: usize = workers.min(64);
+    let std_udp: StdUdpSocket = StdUdpSocket::bind(bind_addr)
+        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+    let sock_ref: SockRef<'_> = SockRef::from(&std_udp);
+    let _: Result<(), io::Error> = sock_ref.set_recv_buffer_size(QUIC_SHARD_SOCKET_BUF_SIZE);
+    let _: Result<(), io::Error> = sock_ref.set_send_buffer_size(QUIC_SHARD_SOCKET_BUF_SIZE);
+    let rx_udp: StdUdpSocket = std_udp
+        .try_clone()
+        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+    let runtime: Arc<dyn Runtime> = Arc::new(TokioRuntime);
+    let tx_socket: Arc<dyn AsyncUdpSocket> = runtime
+        .wrap_udp_socket(std_udp)
+        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+    let mut queues: Vec<Arc<Mutex<ShardQueueState>>> = Vec::with_capacity(shard_count);
+    let mut endpoints: Vec<Endpoint> = Vec::with_capacity(shard_count);
+    for shard_idx in 0..shard_count {
+        let queue: Arc<Mutex<ShardQueueState>> = Arc::new(Mutex::new(ShardQueueState {
+            queue: VecDeque::new(),
+            pool: Vec::new(),
+            waker: None,
+            closed: false,
+        }));
+        let shard_socket: Arc<ShardUdpSocket> = Arc::new(ShardUdpSocket {
+            real_socket: Arc::clone(&tx_socket),
+            queue: Arc::clone(&queue),
+        });
+        let mut endpoint_config: EndpointConfig = EndpointConfig::default();
+        let shard_id: u8 = shard_idx as u8;
+        let total_shards: u8 = shard_count as u8;
+        endpoint_config.cid_generator(move || {
+            Box::new(ShardCidGenerator {
+                shard_id,
+                shard_count: total_shards,
+            })
+        });
+        let crypto: Arc<QuicServerConfig> = Arc::clone(&quic_config);
+        let endpoint: Endpoint = Endpoint::new_with_abstract_socket(
+            endpoint_config,
+            Some(quinn::ServerConfig::with_crypto(crypto)),
+            shard_socket,
+            Arc::clone(&runtime),
+        )
+        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        queues.push(queue);
+        endpoints.push(endpoint);
+    }
+    let (stop_tx, stop_rx): (Sender<()>, Receiver<()>) = channel(());
+    let dispatcher: ThreadJoinHandle<()> = ThreadBuilder::new()
+        .name(QUIC_DISPATCHER_THREAD_NAME.to_owned())
+        .spawn(move || {
+            let Ok(rx_runtime) = RuntimeBuilder::new_current_thread().enable_io().build() else {
+                return;
+            };
+            rx_runtime.block_on(async move {
+                let rx_quinn_rt: TokioRuntime = TokioRuntime;
+                let Ok(rx_socket) = rx_quinn_rt.wrap_udp_socket(rx_udp) else {
+                    return;
+                };
+                run_quic_shard_dispatcher(rx_socket, queues, stop_rx).await;
+            });
+        })
+        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+    Ok(QuicEndpointSet {
+        endpoints,
+        dispatcher: Some(dispatcher),
+        dispatcher_stop: Some(stop_tx),
+    })
+}
+```
+# Path: hyperlane/core/src/protocol/http3/stream/impl.rs
+```rust
+use super::*;
+impl H3DirectState {
+    pub(super) fn reset(&mut self) {
+        if let Some(mut stream) = self.get_mut_send_stream().take() {
+            let _: Result<(), _> = stream.reset(VarInt::from_u32(H3_INTERNAL_ERROR));
+        }
+        self.set_finished(true);
+    }
+    pub(super) fn fail(&mut self, message: &str) -> io::Error {
+        self.set_failed(true);
+        self.reset();
+        io::Error::other(message.to_owned())
+    }
+    #[inline(always)]
+    pub(super) fn poll_drain_pending_wire(
+        &mut self,
+        context: &mut task::Context<'_>,
+    ) -> Poll<io::Result<()>> {
+        while self.get_pending_wire_offset() < self.get_pending_wire().len() {
+            let start: usize = self.get_pending_wire_offset();
+            let Self {
+                send_stream,
+                pending_wire,
+                pending_wire_offset,
+                ..
+            } = self;
+            let Some(stream) = send_stream.as_mut() else {
+                return Poll::Ready(Err(self.fail(MISSING_SEND_CAPACITY)));
+            };
+            match Pin::new(stream).poll_write(context, &pending_wire[start..]) {
+                Poll::Ready(Ok(0)) => {
+                    return Poll::Ready(Err(self.fail(MISSING_SEND_CAPACITY)));
+                }
+                Poll::Ready(Ok(written)) => {
+                    *pending_wire_offset += written;
+                }
+                Poll::Ready(Err(error)) => {
+                    return Poll::Ready(Err(self.fail(&error.to_string())));
+                }
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        self.get_mut_pending_wire().clear();
+        self.set_pending_wire_offset(0);
+        Poll::Ready(Ok(()))
+    }
+    pub(super) fn poll_emit_head(
+        &mut self,
+        context: &mut task::Context<'_>,
+        head_bytes: &[u8],
+        body_bytes: &[u8],
+        caller_len: usize,
+    ) -> Poll<io::Result<usize>> {
+        let is_head: bool = self.get_is_head();
+        let wire: &mut Vec<u8> = self.get_mut_pending_wire();
+        wire.clear();
+        let meta: H3EncodedResponseMeta = match encode_h3_response_head(head_bytes, is_head, wire) {
+            Ok(meta) => meta,
+            Err(error) => return Poll::Ready(Err(self.fail(&error.to_string()))),
+        };
+        self.set_announced_len(meta.announced_len);
+        self.set_suppress_body(meta.suppress_body);
+        self.set_head_sent(true);
+        let head_body: &[u8] = if meta.suppress_body { &[] } else { body_bytes };
+        let accepted_body: usize = head_body.len().min(MAX_POOLED_BUFFER_CAPACITY);
+        if accepted_body > 0 && check_body_budget(self.try_get_announced_len(), 0, accepted_body) {
+            return Poll::Ready(Err(self.fail(OVERFLOWING_RESPONSE_BODY)));
+        }
+        let consumed: usize = if meta.suppress_body {
+            caller_len
+        } else {
+            caller_len - body_bytes.len() + accepted_body
+        };
+        if accepted_body > 0 {
+            let wire: &mut Vec<u8> = self.get_mut_pending_wire();
+            wire.push(H3_FRAME_DATA as u8);
+            encode_varint(accepted_body as u64, wire);
+            wire.extend_from_slice(&head_body[..accepted_body]);
+            self.set_body_len(accepted_body);
+        }
+        self.set_pending_wire_offset(0);
+        match self.poll_drain_pending_wire(context) {
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+            Poll::Ready(Ok(())) | Poll::Pending => Poll::Ready(Ok(consumed)),
+        }
+    }
+}
+impl H3DirectTransport {
+    pub(crate) fn new(send_stream: QuicSendStream, peers: StreamPeers, is_head: bool) -> Self {
+        Self {
+            state: Mutex::new(H3DirectState {
+                send_stream: Some(send_stream),
+                pending_wire: take_h3_buffer(),
+                pending_wire_offset: 0,
+                pending_head: Vec::new(),
+                head_sent: false,
+                suppress_body: is_head,
+                is_head,
+                announced_len: None,
+                body_len: 0,
+                finished: false,
+                failed: false,
+            }),
+            peers,
+        }
+    }
+}
+impl fmt::Debug for H3DirectTransport {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("H3DirectTransport")
+            .field("peers", &self.peers)
+            .finish()
+    }
+}
+impl Drop for H3DirectTransport {
+    fn drop(&mut self) {
+        if let Ok(state) = self.get_mut_state().get_mut() {
+            if !state.finished {
+                state.reset();
+            }
+            let wire: Vec<u8> = mem::take(state.get_mut_pending_wire());
+            return_h3_buffer(wire);
+        }
+    }
+}
+impl Transport for H3DirectTransport {
+    fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        Ok(self.get_peers().remote)
+    }
+    fn local_addr(&self) -> Result<SocketAddr, io::Error> {
+        Ok(self.get_peers().local)
+    }
+}
+impl AsyncRead for H3DirectTransport {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _context: &mut task::Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        buffer.advance(0);
+        Poll::Ready(Ok(()))
+    }
+}
+impl AsyncWrite for H3DirectTransport {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+        bytes: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        };
+        if state.failed {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        }
+        if state.pending_wire_offset < state.pending_wire.len() {
+            match state.poll_drain_pending_wire(context) {
+                Poll::Ready(Ok(())) => {}
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        if bytes.is_empty() {
+            return Poll::Ready(Ok(0));
+        }
+        if !state.head_sent {
+            if state.pending_head.is_empty() {
+                if let Some(body_start) = find_head_end(bytes) {
+                    if body_start > RESPONSE_HEAD_MAX {
+                        return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
+                    }
+                    return state.poll_emit_head(
+                        context,
+                        &bytes[..body_start],
+                        &bytes[body_start..],
+                        bytes.len(),
+                    );
+                }
+                if bytes.len() > RESPONSE_HEAD_MAX {
+                    return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
+                }
+                state.pending_head.extend_from_slice(bytes);
+                return Poll::Ready(Ok(bytes.len()));
+            }
+            let accepted: usize = bytes
+                .len()
+                .min(RESPONSE_HEAD_MAX - state.pending_head.len());
+            if accepted == 0 {
+                return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
+            }
+            state.pending_head.extend_from_slice(&bytes[..accepted]);
+            let Some(body_start) = find_head_end(&state.pending_head) else {
+                if state.pending_head.len() > RESPONSE_HEAD_MAX {
+                    return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
+                }
+                return Poll::Ready(Ok(accepted));
+            };
+            if body_start > RESPONSE_HEAD_MAX {
+                return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
+            }
+            let pending_head: Vec<u8> = mem::take(&mut state.pending_head);
+            return state.poll_emit_head(
+                context,
+                &pending_head[..body_start],
+                &pending_head[body_start..],
+                accepted,
+            );
+        }
+        if state.suppress_body {
+            return Poll::Ready(Ok(bytes.len()));
+        }
+        let accepted: usize = bytes.len().min(MAX_POOLED_BUFFER_CAPACITY);
+        if check_body_budget(state.announced_len, state.body_len, accepted) {
+            return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
+        }
+        state.body_len += accepted;
+        let wire: &mut Vec<u8> = state.get_mut_pending_wire();
+        wire.clear();
+        wire.push(H3_FRAME_DATA as u8);
+        encode_varint(accepted as u64, wire);
+        wire.extend_from_slice(&bytes[..accepted]);
+        state.pending_wire_offset = 0;
+        match state.poll_drain_pending_wire(context) {
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+            Poll::Ready(Ok(())) | Poll::Pending => Poll::Ready(Ok(accepted)),
+        }
+    }
+    fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        };
+        if state.failed {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        }
+        state.poll_drain_pending_wire(context)
+    }
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+    ) -> Poll<io::Result<()>> {
+        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        };
+        if state.failed {
+            state.reset();
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        }
+        match state.poll_drain_pending_wire(context) {
+            Poll::Ready(Ok(())) => {}
+            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+            Poll::Pending => return Poll::Pending,
+        }
+        if !state.head_sent {
+            return Poll::Ready(Err(state.fail(MISSING_RESPONSE_HEAD)));
+        }
+        if !state.suppress_body
+            && let Some(announced) = state.announced_len
+            && state.body_len != announced
+        {
+            return Poll::Ready(Err(state.fail(TRUNCATED_RESPONSE_BODY)));
+        }
+        if !state.finished {
+            state.finished = true;
+            if let Some(mut stream) = state.send_stream.take() {
+                let _: Result<(), _> = stream.finish();
+            }
+        }
+        Poll::Ready(Ok(()))
+    }
+}
+```
+# Path: hyperlane/core/src/protocol/http3/stream/static.rs
+```rust
+use super::*;
+thread_local! {
+    pub(crate) static H3_BUFFER_POOL: RefCell<Vec<Vec<u8>>> = const { RefCell::new(Vec::new()) };
+}
+```
+# Path: hyperlane/core/src/protocol/http3/stream/const.rs
+```rust
+pub(crate) const H3_REASON_MALFORMED_CONTROL: &[u8] = b"malformed control frame";
+pub(crate) const H3_REASON_CONTROL_CLOSED: &[u8] = b"control stream closed";
+pub(crate) const H3_REASON_MISSING_SETTINGS: &[u8] = b"first control frame must be settings";
+pub(crate) const H3_REASON_SETTINGS_TOO_LARGE: &[u8] = b"settings frame too large";
+pub(crate) const H3_REASON_SETTINGS_TRUNCATED: &[u8] = b"control stream closed during settings";
+pub(crate) const H3_REASON_CONTROL_READ: &[u8] = b"control read error";
+pub(crate) const H3_REASON_INVALID_SETTINGS: &[u8] = b"invalid settings payload";
+pub(crate) const H3_REASON_UNEXPECTED_CONTROL: &[u8] = b"unexpected frame on control stream";
+pub(crate) const H3_REASON_CONTROL_TRUNCATED: &[u8] = b"control stream truncated";
+pub(crate) const H3_REASON_DUPLICATE_CONTROL: &[u8] = b"duplicate control stream";
+pub(crate) const H3_REASON_DUPLICATE_ENCODER: &[u8] = b"duplicate qpack encoder stream";
+pub(crate) const H3_REASON_ENCODER_CLOSED: &[u8] = b"qpack encoder stream closed";
+pub(crate) const H3_REASON_DUPLICATE_DECODER: &[u8] = b"duplicate qpack decoder stream";
+pub(crate) const H3_REASON_DECODER_CLOSED: &[u8] = b"qpack decoder stream closed";
+pub(crate) const H3_REASON_CLIENT_PUSH: &[u8] = b"client push stream forbidden";
+pub(crate) const H3_REASON_RESERVED_FRAME: &[u8] = b"reserved http2 frame forbidden";
+pub(crate) const H3_REASON_UNEXPECTED_REQUEST_FRAME: &[u8] = b"unexpected frame on request stream";
+pub(crate) const H3_REASON_FRAME_AFTER_TRAILERS: &[u8] = b"frame after trailing headers";
+pub(crate) const H3_REASON_QPACK_DYNAMIC_UNSUPPORTED: &[u8] =
+    b"qpack dynamic table capacity exceeded";
+pub(crate) const H3_FORBIDDEN_REQUEST_FRAMES: [u64; 5] = [
+    H3_FRAME_CANCEL_PUSH,
+    H3_FRAME_SETTINGS,
+    H3_FRAME_PUSH_PROMISE,
+    H3_FRAME_GOAWAY,
+    H3_FRAME_MAX_PUSH_ID,
+];
+pub(crate) const H3_QPACK_ENCODER_STREAM_ERROR: u32 = 0x0201;
+pub(crate) const QPACK_SET_CAPACITY_ZERO: u8 = 0x20;
+pub(crate) const H3_QPACK_DECODER_STREAM_ERROR: u32 = 0x0202;
+pub(crate) const H3_REASON_QPACK_DECODER_INVALID: &[u8] = b"invalid qpack decoder instruction";
+pub(crate) const H3_FRAME_DATA: u64 = 0x00;
+pub(crate) const H3_FRAME_HEADERS: u64 = 0x01;
+pub(crate) const H3_FRAME_CANCEL_PUSH: u64 = 0x03;
+pub(crate) const H3_FRAME_SETTINGS: u64 = 0x04;
+pub(crate) const H3_FRAME_PUSH_PROMISE: u64 = 0x05;
+pub(crate) const H3_FRAME_GOAWAY: u64 = 0x07;
+pub(crate) const H3_FRAME_MAX_PUSH_ID: u64 = 0x0d;
+pub(crate) const H3_STREAM_CONTROL: u64 = 0x00;
+pub(crate) const H3_STREAM_PUSH: u64 = 0x01;
+pub(crate) const H3_STREAM_QPACK_ENCODER: u64 = 0x02;
+pub(crate) const H3_STREAM_QPACK_DECODER: u64 = 0x03;
+pub(crate) const H3_NO_ERROR: u32 = 0x0100;
+pub(crate) const H3_INTERNAL_ERROR: u32 = 0x0102;
+pub(crate) const H3_STREAM_CREATION_ERROR: u32 = 0x0103;
+pub(crate) const H3_CLOSED_CRITICAL_STREAM: u32 = 0x0104;
+pub(crate) const H3_FRAME_UNEXPECTED: u32 = 0x0105;
+pub(crate) const H3_FRAME_ERROR: u32 = 0x0106;
+pub(crate) const H3_SETTINGS_ERROR: u32 = 0x0109;
+pub(crate) const H3_MISSING_SETTINGS: u32 = 0x010a;
+pub(crate) const H3_SERVER_CONTROL_SETTINGS: &[u8] = &[0x00, 0x04, 0x00];
+pub(crate) const H3_CONTINUE_FRAME: &[u8] = &[0x01, 0x04, 0x00, 0x00, 0xff, 0x00];
+pub(crate) const MAX_POOLED_H3_BUFFERS: usize = 64;
+pub(crate) const H3_READ_CHUNK_SIZE: usize = 4 * 1024;
+pub(crate) const H3_MAX_HEADERS_FRAME_LEN: usize = 256 * 1024;
+pub(crate) const H3_MAX_SETTINGS_FRAME_LEN: usize = 16 * 1024;
+```
+# Path: hyperlane/core/src/protocol/http3/stream/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+pub(crate) use {r#const::*, r#fn::*, r#static::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/http3/stream/struct.rs
 ```rust
 use super::*;
 #[derive(Data)]
-pub(crate) struct H3Framer {
+pub(crate) struct H3DirectState {
     #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) request_stream: Option<RequestH3Stream>,
-    #[get(type(copy), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) send_stream: Option<QuicSendStream>,
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_wire: Vec<u8>,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_wire_offset: usize,
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_head: Vec<u8>,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) head_sent: bool,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) suppress_body: bool,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) is_head: bool,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) announced_len: Option<usize>,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) body_len: usize,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) finished: bool,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) failed: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Data)]
+pub(crate) struct H3DirectTransport {
+    #[get(skip)]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) state: Mutex<H3DirectState>,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) peers: StreamPeers,
+}
+#[derive(Default)]
+pub(crate) struct H3ControlState {
+    pub(super) control_seen: AtomicBool,
+    pub(super) qpack_enc_seen: AtomicBool,
+    pub(super) qpack_dec_seen: AtomicBool,
+}
+#[derive(Clone)]
 pub(crate) struct H3RequestEnv {
-    pub(crate) server: Arc<Server>,
-    pub(crate) request_config: RequestConfig,
+    pub(crate) shared: Arc<ConnectionShared>,
     pub(crate) peers: StreamPeers,
 }
 ```
-# Path: hyperlane/core/src/protocol/http3/fn.rs
+# Path: hyperlane/core/src/protocol/http3/stream/fn.rs
 ```rust
 use super::*;
+#[inline(always)]
+pub(crate) fn take_h3_buffer() -> Vec<u8> {
+    H3_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut buf: Vec<u8> = pool
+            .borrow_mut()
+            .pop()
+            .unwrap_or_else(|| Vec::with_capacity(H3_READ_CHUNK_SIZE));
+        buf.clear();
+        buf
+    })
+}
+#[inline(always)]
+pub(crate) fn return_h3_buffer(mut buffer: Vec<u8>) {
+    if buffer.capacity() == 0 || buffer.capacity() > MAX_POOLED_BUFFER_CAPACITY {
+        return;
+    }
+    buffer.clear();
+    H3_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut pool: RefMut<'_, Vec<Vec<u8>>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_H3_BUFFERS {
+            pool.push(buffer);
+        }
+    });
+}
+#[inline(always)]
+fn is_grease_id(id: u64) -> bool {
+    id >= 0x21 && (id - 0x21).is_multiple_of(0x1f)
+}
+#[inline(always)]
+fn is_reserved_h2_frame(id: u64) -> bool {
+    let low_reserved: bool = id == 0x02 || id == 0x06;
+    let high_reserved: bool = id == 0x08 || id == 0x09;
+    low_reserved || high_reserved
+}
 pub(crate) async fn serve_h3_connection(
     env: ConnectionEnv,
     peers: StreamPeers,
-    mut connection: h3::server::Connection<h3_quinn::Connection, Bytes>,
+    connection: QuicConnection,
 ) {
+    let mut control_stream: Option<QuicSendStream> = match connection.open_uni().await {
+        Ok(mut send) => {
+            if send.write_all(H3_SERVER_CONTROL_SETTINGS).await.is_err() {
+                return;
+            }
+            Some(send)
+        }
+        Err(_) => return,
+    };
+    let control_state: H3ControlState = H3ControlState::default();
+    let mut first_req: Pin<&mut Option<_>> = pin!(None);
+    let mut extra_reqs: Option<FuturesUnordered<_>> = None;
+    let mut first_uni: Pin<&mut Option<_>> = pin!(None);
+    let mut extra_unis: Option<FuturesUnordered<_>> = None;
     loop {
-        let resolver: Option<h3::server::RequestResolver<h3_quinn::Connection, Bytes>> =
-            match connection.accept().await {
-                Ok(resolver) => resolver,
-                Err(_) => return,
-            };
-        let Some(resolver) = resolver else {
-            return;
-        };
-        spawn(h3_request_task(
-            H3RequestEnv {
-                server: env.server.clone(),
-                request_config: env.request_config,
-                peers,
-            },
-            resolver,
-        ));
-    }
-}
-pub(crate) async fn h3_request_task(env: H3RequestEnv, resolver: RequestResolverH3) {
-    let H3RequestEnv {
-        server,
-        request_config,
-        peers,
-    } = env;
-    let (head, request_stream): (http::Request<()>, RequestH3Stream) =
-        match resolver.resolve_request().await {
-            Ok(resolved) => resolved,
-            Err(_) => return,
-        };
-    let (parts, ()): (http::request::Parts, ()) = head.into_parts();
-    let mut framer: H3Framer = H3Framer::new(request_stream);
-    let mut body: Vec<u8> = Vec::new();
-    match collect_h3_body(&mut framer, &request_config, &parts.headers, &mut body).await {
-        Ok(()) => {}
-        Err(error) => {
-            h3_fail_request(
-                &H3RequestEnv {
-                    server,
-                    request_config,
-                    peers,
-                },
-                &mut framer,
-                HttpVersion::Http3,
-                error,
-            )
-            .await;
-            return;
+        let has_extra_reqs: bool = extra_reqs
+            .as_ref()
+            .is_some_and(|queue: &FuturesUnordered<_>| !queue.is_empty());
+        let has_extra_unis: bool = extra_unis
+            .as_ref()
+            .is_some_and(|queue: &FuturesUnordered<_>| !queue.is_empty());
+        tokio::select! {
+            biased;
+            _ = async {
+                if let Some(fut) = first_req.as_mut().as_pin_mut() {
+                    let _: Result<(), Box<dyn Any + Send>> = fut.await;
+                }
+            }, if first_req.is_some() => {
+                first_req.set(None);
+            }
+            _ = async {
+                if let Some(queue) = extra_reqs.as_mut() {
+                    let _: Option<Result<(), Box<dyn Any + Send>>> = queue.next().await;
+                }
+            }, if has_extra_reqs => {}
+            _ = async {
+                if let Some(fut) = first_uni.as_mut().as_pin_mut() {
+                    fut.await;
+                }
+            }, if first_uni.is_some() => {
+                first_uni.set(None);
+            }
+            _ = async {
+                if let Some(queue) = extra_unis.as_mut() {
+                    let _: Option<()> = queue.next().await;
+                }
+            }, if has_extra_unis => {}
+            accepted = connection.accept_bi() => {
+                match accepted {
+                    Ok((send, recv)) => {
+                        let req_env: H3RequestEnv = H3RequestEnv {
+                            shared: Arc::clone(&env.shared),
+                            peers,
+                        };
+                        if first_req.is_none() {
+                            first_req.set(Some(
+                                AssertUnwindSafe(h3_request_task(req_env, &connection, send, recv))
+                                    .catch_unwind(),
+                            ));
+                        } else {
+                            extra_reqs
+                                .get_or_insert_with(FuturesUnordered::new)
+                                .push(
+                                    AssertUnwindSafe(h3_request_task(req_env, &connection, send, recv))
+                                        .catch_unwind(),
+                                );
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            uni = connection.accept_uni() => {
+                match uni {
+                    Ok(recv) => {
+                        if first_uni.is_none() {
+                            first_uni.set(Some(handle_h3_uni_stream(
+                                &connection,
+                                recv,
+                                &control_state,
+                            )));
+                        } else {
+                            extra_unis
+                                .get_or_insert_with(FuturesUnordered::new)
+                                .push(handle_h3_uni_stream(&connection, recv, &control_state));
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
         }
     }
-    let target: String = request_target(parts.uri.path(), parts.uri.query());
-    let built: Result<Request, RequestError> = build_protocol_request(
-        &request_config,
-        ProtocolRequestHead {
-            version: HttpVersion::Http3,
-            method: parts.method.clone(),
-            parts,
-            body,
-        },
-    );
-    let request: Request = match built {
-        Ok(request) => request,
+    let _: Option<QuicSendStream> = control_stream.take();
+}
+fn validate_h3_settings_payload(payload: &[u8]) -> Result<(), u32> {
+    let mut pos: usize = 0;
+    let mut seen: [u64; 16] = [0; 16];
+    let mut seen_len: usize = 0;
+    let mut overflow: Option<HashSet<u64>> = None;
+    while pos < payload.len() {
+        let Some((id, id_len)) = decode_varint(&payload[pos..]) else {
+            return Err(H3_FRAME_ERROR);
+        };
+        pos += id_len;
+        let Some((_, val_len)) = decode_varint(&payload[pos..]) else {
+            return Err(H3_FRAME_ERROR);
+        };
+        pos += val_len;
+        if (0x02..=0x05).contains(&id) {
+            return Err(H3_SETTINGS_ERROR);
+        }
+        if seen[..seen_len].contains(&id) {
+            return Err(H3_SETTINGS_ERROR);
+        }
+        if seen_len < seen.len() {
+            seen[seen_len] = id;
+            seen_len += 1;
+        } else {
+            let set: &mut HashSet<u64> = overflow.get_or_insert_with(HashSet::new);
+            if !set.insert(id) {
+                return Err(H3_SETTINGS_ERROR);
+            }
+        }
+    }
+    Ok(())
+}
+async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRecvStream) {
+    let mut buf: Vec<u8> = take_h3_buffer();
+    let mut pos: usize = 0;
+    let mut settings_seen: bool = false;
+    loop {
+        if pos == buf.len() {
+            buf.clear();
+            pos = 0;
+        }
+        let header: Option<(u64, usize)> =
+            match read_h3_frame_header(recv, &mut buf, &mut pos).await {
+                Ok(Some(pair)) => Some(pair),
+                Ok(None) => None,
+                Err(_) => {
+                    return_h3_buffer(buf);
+                    connection.close(
+                        VarInt::from_u32(H3_FRAME_ERROR),
+                        H3_REASON_MALFORMED_CONTROL,
+                    );
+                    return;
+                }
+            };
+        let Some((frame_type, payload_len)) = header else {
+            return_h3_buffer(buf);
+            connection.close(
+                VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
+                H3_REASON_CONTROL_CLOSED,
+            );
+            return;
+        };
+        if !settings_seen {
+            if frame_type != H3_FRAME_SETTINGS {
+                return_h3_buffer(buf);
+                connection.close(
+                    VarInt::from_u32(H3_MISSING_SETTINGS),
+                    H3_REASON_MISSING_SETTINGS,
+                );
+                return;
+            }
+            if payload_len > H3_MAX_SETTINGS_FRAME_LEN {
+                return_h3_buffer(buf);
+                connection.close(
+                    VarInt::from_u32(H3_FRAME_ERROR),
+                    H3_REASON_SETTINGS_TOO_LARGE,
+                );
+                return;
+            }
+            match ensure_h3_bytes(recv, &mut buf, pos, payload_len).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    return_h3_buffer(buf);
+                    connection.close(
+                        VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
+                        H3_REASON_SETTINGS_TRUNCATED,
+                    );
+                    return;
+                }
+                Err(_) => {
+                    return_h3_buffer(buf);
+                    connection.close(VarInt::from_u32(H3_FRAME_ERROR), H3_REASON_CONTROL_READ);
+                    return;
+                }
+            }
+            let end: usize = pos + payload_len;
+            if let Err(code) = validate_h3_settings_payload(&buf[pos..end]) {
+                return_h3_buffer(buf);
+                connection.close(VarInt::from_u32(code), H3_REASON_INVALID_SETTINGS);
+                return;
+            }
+            pos = end;
+            settings_seen = true;
+            continue;
+        }
+        match frame_type {
+            H3_FRAME_SETTINGS | H3_FRAME_DATA | H3_FRAME_HEADERS | H3_FRAME_PUSH_PROMISE => {
+                return_h3_buffer(buf);
+                connection.close(
+                    VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                    H3_REASON_UNEXPECTED_CONTROL,
+                );
+                return;
+            }
+            other if is_reserved_h2_frame(other) => {
+                return_h3_buffer(buf);
+                connection.close(
+                    VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                    H3_REASON_RESERVED_FRAME,
+                );
+                return;
+            }
+            _ => {
+                if skip_h3_payload(recv, &mut buf, &mut pos, payload_len)
+                    .await
+                    .is_err()
+                {
+                    return_h3_buffer(buf);
+                    connection.close(
+                        VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
+                        H3_REASON_CONTROL_TRUNCATED,
+                    );
+                    return;
+                }
+            }
+        }
+    }
+}
+async fn handle_h3_uni_stream(
+    connection: &QuicConnection,
+    mut recv: QuicRecvStream,
+    state: &H3ControlState,
+) {
+    let mut header_buf: [u8; 8] = [0; 8];
+    let mut filled: usize = 0;
+    let stream_type: u64 = loop {
+        if filled > 0
+            && let Some((val, _)) = decode_varint(&header_buf[..filled])
+        {
+            break val;
+        }
+        if filled == header_buf.len() {
+            return;
+        }
+        match recv.read(&mut header_buf[filled..filled + 1]).await {
+            Ok(Some(n)) if n > 0 => filled += n,
+            _ => return,
+        }
+    };
+    match stream_type {
+        H3_STREAM_CONTROL => {
+            if state.control_seen.swap(true, AtomicOrdering::AcqRel) {
+                connection.close(
+                    VarInt::from_u32(H3_STREAM_CREATION_ERROR),
+                    H3_REASON_DUPLICATE_CONTROL,
+                );
+                return;
+            }
+            drive_h3_control_stream(connection, &mut recv).await;
+        }
+        H3_STREAM_QPACK_ENCODER => {
+            if state.qpack_enc_seen.swap(true, AtomicOrdering::AcqRel) {
+                connection.close(
+                    VarInt::from_u32(H3_STREAM_CREATION_ERROR),
+                    H3_REASON_DUPLICATE_ENCODER,
+                );
+                return;
+            }
+            let mut buf: [u8; 64] = [0; 64];
+            loop {
+                match recv.read(&mut buf).await {
+                    Ok(Some(0)) | Ok(None) => {
+                        connection.close(
+                            VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
+                            H3_REASON_ENCODER_CLOSED,
+                        );
+                        return;
+                    }
+                    Ok(Some(n)) => {
+                        if buf[..n].iter().any(|b: &u8| *b != QPACK_SET_CAPACITY_ZERO) {
+                            connection.close(
+                                VarInt::from_u32(H3_QPACK_ENCODER_STREAM_ERROR),
+                                H3_REASON_QPACK_DYNAMIC_UNSUPPORTED,
+                            );
+                            return;
+                        }
+                    }
+                    Err(_) => return,
+                }
+            }
+        }
+        H3_STREAM_QPACK_DECODER => {
+            if state.qpack_dec_seen.swap(true, AtomicOrdering::AcqRel) {
+                connection.close(
+                    VarInt::from_u32(H3_STREAM_CREATION_ERROR),
+                    H3_REASON_DUPLICATE_DECODER,
+                );
+                return;
+            }
+            let mut buf: [u8; 64] = [0; 64];
+            loop {
+                match recv.read(&mut buf).await {
+                    Ok(Some(0)) | Ok(None) => {
+                        connection.close(
+                            VarInt::from_u32(H3_CLOSED_CRITICAL_STREAM),
+                            H3_REASON_DECODER_CLOSED,
+                        );
+                        return;
+                    }
+                    Ok(Some(n)) => {
+                        if buf[..n].iter().any(|b: &u8| {
+                            let is_inc: bool = (*b & 0xc0) == 0x00;
+                            let is_ack: bool = (*b & 0x80) == 0x80;
+                            is_inc || is_ack
+                        }) {
+                            connection.close(
+                                VarInt::from_u32(H3_QPACK_DECODER_STREAM_ERROR),
+                                H3_REASON_QPACK_DECODER_INVALID,
+                            );
+                            return;
+                        }
+                    }
+                    Err(_) => return,
+                }
+            }
+        }
+        H3_STREAM_PUSH => {
+            connection.close(
+                VarInt::from_u32(H3_STREAM_CREATION_ERROR),
+                H3_REASON_CLIENT_PUSH,
+            );
+        }
+        _ => {
+            let _: Result<(), _> = recv.stop(VarInt::from_u32(H3_NO_ERROR));
+        }
+    }
+}
+#[inline(always)]
+async fn ensure_h3_bytes(
+    recv: &mut QuicRecvStream,
+    buf: &mut Vec<u8>,
+    pos: usize,
+    needed: usize,
+) -> Result<bool, RequestError> {
+    while buf.len() - pos < needed {
+        let old_len: usize = buf.len();
+        let grow: usize = H3_READ_CHUNK_SIZE.max(needed - (old_len - pos));
+        buf.resize(old_len + grow, 0);
+        match recv.read(&mut buf[old_len..]).await {
+            Ok(Some(n)) if n > 0 => {
+                buf.truncate(old_len + n);
+            }
+            Ok(Some(_)) | Ok(None) => {
+                buf.truncate(old_len);
+                return Ok(false);
+            }
+            Err(error) => {
+                buf.truncate(old_len);
+                return Err(RequestError::Request(error.to_string()));
+            }
+        }
+    }
+    Ok(true)
+}
+async fn read_h3_frame_header(
+    recv: &mut QuicRecvStream,
+    buf: &mut Vec<u8>,
+    pos: &mut usize,
+) -> Result<Option<(u64, usize)>, RequestError> {
+    let frame_type: u64 = loop {
+        if *pos < buf.len() {
+            let need: usize = 1usize << (buf[*pos] >> 6);
+            if buf.len() - *pos >= need
+                && let Some((val, consumed)) = decode_varint(&buf[*pos..])
+            {
+                *pos += consumed;
+                break val;
+            }
+        }
+        let need_more: usize = if *pos < buf.len() {
+            1usize << (buf[*pos] >> 6)
+        } else {
+            1
+        };
+        if !ensure_h3_bytes(recv, buf, *pos, need_more).await? {
+            if *pos == buf.len() {
+                return Ok(None);
+            }
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+    };
+    let payload_len_u64: u64 = loop {
+        if *pos < buf.len() {
+            let need: usize = 1usize << (buf[*pos] >> 6);
+            if buf.len() - *pos >= need
+                && let Some((val, consumed)) = decode_varint(&buf[*pos..])
+            {
+                *pos += consumed;
+                break val;
+            }
+        }
+        let need_more: usize = if *pos < buf.len() {
+            1usize << (buf[*pos] >> 6)
+        } else {
+            1
+        };
+        if !ensure_h3_bytes(recv, buf, *pos, need_more).await? {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+    };
+    let payload_len: usize = usize::try_from(payload_len_u64)
+        .map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))?;
+    Ok(Some((frame_type, payload_len)))
+}
+async fn skip_h3_payload(
+    recv: &mut QuicRecvStream,
+    buf: &mut Vec<u8>,
+    pos: &mut usize,
+    mut remaining: usize,
+) -> Result<(), RequestError> {
+    while remaining > 0 {
+        let avail: usize = buf.len() - *pos;
+        if avail > 0 {
+            let take: usize = avail.min(remaining);
+            *pos += take;
+            remaining -= take;
+            continue;
+        }
+        buf.clear();
+        *pos = 0;
+        if !ensure_h3_bytes(recv, buf, 0, 1).await? {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+    }
+    Ok(())
+}
+async fn read_h3_request_headers(
+    connection: &QuicConnection,
+    recv: &mut QuicRecvStream,
+    buf: &mut Vec<u8>,
+    pos: &mut usize,
+    config: &RequestConfig,
+    request: &mut Request,
+    target: &mut String,
+) -> Result<Option<H3DecodedRequestMeta>, RequestError> {
+    loop {
+        let Some((frame_type, payload_len)) = read_h3_frame_header(recv, buf, pos).await? else {
+            return Ok(None);
+        };
+        if frame_type != H3_FRAME_HEADERS {
+            let forbidden: bool =
+                frame_type == H3_FRAME_DATA || H3_FORBIDDEN_REQUEST_FRAMES.contains(&frame_type);
+            if forbidden || is_reserved_h2_frame(frame_type) {
+                let reason: &[u8] = if is_reserved_h2_frame(frame_type) {
+                    H3_REASON_RESERVED_FRAME
+                } else {
+                    H3_REASON_UNEXPECTED_REQUEST_FRAME
+                };
+                connection.close(VarInt::from_u32(H3_FRAME_UNEXPECTED), reason);
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            skip_h3_payload(recv, buf, pos, payload_len).await?;
+            continue;
+        }
+        if payload_len > H3_MAX_HEADERS_FRAME_LEN {
+            return Err(RequestError::HeaderValueTooLong(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        if !ensure_h3_bytes(recv, buf, *pos, payload_len).await? {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+        let payload_end: usize = *pos + payload_len;
+        let meta: H3DecodedRequestMeta =
+            decode_qpack_request(&buf[*pos..payload_end], config, request, target)?;
+        *pos = payload_end;
+        return Ok(Some(meta));
+    }
+}
+async fn collect_h3_data_frames(
+    connection: &QuicConnection,
+    recv: &mut QuicRecvStream,
+    buf: &mut Vec<u8>,
+    pos: &mut usize,
+    max_body_size: usize,
+    body: &mut Vec<u8>,
+) -> Result<(), RequestError> {
+    let mut trailers_seen: bool = false;
+    loop {
+        if *pos == buf.len() {
+            buf.clear();
+            *pos = 0;
+        }
+        let Some((frame_type, payload_len)) = read_h3_frame_header(recv, buf, pos).await? else {
+            return Ok(());
+        };
+        match frame_type {
+            H3_FRAME_DATA => {
+                if trailers_seen {
+                    connection.close(
+                        VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                        H3_REASON_FRAME_AFTER_TRAILERS,
+                    );
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
+                if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
+                    && body.len().saturating_add(payload_len) > max_body_size
+                {
+                    let _: Result<(), _> = recv.stop(VarInt::from_u32(H3_NO_ERROR));
+                    return Err(RequestError::ContentLengthTooLarge(
+                        HttpStatus::PayloadTooLarge,
+                    ));
+                }
+                let mut remaining: usize = payload_len;
+                while remaining > 0 {
+                    let avail: usize = buf.len() - *pos;
+                    if avail > 0 {
+                        let take: usize = avail.min(remaining);
+                        body.extend_from_slice(&buf[*pos..*pos + take]);
+                        *pos += take;
+                        remaining -= take;
+                        continue;
+                    }
+                    let old_len: usize = body.len();
+                    let chunk_len: usize = remaining.min(MAX_POOLED_BUFFER_CAPACITY);
+                    body.resize(old_len + chunk_len, 0);
+                    match recv.read(&mut body[old_len..]).await {
+                        Ok(Some(n)) if n > 0 => {
+                            body.truncate(old_len + n);
+                            remaining -= n;
+                        }
+                        Ok(Some(_)) | Ok(None) => {
+                            body.truncate(old_len);
+                            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                        }
+                        Err(error) => {
+                            body.truncate(old_len);
+                            return Err(RequestError::Request(error.to_string()));
+                        }
+                    }
+                }
+            }
+            H3_FRAME_HEADERS => {
+                if trailers_seen {
+                    connection.close(
+                        VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                        H3_REASON_FRAME_AFTER_TRAILERS,
+                    );
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
+                trailers_seen = true;
+                skip_h3_payload(recv, buf, pos, payload_len).await?;
+            }
+            other if is_grease_id(other) => {
+                skip_h3_payload(recv, buf, pos, payload_len).await?;
+            }
+            H3_FRAME_SETTINGS
+            | H3_FRAME_GOAWAY
+            | H3_FRAME_CANCEL_PUSH
+            | H3_FRAME_PUSH_PROMISE
+            | H3_FRAME_MAX_PUSH_ID => {
+                connection.close(
+                    VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                    H3_REASON_UNEXPECTED_REQUEST_FRAME,
+                );
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            other if is_reserved_h2_frame(other) => {
+                connection.close(
+                    VarInt::from_u32(H3_FRAME_UNEXPECTED),
+                    H3_REASON_RESERVED_FRAME,
+                );
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            _ => {
+                skip_h3_payload(recv, buf, pos, payload_len).await?;
+            }
+        }
+    }
+}
+pub(crate) async fn h3_request_task(
+    env: H3RequestEnv,
+    connection: &QuicConnection,
+    mut send_stream: QuicSendStream,
+    mut recv_stream: QuicRecvStream,
+) {
+    let H3RequestEnv { shared, peers } = env;
+    let server: &Server = &shared.server;
+    let request_config: RequestConfig = shared.request_config;
+    let mut read_buf: Vec<u8> = take_h3_buffer();
+    let mut read_pos: usize = 0;
+    let mut ctx: Context = take_pooled_context();
+    let mut target: String = take_target_buffer();
+    let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
+    let head_result: Result<Option<H3DecodedRequestMeta>, RequestError> =
+        if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+            read_h3_request_headers(
+                connection,
+                &mut recv_stream,
+                &mut read_buf,
+                &mut read_pos,
+                &request_config,
+                ctx.get_mut_request(),
+                &mut target,
+            )
+            .await
+        } else {
+            let mut reading: Pin<&mut _> = pin!(read_h3_request_headers(
+                connection,
+                &mut recv_stream,
+                &mut read_buf,
+                &mut read_pos,
+                &request_config,
+                ctx.get_mut_request(),
+                &mut target,
+            ));
+            if let Some(done) = poll_once_protocol(reading.as_mut()).await {
+                done
+            } else {
+                match timeout(Duration::from_millis(read_timeout_ms), reading).await {
+                    Ok(done) => done,
+                    Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+                }
+            }
+        };
+    let meta: H3DecodedRequestMeta = match head_result {
+        Ok(Some(meta)) => meta,
+        Ok(None) => {
+            return_h3_buffer(read_buf);
+            return_target_buffer(target);
+            return_pooled_context(ctx);
+            return;
+        }
         Err(error) => {
+            let _: Result<(), _> = recv_stream.stop(VarInt::from_u32(H3_NO_ERROR));
+            return_h3_buffer(read_buf);
+            return_target_buffer(target);
             h3_fail_request(
-                &H3RequestEnv {
-                    server,
-                    request_config,
-                    peers,
-                },
-                &mut framer,
+                server,
+                request_config,
+                peers,
+                send_stream,
+                &mut ctx,
                 HttpVersion::Http3,
                 error,
             )
             .await;
+            return_pooled_context(ctx);
             return;
         }
     };
-    let is_head: bool = request.get_method().is_head();
-    let (stream, peer): (Stream, DuplexStream) = build_duplex_transport(request_config, peers);
-    let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request, target);
-    let joined: Result<((), ()), ResponseError> = futures::try_join!(
-        async {
-            lifecycle.run(stream).await;
-            Ok::<(), ResponseError>(())
-        },
-        pump_response(&mut framer, peer, RESPONSE_HEAD_MAX, is_head)
-    );
-    let pump_result: Result<(), ResponseError> = joined.map(|(_, pumped): ((), ())| pumped);
-    if pump_result.is_err() {
-        framer.reset();
-    }
-}
-async fn collect_h3_body(
-    framer: &mut H3Framer,
-    request_config: &RequestConfig,
-    headers: &ProtocolHeaders,
-    body: &mut Vec<u8>,
-) -> Result<(), RequestError> {
     let max_body_size: usize = request_config.get_max_body_size();
-    let declared: Option<usize> = declared_content_length(headers, max_body_size)?;
-    let send_continue: bool =
-        declared != Some(0) && headers.contains_key(EXPECT) && has_continue_expectation(headers);
-    let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
-    if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
-        collect_h3_body_until_end(framer, max_body_size, body, send_continue).await?;
-    } else {
-        let bound: Duration = Duration::from_millis(read_timeout_ms);
-        match timeout(
-            bound,
-            collect_h3_body_until_end(framer, max_body_size, body, send_continue),
-        )
-        .await
-        {
-            Ok(collected) => collected?,
-            Err(_) => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+    let body: &mut Vec<u8> = ctx.get_mut_request().get_mut_body();
+    body.clear();
+    if let Some(expected) = meta.declared_content_length
+        && expected > 0
+    {
+        body.reserve(expected.min(MAX_POOLED_BUFFER_CAPACITY));
+    }
+    let body_result: Result<(), RequestError> = {
+        let mut reading: Pin<&mut _> = pin!(async {
+            if meta.expect_continue {
+                send_stream
+                    .write_all(H3_CONTINUE_FRAME)
+                    .await
+                    .map_err(|error: QuicWriteError| RequestError::Request(error.to_string()))?;
+            }
+            collect_h3_data_frames(
+                connection,
+                &mut recv_stream,
+                &mut read_buf,
+                &mut read_pos,
+                max_body_size,
+                body,
+            )
+            .await
+        });
+        if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
+            reading.await
+        } else if let Some(done) = poll_once_protocol(reading.as_mut()).await {
+            done
+        } else {
+            match timeout(Duration::from_millis(read_timeout_ms), reading).await {
+                Ok(done) => done,
+                Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+            }
         }
+    };
+    return_h3_buffer(read_buf);
+    let body_check: Result<(), RequestError> =
+        body_result.and_then(|()| match meta.declared_content_length {
+            None => Ok(()),
+            Some(declared) => match ctx.get_request().get_body().len().cmp(&declared) {
+                Ordering::Equal => Ok(()),
+                _ => Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned())),
+            },
+        });
+    if let Err(error) = body_check {
+        let _: Result<(), _> = recv_stream.stop(VarInt::from_u32(H3_NO_ERROR));
+        return_target_buffer(target);
+        h3_fail_request(
+            server,
+            request_config,
+            peers,
+            send_stream,
+            &mut ctx,
+            HttpVersion::Http3,
+            error,
+        )
+        .await;
+        return_pooled_context(ctx);
+        return;
     }
-    match declared {
-        None => Ok(()),
-        Some(declared) => match body.len().cmp(&declared) {
-            Ordering::Equal => Ok(()),
-            _ => Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned())),
-        },
-    }
+    let mut stream: Stream = Stream::from_transport(
+        H3DirectTransport::new(send_stream, peers, meta.is_head),
+        request_config,
+        false,
+    );
+    server
+        .run_protocol_lifecycle_in_place(&shared.pipeline, &mut stream, &mut ctx, target)
+        .await;
+    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    return_pooled_context(ctx);
 }
 #[cold]
-async fn send_h3_continue(framer: &mut H3Framer) -> Result<(), RequestError> {
-    let request_stream: &mut RequestH3Stream = framer
-        .get_mut_request_stream()
-        .as_mut()
-        .ok_or_else(|| RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned()))?;
-    request_stream
-        .send_response(continue_response())
-        .await
-        .map_err(|error: StreamError| RequestError::Request(error.to_string()))
-}
-async fn collect_h3_body_until_end(
-    framer: &mut H3Framer,
-    max_body_size: usize,
-    body: &mut Vec<u8>,
-    send_continue: bool,
-) -> Result<(), RequestError> {
-    if send_continue {
-        send_h3_continue(framer).await?;
-    }
-    loop {
-        let Some(request_stream) = framer.get_mut_request_stream().as_mut() else {
-            return Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned()));
-        };
-        let received: Result<Option<_>, h3::error::StreamError> = request_stream.recv_data().await;
-        match received {
-            Ok(Some(mut data)) => {
-                let remaining: usize = bytes::Buf::remaining(&data);
-                let chunk: Bytes = bytes::Buf::copy_to_bytes(&mut data, remaining);
-                let collected: Result<(), RequestError> =
-                    push_bounded_body(max_body_size, body, chunk);
-                collected?;
-            }
-            Ok(None) => return Ok(()),
-            Err(error) => return Err(RequestError::Request(error.to_string())),
-        }
-    }
-}
 pub(crate) async fn h3_fail_request(
-    env: &H3RequestEnv,
-    framer: &mut H3Framer,
+    server: &Server,
+    request_config: RequestConfig,
+    peers: StreamPeers,
+    send_stream: QuicSendStream,
+    ctx: &mut Context,
     version: HttpVersion,
     error: RequestError,
 ) {
-    let mut ctx: Context = Context::default();
-    let mut request: Request = Request::default();
-    request.set_version(version.clone());
-    ctx.set_request(request);
+    ctx.get_mut_request().reset().set_version(version.clone());
     ctx.get_mut_response().reset().set_version(version.clone());
-    let (mut stream, peer): (Stream, DuplexStream) =
-        build_duplex_transport(env.request_config, env.peers);
-    let is_head: bool = false;
-    let server: Arc<Server> = env.server.clone();
-    let (_, pump_result): ((), Result<(), ResponseError>) = join!(
-        async move {
-            reply_to_request_error(&server, &mut stream, &mut ctx, &error, Some(version)).await;
-            drop(stream);
-        },
-        pump_response(framer, peer, RESPONSE_HEAD_MAX, is_head)
+    ctx.clear_route_params();
+    ctx.reset_request_attributes();
+    let mut stream: Stream = Stream::from_transport(
+        H3DirectTransport::new(send_stream, peers, false),
+        request_config,
+        false,
     );
-    if pump_result.is_err() {
-        framer.reset();
+    reply_to_request_error(server, &mut stream, ctx, &error, Some(version)).await;
+    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+}
+```
+# Path: hyperlane/core/src/protocol/http3/qpack/static.rs
+```rust
+use super::*;
+pub(crate) static HUFFMAN_DECODE_TABLES: OnceLock<Vec<[u16; 256]>> = OnceLock::new();
+```
+# Path: hyperlane/core/src/protocol/http3/qpack/const.rs
+```rust
+use super::*;
+pub(crate) const WIRE_METHOD_GET: &[u8] = GET.as_bytes();
+pub(crate) const WIRE_METHOD_POST: &[u8] = POST.as_bytes();
+pub(crate) const WIRE_METHOD_PUT: &[u8] = PUT.as_bytes();
+pub(crate) const WIRE_METHOD_DELETE: &[u8] = DELETE.as_bytes();
+pub(crate) const WIRE_METHOD_HEAD: &[u8] = HEAD.as_bytes();
+pub(crate) const WIRE_METHOD_OPTIONS: &[u8] = OPTIONS.as_bytes();
+pub(crate) const WIRE_METHOD_PATCH: &[u8] = PATCH.as_bytes();
+pub(crate) const WIRE_METHOD_CONNECT: &[u8] = CONNECT.as_bytes();
+pub(crate) const WIRE_METHOD_TRACE: &[u8] = TRACE.as_bytes();
+pub(crate) const H3_SCHEME_PUNCTUATION: &[u8] = b"+-.";
+pub(crate) const QPACK_CONTENT_TYPE_NAME: &[u8] = CONTENT_TYPE.as_bytes();
+pub(crate) const QPACK_CONTENT_TYPE_HTML: &[u8] = STATIC_CT_HTML_UTF8.as_bytes();
+pub(crate) const QPACK_CONTENT_TYPE_PLAIN: &[u8] = TEXT_PLAIN.as_bytes();
+pub(crate) const QPACK_CONTENT_TYPE_PLAIN_UTF8: &[u8] = b"text/plain;charset=utf-8";
+pub(crate) const QPACK_CONTENT_TYPE_JSON: &[u8] = APPLICATION_JSON.as_bytes();
+pub(crate) const QPACK_SET_COOKIE_NAME: &[u8] = SET_COOKIE.as_bytes();
+pub(crate) const QPACK_LOCATION_NAME: &[u8] = LOCATION.as_bytes();
+pub(crate) const QPACK_SERVER_NAME: &[u8] = SERVER.as_bytes();
+pub(crate) const QPACK_DATE_NAME: &[u8] = DATE.as_bytes();
+pub(crate) const QPACK_STATIC_TABLE: [(&str, &str); 99] = [
+    (":authority", ""),
+    (":path", "/"),
+    ("age", "0"),
+    ("content-disposition", ""),
+    ("content-length", "0"),
+    ("cookie", ""),
+    ("date", ""),
+    ("etag", ""),
+    ("if-modified-since", ""),
+    ("if-none-match", ""),
+    ("last-modified", ""),
+    ("link", ""),
+    ("location", ""),
+    ("referer", ""),
+    ("set-cookie", ""),
+    (":method", "CONNECT"),
+    (":method", "DELETE"),
+    (":method", "GET"),
+    (":method", "HEAD"),
+    (":method", "OPTIONS"),
+    (":method", "POST"),
+    (":method", "PUT"),
+    (":scheme", "http"),
+    (":scheme", "https"),
+    (":status", "103"),
+    (":status", "200"),
+    (":status", "304"),
+    (":status", "404"),
+    (":status", "503"),
+    ("accept", "*/*"),
+    ("accept", "application/dns-message"),
+    ("accept-encoding", "gzip, deflate, br"),
+    ("accept-ranges", "bytes"),
+    ("access-control-allow-headers", "cache-control"),
+    ("access-control-allow-headers", "content-type"),
+    ("access-control-allow-origin", "*"),
+    ("cache-control", "max-age=0"),
+    ("cache-control", "max-age=2592000"),
+    ("cache-control", "max-age=604800"),
+    ("cache-control", "no-cache"),
+    ("cache-control", "no-store"),
+    ("cache-control", "public, max-age=31536000"),
+    ("content-encoding", "br"),
+    ("content-encoding", "gzip"),
+    ("content-type", "application/dns-message"),
+    ("content-type", "application/javascript"),
+    ("content-type", "application/json"),
+    ("content-type", "application/x-www-form-urlencoded"),
+    ("content-type", "image/gif"),
+    ("content-type", "image/jpeg"),
+    ("content-type", "image/png"),
+    ("content-type", "text/css"),
+    ("content-type", "text/html; charset=utf-8"),
+    ("content-type", "text/plain"),
+    ("content-type", "text/plain;charset=utf-8"),
+    ("range", "bytes=0-"),
+    ("strict-transport-security", "max-age=31536000"),
+    (
+        "strict-transport-security",
+        "max-age=31536000; includesubdomains",
+    ),
+    (
+        "strict-transport-security",
+        "max-age=31536000; includesubdomains; preload",
+    ),
+    ("vary", "accept-encoding"),
+    ("vary", "origin"),
+    ("x-content-type-options", "nosniff"),
+    ("x-xss-protection", "1; mode=block"),
+    (":status", "100"),
+    (":status", "204"),
+    (":status", "206"),
+    (":status", "302"),
+    (":status", "400"),
+    (":status", "403"),
+    (":status", "421"),
+    (":status", "425"),
+    (":status", "500"),
+    ("accept-language", ""),
+    ("access-control-allow-credentials", "FALSE"),
+    ("access-control-allow-credentials", "TRUE"),
+    ("access-control-allow-headers", "*"),
+    ("access-control-allow-methods", "get"),
+    ("access-control-allow-methods", "get, post, options"),
+    ("access-control-allow-methods", "options"),
+    ("access-control-expose-headers", "content-length"),
+    ("access-control-request-headers", "content-type"),
+    ("access-control-request-method", "get"),
+    ("access-control-request-method", "post"),
+    ("alt-svc", "clear"),
+    ("authorization", ""),
+    (
+        "content-security-policy",
+        "script-src 'none'; object-src 'none'; base-uri 'none'",
+    ),
+    ("early-data", "1"),
+    ("expect-ct", ""),
+    ("forwarded", ""),
+    ("if-range", ""),
+    ("origin", ""),
+    ("purpose", "prefetch"),
+    ("server", ""),
+    ("timing-allow-origin", "*"),
+    ("upgrade-insecure-requests", "1"),
+    ("user-agent", ""),
+    ("x-forwarded-for", ""),
+    ("x-frame-options", "deny"),
+    ("x-frame-options", "sameorigin"),
+];
+pub(crate) const HUFFMAN_CODES: [u32; 256] = [
+    0x1ff8, 0x7fffd8, 0xfffffe2, 0xfffffe3, 0xfffffe4, 0xfffffe5, 0xfffffe6, 0xfffffe7, 0xfffffe8,
+    0xffffea, 0x3ffffffc, 0xfffffe9, 0xfffffea, 0x3ffffffd, 0xfffffeb, 0xfffffec, 0xfffffed,
+    0xfffffee, 0xfffffef, 0xffffff0, 0xffffff1, 0xffffff2, 0x3ffffffe, 0xffffff3, 0xffffff4,
+    0xffffff5, 0xffffff6, 0xffffff7, 0xffffff8, 0xffffff9, 0xffffffa, 0xffffffb, 0x14, 0x3f8,
+    0x3f9, 0xffa, 0x1ff9, 0x15, 0xf8, 0x7fa, 0x3fa, 0x3fb, 0xf9, 0x7fb, 0xfa, 0x16, 0x17, 0x18,
+    0x0, 0x1, 0x2, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x5c, 0xfb, 0x7ffc, 0x20, 0xffb,
+    0x3fc, 0x1ffa, 0x21, 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68,
+    0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x72, 0xfc, 0x73, 0xfd, 0x1ffb, 0x7fff0,
+    0x1ffc, 0x3ffc, 0x22, 0x7ffd, 0x3, 0x23, 0x4, 0x24, 0x5, 0x25, 0x26, 0x27, 0x6, 0x74, 0x75,
+    0x28, 0x29, 0x2a, 0x7, 0x2b, 0x76, 0x2c, 0x8, 0x9, 0x2d, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7ffe,
+    0x7fc, 0x3ffd, 0x1ffd, 0xffffffc, 0xfffe6, 0x3fffd2, 0xfffe7, 0xfffe8, 0x3fffd3, 0x3fffd4,
+    0x3fffd5, 0x7fffd9, 0x3fffd6, 0x7fffda, 0x7fffdb, 0x7fffdc, 0x7fffdd, 0x7fffde, 0xffffeb,
+    0x7fffdf, 0xffffec, 0xffffed, 0x3fffd7, 0x7fffe0, 0xffffee, 0x7fffe1, 0x7fffe2, 0x7fffe3,
+    0x7fffe4, 0x1fffdc, 0x3fffd8, 0x7fffe5, 0x3fffd9, 0x7fffe6, 0x7fffe7, 0xffffef, 0x3fffda,
+    0x1fffdd, 0xfffe9, 0x3fffdb, 0x3fffdc, 0x7fffe8, 0x7fffe9, 0x1fffde, 0x7fffea, 0x3fffdd,
+    0x3fffde, 0xfffff0, 0x1fffdf, 0x3fffdf, 0x7fffeb, 0x7fffec, 0x1fffe0, 0x1fffe1, 0x3fffe0,
+    0x1fffe2, 0x7fffed, 0x3fffe1, 0x7fffee, 0x7fffef, 0xfffea, 0x3fffe2, 0x3fffe3, 0x3fffe4,
+    0x7ffff0, 0x3fffe5, 0x3fffe6, 0x7ffff1, 0x3ffffe0, 0x3ffffe1, 0xfffeb, 0x7fff1, 0x3fffe7,
+    0x7ffff2, 0x3fffe8, 0x1ffffec, 0x3ffffe2, 0x3ffffe3, 0x3ffffe4, 0x7ffffde, 0x7ffffdf,
+    0x3ffffe5, 0xfffff1, 0x1ffffed, 0x7fff2, 0x1fffe3, 0x3ffffe6, 0x7ffffe0, 0x7ffffe1, 0x3ffffe7,
+    0x7ffffe2, 0xfffff2, 0x1fffe4, 0x1fffe5, 0x3ffffe8, 0x3ffffe9, 0xffffffd, 0x7ffffe3, 0x7ffffe4,
+    0x7ffffe5, 0xfffec, 0xfffff3, 0xfffed, 0x1fffe6, 0x3fffe9, 0x1fffe7, 0x1fffe8, 0x7ffff3,
+    0x3fffea, 0x3fffeb, 0x1ffffee, 0x1ffffef, 0xfffff4, 0xfffff5, 0x3ffffea, 0x7ffff4, 0x3ffffeb,
+    0x7ffffe6, 0x3ffffec, 0x3ffffed, 0x7ffffe7, 0x7ffffe8, 0x7ffffe9, 0x7ffffea, 0x7ffffeb,
+    0xffffffe, 0x7ffffec, 0x7ffffed, 0x7ffffee, 0x7ffffef, 0x7fffff0, 0x3ffffee,
+];
+pub(crate) const HUFFMAN_LENGTHS: [u8; 256] = [
+    13, 23, 28, 28, 28, 28, 28, 28, 28, 24, 30, 28, 28, 30, 28, 28, 28, 28, 28, 28, 28, 28, 30, 28,
+    28, 28, 28, 28, 28, 28, 28, 28, 6, 10, 10, 12, 13, 6, 8, 11, 10, 10, 8, 11, 8, 6, 6, 6, 5, 5,
+    5, 6, 6, 6, 6, 6, 6, 6, 7, 8, 15, 6, 12, 10, 13, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 8, 7, 8, 13, 19, 13, 14, 6, 15, 5, 6, 5, 6, 5, 6, 6, 6, 5, 7, 7, 6, 6,
+    6, 5, 6, 7, 6, 5, 5, 6, 7, 7, 7, 7, 7, 15, 11, 14, 13, 28, 20, 22, 20, 20, 22, 22, 22, 23, 22,
+    23, 23, 23, 23, 23, 24, 23, 24, 24, 22, 23, 24, 23, 23, 23, 23, 21, 22, 23, 22, 23, 23, 24, 22,
+    21, 20, 22, 22, 23, 23, 21, 23, 22, 22, 24, 21, 22, 23, 23, 21, 21, 22, 21, 23, 22, 23, 23, 20,
+    22, 22, 22, 23, 22, 22, 23, 26, 26, 20, 19, 22, 23, 22, 25, 26, 26, 26, 27, 27, 26, 24, 25, 19,
+    21, 26, 27, 27, 26, 27, 24, 21, 21, 26, 26, 28, 27, 27, 27, 20, 24, 20, 21, 22, 21, 21, 23, 22,
+    22, 25, 25, 24, 24, 26, 23, 26, 27, 26, 26, 27, 27, 27, 27, 27, 28, 27, 27, 27, 27, 27, 26,
+];
+pub(crate) const HUFFMAN_INVALID: u16 = 0xFFFF;
+pub(crate) const HUFFMAN_BRANCH_FLAG: u16 = 0x8000;
+pub(crate) const H3_LOWER_TOKEN_BYTES: &[u8] = b"!#$%&'*+-.^_`|~";
+```
+# Path: hyperlane/core/src/protocol/http3/qpack/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#static;
+mod r#struct;
+#[cfg(test)]
+#[path = "../../../../tests/protocol/codec/mod.rs"]
+mod tests;
+pub(crate) use {r#const::*, r#fn::*, r#static::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/core/src/protocol/http3/qpack/struct.rs
+```rust
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct H3DecodedRequestMeta {
+    pub(crate) declared_content_length: Option<usize>,
+    pub(crate) expect_continue: bool,
+    pub(crate) is_head: bool,
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct H3EncodedResponseMeta {
+    pub(crate) announced_len: Option<usize>,
+    pub(crate) suppress_body: bool,
+}
+#[derive(Clone, Copy)]
+pub(super) struct HuffmanTrieNode {
+    pub(super) left: u16,
+    pub(super) right: u16,
+    pub(super) sym: u16,
+}
+```
+# Path: hyperlane/core/src/protocol/http3/qpack/fn.rs
+```rust
+use super::*;
+fn huffman_tables() -> &'static [[u16; 256]] {
+    HUFFMAN_DECODE_TABLES
+        .get_or_init(build_huffman_tables)
+        .as_slice()
+}
+fn build_huffman_tables() -> Vec<[u16; 256]> {
+    let mut nodes: Vec<HuffmanTrieNode> = vec![HuffmanTrieNode {
+        left: u16::MAX,
+        right: u16::MAX,
+        sym: u16::MAX,
+    }];
+    for sym in 0..256usize {
+        let code: u32 = HUFFMAN_CODES[sym];
+        let bits: u8 = HUFFMAN_LENGTHS[sym];
+        let mut cur: usize = 0;
+        for shift in (0..bits).rev() {
+            let bit: u32 = (code >> shift) & 1;
+            let next: u16 = if bit == 0 {
+                nodes[cur].left
+            } else {
+                nodes[cur].right
+            };
+            if next == u16::MAX {
+                let idx: u16 = nodes.len() as u16;
+                nodes.push(HuffmanTrieNode {
+                    left: u16::MAX,
+                    right: u16::MAX,
+                    sym: u16::MAX,
+                });
+                if bit == 0 {
+                    nodes[cur].left = idx;
+                } else {
+                    nodes[cur].right = idx;
+                }
+                cur = idx as usize;
+            } else {
+                cur = next as usize;
+            }
+        }
+        nodes[cur].sym = sym as u16;
     }
+    let mut tables: Vec<[u16; 256]> = Vec::new();
+    let mut node_to_table: HashMap<usize, u16> = HashMap::new();
+    let mut queue: VecDeque<usize> = VecDeque::new();
+    node_to_table.insert(0, 0);
+    tables.push([HUFFMAN_INVALID; 256]);
+    queue.push_back(0);
+    while let Some(root_node) = queue.pop_front() {
+        let table_idx: usize = node_to_table[&root_node] as usize;
+        for byte_val in 0..256usize {
+            let mut cur: usize = root_node;
+            let mut entry: u16 = HUFFMAN_INVALID;
+            let mut reached_leaf: bool = false;
+            for step in 0..8u16 {
+                let bit: usize = (byte_val >> (7 - step)) & 1;
+                let next: u16 = if bit == 0 {
+                    nodes[cur].left
+                } else {
+                    nodes[cur].right
+                };
+                if next == u16::MAX {
+                    entry = HUFFMAN_INVALID;
+                    reached_leaf = true;
+                    break;
+                }
+                cur = next as usize;
+                if nodes[cur].sym != u16::MAX {
+                    entry = ((step + 1) << 8) | nodes[cur].sym;
+                    reached_leaf = true;
+                    break;
+                }
+            }
+            if !reached_leaf {
+                let child_table: u16 = match node_to_table.get(&cur) {
+                    Some(&existing) => existing,
+                    None => {
+                        let next_idx: u16 = tables.len() as u16;
+                        node_to_table.insert(cur, next_idx);
+                        tables.push([HUFFMAN_INVALID; 256]);
+                        queue.push_back(cur);
+                        next_idx
+                    }
+                };
+                entry = HUFFMAN_BRANCH_FLAG | (child_table << 8);
+            }
+            tables[table_idx][byte_val] = entry;
+        }
+    }
+    tables
+}
+pub(super) fn decode_huffman(input: &[u8], out: &mut Vec<u8>) -> Result<(), RequestError> {
+    out.clear();
+    if input.is_empty() {
+        return Ok(());
+    }
+    let tables: &[[u16; 256]] = huffman_tables();
+    out.reserve((input.len() * 8) / 5 + 1);
+    let mut bits: u64 = 0;
+    let mut avail: u32 = 0;
+    let mut pos: usize = 0;
+    let mut table_idx: usize = 0;
+    loop {
+        while avail <= 56 && pos < input.len() {
+            bits |= (input[pos] as u64) << (56 - avail);
+            avail += 8;
+            pos += 1;
+        }
+        if avail == 0 {
+            break;
+        }
+        let lookup: usize = (bits >> 56) as usize;
+        let entry: u16 = tables[table_idx][lookup];
+        if entry == HUFFMAN_INVALID {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+        if (entry & HUFFMAN_BRANCH_FLAG) == 0 {
+            let consumed: u32 = (entry >> 8) as u32;
+            if consumed > avail {
+                if table_idx != 0 || avail > 7 {
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
+                let pad_mask: u64 = !0u64 << (64 - avail);
+                if (bits & pad_mask) != pad_mask {
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
+                return Ok(());
+            }
+            out.push(entry as u8);
+            bits <<= consumed;
+            avail -= consumed;
+            table_idx = 0;
+        } else {
+            if avail < 8 {
+                if table_idx != 0 || avail > 7 {
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
+                let pad_mask: u64 = !0u64 << (64 - avail);
+                if (bits & pad_mask) != pad_mask {
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
+                return Ok(());
+            }
+            table_idx = ((entry & 0x7F00) >> 8) as usize;
+            bits <<= 8;
+            avail -= 8;
+        }
+    }
+    if table_idx != 0 {
+        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+    }
+    Ok(())
+}
+#[inline(always)]
+pub(crate) fn decode_varint(buf: &[u8]) -> Option<(u64, usize)> {
+    let first: u8 = *buf.first()?;
+    let tag: u8 = first >> 6;
+    let len: usize = 1usize << tag;
+    if buf.len() < len {
+        return None;
+    }
+    let val: u64 = match len {
+        1 => u64::from(first & 0x3F),
+        2 => u64::from(u16::from_be_bytes([first & 0x3F, buf[1]])),
+        4 => u64::from(u32::from_be_bytes([first & 0x3F, buf[1], buf[2], buf[3]])),
+        _ => u64::from_be_bytes([
+            first & 0x3F,
+            buf[1],
+            buf[2],
+            buf[3],
+            buf[4],
+            buf[5],
+            buf[6],
+            buf[7],
+        ]),
+    };
+    Some((val, len))
+}
+#[inline(always)]
+pub(crate) fn encode_varint(val: u64, out: &mut Vec<u8>) {
+    if val < 64 {
+        out.push(val as u8);
+    } else if val < 16_384 {
+        let bytes: [u8; 2] = ((val as u16) | 0x4000).to_be_bytes();
+        out.extend_from_slice(&bytes);
+    } else if val < 1_073_741_824 {
+        let bytes: [u8; 4] = ((val as u32) | 0x8000_0000).to_be_bytes();
+        out.extend_from_slice(&bytes);
+    } else {
+        let bytes: [u8; 8] = (val | 0xC000_0000_0000_0000).to_be_bytes();
+        out.extend_from_slice(&bytes);
+    }
+}
+#[inline(always)]
+fn decode_prefix_int(buf: &[u8], prefix_bits: u8) -> Result<(u64, usize), RequestError> {
+    let first: u8 = *buf
+        .first()
+        .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+    let max_prefix: u8 = if prefix_bits == 8 {
+        u8::MAX
+    } else {
+        (1u8 << prefix_bits) - 1
+    };
+    let initial: u8 = first & max_prefix;
+    if initial < max_prefix {
+        return Ok((u64::from(initial), 1));
+    }
+    let mut value: u64 = u64::from(max_prefix);
+    let mut shift: u32 = 0;
+    let mut idx: usize = 1;
+    loop {
+        let byte: u8 = *buf
+            .get(idx)
+            .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+        idx += 1;
+        if shift >= 63 {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+        value = value
+            .checked_add(u64::from(byte & 0x7F) << shift)
+            .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+        if (byte & 0x80) == 0 {
+            return Ok((value, idx));
+        }
+        shift += 7;
+    }
+}
+#[inline(always)]
+fn encode_prefix_int(flags: u8, prefix_bits: u8, mut val: u64, out: &mut Vec<u8>) {
+    let max_prefix: u64 = if prefix_bits == 8 {
+        255
+    } else {
+        (1u64 << prefix_bits) - 1
+    };
+    if val < max_prefix {
+        out.push(flags | (val as u8));
+        return;
+    }
+    out.push(flags | (max_prefix as u8));
+    val -= max_prefix;
+    while val >= 128 {
+        out.push(((val as u8) & 0x7F) | 0x80);
+        val >>= 7;
+    }
+    out.push(val as u8);
+}
+#[inline(always)]
+fn decode_qpack_string<'a>(
+    buf: &'a [u8],
+    prefix_bits: u8,
+    scratch: &mut Vec<u8>,
+) -> Result<(&'a [u8], bool, usize), RequestError> {
+    let first: u8 = *buf
+        .first()
+        .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+    let huffman_mask: u8 = 1u8 << prefix_bits;
+    let is_huffman: bool = (first & huffman_mask) != 0;
+    let (len_u64, int_bytes): (u64, usize) = decode_prefix_int(buf, prefix_bits)?;
+    let len: usize =
+        usize::try_from(len_u64).map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))?;
+    let end: usize = int_bytes
+        .checked_add(len)
+        .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+    let raw: &'a [u8] = buf
+        .get(int_bytes..end)
+        .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+    if is_huffman {
+        decode_huffman(raw, scratch)?;
+        Ok((&[], true, end))
+    } else {
+        Ok((raw, false, end))
+    }
+}
+#[inline(always)]
+fn validate_h3_header_name(bytes: &[u8]) -> Result<&str, RequestError> {
+    if bytes.is_empty() {
+        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+    }
+    for &byte in bytes {
+        let valid: bool = byte.is_ascii_lowercase()
+            || byte.is_ascii_digit()
+            || H3_LOWER_TOKEN_BYTES.contains(&byte);
+        if !valid {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+    }
+    from_utf8(bytes).map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))
+}
+#[inline(always)]
+fn validate_h3_header_value(bytes: &[u8]) -> Result<&str, RequestError> {
+    for &byte in bytes {
+        if (byte < 0x20 && byte != b'\t') || byte == 0x7f {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+    }
+    from_utf8(bytes).map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))
+}
+fn value_has_continue_expectation(value: &str) -> bool {
+    value.split(',').any(|member: &str| {
+        member
+            .trim_matches([' ', '\t'])
+            .eq_ignore_ascii_case(CONTINUE_EXPECT)
+    })
+}
+#[inline(always)]
+fn insert_pooled_h3_header(headers: &mut RequestHeaders, name: &str, value: &str) {
+    if let Some(existing) = headers.get_mut(name) {
+        existing.push_back(value.to_owned());
+        return;
+    }
+    let (mut key, mut values): (String, VecDeque<String>) =
+        take_protocol_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+    key.clear();
+    key.push_str(name);
+    while values.len() > 1 {
+        values.pop_back();
+    }
+    if let Some(slot) = values.front_mut() {
+        slot.clear();
+        slot.push_str(value);
+    } else {
+        values.push_back(value.to_owned());
+    }
+    headers.insert(key, values);
+}
+pub(crate) fn decode_qpack_request(
+    payload: &[u8],
+    config: &RequestConfig,
+    request: &mut Request,
+    target: &mut String,
+) -> Result<H3DecodedRequestMeta, RequestError> {
+    if payload.len() < 2 {
+        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+    }
+    let (ric, ric_len): (u64, usize) = decode_prefix_int(payload, 8)?;
+    if ric != 0 {
+        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+    }
+    let (delta_base, base_len): (u64, usize) = decode_prefix_int(&payload[ric_len..], 7)?;
+    if delta_base != 0 || payload[ric_len] & 0x80 != 0 {
+        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+    }
+    let mut pos: usize = ric_len + base_len;
+    request.reset();
+    request.set_version(HttpVersion::Http3);
+    target.clear();
+    let max_header_count: usize = config.get_max_header_count();
+    let max_key_size: usize = config.get_max_header_key_size();
+    let max_val_size: usize = config.get_max_header_value_size();
+    let max_body_size: usize = config.get_max_body_size();
+    let mut method: Option<Method> = None;
+    let mut scheme: Option<&str> = None;
+    let mut scheme_owned: Option<String> = None;
+    let mut has_path: bool = false;
+    let mut authority_buf: [u8; 128] = [0; 128];
+    let mut authority_len: usize = 0;
+    let mut has_authority: bool = false;
+    let mut authority_owned: Option<String> = None;
+    let mut host_buf: [u8; 128] = [0; 128];
+    let mut host_len: usize = 0;
+    let mut has_host: bool = false;
+    let mut host_owned: Option<String> = None;
+    let mut declared_content_length: Option<usize> = None;
+    let mut expect_continue: bool = false;
+    let mut seen_regular_header: bool = false;
+    let mut header_count: usize = 0;
+    let mut name_scratch: Vec<u8> = take_h3_buffer();
+    let mut val_scratch: Vec<u8> = take_h3_buffer();
+    while pos < payload.len() {
+        let first: u8 = payload[pos];
+        let (name_slice, val_slice): (&str, &str) = if (first & 0x80) != 0 {
+            if (first & 0x40) == 0 {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            let (idx_u64, consumed): (u64, usize) = decode_prefix_int(&payload[pos..], 6)?;
+            pos += consumed;
+            let idx: usize = usize::try_from(idx_u64)
+                .map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))?;
+            *QPACK_STATIC_TABLE
+                .get(idx)
+                .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?
+        } else if (first & 0x40) != 0 {
+            if (first & 0x10) == 0 {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            let (idx_u64, name_consumed): (u64, usize) = decode_prefix_int(&payload[pos..], 4)?;
+            pos += name_consumed;
+            let idx: usize = usize::try_from(idx_u64)
+                .map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))?;
+            let (static_name, _): (&str, &str) = *QPACK_STATIC_TABLE
+                .get(idx)
+                .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+            let (raw_val, used_scratch, val_consumed): (&[u8], bool, usize) =
+                decode_qpack_string(&payload[pos..], 7, &mut val_scratch)?;
+            pos += val_consumed;
+            let val_bytes: &[u8] = if used_scratch {
+                val_scratch.as_slice()
+            } else {
+                raw_val
+            };
+            let val_str: &str = validate_h3_header_value(val_bytes)?;
+            (static_name, val_str)
+        } else if (first & 0x20) != 0 {
+            let (raw_name, used_name_scratch, name_consumed): (&[u8], bool, usize) =
+                decode_qpack_string(&payload[pos..], 3, &mut name_scratch)?;
+            pos += name_consumed;
+            let name_bytes: &[u8] = if used_name_scratch {
+                name_scratch.as_slice()
+            } else {
+                raw_name
+            };
+            let (raw_val, used_val_scratch, val_consumed): (&[u8], bool, usize) =
+                decode_qpack_string(&payload[pos..], 7, &mut val_scratch)?;
+            pos += val_consumed;
+            let val_bytes: &[u8] = if used_val_scratch {
+                val_scratch.as_slice()
+            } else {
+                raw_val
+            };
+            let name_str: &str = if name_bytes.starts_with(b":") {
+                from_utf8(name_bytes).map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))?
+            } else {
+                validate_h3_header_name(name_bytes)?
+            };
+            let val_str: &str = validate_h3_header_value(val_bytes)?;
+            (name_str, val_str)
+        } else {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        };
+        if name_slice.starts_with(':') {
+            if seen_regular_header {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            match name_slice {
+                ":method" => {
+                    if method.is_some() || val_slice.is_empty() {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    if !val_slice.bytes().all(|byte: u8| {
+                        byte.is_ascii_alphanumeric() || H3_LOWER_TOKEN_BYTES.contains(&byte)
+                    }) {
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    method = Some(match val_slice.as_bytes() {
+                        WIRE_METHOD_GET => Method::Get,
+                        WIRE_METHOD_POST => Method::Post,
+                        WIRE_METHOD_PUT => Method::Put,
+                        WIRE_METHOD_DELETE => Method::Delete,
+                        WIRE_METHOD_HEAD => Method::Head,
+                        WIRE_METHOD_OPTIONS => Method::Options,
+                        WIRE_METHOD_PATCH => Method::Patch,
+                        WIRE_METHOD_CONNECT => Method::Connect,
+                        WIRE_METHOD_TRACE => Method::Trace,
+                        _ => Method::Unknown(val_slice.to_owned()),
+                    });
+                }
+                ":scheme" => {
+                    if scheme.is_some() || scheme_owned.is_some() || val_slice.is_empty() {
+                        return_h3_buffer(name_scratch);
+                        return_h3_buffer(val_scratch);
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    if val_slice == HTTP_SCHEME {
+                        scheme = Some(HTTP_SCHEME);
+                    } else if val_slice == HTTPS_SCHEME {
+                        scheme = Some(HTTPS_SCHEME);
+                    } else {
+                        scheme_owned = Some(val_slice.to_owned());
+                    }
+                }
+                ":path" => {
+                    if has_path || val_slice.is_empty() {
+                        return_h3_buffer(name_scratch);
+                        return_h3_buffer(val_scratch);
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    has_path = true;
+                    target.push_str(val_slice);
+                }
+                ":authority" => {
+                    if has_authority {
+                        return_h3_buffer(name_scratch);
+                        return_h3_buffer(val_scratch);
+                        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                    }
+                    has_authority = true;
+                    let bytes: &[u8] = val_slice.as_bytes();
+                    if bytes.len() <= authority_buf.len() {
+                        authority_buf[..bytes.len()].copy_from_slice(bytes);
+                        authority_len = bytes.len();
+                    } else {
+                        authority_owned = Some(val_slice.to_owned());
+                    }
+                }
+                _ => return Err(RequestError::HttpRead(HttpStatus::BadRequest)),
+            }
+            continue;
+        }
+        seen_regular_header = true;
+        header_count += 1;
+        if max_header_count != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
+            && header_count > max_header_count
+        {
+            return Err(RequestError::TooManyHeaders(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        if max_key_size != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+            && name_slice.len() > max_key_size
+        {
+            return Err(RequestError::HeaderKeyTooLong(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        if max_val_size != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
+            && val_slice.len() > max_val_size
+        {
+            return Err(RequestError::HeaderValueTooLong(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        match name_slice {
+            "connection" | "proxy-connection" | "keep-alive" | "upgrade" | "transfer-encoding" => {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            "te" if !val_slice.eq_ignore_ascii_case("trailers") => {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            "host" => {
+                if has_host {
+                    return_h3_buffer(name_scratch);
+                    return_h3_buffer(val_scratch);
+                    return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+                }
+                has_host = true;
+                let bytes: &[u8] = val_slice.as_bytes();
+                if bytes.len() <= host_buf.len() {
+                    host_buf[..bytes.len()].copy_from_slice(bytes);
+                    host_len = bytes.len();
+                } else {
+                    host_owned = Some(val_slice.to_owned());
+                }
+            }
+            CONTENT_LENGTH => {
+                if declared_content_length.is_some() {
+                    return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+                }
+                if val_slice.is_empty() || !val_slice.bytes().all(|b: u8| b.is_ascii_digit()) {
+                    return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+                }
+                let parsed_len: usize = val_slice
+                    .parse::<usize>()
+                    .map_err(|_| RequestError::InvalidContentLength(HttpStatus::BadRequest))?;
+                if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE && parsed_len > max_body_size
+                {
+                    return_h3_buffer(name_scratch);
+                    return_h3_buffer(val_scratch);
+                    return Err(RequestError::ContentLengthTooLarge(
+                        HttpStatus::PayloadTooLarge,
+                    ));
+                }
+                declared_content_length = Some(parsed_len);
+            }
+            "expect" if value_has_continue_expectation(val_slice) => {
+                expect_continue = true;
+            }
+            _ => {}
+        }
+        insert_pooled_h3_header(request.get_mut_headers(), name_slice, val_slice);
+    }
+    return_h3_buffer(name_scratch);
+    return_h3_buffer(val_scratch);
+    let method: Method = method.ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+    let scheme_str: Option<&str> = scheme.or(scheme_owned.as_deref());
+    if method == Method::Connect {
+        if has_path || scheme_str.is_some() || !has_authority {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+        target.push_str(DEFAULT_HTTP_PATH);
+    } else {
+        let scheme_value: &str =
+            scheme_str.ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+        let scheme_bytes: &[u8] = scheme_value.as_bytes();
+        let scheme_valid: bool = scheme_bytes.first().is_some_and(u8::is_ascii_alphabetic)
+            && scheme_bytes.iter().all(|byte: &u8| {
+                byte.is_ascii_alphanumeric() || H3_SCHEME_PUNCTUATION.contains(byte)
+            });
+        let scheme_ok: bool = has_path && scheme_valid && scheme_value.parse::<Scheme>().is_ok();
+        if !scheme_ok {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+        if (!target.starts_with(DEFAULT_HTTP_PATH) && !(target == "*" && method == Method::Options))
+            || target.contains(HASH)
+        {
+            return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+        }
+    }
+    let max_path_size: usize = config.get_max_path_size();
+    if max_path_size != DEFAULT_LOW_SECURITY_MAX_PATH_SIZE && target.len() > max_path_size {
+        return Err(RequestError::PathTooLong(HttpStatus::URITooLong));
+    }
+    let auth_str: Option<&str> = if has_authority {
+        match authority_owned.as_deref() {
+            Some(owned) => Some(owned),
+            None => from_utf8(&authority_buf[..authority_len]).ok(),
+        }
+    } else {
+        None
+    };
+    let host_str: Option<&str> = if has_host {
+        match host_owned.as_deref() {
+            Some(owned) => Some(owned),
+            None => from_utf8(&host_buf[..host_len]).ok(),
+        }
+    } else {
+        None
+    };
+    let effective_authority: &str = auth_str
+        .or(host_str)
+        .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
+    let parsed_authority: Authority = effective_authority
+        .parse::<Authority>()
+        .map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))?;
+#[inline(always)]
+fn encode_qpack_header(name: &[u8], value: &[u8], out: &mut Vec<u8>) {
+    match name {
+        QPACK_CONTENT_TYPE_NAME => match value {
+            QPACK_CONTENT_TYPE_HTML => {
+                out.push(0xC0 | 52);
+                return;
+            }
+            QPACK_CONTENT_TYPE_PLAIN => {
+                out.push(0xC0 | 53);
+                return;
+            }
+            QPACK_CONTENT_TYPE_PLAIN_UTF8 => {
+                out.push(0xC0 | 54);
+                return;
+            }
+            QPACK_CONTENT_TYPE_JSON => {
+                out.push(0xC0 | 46);
+                return;
+            }
+            _ => {
+                encode_prefix_int(0x50, 4, 44, out);
+                encode_prefix_int(0x00, 7, value.len() as u64, out);
+                out.extend_from_slice(value);
+                return;
+            }
+        },
+        name if name == CONTENT_LENGTH.as_bytes() => {
+            if value == b"0" {
+                out.push(0xC0 | 4);
+                return;
+            }
+            out.push(0x50 | 4);
+            encode_prefix_int(0x00, 7, value.len() as u64, out);
+            out.extend_from_slice(value);
+            return;
+        }
+        QPACK_SET_COOKIE_NAME => {
+            out.push(0x50 | 14);
+            encode_prefix_int(0x00, 7, value.len() as u64, out);
+            out.extend_from_slice(value);
+            return;
+        }
+        QPACK_LOCATION_NAME => {
+            out.push(0x50 | 12);
+            encode_prefix_int(0x00, 7, value.len() as u64, out);
+            out.extend_from_slice(value);
+            return;
+        }
+        QPACK_SERVER_NAME => {
+            encode_prefix_int(0x50, 4, 92, out);
+            encode_prefix_int(0x00, 7, value.len() as u64, out);
+            out.extend_from_slice(value);
+            return;
+        }
+        QPACK_DATE_NAME => {
+            out.push(0x50 | 6);
+            encode_prefix_int(0x00, 7, value.len() as u64, out);
+            out.extend_from_slice(value);
+            return;
+        }
+        _ => {}
+    }
+    encode_prefix_int(0x20, 3, name.len() as u64, out);
+    out.extend_from_slice(name);
+    encode_prefix_int(0x00, 7, value.len() as u64, out);
+    out.extend_from_slice(value);
+}
+#[inline(always)]
+fn encode_qpack_status(status_code: usize, out: &mut Vec<u8>) {
+    let static_idx: Option<u64> = match status_code {
+        200 => Some(25),
+        103 => Some(24),
+        304 => Some(26),
+        404 => Some(27),
+        503 => Some(28),
+        100 => Some(63),
+        204 => Some(64),
+        206 => Some(65),
+        302 => Some(66),
+        400 => Some(67),
+        403 => Some(68),
+        421 => Some(69),
+        425 => Some(70),
+        500 => Some(71),
+        _ => None,
+    };
+    if let Some(idx) = static_idx {
+        encode_prefix_int(0xC0, 6, idx, out);
+        return;
+    }
+    encode_prefix_int(0x50, 4, 25, out);
+    let digits: [u8; 3] = [
+        (status_code / 100) as u8 + ZERO_STR_U8,
+        ((status_code / 10) % 10) as u8 + ZERO_STR_U8,
+        (status_code % 10) as u8 + ZERO_STR_U8,
+    ];
+    out.push(3);
+    out.extend_from_slice(&digits);
+}
+#[inline(always)]
+fn is_valid_response_header_name(bytes: &[u8]) -> bool {
+    !bytes.is_empty()
+        && bytes
+            .iter()
+            .all(|byte: &u8| byte.is_ascii_alphanumeric() || H3_LOWER_TOKEN_BYTES.contains(byte))
+}
+#[inline(always)]
+fn is_valid_response_header_value(bytes: &[u8]) -> bool {
+    bytes
+        .iter()
+        .all(|&byte: &u8| byte >= 0x20 && byte != 0x7f || byte == b'\t')
+}
+#[inline(always)]
+fn is_hop_by_hop_h3_header(name: &str) -> bool {
+    name.eq_ignore_ascii_case(CONNECTION)
+        || name.eq_ignore_ascii_case(KEEP_ALIVE)
+        || name.eq_ignore_ascii_case(PROXY_CONNECTION)
+        || name.eq_ignore_ascii_case(UPGRADE)
+        || name.eq_ignore_ascii_case(TE)
+        || name.eq_ignore_ascii_case(TRAILER_HEADER)
+}
+pub(crate) fn encode_h3_response_head(
+    head: &[u8],
+    is_head: bool,
+    out: &mut Vec<u8>,
+) -> Result<H3EncodedResponseMeta, ResponseError> {
+    let text: &str =
+        from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
+    let mut lines: SplitLines<'_> = text.split(CRLF);
+    let status_line: &str = lines
+        .next()
+        .ok_or_else(|| ResponseError::Send(MISSING_RESPONSE_VERSION.to_owned()))?;
+    let mut parts: SplitWhitespace<'_> = status_line.split_whitespace();
+    let version: &str = parts
+        .next()
+        .ok_or_else(|| ResponseError::Send(MISSING_RESPONSE_VERSION.to_owned()))?;
+    if !version.starts_with(HTTP_VERSION_PREFIX) {
+        return Err(ResponseError::Send(MISSING_RESPONSE_VERSION.to_owned()));
+    }
+    let status_token: &str = parts
+        .next()
+        .ok_or_else(|| ResponseError::Send(MISSING_RESPONSE_STATUS.to_owned()))?;
+    let status_code: usize = status_token
+        .parse::<usize>()
+        .map_err(|error: ParseIntError| ResponseError::Send(error.to_string()))?;
+    validate_status_code(status_code)?;
+    let hide_length: bool = hides_entity_length(status_code, is_head);
+    let suppress_body: bool = is_head
+        || status_code < HttpStatus::Ok.code()
+        || status_code == HttpStatus::NoContent.code()
+        || status_code == HttpStatus::NotModified.code();
+    let mut parsed_lines: [(&str, &str); 32] = [("", ""); 32];
+    let mut parsed_count: usize = 0;
+    let mut overflow_lines: Vec<(&str, &str)> = Vec::new();
+    let mut nominated: [&str; 8] = [""; 8];
+    let mut nominated_count: usize = 0;
+    let mut overflow_nominated: Vec<&str> = Vec::new();
+    let mut announced_len: Option<usize> = None;
+    for line in lines {
+        if line.is_empty() {
+            break;
+        }
+        let Some((name, value)) = line.split_once(COLON) else {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        };
+        let trimmed_name: &str = name.trim();
+        let trimmed_value: &str = value.trim();
+        if !is_valid_response_header_name(trimmed_name.as_bytes())
+            || !is_valid_response_header_value(trimmed_value.as_bytes())
+        {
+            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+        }
+        if trimmed_name.eq_ignore_ascii_case(TRANSFER_ENCODING) {
+            return Err(ResponseError::Send(
+                UNSUPPORTED_TRANSFER_ENCODING.to_owned(),
+            ));
+        }
+        if trimmed_name.eq_ignore_ascii_case(CONNECTION) {
+            for token in trimmed_value.split(COMMA_STR) {
+                let token: &str = token.trim();
+                if !token.is_empty()
+                    && !token.eq_ignore_ascii_case(KEEP_ALIVE)
+                    && !token.eq_ignore_ascii_case(CLOSE)
+                {
+                    if nominated_count < nominated.len() {
+                        nominated[nominated_count] = token;
+                        nominated_count += 1;
+                    } else {
+                        overflow_nominated.push(token);
+                    }
+                }
+            }
+            continue;
+        }
+        if trimmed_name.eq_ignore_ascii_case(CONTENT_LENGTH) {
+            let value_len: usize = parse_ascii_length(trimmed_value)
+                .map_err(|error: RequestError| ResponseError::Send(error.to_string()))?;
+            match announced_len {
+                None => announced_len = Some(value_len),
+                Some(existing) if existing == value_len => {}
+                Some(_) => {
+                    return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
+                }
+            }
+            if hide_length {
+                continue;
+            }
+        }
+        if parsed_count < parsed_lines.len() {
+            parsed_lines[parsed_count] = (trimmed_name, trimmed_value);
+            parsed_count += 1;
+        } else {
+            overflow_lines.push((trimmed_name, trimmed_value));
+        }
+    }
+    let mut block: Vec<u8> = take_h3_buffer();
+    block.extend_from_slice(&[0, 0]);
+    encode_qpack_status(status_code, &mut block);
+    let mut lower_buf: [u8; 64] = [0; 64];
+    let nom_slice: &[&str] = &nominated[..nominated_count];
+    for &(name, value) in parsed_lines[..parsed_count]
+        .iter()
+        .chain(overflow_lines.iter())
+    {
+        if is_hop_by_hop_h3_header(name)
+            || nom_slice
+                .iter()
+                .chain(overflow_nominated.iter())
+                .any(|token: &&str| token.eq_ignore_ascii_case(name))
+        {
+            continue;
+        }
+        let name_bytes: &[u8] = name.as_bytes();
+        let has_upper: bool = name_bytes.iter().any(|b: &u8| b.is_ascii_uppercase());
+        if !has_upper {
+            encode_qpack_header(name_bytes, value.as_bytes(), &mut block);
+        } else if name_bytes.len() <= lower_buf.len() {
+            for (idx, &b) in name_bytes.iter().enumerate() {
+                lower_buf[idx] = b.to_ascii_lowercase();
+            }
+            encode_qpack_header(&lower_buf[..name_bytes.len()], value.as_bytes(), &mut block);
+        } else {
+            let lowered: String = name.to_ascii_lowercase();
+            encode_qpack_header(lowered.as_bytes(), value.as_bytes(), &mut block);
+        }
+    }
+    out.push(H3_FRAME_HEADERS as u8);
+    encode_varint(block.len() as u64, out);
+    out.extend_from_slice(&block);
+    return_h3_buffer(block);
+    Ok(H3EncodedResponseMeta {
+        announced_len: if suppress_body { None } else { announced_len },
+        suppress_body,
+    })
 }
 ```
 # Path: hyperlane/core/src/protocol/request/mod.rs
@@ -45056,25 +52183,27 @@ use super::*;
 pub(crate) struct ProtocolRequestHead {
     pub(crate) version: HttpVersion,
     pub(crate) method: ProtocolMethod,
-    pub(crate) parts: http::request::Parts,
+    pub(crate) parts: Parts,
     pub(crate) body: Vec<u8>,
 }
 ```
 # Path: hyperlane/core/src/protocol/request/fn.rs
 ```rust
 use super::*;
-pub fn build_protocol_request(
+pub(crate) fn fill_protocol_request(
     config: &RequestConfig,
     head: ProtocolRequestHead,
-) -> Result<Request, RequestError> {
+    request: &mut Request,
+    target: &mut String,
+) -> Result<(), RequestError> {
     let ProtocolRequestHead {
         version,
         method,
         parts,
         body,
     } = head;
-    let uri: &http::Uri = &parts.uri;
-    let target: String = request_target(uri.path(), uri.query());
+    let uri: &Uri = &parts.uri;
+    write_request_target(uri.path(), uri.query(), target);
     let max_path_size: usize = config.get_max_path_size();
     if target.len() > max_path_size && max_path_size != DEFAULT_LOW_SECURITY_MAX_PATH_SIZE {
         return Err(RequestError::PathTooLong(HttpStatus::URITooLong));
@@ -45085,49 +52214,65 @@ pub fn build_protocol_request(
             HttpStatus::PayloadTooLarge,
         ));
     }
-    let mut request: Request = Request::default();
+    check_request_authority(&parts.headers, uri)?;
+    request.get_mut_querys().clear();
     let query_index: Option<usize> = target.find(QUESTION_MARK);
     let hash_index: Option<usize> = target.find(HASH);
     fill_request_querys(
-        split_target_query(&target, query_index, hash_index),
+        split_target_query(target, query_index, hash_index),
         request.get_mut_querys(),
     );
-    request
-        .get_mut_path()
-        .push_str(split_target_path(&target, query_index, hash_index));
+    let req_path: &mut String = request.get_mut_path();
+    req_path.clear();
+    req_path.push_str(split_target_path(target, query_index, hash_index));
     request.set_method(protocol_method(method));
     request.set_version(version);
-    fill_request_headers(&parts.headers, config, &mut request)?;
-    check_request_authority(&parts.headers, uri)?;
-    request.set_host(resolve_request_host(&parts.headers, uri));
-    request.get_mut_body().clear();
-    request.get_mut_body().extend_from_slice(&body);
-    Ok(request)
+    fill_request_headers(&parts.headers, config, request)?;
+    write_request_host(&parts.headers, uri, request.get_mut_host());
+    if !body.is_empty() {
+        *request.get_mut_body() = body;
+    } else {
+        request.get_mut_body().clear();
+    }
+    Ok(())
 }
-pub fn resolve_request_host(headers: &ProtocolHeaders, uri: &http::Uri) -> String {
+pub(crate) fn write_request_host(headers: &ProtocolHeaders, uri: &Uri, out: &mut String) {
+    out.clear();
     if let Some(authority) = uri.authority() {
-        return authority.as_str().to_owned();
+        out.push_str(authority.as_str());
+        return;
     }
     for name in [HOST, COLON_AUTHORITY] {
         if let Some(value) = headers.get(name)
             && let Ok(value) = value.to_str()
         {
-            return value.to_owned();
+            out.push_str(value);
+            return;
         }
     }
-    EMPTY_STR.to_owned()
 }
-pub fn check_request_authority(
-    headers: &ProtocolHeaders,
-    uri: &http::Uri,
-) -> Result<(), RequestError> {
+pub(crate) fn write_request_target(path: &str, query: Option<&str>, target: &mut String) {
+    target.clear();
+    match query {
+        Some(query) => {
+            target.reserve(path.len() + query.len() + 1);
+            target.push_str(path);
+            target.push(QUESTION_MARK);
+            target.push_str(query);
+        }
+        None => {
+            target.push_str(path);
+        }
+    }
+}
+pub fn check_request_authority(headers: &ProtocolHeaders, uri: &Uri) -> Result<(), RequestError> {
     let host_count: usize = headers.get_all(HOST).iter().count();
     if host_count > 1 {
         return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
     }
     let authority: Option<&str> = uri
         .authority()
-        .map(|authority: &http::uri::Authority| authority.as_str());
+        .map(|authority: &Authority| authority.as_str());
     let host: Option<&str> = match headers.get(HOST) {
         Some(value) => match value.to_str() {
             Ok(value) => Some(value),
@@ -45161,17 +52306,37 @@ pub fn check_request_authority(
     Ok(())
 }
 pub fn same_authority(authority: &str, host: &str, scheme: Option<&str>) -> bool {
-    let authority: (String, Option<String>) = normalize_authority(authority, scheme);
-    let host: (String, Option<String>) = normalize_authority(host, scheme);
-    authority == host
+    if authority.eq_ignore_ascii_case(host) {
+        return true;
+    }
+    let (auth_host, auth_port): (&str, Option<&str>) = split_authority_port(authority);
+    let (host_host, host_port): (&str, Option<&str>) = split_authority_port(host);
+    if !auth_host.eq_ignore_ascii_case(host_host) {
+        return false;
+    }
+    let default_port: Option<&str> = match scheme {
+        Some(HTTP_SCHEME) => Some(DEFAULT_HTTP_PORT_STR),
+        Some(HTTPS_SCHEME) => Some(DEFAULT_HTTPS_PORT_STR),
+        _ => None,
+    };
+    let effective_auth_port: Option<&str> = match (auth_port, default_port) {
+        (Some(port), Some(default_port)) if port == default_port => None,
+        (port, _) => port,
+    };
+    let effective_host_port: Option<&str> = match (host_port, default_port) {
+        (Some(port), Some(default_port)) if port == default_port => None,
+        (port, _) => port,
+    };
+    effective_auth_port == effective_host_port
 }
+#[cfg(test)]
 pub fn normalize_authority(authority: &str, scheme: Option<&str>) -> (String, Option<String>) {
     let (host, port): (&str, Option<&str>) = split_authority_port(authority);
     let host: String = host.to_ascii_lowercase();
     let port: Option<String> = port.map(|port: &str| port.to_owned());
     let default_port: Option<&str> = match scheme {
-        Some("http") => Some(DEFAULT_HTTP_PORT_STR),
-        Some("https") => Some(DEFAULT_HTTPS_PORT_STR),
+        Some(HTTP_SCHEME) => Some(DEFAULT_HTTP_PORT_STR),
+        Some(HTTPS_SCHEME) => Some(DEFAULT_HTTPS_PORT_STR),
         _ => None,
     };
     match (port, default_port) {
@@ -45237,16 +52402,44 @@ pub fn fill_request_querys(query: &str, querys: &mut RequestQuerys) {
     }
 }
 pub fn protocol_method(method: ProtocolMethod) -> RequestMethod {
-    method
-        .as_str()
-        .parse::<RequestMethod>()
-        .unwrap_or(Method::Unknown(method.as_str().to_owned()))
+    if method == ProtocolMethod::GET {
+        return Method::Get;
+    }
+    if method == ProtocolMethod::POST {
+        return Method::Post;
+    }
+    if method == ProtocolMethod::PUT {
+        return Method::Put;
+    }
+    if method == ProtocolMethod::DELETE {
+        return Method::Delete;
+    }
+    if method == ProtocolMethod::PATCH {
+        return Method::Patch;
+    }
+    if method == ProtocolMethod::HEAD {
+        return Method::Head;
+    }
+    if method == ProtocolMethod::OPTIONS {
+        return Method::Options;
+    }
+    if method == ProtocolMethod::CONNECT {
+        return Method::Connect;
+    }
+    if method == ProtocolMethod::TRACE {
+        return Method::Trace;
+    }
+    Method::Unknown(method.as_str().to_owned())
 }
 pub fn fill_request_headers(
     headers: &ProtocolHeaders,
     config: &RequestConfig,
     request: &mut Request,
 ) -> Result<(), RequestError> {
+    let max_header_count: usize = config.get_max_header_count();
+    let max_header_key_size: usize = config.get_max_header_key_size();
+    let max_header_value_size: usize = config.get_max_header_value_size();
+    let target_headers: &mut RequestHeaders = request.get_mut_headers();
     let mut header_count: usize = 0;
     for (name, value) in headers.iter() {
         let key: &str = name.as_str();
@@ -45257,28 +52450,41 @@ pub fn fill_request_headers(
             continue;
         };
         header_count += 1;
-        if header_count > config.get_max_header_count()
-            && config.get_max_header_count() != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
+        if header_count > max_header_count
+            && max_header_count != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
         {
             return Err(RequestError::TooManyHeaders(
                 HttpStatus::RequestHeaderFieldsTooLarge,
             ));
         }
-        if key.len() > config.get_max_header_key_size()
-            && config.get_max_header_key_size() != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+        if key.len() > max_header_key_size
+            && max_header_key_size != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
         {
             return Err(RequestError::HeaderKeyTooLong(HttpStatus::BadRequest));
         }
-        if value.len() > config.get_max_header_value_size()
-            && config.get_max_header_value_size() != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
+        if value.len() > max_header_value_size
+            && max_header_value_size != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
         {
             return Err(RequestError::HeaderValueTooLong(HttpStatus::BadRequest));
         }
-        request
-            .get_mut_headers()
-            .entry(key.to_owned())
-            .or_default()
-            .push_back(value.to_owned());
+        if let Some(existing) = target_headers.get_mut(key) {
+            existing.push_back(value.to_owned());
+            continue;
+        }
+        let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
+            take_protocol_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+        pooled_key.clear();
+        pooled_key.push_str(key);
+        while pooled_values.len() > 1 {
+            pooled_values.pop_back();
+        }
+        if let Some(slot) = pooled_values.front_mut() {
+            slot.clear();
+            slot.push_str(value);
+        } else {
+            pooled_values.push_back(value.to_owned());
+        }
+        target_headers.insert(pooled_key, pooled_values);
     }
     Ok(())
 }
@@ -45328,8 +52534,8 @@ fn contains_continue_member(value: &[u8]) -> bool {
     for (offset, byte) in value.iter().copied().enumerate() {
         match byte {
             _ if escaped => escaped = false,
-            b'\\' if quoted => escaped = true,
-            b'"' => quoted = !quoted,
+            HTTP_QUOTED_FIELD_ESCAPE if quoted => escaped = true,
+            HTTP_QUOTED_FIELD_QUOTE => quoted = !quoted,
             COMMA_U8 if !quoted => {
                 if value[start..offset]
                     .trim_ascii()
@@ -45372,6 +52578,7 @@ pub fn push_bounded_body(
     body.extend_from_slice(chunk.as_ref());
     Ok(())
 }
+#[cfg(test)]
 pub fn request_target(path: &str, query: Option<&str>) -> String {
     match query {
         Some(query) => {
@@ -45388,104 +52595,323 @@ pub fn request_target(path: &str, query: Option<&str>) -> String {
 # Path: hyperlane/core/src/protocol/http2/impl.rs
 ```rust
 use super::*;
-impl H2Framer {
-    pub(crate) fn new(send_response: h2::server::SendResponse<Bytes>) -> Self {
-        Self {
-            send_response: Some(send_response),
-            send_stream: None,
-            finished: false,
-        }
-    }
-    pub(crate) fn reset(&mut self) {
+impl H2DirectState {
+    pub(super) fn reset(&mut self) {
         if let Some(mut send_response) = self.get_mut_send_response().take() {
-            send_response.send_reset(h2::Reason::INTERNAL_ERROR);
+            send_response.send_reset(Reason::INTERNAL_ERROR);
         }
         if let Some(mut send_stream) = self.get_mut_send_stream().take() {
-            send_stream.send_reset(h2::Reason::INTERNAL_ERROR);
+            send_stream.send_reset(Reason::INTERNAL_ERROR);
+        }
+        self.set_finished(true);
+    }
+    pub(super) fn fail(&mut self, message: &str) -> io::Error {
+        self.set_failed(true);
+        self.reset();
+        io::Error::other(message.to_owned())
+    }
+    pub(super) fn poll_drain_pending_body(
+        &mut self,
+        context: &mut task::Context<'_>,
+    ) -> Poll<io::Result<()>> {
+        while self.get_pending_body_offset() < self.get_pending_body().len() {
+            if self.get_suppress_body() {
+                self.get_mut_pending_body().clear();
+                self.set_pending_body_offset(0);
+                return Poll::Ready(Ok(()));
+            }
+            let remaining: usize = self.get_pending_body().len() - self.get_pending_body_offset();
+            let capacity: Poll<Option<Result<usize, H2Error>>> = {
+                let Some(send_stream) = self.get_mut_send_stream().as_mut() else {
+                    return Poll::Ready(Err(self.fail(MISSING_SEND_CAPACITY)));
+                };
+                send_stream.reserve_capacity(remaining);
+                send_stream.poll_capacity(context)
+            };
+            match capacity {
+                Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
+                    let take: usize = capacity.min(remaining);
+                    let start: usize = self.get_pending_body_offset();
+                    let end: usize = start + take;
+                    let new_len: usize = self.get_body_len() + take;
+                    let chunk: Bytes = Bytes::copy_from_slice(&self.get_pending_body()[start..end]);
+                    let Some(send_stream) = self.get_mut_send_stream().as_mut() else {
+                        return Poll::Ready(Err(self.fail(MISSING_SEND_CAPACITY)));
+                    };
+                    if let Err(error) = send_stream.send_data(chunk, false) {
+                        return Poll::Ready(Err(self.fail(&error.to_string())));
+                    }
+                    self.set_body_len(new_len);
+                    self.set_pending_body_offset(end);
+                }
+                Poll::Ready(Some(Ok(_))) => continue,
+                Poll::Ready(Some(Err(error))) => {
+                    return Poll::Ready(Err(self.fail(&error.to_string())));
+                }
+                Poll::Ready(None) => {
+                    return Poll::Ready(Err(self.fail(MISSING_SEND_CAPACITY)));
+                }
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        self.get_mut_pending_body().clear();
+        self.set_pending_body_offset(0);
+        Poll::Ready(Ok(()))
+    }
+    pub(super) fn emit_head_and_inline_body(
+        &mut self,
+        context: &mut task::Context<'_>,
+        head_bytes: &[u8],
+        body_bytes: &[u8],
+    ) -> io::Result<usize> {
+        let parsed: ParsedProtocolHead =
+            match parse_protocol_response_head(head_bytes, self.get_is_head()) {
+                Ok(parsed) => parsed,
+                Err(error) => return Err(self.fail(&error.to_string())),
+            };
+        self.set_announced_len(parsed.announced_len);
+        self.set_suppress_body(parsed.suppress_body);
+        let Some(mut send_response) = self.get_mut_send_response().take() else {
+            return Err(self.fail("response head already sent"));
+        };
+        if parsed.suppress_body {
+            if let Err(error) = send_response.send_response(parsed.response, true) {
+                return Err(self.fail(&error.to_string()));
+            }
+            self.set_head_sent(true);
+            self.set_finished(true);
+            return Ok(body_bytes.len());
+        }
+        if check_body_budget(self.try_get_announced_len(), 0, body_bytes.len()) {
+            send_response.send_reset(Reason::INTERNAL_ERROR);
+            return Err(self.fail(OVERFLOWING_RESPONSE_BODY));
+        }
+        let mut send_stream: H2SendStream =
+            match send_response.send_response(parsed.response, false) {
+                Ok(stream) => stream,
+                Err(error) => return Err(self.fail(&error.to_string())),
+            };
+        self.set_head_sent(true);
+        if body_bytes.is_empty() {
+            self.set_send_stream(Some(send_stream));
+            return Ok(0);
+        }
+        send_stream.reserve_capacity(body_bytes.len());
+        match send_stream.poll_capacity(context) {
+            Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
+                let take: usize = capacity.min(body_bytes.len());
+                let chunk: Bytes = Bytes::copy_from_slice(&body_bytes[..take]);
+                if let Err(error) = send_stream.send_data(chunk, false) {
+                    return Err(self.fail(&error.to_string()));
+                }
+                self.set_body_len(take);
+                self.set_send_stream(Some(send_stream));
+                Ok(take)
+            }
+            Poll::Ready(Some(Ok(_))) | Poll::Pending => {
+                self.set_send_stream(Some(send_stream));
+                Ok(0)
+            }
+            Poll::Ready(Some(Err(error))) => Err(self.fail(&error.to_string())),
+            Poll::Ready(None) => Err(self.fail(MISSING_SEND_CAPACITY)),
         }
     }
 }
-impl ResponseFramer for H2Framer {
-    fn send_head<'a>(
-        &'a mut self,
-        head: &'a FramedHead,
-        bodyless: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
-        Box::pin(async move {
-            let mut builder: http::response::Builder =
-                http::Response::builder().status(head.status_code as u16);
-            for (name, value) in head.headers.iter() {
-                let key: &str = name.as_str();
-                if key.starts_with(PSEUDO_HEADER_PREFIX)
-                    || is_hop_by_hop(key)
-                    || connection_nominates(&head.headers, key)
-                {
-                    continue;
+impl H2DirectTransport {
+    pub(crate) fn new(send_response: H2SendResponse, peers: StreamPeers, is_head: bool) -> Self {
+        Self {
+            state: Mutex::new(H2DirectState {
+                send_response: Some(send_response),
+                send_stream: None,
+                pending_head: Vec::new(),
+                pending_body: Vec::new(),
+                pending_body_offset: 0,
+                head_sent: false,
+                suppress_body: is_head,
+                is_head,
+                announced_len: None,
+                body_len: 0,
+                finished: false,
+                failed: false,
+            }),
+            peers,
+        }
+    }
+}
+impl Drop for H2DirectTransport {
+    fn drop(&mut self) {
+        if let Ok(state) = self.get_mut_state().get_mut()
+            && !state.finished
+        {
+            state.reset();
+        }
+    }
+}
+impl Transport for H2DirectTransport {
+    fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
+        Ok(self.get_peers().remote)
+    }
+    fn local_addr(&self) -> Result<SocketAddr, io::Error> {
+        Ok(self.get_peers().local)
+    }
+}
+impl AsyncRead for H2DirectTransport {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _context: &mut task::Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        buffer.advance(0);
+        Poll::Ready(Ok(()))
+    }
+}
+impl AsyncWrite for H2DirectTransport {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+        bytes: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        };
+        if state.failed {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        }
+        if state.pending_body_offset < state.pending_body.len() {
+            match state.poll_drain_pending_body(context) {
+                Poll::Ready(Ok(())) => {}
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        if bytes.is_empty() {
+            return Poll::Ready(Ok(0));
+        }
+        if !state.head_sent {
+            if state.pending_head.is_empty() {
+                if let Some(body_start) = find_head_end(bytes) {
+                    if body_start > RESPONSE_HEAD_MAX {
+                        return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
+                    }
+                    let consumed_body: usize = match state.emit_head_and_inline_body(
+                        context,
+                        &bytes[..body_start],
+                        &bytes[body_start..],
+                    ) {
+                        Ok(consumed) => consumed,
+                        Err(error) => return Poll::Ready(Err(error)),
+                    };
+                    return Poll::Ready(Ok(body_start + consumed_body));
                 }
-                builder = builder.header(name.clone(), value.clone());
+                if bytes.len() > RESPONSE_HEAD_MAX {
+                    return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
+                }
+                state.pending_head.extend_from_slice(bytes);
+                return Poll::Ready(Ok(bytes.len()));
             }
-            let response: ProtocolResponse<()> = builder
-                .body(())
-                .map_err(|error: ProtocolBuildError| ResponseError::Send(error.to_string()))?;
-            let mut send_response: h2::server::SendResponse<Bytes> = self
-                .get_mut_send_response()
-                .take()
-                .ok_or(ResponseError::Terminated)?;
-            if bodyless {
-                self.set_finished(true);
-                send_response
-                    .send_response(response, true)
-                    .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
-                return Ok(());
+            let accepted: usize = bytes
+                .len()
+                .min(RESPONSE_HEAD_MAX - state.pending_head.len());
+            if accepted == 0 {
+                return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
             }
-            let send_stream: H2SendStream = send_response
-                .send_response(response, false)
-                .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
-            self.set_send_stream(Some(send_stream));
-            Ok(())
-        })
-    }
-    fn send_data<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
-        Box::pin(async move {
-            if data.is_empty() || self.get_finished() {
-                return Ok(());
-            }
-            let Some(mut send_stream) = self.get_mut_send_stream().take() else {
-                return Err(ResponseError::Terminated);
+            state.pending_head.extend_from_slice(&bytes[..accepted]);
+            let Some(body_start) = find_head_end(&state.pending_head) else {
+                if state.pending_head.len() > RESPONSE_HEAD_MAX {
+                    return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
+                }
+                return Poll::Ready(Ok(accepted));
             };
-            let mut rest: &[u8] = data;
-            while !rest.is_empty() {
-                let granted: usize = next_h2_capacity(&mut send_stream, rest.len()).await?;
-                let take: usize = granted.min(rest.len());
-                let chunk: Bytes = Bytes::copy_from_slice(&rest[..take]);
-                rest = &rest[take..];
-                send_stream
-                    .send_data(chunk, false)
-                    .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
+            if body_start > RESPONSE_HEAD_MAX {
+                return Poll::Ready(Err(state.fail(RESPONSE_HEAD_TOO_LONG)));
             }
-            self.set_send_stream(Some(send_stream));
-            Ok(())
-        })
-    }
-    fn finish<'a>(
-        &'a mut self,
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>> {
-        Box::pin(async move {
-            if self.get_finished() {
-                return Ok(());
-            }
-            self.set_finished(true);
-            let Some(mut send_stream) = self.get_mut_send_stream().take() else {
-                return Ok(());
+            let pending_head: Vec<u8> = mem::take(&mut state.pending_head);
+            let consumed_body: usize = match state.emit_head_and_inline_body(
+                context,
+                &pending_head[..body_start],
+                &pending_head[body_start..],
+            ) {
+                Ok(consumed) => consumed,
+                Err(error) => return Poll::Ready(Err(error)),
             };
-            send_stream
-                .send_data(Bytes::new(), true)
-                .map_err(|error: H2Error| ResponseError::Send(error.to_string()))?;
-            Ok(())
-        })
+            let trailing_start: usize = body_start + consumed_body;
+            if !state.suppress_body && trailing_start < pending_head.len() {
+                state
+                    .pending_body
+                    .extend_from_slice(&pending_head[trailing_start..]);
+            }
+            return Poll::Ready(Ok(accepted));
+        }
+        if state.suppress_body {
+            return Poll::Ready(Ok(bytes.len()));
+        }
+        if check_body_budget(state.announced_len, state.body_len, bytes.len()) {
+            return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
+        }
+        let current_body_len: usize = state.body_len;
+        let Some(send_stream) = state.send_stream.as_mut() else {
+            return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
+        };
+        send_stream.reserve_capacity(bytes.len());
+        match send_stream.poll_capacity(context) {
+            Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
+                let take: usize = capacity.min(bytes.len());
+                let new_len: usize = current_body_len + take;
+                let chunk: Bytes = Bytes::copy_from_slice(&bytes[..take]);
+                if let Err(error) = send_stream.send_data(chunk, false) {
+                    return Poll::Ready(Err(state.fail(&error.to_string())));
+                }
+                state.body_len = new_len;
+                Poll::Ready(Ok(take))
+            }
+            Poll::Ready(Some(Ok(_))) | Poll::Pending => Poll::Pending,
+            Poll::Ready(Some(Err(error))) => Poll::Ready(Err(state.fail(&error.to_string()))),
+            Poll::Ready(None) => Poll::Ready(Err(state.fail(MISSING_SEND_CAPACITY))),
+        }
+    }
+    fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        };
+        if state.failed {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        }
+        state.poll_drain_pending_body(context)
+    }
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        context: &mut task::Context<'_>,
+    ) -> Poll<io::Result<()>> {
+        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        };
+        if state.failed {
+            state.reset();
+            return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
+        }
+        match state.poll_drain_pending_body(context) {
+            Poll::Ready(Ok(())) => {}
+            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+            Poll::Pending => return Poll::Pending,
+        }
+        if !state.head_sent {
+            return Poll::Ready(Err(state.fail(MISSING_RESPONSE_HEAD)));
+        }
+        if !state.suppress_body
+            && let Some(announced) = state.announced_len
+            && state.body_len != announced
+        {
+            return Poll::Ready(Err(state.fail(TRUNCATED_RESPONSE_BODY)));
+        }
+        if !state.finished {
+            state.finished = true;
+            if let Some(mut send_stream) = state.send_stream.take()
+                && let Err(error) = send_stream.send_data(Bytes::new(), true)
+            {
+                return Poll::Ready(Err(state.fail(&error.to_string())));
+            }
+        }
+        Poll::Ready(Ok(()))
     }
 }
 ```
@@ -45500,25 +52926,71 @@ use super::*;
 # Path: hyperlane/core/src/protocol/http2/struct.rs
 ```rust
 use super::*;
-#[derive(Data)]
-pub(crate) struct H2Framer {
+#[derive(Data, Debug)]
+pub(crate) struct H2DirectState {
     #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) send_response: Option<h2::server::SendResponse<Bytes>>,
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) send_response: Option<H2SendResponse>,
     #[get(skip)]
-    #[get_mut(pub(crate))]
-    #[set(pub(crate))]
-    pub(super) send_stream: Option<h2::SendStream<Bytes>>,
-    #[get(type(copy), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) send_stream: Option<H2SendStream>,
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_head: Vec<u8>,
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_body: Vec<u8>,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) pending_body_offset: usize,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) head_sent: bool,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) suppress_body: bool,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) is_head: bool,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) announced_len: Option<usize>,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) body_len: usize,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
     pub(super) finished: bool,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) failed: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Data, Debug)]
+pub(crate) struct H2DirectTransport {
+    #[get(skip)]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) state: Mutex<H2DirectState>,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) peers: StreamPeers,
+}
+#[derive(Clone)]
 pub(crate) struct H2RequestEnv {
-    pub(crate) server: Arc<Server>,
-    pub(crate) request_config: RequestConfig,
+    pub(crate) shared: Arc<ConnectionShared>,
     pub(crate) peers: StreamPeers,
 }
 ```
@@ -45536,39 +53008,67 @@ pub(crate) async fn serve_h2_connection<T>(
         Ok(connection) => connection,
         Err(_) => return,
     };
-    loop {
-        match connection.accept().await {
-            Some(Ok((request, send_response))) => {
-                spawn(h2_request_task(
-                    H2RequestEnv {
-                        server: env.server.clone(),
-                        request_config: env.request_config,
-                        peers,
-                    },
-                    request,
-                    send_response,
-                ));
+    let mut requests: FuturesUnordered<_> = FuturesUnordered::new();
+    poll_fn(|cx: &mut task::Context<'_>| -> Poll<()> {
+        loop {
+            let mut progressed: bool = false;
+            let mut accepted_batch: usize = 0;
+            while accepted_batch < 64 {
+                match connection.poll_accept(cx) {
+                    Poll::Ready(Some(Ok((request, send_response)))) => {
+                        requests.push(
+                            AssertUnwindSafe(h2_request_task(
+                                H2RequestEnv {
+                                    shared: Arc::clone(&env.shared),
+                                    peers,
+                                },
+                                request,
+                                send_response,
+                            ))
+                            .catch_unwind(),
+                        );
+                        accepted_batch += 1;
+                        progressed = true;
+                    }
+                    Poll::Ready(Some(Err(_))) | Poll::Ready(None) => return Poll::Ready(()),
+                    Poll::Pending => break,
+                }
             }
-            Some(Err(_)) => return,
-            None => return,
+            let mut completed_batch: usize = 0;
+            while !requests.is_empty() && completed_batch < 64 {
+                match requests.poll_next_unpin(cx) {
+                    Poll::Ready(Some(_)) => {
+                        completed_batch += 1;
+                        progressed = true;
+                    }
+                    Poll::Ready(None) | Poll::Pending => break,
+                }
+            }
+            if !progressed {
+                return Poll::Pending;
+            }
+            if accepted_batch == 64 || completed_batch == 64 {
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
+            }
         }
-    }
+    })
+    .await;
 }
 pub(crate) async fn h2_request_task(
     env: H2RequestEnv,
     request: ProtocolRequest<H2RecvStream>,
-    send_response: h2::server::SendResponse<Bytes>,
+    mut send_response: H2SendResponse,
 ) {
-    let H2RequestEnv {
-        server,
-        request_config,
-        peers,
-    } = env;
-    let (parts, mut recv_stream): (http::request::Parts, H2RecvStream) = request.into_parts();
-    let mut framer: H2Framer = H2Framer::new(send_response);
-    let mut body: Vec<u8> = Vec::new();
+    let H2RequestEnv { shared, peers } = env;
+    let server: &Server = &shared.server;
+    let request_config: RequestConfig = shared.request_config;
+    let (parts, mut recv_stream): (Parts, H2RecvStream) = request.into_parts();
+    let mut ctx: Context = take_pooled_context();
+    let mut body: Vec<u8> = mem::take(ctx.get_mut_request().get_mut_body());
+    body.clear();
     if let Err(error) = collect_h2_body(
-        &mut framer,
+        &mut send_response,
         &mut recv_stream,
         &request_config,
         &parts.headers,
@@ -45576,89 +53076,84 @@ pub(crate) async fn h2_request_task(
     )
     .await
     {
+        *ctx.get_mut_request().get_mut_body() = body;
         h2_fail_request(
-            &H2RequestEnv {
-                server,
-                request_config,
-                peers,
-            },
-            &mut framer,
+            server,
+            request_config,
+            peers,
+            send_response,
+            &mut ctx,
             HttpVersion::Http2,
             error,
         )
         .await;
+        return_pooled_context(ctx);
         return;
     }
-    let target: String = request_target(parts.uri.path(), parts.uri.query());
-    let built: Result<Request, RequestError> = build_protocol_request(
+    let mut target: String = take_target_buffer();
+    let method: ProtocolMethod = parts.method.clone();
+    let built: Result<(), RequestError> = fill_protocol_request(
         &request_config,
         ProtocolRequestHead {
             version: HttpVersion::Http2,
-            method: parts.method.clone(),
+            method,
             parts,
             body,
         },
+        ctx.get_mut_request(),
+        &mut target,
     );
-    let request: Request = match built {
-        Ok(request) => request,
-        Err(error) => {
-            h2_fail_request(
-                &H2RequestEnv {
-                    server,
-                    request_config,
-                    peers,
-                },
-                &mut framer,
-                HttpVersion::Http2,
-                error,
-            )
-            .await;
-            return;
-        }
-    };
-    let is_head: bool = request.get_method().is_head();
-    let (stream, peer): (Stream, DuplexStream) = build_duplex_transport(request_config, peers);
-    let lifecycle: ServerLifecycle = ServerLifecycle::new(server, request, target);
-    let joined: Result<((), ()), ResponseError> = futures::try_join!(
-        async {
-            lifecycle.run(stream).await;
-            Ok::<(), ResponseError>(())
-        },
-        pump_response(&mut framer, peer, RESPONSE_HEAD_MAX, is_head)
-    );
-    let pump_result: Result<(), ResponseError> = joined.map(|(_, pumped): ((), ())| pumped);
-    if pump_result.is_err() {
-        framer.reset();
+    if let Err(error) = built {
+        return_target_buffer(target);
+        h2_fail_request(
+            server,
+            request_config,
+            peers,
+            send_response,
+            &mut ctx,
+            HttpVersion::Http2,
+            error,
+        )
+        .await;
+        return_pooled_context(ctx);
+        return;
     }
+    let is_head: bool = ctx.get_request().get_method().is_head();
+    let mut stream: Stream = Stream::from_transport(
+        H2DirectTransport::new(send_response, peers, is_head),
+        request_config,
+        false,
+    );
+    server
+        .run_protocol_lifecycle_in_place(&shared.pipeline, &mut stream, &mut ctx, target)
+        .await;
+    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    return_pooled_context(ctx);
 }
+#[cold]
 pub(crate) async fn h2_fail_request(
-    env: &H2RequestEnv,
-    framer: &mut H2Framer,
+    server: &Server,
+    request_config: RequestConfig,
+    peers: StreamPeers,
+    send_response: H2SendResponse,
+    ctx: &mut Context,
     version: HttpVersion,
     error: RequestError,
 ) {
-    let mut ctx: Context = Context::default();
-    let mut request: Request = Request::default();
-    request.set_version(version.clone());
-    ctx.set_request(request);
+    ctx.get_mut_request().reset().set_version(version.clone());
     ctx.get_mut_response().reset().set_version(version.clone());
-    let (mut stream, peer): (Stream, DuplexStream) =
-        build_duplex_transport(env.request_config, env.peers);
-    let is_head: bool = false;
-    let server: Arc<Server> = env.server.clone();
-    let (_, pump_result): ((), Result<(), ResponseError>) = join!(
-        async move {
-            reply_to_request_error(&server, &mut stream, &mut ctx, &error, Some(version)).await;
-            drop(stream);
-        },
-        pump_response(framer, peer, RESPONSE_HEAD_MAX, is_head)
+    ctx.clear_route_params();
+    ctx.reset_request_attributes();
+    let mut stream: Stream = Stream::from_transport(
+        H2DirectTransport::new(send_response, peers, false),
+        request_config,
+        false,
     );
-    if pump_result.is_err() {
-        framer.reset();
-    }
+    reply_to_request_error(server, &mut stream, ctx, &error, Some(version)).await;
+    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
 }
 async fn collect_h2_body(
-    framer: &mut H2Framer,
+    send_response: &mut H2SendResponse,
     recv_stream: &mut H2RecvStream,
     request_config: &RequestConfig,
     headers: &ProtocolHeaders,
@@ -45666,13 +53161,19 @@ async fn collect_h2_body(
 ) -> Result<(), RequestError> {
     let max_body_size: usize = request_config.get_max_body_size();
     let declared: Option<usize> = declared_content_length(headers, max_body_size)?;
-    if declared != Some(0)
-        && headers.contains_key(EXPECT)
-        && !recv_stream.is_end_stream()
-        && has_continue_expectation(headers)
-        && let Some(sender) = framer.get_mut_send_response().as_mut()
+    if recv_stream.is_end_stream() {
+        return match declared {
+            None | Some(0) => Ok(()),
+            Some(_) => Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned())),
+        };
+    }
+    if let Some(expected) = declared
+        && expected > 0
     {
-        sender
+        body.reserve(expected.min(MAX_POOLED_BUFFER_CAPACITY));
+    }
+    if declared != Some(0) && headers.contains_key(EXPECT) && has_continue_expectation(headers) {
+        send_response
             .send_informational(continue_response())
             .map_err(|error: H2Error| RequestError::Request(error.to_string()))?;
     }
@@ -45680,15 +53181,16 @@ async fn collect_h2_body(
     if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
         collect_h2_body_until_end(recv_stream, max_body_size, body).await?;
     } else {
-        let bound: Duration = Duration::from_millis(read_timeout_ms);
-        match timeout(
-            bound,
-            collect_h2_body_until_end(recv_stream, max_body_size, body),
-        )
-        .await
-        {
-            Ok(collected) => collected?,
-            Err(_) => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+        let mut reading: Pin<&mut _> =
+            pin!(collect_h2_body_until_end(recv_stream, max_body_size, body));
+        if let Some(collected) = poll_once_protocol(reading.as_mut()).await {
+            collected?;
+        } else {
+            let bound: Duration = Duration::from_millis(read_timeout_ms);
+            match timeout(bound, reading).await {
+                Ok(collected) => collected?,
+                Err(_) => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+            }
         }
     }
     match declared {
@@ -45722,160 +53224,151 @@ async fn collect_h2_body_until_end(
 ```rust
 use super::*;
 thread_local! {
-    pub(crate) static BODY_BUFFER_POOL: RefCell<Vec<Vec<u8>>> = const { RefCell::new(Vec::new()) };
+    pub(crate) static CONTEXT_POOL: RefCell<Vec<Context>> = const { RefCell::new(Vec::new()) };
+    pub(crate) static PROTOCOL_HEADER_POOL: RefCell<Vec<(String, VecDeque<String>)>> =
+        const { RefCell::new(Vec::new()) };
+    pub(crate) static TARGET_BUFFER_POOL: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    pub(crate) static ROUTE_PARAM_POOL: RefCell<Vec<(String, String)>> =
+        const { RefCell::new(Vec::new()) };
 }
 ```
 # Path: hyperlane/core/src/protocol/pump/const.rs
 ```rust
-pub(crate) const MAX_POOLED_BUFFERS: usize = 64;
 pub(crate) const MAX_POOLED_BUFFER_CAPACITY: usize = 64 * 1024;
+pub(crate) const MAX_POOLED_CONTEXTS: usize = 64;
+pub(crate) const MAX_POOLED_PROTOCOL_HEADERS: usize = 256;
+pub(crate) const MAX_POOLED_STRING_CAPACITY: usize = 4 * 1024;
 ```
 # Path: hyperlane/core/src/protocol/pump/mod.rs
 ```rust
 mod r#const;
 mod r#fn;
 mod r#static;
-mod r#struct;
-pub(crate) use {r#const::*, r#fn::*, r#static::*, r#struct::*};
+pub(crate) use {r#const::*, r#fn::*, r#static::*};
 use super::*;
-```
-# Path: hyperlane/core/src/protocol/pump/struct.rs
-```rust
-use super::*;
-#[derive(Clone, Debug, DisplayDebug)]
-pub(crate) struct FramedHead {
-    pub(crate) status_code: usize,
-    pub(crate) headers: ProtocolHeaders,
-}
 ```
 # Path: hyperlane/core/src/protocol/pump/fn.rs
 ```rust
 use super::*;
-fn take_recycled_buffer() -> Option<Vec<u8>> {
-    BODY_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| pool.borrow_mut().pop())
+pub(crate) fn take_pooled_context() -> Context {
+    CONTEXT_POOL.with(|pool: &RefCell<Vec<Context>>| pool.borrow_mut().pop().unwrap_or_default())
 }
-fn return_recycled_buffer(buffer: Vec<u8>) {
-    if buffer.capacity() > MAX_POOLED_BUFFER_CAPACITY {
+pub(crate) fn return_pooled_context(mut ctx: Context) {
+    {
+        let headers: &mut RequestHeaders = ctx.get_mut_request().get_mut_headers();
+        if !headers.is_empty() {
+            PROTOCOL_HEADER_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
+                let mut pool: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+                for (key, values) in headers.drain() {
+                    if pool.len() < MAX_POOLED_PROTOCOL_HEADERS
+                        && key.capacity() <= MAX_POOLED_STRING_CAPACITY
+                        && values.capacity() <= B_4
+                        && values
+                            .iter()
+                            .all(|value: &String| value.capacity() <= MAX_POOLED_STRING_CAPACITY)
+                    {
+                        pool.push((key, values));
+                    }
+                }
+            });
+        }
+    }
+    ctx.get_mut_request().reset();
+    if ctx.get_request().get_headers().capacity() > MAX_POOLED_PROTOCOL_HEADERS {
+        *ctx.get_mut_request().get_mut_headers() = RequestHeaders::default();
+    }
+    if ctx.get_request().get_querys().capacity() > MAX_POOLED_PROTOCOL_HEADERS {
+        *ctx.get_mut_request().get_mut_querys() = RequestQuerys::default();
+    }
+    if ctx.get_request().get_body().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+        *ctx.get_mut_request().get_mut_body() = Vec::new();
+    }
+    if ctx.get_request().get_path().capacity() > MAX_POOLED_STRING_CAPACITY {
+        *ctx.get_mut_request().get_mut_path() = String::new();
+    }
+    if ctx.get_request().get_host().capacity() > MAX_POOLED_STRING_CAPACITY {
+        *ctx.get_mut_request().get_mut_host() = String::new();
+    }
+    ctx.get_mut_response().reset();
+    if ctx.get_response().get_headers().capacity() > MAX_POOLED_PROTOCOL_HEADERS {
+        *ctx.get_mut_response().get_mut_headers() = ResponseHeaders::default();
+    }
+    if ctx.get_response().get_reason_phrase().capacity() > MAX_POOLED_STRING_CAPACITY {
+        *ctx.get_mut_response().get_mut_reason_phrase() = String::new();
+    }
+    if ctx.get_response().get_body().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+        *ctx.get_mut_response().get_mut_body() = Vec::new();
+    }
+    ctx.clear_route_params();
+    ctx.reset_request_attributes();
+    ctx.set_original_head(None);
+    if let Some(target) = ctx.take_original_target() {
+        return_target_buffer(target);
+    }
+    CONTEXT_POOL.with(|pool: &RefCell<Vec<Context>>| {
+        let mut pool: RefMut<'_, Vec<Context>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_CONTEXTS {
+            pool.push(ctx);
+        }
+    });
+}
+pub(crate) fn take_protocol_header_entry() -> Option<(String, VecDeque<String>)> {
+    PROTOCOL_HEADER_POOL
+        .with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| pool.borrow_mut().pop())
+}
+pub(crate) fn take_target_buffer() -> String {
+    TARGET_BUFFER_POOL.with(|pool: &RefCell<Vec<String>>| {
+        let mut buffer: String = pool.borrow_mut().pop().unwrap_or_default();
+        buffer.clear();
+        buffer
+    })
+}
+pub(crate) fn return_target_buffer(mut buffer: String) {
+    if buffer.capacity() == 0 || buffer.capacity() > MAX_POOLED_STRING_CAPACITY {
         return;
     }
-    BODY_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
-        let mut pool: RefMut<'_, Vec<Vec<u8>>> = pool.borrow_mut();
-        if pool.len() < MAX_POOLED_BUFFERS {
+    buffer.clear();
+    TARGET_BUFFER_POOL.with(|pool: &RefCell<Vec<String>>| {
+        let mut pool: RefMut<'_, Vec<String>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_CONTEXTS {
             pool.push(buffer);
         }
     });
 }
-pub(crate) async fn pump_response<F>(
-    framer: &mut F,
-    reader: DuplexStream,
-    max_head_size: usize,
-    is_head: bool,
-) -> Result<(), ResponseError>
-where
-    F: ResponseFramer,
-{
-    let mut chunk: Vec<u8> = match take_recycled_buffer() {
-        Some(mut buffer) => {
-            buffer.clear();
-            buffer.resize(PROTOCOL_BODY_CHUNK, 0);
-            buffer
-        }
-        None => vec![0; PROTOCOL_BODY_CHUNK],
-    };
-    let outcome: Result<(), ResponseError> =
-        pump_response_inner(framer, reader, max_head_size, is_head, &mut chunk).await;
-    return_recycled_buffer(chunk);
-    outcome
+pub(crate) fn take_route_param_entry() -> (String, String) {
+    ROUTE_PARAM_POOL.with(|pool: &RefCell<Vec<(String, String)>>| {
+        let mut pair: (String, String) = pool.borrow_mut().pop().unwrap_or_default();
+        pair.0.clear();
+        pair.1.clear();
+        pair
+    })
 }
-async fn pump_response_inner<F>(
-    framer: &mut F,
-    mut reader: DuplexStream,
-    max_head_size: usize,
-    is_head: bool,
-    read_chunk: &mut [u8],
-) -> Result<(), ResponseError>
-where
-    F: ResponseFramer,
-{
-    let mut pending: Vec<u8> = Vec::new();
-    let mut head: Option<FramedHead> = None;
-    let mut body_len: usize = 0;
-    let mut suppress_body: bool = is_head;
-    let mut announced_len: Option<usize> = None;
-    loop {
-        let read: usize = tokio::io::AsyncReadExt::read(&mut reader, read_chunk).await?;
-        if read == 0 {
-            break;
-        }
-        if head.is_none() {
-            pending.extend_from_slice(&read_chunk[..read]);
-            let Some(body_start) = find_head_end(&pending) else {
-                if pending.len() > max_head_size {
-                    return Err(ResponseError::Send(RESPONSE_HEAD_TOO_LONG.to_owned()));
-                }
-                continue;
-            };
-            if body_start > max_head_size {
-                return Err(ResponseError::Send(RESPONSE_HEAD_TOO_LONG.to_owned()));
-            }
-            let (status_code, mut headers): (usize, ProtocolHeaders) =
-                parse_response_head(&pending[..body_start])?;
-            validate_status_code(status_code)?;
-            if has_transfer_encoding(&headers) {
-                return Err(ResponseError::Send(
-                    UNSUPPORTED_TRANSFER_ENCODING.to_owned(),
-                ));
-            }
-            announced_len = parse_content_length(&headers)?;
-            suppress_body = is_bodyless_status(status_code, is_head);
-            if hides_entity_length(status_code, is_head) {
-                headers.remove(CONTENT_LENGTH);
-            }
-            let head_body: &[u8] = if suppress_body {
-                &[]
-            } else {
-                &pending[body_start..]
-            };
-            let parsed: FramedHead = FramedHead {
-                status_code,
-                headers,
-            };
-            framer.send_head(&parsed, suppress_body).await?;
-            if !head_body.is_empty() {
-                let overflowed: bool = check_body_budget(announced_len, body_len, head_body.len());
-                body_len += head_body.len();
-                if overflowed {
-                    return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
-                }
-                framer.send_data(head_body).await?;
-            }
-            head = Some(parsed);
-            pending.clear();
-            continue;
-        }
-        if suppress_body {
-            continue;
-        }
-        let overflowed: bool = check_body_budget(announced_len, body_len, read);
-        body_len += read;
-        if overflowed {
-            return Err(ResponseError::Send(OVERFLOWING_RESPONSE_BODY.to_owned()));
-        }
-        framer.send_data(&read_chunk[..read]).await?;
-    }
-    let Some(head) = head else {
-        return Err(ResponseError::Send(MISSING_RESPONSE_HEAD.to_owned()));
-    };
-    if !suppress_body
-        && let Some(announced) = announced_len
-        && body_len != announced
+pub(crate) fn return_route_param_entry(mut pair: (String, String)) {
+    if pair.0.capacity() > MAX_POOLED_STRING_CAPACITY
+        || pair.1.capacity() > MAX_POOLED_STRING_CAPACITY
     {
-        return Err(ResponseError::Send(TRUNCATED_RESPONSE_BODY.to_owned()));
+        return;
     }
-    framer.finish().await?;
-    let _framed: FramedHead = head;
-    let _forwarded: usize = body_len;
-    Ok(())
+    pair.0.clear();
+    pair.1.clear();
+    ROUTE_PARAM_POOL.with(|pool: &RefCell<Vec<(String, String)>>| {
+        let mut pool: RefMut<'_, Vec<(String, String)>> = pool.borrow_mut();
+        if pool.len() < MAX_POOLED_PROTOCOL_HEADERS {
+            pool.push(pair);
+        }
+    });
+}
+pub(crate) async fn poll_once_protocol<F>(mut future: Pin<&mut F>) -> Option<F::Output>
+where
+    F: Future,
+{
+    poll_fn(
+        |context: &mut task::Context<'_>| match future.as_mut().poll(context) {
+            Poll::Ready(value) => Poll::Ready(Some(value)),
+            Poll::Pending => Poll::Ready(None),
+        },
+    )
+    .await
 }
 pub(crate) fn hides_entity_length(status_code: usize, _is_head: bool) -> bool {
     status_code < HttpStatus::Ok.code() || status_code == HttpStatus::NoContent.code()
@@ -45896,75 +53389,6 @@ pub(crate) fn validate_status_code(status_code: usize) -> Result<(), ResponseErr
         return Err(ResponseError::Send(INVALID_RESPONSE_STATUS.to_owned()));
     }
     Ok(())
-}
-```
-# Path: hyperlane/core/src/protocol/framing/mod.rs
-```rust
-mod r#trait;
-pub(crate) use r#trait::*;
-use super::*;
-```
-# Path: hyperlane/core/src/protocol/framing/trait.rs
-```rust
-use super::*;
-pub(crate) trait ResponseFramer {
-    fn send_head<'a>(
-        &'a mut self,
-        head: &'a FramedHead,
-        bodyless: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>>;
-    fn send_data<'a>(
-        &'a mut self,
-        data: &'a [u8],
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>>;
-    fn finish<'a>(
-        &'a mut self,
-    ) -> Pin<Box<dyn Future<Output = Result<(), ResponseError>> + Send + 'a>>;
-}
-```
-# Path: hyperlane/core/src/protocol/lifecycle/impl.rs
-```rust
-use super::*;
-impl ServerLifecycle {
-    pub(crate) fn new(server: Arc<Server>, request: Request, target: String) -> Self {
-        Self {
-            server,
-            request,
-            target,
-        }
-    }
-    pub(crate) async fn run(self, mut stream: Stream) {
-        let mut ctx: Context = Context::default();
-        self.get_server()
-            .run_protocol_lifecycle(&mut stream, &mut ctx, self.get_request(), self.get_target())
-            .await;
-    }
-}
-```
-# Path: hyperlane/core/src/protocol/lifecycle/mod.rs
-```rust
-mod r#impl;
-mod r#struct;
-pub(crate) use r#struct::*;
-use super::*;
-```
-# Path: hyperlane/core/src/protocol/lifecycle/struct.rs
-```rust
-use super::*;
-#[derive(Data, Debug)]
-pub(crate) struct ServerLifecycle {
-    #[get(type(clone), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
-    pub(super) server: Arc<Server>,
-    #[get(type(clone), pub(crate))]
-    #[get_mut(skip)]
-    #[set(pub(crate))]
-    pub(super) request: Request,
-    #[get(type(clone), pub(super))]
-    #[get_mut(skip)]
-    #[set(skip)]
-    pub(super) target: String,
 }
 ```
 # Path: hyperlane/core/src/tls/type.rs
@@ -45996,26 +53420,39 @@ pub fn build_server_tls_config(
     let private_key: PrivateKeyDer<'static> =
         PrivateKeyDer::from_pem_file(tls.get_private_key_path())
             .map_err(|error: pem::Error| ServerError::Tls(tls_error_string(&error)))?;
+    let mut provider: CryptoProvider = default_provider();
+    let preferred_suites: [SupportedCipherSuite; 9] = [
+        TLS13_AES_128_GCM_SHA256,
+        TLS13_AES_256_GCM_SHA384,
+        TLS13_CHACHA20_POLY1305_SHA256,
+        TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+        TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+        TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+        TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+        TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+        TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+    ];
+    provider.cipher_suites = preferred_suites.to_vec();
     let mut server_config: TlsServerConfig =
-        TlsServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+        TlsServerConfig::builder_with_provider(Arc::new(provider))
             .with_protocol_versions(versions)
             .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?
             .with_no_client_auth()
             .with_single_cert(certificate_chain, private_key)
             .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?;
     server_config.alpn_protocols = vec![alpn.to_vec()];
+    server_config.ignore_client_order = true;
     Ok(Arc::new(server_config))
 }
 pub fn build_stream_tls_config(
     tls: &TlsConfig,
     protocol: &ServerProtocol,
 ) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
-    let versions: &[&'static SupportedProtocolVersion] =
-        &[&rustls::version::TLS13, &rustls::version::TLS12];
+    let versions: &[&'static SupportedProtocolVersion] = &[&TLS13, &TLS12];
     build_server_tls_config(tls, protocol.get_alpn_protocol(), versions)
 }
 pub fn build_quic_tls_config(tls: &TlsConfig) -> Result<Arc<TlsServerConfig>, Box<ServerError>> {
-    let versions: &[&'static SupportedProtocolVersion] = &[&rustls::version::TLS13];
+    let versions: &[&'static SupportedProtocolVersion] = &[&TLS13];
     build_server_tls_config(tls, ServerProtocol::Http3.get_alpn_protocol(), versions)
 }
 fn tls_error_string(error: &pem::Error) -> String {
