@@ -1,4 +1,66 @@
-<!--2026-11-26 07:34:11-->
+<!--2026-11-26 21:10:11-->
+# Path: hyperlane/CLAUDE.md
+# CLAUDE.md
+See [AGENTS.md](AGENTS.md) for workspace architecture, public API and security invariants, Rust coding standards, and verification commands.
+For framework usage, plugin patterns, `http-request` client usage, and performance benchmarking guides, read [.agents/skills/hyperlane/SKILL.md](.agents/skills/hyperlane/SKILL.md).
+# Path: hyperlane/AGENTS.md
+# AGENTS.md
+Repository instructions for AI coding agents working in the Hyperlane Rust monorepo.
+## Workspace Layout
+Rust edition `2024`, unified workspace version in root `Cargo.toml`.
+| Crate | Path | Responsibility |
+| --- | --- | --- |
+| `hyperlane` | `.` (`src/`) | Facade crate re-exporting `hyperlane-core` and `hyperlane-macros` |
+| `hyperlane-core` | `core/` | Multi-protocol async server (`HTTP/1.x`, `HTTP/2` `h2c`/`h2`, `HTTP/3` QUIC), router, `Context`, `ServerHook`, Linux `io_uring` transport |
+| `hyperlane-macros` | `macros/` | Proc macros (`#[route]`, `#[request_middleware]`, `#[response_middleware]`, `#[hyperlane]`, `#[send]`, `#[host]`, `#[referer]`, etc.) |
+| `http-type` | `type/` | Wire parsers/builders, `Request`, `Response`, `Stream`, `Cookie`, `MultipartFormData`, `WebSocket`, `Status`, `RequestConfig` |
+| `http-constant` | `constant/` | Shared HTTP header/method/status/symbol constants |
+| `http-compress` | `compress/` | Bounded gzip, deflate, and brotli compression/decompression (`MAX_DECOMPRESSED_BYTES = 64 MiB`), RFC 9110 `Accept-Encoding` negotiation |
+| `http-request` | `request/` | Sync and async HTTP/1.1 + HTTP/2 client with opt-in keep-alive pooling, TLS session resumption, custom PEM roots, retries, form/multipart, and HTTP/SOCKS5 proxies |
+| `hyperlane-cli` | `cli/` | CLI project scaffolding and workflow tooling |
+| `hyperlane-performance` | `performance/` | Official CPU-pinned Docker and native loadgen / control / alloc-count benchmark harness |
+| `hyperlane-plugin-logger` | `plugin/logger/` | Console and file logger with CRLF/ANSI sanitization |
+| `hyperlane-plugin-negotiate` | `plugin/negotiate/` | `Accept-Encoding` compression and conditional `304 Not Modified` ETag middlewares |
+| `hyperlane-plugin-websocket` | `plugin/websocket/` | Room-based WebSocket broadcast and lifecycle hooks |
+| `hyperlane-plugin-sse` | `plugin/sse/` | WHATWG SSE framing, CRLF sanitization, topic pub/sub, `Last-Event-ID` replay, heartbeats |
+| `hyperlane-plugin-mq` | `plugin/mq/` | Async `MessageBroker` trait and `InMemoryBroker` (consumer groups, TTL, retries, visibility timeout, DLQ) |
+| `hyperlane-plugin-rpc` | `plugin/rpc/` | JSON-RPC 2.0 router, batch/notification dispatch, payload/batch caps, `RpcHook` |
+| `hyperlane-plugin-grpc` | `plugin/grpc/` | gRPC over HTTP/2 5-byte framing, bounded compression, status codes `0..=16`, `grpc-timeout`, `GrpcHook` |
+| `hyperlane-plugin-mcp` | `plugin/mcp/` | Model Context Protocol Streamable HTTP server, tools/resources/prompts registries, `Mcp-Session-Id`, `Origin` DNS-rebinding guard, `McpHook` |
+| `hyperlane-plugin-gateway` | `plugin/gateway/` | Reverse proxy & API gateway backed by pooled `http-request` (load balancing, circuit breaker, token-bucket rate limit, RFC 9110 hop-by-hop stripping, `GatewayHook`) |
+## Core Architectural Invariants
+1. **Public API stability**: Never remove or break existing `pub` signatures across workspace crates without an explicit major-version plan. Do not introduce duplicate APIs for equivalent functionality.
+2. **`ServerHook` lifecycle**:
+   - `ServerHook::new(&mut Stream, &mut Context) -> Self` and `ServerHook::handle(self, &mut Stream, &mut Context) -> Status`.
+   - Returning `Status::Continue` advances to the next middleware/route/response hook.
+   - Returning `Status::Reject` stops the remaining pipeline immediately (used after writing the response or rejecting an invalid request). Always send via `stream.try_send(&ctx.get_mut_response().build()).await` (or `#[hyperlane::send]`) before returning `Status::Reject` if a reply is expected.
+   - Keep-alive connections reset `Context` (request, response, route params, attributes, HTTP version) across every request boundary, including errors and panics.
+3. **Plugin contract (`plugin/README.md`)**:
+   - Plugins must be opt-in and transparent when unconfigured (`OnceLock` `init`/`get`; unconfigured hooks return `Status::Continue`).
+   - Add new publishable plugins to root `Cargo.toml` `[workspace] members` and `.github/workflows/rust.yml` `PACKAGES`.
+4. **Security & wire conformance invariants**:
+   - Reject HTTP request smuggling (`Content-Length` + `Transfer-Encoding`, duplicate `Content-Length`, obs-fold, bare CR/LF, invalid request-line/HTTP version).
+   - Enforce response CRLF/header-value validation at the wire builder boundary and forbid `Content-Length` alongside `Transfer-Encoding`.
+   - Cap all unbounded allocations: H1 request line/head/body caps, H2 `SETTINGS_MAX_HEADER_LIST_SIZE` & reset caps, H3 GREASE skip budget & streaming body caps, decompression bomb cap (`64 MiB`), WebSocket control-frame (`125 B`) & reassembled message caps, redirect credential stripping across origins or HTTPS->HTTP downgrades, and MCP `Origin` validation.
+   - Preserve exact route anchoring (`{param:regex}` anchored as `^(?:...)$`) and leading-slash normalization.
+## Mandatory Rust Coding Standards
+All `.rs` and `.toml` changes must pass the workspace style gate:
+- **9 keyword filenames only**: `lib.rs`, `mod.rs`, `const.rs`, `static.rs`, `type.rs`, `enum.rs`, `struct.rs`, `trait.rs`, `impl.rs`, `fn.rs`. No code files alongside subdirectories.
+- **Centralized imports**: Declare external/std imports once in crate root (`src/lib.rs` / `tests/mod.rs`); submodules use `use super::*;`. No `use ... as ...` aliases.
+- **Strict cleanliness**: Zero comments in `mod.rs`, `*.toml`, and `tests/**/*.rs`; no blank lines inside function bodies; explicit types on all `let` bindings and closure parameters; generic bounds in `where` clauses; no `#[allow]`/`#[expect]` in production code; no `.unwrap()`/`.expect()`/`panic!()` in `src/`.
+- **Field & string discipline**: Read fields via accessors rather than `self.field` outside accessors/Display/Debug/constructors; store string literals (`>= 4` chars) in `const.rs` with `pub` items ordered before `pub(crate)` and private items; include 4-layer doc comments (`# Arguments`, `# Returns`) on functions.
+- **Externalized tests**: Keep unit and integration tests under `tests/`, never inline `#[cfg(test)] mod tests` in `src/`.
+## Verification & Benchmarking Workflow
+Run locally before opening or updating a PR:
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-features --all-targets -- -D warnings
+cargo test --workspace --all-features
+cargo check --release --workspace --all-features
+```
+For performance changes, validate with real paired measurements (`performance/` harness: `h1`, `h1-tls`, `h2c`, `h2-tls`, `h3`, `errors == 0`, plus deterministic `alloc-count`), never code inspection alone.
+## Repo-Local Skills
+See [.agents/skills/hyperlane/SKILL.md](.agents/skills/hyperlane/SKILL.md) for task-oriented Hyperlane development, plugin integration, client usage, and benchmarking patterns.
 # Path: hyperlane/README.md
 <p align="center">
 </p>
@@ -66,7 +128,7 @@ Select the wire protocol per listener with [`ServerConfig`][config].
 | [`hyperlane`][api], [`hyperlane-core`](core/README.md), [`hyperlane-macros`](macros/README.md)              | Server API, routing, and procedural macros |
 | [`http-type`](type/README.md), [`http-constant`](constant/README.md), [`http-compress`](compress/README.md) | HTTP types, constants, and compression     |
 | [`http-request`](request/README.md)                                                                         | Synchronous and asynchronous HTTP client   |
-| [WebSocket plugin](plugin/websocket/README.md), [Logger plugin](plugin/logger/README.md), [Negotiate plugin](plugin/negotiate/README.md)                    | Opt-in plugins                             |
+| [Logger](plugin/logger/README.md), [Negotiate](plugin/negotiate/README.md), [WebSocket](plugin/websocket/README.md), [SSE](plugin/sse/README.md), [MQ](plugin/mq/README.md), [RPC](plugin/rpc/README.md), [gRPC](plugin/grpc/README.md), [MCP](plugin/mcp/README.md), [Gateway](plugin/gateway/README.md) | Opt-in plugins |
 | [`hyperlane-cli`](cli/README.md), [`hyperlane-performance`](performance/README.md)                          | Project and benchmark tooling              |
 ## Protocol notes
 These notes describe the current checkout. For the behavior of an installed
@@ -114,6 +176,7 @@ cargo add http-compress
 # Path: hyperlane/compress/tests/mod.rs
 ```rust
 mod compress;
+mod security;
 mod xx_hash3_64;
 use super::*;
 use std::{
@@ -420,6 +483,45 @@ fn from_accept_encoding_ignores_unknown_parameters() {
     );
 }
 ```
+# Path: hyperlane/compress/tests/security/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/compress/tests/security/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_security_decompression_bomb_capped_across_gzip_deflate_brotli() {
+    let huge: Vec<u8> = vec![0u8; 68 * 1024 * 1024];
+    for algo in [Compress::Gzip, Compress::Deflate, Compress::Br] {
+        let compressed: Cow<'_, [u8]> = algo.encode(&huge, 8192);
+        assert!(compressed.len() < 512 * 1024);
+        let decoded: Cow<'_, [u8]> = algo.decode(&compressed, 8192);
+        assert!(decoded.len() <= 64 * 1024 * 1024);
+    }
+}
+#[test]
+fn test_security_accept_encoding_strict_qvalue_x_gzip_and_multi_member_gzip() {
+    assert_eq!(
+        Compress::from_accept_encoding("x-gzip;q=0.9, deflate;q=0.5"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(
+        Compress::from_accept_encoding("GZIP;q=1.000"),
+        Some(Compress::Gzip)
+    );
+    assert_eq!(Compress::from_accept_encoding("gzip;q=1.5"), None);
+    assert_eq!(Compress::from_accept_encoding("gzip;q=NaN"), None);
+    assert_eq!(Compress::from_accept_encoding("gzip;q=-0.1"), None);
+    assert_eq!(Compress::from_accept_encoding("gzip;q=1.0000"), None);
+    assert_eq!(Compress::from_accept_encoding("gzip;q=0.0"), None);
+    let mut multi: Vec<u8> = Compress::Gzip.encode(b"part-one-", 1024).into_owned();
+    multi.extend_from_slice(&Compress::Gzip.encode(b"part-two", 1024));
+    let decoded: Cow<'_, [u8]> = Compress::Gzip.decode(&multi, 1024);
+    assert_eq!(decoded.as_ref(), b"part-one-part-two");
+}
+```
 # Path: hyperlane/compress/tests/xx_hash3_64/mod.rs
 ```rust
 mod r#fn;
@@ -511,7 +613,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fmt,
-    io::{self, BufReader, BufWriter, Read, prelude::*},
+    io::{self, Read, Write},
     mem::MaybeUninit,
     ptr, slice,
     str::FromStr,
@@ -521,7 +623,7 @@ use {
     core::hash::BuildHasherDefault,
     flate2::{
         Compression,
-        read::{DeflateDecoder, GzDecoder},
+        read::{DeflateDecoder, MultiGzDecoder},
         write::{DeflateEncoder, GzEncoder},
     },
     twox_hash::xxhash3_64::{self, DEFAULT_SECRET_LENGTH, RawHasher, SecretBuffer},
@@ -534,11 +636,16 @@ impl FromStr for Compress {
     type Err = ();
     #[inline(always)]
     fn from_str(data: &str) -> Result<Self, Self::Err> {
-        match data.to_lowercase().as_str() {
-            _data if _data == CONTENT_ENCODING_GZIP => Ok(Self::Gzip),
-            _data if _data == CONTENT_ENCODING_DEFLATE => Ok(Self::Deflate),
-            _data if _data == CONTENT_ENCODING_BROTLI => Ok(Self::Br),
-            _ => Ok(Self::Unknown),
+        if data.eq_ignore_ascii_case(CONTENT_ENCODING_GZIP)
+            || data.eq_ignore_ascii_case(CONTENT_ENCODING_X_GZIP)
+        {
+            Ok(Self::Gzip)
+        } else if data.eq_ignore_ascii_case(CONTENT_ENCODING_DEFLATE) {
+            Ok(Self::Deflate)
+        } else if data.eq_ignore_ascii_case(CONTENT_ENCODING_BROTLI) {
+            Ok(Self::Br)
+        } else {
+            Ok(Self::Unknown)
         }
     }
 }
@@ -579,7 +686,9 @@ impl Compress {
                 wildcard = Some(quality);
             } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_BROTLI) {
                 brotli = Some(quality);
-            } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_GZIP) {
+            } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_GZIP)
+                || coding.eq_ignore_ascii_case(CONTENT_ENCODING_X_GZIP)
+            {
                 gzip = Some(quality);
             } else if coding.eq_ignore_ascii_case(CONTENT_ENCODING_DEFLATE) {
                 deflate = Some(quality);
@@ -619,18 +728,32 @@ impl Compress {
             if !name.trim().eq_ignore_ascii_case(ACCEPT_ENCODING_QUALITY) {
                 continue;
             }
-            let quality: f32 = value.trim().parse().ok()?;
-            if !(0.0..=1.0).contains(&quality) {
+            let quality_text: &str = value.trim();
+            if !Self::is_valid_qvalue(quality_text) {
                 return None;
             }
+            let quality: f32 = quality_text.parse().ok()?;
             return Some((coding, quality));
         }
         Some((coding, DEFAULT_QUALITY))
     }
     #[inline(always)]
+    fn is_valid_qvalue(value: &str) -> bool {
+        let bytes: &[u8] = value.as_bytes();
+        match bytes {
+            [b'0'] | [b'1'] => true,
+    #[inline(always)]
     pub fn from(header: &HashMap<String, String, BuildHasherDefault<XxHash3_64>>) -> Self {
         header
             .get(CONTENT_ENCODING)
+            .or_else(|| {
+                header
+                    .iter()
+                    .find(|(key, _): &(&String, &String)| {
+                        key.eq_ignore_ascii_case(CONTENT_ENCODING)
+                    })
+                    .map(|(_, value): (&String, &String)| value)
+            })
             .map(|value: &String| value.parse::<Compress>().unwrap_or_default())
             .unwrap_or_default()
     }
@@ -639,7 +762,7 @@ impl Compress {
             Self::Gzip => gzip::decode(data, buffer_size),
             Self::Deflate => deflate::decode(data, buffer_size),
             Self::Br => brotli::decode(data, buffer_size),
-            Self::Unknown => Cow::Owned(data.to_vec()),
+            Self::Unknown => Cow::Borrowed(data),
         }
     }
     pub fn encode<'a>(&self, data: &'a [u8], buffer_size: usize) -> Cow<'a, [u8]> {
@@ -647,7 +770,7 @@ impl Compress {
             Self::Gzip => gzip::encode(data, buffer_size),
             Self::Deflate => deflate::encode(data, buffer_size),
             Self::Br => brotli::encode(data, buffer_size),
-            Self::Unknown => Cow::Owned(data.to_vec()),
+            Self::Unknown => Cow::Borrowed(data),
         }
     }
 }
@@ -668,6 +791,7 @@ pub enum Compress {
 pub(crate) const CONTENT_ENCODING: &str = "content-encoding";
 pub(crate) const EMPTY_STR: &str = "";
 pub(crate) const CONTENT_ENCODING_GZIP: &str = "gzip";
+pub(crate) const CONTENT_ENCODING_X_GZIP: &str = "x-gzip";
 pub(crate) const CONTENT_ENCODING_DEFLATE: &str = "deflate";
 pub(crate) const CONTENT_ENCODING_BROTLI: &str = "br";
 pub(crate) const BROTLI_DEFAULT_QUALITY: u32 = 5;
@@ -678,6 +802,7 @@ pub(crate) const PARAMETER_ASSIGN: &str = "=";
 pub(crate) const ACCEPT_ENCODING_WILDCARD: &str = "*";
 pub(crate) const ACCEPT_ENCODING_QUALITY: &str = "q";
 pub(crate) const DEFAULT_QUALITY: f32 = 1.0;
+pub(crate) const MAX_DECOMPRESSED_BYTES: usize = 64 * 1024 * 1024;
 ```
 # Path: hyperlane/compress/src/compress/mod.rs
 ```rust
@@ -698,24 +823,22 @@ use super::*;
 ```rust
 use super::*;
 pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
-    let encoder: DeflateEncoder<Vec<u8>> = DeflateEncoder::new(Vec::new(), Compression::default());
-    let mut buffered_writer: BufWriter<DeflateEncoder<Vec<u8>>> =
-        BufWriter::with_capacity(buffer_size, encoder);
-    if buffered_writer.write_all(data).is_err() {
+    let initial_capacity: usize = data.len().min(buffer_size);
+    let mut encoder: DeflateEncoder<Vec<u8>> =
+        DeflateEncoder::new(Vec::with_capacity(initial_capacity), Compression::default());
+    if encoder.write_all(data).is_err() {
         return Cow::Owned(Vec::new());
     }
-    match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new())),
-        Err(_) => Cow::Owned(Vec::new()),
-    }
+    Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new()))
 }
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
     let decoder: DeflateDecoder<&[u8]> = DeflateDecoder::new(data);
-    let mut buffered_reader: BufReader<DeflateDecoder<&[u8]>> =
-        BufReader::with_capacity(buffer_size, decoder);
-    let mut decompressed_data: Vec<u8> = Vec::new();
-    match buffered_reader.read_to_end(&mut decompressed_data) {
-        Ok(_) => Cow::Owned(decompressed_data),
+    let mut limited: io::Take<DeflateDecoder<&[u8]>> =
+        decoder.take((MAX_DECOMPRESSED_BYTES + 1) as u64);
+    let initial_capacity: usize = data.len().min(buffer_size);
+    let mut decompressed_data: Vec<u8> = Vec::with_capacity(initial_capacity);
+    match limited.read_to_end(&mut decompressed_data) {
+        Ok(_) if decompressed_data.len() <= MAX_DECOMPRESSED_BYTES => Cow::Owned(decompressed_data),
         _ => Cow::Owned(Vec::new()),
     }
 }
@@ -730,24 +853,22 @@ use super::*;
 ```rust
 use super::*;
 pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
-    let encoder: GzEncoder<Vec<u8>> = GzEncoder::new(Vec::new(), Compression::default());
-    let mut buffered_writer: BufWriter<GzEncoder<Vec<u8>>> =
-        BufWriter::with_capacity(buffer_size, encoder);
-    if buffered_writer.write_all(data).is_err() {
+    let initial_capacity: usize = data.len().min(buffer_size);
+    let mut encoder: GzEncoder<Vec<u8>> =
+        GzEncoder::new(Vec::with_capacity(initial_capacity), Compression::default());
+    if encoder.write_all(data).is_err() {
         return Cow::Owned(Vec::new());
     }
-    match buffered_writer.into_inner() {
-        Ok(encoder) => Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new())),
-        Err(_) => Cow::Owned(Vec::new()),
-    }
+    Cow::Owned(encoder.finish().unwrap_or_else(|_: io::Error| Vec::new()))
 }
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
-    let decoder: GzDecoder<&[u8]> = GzDecoder::new(data);
-    let mut buffered_reader: BufReader<GzDecoder<&[u8]>> =
-        BufReader::with_capacity(buffer_size, decoder);
-    let mut decompressed_data: Vec<u8> = Vec::new();
-    match buffered_reader.read_to_end(&mut decompressed_data) {
-        Ok(_) => Cow::Owned(decompressed_data),
+    let decoder: MultiGzDecoder<&[u8]> = MultiGzDecoder::new(data);
+    let mut limited: io::Take<MultiGzDecoder<&[u8]>> =
+        decoder.take((MAX_DECOMPRESSED_BYTES + 1) as u64);
+    let initial_capacity: usize = data.len().min(buffer_size);
+    let mut decompressed_data: Vec<u8> = Vec::with_capacity(initial_capacity);
+    match limited.read_to_end(&mut decompressed_data) {
+        Ok(_) if decompressed_data.len() <= MAX_DECOMPRESSED_BYTES => Cow::Owned(decompressed_data),
         _ => Cow::Owned(Vec::new()),
     }
 }
@@ -774,10 +895,12 @@ pub fn encode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
     Cow::Owned(encoder.into_inner())
 }
 pub fn decode(data: &'_ [u8], buffer_size: usize) -> Cow<'_, [u8]> {
-    let mut decompressor: Decompressor<&[u8]> = Decompressor::new(data, buffer_size);
+    let decompressor: Decompressor<&[u8]> = Decompressor::new(data, buffer_size);
+    let mut limited: io::Take<Decompressor<&[u8]>> =
+        decompressor.take((MAX_DECOMPRESSED_BYTES + 1) as u64);
     let mut decompressed_data: Vec<u8> = Vec::new();
-    match decompressor.read_to_end(&mut decompressed_data) {
-        Ok(_) => Cow::Owned(decompressed_data),
+    match limited.read_to_end(&mut decompressed_data) {
+        Ok(_) if decompressed_data.len() <= MAX_DECOMPRESSED_BYTES => Cow::Owned(decompressed_data),
         _ => Cow::Owned(Vec::new()),
     }
 }
@@ -843,8 +966,8 @@ impl core::hash::Hasher for XxHash3_64 {
             *prefix_len = current_len + incoming_len;
             return;
         }
-        let mut hasher: RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]> =
-            RawHasher::new(SecretBuffer::default());
+        let mut hasher: Box<RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>> =
+            Box::new(RawHasher::new(SecretBuffer::default()));
         let initialized: &[u8] =
             unsafe { slice::from_raw_parts(prefix.as_ptr().cast::<u8>(), current_len) };
         hasher.write(initialized);
@@ -868,8 +991,8 @@ impl core::hash::Hasher for XxHash3_64 {
             *prefix_len = current_len + 1;
             return;
         }
-        let mut hasher: RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]> =
-            RawHasher::new(SecretBuffer::default());
+        let mut hasher: Box<RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>> =
+            Box::new(RawHasher::new(SecretBuffer::default()));
         let initialized: &[u8] =
             unsafe { slice::from_raw_parts(prefix.as_ptr().cast::<u8>(), current_len) };
         hasher.write(initialized);
@@ -911,11 +1034,72 @@ use super::*;
 ```rust
 use super::*;
 pub struct XxHash3_64 {
-    pub(super) inner: Option<RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>>,
+    pub(super) inner: Option<Box<RawHasher<&'static [u8; DEFAULT_SECRET_LENGTH]>>>,
     pub(super) prefix: [MaybeUninit<u8>; HASH_PREFIX_CAPACITY],
     pub(super) prefix_len: usize,
 }
 ```
+# Path: hyperlane/.agents/skills/hyperlane/SKILL.md
+# Hyperlane Development Skill
+## Quick Orientation
+- **Facade crate**: `hyperlane` re-exports `hyperlane-core` (`Server`, `ServerConfig`, `Context`, `ServerHook`, `Status`, `Stream`, `Request`, `Response`, `HttpStatus`, `tokio`) and `hyperlane-macros` (`#[route]`, `#[request_middleware]`, `#[response_middleware]`, `#[hyperlane]`, `#[send]`, `#[host]`, `#[referer]`, etc.).
+- **Protocols**: `HTTP/1.0`, `HTTP/1.1` (TCP & TLS), `HTTP/2` (`h2c` prior knowledge & TLS ALPN `h2`), `HTTP/3` (QUIC + TLS), WebSocket, and Server-Sent Events (SSE).
+- **Client crate**: `http-request` (`RequestBuilder`, `HttpRequest`, `HttpResponse`, `Proxy`) supporting sync/async H1, multiplexed async H2 (`h2`/`h2c`), opt-in connection pooling (`.keep_alive(true)`), TLS session resumption, custom PEM root CAs (`.root_cert_pem()`), idempotent retries (`.retry(n)`), form/multipart bodies, auth helpers, and HTTP/HTTPS/SOCKS5 proxies.
+## ServerHook Pattern
+```rust
+use hyperlane::{Context, ServerHook, Status, Stream};
+pub struct HealthRoute;
+impl ServerHook for HealthRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    #[hyperlane::send]
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response().set_body("ok");
+        Status::Reject
+    }
+}
+```
+- Return `Status::Continue` to pass execution to the next middleware/route/response hook.
+- Return `Status::Reject` to terminate the request pipeline immediately (ensure the response is sent before rejecting if the client expects a reply).
+- Route dynamic segments use `{name}` or anchored regex `{name:pattern}` (automatically anchored as `^(?:pattern)$`).
+## HTTP Client (`http-request`) Pattern
+```rust
+use http_request::{HttpRequest, HttpResponse, RequestBuilder};
+let mut builder: RequestBuilder = RequestBuilder::new();
+let mut req: HttpRequest = builder
+    .get("https://api.example.com/v1/items")
+    .query("limit", "20")
+    .bearer_auth("token")
+    .keep_alive(true)
+    .connect_timeout(2000)
+    .timeout(5000)
+    .retry(2)
+    .decode()
+    .build();
+let resp: HttpResponse = req.send_async().await?;
+```
+- Use `.keep_alive(true)` for high-concurrency pooling (reuses persistent H1 connections and multiplexed H2 senders).
+- Use `.http2_only()` for async `h2` (ALPN over TLS) or cleartext `h2c`.
+- Automatic retries apply strictly to RFC 9110 idempotent methods (`GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`) on transient transport errors or `429`/`502`/`503`/`504`.
+## Official Plugin Ecosystem
+All plugins live under `plugin/` and follow the opt-in `OnceLock` (`init`/`get`) contract — unconfigured hooks return `Status::Continue`:
+| Plugin | Key Types | Purpose |
+| --- | --- | --- |
+| `hyperlane-plugin-logger` | `Logger`, `LoggerConfig`, `LoggerHook` | Console/file logging with CRLF/ANSI sanitization |
+| `hyperlane-plugin-negotiate` | `CompressMiddleware`, `ConditionalMiddleware`, `EntityTag` | `Accept-Encoding` compression + `304 Not Modified` |
+| `hyperlane-plugin-websocket` | `WebSocketHook`, room broadcast | WebSocket upgrade, rooms, connection lifecycle |
+| `hyperlane-plugin-sse` | `SseEvent`, `SseHub`, `SseStream`, `SsePlugin` | CRLF-safe SSE framing, topic fan-out, `Last-Event-ID` replay, heartbeats |
+| `hyperlane-plugin-mq` | `MessageBroker`, `InMemoryBroker`, `MqMessage`, `MqPlugin` | Consumer groups, bounded queues, TTL, visibility timeout, retries, DLQ |
+| `hyperlane-plugin-rpc` | `RpcRouter`, `RpcRequest`, `RpcResponse`, `RpcHook`, `RpcPlugin` | JSON-RPC 2.0 single/batch/notification dispatch with DoS caps |
+| `hyperlane-plugin-grpc` | `GrpcFrame`, `GrpcRouter`, `GrpcStatus`, `GrpcHook`, `GrpcPlugin` | 5-byte gRPC framing, bounded compression, `grpc-timeout` enforcement |
+| `hyperlane-plugin-mcp` | `McpRegistry`, `McpTool`, `McpResource`, `McpPrompt`, `McpHook` | MCP Streamable HTTP server, `Mcp-Session-Id`, `Origin` DNS-rebinding guard |
+| `hyperlane-plugin-gateway` | `GatewayRuntime`, `GatewayRoute`, `GatewayHook`, `GatewayPlugin` | Reverse proxy with pooled H1/H2, LB strategies, circuit breaker, token-bucket rate limit, hop-by-hop stripping |
+## Verification & Performance Rules
+1. Run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-features --all-targets -- -D warnings`, and `cargo test --workspace --all-features`.
+2. Note two long-running integration tests (`core/tests/server/fn.rs::main` and `plugin/websocket/tests/websocket/fn.rs::main`) sleep 60 s; skip only during tight iteration (`-- --skip "::main"`), and run the full suite before committing.
+3. Validate throughput/latency changes with paired runs in `performance/` (`h1`, `h1-tls`, `h2c`, `h2-tls`, `h3`, `errors == 0`) and deterministic `alloc-count` before claiming improvements.
+4. On Linux targets, verify `#[cfg(target_os = "linux")]` `io_uring` code builds and passes tests cleanly.
 # Path: hyperlane/performance/README.md
 ## hyperlane-performance
 [Api Docs](https://docs.rs/hyperlane-performance/latest/)
@@ -5569,6 +5753,13 @@ fn context_leak_generation_preserves_the_unsafe_mode() {
         quote!(ctx.leak_mut()).to_string()
     );
 }
+#[test]
+fn order_expression_accepts_negative_integer_literal() {
+    let neg: Expr = parse_quote!(-120);
+    let tokens: TokenStream = expr_to_isize(&Some(neg));
+    let _: Expr = parse2(tokens.clone()).unwrap();
+    assert_eq!(tokens.to_string().replace(' ', ""), "Some(-120isize)");
+}
 ```
 # Path: hyperlane/macros/src/lib.rs
 ```rust
@@ -6482,7 +6673,7 @@ pub(crate) fn context_macro(input: TokenStream) -> TokenStream {
 # Path: hyperlane/macros/src/inject/const.rs
 ```rust
 pub(crate) const MACRO_PATH_SHOULD_HAVE_IDENTIFIER: &str = "Macro path should have an identifier";
-pub(crate) const FAILED_TO_PARSE_MACRO_ATTRIBUTES: &str = "Failed to parse macro attributes";
+pub(crate) const UNSUPPORTED_MACRO_FORMAT: &str = "Unsupported macro format in inject macro";
 ```
 # Path: hyperlane/macros/src/inject/mod.rs
 ```rust
@@ -6495,22 +6686,28 @@ use super::*;
 ```rust
 use super::*;
 fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) -> TokenStream {
-    let (macro_name, macro_attr) = match macro_meta {
-        Meta::Path(path) => (
-            path.get_ident()
-                .expect(MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
-                .to_string(),
-            TokenStream::new(),
-        ),
-        Meta::List(meta_list) => (
-            meta_list
-                .path
-                .get_ident()
-                .expect(MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
-                .to_string(),
-            meta_list.tokens.clone().into(),
-        ),
-        _ => panic!("Unsupported macro format in inject macro"),
+    let (macro_name, macro_attr): (String, TokenStream) = match macro_meta {
+        Meta::Path(path) => match path.get_ident() {
+            Some(ident) => (ident.to_string(), TokenStream::new()),
+            None => {
+                return Error::new_spanned(path, MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
+                    .to_compile_error()
+                    .into();
+            }
+        },
+        Meta::List(meta_list) => match meta_list.path.get_ident() {
+            Some(ident) => (ident.to_string(), meta_list.tokens.clone().into()),
+            None => {
+                return Error::new_spanned(&meta_list.path, MACRO_PATH_SHOULD_HAVE_IDENTIFIER)
+                    .to_compile_error()
+                    .into();
+            }
+        },
+        _ => {
+            return Error::new_spanned(macro_meta, UNSUPPORTED_MACRO_FORMAT)
+                .to_compile_error()
+                .into();
+        }
     };
     for injectable_macro in INJECTABLE_MACROS {
         if injectable_macro.name == macro_name {
@@ -6518,7 +6715,12 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
                 Handler::WithAttr(handler) => handler(macro_attr, item_stream),
                 Handler::NoAttrPosition(handler) => {
                     if !macro_attr.is_empty() {
-                        panic!("Macro {macro_name} does not take attributes");
+                        return Error::new_spanned(
+                            macro_meta,
+                            format!("Macro {macro_name} does not take attributes"),
+                        )
+                        .to_compile_error()
+                        .into();
                     }
                     handler(item_stream, position)
                 }
@@ -6526,12 +6728,16 @@ fn apply_macro(macro_meta: &Meta, item_stream: TokenStream, position: Position) 
             };
         }
     }
-    panic!("Unsupported macro: {macro_name}");
+    Error::new_spanned(macro_meta, format!("Unsupported macro: {macro_name}"))
+        .to_compile_error()
+        .into()
 }
 pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse(attr)
-        .expect(FAILED_TO_PARSE_MACRO_ATTRIBUTES);
+    let metas: Punctuated<Meta, Comma> =
+        match Punctuated::<Meta, Token![,]>::parse_terminated.parse(attr) {
+            Ok(metas) => metas,
+            Err(error) => return error.to_compile_error().into(),
+        };
     let mut current_stream: TokenStream = item;
     for meta in metas.iter().rev() {
         current_stream = apply_macro(meta, current_stream, Position::Prologue);
@@ -6539,9 +6745,11 @@ pub(crate) fn prologue_macros_macro(attr: TokenStream, item: TokenStream) -> Tok
     current_stream
 }
 pub(crate) fn epilogue_macros_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let metas: Punctuated<Meta, Comma> = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse(attr)
-        .expect(FAILED_TO_PARSE_MACRO_ATTRIBUTES);
+    let metas: Punctuated<Meta, Comma> =
+        match Punctuated::<Meta, Token![,]>::parse_terminated.parse(attr) {
+            Ok(metas) => metas,
+            Err(error) => return error.to_compile_error().into(),
+        };
     let mut current_stream: TokenStream = item;
     for meta in metas.iter() {
         current_stream = apply_macro(meta, current_stream, Position::Epilogue);
@@ -7229,12 +7437,21 @@ where
                     })
                     .collect();
                 let gen_code: proc_macro2::TokenStream = match tail_expr {
+                    Some(expr) if matches!(sig.output, ReturnType::Default) => quote! {
+                        #(#attrs)*
+                        #vis #sig {
+                            #(#normalized_leading)*
+                            #expr;
+                            #after_code
+                        }
+                    },
                     Some(expr) => quote! {
                         #(#attrs)*
                         #vis #sig {
                             #(#normalized_leading)*
+                            let __hyperlane_epilogue_result = { #expr };
                             #after_code
-                            #expr
+                            __hyperlane_epilogue_result
                         }
                     },
                     None => quote! {
@@ -7351,17 +7568,36 @@ pub(crate) fn expr_to_isize(opt_expr: &Option<Expr>) -> proc_macro2::TokenStream
             Expr::Lit(ExprLit {
                 lit: Lit::Int(lit_int),
                 ..
-            }) => {
-                let value: isize = lit_int.base10_parse::<isize>().unwrap();
-                quote! { Some(#value) }
-            }
+            }) => match lit_int.base10_parse::<isize>() {
+                Ok(value) => quote! { Some(#value) },
+                Err(error) => error.to_compile_error(),
+            },
+            Expr::Unary(ExprUnary {
+                op: UnOp::Neg(_),
+                expr: inner,
+                ..
+            }) => match inner.as_ref() {
+                Expr::Lit(ExprLit {
+                    lit: Lit::Int(lit_int),
+                    ..
+                }) => {
+                    let negated: String = format!("-{}", lit_int.base10_digits());
+                    match negated.parse::<isize>() {
+                        Ok(value) => quote! { Some(#value) },
+                        Err(_) => {
+                            Error::new_spanned(expr, CANNOT_PARSE_TO_ISIZE).to_compile_error()
+                        }
+                    }
+                }
+                _ => quote! { None },
+            },
             Expr::Lit(ExprLit {
                 lit: Lit::Str(lit_str),
                 ..
-            }) => {
-                let value: isize = lit_str.value().parse().expect(CANNOT_PARSE_TO_ISIZE);
-                quote! { Some(#value) }
-            }
+            }) => match lit_str.value().parse::<isize>() {
+                Ok(value) => quote! { Some(#value) },
+                Err(_) => Error::new_spanned(lit_str, CANNOT_PARSE_TO_ISIZE).to_compile_error(),
+            },
             _ => quote! { None },
         },
         None => quote! { None },
@@ -7611,15 +7847,29 @@ pub(crate) fn referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &Expr| {
+        let checks: Vec<proc_macro2::TokenStream> = multi_referer
+            .referer_values
+            .iter()
+            .map(|referer_value: &Expr| {
+                quote! {
+                    referer_header == #referer_value
+                }
+            })
+            .collect();
+        if checks.is_empty() {
+            quote! {}
+        } else {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header != #referer_value) {
+                if #context
+                    .get_request()
+                    .try_get_header_back(::hyperlane::REFERER)
+                    .map_or(true, |referer_header: ::hyperlane::RequestHeadersValueItem| {
+                        !(#(#checks)||*)
+                    })
+                {
                     return ::hyperlane::Status::Continue;
                 }
             }
-        }).collect();
-        quote! {
-            #(#statements)*
         }
     })
 }
@@ -7630,15 +7880,29 @@ pub(crate) fn reject_referer_macro(
 ) -> TokenStream {
     let multi_referer: MultiRefererData = parse_macro_input!(attr as MultiRefererData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_referer.referer_values.iter().map(|referer_value: &Expr| {
+        let checks: Vec<proc_macro2::TokenStream> = multi_referer
+            .referer_values
+            .iter()
+            .map(|referer_value: &Expr| {
+                quote! {
+                    referer_header == #referer_value
+                }
+            })
+            .collect();
+        if checks.is_empty() {
+            quote! {}
+        } else {
             quote! {
-                if #context.get_request().try_get_header_back(::hyperlane::REFERER).map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| referer_header == #referer_value) {
+                if #context
+                    .get_request()
+                    .try_get_header_back(::hyperlane::REFERER)
+                    .map_or(false, |referer_header: ::hyperlane::RequestHeadersValueItem| {
+                        #(#checks)||*
+                    })
+                {
                     return ::hyperlane::Status::Continue;
                 }
             }
-        }).collect();
-        quote! {
-            #(#statements)*
         }
     })
 }
@@ -8560,19 +8824,26 @@ use super::*;
 pub(crate) fn host_macro(attr: TokenStream, item: TokenStream, position: Position) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_host
+        let checks: Vec<proc_macro2::TokenStream> = multi_host
             .host_values
             .iter()
             .map(|host_value: &Expr| {
                 quote! {
-                    if #context.get_request().get_host() != #host_value {
-                        return ::hyperlane::Status::Continue;
-                    }
+                    #context
+                        .get_request()
+                        .get_host()
+                        .eq_ignore_ascii_case(::std::convert::AsRef::<str>::as_ref(&(#host_value)))
                 }
             })
             .collect();
-        quote! {
-            #(#statements)*
+        if checks.is_empty() {
+            quote! {}
+        } else {
+            quote! {
+                if !(#(#checks)||*) {
+                    return ::hyperlane::Status::Continue;
+                }
+            }
         }
     })
 }
@@ -8583,19 +8854,26 @@ pub(crate) fn reject_host_macro(
 ) -> TokenStream {
     let multi_host: MultiHostData = parse_macro_input!(attr as MultiHostData);
     inject(position, item, |context: &Ident, _: &Ident| {
-        let statements: Vec<proc_macro2::TokenStream> = multi_host
+        let checks: Vec<proc_macro2::TokenStream> = multi_host
             .host_values
             .iter()
             .map(|host_value: &Expr| {
                 quote! {
-                    if #context.get_request().get_host() == #host_value {
-                        return ::hyperlane::Status::Continue;
-                    }
+                    #context
+                        .get_request()
+                        .get_host()
+                        .eq_ignore_ascii_case(::std::convert::AsRef::<str>::as_ref(&(#host_value)))
                 }
             })
             .collect();
-        quote! {
-            #(#statements)*
+        if checks.is_empty() {
+            quote! {}
+        } else {
+            quote! {
+                if #(#checks)||* {
+                    return ::hyperlane::Status::Continue;
+                }
+            }
         }
     })
 }
@@ -8686,14 +8964,23 @@ Ensure that CMake is installed on the system
 mod body;
 mod builder;
 mod parser;
+mod protocol;
 mod proxy;
 mod request_api;
 mod request_builder;
 mod response;
 mod url;
 use super::*;
-use http_type::{CHUNKED, CONTENT_ENCODING, TRANSFER_ENCODING};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use http_type::{
+    BodyPart, CHUNKED, CONTENT_ENCODING, MultipartFormData, TRANSFER_ENCODING,
+    tokio::{net::TcpListener, spawn, task::JoinHandle, time::sleep},
+};
+use rustls::ServerConfig;
+use rustls_pki_types::PrivateKeyDer;
+use serde::Deserialize;
 use serde_json::{Value, json, to_string};
+use tokio_rustls::TlsAcceptor;
 ```
 # Path: hyperlane/request/tests/parser/mod.rs
 ```rust
@@ -10455,14 +10742,635 @@ fn client_async_reads_close_delimited_body_through_eof() {
     assert_client_reads_close_delimited_body_through_eof(false);
 }
 ```
+# Path: hyperlane/request/tests/protocol/const.rs
+```rust
+pub(crate) const TEST_CA_PEM: &[u8] = b"-----BEGIN CERTIFICATE-----\n\
+MIIDQTCCAimgAwIBAgIUDqWSpNbkuYAWUBub6oiYQTZaUrswDQYJKoZIhvcNAQEL\n\
+BQAwNjEaMBgGA1UEAwwRaHlwZXJsYW5lLXRlc3QtY2ExGDAWBgNVBAoMD2h5cGVy\n\
+bGFuZS10ZXN0czAgFw0yMDAxMDEwMDAwMDBaGA8yMTI2MDEwMTAwMDAwMFowNjEa\n\
+MBgGA1UEAwwRaHlwZXJsYW5lLXRlc3QtY2ExGDAWBgNVBAoMD2h5cGVybGFuZS10\n\
+ZXN0czCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJthDZ+SnEHTw7Di\n\
++NHXOATUT4k0om5hOEljIjMm01X0DonRfLByPwj+Th0/9yy9QHlrPS2NZSyNPrUH\n\
+Cs7CQ8NEfiHMhJryXQFSsj0UfWF7ifp+YwU2iHUwMV+vXnoYWfHcmIGunz8o8/Zn\n\
+9c2Grvxzf86lYgFYCHmoI+E3S3B/2Tu3TpIM/BnIGfeTJLbsgjQlGm24B3PsesxW\n\
+wmohxWzHV2huTZjyNXo5A0GB+XREYOGOnNNQDXW9LEQ+oMFZ2Y+K+w8SojqwACxO\n\
+HvbXUeO/dZOa9Eb+KMpWZ2UdmIEUHkQDhzLXuS2XReF6e8fN3R2kD4f2f/tti5M7\n\
+1vUJBl0CAwEAAaNFMEMwHQYDVR0OBBYEFHEHCNvh/CSv4qwW6N01NriE4ZAwMBIG\n\
+A1UdEwEB/wQIMAYBAf8CAQEwDgYDVR0PAQH/BAQDAgEGMA0GCSqGSIb3DQEBCwUA\n\
+A4IBAQBJ+L0tH+RLj4eBTqwAqY7Oi2d5DbK05p6ft9o+n7Nz4V4pXvDsMmNBy3D3\n\
+tZ3e99/+r0K6OFp+P9cZ+BE2W4SHOIv2JE/XTysyB0R/HBVH5U7zSkjIUM/wn0cg\n\
+kNe5/ziFwfneI4O7piRlZ+W2VJHpe3Ja5UC8nwYCqHyg2kCwl388Tpi6qWll1VqB\n\
+766Nxy1sfr6bVPgDCwwIeXET2H4L3DIVgzKawtKfVfgu3aJXlVR3cBbIldV+X0og\n\
+fg+3Trwbxyg9nMT7ZKCtqW0TMz8b1wWbIhmfLR6zZiKH2a1Zp0AimDoh2wd2S3WO\n\
+vPPiLiX9K2KPpoNX1b6Zzi+Ha0A2\n\
+-----END CERTIFICATE-----\n";
+pub(crate) const TEST_LEAF_PEM: &[u8] = b"-----BEGIN CERTIFICATE-----\n\
+MIIDRTCCAi2gAwIBAgIUX+oHTgPiNU49EeY5l5hkXt/YZgQwDQYJKoZIhvcNAQEL\n\
+BQAwNjEaMBgGA1UEAwwRaHlwZXJsYW5lLXRlc3QtY2ExGDAWBgNVBAoMD2h5cGVy\n\
+bGFuZS10ZXN0czAgFw0yMDAxMDEwMDAwMDBaGA8yMTI2MDEwMTAwMDAwMFowLjES\n\
+MBAGA1UEAwwJbG9jYWxob3N0MRgwFgYDVQQKDA9oeXBlcmxhbmUtdGVzdHMwggEi\n\
+MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCTwE/Rxbk0nbowVMr5CYnp+PH8\n\
+K0NzgbWl2isQtHmz9SVexGJMJvg/pWFAhyRHm8zu3tX/u1h6Yfw5wxe1+VSWBNu7\n\
+xXG1OqEKWLXHikoM9g+mSIBNnwMhzXONACTwr6pR/yJZ9fCTwaNI681Pjbh5Lq6K\n\
+OdjlmfToHq4bPUp7ud/GQevDdRQEQR+LjSVMgPVdkbXOeB5XqpAkMsOcQ7Z4uVfx\n\
+IiMJnaT20HN3OV73FEbNrv3F5M6ti3s+aDHyIUGCGn+pNGz4aNt7/oFf9R8SH0sG\n\
+/dMfdtTroH7SEBpH25nZ8hfWqzTkuatramvxXwz4NgKgOPQJeks/mbvqNvlHAgMB\n\
+AAGjUTBPMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgWgMBMGA1UdJQQMMAoG\n\
+CCsGAQUFBwMBMBoGA1UdEQQTMBGCCWxvY2FsaG9zdIcEfwAAATANBgkqhkiG9w0B\n\
+AQsFAAOCAQEAhDn4l4g4LzHolwbiNH/hnYiCtq7BlGRM021gdZDaOARBEgRvb2M1\n\
+/x0eUdcclIoGXpHztfHUg/EAmTBrMCCSwKHdXOOvNOZPX0HtlXbrWOmAW9ZlnIJE\n\
+BaTaEfPk5tTPn2NcqQ6vhuDLBBmvNG2K+UWE40keBOm2YbPlKbUOwhvgNOaQDue7\n\
+2e3CkWEaty7yIvKHaHV8/kkF0gDc13UuYnnUXvTCNspYAhlNuKAdoqSRUicSmgiW\n\
+CK0PuNQx601PmJV4Qav1XkHsyeBtJzOZK5fVCMkIZdClF07EcdAnmI4O+gHh+Bl4\n\
+6RDQB9KK/btWSmguV6v/vQZzgXWjzDXMPg==\n\
+-----END CERTIFICATE-----\n";
+pub(crate) const TEST_LEAF_KEY: &[u8] = b"-----BEGIN PRIVATE KEY-----\n\
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCTwE/Rxbk0nbow\n\
+VMr5CYnp+PH8K0NzgbWl2isQtHmz9SVexGJMJvg/pWFAhyRHm8zu3tX/u1h6Yfw5\n\
+wxe1+VSWBNu7xXG1OqEKWLXHikoM9g+mSIBNnwMhzXONACTwr6pR/yJZ9fCTwaNI\n\
+681Pjbh5Lq6KOdjlmfToHq4bPUp7ud/GQevDdRQEQR+LjSVMgPVdkbXOeB5XqpAk\n\
+MsOcQ7Z4uVfxIiMJnaT20HN3OV73FEbNrv3F5M6ti3s+aDHyIUGCGn+pNGz4aNt7\n\
+/oFf9R8SH0sG/dMfdtTroH7SEBpH25nZ8hfWqzTkuatramvxXwz4NgKgOPQJeks/\n\
+mbvqNvlHAgMBAAECggEAPOgh/0+KsW3zusi5gz+zYogE+Pa8r3jg8KWm6xP6t3xv\n\
+E0nRW6MU4ufB11/eTMalDDM/9FO+fXS3DPinZZSKke0ex6D05shsal93T/Jp5D3q\n\
+5ZktitHp8J1I7O8KS02e4H5UItGHguFn9j9+OzUovovH16NRDhURKD69du0lLysn\n\
+588qCIi1wLn13j2PJsxPRDTHgUdMy6UJ0xN4ETNJWDrDHEvWPVMwdomQnRX7/Z20\n\
+TL6AaCNzxZFFxOmzN6lHeg3UDKglNbFB7Qw93gE/NgNsa4Z/cgvDdU2SzJAkd6cP\n\
+1P/7hcV2r/r0cfr0aMtLOnjDEL9iEqsOKdXtur/5AQKBgQDJxmisO7hXIt4NA4ds\n\
+xrHuGh5rMY2kkgLbFnDhQxCwE5YpaZvZlVzOvoJuWuKFCOMZN04RTxpGJ8IzNsPl\n\
+Dt9z5Vgzo3fZaaQQyGyKDgJU8+nViuKGadsQbyvjOQxBiRPtIGcMF+MopBGh6MEV\n\
+sIIuSKd5aX/s+10A0dB5FFpcsQKBgQC7dTThm7lrJZ2vOOxZpZ1kpxkfMakSkiox\n\
+6Bth4yLanwPXgw/aO/2xXIVxYDMi0pUSzesljz1+z0Vr51pjKXzKBJBvGPOrm+XY\n\
+5LXe9v0MwmG1BV2G2SGqjNHs163ymOs7qH0EQvq4by+wisdLwalb3TsFJM8i7sHv\n\
+fXB+ytDTdwKBgD6uYz/2AWsYStDSItTY2Nd1x7NXHoBcV4TF8OUZl2qLex98Tk0G\n\
+iGE1b4FmvG3Fd/8SXi8kWq4mlb6hKbPTrfjr6z2Hb6jbl3sbOBSfC3xmlWKgFYTa\n\
+B5KQZprc0wDc25LTeQ+ZsBik91FL5Aef4KEOMvCVpIbzA05I37FtcDDRAoGBAJFP\n\
+j8h7IEZQiGU1qPDtEo7dgPnPUxJUP2UkWWWN3oy9ywqaTAWNj2CXKdHzEnCh8HD9\n\
+MpSQ7siH/3Zfho9rr5Ih65xTKUATvx5cXCcUKqBjZb4fBJrtYc2FD42auvpdU6uR\n\
+NifBi/zAI6WkTk0JODE/0upv2ClqDueIw1Vl/m6NAoGBAI3hjWxWSlS/CJBudkh2\n\
+5ckibed12JC68n+RwgeT76qpeAfEh/EjNfG/bOJm7tkO7MRyemfl0K3JzM8+YzCN\n\
+Gpw3yS6fVH9GU3ttJW3ktoXxueGDvrG/lLZjm6BxkaQ5RC6u4uWPXpepsgODoSM9\n\
+TZJK+QJZKRSHFsZTx/y+VAiI\n\
+-----END PRIVATE KEY-----\n";
+```
+# Path: hyperlane/request/tests/protocol/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+use super::*;
+use r#const::*;
+```
+# Path: hyperlane/request/tests/protocol/fn.rs
+```rust
+use super::*;
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+struct EchoPayload {
+    ok: bool,
+    count: usize,
+}
+fn build_test_tls_acceptor(alpn: Vec<Vec<u8>>) -> TlsAcceptor {
+    let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_slice_iter(TEST_LEAF_PEM)
+        .map(|item: Result<CertificateDer<'static>, _>| item.unwrap())
+        .collect();
+    let key: PrivateKeyDer<'static> = PrivateKeyDer::from_pem_slice(TEST_LEAF_KEY).unwrap();
+    let mut cfg: ServerConfig = ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(certs, key)
+        .unwrap();
+    cfg.alpn_protocols = alpn;
+    TlsAcceptor::from(Arc::new(cfg))
+}
+#[tokio::test]
+async fn test_h1_keep_alive_pool_reuses_single_connection_async_and_sync() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let accepts: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+    let accepts_srv: Arc<AtomicUsize> = Arc::clone(&accepts);
+    let server: JoinHandle<()> = spawn(async move {
+        loop {
+            let Ok((mut stream, _)) = listener.accept().await else {
+                break;
+            };
+            accepts_srv.fetch_add(1, Ordering::SeqCst);
+            spawn(async move {
+                let mut buf: [u8; 1024] = [0u8; 1024];
+                let mut acc: Vec<u8> = Vec::new();
+                while let Ok(n) = stream.read(&mut buf).await {
+                    if n == 0 {
+                        break;
+                    }
+                    acc.extend_from_slice(&buf[..n]);
+                    while let Some(end) = find_double_crlf(&acc, 0) {
+                        acc.drain(..end + 4);
+                        let resp: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: keep-alive\r\n\r\nok";
+                        if stream.write_all(resp).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+    });
+    let url: String = format!("http://{addr}/ping");
+    for _ in 0..8usize {
+        let mut req: HttpRequest = RequestBuilder::new()
+            .get(&url)
+            .keep_alive(true)
+            .timeout(2000)
+            .build();
+        let resp: HttpResponse = req.send_async().await.unwrap();
+        assert_eq!(resp.get_status_code(), 200);
+        assert_eq!(resp.bytes(), b"ok");
+    }
+    assert_eq!(accepts.load(Ordering::SeqCst), 1usize);
+    let url_sync: String = url.clone();
+    http_type::tokio::task::spawn_blocking(move || {
+        for _ in 0..5usize {
+            let mut req: HttpRequest = RequestBuilder::new()
+                .get(&url_sync)
+                .keep_alive(true)
+                .timeout(2000)
+                .build();
+            let resp: HttpResponse = req.send().unwrap();
+            assert_eq!(resp.get_status_code(), 200);
+            assert_eq!(resp.bytes(), b"ok");
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(accepts.load(Ordering::SeqCst), 2usize);
+    server.abort();
+}
+#[tokio::test]
+async fn test_h1_keep_alive_transparently_redials_stale_pooled_connection() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let accepts: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+    let accepts_srv: Arc<AtomicUsize> = Arc::clone(&accepts);
+    let server: JoinHandle<()> = spawn(async move {
+        for index in 0..2usize {
+            let (mut stream, _): (http_type::tokio::net::TcpStream, SocketAddr) =
+                listener.accept().await.unwrap();
+            accepts_srv.fetch_add(1, Ordering::SeqCst);
+            let mut buf: [u8; 512] = [0u8; 512];
+            let _: usize = stream.read(&mut buf).await.unwrap();
+            let body: String = format!("hit-{index}");
+            let resp: String = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: keep-alive\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(resp.as_bytes()).await.unwrap();
+            stream.shutdown().await.unwrap();
+        }
+    });
+    let url: String = format!("http://{addr}/stale");
+    let mut first: HttpRequest = RequestBuilder::new()
+        .get(&url)
+        .keep_alive(true)
+        .timeout(2000)
+        .build();
+    let r1: HttpResponse = first.send_async().await.unwrap();
+    assert_eq!(r1.bytes(), b"hit-0");
+    sleep(Duration::from_millis(20)).await;
+    let mut second: HttpRequest = RequestBuilder::new()
+        .get(&url)
+        .keep_alive(true)
+        .timeout(2000)
+        .build();
+    let r2: HttpResponse = second.send_async().await.unwrap();
+    assert_eq!(r2.bytes(), b"hit-1");
+    assert_eq!(accepts.load(Ordering::SeqCst), 2usize);
+    server.await.unwrap();
+}
+#[tokio::test]
+async fn test_h2c_multiplexed_client_and_connection_reuse() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let accepts: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+    let accepts_srv: Arc<AtomicUsize> = Arc::clone(&accepts);
+    let server: JoinHandle<()> = spawn(async move {
+        loop {
+            let Ok((tcp, _)) = listener.accept().await else {
+                break;
+            };
+            accepts_srv.fetch_add(1, Ordering::SeqCst);
+            spawn(async move {
+                let Ok(mut conn) = h2::server::handshake(tcp).await else {
+                    return;
+                };
+                while let Some(Ok((req, mut respond))) = conn.accept().await {
+                    let uri_text: String = req.uri().to_string();
+                    let resp: Response<()> = Response::builder().status(200).body(()).unwrap();
+                    if let Ok(mut send) = respond.send_response(resp, false) {
+                        let _: Result<(), h2::Error> = send.send_data(Bytes::from(uri_text), true);
+                    }
+                }
+            });
+        }
+    });
+    let mut warm: HttpRequest = RequestBuilder::new()
+        .get(format!("http://{addr}/item?id=0"))
+        .http2_only()
+        .keep_alive(true)
+        .timeout(3000)
+        .build();
+    let warm_resp: HttpResponse = warm.send_async().await.unwrap();
+    assert_eq!(warm_resp.get_status_code(), 200);
+    assert_eq!(*warm_resp.get_version(), HttpVersion::Http2);
+    assert!(warm_resp.text().contains("id=0"));
+    let mut handles: Vec<JoinHandle<()>> = Vec::new();
+    for id in 1..=12usize {
+        let url: String = format!("http://{addr}/item?id={id}");
+        handles.push(spawn(async move {
+            let mut req: HttpRequest = RequestBuilder::new()
+                .get(url)
+                .http2_only()
+                .keep_alive(true)
+                .timeout(3000)
+                .build();
+            let resp: HttpResponse = req.send_async().await.unwrap();
+            assert_eq!(resp.get_status_code(), 200);
+            assert!(resp.text().contains(&format!("id={id}")));
+        }));
+    }
+    for handle in handles {
+        handle.await.unwrap();
+    }
+    assert_eq!(accepts.load(Ordering::SeqCst), 1usize);
+    server.abort();
+}
+#[tokio::test]
+async fn test_https_h1_and_h2_with_custom_root_cert_pem() {
+    let mut bad_builder: RequestBuilder = RequestBuilder::new();
+    assert!(bad_builder.root_cert_pem(b"not-a-valid-pem").is_err());
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let acceptor: TlsAcceptor = build_test_tls_acceptor(vec![b"h2".to_vec(), b"http/1.1".to_vec()]);
+    let server: JoinHandle<()> = spawn(async move {
+        loop {
+            let Ok((tcp, _)) = listener.accept().await else {
+                break;
+            };
+            let acc: TlsAcceptor = acceptor.clone();
+            spawn(async move {
+                let Ok(mut tls) = acc.accept(tcp).await else {
+                    return;
+                };
+                let is_h2: bool = tls.get_ref().1.alpn_protocol() == Some(b"h2".as_slice());
+                if is_h2 {
+                    let Ok(mut conn) = h2::server::handshake(tls).await else {
+                        return;
+                    };
+                    while let Some(Ok((_, mut respond))) = conn.accept().await {
+                        let resp: Response<()> = Response::builder()
+                            .status(200)
+                            .header("x-proto", "h2-tls")
+                            .body(())
+                            .unwrap();
+                        if let Ok(mut send) = respond.send_response(resp, false) {
+                            let _: Result<(), h2::Error> = send
+                                .send_data(Bytes::from_static(b"{\"ok\":true,\"count\":2}"), true);
+                        }
+                    }
+                } else {
+                    let mut buf: [u8; 1024] = [0u8; 1024];
+                    let _: usize = tls.read(&mut buf).await.unwrap_or(0);
+                    let wire: &[u8] = b"HTTP/1.1 200 OK\r\nX-Proto: h1-tls\r\nContent-Length: 21\r\n\r\n{\"ok\":true,\"count\":1}";
+                    let _: Result<(), io::Error> = tls.write_all(wire).await;
+                }
+            });
+        }
+    });
+    let url: String = format!("https://127.0.0.1:{}/tls", addr.port());
+    let mut untrusted: HttpRequest = RequestBuilder::new().get(&url).timeout(2000).build();
+    assert!(untrusted.send_async().await.is_err());
+    let mut h1_builder: RequestBuilder = RequestBuilder::new();
+    let mut h1_req: HttpRequest = h1_builder
+        .get(&url)
+        .root_cert_pem(TEST_CA_PEM)
+        .unwrap()
+        .timeout(3000)
+        .build();
+    let h1_resp: HttpResponse = h1_req.send_async().await.unwrap();
+    assert_eq!(h1_resp.get_status_code(), 200);
+    assert_eq!(h1_resp.get_header("x-proto"), Some("h1-tls"));
+    let h1_json: EchoPayload = h1_resp.json().unwrap();
+    assert_eq!(h1_json, EchoPayload { ok: true, count: 1 });
+    let mut h2_builder: RequestBuilder = RequestBuilder::new();
+    let mut h2_req: HttpRequest = h2_builder
+        .get(&url)
+        .http2_only()
+        .keep_alive(true)
+        .root_cert_pem(TEST_CA_PEM)
+        .unwrap()
+        .timeout(3000)
+        .build();
+    let h2_resp: HttpResponse = h2_req.send_async().await.unwrap();
+    assert_eq!(h2_resp.get_status_code(), 200);
+    assert_eq!(*h2_resp.get_version(), HttpVersion::Http2);
+    assert_eq!(h2_resp.get_header("x-proto"), Some("h2-tls"));
+    let h2_json: EchoPayload = h2_resp.json().unwrap();
+    assert_eq!(h2_json, EchoPayload { ok: true, count: 2 });
+    server.abort();
+}
+#[tokio::test]
+async fn test_retry_idempotent_get_recovers_from_503_and_post_does_not_retry() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let hits: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+    let hits_srv: Arc<AtomicUsize> = Arc::clone(&hits);
+    let server: JoinHandle<()> = spawn(async move {
+        loop {
+            let Ok((mut stream, _)) = listener.accept().await else {
+                break;
+            };
+            let current: usize = hits_srv.fetch_add(1, Ordering::SeqCst) + 1;
+            let mut buf: [u8; 512] = [0u8; 512];
+            let _: usize = stream.read(&mut buf).await.unwrap_or(0);
+            let resp: &[u8] = if current < 3 || current == 4 {
+                b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 4\r\n\r\nbusy"
+            } else {
+                b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
+            };
+            let _: Result<(), io::Error> = stream.write_all(resp).await;
+            let _: Result<(), io::Error> = stream.shutdown().await;
+        }
+    });
+    let url: String = format!("http://{addr}/retry");
+    let mut get_req: HttpRequest = RequestBuilder::new()
+        .get(&url)
+        .retry(3)
+        .timeout(3000)
+        .build();
+    let get_resp: HttpResponse = get_req.send_async().await.unwrap();
+    assert_eq!(get_resp.get_status_code(), 200);
+    assert_eq!(hits.load(Ordering::SeqCst), 3usize);
+    let mut post_req: HttpRequest = RequestBuilder::new()
+        .post(&url)
+        .body_text("order")
+        .retry(3)
+        .timeout(3000)
+        .build();
+    let post_resp: HttpResponse = post_req.send_async().await.unwrap();
+    assert_eq!(post_resp.get_status_code(), 503);
+    assert!(post_resp.is_server_error());
+    assert_eq!(hits.load(Ordering::SeqCst), 4usize);
+    server.abort();
+}
+#[test]
+fn test_builder_extended_methods_query_auth_cookie_form_and_multipart() {
+    let mut b1: RequestBuilder = RequestBuilder::new();
+    let put_req: HttpRequest = b1
+        .put("http://api.test/items#frag")
+        .query("a", "hello world")
+        .query_pairs([("k", "1+2"), ("empty", "")])
+        .bearer_auth("tok-123")
+        .cookie("sid", "abc")
+        .cookie("theme", "dark")
+        .connect_timeout(500)
+        .retry(2)
+        .keep_alive(true)
+        .build();
+    assert_eq!(put_req.get_method(), Method::Put);
+    assert_eq!(
+        put_req.get_url(),
+        "http://api.test/items?a=hello%20world&k=1%2B2&empty=#frag"
+    );
+    assert_eq!(
+        put_req
+            .get_headers()
+            .get("authorization")
+            .map(String::as_str),
+        Some("Bearer tok-123")
+    );
+    assert_eq!(
+        put_req.get_headers().get("cookie").map(String::as_str),
+        Some("sid=abc; theme=dark")
+    );
+    assert_eq!(put_req.get_config().get_connect_timeout(), 500u64);
+    assert_eq!(put_req.get_config().get_max_retries(), 2usize);
+    assert!(put_req.get_config().get_keep_alive());
+    let mut b2: RequestBuilder = RequestBuilder::new();
+    let del_req: HttpRequest = b2
+        .delete("http://api.test/1")
+        .basic_auth("alice", "s3cr3t")
+        .build();
+    assert_eq!(del_req.get_method(), Method::Delete);
+    assert_eq!(
+        del_req
+            .get_headers()
+            .get("authorization")
+            .map(String::as_str),
+        Some("Basic YWxpY2U6czNjcjN0")
+    );
+    let mut b3: RequestBuilder = RequestBuilder::new();
+    let patch_req: HttpRequest = b3
+        .patch("http://api.test/form")
+        .body_form([("name", "a&b"), ("city", "sh")])
+        .build();
+    assert_eq!(patch_req.get_method(), Method::Patch);
+    assert_eq!(
+        patch_req
+            .get_headers()
+            .get("content-type")
+            .map(String::as_str),
+        Some("application/x-www-form-urlencoded")
+    );
+    assert_eq!(patch_req.get_body().as_str(), Some("name=a%26b&city=sh"));
+    let mut b4: RequestBuilder = RequestBuilder::new();
+    let parts: Vec<BodyPart> = vec![
+        BodyPart::new(
+            "field".to_owned(),
+            String::new(),
+            String::new(),
+            hash_map_xx_hash3_64(),
+            b"value-1".to_vec(),
+        ),
+        BodyPart::new(
+            "upload".to_owned(),
+            "report.txt".to_owned(),
+            "text/plain".to_owned(),
+            hash_map_xx_hash3_64(),
+            b"file-bytes".to_vec(),
+        ),
+    ];
+    let mp_req: HttpRequest = b4
+        .post("http://api.test/upload")
+        .body_multipart(&parts)
+        .build();
+    let ct: &str = mp_req.get_headers().get("content-type").unwrap();
+    let boundary: String = MultipartFormData::get_boundary(ct).unwrap();
+    let parsed: Vec<BodyPart> =
+        MultipartFormData::parse(mp_req.get_body().as_slice(), &boundary).unwrap();
+    assert_eq!(parsed.len(), 2usize);
+    assert_eq!(
+        MultipartFormData::try_get_part_text(&parsed, "field").as_deref(),
+        Some("value-1")
+    );
+    let file_part: &BodyPart = MultipartFormData::try_get_part(&parsed, "upload").unwrap();
+    assert_eq!(
+        file_part.try_get_file_name().map(String::as_str),
+        Some("report.txt")
+    );
+    assert_eq!(file_part.try_get_data(), Some(b"file-bytes".as_slice()));
+    let mut b5: RequestBuilder = RequestBuilder::new();
+    assert_eq!(
+        b5.head("http://api.test/h").build().get_method(),
+        Method::Head
+    );
+    let mut b6: RequestBuilder = RequestBuilder::new();
+    assert_eq!(
+        b6.options("http://api.test/o").build().get_method(),
+        Method::Options
+    );
+    let err_resp: HttpResponse = HttpResponse::from_bytes(
+        b"HTTP/1.1 404 Not Found\r\nSet-Cookie: sid=xyz; Path=/\r\n\r\nmissing",
+    );
+    assert!(err_resp.is_client_error());
+    assert!(!err_resp.is_server_error());
+    let cookies: Cookies = err_resp.try_get_cookies().unwrap();
+    assert_eq!(cookies.get("sid").map(String::as_str), Some("xyz"));
+}
+#[tokio::test]
+async fn test_security_redirect_strips_credentials_rewrites_post_and_blocks_loops() {
+    let target_listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let target_addr: SocketAddr = target_listener.local_addr().unwrap();
+    let origin_listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin_addr: SocketAddr = origin_listener.local_addr().unwrap();
+    let origin_srv: JoinHandle<()> = spawn(async move {
+        let (mut stream, _): (http_type::tokio::net::TcpStream, SocketAddr) =
+            origin_listener.accept().await.unwrap();
+        let mut buf: [u8; 1024] = [0u8; 1024];
+        let _: usize = stream.read(&mut buf).await.unwrap();
+        let resp: String = format!(
+            "HTTP/1.1 302 Found\r\nLocation: http://{target_addr}/dest\r\nContent-Length: 0\r\n\r\n"
+        );
+        stream.write_all(resp.as_bytes()).await.unwrap();
+    });
+    let target_srv: JoinHandle<String> = spawn(async move {
+        let (mut stream, _): (http_type::tokio::net::TcpStream, SocketAddr) =
+            target_listener.accept().await.unwrap();
+        let mut buf: [u8; 1024] = [0u8; 1024];
+        let n: usize = stream.read(&mut buf).await.unwrap();
+        let req_text: String = String::from_utf8_lossy(&buf[..n]).into_owned();
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndone")
+            .await
+            .unwrap();
+        req_text
+    });
+    let mut req: HttpRequest = RequestBuilder::new()
+        .post(format!("http://{origin_addr}/start"))
+        .bearer_auth("secret-token")
+        .cookie("session", "top-secret")
+        .body_text("sensitive-body")
+        .redirect()
+        .max_redirect_times(3)
+        .timeout(3000)
+        .build();
+    let resp: HttpResponse = req.send_async().await.unwrap();
+    assert_eq!(resp.get_status_code(), 200);
+    assert_eq!(resp.bytes(), b"done");
+    let captured: String = target_srv.await.unwrap();
+    origin_srv.await.unwrap();
+    assert!(captured.starts_with("GET /dest HTTP/1.1\r\n"));
+    assert!(!captured.to_ascii_lowercase().contains("authorization:"));
+    assert!(!captured.to_ascii_lowercase().contains("cookie:"));
+    assert!(!captured.contains("sensitive-body"));
+    let loop_listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let loop_addr: SocketAddr = loop_listener.local_addr().unwrap();
+    let loop_url: String = format!("http://{loop_addr}/self");
+    let loop_url_srv: String = loop_url.clone();
+    let loop_srv: JoinHandle<()> = spawn(async move {
+        let (mut stream, _): (http_type::tokio::net::TcpStream, SocketAddr) =
+            loop_listener.accept().await.unwrap();
+        let mut buf: [u8; 512] = [0u8; 512];
+        let _: usize = stream.read(&mut buf).await.unwrap();
+        let resp: String = format!(
+            "HTTP/1.1 301 Moved Permanently\r\nLocation: {loop_url_srv}\r\nContent-Length: 0\r\n\r\n"
+        );
+        stream.write_all(resp.as_bytes()).await.unwrap();
+    });
+    let mut loop_req: HttpRequest = RequestBuilder::new()
+        .get(&loop_url)
+        .redirect()
+        .max_redirect_times(5)
+        .timeout(2000)
+        .build();
+    assert!(loop_req.send_async().await.is_err());
+    loop_srv.await.unwrap();
+}
+#[tokio::test]
+async fn test_security_async_timeout_interim_cap_and_proxy_hardening() {
+    let slow_listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let slow_addr: SocketAddr = slow_listener.local_addr().unwrap();
+    let slow_srv: JoinHandle<()> = spawn(async move {
+        let (_stream, _): (http_type::tokio::net::TcpStream, SocketAddr) =
+            slow_listener.accept().await.unwrap();
+        sleep(Duration::from_secs(2)).await;
+    });
+    let mut timeout_req: HttpRequest = RequestBuilder::new()
+        .get(format!("http://{slow_addr}/slow"))
+        .timeout(100)
+        .build();
+    assert!(matches!(
+        timeout_req.send_async().await,
+        Err(RequestError::ReadTimeout(_))
+    ));
+    slow_srv.abort();
+    let interim_listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let interim_addr: SocketAddr = interim_listener.local_addr().unwrap();
+    let interim_srv: JoinHandle<()> = spawn(async move {
+        let (mut stream, _): (http_type::tokio::net::TcpStream, SocketAddr) =
+            interim_listener.accept().await.unwrap();
+        let mut buf: [u8; 512] = [0u8; 512];
+        let _: usize = stream.read(&mut buf).await.unwrap();
+        let mut wire: Vec<u8> = Vec::new();
+        for _ in 0..20usize {
+            wire.extend_from_slice(b"HTTP/1.1 100 Continue\r\n\r\n");
+        }
+        wire.extend_from_slice(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+        let _: Result<(), io::Error> = stream.write_all(&wire).await;
+    });
+    let mut interim_req: HttpRequest = RequestBuilder::new()
+        .get(format!("http://{interim_addr}/many-1xx"))
+        .timeout(2000)
+        .build();
+    assert!(interim_req.send_async().await.is_err());
+    interim_srv.await.unwrap();
+    let mut bad_connect: HttpRequest = RequestBuilder::new()
+        .get("http://example.com/")
+        .proxy(Proxy::http("127.0.0.1", 9).auth("bad:user", "pass"))
+        .build();
+    assert!(bad_connect.send_async().await.is_err());
+    let mut bad_socks: HttpRequest = RequestBuilder::new()
+        .get("http://example.com/")
+        .proxy(Proxy::socks5("127.0.0.1", 9).auth("u".repeat(300), "pass"))
+        .build();
+    assert!(bad_socks.send_async().await.is_err());
+    let mut bad_method: HttpRequest = RequestBuilder::new()
+        .method(Method::Unknown("GET\r\nInjected: 1".to_owned()))
+        .url("http://127.0.0.1:9/")
+        .build();
+    assert!(bad_method.send_async().await.is_err());
+    let mut bad_ver: HttpRequest = HttpRequest::get("http://127.0.0.1:9/");
+    bad_ver
+        .get_mut_config()
+        .set_http_version(HttpVersion::Unknown("HTTP/1.1\r\nX: y".to_owned()));
+    assert!(bad_ver.send_async().await.is_err());
+}
+```
 # Path: hyperlane/request/src/lib.rs
 ```rust
 mod common;
+mod pool;
+mod protocol;
 mod request;
 mod response;
 #[cfg(test)]
 #[path = "../tests/mod.rs"]
 mod tests;
+mod tls;
 mod utils;
 pub use {request::*, response::*};
 pub use http_type::{
@@ -10499,7 +11407,26 @@ pub use {
 };
 pub use common::*;
 pub use lombok_macros::*;
-use http_type::{GET, HEAD};
+pub(crate) use {pool::*, protocol::*, tls::*};
+use std::{
+    cell::{RefCell, RefMut},
+    net::{SocketAddr, ToSocketAddrs},
+    sync::{Mutex, OnceLock},
+    thread,
+    time::Instant,
+};
+use {
+    bytes::Bytes,
+    h2::{RecvStream, client::SendRequest},
+    http::{HeaderName, HeaderValue, Request, Response, StatusCode, Uri, request::Builder},
+    http_type::{
+        BodyPart, CLOSE, CONNECTION, COOKIE, CookieBuilder, Cookies, KEEP_ALIVE, SET_COOKIE, tokio,
+    },
+    rustls::client::Resumption,
+    rustls_pki_types::{CertificateDer, pem::PemObject},
+    serde::de::DeserializeOwned,
+    serde_json::from_slice,
+};
 ```
 # Path: hyperlane/request/src/response/type.rs
 ```rust
@@ -10631,9 +11558,32 @@ impl HttpResponse {
     pub fn is_redirect(&self) -> bool {
         (300..400).contains(&self.get_status_code())
     }
-    pub fn get_header<K: AsRef<str>>(&self, key: K) -> Option<&str> {
-        let normalized: String = key.as_ref().to_ascii_lowercase();
-        self.headers.get(&normalized).map(String::as_str)
+    pub fn is_client_error(&self) -> bool {
+        (400..500).contains(&self.get_status_code())
+    }
+    pub fn is_server_error(&self) -> bool {
+        (500..600).contains(&self.get_status_code())
+    }
+    pub fn get_header<K>(&self, key: K) -> Option<&str>
+    where
+        K: AsRef<str>,
+    {
+        let raw: &str = key.as_ref();
+        let bytes: &[u8] = raw.as_bytes();
+        if !bytes.iter().any(|b: &u8| b.is_ascii_uppercase()) {
+            return self.get_headers().get(raw).map(String::as_str);
+        }
+        if bytes.len() <= RESPONSE_HEADER_STACK_LIMIT {
+            let mut stack_buf: [u8; RESPONSE_HEADER_STACK_LIMIT] = [0; RESPONSE_HEADER_STACK_LIMIT];
+            for (idx, &byte) in bytes.iter().enumerate() {
+                stack_buf[idx] = byte.to_ascii_lowercase();
+            }
+            if let Ok(lower) = from_utf8(&stack_buf[..bytes.len()]) {
+                return self.get_headers().get(lower).map(String::as_str);
+            }
+        }
+        let normalized: String = raw.to_ascii_lowercase();
+        self.get_headers().get(&normalized).map(String::as_str)
     }
     pub fn text(&self) -> String {
         String::from_utf8_lossy(self.get_body()).into_owned()
@@ -10641,9 +11591,23 @@ impl HttpResponse {
     pub fn bytes(&self) -> &[u8] {
         self.get_body()
     }
+    pub fn json<T>(&self) -> Result<T, serde_json::Error>
+    where
+        T: DeserializeOwned,
+    {
+        from_slice(self.get_body())
+    }
+    pub fn try_get_cookies(&self) -> Option<Cookies> {
+        let header: &str = self.get_header(SET_COOKIE)?;
+        let parsed: CookieBuilder = CookieBuilder::parse(header);
+        let mut cookies: Cookies = hash_map_xx_hash3_64();
+        if !parsed.get_name().is_empty() {
+            cookies.insert(parsed.get_name().clone(), parsed.get_value().clone());
+        }
+        Some(cookies)
+    }
     pub fn decode(&self, buffer_size: usize) -> HttpResponse {
-        let flat_headers: HttpResponseHeaders = self.get_headers().clone();
-        let decoded: ResponseBody = Compress::from(&flat_headers)
+        let decoded: ResponseBody = Compress::from(self.get_headers())
             .decode(self.get_body(), buffer_size)
             .into_owned();
         HttpResponse {
@@ -10694,7 +11658,10 @@ impl Body {
     pub const fn empty() -> Self {
         Self { bytes: Vec::new() }
     }
-    pub fn from_bytes<B: Into<Vec<u8>>>(bytes: B) -> Self {
+    pub fn from_bytes<B>(bytes: B) -> Self
+    where
+        B: Into<Vec<u8>>,
+    {
         Self {
             bytes: bytes.into(),
         }
@@ -10820,7 +11787,12 @@ pub(crate) const HTTP_STATUS_CODE_OFFSET: usize = 9;
 pub(crate) const FIELD_NAME_PUNCTUATION: &[u8] = b"!#$%&'*+-.^_`|~";
 pub(crate) const INVALID_REQUEST_HEADER: &str = "Invalid HTTP request header";
 pub(crate) const MAX_RESPONSE_CHUNK_SIZE: usize = 64 * 1024 * 1024;
+pub(crate) const MAX_RESPONSE_HEAD_BYTES: usize = 64 * 1024;
+pub(crate) const MAX_RESPONSE_BODY_BYTES: usize = 64 * 1024 * 1024;
+pub(crate) const MAX_INTERIM_RESPONSES: usize = 16;
 pub(crate) const INVALID_RESPONSE_FRAMING: &str = "Invalid or ambiguous HTTP response framing";
+pub(crate) const RESPONSE_TOO_LARGE: &str = "HTTP response exceeds maximum allowed size";
+pub(crate) const TOO_MANY_INTERIM_RESPONSES: &str = "Too many interim HTTP responses";
 pub(crate) const CHUNK_EXTENSION_SEPARATOR: u8 = b';';
 ```
 # Path: hyperlane/request/src/request/parser/mod.rs
@@ -10870,6 +11842,7 @@ pub(crate) fn split_whitespace(input: &[u8]) -> Vec<&[u8]> {
     }
     parts
 }
+#[cfg(test)]
 pub(crate) fn build_http_request(
     method: &str,
     path: String,
@@ -10942,6 +11915,7 @@ pub(crate) fn parse_chunk_size(line: &[u8]) -> Result<usize, RequestError> {
 }
 pub(crate) fn chunked_body_end(body_bytes: &[u8]) -> Result<Option<usize>, RequestError> {
     let mut pos: usize = 0;
+    let mut total_decoded: usize = 0;
     while pos < body_bytes.len() {
         let Some(line_end) = find_crlf(body_bytes, pos) else {
             return Ok(None);
@@ -10954,10 +11928,20 @@ pub(crate) fn chunked_body_end(body_bytes: &[u8]) -> Result<Option<usize>, Reque
             }
             if let Some(trailer_end) = find_double_crlf(body_bytes, data_start) {
                 let end: usize = trailer_end + HTTP_BR_BYTES.len() * 2;
-                let _: Option<&[u8]> = response_header_value(&body_bytes[data_start..end], &[])?;
+                let _: Option<&[u8]> =
+                    validate_header_block(&body_bytes[data_start..end], &[], false)?;
                 return Ok(Some(end));
             }
+            if body_bytes.len().saturating_sub(data_start) > MAX_RESPONSE_HEAD_BYTES {
+                return Err(RequestError::Request(RESPONSE_TOO_LARGE.to_owned()));
+            }
             return Ok(None);
+        }
+        total_decoded = total_decoded
+            .checked_add(chunk_size)
+            .ok_or(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest))?;
+        if total_decoded > MAX_RESPONSE_BODY_BYTES {
+            return Err(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
         }
         let data_end: usize = data_start
             .checked_add(chunk_size)
@@ -11079,9 +12063,10 @@ pub(crate) fn validate_request_headers(
     }
     Ok(())
 }
-pub(crate) fn response_header_value<'a>(
+pub(crate) fn validate_header_block<'a>(
     headers_bytes: &'a [u8],
     field_name: &[u8],
+    skip_status_line: bool,
 ) -> Result<Option<&'a [u8]>, RequestError> {
     let mut value: Option<&[u8]> = None;
     let mut pos: usize = 0;
@@ -11091,7 +12076,7 @@ pub(crate) fn response_header_value<'a>(
         if line.is_empty() {
             break;
         }
-        if !(pos == 0 && line.starts_with(HTTP_STATUS_PREFIX)) {
+        if !(skip_status_line && pos == 0 && line.starts_with(HTTP_STATUS_PREFIX)) {
             let separator: usize = line
                 .iter()
                 .position(|byte: &u8| *byte == COLON_U8)
@@ -11101,7 +12086,7 @@ pub(crate) fn response_header_value<'a>(
             if !is_valid_header_name(name) || !is_valid_header_value(raw_value) {
                 return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
             }
-            if name.eq_ignore_ascii_case(field_name) {
+            if !field_name.is_empty() && name.eq_ignore_ascii_case(field_name) {
                 if value.is_some() {
                     return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
                 }
@@ -11114,6 +12099,12 @@ pub(crate) fn response_header_value<'a>(
         pos = end + HTTP_BR_BYTES.len();
     }
     Ok(value)
+}
+pub(crate) fn response_header_value<'a>(
+    headers_bytes: &'a [u8],
+    field_name: &[u8],
+) -> Result<Option<&'a [u8]>, RequestError> {
+    validate_header_block(headers_bytes, field_name, true)
 }
 pub(crate) fn parse_status_code(status_bytes: &[u8]) -> usize {
     if status_bytes.len() != 3 {
@@ -11134,16 +12125,16 @@ pub(crate) fn calculate_buffer_capacity(
     n: usize,
     current_capacity: usize,
 ) -> usize {
-    if response_bytes.len() + n <= current_capacity {
+    let needed_cap: usize = response_bytes.len().saturating_add(n);
+    if needed_cap <= current_capacity {
         return 0;
     }
-    let needed_cap: usize = response_bytes.len() + n;
     if current_capacity == 0 {
         needed_cap.max(1024)
-    } else if needed_cap <= current_capacity * 2 {
-        current_capacity * 2
+    } else if needed_cap <= current_capacity.saturating_mul(2) {
+        current_capacity.saturating_mul(2)
     } else {
-        (needed_cap * 3) / 2
+        needed_cap.saturating_add(needed_cap / 2)
     }
 }
 pub(crate) fn parse_response_headers(
@@ -11176,12 +12167,18 @@ pub(crate) fn parse_response_headers(
                 return Err(RequestError::Request(INVALID_RESPONSE_FRAMING.to_owned()));
             }
             (None, true) => ResponseFraming::Chunked,
-            (Some(length), false) => ResponseFraming::Fixed(length),
+            (Some(length), false) => {
+                if length > MAX_RESPONSE_BODY_BYTES {
+                    return Err(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
+                }
+                ResponseFraming::Fixed(length)
+            }
             (None, false) => ResponseFraming::Close,
         }
     };
     if status_code == HttpStatus::SwitchingProtocols.code()
         || status_code == HttpStatus::NoContent.code()
+        || status_code == HttpStatus::ResetContent.code()
         || status_code == HttpStatus::NotModified.code()
     {
         return Ok(Some((ResponseFraming::Fixed(0), None)));
@@ -11189,7 +12186,7 @@ pub(crate) fn parse_response_headers(
     if status_code < HttpStatus::Ok.code() {
         return Ok(None);
     }
-    let redirect: Option<Vec<u8>> = if (300..=399).contains(&status_code) {
+    let redirect: Option<Vec<u8>> = if [301, 302, 303, 307, 308].contains(&status_code) {
         response_header_value(headers_bytes, LOCATION.as_bytes())?.map(<[u8]>::to_vec)
     } else {
         None
@@ -11200,21 +12197,32 @@ pub(crate) fn find_final_response_head(
     bytes: &mut Vec<u8>,
     mut search_start: usize,
     is_head: bool,
+    interim_count: &mut usize,
 ) -> Result<Option<FinalResponseHead>, RequestError> {
     let mut start: usize = 0;
     while let Some(position) = find_double_crlf(bytes, search_start) {
         let end: usize = position + HTTP_BR_BYTES.len() * 2;
+        if end.saturating_sub(start) > MAX_RESPONSE_HEAD_BYTES {
+            return Err(RequestError::Request(RESPONSE_TOO_LARGE.to_owned()));
+        }
         if let Some((framing, redirect)) = parse_response_headers(&bytes[start..end], is_head)? {
             if start != 0 {
                 drop(bytes.drain(..start));
             }
             return Ok(Some((end - start, framing, redirect)));
         }
+        *interim_count += 1;
+        if *interim_count > MAX_INTERIM_RESPONSES {
+            return Err(RequestError::Request(TOO_MANY_INTERIM_RESPONSES.to_owned()));
+        }
         start = end;
         search_start = end;
     }
     if start != 0 {
         drop(bytes.drain(..start));
+    }
+    if bytes.len() > MAX_RESPONSE_HEAD_BYTES {
+        return Err(RequestError::Request(RESPONSE_TOO_LARGE.to_owned()));
     }
     Ok(None)
 }
@@ -11358,21 +12366,37 @@ impl Write for SyncProxyTunnelStream {
     }
 }
 impl Proxy {
-    pub fn http<H: AsRef<str>>(host: H, port: u16) -> Self {
+    pub fn http<H>(host: H, port: u16) -> Self
+    where
+        H: AsRef<str>,
+    {
         Self::new(ProxyType::Http, host, port)
     }
-    pub fn https<H: AsRef<str>>(host: H, port: u16) -> Self {
+    pub fn https<H>(host: H, port: u16) -> Self
+    where
+        H: AsRef<str>,
+    {
         Self::new(ProxyType::Https, host, port)
     }
-    pub fn socks5<H: AsRef<str>>(host: H, port: u16) -> Self {
+    pub fn socks5<H>(host: H, port: u16) -> Self
+    where
+        H: AsRef<str>,
+    {
         Self::new(ProxyType::Socks5, host, port)
     }
-    pub fn auth<U: AsRef<str>, P: AsRef<str>>(mut self, username: U, password: P) -> Self {
+    pub fn auth<U, P>(mut self, username: U, password: P) -> Self
+    where
+        U: AsRef<str>,
+        P: AsRef<str>,
+    {
         self.set_username(Some(username.as_ref().to_owned()));
         self.set_password(Some(password.as_ref().to_owned()));
         self
     }
-    fn new<H: AsRef<str>>(proxy_type: ProxyType, host: H, port: u16) -> Self {
+    fn new<H>(proxy_type: ProxyType, host: H, port: u16) -> Self
+    where
+        H: AsRef<str>,
+    {
         Self {
             proxy_type,
             host: host.as_ref().to_owned(),
@@ -11461,6 +12485,12 @@ pub struct RequestConfig {
     pub(crate) decode: bool,
     #[get(type(clone))]
     pub(crate) proxy: Option<Proxy>,
+    #[get(type(copy))]
+    pub(crate) connect_timeout: u64,
+    #[get(type(copy))]
+    pub(crate) max_retries: usize,
+    #[get(type(copy))]
+    pub(crate) keep_alive: bool,
 }
 ```
 # Path: hyperlane/request/src/request/request_builder/impl.rs
@@ -11470,13 +12500,59 @@ impl RequestBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn get<T: Into<String>>(&mut self, url: T) -> &mut Self {
+    pub fn get<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
         self.get_mut_request().set_method(Method::Get);
         self.get_mut_request().set_url(url);
         self
     }
-    pub fn post<T: Into<String>>(&mut self, url: T) -> &mut Self {
+    pub fn post<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
         self.get_mut_request().set_method(Method::Post);
+        self.get_mut_request().set_url(url);
+        self
+    }
+    pub fn put<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
+        self.get_mut_request().set_method(Method::Put);
+        self.get_mut_request().set_url(url);
+        self
+    }
+    pub fn delete<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
+        self.get_mut_request().set_method(Method::Delete);
+        self.get_mut_request().set_url(url);
+        self
+    }
+    pub fn patch<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
+        self.get_mut_request().set_method(Method::Patch);
+        self.get_mut_request().set_url(url);
+        self
+    }
+    pub fn head<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
+        self.get_mut_request().set_method(Method::Head);
+        self.get_mut_request().set_url(url);
+        self
+    }
+    pub fn options<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
+        self.get_mut_request().set_method(Method::Options);
         self.get_mut_request().set_url(url);
         self
     }
@@ -11484,11 +12560,65 @@ impl RequestBuilder {
         self.get_mut_request().set_method(method);
         self
     }
-    pub fn url<T: Into<String>>(&mut self, url: T) -> &mut Self {
+    pub fn url<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
         self.get_mut_request().set_url(url);
         self
     }
-    pub fn header<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) -> &mut Self {
+    pub fn query<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let current: String = self.get_request().get_url().clone();
+        let (base, fragment): (&str, Option<&str>) = match current.split_once(URL_FRAGMENT) {
+            Some((prefix, frag)) => (prefix, Some(frag)),
+            None => (current.as_str(), None),
+        };
+        let sep: char = if base.contains(URL_QUERY) {
+            if base.ends_with(URL_QUERY) || base.ends_with('&') {
+                '\0'
+            } else {
+                '&'
+            }
+        } else {
+            URL_QUERY
+        };
+        let mut updated: String = String::with_capacity(
+            current.len() + key.as_ref().len() * 3 + value.as_ref().len() * 3 + 2,
+        );
+        updated.push_str(base);
+        if sep != '\0' {
+            updated.push(sep);
+        }
+        push_percent_encoded(key.as_ref(), &mut updated);
+        updated.push('=');
+        push_percent_encoded(value.as_ref(), &mut updated);
+        if let Some(frag) = fragment {
+            updated.push(URL_FRAGMENT);
+            updated.push_str(frag);
+        }
+        self.get_mut_request().set_url(updated);
+        self
+    }
+    pub fn query_pairs<I, K, V>(&mut self, pairs: I) -> &mut Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        for (key, value) in pairs {
+            self.query(key, value);
+        }
+        self
+    }
+    pub fn header<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
         self.get_mut_request().set_header(key, value);
         self
     }
@@ -11502,7 +12632,50 @@ impl RequestBuilder {
         }
         self
     }
-    pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
+    pub fn bearer_auth<T>(&mut self, token: T) -> &mut Self
+    where
+        T: AsRef<str>,
+    {
+        let value: String = format!("{BEARER_PREFIX}{}", token.as_ref());
+        self.get_mut_request()
+            .set_header(HEADER_AUTHORIZATION, value);
+        self
+    }
+    pub fn basic_auth<U, P>(&mut self, username: U, password: P) -> &mut Self
+    where
+        U: AsRef<str>,
+        P: AsRef<str>,
+    {
+        let raw: String = format!("{}:{}", username.as_ref(), password.as_ref());
+        let encoded: String = crate::utils::base64_encode(raw.as_bytes());
+        let value: String = format!("{BASIC_PREFIX}{encoded}");
+        self.get_mut_request()
+            .set_header(HEADER_AUTHORIZATION, value);
+        self
+    }
+    pub fn cookie<K, V>(&mut self, name: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let pair: String = format!("{}={}", name.as_ref(), value.as_ref());
+        let existing: Option<String> = self
+            .get_request()
+            .get_headers()
+            .iter()
+            .find(|(k, _): &(&String, &String)| k.eq_ignore_ascii_case(COOKIE))
+            .map(|(_, v): (&String, &String)| v.clone());
+        let merged: String = match existing {
+            Some(prev) if !prev.is_empty() => format!("{prev}; {pair}"),
+            _ => pair,
+        };
+        self.get_mut_request().set_header(COOKIE, merged);
+        self
+    }
+    pub fn remove_header<K>(&mut self, key: K) -> &mut Self
+    where
+        K: AsRef<str>,
+    {
         self.get_mut_request().remove_header(key);
         self
     }
@@ -11510,23 +12683,83 @@ impl RequestBuilder {
         self.get_mut_request().clear_headers();
         self
     }
-    pub fn body<B: Into<Vec<u8>>>(&mut self, bytes: B) -> &mut Self {
+    pub fn body<B>(&mut self, bytes: B) -> &mut Self
+    where
+        B: Into<Vec<u8>>,
+    {
         self.get_mut_request().set_body(Body::from_bytes(bytes));
         self
     }
-    pub fn body_text<T: Into<String>>(&mut self, text: T) -> &mut Self {
+    pub fn body_text<T>(&mut self, text: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
         self.get_mut_request()
             .set_body(Body::from_bytes(text.into().into_bytes()));
         self
     }
-    pub fn body_json<V: Serialize>(&mut self, value: &V) -> &mut Self {
+    pub fn body_json<V>(&mut self, value: &V) -> &mut Self
+    where
+        V: Serialize,
+    {
         if let Ok(bytes) = to_vec(value) {
             self.get_mut_request().set_body(Body::from_bytes(bytes));
         }
         self
     }
+    pub fn body_form<I, K, V>(&mut self, fields: I) -> &mut Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let mut encoded: String = String::new();
+        for (key, value) in fields {
+            if !encoded.is_empty() {
+                encoded.push('&');
+            }
+            push_percent_encoded(key.as_ref(), &mut encoded);
+            encoded.push('=');
+            push_percent_encoded(value.as_ref(), &mut encoded);
+        }
+        self.get_mut_request()
+            .set_header(CONTENT_TYPE, FORM_URLENCODED_CONTENT_TYPE);
+        self.get_mut_request()
+            .set_body(Body::from_bytes(encoded.into_bytes()));
+        self
+    }
+    pub fn body_multipart(&mut self, parts: &[BodyPart]) -> &mut Self {
+        let (content_type, bytes): (String, Vec<u8>) = encode_multipart_parts(parts);
+        self.get_mut_request()
+            .set_header(CONTENT_TYPE, content_type);
+        self.get_mut_request().set_body(Body::from_bytes(bytes));
+        self
+    }
+    pub fn root_cert_pem(&mut self, pem_bytes: &[u8]) -> Result<&mut Self, RequestError> {
+        let roots: &mut RootCertStore = self.get_mut_request().get_mut_tmp().get_mut_root_cert();
+        let _: usize = add_pem_certs_to_store(roots, pem_bytes)?;
+        Ok(self)
+    }
     pub fn timeout(&mut self, ms: u64) -> &mut Self {
         self.get_mut_request().get_mut_config().set_timeout(ms);
+        self
+    }
+    pub fn connect_timeout(&mut self, ms: u64) -> &mut Self {
+        self.get_mut_request()
+            .get_mut_config()
+            .set_connect_timeout(ms);
+        self
+    }
+    pub fn retry(&mut self, max_retries: usize) -> &mut Self {
+        self.get_mut_request()
+            .get_mut_config()
+            .set_max_retries(max_retries);
+        self
+    }
+    pub fn keep_alive(&mut self, enabled: bool) -> &mut Self {
+        self.get_mut_request()
+            .get_mut_config()
+            .set_keep_alive(enabled);
         self
     }
     pub fn buffer_size(&mut self, n: usize) -> &mut Self {
@@ -11610,8 +12843,8 @@ pub type RequestResult = Result<HttpResponse, RequestError>;
 # Path: hyperlane/request/src/request/http_request/impl.rs
 ```rust
 use super::*;
-impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
-impl<T: Read + Write> ReadWrite for T {}
+impl<T> AsyncReadWrite for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T> ReadWrite for T where T: Read + Write + Send {}
 impl HttpRequest {
     pub fn send(&mut self) -> RequestResult {
         self.send_sync()
@@ -11674,6 +12907,7 @@ impl HttpRequest {
         }
         Ok(components)
     }
+    #[cfg(test)]
     pub(crate) fn full_path(&self) -> Result<String, RequestError> {
         let url_obj: HttpUrlComponents = self.parse_url()?;
         let query: String = url_obj.get_query().unwrap_or_default();
@@ -11684,9 +12918,7 @@ impl HttpRequest {
             Ok(format!("{}{}{}", path, QUERY, query))
         }
     }
-    pub(crate) fn protocol_lower(config: &RequestConfig) -> String {
-        config.get_http_version().to_string().to_ascii_lowercase()
-    }
+    #[cfg(test)]
     pub(crate) fn header_bytes(&self, body_length: usize) -> Result<Vec<u8>, RequestError> {
         let mut header: HashMap<String, String> = self.get_headers().clone();
         let host_value: String = self.parse_url()?.get_host().unwrap_or_default();
@@ -11717,229 +12949,712 @@ impl HttpRequest {
         }
         Ok(out)
     }
+    #[cfg(test)]
     fn header_has_key(header: &HashMap<String, String>, target_key: &str) -> bool {
         header
             .keys()
             .any(|key: &String| key.eq_ignore_ascii_case(target_key))
     }
-    pub(crate) fn body_bytes(&self) -> Vec<u8> {
-        let ct: Option<String> = self
-            .headers
-            .iter()
-            .find(|(k, _): &(&String, &String)| k.eq_ignore_ascii_case(CONTENT_TYPE))
-            .map(|(_, v): (&String, &String)| v.clone());
-        match ct {
-            Some(value) => value
-                .to_lowercase()
-                .parse::<ContentType>()
-                .unwrap_or_default()
-                .get_body_string(&String::from_utf8_lossy(self.get_body().as_slice()))
-                .into_bytes(),
-            None => Vec::new(),
-        }
+    fn remove_header_ci(&mut self, target_key: &str) {
+        self.get_mut_headers()
+            .retain(|key: &String, _: &mut String| !key.eq_ignore_ascii_case(target_key));
     }
-    pub(crate) fn send_sync(&mut self) -> RequestResult {
-        let url_obj: HttpUrlComponents = self.parse_url()?;
-        validate_request_headers(self.get_headers())?;
-        let host: String = url_obj.get_host().clone().unwrap_or_default();
-        let port: u16 = self.resolve_port(url_obj.get_port().unwrap_or_default());
-        let mut stream: BoxReadWrite = self.open_sync_stream(host, port)?;
-        let method: Method = self.get_method();
-        if method.is_get() {
-            self.send_bodyless_request_sync(&mut stream, false)
-        } else if method.is_post() {
-            self.send_post_request_sync(&mut stream)
-        } else if method.is_head() {
-            self.send_bodyless_request_sync(&mut stream, true)
-        } else {
-            Err(RequestError::Request(METHOD_NOT_ALLOWED.to_string()))
-        }
+    fn scheme_is_https(url_obj: &HttpUrlComponents) -> bool {
+        url_obj.get_protocol().eq_ignore_ascii_case(HTTPS_LOWERCASE)
     }
-    async fn send_async_impl(&mut self) -> RequestResult {
-        let url_obj: HttpUrlComponents = self.parse_url()?;
-        validate_request_headers(self.get_headers())?;
-        let host: String = url_obj.get_host().clone().unwrap_or_default();
-        let port: u16 = self.resolve_port(url_obj.get_port().unwrap_or_default());
-        let mut stream: BoxAsyncReadWrite = self.open_async_stream(host, port).await?;
-        let method: Method = self.get_method();
-        if method.is_get() {
-            self.send_bodyless_request_async(&mut stream, false).await
-        } else if method.is_post() {
-            self.send_post_request_async(&mut stream).await
-        } else if method.is_head() {
-            self.send_bodyless_request_async(&mut stream, true).await
-        } else {
-            Err(RequestError::Request(METHOD_NOT_ALLOWED.to_string()))
-        }
-    }
-    fn resolve_port(&self, port: u16) -> u16 {
+    fn resolve_port_for_scheme(port: u16, is_https: bool) -> u16 {
         if port != 0 {
             return port;
         }
-        let protocol: String = Self::protocol_lower(self.get_config());
-        Protocol::get_port(&protocol)
-    }
-    fn is_https(&self) -> bool {
-        Self::protocol_lower(self.get_config()) == HTTPS_LOWERCASE
-    }
-    fn open_sync_stream(&self, host: String, port: u16) -> Result<BoxReadWrite, RequestError> {
-        if let Some(proxy) = &self.get_config().get_proxy() {
-            return self.open_sync_proxy_stream(host, port, proxy);
+        if is_https {
+            HTTPS_DEFAULT_PORT
+        } else {
+            HTTP_DEFAULT_PORT
         }
-        let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
-        let tcp: TcpStream = TcpStream::connect((host.clone(), port))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        tcp.set_read_timeout(Some(timeout))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        tcp.set_write_timeout(Some(timeout))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        if self.is_https() {
-            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
-            let tls_cfg: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let dns: ServerName<'static> = ServerName::try_from(host.clone())
-                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
+    }
+    fn strip_ipv6_brackets(host: &str) -> &str {
+        host.strip_prefix('[')
+            .and_then(|inner: &str| inner.strip_suffix(']'))
+            .unwrap_or(host)
+    }
+    fn format_authority(host: &str, port: u16) -> String {
+        if host.contains(':') && !host.starts_with('[') {
+            format!("[{host}]:{port}")
+        } else {
+            format!("{host}:{port}")
+        }
+    }
+    fn server_name_for_host(host: &str) -> Result<ServerName<'static>, RequestError> {
+        let clean: &str = Self::strip_ipv6_brackets(host);
+        ServerName::try_from(clean.to_owned())
+            .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))
+    }
+    fn effective_buffer_size(&self) -> usize {
+        let configured: usize = self.get_config().get_buffer_size();
+        if configured == 0 {
+            DEFAULT_EFFECTIVE_BUFFER_SIZE
+        } else {
+            configured
+        }
+    }
+    fn tls_client_config(&self) -> Arc<ClientConfig> {
+        resolve_tls_client_config(self.get_tmp().get_root_cert(), false)
+    }
+    fn tls_client_config_h2(&self) -> Arc<ClientConfig> {
+        resolve_tls_client_config(self.get_tmp().get_root_cert(), true)
+    }
+    fn effective_connect_timeout_ms(&self) -> u64 {
+        let connect_ms: u64 = self.get_config().get_connect_timeout();
+        if connect_ms > 0 {
+            connect_ms
+        } else {
+            self.get_config().get_timeout()
+        }
+    }
+    fn validated_http_method(&self) -> Result<(String, bool), RequestError> {
+        let method: Method = self.get_method();
+        let token: String = method.to_string();
+        if token.is_empty() || !is_valid_header_name(token.as_bytes()) {
+            return Err(RequestError::Request(INVALID_HTTP_METHOD.to_owned()));
+        }
+        Ok((token, method.is_head()))
+    }
+    fn validated_http_version(&self) -> Result<String, RequestError> {
+        let version: String = self.get_config().get_http_version().to_string();
+        if !version.as_bytes().starts_with(HTTP_STATUS_PREFIX)
+            || version.len() <= HTTP_STATUS_PREFIX.len()
+            || version
+                .bytes()
+                .any(|byte: u8| byte <= SPACE_U8 || byte >= 0x7f)
+        {
+            return Err(RequestError::Request(INVALID_HTTP_VERSION.to_owned()));
+        }
+        Ok(version)
+    }
+    fn is_connect_success_head(head: &[u8]) -> bool {
+        let has_prefix: bool =
+            head.starts_with(HTTP_CONNECT_PREFIX_1_1) || head.starts_with(HTTP_CONNECT_PREFIX_1_0);
+        if !has_prefix {
+            return false;
+        }
+        let status_start: usize = HTTP_CONNECT_PREFIX_1_1.len();
+        let status_code: usize = head
+            .get(status_start..status_start + 3)
+            .map_or(0, parse_status_code);
+        (200..300).contains(&status_code)
+            && matches!(head.get(status_start + 3), Some(b' ' | b'\r') | None)
+    }
+    fn build_connect_request(
+        target_host: &str,
+        target_port: u16,
+        proxy: &Proxy,
+    ) -> Result<String, RequestError> {
+        if !is_valid_header_value(target_host.as_bytes())
+            || target_host
+                .bytes()
+                .any(|byte: u8| byte <= SPACE_U8 || byte >= 0x7f)
+        {
+            return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
+        }
+        let authority: String = Self::format_authority(target_host, target_port);
+        if let (Some(u), Some(p)) = (proxy.get_username(), proxy.get_password()) {
+            if u.contains(':')
+                || !is_valid_header_value(u.as_bytes())
+                || !is_valid_header_value(p.as_bytes())
+            {
+                return Err(RequestError::Request(PROXY_AUTH_ERROR.to_owned()));
+            }
+            let auth: String = format!("{u}:{p}");
+            let encoded: String = crate::utils::base64_encode(auth.as_bytes());
+            Ok(format!(
+                "CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\nProxy-Authorization: Basic {encoded}\r\n\r\n"
+            ))
+        } else {
+            Ok(format!(
+                "CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\n\r\n"
+            ))
+        }
+    }
+    fn resolve_redirect_url(
+        current: &HttpUrlComponents,
+        location: &str,
+    ) -> Result<String, RequestError> {
+        let trimmed: &str = location.trim();
+        if trimmed.is_empty() {
+            return Err(RequestError::Request(MISSING_REDIRECT_URL.to_owned()));
+        }
+        if trimmed.contains(SCHEME_SEPARATOR) {
+            return Ok(trimmed.to_owned());
+        }
+        let raw_protocol: &str = current.get_protocol();
+        let scheme: String = if raw_protocol.is_empty() {
+            HTTP_SCHEME.to_owned()
+        } else {
+            raw_protocol.to_ascii_lowercase()
+        };
+        if let Some(rest) = trimmed.strip_prefix("//") {
+            return Ok(format!("{scheme}://{rest}"));
+        }
+        let host: String = current.get_host().unwrap_or_default();
+        let authority: String = match current.get_port() {
+            Some(port) if port != 0 => Self::format_authority(&host, port),
+            _ => host,
+        };
+        if trimmed.starts_with(URL_SLASH) {
+            return Ok(format!("{scheme}://{authority}{trimmed}"));
+        }
+        if trimmed.starts_with(URL_QUERY) {
+            let base_path: String = current.get_path().unwrap_or_else(|| URL_SLASH.to_string());
+            return Ok(format!("{scheme}://{authority}{base_path}{trimmed}"));
+        }
+        let current_path: String = current.get_path().unwrap_or_else(|| URL_SLASH.to_string());
+        let base_dir: &str = match current_path.rfind(URL_SLASH) {
+            Some(pos) => &current_path[..=pos],
+            None => "/",
+        };
+        Ok(format!("{scheme}://{authority}{base_dir}{trimmed}"))
+    }
+    fn prepare_redirect_hop(
+        &mut self,
+        current_url: &HttpUrlComponents,
+        status_code: usize,
+        location: String,
+    ) -> Result<(), RequestError> {
+        let resolved: String = Self::resolve_redirect_url(current_url, &location)?;
+        if self.get_tmp().get_visit_url().contains(&resolved) {
+            return Err(RequestError::Request(REDIRECT_URL_DEAD_LOOP.to_string()));
+        }
+        self.get_mut_tmp()
+            .get_mut_visit_url()
+            .insert(resolved.clone());
+        let remaining: usize = self.get_config().get_max_redirect_times();
+        if remaining == 0 {
+            return Err(RequestError::Request(
+                MAX_REDIRECT_TIMES_EXCEEDED.to_string(),
+            ));
+        }
+        self.get_mut_config()
+            .set_max_redirect_times(remaining.saturating_sub(1));
+        let prev_https: bool = Self::scheme_is_https(current_url);
+        let prev_host: String = current_url.get_host().unwrap_or_default();
+        let prev_port: u16 =
+            Self::resolve_port_for_scheme(current_url.get_port().unwrap_or_default(), prev_https);
+        self.set_url(resolved);
+        let next_url: HttpUrlComponents = self.parse_url()?;
+        let next_https: bool = Self::scheme_is_https(&next_url);
+        let next_host: String = next_url.get_host().unwrap_or_default();
+        let next_port: u16 =
+            Self::resolve_port_for_scheme(next_url.get_port().unwrap_or_default(), next_https);
+        let same_origin: bool = prev_https == next_https
+            && prev_host.eq_ignore_ascii_case(&next_host)
+            && prev_port == next_port;
+        if !same_origin || (prev_https && !next_https) {
+            self.remove_header_ci(HEADER_AUTHORIZATION);
+            self.remove_header_ci(HEADER_PROXY_AUTHORIZATION);
+            self.remove_header_ci(HEADER_COOKIE);
+        }
+        self.remove_header_ci(HOST);
+        let current_method: Method = self.get_method();
+        let rewrite_to_get: bool =
+            (status_code == 303 && !current_method.is_get() && !current_method.is_head())
+                || ([301, 302].contains(&status_code) && current_method.is_post());
+        if rewrite_to_get {
+            self.set_method(Method::Get);
+            self.set_body(Body::empty());
+            self.remove_header_ci(CONTENT_TYPE);
+            self.remove_header_ci(CONTENT_LENGTH);
+        }
+        Ok(())
+    }
+    pub(crate) fn send_sync(&mut self) -> RequestResult {
+        let initial_url: String = self.get_url().to_owned();
+        self.get_mut_tmp().get_mut_visit_url().insert(initial_url);
+        loop {
+            let url_obj: HttpUrlComponents = self.parse_url()?;
+            validate_request_headers(self.get_headers())?;
+            let (method_token, is_head): (String, bool) = self.validated_http_method()?;
+            let version: String = self.validated_http_version()?;
+            let request_bytes: Vec<u8> =
+                build_wire_request_direct(self, &url_obj, &method_token, is_head, &version)?;
+            let is_https: bool = Self::scheme_is_https(&url_obj);
+            let host: String = url_obj.get_host().clone().unwrap_or_default();
+            let port: u16 =
+                Self::resolve_port_for_scheme(url_obj.get_port().unwrap_or_default(), is_https);
+            let max_retries: usize = if is_idempotent_method(&self.get_method()) {
+                self.get_config().get_max_retries()
+            } else {
+                0
+            };
+            let mut attempt: usize = 0;
+            let (mut response, redirect_url): (HttpResponse, Option<Vec<u8>>) = loop {
+                let res: Result<(HttpResponse, Option<Vec<u8>>), RequestError> =
+                    self.exchange_sync_once(&host, port, is_https, &request_bytes, is_head);
+                match res {
+                    Ok((resp, redir)) => {
+                        if attempt < max_retries && is_retryable_status(resp.get_status_code()) {
+                            thread::sleep(retry_backoff_duration(attempt));
+                            attempt += 1;
+                            continue;
+                        }
+                        break (resp, redir);
+                    }
+                    Err(error) => {
+                        if attempt < max_retries && is_retryable_error(&error) {
+                            thread::sleep(retry_backoff_duration(attempt));
+                            attempt += 1;
+                            continue;
+                        }
+                        return Err(error);
+                    }
+                }
+            };
+            if !self.get_config().get_redirect() || redirect_url.is_none() {
+                if !is_head && self.get_config().get_decode() {
+                    response = response.decode(self.effective_buffer_size());
+                }
+                return Ok(response);
+            }
+            let url_bytes: Vec<u8> = redirect_url
+                .ok_or_else(|| RequestError::Request(MISSING_REDIRECT_URL.to_string()))?;
+            let location: String = String::from_utf8(url_bytes)
+                .map_err(|e: FromUtf8Error| RequestError::Request(e.to_string()))?;
+            self.prepare_redirect_hop(&url_obj, response.get_status_code(), location)?;
+        }
+    }
+    fn exchange_sync_once(
+        &self,
+        host: &str,
+        port: u16,
+        is_https: bool,
+        request_bytes: &[u8],
+        is_head: bool,
+    ) -> Result<(HttpResponse, Option<Vec<u8>>), RequestError> {
+        let disable_keep_alive: bool = request_disables_keep_alive(self);
+        let pool_key: PoolKey = make_pool_key(
+            is_https,
+            host,
+            port,
+            self.get_config().get_proxy().as_ref(),
+            self.get_tmp().get_root_cert(),
+            self.get_config().get_timeout(),
+        );
+        let mut attempted_pooled: bool = false;
+        loop {
+            let (mut stream, from_pool): (BoxReadWrite, bool) = if !disable_keep_alive
+                && !attempted_pooled
+                && let Some(cached) = take_sync_h1_conn(&pool_key)
+            {
+                (cached, true)
+            } else {
+                (
+                    self.open_sync_stream(host.to_owned(), port, is_https)?,
+                    false,
+                )
+            };
+            let write_res: Result<(), RequestError> = stream
+                .write_all(request_bytes)
+                .and_then(|_: ()| stream.flush())
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()));
+            if let Err(error) = write_res {
+                if from_pool {
+                    attempted_pooled = true;
+                    continue;
+                }
+                return Err(error);
+            }
+            match self.read_response_once_sync(&mut stream, is_head, disable_keep_alive) {
+                Ok((response, redirect_url, reusable)) => {
+                    if reusable && !disable_keep_alive {
+                        put_sync_h1_conn(pool_key, stream);
+                    }
+                    return Ok((response, redirect_url));
+                }
+                Err(error) => {
+                    if from_pool && is_retryable_error(&error) {
+                        attempted_pooled = true;
+                        continue;
+                    }
+                    return Err(error);
+                }
+            }
+        }
+    }
+    async fn send_async_impl(&mut self) -> RequestResult {
+        let initial_url: String = self.get_url().to_owned();
+        self.get_mut_tmp().get_mut_visit_url().insert(initial_url);
+        loop {
+            let url_obj: HttpUrlComponents = self.parse_url()?;
+            validate_request_headers(self.get_headers())?;
+            let (method_token, is_head): (String, bool) = self.validated_http_method()?;
+            let is_https: bool = Self::scheme_is_https(&url_obj);
+            let host: String = url_obj.get_host().clone().unwrap_or_default();
+            let port: u16 =
+                Self::resolve_port_for_scheme(url_obj.get_port().unwrap_or_default(), is_https);
+            let is_h2: bool = *self.get_config().get_http_version() == HttpVersion::Http2;
+            let request_bytes: Option<Vec<u8>> = if is_h2 {
+                None
+            } else {
+                let version: String = self.validated_http_version()?;
+                Some(build_wire_request_direct(
+                    self,
+                    &url_obj,
+                    &method_token,
+                    is_head,
+                    &version,
+                )?)
+            };
+            let timeout_ms: u64 = self.get_config().get_timeout();
+            let max_retries: usize = if is_idempotent_method(&self.get_method()) {
+                self.get_config().get_max_retries()
+            } else {
+                0
+            };
+            let mut attempt: usize = 0;
+            let (mut response, redirect_url): (HttpResponse, Option<Vec<u8>>) = loop {
+                let attempt_res: Result<(HttpResponse, Option<Vec<u8>>), RequestError> = if is_h2 {
+                    let pool_key: PoolKey = make_pool_key(
+                        is_https,
+                        &host,
+                        port,
+                        self.get_config().get_proxy().as_ref(),
+                        self.get_tmp().get_root_cert(),
+                        0,
+                    );
+                    let target: H2ExchangeTarget<'_> = H2ExchangeTarget {
+                        url_obj: &url_obj,
+                        method_token: &method_token,
+                        is_head,
+                        host: &host,
+                        port,
+                        is_https,
+                        pool_key,
+                    };
+                    if timeout_ms > 0 {
+                        match tokio::time::timeout(
+                            Duration::from_millis(timeout_ms),
+                            send_h2_exchange_async(self, target),
+                        )
+                        .await
+                        {
+                            Ok(inner) => inner,
+                            Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+                        }
+                    } else {
+                        send_h2_exchange_async(self, target).await
+                    }
+                } else {
+                    let wire: &[u8] = request_bytes.as_deref().unwrap_or_default();
+                    if timeout_ms > 0 {
+                        match tokio::time::timeout(
+                            Duration::from_millis(timeout_ms),
+                            self.exchange_async_once(&host, port, is_https, wire, is_head),
+                        )
+                        .await
+                        {
+                            Ok(inner) => inner,
+                            Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+                        }
+                    } else {
+                        self.exchange_async_once(&host, port, is_https, wire, is_head)
+                            .await
+                    }
+                };
+                match attempt_res {
+                    Ok((resp, redir)) => {
+                        if attempt < max_retries && is_retryable_status(resp.get_status_code()) {
+                            tokio::time::sleep(retry_backoff_duration(attempt)).await;
+                            attempt += 1;
+                            continue;
+                        }
+                        break (resp, redir);
+                    }
+                    Err(error) => {
+                        if attempt < max_retries && is_retryable_error(&error) {
+                            tokio::time::sleep(retry_backoff_duration(attempt)).await;
+                            attempt += 1;
+                            continue;
+                        }
+                        return Err(error);
+                    }
+                }
+            };
+            if !self.get_config().get_redirect() || redirect_url.is_none() {
+                if !is_head && self.get_config().get_decode() {
+                    response = response.decode(self.effective_buffer_size());
+                }
+                return Ok(response);
+            }
+            let url_bytes: Vec<u8> = redirect_url
+                .ok_or_else(|| RequestError::Request(MISSING_REDIRECT_URL.to_string()))?;
+            let location: String = String::from_utf8(url_bytes)
+                .map_err(|e: FromUtf8Error| RequestError::Request(e.to_string()))?;
+            self.prepare_redirect_hop(&url_obj, response.get_status_code(), location)?;
+        }
+    }
+    async fn exchange_async_once(
+        &self,
+        host: &str,
+        port: u16,
+        is_https: bool,
+        request_bytes: &[u8],
+        is_head: bool,
+    ) -> Result<(HttpResponse, Option<Vec<u8>>), RequestError> {
+        let disable_keep_alive: bool = request_disables_keep_alive(self);
+        let pool_key: PoolKey = make_pool_key(
+            is_https,
+            host,
+            port,
+            self.get_config().get_proxy().as_ref(),
+            self.get_tmp().get_root_cert(),
+            0,
+        );
+        let mut attempted_pooled: bool = false;
+        loop {
+            let (mut stream, from_pool): (BoxAsyncReadWrite, bool) = if !disable_keep_alive
+                && !attempted_pooled
+                && let Some(cached) = take_async_h1_conn(&pool_key)
+            {
+                (cached, true)
+            } else {
+                (
+                    self.open_async_stream(host.to_owned(), port, is_https)
+                        .await?,
+                    false,
+                )
+            };
+            let write_res: Result<(), RequestError> = match stream.write_all(request_bytes).await {
+                Ok(()) => stream
+                    .flush()
+                    .await
+                    .map_err(|e: io::Error| RequestError::Request(e.to_string())),
+                Err(error) => Err(RequestError::Request(error.to_string())),
+            };
+            if let Err(error) = write_res {
+                if from_pool {
+                    attempted_pooled = true;
+                    continue;
+                }
+                return Err(error);
+            }
+            match self
+                .read_response_once_async(&mut stream, is_head, disable_keep_alive)
+                .await
+            {
+                Ok((response, redirect_url, reusable)) => {
+                    if reusable && !disable_keep_alive {
+                        put_async_h1_conn(pool_key, stream);
+                    }
+                    return Ok((response, redirect_url));
+                }
+                Err(error) => {
+                    if from_pool && is_retryable_error(&error) {
+                        attempted_pooled = true;
+                        continue;
+                    }
+                    return Err(error);
+                }
+            }
+        }
+    }
+    fn connect_sync_tcp(&self, host: &str, port: u16) -> Result<TcpStream, RequestError> {
+        let clean_host: &str = Self::strip_ipv6_brackets(host);
+        let connect_ms: u64 = self.effective_connect_timeout_ms();
+        let io_timeout_ms: u64 = self.get_config().get_timeout();
+        let tcp: TcpStream = if connect_ms > 0 {
+            let connect_dur: Duration = Duration::from_millis(connect_ms);
+            let addrs: Vec<SocketAddr> = (clean_host, port)
+                .to_socket_addrs()
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?
+                .collect();
+            let mut last_err: Option<io::Error> = None;
+            let mut connected: Option<TcpStream> = None;
+            for addr in addrs {
+                match TcpStream::connect_timeout(&addr, connect_dur) {
+                    Ok(stream) => {
+                        connected = Some(stream);
+                        break;
+                    }
+                    Err(error) => {
+                        last_err = Some(error);
+                    }
+                }
+            }
+            match connected {
+                Some(stream) => stream,
+                None => {
+                    return Err(RequestError::Request(
+                        last_err
+                            .map(|e: io::Error| e.to_string())
+                            .unwrap_or_else(|| INTERNAL_SERVER_ERROR.to_owned()),
+                    ));
+                }
+            }
+        } else {
+            TcpStream::connect((clean_host, port))
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?
+        };
+        let _: Result<(), io::Error> = tcp.set_nodelay(true);
+        if io_timeout_ms > 0 {
+            let io_dur: Duration = Duration::from_millis(io_timeout_ms);
+            tcp.set_read_timeout(Some(io_dur))
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+            tcp.set_write_timeout(Some(io_dur))
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        }
+        Ok(tcp)
+    }
+    async fn connect_async_tcp(
+        &self,
+        host: &str,
+        port: u16,
+    ) -> Result<tokio::net::TcpStream, RequestError> {
+        let clean_host: String = Self::strip_ipv6_brackets(host).to_owned();
+        let connect_ms: u64 = self.effective_connect_timeout_ms();
+        let tcp: tokio::net::TcpStream = if connect_ms > 0 {
+            tokio::time::timeout(
+                Duration::from_millis(connect_ms),
+                tokio::net::TcpStream::connect((clean_host, port)),
+            )
+            .await
+            .map_err(|_| RequestError::ReadTimeout(HttpStatus::RequestTimeout))?
+            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?
+        } else {
+            tokio::net::TcpStream::connect((clean_host, port))
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?
+        };
+        let _: Result<(), io::Error> = tcp.set_nodelay(true);
+        Ok(tcp)
+    }
+    fn open_sync_stream(
+        &self,
+        host: String,
+        port: u16,
+        is_https: bool,
+    ) -> Result<BoxReadWrite, RequestError> {
+        if let Some(proxy) = &self.get_config().get_proxy() {
+            return self.open_sync_proxy_stream(host, port, is_https, proxy);
+        }
+        let tcp: TcpStream = self.connect_sync_tcp(&host, port)?;
+        if is_https {
+            let tls_cfg: Arc<ClientConfig> = self.tls_client_config();
+            let dns: ServerName<'static> = Self::server_name_for_host(&host)?;
+            let session: ClientConnection = ClientConnection::new(tls_cfg, dns)
                 .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             Ok(Box::new(StreamOwned::new(session, tcp)))
         } else {
             Ok(Box::new(tcp))
         }
     }
-    fn send_bodyless_request_sync(
-        &mut self,
+    fn read_response_once_sync(
+        &self,
         stream: &mut BoxReadWrite,
         is_head: bool,
-    ) -> Result<HttpResponse, RequestError> {
-        let path: String = self.full_path()?;
-        let header_bytes: Vec<u8> = self.header_bytes(0)?;
-        let version: String = self.get_config().get_http_version().to_string();
-        let method: &str = if is_head { HEAD } else { GET };
-        let request: Vec<u8> = build_http_request(method, path, header_bytes, None, version);
-        stream
-            .write_all(&request)
-            .and_then(|_: ()| stream.flush())
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        self.read_response_sync(stream, is_head)
-    }
-    fn send_post_request_sync(
-        &mut self,
-        stream: &mut BoxReadWrite,
-    ) -> Result<HttpResponse, RequestError> {
-        let body_bytes: Vec<u8> = self.body_bytes();
-        let path: String = self.full_path()?;
-        let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len())?;
-        let version: String = self.get_config().get_http_version().to_string();
-        let request: Vec<u8> = build_http_request(
-            HTTP_METHOD_POST,
-            path,
-            header_bytes,
-            Some(body_bytes),
-            version,
-        );
-        stream
-            .write_all(&request)
-            .and_then(|_: ()| stream.flush())
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        self.read_response_sync(stream, false)
-    }
-    fn read_response_sync(
-        &mut self,
-        stream: &mut BoxReadWrite,
-        is_head: bool,
-    ) -> Result<HttpResponse, RequestError> {
-        let buffer_size: usize = self.get_config().buffer_size;
-        let mut buffer: Vec<u8> = vec![0u8; buffer_size];
-        let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
+        disable_keep_alive: bool,
+    ) -> Result<(HttpResponse, Option<Vec<u8>>, bool), RequestError> {
+        let buffer_size: usize = self.effective_buffer_size();
+        let mut buffer: Vec<u8> = take_client_buffer(buffer_size);
+        buffer.resize(buffer_size, 0u8);
+        let mut response_bytes: Vec<u8> = take_client_buffer(buffer_size.max(8192));
         let mut head: Option<FinalResponseHead> = None;
+        let mut interim_count: usize = 0;
+        let mut read_error: Option<RequestError> = None;
         loop {
-            let n: usize = stream
-                .read(&mut buffer)
-                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+            let n: usize = match stream.read(&mut buffer) {
+                Ok(n) => n,
+                Err(error) => {
+                    read_error = Some(RequestError::Request(error.to_string()));
+                    break;
+                }
+            };
             if n == 0 {
                 break;
             }
             let new_cap: usize =
                 calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
             if new_cap > 0 {
-                response_bytes.reserve(new_cap - response_bytes.capacity());
+                response_bytes.reserve(new_cap.saturating_sub(response_bytes.capacity()));
             }
             let old_len: usize = response_bytes.len();
             response_bytes.extend_from_slice(&buffer[..n]);
             if head.is_none() {
-                head = find_final_response_head(
+                match find_final_response_head(
                     &mut response_bytes,
                     old_len.saturating_sub(3),
                     is_head,
-                )?;
+                    &mut interim_count,
+                ) {
+                    Ok(found) => head = found,
+                    Err(error) => {
+                        read_error = Some(error);
+                        break;
+                    }
+                }
             }
-            if let Some((end, framing, _)) = &head
-                && response_body_is_complete(*framing, &response_bytes[*end..])?
-            {
-                break;
+            if let Some((end, framing, _)) = &head {
+                let body_slice: &[u8] = &response_bytes[*end..];
+                if body_slice.len() > MAX_RESPONSE_BODY_BYTES {
+                    read_error = Some(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
+                    break;
+                }
+                match response_body_is_complete(*framing, body_slice) {
+                    Ok(true) => break,
+                    Ok(false) => {}
+                    Err(error) => {
+                        read_error = Some(error);
+                        break;
+                    }
+                }
             }
         }
-        let Some((head_end, framing, mut redirect_url)) = head else {
+        return_client_buffer(buffer);
+        if let Some(error) = read_error {
+            return_client_buffer(response_bytes);
+            return Err(error);
+        }
+        let Some((head_end, framing, redirect_url)) = head else {
+            return_client_buffer(response_bytes);
             return Err(RequestError::HttpRequestPartsInsufficient(
                 HttpStatus::BadRequest,
             ));
         };
-        let mut response: HttpResponse =
-            finish_framed_response(&response_bytes, head_end, framing)?;
-        if !self.get_config().get_redirect() || redirect_url.is_none() {
-            if !is_head && self.get_config().get_decode() {
-                response = response.decode(self.get_config().buffer_size);
-            }
-            return Ok(response);
-        }
-        let url_bytes: Vec<u8> = redirect_url
-            .take()
-            .ok_or_else(|| RequestError::Request(MISSING_REDIRECT_URL.to_string()))?;
-        let url: String = String::from_utf8(url_bytes)
-            .map_err(|e: FromUtf8Error| RequestError::Request(e.to_string()))?;
-        self.handle_redirect(url)
-    }
-    fn handle_redirect(&mut self, url: String) -> Result<HttpResponse, RequestError> {
-        if !self.get_config().get_redirect() {
-            return Err(RequestError::Request(REDIRECT_NOT_ENABLED.to_string()));
-        }
-        if self.get_tmp().get_visit_url().contains(&url) {
-            return Err(RequestError::Request(REDIRECT_URL_DEAD_LOOP.to_string()));
-        }
-        self.get_mut_tmp().get_mut_visit_url().insert(url.clone());
-        if self.get_config().get_max_redirect_times() == 0 {
-            return Err(RequestError::Request(
-                MAX_REDIRECT_TIMES_EXCEEDED.to_string(),
-            ));
-        }
-        let remaining: usize = self.get_config().get_max_redirect_times();
-        self.get_mut_config()
-            .set_max_redirect_times(remaining.saturating_sub(1));
-        self.set_url(url);
-        self.send_sync()
+        let body_slice: &[u8] = &response_bytes[head_end..];
+        let has_trailing: bool = match framing {
+            ResponseFraming::Fixed(len) => body_slice.len() != len,
+            ResponseFraming::Chunked => match chunked_body_end(body_slice) {
+                Ok(Some(end)) => end != body_slice.len(),
+                _ => true,
+            },
+            ResponseFraming::Close => true,
+        };
+        let reusable: bool = response_allows_pool_reuse(
+            &response_bytes[..head_end],
+            framing,
+            has_trailing,
+            disable_keep_alive,
+        );
+        let parsed: Result<HttpResponse, RequestError> =
+            finish_framed_response(&response_bytes, head_end, framing);
+        return_client_buffer(response_bytes);
+        let response: HttpResponse = parsed?;
+        Ok((response, redirect_url, reusable))
     }
     async fn open_async_stream(
         &self,
         host: String,
         port: u16,
+        is_https: bool,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
         if let Some(proxy) = &self.get_config().get_proxy() {
-            return self.open_async_proxy_stream(host, port, proxy).await;
+            return self
+                .open_async_proxy_stream(host, port, is_https, proxy, false)
+                .await;
         }
-        let tcp: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect((host.clone(), port))
-                .await
-                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        if self.is_https() {
-            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
-            let tls_cfg: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns: ServerName<'static> = ServerName::try_from(host.clone())
-                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tls: TlsStream<http_type::tokio::net::TcpStream> = connector
+        let tcp: tokio::net::TcpStream = self.connect_async_tcp(&host, port).await?;
+        if is_https {
+            let connector: TlsConnector = TlsConnector::from(self.tls_client_config());
+            let dns: ServerName<'static> = Self::server_name_for_host(&host)?;
+            let tls: TlsStream<tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -11948,178 +13663,160 @@ impl HttpRequest {
             Ok(Box::new(tcp))
         }
     }
-    async fn send_bodyless_request_async(
-        &mut self,
-        stream: &mut BoxAsyncReadWrite,
-        is_head: bool,
-    ) -> Result<HttpResponse, RequestError> {
-        let path: String = self.full_path()?;
-        let header_bytes: Vec<u8> = self.header_bytes(0)?;
-        let version: String = self.get_config().get_http_version().to_string();
-        let method: &str = if is_head { HEAD } else { GET };
-        let request: Vec<u8> = build_http_request(method, path, header_bytes, None, version);
-        stream
-            .write_all(&request)
-            .await
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        stream
-            .flush()
-            .await
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        self.read_response_async(stream, is_head).await
-    }
-    async fn send_post_request_async(
-        &mut self,
-        stream: &mut BoxAsyncReadWrite,
-    ) -> Result<HttpResponse, RequestError> {
-        let body_bytes: Vec<u8> = self.body_bytes();
-        let path: String = self.full_path()?;
-        let header_bytes: Vec<u8> = self.header_bytes(body_bytes.len())?;
-        let version: String = self.get_config().get_http_version().to_string();
-        let request: Vec<u8> = build_http_request(
-            HTTP_METHOD_POST,
-            path,
-            header_bytes,
-            Some(body_bytes),
-            version,
-        );
-        stream
-            .write_all(&request)
-            .await
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        stream
-            .flush()
-            .await
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        self.read_response_async(stream, false).await
-    }
-    async fn read_response_async(
-        &mut self,
-        stream: &mut BoxAsyncReadWrite,
-        is_head: bool,
-    ) -> Result<HttpResponse, RequestError> {
-        let buffer_size: usize = self.get_config().buffer_size;
-        let mut buffer: Vec<u8> = vec![0u8; buffer_size];
-        let mut response_bytes: Vec<u8> = Vec::with_capacity(buffer_size.max(8192));
-        let mut head: Option<FinalResponseHead> = None;
-        loop {
-            let n: usize = stream
-                .read(&mut buffer)
+    pub(crate) async fn open_async_stream_h2(
+        &self,
+        host: &str,
+        port: u16,
+        is_https: bool,
+    ) -> Result<BoxAsyncReadWrite, RequestError> {
+        if let Some(proxy) = &self.get_config().get_proxy() {
+            return self
+                .open_async_proxy_stream(host.to_owned(), port, is_https, proxy, true)
+                .await;
+        }
+        let tcp: tokio::net::TcpStream = self.connect_async_tcp(host, port).await?;
+        if is_https {
+            let connector: TlsConnector = TlsConnector::from(self.tls_client_config_h2());
+            let dns: ServerName<'static> = Self::server_name_for_host(host)?;
+            let tls: TlsStream<tokio::net::TcpStream> = connector
+                .connect(dns, tcp)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+            if tls.get_ref().1.alpn_protocol() != Some(ALPN_H2) {
+                return Err(RequestError::Request(H2_ALPN_MISMATCH.to_owned()));
+            }
+            Ok(Box::new(tls))
+        } else {
+            Ok(Box::new(tcp))
+        }
+    }
+    async fn read_response_once_async(
+        &self,
+        stream: &mut BoxAsyncReadWrite,
+        is_head: bool,
+        disable_keep_alive: bool,
+    ) -> Result<(HttpResponse, Option<Vec<u8>>, bool), RequestError> {
+        let buffer_size: usize = self.effective_buffer_size();
+        let mut buffer: Vec<u8> = take_client_buffer(buffer_size);
+        buffer.resize(buffer_size, 0u8);
+        let mut response_bytes: Vec<u8> = take_client_buffer(buffer_size.max(8192));
+        let mut head: Option<FinalResponseHead> = None;
+        let mut interim_count: usize = 0;
+        let mut read_error: Option<RequestError> = None;
+        loop {
+            let n: usize = match stream.read(&mut buffer).await {
+                Ok(n) => n,
+                Err(error) => {
+                    read_error = Some(RequestError::Request(error.to_string()));
+                    break;
+                }
+            };
             if n == 0 {
                 break;
             }
             let new_cap: usize =
                 calculate_buffer_capacity(&response_bytes, n, response_bytes.capacity());
             if new_cap > 0 {
-                response_bytes.reserve(new_cap - response_bytes.capacity());
+                response_bytes.reserve(new_cap.saturating_sub(response_bytes.capacity()));
             }
             let old_len: usize = response_bytes.len();
             response_bytes.extend_from_slice(&buffer[..n]);
             if head.is_none() {
-                head = find_final_response_head(
+                match find_final_response_head(
                     &mut response_bytes,
                     old_len.saturating_sub(3),
                     is_head,
-                )?;
+                    &mut interim_count,
+                ) {
+                    Ok(found) => head = found,
+                    Err(error) => {
+                        read_error = Some(error);
+                        break;
+                    }
+                }
             }
-            if let Some((end, framing, _)) = &head
-                && response_body_is_complete(*framing, &response_bytes[*end..])?
-            {
-                break;
+            if let Some((end, framing, _)) = &head {
+                let body_slice: &[u8] = &response_bytes[*end..];
+                if body_slice.len() > MAX_RESPONSE_BODY_BYTES {
+                    read_error = Some(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
+                    break;
+                }
+                match response_body_is_complete(*framing, body_slice) {
+                    Ok(true) => break,
+                    Ok(false) => {}
+                    Err(error) => {
+                        read_error = Some(error);
+                        break;
+                    }
+                }
             }
         }
-        let Some((head_end, framing, mut redirect_url)) = head else {
+        return_client_buffer(buffer);
+        if let Some(error) = read_error {
+            return_client_buffer(response_bytes);
+            return Err(error);
+        }
+        let Some((head_end, framing, redirect_url)) = head else {
+            return_client_buffer(response_bytes);
             return Err(RequestError::HttpRequestPartsInsufficient(
                 HttpStatus::BadRequest,
             ));
         };
-        let mut response: HttpResponse =
-            finish_framed_response(&response_bytes, head_end, framing)?;
-        if !self.get_config().get_redirect() || redirect_url.is_none() {
-            if !is_head && self.get_config().get_decode() {
-                response = response.decode(self.get_config().buffer_size);
-            }
-            return Ok(response);
-        }
-        let url_bytes: Vec<u8> = redirect_url
-            .take()
-            .ok_or_else(|| RequestError::Request(MISSING_REDIRECT_URL.to_string()))?;
-        let url: String = String::from_utf8(url_bytes)
-            .map_err(|e: FromUtf8Error| RequestError::Request(e.to_string()))?;
-        self.handle_redirect_async(url).await
-    }
-    async fn handle_redirect_async(&mut self, url: String) -> Result<HttpResponse, RequestError> {
-        if !self.get_config().get_redirect() {
-            return Err(RequestError::Request(REDIRECT_NOT_ENABLED.to_string()));
-        }
-        if self.get_tmp().get_visit_url().contains(&url) {
-            return Err(RequestError::Request(REDIRECT_URL_DEAD_LOOP.to_string()));
-        }
-        self.get_mut_tmp().get_mut_visit_url().insert(url.clone());
-        if self.get_config().get_max_redirect_times() == 0 {
-            return Err(RequestError::Request(
-                MAX_REDIRECT_TIMES_EXCEEDED.to_string(),
-            ));
-        }
-        let remaining: usize = self.get_config().get_max_redirect_times();
-        self.get_mut_config()
-            .set_max_redirect_times(remaining.saturating_sub(1));
-        self.set_url(url);
-        Box::pin(self.send_async()).await
+        let body_slice: &[u8] = &response_bytes[head_end..];
+        let has_trailing: bool = match framing {
+            ResponseFraming::Fixed(len) => body_slice.len() != len,
+            ResponseFraming::Chunked => match chunked_body_end(body_slice) {
+                Ok(Some(end)) => end != body_slice.len(),
+                _ => true,
+            },
+            ResponseFraming::Close => true,
+        };
+        let reusable: bool = response_allows_pool_reuse(
+            &response_bytes[..head_end],
+            framing,
+            has_trailing,
+            disable_keep_alive,
+        );
+        let parsed: Result<HttpResponse, RequestError> =
+            finish_framed_response(&response_bytes, head_end, framing);
+        return_client_buffer(response_bytes);
+        let response: HttpResponse = parsed?;
+        Ok((response, redirect_url, reusable))
     }
     fn open_sync_proxy_stream(
         &self,
         target_host: String,
         target_port: u16,
+        is_https: bool,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
         match *proxy.get_proxy_type() {
             ProxyType::Http | ProxyType::Https => {
-                self.open_sync_http_proxy(target_host, target_port, proxy)
+                self.open_sync_http_proxy(target_host, target_port, is_https, proxy)
             }
-            ProxyType::Socks5 => self.open_sync_socks5_proxy(target_host, target_port, proxy),
+            ProxyType::Socks5 => {
+                self.open_sync_socks5_proxy(target_host, target_port, is_https, proxy)
+            }
         }
     }
     fn open_sync_http_proxy(
         &self,
         target_host: String,
         target_port: u16,
+        is_https: bool,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
-        let tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        tcp.set_read_timeout(Some(timeout))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        tcp.set_write_timeout(Some(timeout))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let connect_request: String =
+            Self::build_connect_request(&target_host, target_port, proxy)?;
+        let tcp: TcpStream = self.connect_sync_tcp(proxy.get_host(), proxy.get_port())?;
         let mut proxy_stream: BoxReadWrite = if proxy.get_proxy_type() == &ProxyType::Https {
-            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
-            let tls_cfg: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let dns: ServerName<'static> = ServerName::try_from(proxy.get_host().clone())
-                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
+            let tls_cfg: Arc<ClientConfig> = self.tls_client_config();
+            let dns: ServerName<'static> = Self::server_name_for_host(proxy.get_host())?;
+            let session: ClientConnection = ClientConnection::new(tls_cfg, dns)
                 .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             Box::new(StreamOwned::new(session, tcp))
         } else {
             Box::new(tcp)
-        };
-        let connect_request: String = if let (Some(u), Some(p)) =
-            (proxy.get_username(), proxy.get_password())
-        {
-            let auth: String = format!("{u}:{p}");
-            let encoded: String = crate::utils::base64_encode(auth.as_bytes());
-            format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {encoded}\r\n\r\n"
-            )
-        } else {
-            format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n\r\n"
-            )
         };
         proxy_stream
             .write_all(connect_request.as_bytes())
@@ -12127,33 +13824,31 @@ impl HttpRequest {
         proxy_stream
             .flush()
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let mut buf: [u8; 1024] = [0u8; 1024];
-        let n: usize = proxy_stream
-            .read(&mut buf)
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let s: &str = from_utf8(&buf[..n]).unwrap_or("");
-        let pre_read: Vec<u8> = if let Some(pos) = s.find(HEADER_TERMINATOR) {
-            let header_part: &str = &s[..pos];
-            if !header_part.starts_with(HTTP_1_1_OK_PREFIX)
-                && !header_part.starts_with(HTTP_1_0_OK_PREFIX)
-            {
+        let mut raw_resp: Vec<u8> = Vec::with_capacity(512);
+        let mut chunk: [u8; 512] = [0u8; 512];
+        let head_end: usize = loop {
+            if let Some(pos) = find_double_crlf(&raw_resp, 0) {
+                break pos;
+            }
+            if raw_resp.len() >= MAX_CONNECT_HEAD_BYTES {
                 return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
             }
-            buf[pos + 4..n].to_vec()
-        } else {
-            if !s.starts_with(HTTP_1_1_OK_PREFIX) && !s.starts_with(HTTP_1_0_OK_PREFIX) {
+            let n: usize = proxy_stream
+                .read(&mut chunk)
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+            if n == 0 {
                 return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
             }
-            Vec::new()
+            raw_resp.extend_from_slice(&chunk[..n]);
         };
-        if self.is_https() {
-            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
-            let tls_cfg: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let dns: ServerName<'static> = ServerName::try_from(target_host.clone())
-                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
+        if !Self::is_connect_success_head(&raw_resp[..head_end]) {
+            return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
+        }
+        let pre_read: Vec<u8> = raw_resp[head_end + 4..].to_vec();
+        if is_https {
+            let tls_cfg: Arc<ClientConfig> = self.tls_client_config();
+            let dns: ServerName<'static> = Self::server_name_for_host(&target_host)?;
+            let session: ClientConnection = ClientConnection::new(tls_cfg, dns)
                 .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             let tunnel: SyncProxyTunnelStream = SyncProxyTunnelStream::new(proxy_stream, pre_read);
             return Ok(Box::new(StreamOwned::new(session, tunnel)));
@@ -12164,21 +13859,37 @@ impl HttpRequest {
         &self,
         target_host: String,
         target_port: u16,
+        is_https: bool,
         proxy: &Proxy,
     ) -> Result<BoxReadWrite, RequestError> {
-        let timeout: Duration = Duration::from_millis(self.get_config().get_timeout());
-        let mut tcp: TcpStream = TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        tcp.set_read_timeout(Some(timeout))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        tcp.set_write_timeout(Some(timeout))
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let auth_methods: Vec<u8> =
-            if proxy.get_username().is_some() && proxy.get_password().is_some() {
-                vec![0x05, 0x02, 0x00, 0x02]
-            } else {
-                vec![0x05, 0x01, 0x00]
-            };
+        let has_auth: bool = proxy.get_username().is_some() && proxy.get_password().is_some();
+        if let (Some(u), Some(p)) = (proxy.get_username(), proxy.get_password())
+            && (u.len() > usize::from(u8::MAX) || p.len() > usize::from(u8::MAX))
+        {
+            return Err(RequestError::Request(PROXY_AUTH_ERROR.to_owned()));
+        }
+        let clean_target: &str = Self::strip_ipv6_brackets(&target_host);
+        let mut connect_req: Vec<u8> = vec![0x05, 0x01, 0x00];
+        if let Ok(ip) = clean_target.parse::<Ipv4Addr>() {
+            connect_req.push(0x01);
+            connect_req.extend_from_slice(&ip.octets());
+        } else if let Ok(ip) = clean_target.parse::<Ipv6Addr>() {
+            connect_req.push(0x04);
+            connect_req.extend_from_slice(&ip.octets());
+        } else {
+            let host_len: u8 = u8::try_from(clean_target.len())
+                .map_err(|_| RequestError::Request(PROXY_AUTH_ERROR.to_owned()))?;
+            connect_req.push(0x03);
+            connect_req.push(host_len);
+            connect_req.extend_from_slice(clean_target.as_bytes());
+        }
+        connect_req.extend_from_slice(&target_port.to_be_bytes());
+        let mut tcp: TcpStream = self.connect_sync_tcp(proxy.get_host(), proxy.get_port())?;
+        let auth_methods: [u8; 3] = if has_auth {
+            [0x05, 0x01, 0x02]
+        } else {
+            [0x05, 0x01, 0x00]
+        };
         tcp.write_all(&auth_methods)
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let mut resp: [u8; 2] = [0u8; 2];
@@ -12188,12 +13899,13 @@ impl HttpRequest {
             return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
         }
         match resp[1] {
-            0x00 => {}
+            0x00 if !has_auth => {}
             0x02 => {
                 let (Some(u), Some(p)) = (proxy.get_username(), proxy.get_password()) else {
                     return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 };
-                let mut auth_req: Vec<u8> = vec![0x01];
+                let mut auth_req: Vec<u8> = Vec::with_capacity(3 + u.len() + p.len());
+                auth_req.push(0x01);
                 auth_req.push(u.len() as u8);
                 auth_req.extend_from_slice(u.as_bytes());
                 auth_req.push(p.len() as u8);
@@ -12203,25 +13915,12 @@ impl HttpRequest {
                 let mut auth_resp: [u8; 2] = [0u8; 2];
                 tcp.read_exact(&mut auth_resp)
                     .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-                if auth_resp[1] != 0x00 {
+                if auth_resp[0] != 0x01 || auth_resp[1] != 0x00 {
                     return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 }
             }
             _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
-        let mut connect_req: Vec<u8> = vec![0x05, 0x01, 0x00];
-        if let Ok(ip) = target_host.parse::<Ipv4Addr>() {
-            connect_req.push(0x01);
-            connect_req.extend_from_slice(&ip.octets());
-        } else if let Ok(ip) = target_host.parse::<Ipv6Addr>() {
-            connect_req.push(0x04);
-            connect_req.extend_from_slice(&ip.octets());
-        } else {
-            connect_req.push(0x03);
-            connect_req.push(target_host.len() as u8);
-            connect_req.extend_from_slice(target_host.as_bytes());
-        }
-        connect_req.extend_from_slice(&target_port.to_be_bytes());
         tcp.write_all(&connect_req)
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
         let mut connect_resp: [u8; 4] = [0u8; 4];
@@ -12251,14 +13950,10 @@ impl HttpRequest {
             }
             _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
-        if self.is_https() {
-            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
-            let tls_cfg: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let dns: ServerName<'static> = ServerName::try_from(target_host)
-                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let session: ClientConnection = ClientConnection::new(Arc::new(tls_cfg), dns)
+        if is_https {
+            let tls_cfg: Arc<ClientConfig> = self.tls_client_config();
+            let dns: ServerName<'static> = Self::server_name_for_host(&target_host)?;
+            let session: ClientConnection = ClientConnection::new(tls_cfg, dns)
                 .map_err(|e: Error| RequestError::Request(e.to_string()))?;
             let proxy_box: BoxReadWrite = Box::new(tcp);
             let tunnel: SyncProxyTunnelStream = SyncProxyTunnelStream::new(proxy_box, Vec::new());
@@ -12270,15 +13965,17 @@ impl HttpRequest {
         &self,
         target_host: String,
         target_port: u16,
+        is_https: bool,
         proxy: &Proxy,
+        enable_h2: bool,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
         match *proxy.get_proxy_type() {
             ProxyType::Http | ProxyType::Https => {
-                self.open_async_http_proxy(target_host, target_port, proxy)
+                self.open_async_http_proxy(target_host, target_port, is_https, proxy, enable_h2)
                     .await
             }
             ProxyType::Socks5 => {
-                self.open_async_socks5_proxy(target_host, target_port, proxy)
+                self.open_async_socks5_proxy(target_host, target_port, is_https, proxy, enable_h2)
                     .await
             }
         }
@@ -12287,40 +13984,25 @@ impl HttpRequest {
         &self,
         target_host: String,
         target_port: u16,
+        is_https: bool,
         proxy: &Proxy,
+        enable_h2: bool,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let tcp: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
-                .await
-                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+        let connect_request: String =
+            Self::build_connect_request(&target_host, target_port, proxy)?;
+        let tcp: tokio::net::TcpStream = self
+            .connect_async_tcp(proxy.get_host(), proxy.get_port())
+            .await?;
         let mut proxy_stream: BoxAsyncReadWrite = if proxy.get_proxy_type() == &ProxyType::Https {
-            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
-            let tls_cfg: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns: ServerName<'static> = ServerName::try_from(proxy.get_host().clone())
-                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
-            let tls: TlsStream<http_type::tokio::net::TcpStream> = connector
+            let connector: TlsConnector = TlsConnector::from(self.tls_client_config());
+            let dns: ServerName<'static> = Self::server_name_for_host(proxy.get_host())?;
+            let tls: TlsStream<tokio::net::TcpStream> = connector
                 .connect(dns, tcp)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
             Box::new(tls)
         } else {
             Box::new(tcp)
-        };
-        let connect_request: String = if let (Some(u), Some(p)) =
-            (proxy.get_username(), proxy.get_password())
-        {
-            let auth: String = format!("{u}:{p}");
-            let encoded: String = crate::utils::base64_encode(auth.as_bytes());
-            format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\nProxy-Authorization: Basic {encoded}\r\n\r\n"
-            )
-        } else {
-            format!(
-                "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n\r\n"
-            )
         };
         proxy_stream
             .write_all(connect_request.as_bytes())
@@ -12330,39 +14012,44 @@ impl HttpRequest {
             .flush()
             .await
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let mut buf: [u8; 1024] = [0u8; 1024];
-        let n: usize = proxy_stream
-            .read(&mut buf)
-            .await
-            .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let s: &str = from_utf8(&buf[..n]).unwrap_or("");
-        let pre_read: Vec<u8> = if let Some(pos) = s.find(HEADER_TERMINATOR) {
-            let header_part: &str = &s[..pos];
-            if !header_part.starts_with(HTTP_1_1_OK_PREFIX)
-                && !header_part.starts_with(HTTP_1_0_OK_PREFIX)
-            {
+        let mut raw_resp: Vec<u8> = Vec::with_capacity(512);
+        let mut chunk: [u8; 512] = [0u8; 512];
+        let head_end: usize = loop {
+            if let Some(pos) = find_double_crlf(&raw_resp, 0) {
+                break pos;
+            }
+            if raw_resp.len() >= MAX_CONNECT_HEAD_BYTES {
                 return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
             }
-            buf[pos + 4..n].to_vec()
-        } else {
-            if !s.starts_with(HTTP_1_1_OK_PREFIX) && !s.starts_with(HTTP_1_0_OK_PREFIX) {
+            let n: usize = proxy_stream
+                .read(&mut chunk)
+                .await
+                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+            if n == 0 {
                 return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
             }
-            Vec::new()
+            raw_resp.extend_from_slice(&chunk[..n]);
         };
-        if self.is_https() {
-            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
-            let tls_cfg: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns: ServerName<'static> = ServerName::try_from(target_host.clone())
-                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+        if !Self::is_connect_success_head(&raw_resp[..head_end]) {
+            return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
+        }
+        let pre_read: Vec<u8> = raw_resp[head_end + 4..].to_vec();
+        if is_https {
+            let tls_cfg: Arc<ClientConfig> = if enable_h2 {
+                self.tls_client_config_h2()
+            } else {
+                self.tls_client_config()
+            };
+            let connector: TlsConnector = TlsConnector::from(tls_cfg);
+            let dns: ServerName<'static> = Self::server_name_for_host(&target_host)?;
             let tunnel: ProxyTunnelStream = ProxyTunnelStream::new(proxy_stream, pre_read);
             let tls: TlsStream<ProxyTunnelStream> = connector
                 .connect(dns, tunnel)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+            if enable_h2 && tls.get_ref().1.alpn_protocol() != Some(ALPN_H2) {
+                return Err(RequestError::Request(H2_ALPN_MISMATCH.to_owned()));
+            }
             Ok(Box::new(tls))
         } else {
             Ok(Box::new(ProxyTunnelStream::new(proxy_stream, pre_read)))
@@ -12372,18 +14059,40 @@ impl HttpRequest {
         &self,
         target_host: String,
         target_port: u16,
+        is_https: bool,
         proxy: &Proxy,
+        enable_h2: bool,
     ) -> Result<BoxAsyncReadWrite, RequestError> {
-        let mut tcp: http_type::tokio::net::TcpStream =
-            http_type::tokio::net::TcpStream::connect((proxy.get_host().clone(), proxy.get_port()))
-                .await
-                .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-        let auth_methods: Vec<u8> =
-            if proxy.get_username().is_some() && proxy.get_password().is_some() {
-                vec![0x05, 0x02, 0x00, 0x02]
-            } else {
-                vec![0x05, 0x01, 0x00]
-            };
+        let has_auth: bool = proxy.get_username().is_some() && proxy.get_password().is_some();
+        if let (Some(u), Some(p)) = (proxy.get_username(), proxy.get_password())
+            && (u.len() > usize::from(u8::MAX) || p.len() > usize::from(u8::MAX))
+        {
+            return Err(RequestError::Request(PROXY_AUTH_ERROR.to_owned()));
+        }
+        let clean_target: &str = Self::strip_ipv6_brackets(&target_host);
+        let mut connect_req: Vec<u8> = vec![0x05, 0x01, 0x00];
+        if let Ok(ip) = clean_target.parse::<Ipv4Addr>() {
+            connect_req.push(0x01);
+            connect_req.extend_from_slice(&ip.octets());
+        } else if let Ok(ip) = clean_target.parse::<Ipv6Addr>() {
+            connect_req.push(0x04);
+            connect_req.extend_from_slice(&ip.octets());
+        } else {
+            let host_len: u8 = u8::try_from(clean_target.len())
+                .map_err(|_| RequestError::Request(PROXY_AUTH_ERROR.to_owned()))?;
+            connect_req.push(0x03);
+            connect_req.push(host_len);
+            connect_req.extend_from_slice(clean_target.as_bytes());
+        }
+        connect_req.extend_from_slice(&target_port.to_be_bytes());
+        let mut tcp: tokio::net::TcpStream = self
+            .connect_async_tcp(proxy.get_host(), proxy.get_port())
+            .await?;
+        let auth_methods: [u8; 3] = if has_auth {
+            [0x05, 0x01, 0x02]
+        } else {
+            [0x05, 0x01, 0x00]
+        };
         tcp.write_all(&auth_methods)
             .await
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -12395,12 +14104,13 @@ impl HttpRequest {
             return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
         }
         match resp[1] {
-            0x00 => {}
+            0x00 if !has_auth => {}
             0x02 => {
                 let (Some(u), Some(p)) = (proxy.get_username(), proxy.get_password()) else {
                     return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 };
-                let mut auth_req: Vec<u8> = vec![0x01u8];
+                let mut auth_req: Vec<u8> = Vec::with_capacity(3 + u.len() + p.len());
+                auth_req.push(0x01);
                 auth_req.push(u.len() as u8);
                 auth_req.extend_from_slice(u.as_bytes());
                 auth_req.push(p.len() as u8);
@@ -12412,25 +14122,12 @@ impl HttpRequest {
                 tcp.read_exact(&mut auth_resp)
                     .await
                     .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
-                if auth_resp[1] != 0x00 {
+                if auth_resp[0] != 0x01 || auth_resp[1] != 0x00 {
                     return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string()));
                 }
             }
             _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
-        let mut connect_req: Vec<u8> = vec![0x05, 0x01, 0x00];
-        if let Ok(ip) = target_host.parse::<Ipv4Addr>() {
-            connect_req.push(0x01);
-            connect_req.extend_from_slice(&ip.octets());
-        } else if let Ok(ip) = target_host.parse::<Ipv6Addr>() {
-            connect_req.push(0x04);
-            connect_req.extend_from_slice(&ip.octets());
-        } else {
-            connect_req.push(0x03);
-            connect_req.push(target_host.len() as u8);
-            connect_req.extend_from_slice(target_host.as_bytes());
-        }
-        connect_req.extend_from_slice(&target_port.to_be_bytes());
         tcp.write_all(&connect_req)
             .await
             .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
@@ -12466,20 +14163,23 @@ impl HttpRequest {
             }
             _ => return Err(RequestError::Request(INTERNAL_SERVER_ERROR.to_string())),
         }
-        if self.is_https() {
-            let roots: RootCertStore = self.get_tmp().get_root_cert().clone();
-            let tls_cfg: ClientConfig = ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth();
-            let connector: TlsConnector = TlsConnector::from(Arc::new(tls_cfg));
-            let dns: ServerName<'static> = ServerName::try_from(target_host)
-                .map_err(|e: InvalidDnsNameError| RequestError::Request(e.to_string()))?;
+        if is_https {
+            let tls_cfg: Arc<ClientConfig> = if enable_h2 {
+                self.tls_client_config_h2()
+            } else {
+                self.tls_client_config()
+            };
+            let connector: TlsConnector = TlsConnector::from(tls_cfg);
+            let dns: ServerName<'static> = Self::server_name_for_host(&target_host)?;
             let proxy_box: BoxAsyncReadWrite = Box::new(tcp);
             let tunnel: ProxyTunnelStream = ProxyTunnelStream::new(proxy_box, Vec::new());
             let tls: TlsStream<ProxyTunnelStream> = connector
                 .connect(dns, tunnel)
                 .await
                 .map_err(|e: io::Error| RequestError::Request(e.to_string()))?;
+            if enable_h2 && tls.get_ref().1.alpn_protocol() != Some(ALPN_H2) {
+                return Err(RequestError::Request(H2_ALPN_MISMATCH.to_owned()));
+            }
             Ok(Box::new(tls))
         } else {
             Ok(Box::new(tcp))
@@ -12487,7 +14187,10 @@ impl HttpRequest {
     }
 }
 impl HttpRequest {
-    pub fn get<T: Into<String>>(url: T) -> Self {
+    pub fn get<T>(url: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self {
             method: Method::Get,
             url: url.into(),
@@ -12497,7 +14200,10 @@ impl HttpRequest {
             tmp: Tmp::default(),
         }
     }
-    pub fn post<T: Into<String>>(url: T) -> Self {
+    pub fn post<T>(url: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self {
             method: Method::Post,
             url: url.into(),
@@ -12511,16 +14217,27 @@ impl HttpRequest {
         self.method = method;
         self
     }
-    pub fn set_url<T: Into<String>>(&mut self, url: T) -> &mut Self {
+    pub fn set_url<T>(&mut self, url: T) -> &mut Self
+    where
+        T: Into<String>,
+    {
         self.url = url.into();
         self
     }
-    pub fn set_header<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) -> &mut Self {
+    pub fn set_header<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
         let normalized: String = Self::normalize_header_key(key.as_ref());
-        self.headers.insert(normalized, value.as_ref().to_owned());
+        self.get_mut_headers()
+            .insert(normalized, value.as_ref().to_owned());
         self
     }
-    pub fn remove_header<K: AsRef<str>>(&mut self, key: K) -> &mut Self {
+    pub fn remove_header<K>(&mut self, key: K) -> &mut Self
+    where
+        K: AsRef<str>,
+    {
         let normalized: String = Self::normalize_header_key(key.as_ref());
         self.get_mut_headers().remove(&normalized);
         self
@@ -12547,16 +14264,22 @@ impl HttpRequest {
 pub(crate) const CONTENT_LENGTH_PATTERN: &[u8] = b"content-length:";
 pub(crate) const TRANSFER_ENCODING_PATTERN: &[u8] = b"transfer-encoding:";
 pub(crate) const CHUNKED_PATTERN: &[u8] = b"chunked";
-pub(crate) const METHOD_NOT_ALLOWED: &str = "Method Not Allowed";
 pub(crate) const MISSING_REDIRECT_URL: &str = "Missing Redirect URL";
-pub(crate) const REDIRECT_NOT_ENABLED: &str = "Redirect Not Enabled";
 pub(crate) const REDIRECT_URL_DEAD_LOOP: &str = "Redirect URL Dead Loop";
 pub(crate) const MAX_REDIRECT_TIMES_EXCEEDED: &str = "Max Redirect Times Exceeded";
 pub(crate) const INTERNAL_SERVER_ERROR: &str = "Internal Server Error";
-pub(crate) const HTTP_1_1_OK_PREFIX: &str = "HTTP/1.1 200";
-pub(crate) const HTTP_1_0_OK_PREFIX: &str = "HTTP/1.0 200";
-pub(crate) const HEADER_TERMINATOR: &str = "\r\n\r\n";
-pub(crate) const HTTP_METHOD_POST: &str = "POST";
+pub(crate) const INVALID_HTTP_VERSION: &str = "Invalid HTTP version";
+pub(crate) const INVALID_HTTP_METHOD: &str = "Invalid HTTP method";
+pub(crate) const PROXY_AUTH_ERROR: &str = "Invalid proxy authentication or target";
+pub(crate) const HTTP_CONNECT_PREFIX_1_1: &[u8] = b"HTTP/1.1 ";
+pub(crate) const HTTP_CONNECT_PREFIX_1_0: &[u8] = b"HTTP/1.0 ";
+pub(crate) const DEFAULT_EFFECTIVE_BUFFER_SIZE: usize = 4096;
+pub(crate) const MAX_CONNECT_HEAD_BYTES: usize = 16 * 1024;
+pub(crate) const HTTP_DEFAULT_PORT: u16 = 80;
+pub(crate) const HTTPS_DEFAULT_PORT: u16 = 443;
+pub(crate) const HEADER_AUTHORIZATION: &str = "authorization";
+pub(crate) const HEADER_PROXY_AUTHORIZATION: &str = "proxy-authorization";
+pub(crate) const HEADER_COOKIE: &str = "cookie";
 pub(crate) const HEADER_VALUE_SEPARATOR: &[u8] = b": ";
 pub(crate) const HTTP_CARRIAGE_RETURN_LINE_FEED: &[u8] = b"\r\n";
 ```
@@ -12600,7 +14323,837 @@ pub trait RequestTrait: Send + Debug {
     fn send(&mut self) -> Self::RequestResult;
 }
 pub(crate) trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
-pub(crate) trait ReadWrite: Read + Write {}
+pub(crate) trait ReadWrite: Read + Write + Send {}
+```
+# Path: hyperlane/request/src/protocol/const.rs
+```rust
+pub(crate) const HEX_UPPER: &[u8; 16] = b"0123456789ABCDEF";
+pub(crate) const FORM_URLENCODED_CONTENT_TYPE: &str = "application/x-www-form-urlencoded";
+pub(crate) const MULTIPART_BOUNDARY_PREFIX: &str = "hyperlane-boundary-";
+pub(crate) const BEARER_PREFIX: &str = "Bearer ";
+pub(crate) const BASIC_PREFIX: &str = "Basic ";
+pub(crate) const HTTP_1_0_PREFIX: &[u8] = b"HTTP/1.0 ";
+pub(crate) const H2_ALPN_MISMATCH: &str = "Server did not negotiate HTTP/2 via ALPN";
+pub(crate) const RESPONSE_HEADER_STACK_LIMIT: usize = 64;
+pub(crate) const MAX_RETRY_BACKOFF_MS: u64 = 1000;
+pub(crate) const BASE_RETRY_BACKOFF_MS: u64 = 50;
+```
+# Path: hyperlane/request/src/protocol/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#struct;
+pub(crate) use {r#const::*, r#fn::*, r#struct::*};
+use super::*;
+```
+# Path: hyperlane/request/src/protocol/struct.rs
+```rust
+use super::*;
+pub(crate) struct H2ExchangeTarget<'a> {
+    pub(crate) url_obj: &'a HttpUrlComponents,
+    pub(crate) method_token: &'a str,
+    pub(crate) is_head: bool,
+    pub(crate) host: &'a str,
+    pub(crate) port: u16,
+    pub(crate) is_https: bool,
+    pub(crate) pool_key: PoolKey,
+}
+```
+# Path: hyperlane/request/src/protocol/fn.rs
+```rust
+use super::*;
+pub(crate) fn push_percent_encoded(input: &str, out: &mut String) {
+    for &byte in input.as_bytes() {
+        let unreserved: bool = byte.is_ascii_alphanumeric() || b"-_.~".contains(&byte);
+        if unreserved {
+            out.push(char::from(byte));
+        } else {
+            out.push('%');
+            out.push(char::from(HEX_UPPER[(byte >> 4) as usize]));
+            out.push(char::from(HEX_UPPER[(byte & 0x0f) as usize]));
+        }
+    }
+}
+pub(crate) fn encode_multipart_parts(parts: &[BodyPart]) -> (String, Vec<u8>) {
+    let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
+    for part in parts {
+        let name_len: usize = part.try_get_name().map_or(0, String::len);
+        let data_len: usize = part.try_get_data().map_or(0, <[u8]>::len);
+        seed = seed.rotate_left(7) ^ (name_len as u64);
+        seed = seed.wrapping_mul(0x517c_c1b7_2722_0a95) ^ (data_len as u64);
+    }
+    let boundary: String = format!("{MULTIPART_BOUNDARY_PREFIX}{seed:016x}");
+    let estimated: usize = parts
+        .iter()
+        .map(|part: &BodyPart| {
+            let name_len: usize = part.try_get_name().map_or(0, String::len);
+            let data_len: usize = part.try_get_data().map_or(0, <[u8]>::len);
+            data_len + name_len + 128
+        })
+        .sum::<usize>()
+        + boundary.len()
+        + 16;
+    let mut body: Vec<u8> = Vec::with_capacity(estimated);
+    for part in parts {
+        let name: &str = part.try_get_name().map_or("", String::as_str);
+        body.extend_from_slice(b"--");
+        body.extend_from_slice(boundary.as_bytes());
+        body.extend_from_slice(HTTP_BR_BYTES);
+        body.extend_from_slice(b"Content-Disposition: form-data; name=\"");
+        for byte in name.bytes() {
+            if byte == b'"' || byte == b'\r' || byte == b'\n' {
+                body.push(b'_');
+            } else {
+                body.push(byte);
+            }
+        }
+        body.push(b'"');
+        if let Some(filename) = part.try_get_file_name() {
+            body.extend_from_slice(b"; filename=\"");
+            for byte in filename.bytes() {
+                if byte == b'"' || byte == b'\r' || byte == b'\n' {
+                    body.push(b'_');
+                } else {
+                    body.push(byte);
+                }
+            }
+            body.push(b'"');
+        }
+        body.extend_from_slice(HTTP_BR_BYTES);
+        if let Some(content_type) = part.try_get_content_type()
+            && is_valid_header_value(content_type.as_bytes())
+        {
+            body.extend_from_slice(b"Content-Type: ");
+            body.extend_from_slice(content_type.as_bytes());
+            body.extend_from_slice(HTTP_BR_BYTES);
+        }
+        body.extend_from_slice(HTTP_BR_BYTES);
+        if let Some(data) = part.try_get_data() {
+            body.extend_from_slice(data);
+        }
+        body.extend_from_slice(HTTP_BR_BYTES);
+    }
+    body.extend_from_slice(b"--");
+    body.extend_from_slice(boundary.as_bytes());
+    body.extend_from_slice(b"--");
+    body.extend_from_slice(HTTP_BR_BYTES);
+    let content_type: String = format!("multipart/form-data; boundary={boundary}");
+    (content_type, body)
+}
+pub(crate) fn build_wire_request_direct(
+    request: &HttpRequest,
+    url_obj: &HttpUrlComponents,
+    method_token: &str,
+    is_head: bool,
+    version: &str,
+) -> Result<Vec<u8>, RequestError> {
+    let headers: &HashMap<String, String> = request.get_headers();
+    let body_slice: &[u8] = if is_head {
+        &[]
+    } else {
+        request.get_body().as_slice()
+    };
+    let path: String = url_obj.get_path().unwrap_or_default();
+    let query: String = url_obj.get_query().unwrap_or_default();
+    let host_value: String = url_obj.get_host().unwrap_or_default();
+    let mut has_host: bool = false;
+    let mut has_content_length: bool = false;
+    let mut has_accept: bool = false;
+    let mut has_user_agent: bool = false;
+    let mut has_connection: bool = false;
+    let mut header_cap: usize = 96;
+    for (name, value) in headers {
+        if name.eq_ignore_ascii_case(HOST) {
+            has_host = true;
+        } else if name.eq_ignore_ascii_case(CONTENT_LENGTH) {
+            has_content_length = true;
+        } else if name.eq_ignore_ascii_case(ACCEPT) {
+            has_accept = true;
+        } else if name.eq_ignore_ascii_case(USER_AGENT) {
+            has_user_agent = true;
+        } else if name.eq_ignore_ascii_case(CONNECTION) {
+            has_connection = true;
+        }
+        header_cap += name.len() + value.len() + 4;
+    }
+    let query_extra: usize = if query.is_empty() { 0 } else { 1 + query.len() };
+    let total_cap: usize = method_token.len()
+        + 1
+        + path.len()
+        + query_extra
+        + 1
+        + version.len()
+        + 2
+        + header_cap
+        + host_value.len()
+        + 2
+        + body_slice.len();
+    let mut out: Vec<u8> = Vec::with_capacity(total_cap);
+    out.extend_from_slice(method_token.as_bytes());
+    out.push(SPACE_U8);
+    out.extend_from_slice(path.as_bytes());
+    if !query.is_empty() {
+        out.push(b'?');
+        out.extend_from_slice(query.as_bytes());
+    }
+    out.push(SPACE_U8);
+    out.extend_from_slice(version.as_bytes());
+    out.extend_from_slice(HTTP_BR_BYTES);
+    for (name, value) in headers {
+        out.extend_from_slice(name.as_bytes());
+        out.extend_from_slice(HEADER_VALUE_SEPARATOR);
+        out.extend_from_slice(value.as_bytes());
+        out.extend_from_slice(HTTP_BR_BYTES);
+    }
+    if !has_host {
+        if !is_valid_header_value(host_value.as_bytes()) {
+            return Err(RequestError::Request(INVALID_REQUEST_HEADER.to_owned()));
+        }
+        out.extend_from_slice(HOST.as_bytes());
+        out.extend_from_slice(HEADER_VALUE_SEPARATOR);
+        out.extend_from_slice(host_value.as_bytes());
+        out.extend_from_slice(HTTP_BR_BYTES);
+    }
+    if !has_content_length {
+        out.extend_from_slice(CONTENT_LENGTH.as_bytes());
+        out.extend_from_slice(HEADER_VALUE_SEPARATOR);
+        let mut digits: [u8; 20] = [0u8; 20];
+        let mut n: usize = body_slice.len();
+        let mut idx: usize = digits.len();
+        if n == 0 {
+            idx -= 1;
+            digits[idx] = b'0';
+        } else {
+            while n > 0 {
+                idx -= 1;
+                digits[idx] = b'0' + (n % 10) as u8;
+                n /= 10;
+            }
+        }
+        out.extend_from_slice(&digits[idx..]);
+        out.extend_from_slice(HTTP_BR_BYTES);
+    }
+    if !has_accept {
+        out.extend_from_slice(ACCEPT.as_bytes());
+        out.extend_from_slice(HEADER_VALUE_SEPARATOR);
+        out.extend_from_slice(ACCEPT_ANY.as_bytes());
+        out.extend_from_slice(HTTP_BR_BYTES);
+    }
+    if !has_user_agent {
+        out.extend_from_slice(USER_AGENT.as_bytes());
+        out.extend_from_slice(HEADER_VALUE_SEPARATOR);
+        out.extend_from_slice(APP_NAME.as_bytes());
+        out.extend_from_slice(HTTP_BR_BYTES);
+    }
+    if !has_connection && request.get_config().get_keep_alive() {
+        out.extend_from_slice(CONNECTION.as_bytes());
+        out.extend_from_slice(HEADER_VALUE_SEPARATOR);
+        out.extend_from_slice(KEEP_ALIVE.as_bytes());
+        out.extend_from_slice(HTTP_BR_BYTES);
+    }
+    out.extend_from_slice(HTTP_BR_BYTES);
+    if !body_slice.is_empty() {
+        out.extend_from_slice(body_slice);
+    }
+    Ok(out)
+}
+pub(crate) fn response_allows_pool_reuse(
+    head_bytes: &[u8],
+    framing: ResponseFraming,
+    has_trailing_bytes: bool,
+    disable_keep_alive: bool,
+) -> bool {
+    if disable_keep_alive || has_trailing_bytes {
+        return false;
+    }
+    if framing == ResponseFraming::Close {
+        return false;
+    }
+    let is_http_1_0: bool = head_bytes.starts_with(HTTP_1_0_PREFIX);
+    let mut saw_keep_alive: bool = false;
+    let mut pos: usize = 0;
+    while pos < head_bytes.len() {
+        let end: usize = find_crlf(head_bytes, pos).unwrap_or(head_bytes.len());
+        let line: &[u8] = &head_bytes[pos..end];
+        if line.is_empty() {
+            break;
+        }
+        if pos > 0
+            && let Some(sep) = line.iter().position(|b: &u8| *b == COLON_U8)
+        {
+            let name: &[u8] = &line[..sep];
+            if name.eq_ignore_ascii_case(CONNECTION.as_bytes()) {
+                let raw_val: &[u8] = &line[sep + 1..];
+                for token in raw_val.split(|b: &u8| *b == b',') {
+                    let trimmed: &[u8] = token.trim_ascii();
+                    if trimmed.eq_ignore_ascii_case(CLOSE.as_bytes()) {
+                        return false;
+                    }
+                    if trimmed.eq_ignore_ascii_case(KEEP_ALIVE.as_bytes()) {
+                        saw_keep_alive = true;
+                    }
+                }
+            }
+        }
+        if end == head_bytes.len() {
+            break;
+        }
+        pos = end + HTTP_BR_BYTES.len();
+    }
+    if is_http_1_0 { saw_keep_alive } else { true }
+}
+pub(crate) fn request_disables_keep_alive(request: &HttpRequest) -> bool {
+    if !request.get_config().get_keep_alive() {
+        return true;
+    }
+    for (name, value) in request.get_headers() {
+        if name.eq_ignore_ascii_case(CONNECTION)
+            && value
+                .split(',')
+                .any(|tok: &str| tok.trim().eq_ignore_ascii_case(CLOSE))
+        {
+            return true;
+        }
+    }
+    false
+}
+pub(crate) fn is_retryable_error(error: &RequestError) -> bool {
+    match error {
+        RequestError::ReadTimeout(_) | RequestError::HttpRequestPartsInsufficient(_) => true,
+        RequestError::Request(msg) => !matches!(
+            msg.as_str(),
+            INVALID_REQUEST_HEADER
+                | INVALID_HTTP_METHOD
+                | INVALID_HTTP_VERSION
+                | INVALID_RESPONSE_FRAMING
+                | RESPONSE_TOO_LARGE
+                | TOO_MANY_INTERIM_RESPONSES
+                | PROXY_AUTH_ERROR
+                | H2_ALPN_MISMATCH
+                | MISSING_REDIRECT_URL
+                | REDIRECT_URL_DEAD_LOOP
+                | MAX_REDIRECT_TIMES_EXCEEDED
+        ),
+        _ => false,
+    }
+}
+pub(crate) fn retry_backoff_duration(attempt: usize) -> Duration {
+    let shift: u32 = (attempt.min(5)) as u32;
+    let ms: u64 = BASE_RETRY_BACKOFF_MS
+        .saturating_mul(1u64 << shift)
+        .min(MAX_RETRY_BACKOFF_MS);
+    Duration::from_millis(ms)
+}
+pub(crate) fn is_idempotent_method(method: &Method) -> bool {
+    matches!(
+        method,
+        Method::Get | Method::Head | Method::Put | Method::Delete | Method::Options
+    )
+}
+pub(crate) fn is_retryable_status(status: usize) -> bool {
+    [429, 502, 503, 504].contains(&status)
+}
+pub(crate) async fn send_h2_exchange_async(
+    request: &HttpRequest,
+    target: H2ExchangeTarget<'_>,
+) -> Result<(HttpResponse, Option<Vec<u8>>), RequestError> {
+    let mut attempted_pooled: bool = false;
+    let pool_enabled: bool = !request_disables_keep_alive(request);
+    loop {
+        let sender_opt: Option<H2SendRequest> = if pool_enabled && !attempted_pooled {
+            get_h2_sender(&target.pool_key)
+        } else {
+            None
+        };
+        let (sender, from_pool): (H2SendRequest, bool) = match sender_opt {
+            Some(existing) => (existing, true),
+            None => {
+                let fresh: H2SendRequest =
+                    establish_h2_sender(request, target.host, target.port, target.is_https).await?;
+                if pool_enabled {
+                    put_h2_sender(target.pool_key.clone(), fresh.clone());
+                }
+                (fresh, false)
+            }
+        };
+        let ready_res: Result<H2SendRequest, h2::Error> = sender.ready().await;
+        match ready_res {
+            Ok(mut ready_sender) => {
+                let exchange: Result<(HttpResponse, Option<Vec<u8>>), RequestError> =
+                    run_h2_request_on_sender(&mut ready_sender, request, &target).await;
+                if exchange.is_err() && from_pool {
+                    remove_h2_sender(&target.pool_key);
+                    attempted_pooled = true;
+                    continue;
+                }
+                return exchange;
+            }
+            Err(error) => {
+                if from_pool {
+                    remove_h2_sender(&target.pool_key);
+                    attempted_pooled = true;
+                    continue;
+                }
+                return Err(RequestError::Request(error.to_string()));
+            }
+        }
+    }
+}
+async fn establish_h2_sender(
+    request: &HttpRequest,
+    host: &str,
+    port: u16,
+    is_https: bool,
+) -> Result<H2SendRequest, RequestError> {
+    let stream: BoxAsyncReadWrite = request.open_async_stream_h2(host, port, is_https).await?;
+    let (sender, conn): (H2SendRequest, _) = h2::client::handshake(stream)
+        .await
+        .map_err(|error: h2::Error| RequestError::Request(error.to_string()))?;
+    tokio::spawn(async move {
+        let _: Result<(), h2::Error> = conn.await;
+    });
+    Ok(sender)
+}
+async fn run_h2_request_on_sender(
+    sender: &mut H2SendRequest,
+    request: &HttpRequest,
+    target: &H2ExchangeTarget<'_>,
+) -> Result<(HttpResponse, Option<Vec<u8>>), RequestError> {
+    let method: http::Method = http::Method::from_bytes(target.method_token.as_bytes())
+        .map_err(|_| RequestError::Request(INVALID_HTTP_METHOD.to_owned()))?;
+    let scheme: &str = if target.is_https {
+        HTTPS_LOWERCASE
+    } else {
+        HTTP_SCHEME
+    };
+    let path: String = target.url_obj.get_path().unwrap_or_default();
+    let query: String = target.url_obj.get_query().unwrap_or_default();
+    let authority: String = if (target.is_https && target.port == HTTPS_DEFAULT_PORT)
+        || (!target.is_https && target.port == HTTP_DEFAULT_PORT)
+    {
+        target.host.to_owned()
+    } else {
+        format!("{}:{}", target.host, target.port)
+    };
+    let uri_str: String = if query.is_empty() {
+        format!("{scheme}://{authority}{path}")
+    } else {
+        format!("{scheme}://{authority}{path}?{query}")
+    };
+    let uri: Uri = uri_str
+        .parse::<Uri>()
+        .map_err(|_| RequestError::InvalidUrl(HttpStatus::BadRequest))?;
+    let mut builder: Builder = Request::builder().method(method).uri(uri);
+    let mut has_accept: bool = false;
+    let mut has_user_agent: bool = false;
+    for (name, value) in request.get_headers() {
+        if name.eq_ignore_ascii_case(HOST)
+            || name.eq_ignore_ascii_case(CONNECTION)
+            || name.eq_ignore_ascii_case("keep-alive")
+            || name.eq_ignore_ascii_case("transfer-encoding")
+            || name.eq_ignore_ascii_case("upgrade")
+        {
+            continue;
+        }
+        if name.eq_ignore_ascii_case(ACCEPT) {
+            has_accept = true;
+        } else if name.eq_ignore_ascii_case(USER_AGENT) {
+            has_user_agent = true;
+        }
+        let header_name: HeaderName = HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| RequestError::Request(INVALID_REQUEST_HEADER.to_owned()))?;
+        let header_value: HeaderValue = HeaderValue::from_bytes(value.as_bytes())
+            .map_err(|_| RequestError::Request(INVALID_REQUEST_HEADER.to_owned()))?;
+        builder = builder.header(header_name, header_value);
+    }
+    if !has_accept {
+        builder = builder.header(ACCEPT, ACCEPT_ANY);
+    }
+    if !has_user_agent {
+        builder = builder.header(USER_AGENT, APP_NAME);
+    }
+    let body_bytes: &[u8] = if target.is_head {
+        &[]
+    } else {
+        request.get_body().as_slice()
+    };
+    let end_of_stream: bool = body_bytes.is_empty();
+    let proto_req: Request<()> = builder
+        .body(())
+        .map_err(|error: http::Error| RequestError::Request(error.to_string()))?;
+    let (response_fut, mut send_stream) = sender
+        .send_request(proto_req, end_of_stream)
+        .map_err(|error: h2::Error| RequestError::Request(error.to_string()))?;
+    if !end_of_stream {
+        send_stream
+            .send_data(Bytes::copy_from_slice(body_bytes), true)
+            .map_err(|error: h2::Error| RequestError::Request(error.to_string()))?;
+    }
+    let proto_resp: Response<RecvStream> = response_fut
+        .await
+        .map_err(|error: h2::Error| RequestError::Request(error.to_string()))?;
+    let status: StatusCode = proto_resp.status();
+    let status_code: usize = usize::from(status.as_u16());
+    let reason_phrase: String = status
+        .canonical_reason()
+        .map(str::to_owned)
+        .unwrap_or_else(|| HttpStatus::phrase_ref(status_code).to_owned());
+    let mut headers: HttpResponseHeaders = new_response_headers();
+    let mut redirect_url: Option<Vec<u8>> = None;
+    for (name, value) in proto_resp.headers() {
+        let key: String = name.as_str().to_owned();
+        let val_str: String = String::from_utf8_lossy(value.as_bytes()).into_owned();
+        if [301, 302, 303, 307, 308].contains(&status_code)
+            && key == LOCATION
+            && redirect_url.is_none()
+        {
+            redirect_url = Some(value.as_bytes().to_vec());
+        }
+        headers.insert(key, val_str);
+    }
+    let mut body: ResponseBody = ResponseBody::new();
+    if !target.is_head {
+        let mut recv_stream: RecvStream = proto_resp.into_body();
+        while let Some(chunk_res) = recv_stream.data().await {
+            let chunk: Bytes =
+                chunk_res.map_err(|error: h2::Error| RequestError::Request(error.to_string()))?;
+            if body.len().saturating_add(chunk.len()) > MAX_RESPONSE_BODY_BYTES {
+                return Err(RequestError::ContentLengthTooLarge(HttpStatus::BadRequest));
+            }
+            body.extend_from_slice(&chunk);
+            let _: Result<(), h2::Error> = recv_stream.flow_control().release_capacity(chunk.len());
+        }
+    }
+    let response: HttpResponse = HttpResponse {
+        version: HttpVersion::Http2,
+        status_code,
+        reason_phrase,
+        headers,
+        body,
+    };
+    Ok((response, redirect_url))
+}
+```
+# Path: hyperlane/request/src/tls/static.rs
+```rust
+use super::*;
+pub(crate) static DEFAULT_H1_TLS_CONFIG: OnceLock<Arc<ClientConfig>> = OnceLock::new();
+pub(crate) static DEFAULT_H2_TLS_CONFIG: OnceLock<Arc<ClientConfig>> = OnceLock::new();
+```
+# Path: hyperlane/request/src/tls/const.rs
+```rust
+pub(crate) const ALPN_HTTP1_1: &[u8] = b"http/1.1";
+pub(crate) const ALPN_H2: &[u8] = b"h2";
+pub(crate) const TLS_CLIENT_SESSION_CACHE_CAP: usize = 1024;
+pub(crate) const INVALID_PEM_CERT_ERROR: &str = "Invalid PEM root certificate";
+```
+# Path: hyperlane/request/src/tls/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#static;
+pub(crate) use {r#const::*, r#fn::*, r#static::*};
+use super::*;
+```
+# Path: hyperlane/request/src/tls/fn.rs
+```rust
+use super::*;
+fn build_client_config(roots: RootCertStore, enable_h2: bool) -> Arc<ClientConfig> {
+    let mut cfg: ClientConfig = ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    cfg.resumption = Resumption::in_memory_sessions(TLS_CLIENT_SESSION_CACHE_CAP);
+    cfg.alpn_protocols = if enable_h2 {
+        vec![ALPN_H2.to_vec(), ALPN_HTTP1_1.to_vec()]
+    } else {
+        vec![ALPN_HTTP1_1.to_vec()]
+    };
+    Arc::new(cfg)
+}
+pub(crate) fn resolve_tls_client_config(
+    roots: &RootCertStore,
+    enable_h2: bool,
+) -> Arc<ClientConfig> {
+    if roots.roots.len() == TLS_SERVER_ROOTS.len() {
+        let cache: &OnceLock<Arc<ClientConfig>> = if enable_h2 {
+            &DEFAULT_H2_TLS_CONFIG
+        } else {
+            &DEFAULT_H1_TLS_CONFIG
+        };
+        return Arc::clone(cache.get_or_init(|| {
+            let default_roots: RootCertStore = RootCertStore {
+                roots: TLS_SERVER_ROOTS.to_vec(),
+            };
+            build_client_config(default_roots, enable_h2)
+        }));
+    }
+    build_client_config(roots.clone(), enable_h2)
+}
+pub(crate) fn add_pem_certs_to_store(
+    roots: &mut RootCertStore,
+    pem_bytes: &[u8],
+) -> Result<usize, RequestError> {
+    let mut added: usize = 0;
+    for parsed in CertificateDer::pem_slice_iter(pem_bytes) {
+        let cert: CertificateDer<'static> =
+            parsed.map_err(|_| RequestError::Request(INVALID_PEM_CERT_ERROR.to_owned()))?;
+        roots
+            .add(cert)
+            .map_err(|_| RequestError::Request(INVALID_PEM_CERT_ERROR.to_owned()))?;
+        added += 1;
+    }
+    if added == 0 {
+        return Err(RequestError::Request(INVALID_PEM_CERT_ERROR.to_owned()));
+    }
+    Ok(added)
+}
+```
+# Path: hyperlane/request/src/pool/type.rs
+```rust
+use super::*;
+pub(crate) type H2SendRequest = SendRequest<Bytes>;
+pub(crate) type AsyncH1PoolMap = HashMap<PoolKey, VecDeque<PooledAsyncConn>>;
+pub(crate) type SyncH1PoolMap = HashMap<PoolKey, VecDeque<PooledSyncConn>>;
+pub(crate) type AsyncH2PoolMap = HashMap<PoolKey, H2SendRequest>;
+```
+# Path: hyperlane/request/src/pool/static.rs
+```rust
+use super::*;
+pub(crate) static ASYNC_H1_POOL: OnceLock<Mutex<AsyncH1PoolMap>> = OnceLock::new();
+pub(crate) static SYNC_H1_POOL: OnceLock<Mutex<SyncH1PoolMap>> = OnceLock::new();
+pub(crate) static ASYNC_H2_POOL: OnceLock<Mutex<AsyncH2PoolMap>> = OnceLock::new();
+thread_local! {
+    pub(crate) static CLIENT_BUFFER_POOL: RefCell<Vec<Vec<u8>>> = const { RefCell::new(Vec::new()) };
+}
+```
+# Path: hyperlane/request/src/pool/const.rs
+```rust
+pub(crate) const POOL_MAX_IDLE_PER_HOST: usize = 32;
+pub(crate) const POOL_MAX_IDLE_TOTAL: usize = 256;
+pub(crate) const POOL_IDLE_TTL_SECS: u64 = 60;
+pub(crate) const CLIENT_MAX_POOLED_BUFFERS: usize = 32;
+pub(crate) const CLIENT_MAX_POOLED_BUFFER_CAP: usize = 64 * 1024;
+```
+# Path: hyperlane/request/src/pool/mod.rs
+```rust
+mod r#const;
+mod r#fn;
+mod r#static;
+mod r#struct;
+mod r#type;
+pub(crate) use {r#const::*, r#fn::*, r#static::*, r#struct::*, r#type::*};
+use super::*;
+```
+# Path: hyperlane/request/src/pool/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct PoolKey {
+    pub(crate) is_https: bool,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) proxy: Option<ProxyKey>,
+    pub(crate) root_cert_fingerprint: u64,
+    pub(crate) sync_timeout_ms: u64,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct ProxyKey {
+    pub(crate) proxy_type_tag: u8,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) username: Option<String>,
+    pub(crate) password: Option<String>,
+}
+pub(crate) struct PooledAsyncConn {
+    pub(crate) stream: BoxAsyncReadWrite,
+    pub(crate) idle_since: Instant,
+}
+pub(crate) struct PooledSyncConn {
+    pub(crate) stream: BoxReadWrite,
+    pub(crate) idle_since: Instant,
+}
+```
+# Path: hyperlane/request/src/pool/fn.rs
+```rust
+use super::*;
+fn root_cert_fingerprint(roots: &RootCertStore) -> u64 {
+    if roots.roots.len() == TLS_SERVER_ROOTS.len() {
+        return 0;
+    }
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let extra_start: usize = roots.roots.len().min(TLS_SERVER_ROOTS.len());
+    for anchor in &roots.roots[extra_start..] {
+        for &byte in anchor.subject.as_ref() {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        for &byte in anchor.subject_public_key_info.as_ref() {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    hash ^ (roots.roots.len() as u64)
+}
+pub(crate) fn make_pool_key(
+    is_https: bool,
+    host: &str,
+    port: u16,
+    proxy: Option<&Proxy>,
+    roots: &RootCertStore,
+    sync_timeout_ms: u64,
+) -> PoolKey {
+    let proxy_key: Option<ProxyKey> = proxy.map(|p: &Proxy| ProxyKey {
+        proxy_type_tag: match *p.get_proxy_type() {
+            ProxyType::Http => 0,
+            ProxyType::Https => 1,
+            ProxyType::Socks5 => 2,
+        },
+        host: p.get_host().to_ascii_lowercase(),
+        port: p.get_port(),
+        username: p.get_username(),
+        password: p.get_password(),
+    });
+    PoolKey {
+        is_https,
+        host: host.to_ascii_lowercase(),
+        port,
+        proxy: proxy_key,
+        root_cert_fingerprint: root_cert_fingerprint(roots),
+        sync_timeout_ms,
+    }
+}
+pub(crate) fn take_async_h1_conn(key: &PoolKey) -> Option<BoxAsyncReadWrite> {
+    let map_lock: &Mutex<AsyncH1PoolMap> = ASYNC_H1_POOL.get_or_init(|| Mutex::new(HashMap::new()));
+    let Ok(mut map) = map_lock.lock() else {
+        return None;
+    };
+    let queue: &mut VecDeque<PooledAsyncConn> = map.get_mut(key)?;
+    let ttl: Duration = Duration::from_secs(POOL_IDLE_TTL_SECS);
+    while let Some(conn) = queue.pop_back() {
+        if conn.idle_since.elapsed() < ttl {
+            if queue.is_empty() {
+                map.remove(key);
+            }
+            return Some(conn.stream);
+        }
+    }
+    map.remove(key);
+    None
+}
+pub(crate) fn put_async_h1_conn(key: PoolKey, stream: BoxAsyncReadWrite) {
+    let map_lock: &Mutex<AsyncH1PoolMap> = ASYNC_H1_POOL.get_or_init(|| Mutex::new(HashMap::new()));
+    let Ok(mut map) = map_lock.lock() else {
+        return;
+    };
+    let ttl: Duration = Duration::from_secs(POOL_IDLE_TTL_SECS);
+    let mut total: usize = 0;
+    map.retain(|_: &PoolKey, q: &mut VecDeque<PooledAsyncConn>| {
+        q.retain(|item: &PooledAsyncConn| item.idle_since.elapsed() < ttl);
+        total += q.len();
+        !q.is_empty()
+    });
+    if total >= POOL_MAX_IDLE_TOTAL {
+        return;
+    }
+    let queue: &mut VecDeque<PooledAsyncConn> = map.entry(key).or_default();
+    if queue.len() < POOL_MAX_IDLE_PER_HOST {
+        queue.push_back(PooledAsyncConn {
+            stream,
+            idle_since: Instant::now(),
+        });
+    }
+}
+pub(crate) fn take_sync_h1_conn(key: &PoolKey) -> Option<BoxReadWrite> {
+    let map_lock: &Mutex<SyncH1PoolMap> = SYNC_H1_POOL.get_or_init(|| Mutex::new(HashMap::new()));
+    let Ok(mut map) = map_lock.lock() else {
+        return None;
+    };
+    let queue: &mut VecDeque<PooledSyncConn> = map.get_mut(key)?;
+    let ttl: Duration = Duration::from_secs(POOL_IDLE_TTL_SECS);
+    while let Some(conn) = queue.pop_back() {
+        if conn.idle_since.elapsed() < ttl {
+            if queue.is_empty() {
+                map.remove(key);
+            }
+            return Some(conn.stream);
+        }
+    }
+    map.remove(key);
+    None
+}
+pub(crate) fn put_sync_h1_conn(key: PoolKey, stream: BoxReadWrite) {
+    let map_lock: &Mutex<SyncH1PoolMap> = SYNC_H1_POOL.get_or_init(|| Mutex::new(HashMap::new()));
+    let Ok(mut map) = map_lock.lock() else {
+        return;
+    };
+    let ttl: Duration = Duration::from_secs(POOL_IDLE_TTL_SECS);
+    let mut total: usize = 0;
+    map.retain(|_: &PoolKey, q: &mut VecDeque<PooledSyncConn>| {
+        q.retain(|item: &PooledSyncConn| item.idle_since.elapsed() < ttl);
+        total += q.len();
+        !q.is_empty()
+    });
+    if total >= POOL_MAX_IDLE_TOTAL {
+        return;
+    }
+    let queue: &mut VecDeque<PooledSyncConn> = map.entry(key).or_default();
+    if queue.len() < POOL_MAX_IDLE_PER_HOST {
+        queue.push_back(PooledSyncConn {
+            stream,
+            idle_since: Instant::now(),
+        });
+    }
+}
+pub(crate) fn get_h2_sender(key: &PoolKey) -> Option<H2SendRequest> {
+    let map_lock: &Mutex<AsyncH2PoolMap> = ASYNC_H2_POOL.get_or_init(|| Mutex::new(HashMap::new()));
+    let Ok(map) = map_lock.lock() else {
+        return None;
+    };
+    map.get(key).cloned()
+}
+pub(crate) fn put_h2_sender(key: PoolKey, sender: H2SendRequest) {
+    let map_lock: &Mutex<AsyncH2PoolMap> = ASYNC_H2_POOL.get_or_init(|| Mutex::new(HashMap::new()));
+    let Ok(mut map) = map_lock.lock() else {
+        return;
+    };
+    if map.len() >= POOL_MAX_IDLE_TOTAL {
+        map.clear();
+    }
+    map.insert(key, sender);
+}
+pub(crate) fn remove_h2_sender(key: &PoolKey) {
+    let map_lock: &Mutex<AsyncH2PoolMap> = ASYNC_H2_POOL.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(mut map) = map_lock.lock() {
+        map.remove(key);
+    }
+}
+#[inline(always)]
+pub(crate) fn take_client_buffer(min_cap: usize) -> Vec<u8> {
+    CLIENT_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut buf: Vec<u8> = pool
+            .borrow_mut()
+            .pop()
+            .unwrap_or_else(|| Vec::with_capacity(min_cap));
+        buf.clear();
+        if buf.capacity() < min_cap {
+            buf.reserve(min_cap - buf.capacity());
+        }
+        buf
+    })
+}
+#[inline(always)]
+pub(crate) fn return_client_buffer(mut buf: Vec<u8>) {
+    if buf.capacity() == 0 || buf.capacity() > CLIENT_MAX_POOLED_BUFFER_CAP {
+        return;
+    }
+    buf.clear();
+    CLIENT_BUFFER_POOL.with(|pool: &RefCell<Vec<Vec<u8>>>| {
+        let mut guard: RefMut<'_, Vec<Vec<u8>>> = pool.borrow_mut();
+        if guard.len() < CLIENT_MAX_POOLED_BUFFERS {
+            guard.push(buf);
+        }
+    });
+}
 ```
 # Path: hyperlane/type/README.md
 ## hyperlane
@@ -12641,6 +15194,7 @@ mod protocol;
 mod rc_rwlock;
 mod request;
 mod response;
+mod security;
 mod status;
 mod stream;
 mod task;
@@ -16330,6 +18884,88 @@ fn test_hash_set_xx_hash3_64_iter() {
     assert_eq!(count, 2);
 }
 ```
+# Path: hyperlane/type/tests/security/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/type/tests/security/fn.rs
+```rust
+use super::*;
+async fn parse_h1_wire(raw: &[u8], cfg: RequestConfig) -> Result<Request, RequestError> {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let payload: Vec<u8> = raw.to_vec();
+    let writer: JoinHandle<()> = spawn(async move {
+        let mut client: TcpStream = TcpStream::connect(addr).await.unwrap();
+        let _: Result<(), io::Error> = client.write_all(&payload).await;
+        let _: Result<(), io::Error> = client.shutdown().await;
+    });
+    let (server, _): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+    let mut stream: Stream = Stream::new(server, cfg, false);
+    let res: Result<Request, RequestError> = stream.try_get_http_request().await;
+    let _: Result<(), JoinError> = writer.await;
+    res
+}
+#[tokio::test]
+async fn test_security_pr52_pr54_pr56_http1_smuggling_and_bounds() {
+    let mut cfg: RequestConfig = RequestConfig::default();
+    cfg.set_max_body_size(64).set_max_path_size(256);
+    let cl_and_te: &[u8] = b"POST / HTTP/1.1\r\nHost: ex\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n";
+    assert!(parse_h1_wire(cl_and_te, cfg).await.is_err());
+    let dup_cl: &[u8] =
+        b"POST / HTTP/1.1\r\nHost: ex\r\nContent-Length: 5\r\nContent-Length: 6\r\n\r\nhello!";
+    assert!(parse_h1_wire(dup_cl, cfg).await.is_err());
+    let obs_fold: &[u8] = b"GET / HTTP/1.1\r\nHost: ex\r\nX-Fold: a\r\n b\r\n\r\n";
+    assert!(parse_h1_wire(obs_fold, cfg).await.is_err());
+    let h2_on_h1: &[u8] = b"GET / HTTP/2.0\r\nHost: ex\r\n\r\n";
+    assert!(parse_h1_wire(h2_on_h1, cfg).await.is_err());
+    let huge_cl: &[u8] = b"POST / HTTP/1.1\r\nHost: ex\r\nContent-Length: 999999999\r\n\r\n";
+    assert!(parse_h1_wire(huge_cl, cfg).await.is_err());
+    let hash_before_query: &[u8] = b"GET /safe#frag?evil=1 HTTP/1.1\r\nHost: ex\r\n\r\n";
+    let parsed_frag: Request = parse_h1_wire(hash_before_query, cfg).await.unwrap();
+    assert_eq!(parsed_frag.get_path(), "/safe");
+    assert!(parsed_frag.get_querys().is_empty());
+    let multi_conn: &[u8] = b"GET / HTTP/1.1\r\nHost: ex\r\nConnection: keep-alive, close\r\n\r\n";
+    let parsed_conn: Request = parse_h1_wire(multi_conn, cfg).await.unwrap();
+    assert!(!parsed_conn.is_enable_keep_alive());
+}
+#[test]
+#[test]
+fn test_security_websocket_frame_and_cookie_multipart_file_extension() {
+    let bad_rsv: [u8; 2] = [0xC1, 0x00];
+    assert!(WebSocketFrame::decode_ws_frame_checked(&bad_rsv, 1024).is_err());
+    let reserved_op: [u8; 2] = [0x83, 0x00];
+    assert!(WebSocketFrame::decode_ws_frame_checked(&reserved_op, 1024).is_err());
+    let frag_ping: [u8; 2] = [0x09, 0x00];
+    assert!(WebSocketFrame::decode_ws_frame_checked(&frag_ping, 1024).is_err());
+    let long_ping: Vec<u8> = [vec![0x89u8, 126u8, 0u8, 126u8], vec![b'a'; 126]].concat();
+    assert!(WebSocketFrame::decode_ws_frame_checked(&long_ping, 1024).is_err());
+    let msb_set_64: [u8; 10] = [0x82, 127, 0x80, 0, 0, 0, 0, 0, 0, 1];
+    assert!(WebSocketFrame::decode_ws_frame_checked(&msb_set_64, 1024).is_err());
+    let non_minimal_16: [u8; 4] = [0x82, 126, 0x00, 10];
+    assert!(WebSocketFrame::decode_ws_frame_checked(&non_minimal_16, 1024).is_err());
+    let cookies: Cookies = Cookie::parse("sid=first; sid=second; theme=dark");
+    assert_eq!(cookies.get("sid").map(String::as_str), Some("first"));
+    assert_eq!(FileExtension::get_extension_name("/dir.v1/readme"), "");
+    assert_eq!(
+        FileExtension::get_extension_name("/dir.v1/index.html"),
+        "html"
+    );
+    let ct: &str = "multipart/form-data; param=\"a;b\"; boundary=\"bnd123\"";
+    assert_eq!(
+        MultipartFormData::get_boundary(ct).as_deref(),
+        Some("bnd123")
+    );
+    let mp_body: &[u8] =
+        b"--bnd123\ncontent-disposition: form-data; name=\"k\"\n\nval\n--bnd123--\nepilogue";
+    let parts: Vec<BodyPart> = MultipartFormData::parse(mp_body, "bnd123").unwrap();
+    assert_eq!(
+        MultipartFormData::try_get_part_text(&parts, "k").as_deref(),
+        Some("val")
+    );
+}
+```
 # Path: hyperlane/type/tests/request/mod.rs
 ```rust
 mod r#fn;
@@ -17935,14 +20571,13 @@ use std::{
     future::{self, Future},
     hash::Hash,
     io::{self, ErrorKind},
-    mem::{self, MaybeUninit},
+    mem,
     net::{IpAddr, SocketAddr},
     num::ParseIntError,
     pin::{Pin, pin},
     rc::Rc,
     result::Result,
-    slice,
-    str::{FromStr, SplitWhitespace, from_utf8, from_utf8_unchecked},
+    str::{FromStr, from_utf8, from_utf8_unchecked},
     sync::{
         Arc, OnceLock,
         atomic::{self, AtomicBool, AtomicUsize},
@@ -17969,7 +20604,7 @@ use {
             mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
         },
         task::{JoinError, LocalSet, spawn_blocking, spawn_local},
-        time::{error::Elapsed, timeout},
+        time::{Instant, Sleep, error::Elapsed, sleep_until, timeout},
     },
     url::{ParseError, Url},
 };
@@ -18133,7 +20768,10 @@ impl MultipartFormData {
     where
         C: AsRef<str>,
     {
-        for parameter in content_type.as_ref().split(SEMICOLON).skip(1) {
+        for parameter in Self::split_header_parameters(content_type.as_ref())
+            .into_iter()
+            .skip(1)
+        {
             let Some((key, value)) = parameter.trim().split_once(EQUAL) else {
                 continue;
             };
@@ -18149,6 +20787,26 @@ impl MultipartFormData {
             }
         }
         None
+    }
+    pub(crate) fn split_header_parameters(input: &str) -> Vec<&str> {
+        let mut segments: Vec<&str> = Vec::new();
+        let mut start: usize = 0;
+        let mut quoted: bool = false;
+        let mut escaped: bool = false;
+        for (offset, byte) in input.bytes().enumerate() {
+            match byte {
+                _ if escaped => escaped = false,
+                b'\\' if quoted => escaped = true,
+                b'"' => quoted = !quoted,
+                b';' if !quoted => {
+                    segments.push(&input[start..offset]);
+                    start = offset + 1;
+                }
+                _ => {}
+            }
+        }
+        segments.push(&input[start..]);
+        segments
     }
     pub fn is_form_data<C>(content_type: C) -> bool
     where
@@ -18203,16 +20861,23 @@ impl MultipartFormData {
                 break;
             };
             let position: usize = offset + found;
+            let at_line_start: bool = position == 0 || body[position - 1] == b'\n';
             let after: usize = position + delimiter.len();
-            if after == body.len() || Self::is_boundary_tail(&body[after..]) {
+            if at_line_start && (after == body.len() || Self::is_boundary_tail(&body[after..])) {
                 positions.push(position);
+                if Self::is_closing_delimiter(&body[after..]) {
+                    break;
+                }
             }
             offset = position + 1;
         }
         positions
     }
     fn trim_boundary_breaks(segment: &[u8]) -> &[u8] {
-        let segment: &[u8] = segment.strip_prefix(HTTP_BR.as_bytes()).unwrap_or(segment);
+        let segment: &[u8] = segment
+            .strip_prefix(HTTP_BR.as_bytes())
+            .or_else(|| segment.strip_prefix(MULTIPART_LINE_FEED))
+            .unwrap_or(segment);
         if let Some(trimmed) = segment.strip_suffix(HTTP_BR.as_bytes()) {
             return trimmed;
         }
@@ -18249,8 +20914,8 @@ impl MultipartFormData {
     fn parse_part_headers(header_block: &[u8]) -> Option<BodyPartHeaders> {
         let header_text: &str = from_utf8(header_block).ok()?;
         let mut headers: BodyPartHeaders = hash_map_xx_hash3_64();
-        for line in header_text.split(HTTP_BR) {
-            let line: &str = line.trim_end_matches('\n').trim();
+        for raw_line in header_text.split('\n') {
+            let line: &str = raw_line.strip_suffix('\r').unwrap_or(raw_line).trim();
             if line.is_empty() {
                 continue;
             }
@@ -18266,7 +20931,10 @@ impl MultipartFormData {
     fn parse_part_disposition(disposition: &str) -> (BodyPartName, BodyPartFileName) {
         let mut name: BodyPartName = String::new();
         let mut file_name: BodyPartFileName = String::new();
-        for parameter in disposition.split(SEMICOLON).skip(1) {
+        for parameter in Self::split_header_parameters(disposition)
+            .into_iter()
+            .skip(1)
+        {
             let Some((key, value)) = parameter.trim().split_once(EQUAL) else {
                 continue;
             };
@@ -18412,7 +21080,15 @@ impl BodyPart {
     where
         K: AsRef<str>,
     {
-        self.get_headers().get(key.as_ref())
+        let key_ref: &str = key.as_ref();
+        if !key_ref
+            .as_bytes()
+            .iter()
+            .any(|byte: &u8| byte.is_ascii_uppercase())
+        {
+            return self.get_headers().get(key_ref);
+        }
+        self.get_headers().get(&key_ref.to_ascii_lowercase())
     }
     pub fn try_get_data(&self) -> Option<&[u8]> {
         (!self.get_data().is_empty()).then(|| self.get_data().as_slice())
@@ -18588,7 +21264,11 @@ impl WebSocketFrame {
             if data_ref.len() < index + 8 {
                 return None;
             }
-            payload_len = u64::from_be_bytes(data_ref[index..index + 8].try_into().ok()?) as usize;
+            let raw_len: u64 = u64::from_be_bytes(data_ref[index..index + 8].try_into().ok()?);
+            if (raw_len >> 63) != 0 {
+                return None;
+            }
+            payload_len = usize::try_from(raw_len).ok()?;
             index += 8;
         }
         let mask_key: Option<[u8; 4]> = if mask {
@@ -18601,23 +21281,141 @@ impl WebSocketFrame {
         } else {
             None
         };
-        if data_ref.len() < index + payload_len {
+        let total_len: usize = index.checked_add(payload_len)?;
+        if data_ref.len() < total_len {
             return None;
         }
-        let mut payload: Vec<u8> = data_ref[index..index + payload_len].to_vec();
+        let mut payload: Vec<u8> = data_ref[index..total_len].to_vec();
         if let Some(mask_key) = mask_key {
-            for (byte_index, payload_byte) in payload.iter_mut().enumerate() {
-                *payload_byte ^= mask_key[byte_index % 4];
-            }
+            Self::apply_mask(&mut payload, mask_key);
         }
-        index += payload_len;
         let frame: WebSocketFrame = WebSocketFrame {
             fin,
             opcode,
             mask,
             payload_data: payload,
         };
-        Some((frame, index))
+        Some((frame, total_len))
+    }
+    pub(crate) fn decode_ws_frame_checked(
+        data_ref: &[u8],
+        max_payload_size: usize,
+    ) -> Result<Option<(WebSocketFrame, usize)>, RequestError> {
+        if data_ref.len() < 2 {
+            return Ok(None);
+        }
+        let first_byte: u8 = data_ref[0];
+        let second_byte: u8 = data_ref[1];
+        if (first_byte & 0b0111_0000) != 0 {
+            return Err(RequestError::WebSocketInvalidExtension(
+                HttpStatus::BadRequest,
+            ));
+        }
+        let fin: bool = (first_byte & 0b1000_0000) != 0;
+        let opcode: WebSocketOpcode = WebSocketOpcode::from_u8(first_byte & 0b0000_1111);
+        if opcode.is_reserved() {
+            return Err(RequestError::WebSocketOpcodeUnsupported(
+                HttpStatus::NotImplemented,
+            ));
+        }
+        let mask: bool = (second_byte & 0b1000_0000) != 0;
+        let len_code: u8 = second_byte & 0b0111_1111;
+        if opcode.is_control() && (!fin || len_code >= 126) {
+            return Err(RequestError::WebSocketPayloadCorrupted(
+                HttpStatus::BadRequest,
+            ));
+        }
+        let mut index: usize = 2;
+        let payload_len: usize = if len_code == 126 {
+            if data_ref.len() < index + 2 {
+                return Ok(None);
+            }
+            let raw_len: u16 = u16::from_be_bytes([data_ref[index], data_ref[index + 1]]);
+            if raw_len < 126 {
+                return Err(RequestError::WebSocketPayloadCorrupted(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            index += 2;
+            usize::from(raw_len)
+        } else if len_code == 127 {
+            if data_ref.len() < index + 8 {
+                return Ok(None);
+            }
+            let raw_len: u64 = u64::from_be_bytes([
+                data_ref[index],
+                data_ref[index + 1],
+                data_ref[index + 2],
+                data_ref[index + 3],
+                data_ref[index + 4],
+                data_ref[index + 5],
+                data_ref[index + 6],
+                data_ref[index + 7],
+            ]);
+            if (raw_len >> 63) != 0 || raw_len <= u64::from(u16::MAX) {
+                return Err(RequestError::WebSocketPayloadCorrupted(
+                    HttpStatus::BadRequest,
+                ));
+            }
+            index += 8;
+            usize::try_from(raw_len)
+                .map_err(|_| RequestError::WebSocketFrameTooLarge(HttpStatus::PayloadTooLarge))?
+        } else {
+            usize::from(len_code)
+        };
+        if max_payload_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE && payload_len > max_payload_size
+        {
+            return Err(RequestError::WebSocketFrameTooLarge(
+                HttpStatus::PayloadTooLarge,
+            ));
+        }
+        let mask_key: Option<[u8; 4]> = if mask {
+            if data_ref.len() < index + 4 {
+                return Ok(None);
+            }
+            let key: [u8; 4] = [
+                data_ref[index],
+                data_ref[index + 1],
+                data_ref[index + 2],
+                data_ref[index + 3],
+            ];
+            index += 4;
+            Some(key)
+        } else {
+            None
+        };
+        let total_len: usize =
+            index
+                .checked_add(payload_len)
+                .ok_or(RequestError::WebSocketFrameTooLarge(
+                    HttpStatus::PayloadTooLarge,
+                ))?;
+        if data_ref.len() < total_len {
+            return Ok(None);
+        }
+        let mut payload: Vec<u8> = data_ref[index..total_len].to_vec();
+        if let Some(mask_key) = mask_key {
+            Self::apply_mask(&mut payload, mask_key);
+        }
+        let frame: WebSocketFrame = WebSocketFrame {
+            fin,
+            opcode,
+            mask,
+            payload_data: payload,
+        };
+        Ok(Some((frame, total_len)))
+    }
+    #[inline(always)]
+    fn apply_mask(payload: &mut [u8], mask_key: [u8; 4]) {
+        let mask_u32: u32 = u32::from_ne_bytes(mask_key);
+        let (chunks, remainder): (&mut [[u8; 4]], &mut [u8]) = payload.as_chunks_mut::<4>();
+        for chunk in chunks {
+            let word: u32 = u32::from_ne_bytes(*chunk) ^ mask_u32;
+            *chunk = word.to_ne_bytes();
+        }
+        for (idx, byte) in remainder.iter_mut().enumerate() {
+            *byte ^= mask_key[idx];
+        }
     }
     pub fn create_frame_list<D>(data: D) -> Vec<ResponseBody>
     where
@@ -18625,6 +21423,9 @@ impl WebSocketFrame {
     {
         let data_ref: &[u8] = data.as_ref();
         let total_len: usize = data_ref.len();
+        if total_len == 0 {
+            return vec![vec![0x81, 0x00]];
+        }
         let mut offset: usize = 0;
         let mut frames_list: Vec<ResponseBody> =
             Vec::with_capacity((total_len / MAX_FRAME_SIZE) + 1);
@@ -18657,12 +21458,12 @@ impl WebSocketFrame {
             frame.push(fin | opcode_byte);
             if frame_size < 126 {
                 frame.push(frame_size as u8);
-            } else if frame_size <= MAX_FRAME_SIZE {
+            } else if frame_size <= usize::from(u16::MAX) {
                 frame.push(126);
                 frame.extend_from_slice(&(frame_size as u16).to_be_bytes());
             } else {
                 frame.push(127);
-                frame.extend_from_slice(&(frame_size as u16).to_be_bytes());
+                frame.extend_from_slice(&(frame_size as u64).to_be_bytes());
             }
             let end: usize = offset + frame_size;
             frame.extend_from_slice(&data_ref[offset..end]);
@@ -18743,9 +21544,18 @@ impl WebSocketFrame {
     where
         K: AsRef<str>,
     {
-        let key_ref: &str = key.as_ref();
+        let key_bytes: &[u8] = key.as_ref().as_bytes();
+        if key_bytes.len() != 24
+            || key_bytes[22] != b'='
+            || key_bytes[23] != b'='
+            || !key_bytes[..22]
+                .iter()
+                .all(|byte: &u8| byte.is_ascii_alphanumeric() || *byte == b'+' || *byte == b'/')
+        {
+            return None;
+        }
         let mut data: [u8; 60] = [0u8; 60];
-        data[..24].copy_from_slice(&key_ref.as_bytes()[..24.min(key_ref.len())]);
+        data[..24].copy_from_slice(key_bytes);
         data[24..].copy_from_slice(GUID);
         let hash: [u8; 20] = Self::sha1(data);
         Self::try_base64_encode(hash)
@@ -18755,11 +21565,19 @@ impl WebSocketFrame {
     where
         K: AsRef<str>,
     {
-        let key_ref: &str = key.as_ref();
-        let mut data: [u8; 60] = [0u8; 60];
-        data[..24].copy_from_slice(&key_ref.as_bytes()[..24.min(key_ref.len())]);
-        data[24..].copy_from_slice(GUID);
-        let hash: [u8; 20] = Self::sha1(data);
+        let key_bytes: &[u8] = key.as_ref().as_bytes();
+        if key_bytes.len() <= 24 {
+            let mut data: [u8; 60] = [0u8; 60];
+            let key_len: usize = key_bytes.len();
+            data[..key_len].copy_from_slice(key_bytes);
+            data[key_len..key_len + GUID.len()].copy_from_slice(GUID);
+            let hash: [u8; 20] = Self::sha1(&data[..key_len + GUID.len()]);
+            return Self::base64_encode(hash);
+        }
+        let mut data: Vec<u8> = Vec::with_capacity(key_bytes.len() + GUID.len());
+        data.extend_from_slice(key_bytes);
+        data.extend_from_slice(GUID);
+        let hash: [u8; 20] = Self::sha1(&data);
         Self::base64_encode(hash)
     }
     pub fn try_base64_encode<D>(data: D) -> Option<String>
@@ -18820,18 +21638,6 @@ impl WebSocketFrame {
     #[inline(always)]
     pub fn is_reserved_opcode(&self) -> bool {
         self.get_opcode().is_reserved()
-    }
-    #[inline(always)]
-    pub(crate) fn build_full_frame(
-        &self,
-        full_frame: &mut Vec<u8>,
-    ) -> Result<Option<RequestBody>, RequestError> {
-        let payload_data: &[u8] = self.get_payload_data();
-        full_frame.extend_from_slice(payload_data);
-        if self.get_fin() {
-            return Ok(Some(mem::take(full_frame)));
-        }
-        Ok(None)
     }
 }
 ```
@@ -18899,7 +21705,7 @@ impl PanicData {
         let default_message: String = join_error.to_string();
         let mut message: Option<String> = if let Ok(panic_join_error) = join_error.try_into_panic()
         {
-            Self::try_extract_panic_message(&panic_join_error)
+            Self::try_extract_panic_message(&*panic_join_error)
         } else {
             None
         };
@@ -18994,6 +21800,9 @@ impl Response {
     #[inline(always)]
     pub fn set_reason_phrase(&mut self, val: impl AsRef<str>) -> &mut Self {
         let text: &str = val.as_ref();
+        if !Self::is_valid_header_value(text) {
+            return self;
+        }
         self.reason_phrase.clear();
         self.reason_phrase.push_str(text);
         self
@@ -19072,7 +21881,8 @@ impl Response {
         V: AsRef<str>,
     {
         if let Some(values) = self.get_headers().get(key.as_ref()) {
-            values.contains(&value.as_ref().to_owned())
+            let target: &str = value.as_ref();
+            values.iter().any(|data: &String| data == target)
         } else {
             false
         }
@@ -19121,8 +21931,42 @@ impl Response {
         self.try_get_body_json().unwrap()
     }
     #[inline(always)]
+    fn is_valid_header_name(key: &str) -> bool {
+        !key.is_empty()
+            && key
+                .bytes()
+                .all(|byte: u8| HTTP_HEADER_TOKEN_TABLE[byte as usize])
+    }
+    #[inline(always)]
+    fn is_valid_header_value(value: &str) -> bool {
+        value
+            .bytes()
+            .all(|byte: u8| HTTP_HEADER_VALUE_VALID_TABLE[byte as usize])
+    }
+    #[inline(always)]
+    fn is_valid_http_version(version: &str) -> bool {
+        !version.is_empty()
+            && version
+                .bytes()
+                .all(|byte: u8| byte > SPACE_U8 && byte < HTTP_HEADER_DELETE)
+    }
+    #[inline(always)]
+    fn find_header_back_ci<'a>(headers: &'a ResponseHeaders, target: &str) -> Option<&'a String> {
+        if let Some(values) = headers.get(target) {
+            return values.back();
+        }
+        headers
+            .iter()
+            .find(|(name, _): &(&String, &ResponseHeadersValue)| name.eq_ignore_ascii_case(target))
+            .and_then(|(_, values): (&String, &ResponseHeadersValue)| values.back())
+    }
+    #[inline(always)]
+    fn has_header_ci(headers: &ResponseHeaders, target: &str) -> bool {
+        Self::find_header_back_ci(headers, target).is_some()
+    }
+    #[inline(always)]
     fn should_skip_header(&self, key: &str) -> bool {
-        key.trim().is_empty() || key == CONTENT_LENGTH
+        !Self::is_valid_header_name(key) || key.eq_ignore_ascii_case(CONTENT_LENGTH)
     }
     #[inline(always)]
     fn set_header_without_check<K, V>(&mut self, key: K, value: V) -> &mut Self
@@ -19166,7 +22010,8 @@ impl Response {
         V: AsRef<str>,
     {
         let key: &str = key.as_ref();
-        if self.should_skip_header(key) {
+        let value: &str = value.as_ref();
+        if self.should_skip_header(key) || !Self::is_valid_header_value(value) {
             return self;
         }
         self.set_header_without_check(key, value)
@@ -19177,14 +22022,29 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        let key: ResponseHeadersKey = key.as_ref().to_owned();
-        if self.should_skip_header(&key) {
+        let key_ref: &str = key.as_ref();
+        let value_ref: &str = value.as_ref();
+        if self.should_skip_header(key_ref) || !Self::is_valid_header_value(value_ref) {
             return self;
         }
-        self.get_mut_headers()
-            .entry(key)
-            .or_default()
-            .push_back(value.as_ref().to_owned());
+        if let Some(existing) = self.get_mut_headers().get_mut(key_ref) {
+            existing.push_back(value_ref.to_owned());
+            return self;
+        }
+        let (mut name, mut values): (String, VecDeque<String>) =
+            take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
+        name.clear();
+        name.push_str(key_ref);
+        while values.len() > 1 {
+            values.pop_back();
+        }
+        if let Some(slot) = values.front_mut() {
+            slot.clear();
+            slot.push_str(value_ref);
+        } else {
+            values.push_back(value_ref.to_owned());
+        }
+        self.get_mut_headers().insert(name, values);
         self
     }
     #[inline(always)]
@@ -19201,26 +22061,34 @@ impl Response {
         K: AsRef<str>,
         V: AsRef<str>,
     {
-        let key: ResponseHeadersKey = key.as_ref().to_owned();
-        if let Some(values) = self.get_mut_headers().get_mut(&key) {
-            values.retain(|data: &String| data != &value.as_ref().to_owned());
-            if values.is_empty() {
-                self.get_mut_headers().remove(&key);
-            }
+        let key_ref: &str = key.as_ref();
+        let value_ref: &str = value.as_ref();
+        let should_remove: bool = if let Some(values) = self.get_mut_headers().get_mut(key_ref) {
+            values.retain(|data: &String| data != value_ref);
+            values.is_empty()
+        } else {
+            false
+        };
+        if should_remove {
+            self.get_mut_headers().remove(key_ref);
         }
         self
     }
     #[inline(always)]
     pub fn clear_headers(&mut self) -> &mut Self {
-        self.get_mut_headers().clear();
+        self.recycle_headers();
         self
     }
     pub fn reset(&mut self) -> &mut Self {
         let http_status: HttpStatus = HttpStatus::default();
+        self.set_version(HttpVersion::Http1_1);
         self.set_status_code(http_status.code());
+        let phrase: &'static str = HttpStatus::phrase_ref(http_status.code());
         let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
-        stored.clear();
-        stored.push_str(HttpStatus::phrase_ref(http_status.code()));
+        if stored.as_str() != phrase {
+            stored.clear();
+            stored.push_str(phrase);
+        }
         self.recycle_headers();
         self.get_mut_body().clear();
         self
@@ -19234,8 +22102,21 @@ impl Response {
     }
     #[inline(always)]
     pub fn try_get_cookies(&self) -> Option<Cookies> {
-        self.try_get_header_back(SET_COOKIE)
-            .map(|cookie_header: String| Cookie::parse(cookie_header))
+        let mut cookies: Cookies = hash_map_xx_hash3_64();
+        let mut found_header: bool = false;
+        for (name, values) in self.get_headers() {
+            if !name.eq_ignore_ascii_case(SET_COOKIE) {
+                continue;
+            }
+            for header_value in values {
+                found_header = true;
+                let parsed: CookieBuilder = CookieBuilder::parse(header_value);
+                if !parsed.get_name().is_empty() {
+                    cookies.insert(parsed.get_name().clone(), parsed.get_value().clone());
+                }
+            }
+        }
+        found_header.then_some(cookies)
     }
     #[inline(always)]
     pub fn get_cookies(&self) -> Cookies {
@@ -19274,7 +22155,10 @@ impl Response {
     }
     fn build_wire<const INCLUDE_BODY: bool>(&mut self) -> ResponseData {
         let status_code: ResponseStatusCode = self.get_status_code();
-        if self.get_reason_phrase().is_empty() || self.get_reason_phrase().as_str() == OK {
+        if self.get_reason_phrase().is_empty()
+            || self.get_reason_phrase().as_str() == OK
+            || !Self::is_valid_header_value(self.get_reason_phrase())
+        {
             let phrase: &'static str = HttpStatus::phrase_ref(status_code);
             if self.get_reason_phrase().as_str() != phrase {
                 let stored: &mut ResponseReasonPhrase = self.get_mut_reason_phrase();
@@ -19289,55 +22173,66 @@ impl Response {
             && status_code != HttpStatus::ResetContent.code()
             && status_code != HttpStatus::NotModified.code()
         {
+            let raw_version: &str = self.get_version().as_str();
+            let version_str: &str = if Self::is_valid_http_version(raw_version) {
+                raw_version
+            } else {
+                HTTP_VERSION_1_1
+            };
             let content_type: &str = default_content_type();
             let body_len: usize = self.get_body().len();
             let mut digits: [u8; B_20] = [0; B_20];
             let rendered_len: &str = render_length(body_len, &mut digits);
-            let mut code_digits: [u8; B_20] = [0; B_20];
-            let rendered_code: &str = render_length(status_code, &mut code_digits);
-            let version_str: &str = self.get_version().as_str();
             let phrase_str: &str = self.get_reason_phrase().as_str();
-            let total_size: usize = version_str.len()
-                + 1
-                + rendered_code.len()
-                + 1
-                + phrase_str.len()
-                + HTTP_BR.len()
-                + CONNECTION.len()
-                + COLON.len()
-                + KEEP_ALIVE.len()
-                + HTTP_BR.len()
-                + CONTENT_TYPE.len()
-                + COLON.len()
-                + content_type.len()
-                + HTTP_BR.len()
-                + CONTENT_LENGTH.len()
-                + COLON.len()
-                + rendered_len.len()
-                + HTTP_BR.len()
-                + HTTP_BR.len()
-                + body_len;
-            let mut response_bytes: Vec<u8> = Vec::with_capacity(total_size);
-            response_bytes.extend_from_slice(version_str.as_bytes());
-            response_bytes.push(b' ');
-            response_bytes.extend_from_slice(rendered_code.as_bytes());
-            response_bytes.push(b' ');
-            response_bytes.extend_from_slice(phrase_str.as_bytes());
-            response_bytes.extend_from_slice(HTTP_BR.as_bytes());
-            Self::push_header(&mut response_bytes, CONTENT_LENGTH, rendered_len);
-            Self::push_header(&mut response_bytes, CONNECTION, KEEP_ALIVE);
-            Self::push_header(&mut response_bytes, CONTENT_TYPE, content_type);
-            response_bytes.extend_from_slice(HTTP_BR.as_bytes());
+            let fast_prefix: Option<&[u8]> =
+                if status_code == HttpStatus::Ok.code() && phrase_str == OK {
+                    match version_str {
+                        HTTP_VERSION_1_1 => Some(FAST_HTTP11_200_CL_PREFIX),
+                        HTTP_VERSION_2 => Some(FAST_HTTP2_200_CL_PREFIX),
+                        HTTP_VERSION_3 => Some(FAST_HTTP3_200_CL_PREFIX),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+            let mut response_bytes: Vec<u8> = if let Some(prefix) = fast_prefix {
+                let total_size: usize = prefix.len()
+                    + rendered_len.len()
+                    + FAST_DEFAULT_HEADERS_SUFFIX.len()
+                    + body_len;
+                let mut out: Vec<u8> = Vec::with_capacity(total_size);
+                out.extend_from_slice(prefix);
+                out.extend_from_slice(rendered_len.as_bytes());
+                out.extend_from_slice(FAST_DEFAULT_HEADERS_SUFFIX);
+                out
+            } else {
+                let mut code_digits: [u8; B_20] = [0; B_20];
+                let rendered_code: &str = render_length(status_code, &mut code_digits);
+                let total_size: usize = version_str.len()
+                    + 1
+                    + rendered_code.len()
+                    + 1
+                    + phrase_str.len()
+                    + FAST_CL_PREFIX.len()
+                    + rendered_len.len()
+                    + FAST_DEFAULT_HEADERS_SUFFIX.len()
+                    + body_len;
+                let mut out: Vec<u8> = Vec::with_capacity(total_size);
+                out.extend_from_slice(version_str.as_bytes());
+                out.push(b' ');
+                out.extend_from_slice(rendered_code.as_bytes());
+                out.push(b' ');
+                out.extend_from_slice(phrase_str.as_bytes());
+                out.extend_from_slice(FAST_CL_PREFIX);
+                out.extend_from_slice(rendered_len.as_bytes());
+                out.extend_from_slice(FAST_DEFAULT_HEADERS_SUFFIX);
+                out
+            };
             response_bytes.extend_from_slice(self.get_body().as_slice());
             self.populate_default_headers_batch(content_type, rendered_len);
             return response_bytes;
         }
-        if self
-            .get_headers()
-            .get(CONNECTION)
-            .and_then(|values: &VecDeque<String>| values.back())
-            .is_none()
-        {
+        if !Self::has_header_ci(self.get_headers(), CONNECTION) {
             self.set_header_without_check(CONNECTION, KEEP_ALIVE);
         }
         let compressed_body: Option<ResponseBody>;
@@ -19350,21 +22245,24 @@ impl Response {
                 &[]
             }
             _ => {
-                let content_type: Option<&String> = self
-                    .get_headers()
-                    .get(CONTENT_TYPE)
-                    .and_then(|values: &ResponseHeadersValue| values.back());
-                let is_event_stream: bool = if let Some(value) = content_type {
-                    value.eq_ignore_ascii_case(TEXT_EVENT_STREAM)
+                let is_event_stream: bool = if let Some(value) =
+                    Self::find_header_back_ci(self.get_headers(), CONTENT_TYPE)
+                {
+                    value
+                        .split(SEMICOLON)
+                        .next()
+                        .unwrap_or(EMPTY_STR)
+                        .trim()
+                        .eq_ignore_ascii_case(TEXT_EVENT_STREAM)
                 } else {
                     self.set_header_without_check(CONTENT_TYPE, default_content_type());
                     false
                 };
-                let compress_type: Option<Compress> = self
-                    .get_headers()
-                    .get(CONTENT_ENCODING)
-                    .and_then(|values: &ResponseHeadersValue| values.back())
-                    .map(|value: &String| value.parse::<Compress>().unwrap_or_default());
+                let has_transfer_encoding: bool =
+                    Self::has_header_ci(self.get_headers(), TRANSFER_ENCODING);
+                let compress_type: Option<Compress> =
+                    Self::find_header_back_ci(self.get_headers(), CONTENT_ENCODING)
+                        .map(|value: &String| value.parse::<Compress>().unwrap_or_default());
                 if INCLUDE_BODY {
                     compressed_body = match compress_type {
                         Some(encoding) if !encoding.is_unknown() => Some(
@@ -19374,7 +22272,18 @@ impl Response {
                         ),
                         _ => None,
                     };
-                    if !is_event_stream {
+                    if has_transfer_encoding {
+                        self.get_mut_headers().retain(
+                            |name: &String, _: &mut ResponseHeadersValue| {
+                                !name.eq_ignore_ascii_case(CONTENT_LENGTH)
+                            },
+                        );
+                    } else if !is_event_stream {
+                        self.get_mut_headers().retain(
+                            |name: &String, _: &mut ResponseHeadersValue| {
+                                name == CONTENT_LENGTH || !name.eq_ignore_ascii_case(CONTENT_LENGTH)
+                            },
+                        );
                         let body_len: usize = compressed_body
                             .as_ref()
                             .map_or_else(|| self.get_body().len(), Vec::len);
@@ -19410,8 +22319,14 @@ impl Response {
                     .sum::<usize>()
             })
             .sum::<usize>();
+        let raw_version: &str = self.get_version().as_str();
+        let version_str: &str = if Self::is_valid_http_version(raw_version) {
+            raw_version
+        } else {
+            HTTP_VERSION_1_1
+        };
         let mut response_bytes: Vec<u8> = Vec::with_capacity(head_size + body.len());
-        response_bytes.extend_from_slice(self.get_version().as_str().as_bytes());
+        response_bytes.extend_from_slice(version_str.as_bytes());
         response_bytes.push(b' ');
         let mut code: [u8; B_20] = [0; B_20];
         response_bytes.extend_from_slice(render_length(status_code, &mut code).as_bytes());
@@ -19422,8 +22337,13 @@ impl Response {
             .iter()
             .for_each(|header_entry: (&String, &VecDeque<String>)| {
                 let (header_key, header_values): (&String, &VecDeque<String>) = header_entry;
+                if !Self::is_valid_header_name(header_key) {
+                    return;
+                }
                 for header_value in header_values.iter() {
-                    Self::push_header(&mut response_bytes, header_key, header_value);
+                    if Self::is_valid_header_value(header_value) {
+                        Self::push_header(&mut response_bytes, header_key, header_value);
+                    }
                 }
             });
         response_bytes.extend_from_slice(HTTP_BR.as_bytes());
@@ -19485,8 +22405,18 @@ pub enum ResponseError {
 use super::*;
 pub(crate) static DEFAULT_CONTENT_TYPE: OnceLock<String> = OnceLock::new();
 ```
+# Path: hyperlane/type/src/response/const.rs
+```rust
+pub(crate) const FAST_HTTP11_200_CL_PREFIX: &[u8] = b"HTTP/1.1 200 OK\r\ncontent-length:";
+pub(crate) const FAST_HTTP2_200_CL_PREFIX: &[u8] = b"HTTP/2 200 OK\r\ncontent-length:";
+pub(crate) const FAST_HTTP3_200_CL_PREFIX: &[u8] = b"HTTP/3 200 OK\r\ncontent-length:";
+pub(crate) const FAST_DEFAULT_HEADERS_SUFFIX: &[u8] =
+    b"\r\nconnection:keep-alive\r\ncontent-type:text/html; charset=utf-8\r\n\r\n";
+pub(crate) const FAST_CL_PREFIX: &[u8] = b"\r\ncontent-length:";
+```
 # Path: hyperlane/type/src/response/mod.rs
 ```rust
+mod r#const;
 mod r#enum;
 mod r#fn;
 mod r#impl;
@@ -19494,7 +22424,7 @@ mod r#static;
 mod r#struct;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
-pub(crate) use {r#fn::*, r#static::*};
+pub(crate) use {r#const::*, r#fn::*, r#static::*};
 use super::*;
 ```
 # Path: hyperlane/type/src/response/struct.rs
@@ -19599,6 +22529,18 @@ pub type Cookies = HashMapXxHash3_64<CookieKey, CookieValue>;
 # Path: hyperlane/type/src/cookie/impl.rs
 ```rust
 use super::*;
+impl Error for CookieError {}
+impl Display for CookieError {
+    #[inline(always)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidName => write!(f, "Invalid cookie name"),
+            Self::InvalidValue => write!(f, "Invalid cookie value"),
+            Self::InvalidAttribute => write!(f, "Invalid cookie attribute"),
+            Self::Unknown => write!(f, "Unknown cookie error"),
+        }
+    }
+}
 impl CookieBuilder {
     #[inline(always)]
     pub fn new<N, V>(name: N, value: V) -> Self
@@ -19633,12 +22575,9 @@ impl CookieBuilder {
                 let name: &str = name.trim();
                 let value: &str = value.trim();
                 if is_cookie_name_valid(name) && !value.bytes().any(is_control_byte) {
-                    cookie_builder.name = name.to_owned();
-                    cookie_builder.value = value.to_owned();
+                    cookie_builder.set_name(name);
+                    cookie_builder.set_value(value);
                 }
-            } else if is_cookie_name_valid(name_value_pair) {
-                cookie_builder.name = name_value_pair.to_owned();
-                cookie_builder.value = String::new();
             }
         }
         for part in parts.iter().skip(1) {
@@ -19830,10 +22769,10 @@ impl Cookie {
                 let name: &str = name.trim();
                 let value: &str = value.trim();
                 if is_cookie_name_valid(name) && !value.bytes().any(is_control_byte) {
-                    cookies.insert(name.to_owned(), value.to_owned());
+                    cookies
+                        .entry(name.to_owned())
+                        .or_insert_with(|| value.to_owned());
                 }
-            } else if is_cookie_name_valid(part) {
-                cookies.insert(part.to_owned(), String::new());
             }
         }
         cookies
@@ -19955,7 +22894,9 @@ impl Default for Task {
 impl Drop for Task {
     #[inline(always)]
     fn drop(&mut self) {
-        self.shutdown();
+        if Arc::strong_count(self.get_counter()) == 1 {
+            self.shutdown();
+        }
     }
 }
 impl Task {
@@ -20005,7 +22946,7 @@ impl Task {
             return false;
         }
         let index: usize = index_opt
-            .unwrap_or(self.get_counter().fetch_add(1, atomic::Ordering::Relaxed))
+            .unwrap_or_else(|| self.get_counter().fetch_add(1, atomic::Ordering::Relaxed))
             .wrapping_rem(self.get_pool().len());
         if let Some(sender) = self.get_pool().get(index) {
             let result: bool = sender.send(Box::pin(hook)).is_ok();
@@ -20213,6 +23154,18 @@ impl AsyncBufRead for PooledReader<'_> {
         this.set_start(new_start);
     }
 }
+impl Default for WebSocketReadState {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            buffer: Vec::new(),
+            cursor: 0,
+            full_frame: Vec::new(),
+            fragment_opcode: None,
+            is_client_response: true,
+        }
+    }
+}
 impl Stream {
     pub fn from_transport<T>(transport: T, request_config: RequestConfig, closed: bool) -> Self
     where
@@ -20228,6 +23181,7 @@ impl Stream {
             line_buffer: String::new(),
             header_line_buffer: String::new(),
             websocket_state: None,
+            read_timer: None,
         }
     }
     pub fn new(stream: TcpStream, request_config: RequestConfig, closed: bool) -> Self {
@@ -20273,7 +23227,10 @@ impl Stream {
             Pin::new(&mut reader).poll_fill_buf(cx).map_ok(<[u8]>::len)
         })
         .await?;
-        let fast_framing: Option<RequestFraming> = if filled_len > 0 {
+        if filled_len == 0 {
+            return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
+        }
+        let fast_framing: Option<RequestFraming> = {
             let slice: &[u8] = &reader.get_buffer()[reader.get_start()..reader.get_end()];
             match request.parse_http_head_from_slice(slice, &config, line_buffer)? {
                 Some((framing, consumed)) => {
@@ -20282,21 +23239,39 @@ impl Stream {
                 }
                 None => None,
             }
-        } else {
-            None
         };
         let framing: RequestFraming = match fast_framing {
             Some(framing) => framing,
             None => {
-                line_buffer.clear();
-                AsyncBufReadExt::read_line(&mut reader, line_buffer).await?;
+                let max_request_line: usize = if max_path_size == DEFAULT_LOW_SECURITY_MAX_PATH_SIZE
+                {
+                    usize::MAX
+                } else {
+                    max_path_size.saturating_add(HTTP_REQUEST_LINE_OVERHEAD)
+                };
+                let line_len: usize = read_http_line_bounded(
+                    &mut reader,
+                    line_buffer,
+                    max_request_line,
+                    RequestError::RequestTooLong(HttpStatus::URITooLong),
+                )
+                .await?;
+                if line_len == 0 {
+                    return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
+                }
                 let (method, path, version): (RequestMethod, &str, RequestVersion) =
                     Request::get_http_first_line(line_buffer)?;
                 Request::check_http_path_size(path, max_path_size)?;
-                let hash_index: Option<usize> = path.find(HASH);
-                let query_index: Option<usize> = path.find(QUERY);
+                let (query_index, hash_index): (Option<usize>, Option<usize>) =
+                    Request::find_path_separators(path);
                 let query: &str = Request::get_http_query(path, query_index, hash_index);
-                Request::fill_http_querys(query, request.get_mut_querys());
+                let max_query_count: usize = if max_path_size == DEFAULT_LOW_SECURITY_MAX_PATH_SIZE
+                {
+                    usize::MAX
+                } else {
+                    HTTP_MAX_QUERY_PARAM_COUNT
+                };
+                Request::fill_http_querys(query, request.get_mut_querys(), max_query_count)?;
                 let path_slice: &str = Request::get_http_path(path, query_index, hash_index);
                 request.get_mut_path().push_str(path_slice);
                 request.set_version(version);
@@ -20360,11 +23335,20 @@ impl Stream {
             return self.fill_http_from_stream(request).await;
         }
         let duration: Duration = Duration::from_millis(timeout_ms);
-        let mut reading: Pin<&mut _> = pin!(self.fill_http_from_stream(request));
-        if let Some(result) = poll_once(reading.as_mut()).await {
-            return result;
+        let mut timer_slot: Option<Pin<Box<Sleep>>> = {
+            let Stream { read_timer, .. } = self;
+            read_timer.take()
+        };
+        let outcome: Option<Result<(), RequestError>> = {
+            let mut reading: Pin<&mut _> = pin!(self.fill_http_from_stream(request));
+            poll_with_timeout(reading.as_mut(), &mut timer_slot, duration).await
+        };
+        let Stream { read_timer, .. } = self;
+        *read_timer = timer_slot;
+        match outcome {
+            Some(result) => result,
+            None => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
         }
-        timeout(duration, reading).await?
     }
     pub async fn try_get_http_request(&mut self) -> Result<Request, RequestError> {
         let mut request: Request = Request::default();
@@ -20398,10 +23382,24 @@ impl Stream {
                 Some(Duration::from_millis(adjusted_timeout_ms))
             };
         loop {
-            let parsed: Result<Option<RequestBody>, RequestError> =
+            let parsed: Result<WebSocketParseStep, RequestError> =
                 self.try_parse_websocket_request();
-            if let Some(body) = self.reset_websocket_state_on_error(parsed)? {
-                return Ok(body);
+            match self.reset_websocket_state_on_error(parsed)? {
+                WebSocketParseStep::Message(body) => return Ok(body),
+                WebSocketParseStep::Ping(payload) => {
+                    let mut pong: Vec<u8> = Vec::with_capacity(2 + payload.len());
+                    pong.push(0x8A);
+                    pong.push(payload.len() as u8);
+                    pong.extend_from_slice(&payload);
+                    let send_result: Result<(), RequestError> =
+                        self.try_send(&pong).await.map_err(Into::into);
+                    self.reset_websocket_state_on_error(send_result)?;
+                    let flush_result: Result<(), RequestError> =
+                        self.try_flush().await.map_err(Into::into);
+                    self.reset_websocket_state_on_error(flush_result)?;
+                    continue;
+                }
+                WebSocketParseStep::NeedMore => {}
             }
             let read: Result<Option<usize>, RequestError> =
                 self.get_websocket_from_stream(duration_opt).await;
@@ -20422,48 +23420,136 @@ impl Stream {
         }
         result
     }
-    fn try_parse_websocket_request(&mut self) -> Result<Option<RequestBody>, RequestError> {
+    fn try_parse_websocket_request(&mut self) -> Result<WebSocketParseStep, RequestError> {
+        let max_body_size: usize = self.get_request_config().get_max_body_size();
         let state: &mut WebSocketReadState = self.get_mut_websocket_state().as_deref_mut().ok_or(
             RequestError::IncompleteWebSocketFrame(HttpStatus::BadRequest),
         )?;
         let WebSocketReadState {
             buffer,
+            cursor,
             full_frame,
+            fragment_opcode,
             is_client_response,
         }: &mut WebSocketReadState = state;
-        while let Some((frame, consumed)) = WebSocketFrame::decode_ws_frame(&buffer[..]) {
+        while let Some((frame, consumed)) =
+            WebSocketFrame::decode_ws_frame_checked(&buffer[*cursor..], max_body_size)?
+        {
             *is_client_response = true;
-            buffer.drain(..consumed);
-            if buffer.is_empty() {
+            *cursor += consumed;
+            if *cursor >= buffer.len() {
+                *cursor = 0;
                 let mut recycled: Vec<u8> = mem::take(buffer);
                 recycled.resize(recycled.capacity().min(MAX_POOLED_READ_BUFFER_SIZE), 0);
                 return_read_buffer(recycled);
+            } else if *cursor >= MAX_POOLED_READ_BUFFER_SIZE {
+                buffer.drain(..*cursor);
+                *cursor = 0;
             }
             match frame.get_opcode() {
                 WebSocketOpcode::Close => {
+                    let payload: &[u8] = frame.get_payload_data();
+                    if payload.len() == 1 {
+                        return Err(RequestError::WebSocketInvalidCloseCode(
+                            HttpStatus::BadRequest,
+                        ));
+                    }
+                    if payload.len() >= 2 {
+                        let code: u16 = u16::from_be_bytes([payload[0], payload[1]]);
+                        let is_std_close: bool =
+                            (1000..=1003).contains(&code) || (1007..=1011).contains(&code);
+                        let valid_code: bool = is_std_close || (3000..=4999).contains(&code);
+                        if !valid_code {
+                            return Err(RequestError::WebSocketInvalidCloseCode(
+                                HttpStatus::BadRequest,
+                            ));
+                        }
+                        if from_utf8(&payload[2..]).is_err() {
+                            return Err(RequestError::WebSocketInvalidUtf8(HttpStatus::BadRequest));
+                        }
+                    }
                     return Err(RequestError::ClientClosedConnection(HttpStatus::BadRequest));
                 }
-                WebSocketOpcode::Ping | WebSocketOpcode::Pong => continue,
+                WebSocketOpcode::Ping => {
+                    let WebSocketFrame { payload_data, .. }: WebSocketFrame = frame;
+                    return Ok(WebSocketParseStep::Ping(payload_data));
+                }
+                WebSocketOpcode::Pong => continue,
                 WebSocketOpcode::Text | WebSocketOpcode::Binary => {
-                    if frame.get_fin() && full_frame.is_empty() {
-                        let WebSocketFrame { payload_data, .. }: WebSocketFrame = frame;
-                        return Ok(Some(payload_data));
+                    if fragment_opcode.is_some() {
+                        return Err(RequestError::WebSocketPayloadCorrupted(
+                            HttpStatus::BadRequest,
+                        ));
                     }
-                    if let Some(body) = frame.build_full_frame(full_frame)? {
-                        return Ok(Some(body));
+                    let is_text: bool = frame.is_text_opcode();
+                    if frame.get_fin() {
+                        let WebSocketFrame { payload_data, .. }: WebSocketFrame = frame;
+                        if is_text && from_utf8(&payload_data).is_err() {
+                            return Err(RequestError::WebSocketInvalidUtf8(HttpStatus::BadRequest));
+                        }
+                        return Ok(WebSocketParseStep::Message(payload_data));
+                    }
+                    let opcode: WebSocketOpcode = *frame.get_opcode();
+                    let payload: &[u8] = frame.get_payload_data();
+                    if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
+                        && payload.len() > max_body_size
+                    {
+                        return Err(RequestError::WebSocketFrameTooLarge(
+                            HttpStatus::PayloadTooLarge,
+                        ));
+                    }
+                    full_frame.clear();
+                    full_frame.extend_from_slice(payload);
+                    *fragment_opcode = Some(opcode);
+                }
+                WebSocketOpcode::Continuation => {
+                    let Some(active_opcode) = fragment_opcode.as_ref() else {
+                        return Err(RequestError::WebSocketPayloadCorrupted(
+                            HttpStatus::BadRequest,
+                        ));
+                    };
+                    let is_text: bool = active_opcode.is_text();
+                    let payload: &[u8] = frame.get_payload_data();
+                    if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
+                        && payload.len() > max_body_size.saturating_sub(full_frame.len())
+                    {
+                        return Err(RequestError::WebSocketFrameTooLarge(
+                            HttpStatus::PayloadTooLarge,
+                        ));
+                    }
+                    full_frame.extend_from_slice(payload);
+                    if frame.get_fin() {
+                        *fragment_opcode = None;
+                        let body: RequestBody = mem::take(full_frame);
+                        if is_text && from_utf8(&body).is_err() {
+                            return Err(RequestError::WebSocketInvalidUtf8(HttpStatus::BadRequest));
+                        }
+                        return Ok(WebSocketParseStep::Message(body));
                     }
                 }
-                _ => {
+                WebSocketOpcode::Reserved(_) => {
                     return Err(RequestError::WebSocketOpcodeUnsupported(
                         HttpStatus::NotImplemented,
                     ));
                 }
             }
         }
-        Ok(None)
+        Ok(WebSocketParseStep::NeedMore)
     }
     fn poll_websocket_read(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<usize>> {
         let capacity: usize = self.get_request_config().get_buffer_size();
+        let max_body_size: usize = self.get_request_config().get_max_body_size();
+        if let Some(state) = self.try_get_websocket_state().as_deref() {
+            let unread: usize = state.get_buffer().len().saturating_sub(state.get_cursor());
+            if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
+                && unread > max_body_size.saturating_add(14)
+            {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    WEBSOCKET_FRAME_TOO_LARGE_ERROR,
+                )));
+            }
+        }
         let mut temporary: Vec<u8> = take_read_buffer(capacity);
         let mut read_buffer: ReadBuf<'_> = ReadBuf::new(&mut temporary[..capacity]);
         match Pin::new(&mut **self.get_mut_stream()).poll_read(cx, &mut read_buffer) {
@@ -20481,6 +23567,14 @@ impl Stream {
                             )));
                         }
                     };
+                let cursor: usize = state.get_cursor();
+                if cursor >= state.get_buffer().len() {
+                    state.set_cursor(0);
+                    state.get_mut_buffer().clear();
+                } else if cursor > 0 {
+                    state.get_mut_buffer().drain(..cursor);
+                    state.set_cursor(0);
+                }
                 if state.get_buffer().is_empty() {
                     mem::swap(state.get_mut_buffer(), &mut temporary);
                 } else {
@@ -20577,6 +23671,15 @@ impl Stream {
     }
 }
 ```
+# Path: hyperlane/type/src/stream/enum.rs
+```rust
+use super::*;
+pub(crate) enum WebSocketParseStep {
+    NeedMore,
+    Message(RequestBody),
+    Ping(Vec<u8>),
+}
+```
 # Path: hyperlane/type/src/stream/static.rs
 ```rust
 use super::*;
@@ -20592,6 +23695,7 @@ use super::*;
 pub(crate) const HTTP_QUOTED_FIELD_QUOTE: u8 = b'"';
 pub(crate) const HTTP_QUOTED_FIELD_ESCAPE: u8 = b'\\';
 pub(crate) const WEBSOCKET_STATE_ERROR: &str = "WebSocket state must be initialized";
+pub(crate) const WEBSOCKET_FRAME_TOO_LARGE_ERROR: &str = "WebSocket frame exceeds max body size";
 pub(super) const HTTP_CONTINUE_RESPONSE: &[u8] = b"HTTP/1.1 100 Continue\r\n\r\n";
 pub(crate) const MAX_POOLED_HEADER_ENTRIES: usize = B_128;
 pub(crate) const MAX_POOLED_HEADER_STRING_CAPACITY: usize = 4 * 1024;
@@ -20600,6 +23704,7 @@ pub(crate) const MAX_POOLED_HEADER_VALUE_CAPACITY: usize = B_4;
 # Path: hyperlane/type/src/stream/mod.rs
 ```rust
 mod r#const;
+mod r#enum;
 mod r#fn;
 mod r#impl;
 mod r#static;
@@ -20607,7 +23712,7 @@ mod r#struct;
 mod r#trait;
 mod r#type;
 pub use {r#struct::*, r#trait::*, r#type::*};
-pub(crate) use {r#const::*, r#fn::*, r#static::*};
+pub(crate) use {r#const::*, r#enum::*, r#fn::*, r#static::*};
 use super::*;
 ```
 # Path: hyperlane/type/src/stream/struct.rs
@@ -20643,17 +23748,29 @@ pub struct Stream {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) websocket_state: Option<Box<WebSocketReadState>>,
+    #[get(skip)]
+    #[get_mut(skip)]
+    #[set(skip)]
+    pub(super) read_timer: Option<Pin<Box<Sleep>>>,
 }
-#[derive(Clone, Data, Debug, Default)]
+#[derive(Clone, Data, Debug)]
 pub(super) struct WebSocketReadState {
     #[get(pub(super), type(ref))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) buffer: Vec<u8>,
+    #[get(pub(super), type(copy))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) cursor: usize,
     #[get(pub(super))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) full_frame: Vec<u8>,
+    #[get(pub(super), type(ref))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) fragment_opcode: Option<WebSocketOpcode>,
     #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
@@ -20790,16 +23907,42 @@ where
         }
     });
 }
-pub(crate) async fn poll_once<F>(mut future: Pin<&mut F>) -> Option<F::Output>
+pub(crate) async fn poll_with_timeout<F>(
+    mut future: Pin<&mut F>,
+    timer_slot: &mut Option<Pin<Box<Sleep>>>,
+    duration: Duration,
+) -> Option<F::Output>
 where
     F: Future,
 {
-    future::poll_fn(
-        |context: &mut Context<'_>| match future.as_mut().poll(context) {
-            Poll::Ready(value) => Poll::Ready(Some(value)),
-            Poll::Pending => Poll::Ready(None),
-        },
-    )
+    let mut exact_deadline: Option<Instant> = None;
+    future::poll_fn(|context: &mut Context<'_>| {
+        if let Poll::Ready(value) = future.as_mut().poll(context) {
+            return Poll::Ready(Some(value));
+        }
+        let deadline: Instant = *exact_deadline.get_or_insert_with(|| Instant::now() + duration);
+        let timer: &mut Pin<Box<Sleep>> = match timer_slot {
+            Some(existing) => {
+                if existing.deadline() > deadline {
+                    existing.as_mut().reset(deadline);
+                }
+                existing
+            }
+            None => timer_slot.insert(Box::pin(sleep_until(deadline))),
+        };
+        loop {
+            match timer.as_mut().poll(context) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(()) => {
+                    if Instant::now() < deadline {
+                        timer.as_mut().reset(deadline);
+                        continue;
+                    }
+                    return Poll::Ready(None);
+                }
+            }
+        }
+    })
     .await
 }
 pub(crate) fn take_read_buffer(capacity: usize) -> Vec<u8> {
@@ -21485,90 +24628,54 @@ impl Request {
     pub(crate) fn get_http_first_line(
         line: &str,
     ) -> Result<(RequestMethod, &str, RequestVersion), RequestError> {
-        let (method_str, full_path, version_str): (&str, &str, &str) = if line.is_ascii() {
-            let bytes: &[u8] = line.as_bytes();
-            let mut idx: usize = 0;
-            let len: usize = bytes.len();
-            while idx < len && bytes[idx].is_ascii_whitespace() {
-                idx += 1;
-            }
-            let m_start: usize = idx;
-            while idx < len && !bytes[idx].is_ascii_whitespace() {
-                idx += 1;
-            }
-            if m_start == idx {
-                return Err(RequestError::HttpRequestPartsInsufficient(
-                    HttpStatus::BadRequest,
-                ));
-            }
-            let m_end: usize = idx;
-            while idx < len && bytes[idx].is_ascii_whitespace() {
-                idx += 1;
-            }
-            let p_start: usize = idx;
-            while idx < len && !bytes[idx].is_ascii_whitespace() {
-                idx += 1;
-            }
-            if p_start == idx {
-                return Err(RequestError::HttpRequestPartsInsufficient(
-                    HttpStatus::BadRequest,
-                ));
-            }
-            let p_end: usize = idx;
-            while idx < len && bytes[idx].is_ascii_whitespace() {
-                idx += 1;
-            }
-            let v_start: usize = idx;
-            while idx < len && !bytes[idx].is_ascii_whitespace() {
-                idx += 1;
-            }
-            if v_start == idx {
-                return Err(RequestError::HttpRequestPartsInsufficient(
-                    HttpStatus::BadRequest,
-                ));
-            }
-            let v_end: usize = idx;
-            while idx < len && bytes[idx].is_ascii_whitespace() {
-                idx += 1;
-            }
-            if idx != len {
-                return Err(RequestError::HttpRequestPartsInsufficient(
-                    HttpStatus::BadRequest,
-                ));
-            }
-            (
-                &line[m_start..m_end],
-                &line[p_start..p_end],
-                &line[v_start..v_end],
-            )
-        } else {
-            let mut parts: SplitWhitespace<'_> = line.split_whitespace();
-            let method_str: &str =
-                parts
-                    .next()
-                    .ok_or(RequestError::HttpRequestPartsInsufficient(
-                        HttpStatus::BadRequest,
-                    ))?;
-            let full_path: &str =
-                parts
-                    .next()
-                    .ok_or(RequestError::HttpRequestPartsInsufficient(
-                        HttpStatus::BadRequest,
-                    ))?;
-            let version_str: &str =
-                parts
-                    .next()
-                    .ok_or(RequestError::HttpRequestPartsInsufficient(
-                        HttpStatus::BadRequest,
-                    ))?;
-            if parts.next().is_some() {
-                return Err(RequestError::HttpRequestPartsInsufficient(
-                    HttpStatus::BadRequest,
-                ));
-            }
-            (method_str, full_path, version_str)
+        let trimmed_lf: &str = line.strip_suffix(HTTP_HEADER_LINE_FEED).unwrap_or(line);
+        let raw: &str = trimmed_lf
+            .strip_suffix(HTTP_HEADER_CARRIAGE_RETURN)
+            .unwrap_or(trimmed_lf);
+        let bytes: &[u8] = raw.as_bytes();
+        if bytes.is_empty() || bytes[0] == SPACE_U8 {
+            return Err(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ));
+        }
+        let Some(first_sp) = bytes.iter().position(|byte: &u8| *byte == SPACE_U8) else {
+            return Err(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ));
         };
-        let method: RequestMethod = match method_str.as_bytes() {
+        let rest_after_method: &[u8] = &bytes[first_sp + 1..];
+        let Some(rel_second_sp) = rest_after_method
+            .iter()
+            .position(|byte: &u8| *byte == SPACE_U8)
+        else {
+            return Err(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ));
+        };
+        let second_sp: usize = first_sp + 1 + rel_second_sp;
+        let method_bytes: &[u8] = &bytes[..first_sp];
+        let path_bytes: &[u8] = &bytes[first_sp + 1..second_sp];
+        let version_bytes: &[u8] = &bytes[second_sp + 1..];
+        if method_bytes.is_empty()
+            || path_bytes.is_empty()
+            || version_bytes.is_empty()
+            || version_bytes.contains(&SPACE_U8)
+        {
+            return Err(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ));
+        }
+        if path_bytes
+            .iter()
+            .any(|byte: &u8| *byte <= SPACE_U8 || *byte == HTTP_HEADER_DELETE)
+        {
+            return Err(RequestError::HttpRequestPartsInsufficient(
+                HttpStatus::BadRequest,
+            ));
+        }
+        let method_str: &str = &raw[..first_sp];
+        let full_path: &str = &raw[first_sp + 1..second_sp];
+        let method: RequestMethod = match method_bytes {
             WIRE_METHOD_GET => Method::Get,
             WIRE_METHOD_POST => Method::Post,
             WIRE_METHOD_PUT => Method::Put,
@@ -21578,24 +24685,42 @@ impl Request {
             WIRE_METHOD_PATCH => Method::Patch,
             WIRE_METHOD_CONNECT => Method::Connect,
             WIRE_METHOD_TRACE => Method::Trace,
-            _ => Method::Unknown(method_str.to_owned()),
-        };
-        let version: RequestVersion = match version_str.as_bytes() {
-            WIRE_VERSION_1_1 => HttpVersion::Http1_1,
-            WIRE_VERSION_1_0 => HttpVersion::Http1_0,
-            WIRE_VERSION_0_9 => HttpVersion::Http0_9,
-            WIRE_VERSION_2 => HttpVersion::Http2,
-            WIRE_VERSION_3 => HttpVersion::Http3,
-            _ => match version_str.parse::<RequestVersion>() {
-                Ok(RequestVersion::Unknown(_)) | Err(_) => {
+            _ => {
+                if !method_bytes
+                    .iter()
+                    .all(|byte: &u8| HTTP_HEADER_TOKEN_TABLE[*byte as usize])
+                {
                     return Err(RequestError::HttpRequestPartsInsufficient(
                         HttpStatus::BadRequest,
                     ));
                 }
-                Ok(version) => version,
-            },
+                Method::Unknown(method_str.to_owned())
+            }
+        };
+        let version: RequestVersion = match version_bytes {
+            WIRE_VERSION_1_1 => HttpVersion::Http1_1,
+            WIRE_VERSION_1_0 => HttpVersion::Http1_0,
+            _ => {
+                return Err(RequestError::HttpRequestPartsInsufficient(
+                    HttpStatus::BadRequest,
+                ));
+            }
         };
         Ok((method, full_path, version))
+    }
+    #[inline(always)]
+    pub(crate) fn find_path_separators(path: &str) -> (Option<usize>, Option<usize>) {
+        let mut query_index: Option<usize> = None;
+        let mut hash_index: Option<usize> = None;
+        for (idx, byte) in path.bytes().enumerate() {
+            if byte == b'?' && query_index.is_none() && hash_index.is_none() {
+                query_index = Some(idx);
+            } else if byte == b'#' {
+                hash_index = Some(idx);
+                break;
+            }
+        }
+        (query_index, hash_index)
     }
     #[inline(always)]
     pub(crate) fn check_http_path_size(path: &str, max_size: usize) -> Result<(), RequestError> {
@@ -21610,13 +24735,10 @@ impl Request {
         query_index: Option<usize>,
         hash_index: Option<usize>,
     ) -> &str {
-        query_index.map_or(EMPTY_STR, |query_index: usize| {
-            let temp: &str = &path[query_index + 1..];
-            match hash_index {
-                None => temp,
-                Some(hash_index) if hash_index <= query_index => temp,
-                Some(hash_index) => &temp[..hash_index - query_index - 1],
-            }
+        query_index.map_or(EMPTY_STR, |query_index: usize| match hash_index {
+            None => &path[query_index + 1..],
+            Some(hash_index) if hash_index < query_index => EMPTY_STR,
+            Some(hash_index) => &path[query_index + 1..hash_index],
         })
     }
     #[inline(always)]
@@ -21625,19 +24747,34 @@ impl Request {
         query_index: Option<usize>,
         hash_index: Option<usize>,
     ) -> &str {
-        match query_index.or(hash_index) {
-            Some(separator_index) => &path[..separator_index],
+        let separator_index: Option<usize> = match (query_index, hash_index) {
+            (Some(q), Some(h)) => Some(q.min(h)),
+            (Some(q), None) => Some(q),
+            (None, Some(h)) => Some(h),
+            (None, None) => None,
+        };
+        match separator_index {
+            Some(index) => &path[..index],
             None => path,
         }
     }
     #[inline(always)]
-    pub(crate) fn fill_http_querys(query: &str, querys: &mut RequestQuerys) {
+    pub(crate) fn fill_http_querys(
+        query: &str,
+        querys: &mut RequestQuerys,
+        max_count: usize,
+    ) -> Result<(), RequestError> {
         if query.is_empty() {
-            return;
+            return Ok(());
         }
+        let mut count: usize = 0;
         for pair in query.split(AND) {
             if let Some((key, value)) = pair.split_once(EQUAL) {
                 if !key.is_empty() {
+                    count += 1;
+                    if count > max_count {
+                        return Err(RequestError::QueryTooLong(HttpStatus::URITooLong));
+                    }
                     if let Some(existing) = querys.get_mut(key) {
                         existing.push_back(value.to_owned());
                     } else {
@@ -21658,6 +24795,10 @@ impl Request {
                     }
                 }
             } else if !pair.is_empty() && !querys.contains_key(pair) {
+                count += 1;
+                if count > max_count {
+                    return Err(RequestError::QueryTooLong(HttpStatus::URITooLong));
+                }
                 let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
                     take_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
                 pooled_key.clear();
@@ -21666,6 +24807,7 @@ impl Request {
                 querys.insert(pooled_key, pooled_values);
             }
         }
+        Ok(())
     }
     #[inline(always)]
     pub(crate) fn check_http_header_count(
@@ -21737,11 +24879,17 @@ impl Request {
         line_buffer.push_str(first_line);
         let (method, full_path, version): (RequestMethod, &str, RequestVersion) =
             Self::get_http_first_line(first_line)?;
-        Self::check_http_path_size(full_path, config.get_max_path_size())?;
-        let hash_index: Option<usize> = full_path.find(HASH);
-        let query_index: Option<usize> = full_path.find(QUERY);
+        let max_path_size: usize = config.get_max_path_size();
+        Self::check_http_path_size(full_path, max_path_size)?;
+        let (query_index, hash_index): (Option<usize>, Option<usize>) =
+            Self::find_path_separators(full_path);
         let query: &str = Self::get_http_query(full_path, query_index, hash_index);
-        Self::fill_http_querys(query, self.get_mut_querys());
+        let max_query_count: usize = if max_path_size == DEFAULT_LOW_SECURITY_MAX_PATH_SIZE {
+            usize::MAX
+        } else {
+            HTTP_MAX_QUERY_PARAM_COUNT
+        };
+        Self::fill_http_querys(query, self.get_mut_querys(), max_query_count)?;
         let path_slice: &str = Self::get_http_path(full_path, query_index, hash_index);
         self.get_mut_path().push_str(path_slice);
         self.set_version(version);
@@ -21840,7 +24988,7 @@ impl Request {
                     Self::check_http_header_value_size(value, max_header_value_size)?;
                     match key.len() {
                         4 if key.eq_ignore_ascii_case(HOST) => {
-                            if host_seen {
+                            if host_seen || !is_valid_http_host(value) {
                                 return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                             }
                             host_seen = true;
@@ -21913,9 +25061,27 @@ impl Request {
         let mut content_length_seen: bool = false;
         let mut transfer_encoding_seen: bool = false;
         let mut host_seen: bool = false;
+        let max_header_line: usize = if max_header_key_size
+            == DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+            || max_header_value_size == DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
+        {
+            usize::MAX
+        } else {
+            max_header_key_size
+                .saturating_add(max_header_value_size)
+                .saturating_add(HTTP_HEADER_LINE_OVERHEAD)
+        };
         loop {
-            header_line_buffer.clear();
-            AsyncBufReadExt::read_line(reader, header_line_buffer).await?;
+            let line_len: usize = read_http_line_bounded(
+                reader,
+                header_line_buffer,
+                max_header_line,
+                RequestError::HeaderLineTooLong(HttpStatus::RequestHeaderFieldsTooLarge),
+            )
+            .await?;
+            if line_len == 0 {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
             let header_line: &str = header_line_buffer
                 .strip_suffix(HTTP_HEADER_LINE_FEED)
                 .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
@@ -21956,7 +25122,7 @@ impl Request {
                     transfer_encoding_seen = true;
                 }
                 key if key.eq_ignore_ascii_case(HOST) => {
-                    if host_seen {
+                    if host_seen || !is_valid_http_host(value) {
                         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                     }
                     host_seen = true;
@@ -22005,91 +25171,36 @@ impl Request {
         has_upper: bool,
         value: &str,
     ) {
-        if !has_upper {
-            if let Some(existing) = headers.get_mut(key) {
-                existing.push_back(value.to_owned());
-                return;
-            }
-            let (mut name, mut values): (String, VecDeque<String>) = pool
-                .pop()
-                .unwrap_or_else(|| (String::new(), VecDeque::new()));
-            name.clear();
-            name.push_str(key);
-            while values.len() > 1 {
-                values.pop_back();
-            }
-            if let Some(slot) = values.front_mut() {
-                slot.clear();
-                slot.push_str(value);
-            } else {
-                values.push_back(value.to_owned());
-            }
-            headers.insert(name, values);
-            return;
-        }
-        if key.len() <= STACK_HEADER_KEY_LIMIT {
-            let mut stack_buf: [MaybeUninit<u8>; STACK_HEADER_KEY_LIMIT] =
-                [const { MaybeUninit::uninit() }; STACK_HEADER_KEY_LIMIT];
-            let key_bytes: &[u8] = key.as_bytes();
-            let mut idx: usize = 0;
-            while idx < key_bytes.len() {
-                stack_buf[idx].write(key_bytes[idx].to_ascii_lowercase());
-                idx += 1;
-            }
-            let lower: &str = unsafe {
-                from_utf8_unchecked(slice::from_raw_parts(
-                    stack_buf.as_ptr().cast::<u8>(),
-                    key_bytes.len(),
-                ))
-            };
-            if let Some(existing) = headers.get_mut(lower) {
-                existing.push_back(value.to_owned());
-                return;
-            }
-            let (mut name, mut values): (String, VecDeque<String>) = pool
-                .pop()
-                .unwrap_or_else(|| (String::new(), VecDeque::new()));
-            name.clear();
-            name.push_str(lower);
-            while values.len() > 1 {
-                values.pop_back();
-            }
-            if let Some(slot) = values.front_mut() {
-                slot.clear();
-                slot.push_str(value);
-            } else {
-                values.push_back(value.to_owned());
-            }
-            headers.insert(name, values);
-            return;
-        }
         let (mut name, mut values): (String, VecDeque<String>) = pool
             .pop()
             .unwrap_or_else(|| (String::new(), VecDeque::new()));
         name.clear();
-        for ch in key.chars() {
-            name.push(ch.to_ascii_lowercase());
+        name.push_str(key);
+        if has_upper {
+            name.make_ascii_lowercase();
         }
-        if let Some(existing) = headers.get_mut(&name) {
-            existing.push_back(value.to_owned());
-            if name.capacity() <= MAX_POOLED_HEADER_STRING_CAPACITY
-                && values.capacity() <= MAX_POOLED_HEADER_VALUE_CAPACITY
-                && pool.len() < MAX_POOLED_HEADER_ENTRIES
-            {
-                pool.push((name, values));
+        match headers.entry(name) {
+            Entry::Occupied(mut occupied) => {
+                occupied.get_mut().push_back(value.to_owned());
+                if values.capacity() <= MAX_POOLED_HEADER_VALUE_CAPACITY
+                    && pool.len() < MAX_POOLED_HEADER_ENTRIES
+                {
+                    pool.push((String::new(), values));
+                }
             }
-            return;
+            Entry::Vacant(vacant) => {
+                while values.len() > 1 {
+                    values.pop_back();
+                }
+                if let Some(slot) = values.front_mut() {
+                    slot.clear();
+                    slot.push_str(value);
+                } else {
+                    values.push_back(value.to_owned());
+                }
+                vacant.insert(values);
+            }
         }
-        while values.len() > 1 {
-            values.pop_back();
-        }
-        if let Some(slot) = values.front_mut() {
-            slot.clear();
-            slot.push_str(value);
-        } else {
-            values.push_back(value.to_owned());
-        }
-        headers.insert(name, values);
     }
     fn insert_http_header(headers: &mut RequestHeaders, key: &str, value: &str) {
         let (mut name, mut values): (String, VecDeque<String>) =
@@ -22127,9 +25238,24 @@ impl Request {
         R: AsyncRead + Unpin,
     {
         body.clear();
-        if content_size > 0 {
-            body.resize(content_size, 0);
-            AsyncReadExt::read_exact(reader, body).await?;
+        let mut remaining: usize = content_size;
+        while remaining > 0 {
+            let step: usize = remaining.min(HTTP_BODY_READ_CHUNK_SIZE);
+            let start: usize = body.len();
+            body.try_reserve(step)
+                .map_err(|_| RequestError::ContentLengthTooLarge(HttpStatus::PayloadTooLarge))?;
+            body.resize(start + step, 0);
+            let mut filled: usize = 0;
+            while filled < step {
+                let read_len: usize =
+                    AsyncReadExt::read(reader, &mut body[start + filled..]).await?;
+                if read_len == 0 {
+                    body.truncate(start + filled);
+                    return Err(RequestError::ReadConnection(HttpStatus::BadRequest));
+                }
+                filled += read_len;
+            }
+            remaining -= step;
         }
         Ok(())
     }
@@ -22358,8 +25484,18 @@ impl Request {
     }
     #[inline(always)]
     pub fn try_get_cookies(&self) -> Option<Cookies> {
-        self.try_get_header_back(COOKIE)
-            .map(|cookie_header: String| Cookie::parse(cookie_header))
+        let values: &RequestHeadersValue = self.get_header_ref(COOKIE)?;
+        if values.is_empty() {
+            return None;
+        }
+        let mut merged: Cookies = hash_map_xx_hash3_64();
+        for header_value in values {
+            let parsed: Cookies = Cookie::parse(header_value);
+            for (name, value) in parsed {
+                merged.entry(name).or_insert(value);
+            }
+        }
+        Some(merged)
     }
     #[inline(always)]
     pub fn get_cookies(&self) -> Cookies {
@@ -22434,8 +25570,13 @@ impl Request {
     {
         let content_type: String = self.try_get_header_front(CONTENT_TYPE)?;
         let name: &str = name.as_ref();
-        for parameter in content_type.split(SEMICOLON).skip(1) {
-            let (key, value) = parameter.trim().split_once(EQUAL)?;
+        for parameter in MultipartFormData::split_header_parameters(&content_type)
+            .into_iter()
+            .skip(1)
+        {
+            let Some((key, value)) = parameter.trim().split_once(EQUAL) else {
+                continue;
+            };
             if !key.trim().eq_ignore_ascii_case(name) {
                 continue;
             }
@@ -22480,15 +25621,21 @@ impl Request {
     }
     #[inline(always)]
     pub fn is_enable_keep_alive(&self) -> bool {
-        if let Some(connection_value) = self
-            .get_headers()
-            .get(CONNECTION)
-            .and_then(|values: &VecDeque<String>| values.back())
-        {
-            if connection_value.eq_ignore_ascii_case(KEEP_ALIVE) {
+        if let Some(values) = self.get_header_ref(CONNECTION) {
+            let mut has_keep_alive: bool = false;
+            for header_value in values {
+                for token in header_value.split(COMMA) {
+                    let token: &str = token.trim_matches(HTTP_HEADER_OPTIONAL_WHITESPACE);
+                    if token.eq_ignore_ascii_case(CLOSE) {
+                        return self.is_ws_upgrade_type();
+                    }
+                    if token.eq_ignore_ascii_case(KEEP_ALIVE) {
+                        has_keep_alive = true;
+                    }
+                }
+            }
+            if has_keep_alive {
                 return true;
-            } else if connection_value.eq_ignore_ascii_case(CLOSE) {
-                return self.is_ws_upgrade_type();
             }
         }
         self.get_version().is_http1_1_or_higher() || self.is_ws_upgrade_type()
@@ -22575,9 +25722,6 @@ pub(crate) const WIRE_METHOD_CONNECT: &[u8] = CONNECT.as_bytes();
 pub(crate) const WIRE_METHOD_TRACE: &[u8] = TRACE.as_bytes();
 pub(crate) const WIRE_VERSION_1_1: &[u8] = HTTP_VERSION_1_1.as_bytes();
 pub(crate) const WIRE_VERSION_1_0: &[u8] = HTTP_VERSION_1_0.as_bytes();
-pub(crate) const WIRE_VERSION_0_9: &[u8] = HTTP_VERSION_0_9.as_bytes();
-pub(crate) const WIRE_VERSION_2: &[u8] = HTTP_VERSION_2.as_bytes();
-pub(crate) const WIRE_VERSION_3: &[u8] = HTTP_VERSION_3.as_bytes();
 pub(crate) const HTTP_HEADER_TAB: u8 = b'\t';
 pub(crate) const ENTITY_TAG_QUOTE: u8 = b'"';
 pub(crate) const HTTP_HEADER_DELETE: u8 = 0x7f;
@@ -22595,6 +25739,10 @@ pub(super) const HTTP_HEADER_TRAILER: &str = "trailer";
 pub(crate) const ENTITY_TAG_OPTIONAL_WHITESPACE: &[u8] = b" \t";
 pub(crate) const HTTP_HEADER_OPTIONAL_WHITESPACE: [char; 2] = [' ', '\t'];
 pub(crate) const STACK_HEADER_KEY_LIMIT: usize = B_64;
+pub(crate) const HTTP_REQUEST_LINE_OVERHEAD: usize = 1024;
+pub(crate) const HTTP_HEADER_LINE_OVERHEAD: usize = 1024;
+pub(crate) const HTTP_BODY_READ_CHUNK_SIZE: usize = 64 * 1024;
+pub(crate) const HTTP_MAX_QUERY_PARAM_COUNT: usize = 1024;
 pub(crate) const HTTP_HEADER_TOKEN_TABLE: [bool; 256] = {
     let mut table: [bool; 256] = [false; 256];
     let mut idx: usize = 0;
@@ -22645,7 +25793,7 @@ mod r#impl;
 mod r#struct;
 mod r#type;
 pub use {r#enum::*, r#struct::*, r#type::*};
-pub(crate) use r#const::*;
+pub(crate) use {r#const::*, r#fn::*};
 use super::*;
 ```
 # Path: hyperlane/type/src/request/struct.rs
@@ -22716,6 +25864,128 @@ pub(super) fn parse_transfer_encoding(
         return Err(RequestError::HttpRead(HttpStatus::NotImplemented));
     }
     Ok(RequestFraming::Chunked)
+}
+pub(crate) async fn read_http_line_bounded<R>(
+    reader: &mut R,
+    out: &mut String,
+    max_len: usize,
+    overflow_error: RequestError,
+) -> Result<usize, RequestError>
+where
+    R: AsyncBufReadExt + Unpin,
+{
+    out.clear();
+    let mut raw: Vec<u8> = Vec::new();
+    loop {
+        let available: &[u8] = reader.fill_buf().await?;
+        if available.is_empty() {
+            break;
+        }
+        let budget: usize = max_len.saturating_sub(raw.len());
+        if budget == 0 {
+            return Err(overflow_error);
+        }
+        let scan_len: usize = available.len().min(budget);
+        let newline: Option<usize> = available[..scan_len]
+            .iter()
+            .position(|byte: &u8| *byte == BR_U8);
+        let consumed: usize = newline.map_or(scan_len, |index: usize| index + 1);
+        raw.extend_from_slice(&available[..consumed]);
+        reader.consume(consumed);
+        if newline.is_some() {
+            break;
+        }
+        if raw.len() >= max_len && max_len != usize::MAX {
+            return Err(overflow_error);
+        }
+    }
+    let text: &str =
+        from_utf8(&raw).map_err(|_| RequestError::ReadConnection(HttpStatus::BadRequest))?;
+    out.push_str(text);
+    Ok(raw.len())
+}
+#[inline(always)]
+pub(crate) fn is_valid_http_host(value: &str) -> bool {
+    if value.is_empty() {
+        return true;
+    }
+    let bytes: &[u8] = value.as_bytes();
+    let (host_part, port_part): (&[u8], Option<&[u8]>) = if bytes[0] == b'[' {
+        let Some(close_idx) = bytes.iter().position(|byte: &u8| *byte == b']') else {
+            return false;
+        };
+        let literal: &[u8] = &bytes[1..close_idx];
+        if literal.is_empty()
+            || !literal
+                .iter()
+                .all(|byte: &u8| byte.is_ascii_hexdigit() || *byte == b':' || *byte == b'.')
+        {
+            return false;
+        }
+        let rest: &[u8] = &bytes[close_idx + 1..];
+        if rest.is_empty() {
+            (literal, None)
+        } else if let Some(port) = rest.strip_prefix(b":") {
+            (literal, Some(port))
+        } else {
+            return false;
+        }
+    } else {
+        let mut colon_pos: Option<usize> = None;
+        for (idx, &byte) in bytes.iter().enumerate() {
+            if byte == b':' {
+                if colon_pos.is_some() {
+                    return false;
+                }
+                colon_pos = Some(idx);
+            }
+        }
+        match colon_pos {
+            Some(idx) => (&bytes[..idx], Some(&bytes[idx + 1..])),
+            None => (bytes, None),
+        }
+    };
+    if bytes[0] != b'[' {
+        if host_part.is_empty() {
+            return false;
+        }
+        let valid_reg_name: bool = host_part.iter().all(|byte: &u8| {
+            byte.is_ascii_alphanumeric()
+                || matches!(
+                    *byte,
+                    b'-' | b'.'
+                        | b'_'
+                        | b'~'
+                        | b'%'
+                        | b'!'
+                        | b'$'
+                        | b'&'
+                        | b'\''
+                        | b'('
+                        | b')'
+                        | b'*'
+                        | b'+'
+                        | b','
+                        | b';'
+                        | b'='
+                )
+        });
+        if !valid_reg_name {
+            return false;
+        }
+    }
+    if let Some(port) = port_part {
+        if port.is_empty() || !port.iter().all(|byte: &u8| byte.is_ascii_digit()) {
+            return false;
+        }
+        let Ok(port_str) = from_utf8(port) else {
+            return false;
+        };
+        if port_str.parse::<u16>().is_err() {
+            return false;
+        }
+    }
+    true
 }
 pub(super) fn parse_entity_tag(input: &[u8]) -> Option<(&[u8], &[u8])> {
     let bytes: &[u8] = input.strip_prefix(ENTITY_TAG_WEAK_PREFIX).unwrap_or(input);
@@ -23132,9 +26402,13 @@ impl FileExtension {
         F: AsRef<str>,
     {
         let full_path_ref: &str = full_path.as_ref();
-        full_path_ref
+        let file_name: &str = full_path_ref
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(full_path_ref);
+        file_name
             .rfind(POINT)
-            .map(|index: usize| full_path_ref[index + 1..].to_string())
+            .map(|index: usize| file_name[index + 1..].to_string())
             .unwrap_or_default()
     }
     pub fn get_content_type(&self) -> &'static str {
@@ -25342,8 +28616,8 @@ pub use {command::*, config::*, help::*, logger::*, new::*, template::*, version
 pub(crate) use std::{
     env::args,
     fmt::Arguments,
-    io,
-    path::{Path, PathBuf},
+    io::{self, ErrorKind},
+    path::{Component, Components, Path, PathBuf},
     process::{Output, Stdio},
     str::FromStr,
 };
@@ -25357,8 +28631,8 @@ pub(crate) use {
     },
     std::ffi::OsStr,
     tokio::{
-        fs::{create_dir_all, write},
-        process::Command,
+        fs::{canonicalize, create_dir_all, write},
+        process::{Child, Command},
         sync::watch::{Receiver, Sender, channel, error::SendError},
         time::{Duration, Interval, interval, sleep},
     },
@@ -25720,6 +28994,7 @@ pub(crate) const FILE_NAME_STRUCT_RS: &str = "struct.rs";
 pub(crate) const PUB_USE_PREFIX: &str = "pub use {";
 pub(crate) const KEYWORD_FILE_HEADER: &str = "use super::*;\n";
 pub(crate) const ERROR_MISSING_MODEL_SUB_TYPE: &str = "Missing model subtype";
+pub(crate) const ERROR_INVALID_COMPONENT_NAME: &str = "Invalid template component name";
 pub(crate) const CARGO_FMT_PROGRAM: &str = "cargo";
 ```
 # Path: hyperlane/cli/src/template/mod.rs
@@ -25961,11 +29236,36 @@ async fn create_model_template(
     write(&struct_rs, KEYWORD_FILE_HEADER).await?;
     Ok(())
 }
+fn validate_component_name(component_name: &str) -> Result<(), TemplateError> {
+    if component_name.is_empty()
+        || component_name.contains('/')
+        || component_name.contains('\\')
+        || component_name.contains('\0')
+        || !component_name
+            .bytes()
+            .all(|byte: u8| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        || component_name.starts_with('-')
+    {
+        return Err(TemplateError::IoError(io::Error::new(
+            ErrorKind::InvalidInput,
+            ERROR_INVALID_COMPONENT_NAME,
+        )));
+    }
+    let mut components: Components<'_> = Path::new(component_name).components();
+    match (components.next(), components.next()) {
+        (Some(Component::Normal(_)), None) => Ok(()),
+        _ => Err(TemplateError::IoError(io::Error::new(
+            ErrorKind::InvalidInput,
+            ERROR_INVALID_COMPONENT_NAME,
+        ))),
+    }
+}
 pub async fn execute_template(
     template_type: TemplateType,
     component_name: &str,
     model_sub_type: Option<ModelSubType>,
 ) -> Result<(), TemplateError> {
+    validate_component_name(component_name)?;
     let config: TemplateConfig =
         TemplateConfig::new(template_type, component_name.to_string(), model_sub_type);
     let base_path: PathBuf = PathBuf::from(&config.base_directory);
@@ -25978,6 +29278,14 @@ pub async fn execute_template(
         ));
     }
     ensure_directory(&type_dir).await?;
+    let canonical_base: PathBuf = canonicalize(&base_path).await?;
+    let canonical_type: PathBuf = canonicalize(&type_dir).await?;
+    if !canonical_type.starts_with(&canonical_base) {
+        return Err(TemplateError::IoError(io::Error::new(
+            ErrorKind::PermissionDenied,
+            ERROR_INVALID_COMPONENT_NAME,
+        )));
+    }
     match config.template_type {
         TemplateType::Controller => {
             create_controller_template(&target_dir, &config.component_name).await?
@@ -26171,46 +29479,26 @@ use super::*;
 # Path: hyperlane/cli/src/watch/fn.rs
 ```rust
 use super::*;
-async fn run_cargo_run() -> Result<(), io::Error> {
-    let output: Output = Command::new(CARGO_RUN_PROGRAM)
+fn spawn_cargo_run() -> Result<Child, io::Error> {
+    Command::new(CARGO_RUN_PROGRAM)
         .arg("run")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .await?;
-    let stdout: String = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr: String = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    if !stdout.is_empty() {
-        for line in stdout.lines() {
-            log::info!("{line}");
-        }
+        .kill_on_drop(true)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+}
+async fn stop_cargo_run(child: &mut Option<Child>) {
+    if let Some(mut process) = child.take() {
+        let _: Result<(), io::Error> = process.kill().await;
+        let _: Result<_, io::Error> = process.wait().await;
     }
-    if !stderr.is_empty() {
-        if output.status.success() {
-            for line in stderr.lines() {
-                if line.is_empty() {
-                    continue;
-                }
-                log::info!("{line}");
-            }
-        } else {
-            for line in stderr.lines() {
-                if line.is_empty() {
-                    continue;
-                }
-                log::error!("{line}");
-            }
-            log::error!("cargo run failed");
-        }
-    }
-    Ok(())
 }
 pub async fn execute_watch() -> Result<(), io::Error> {
     let src_path: PathBuf = PathBuf::from("src");
     if !src_path.exists() {
         return Err(io::Error::other(ERROR_SRC_DIRECTORY_NOT_FOUND));
     }
-    run_cargo_run().await?;
+    let mut active_child: Option<Child> = Some(spawn_cargo_run()?);
     let (tx, mut rx): (Sender<Event>, Receiver<Event>) = channel(Event::new(EventKind::Any));
     let mut watcher: RecommendedWatcher =
         recommended_watcher(move |result: Result<Event, Error>| {
@@ -26237,8 +29525,10 @@ pub async fn execute_watch() -> Result<(), io::Error> {
         log::warn!("File change detected: {}", event.paths[0].display());
         debounce.reset();
         sleep(Duration::from_millis(300)).await;
-        run_cargo_run().await?;
+        stop_cargo_run(&mut active_child).await;
+        active_child = Some(spawn_cargo_run()?);
     }
+    stop_cargo_run(&mut active_child).await;
     Ok(())
 }
 ```
@@ -26315,6 +29605,18 @@ plugin is held to the same rules as the framework.
   that takes or returns something documents it under `# Arguments` and
   `# Returns`.
 - **No `#[allow]`.**
+## Official plugins in this repository
+| crate | path | capabilities |
+|---|---|---|
+| `hyperlane-plugin-logger` | `plugin/logger` | console and file logging with CRLF/ANSI sanitization |
+| `hyperlane-plugin-negotiate` | `plugin/negotiate` | `Accept-Encoding` compression negotiation and conditional `304 Not Modified` ETag validation |
+| `hyperlane-plugin-websocket` | `plugin/websocket` | WebSocket room broadcast and connection lifecycle hooks |
+| `hyperlane-plugin-sse` | `plugin/sse` | WHATWG Server-Sent Events framing, CRLF sanitization, topic pub/sub, `Last-Event-ID` replay, heartbeats |
+| `hyperlane-plugin-mq` | `plugin/mq` | pluggable `MessageBroker` trait and `InMemoryBroker` with consumer groups, TTL, retries, visibility timeouts, DLQ |
+| `hyperlane-plugin-rpc` | `plugin/rpc` | JSON-RPC 2.0 async router, single/batch/notification dispatch, payload & batch DoS caps, `RpcHook` |
+| `hyperlane-plugin-grpc` | `plugin/grpc` | gRPC over HTTP/2 5-byte framing, bounded compression, canonical status codes `0..=16`, `grpc-timeout`, `GrpcHook` |
+| `hyperlane-plugin-mcp` | `plugin/mcp` | Model Context Protocol Streamable HTTP server, tools/resources/prompts registries, `Mcp-Session-Id`, `Origin` guard, `McpHook` |
+| `hyperlane-plugin-gateway` | `plugin/gateway` | reverse proxy & API gateway with pooled H1/H2 `http-request`, load balancing, circuit breaker, token-bucket rate limiting, RFC 9110 hop-by-hop stripping, `GatewayHook` |
 ## The plugins, in the order they are worth building
 ### P0 - the ground every service needs
 | plugin | what it gives |
@@ -26471,6 +29773,17 @@ fn is_a_unit_type() {
     let copied: LoggerPlugin = plugin;
     assert_eq!(format!("{copied:?}"), format!("{plugin:?}"));
 }
+#[test]
+fn test_security_log_sanitization_strips_crlf_and_ansi_escapes() {
+    let forged: &str = "user=alice\r\nERROR injected\x1b[31mred\x00end";
+    let safe: String = LoggerPlugin::sanitize_log_text(forged);
+    assert!(!safe.contains('\r'));
+    assert!(!safe.contains('\n'));
+    assert!(!safe.contains('\x1b'));
+    assert!(!safe.contains('\0'));
+    assert!(safe.contains("\\r\\n"));
+    assert!(safe.contains("\\x1b"));
+}
 ```
 # Path: hyperlane/plugin/logger/src/impl.rs
 ```rust
@@ -26484,11 +29797,18 @@ impl Default for LoggerConfig {
     }
 }
 impl log::Log for LoggerPlugin {
-    fn enabled(&self, _: &Metadata<'_>) -> bool {
-        true
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        CONFIG
+            .get()
+            .is_none_or(|config: &LoggerConfig| metadata.level() <= config.level)
     }
     fn log(&self, record: &Record<'_>) {
-        let line: String = format!("{} {}", record.level(), record.args());
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let raw_message: String = format!("{}", record.args());
+        let safe_message: String = Self::sanitize_log_text(&raw_message);
+        let line: String = format!("{} {}", record.level(), safe_message);
         if let Some(file) = FILE.get()
             && let Ok(mut file) = file.lock()
             && let Some(file) = file.as_mut()
@@ -26507,7 +29827,27 @@ impl log::Log for LoggerPlugin {
     }
 }
 impl LoggerPlugin {
+    pub(crate) fn sanitize_log_text(input: &str) -> String {
+        let mut out: String = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '\r' => out.push_str(ESCAPED_CR),
+                '\n' => out.push_str(ESCAPED_LF),
+                '\x1b' => out.push_str(ESCAPED_ESC),
+                '\t' => out.push('\t'),
+                c if c.is_control() => out.push(' '),
+                c => out.push(c),
+            }
+        }
+        out
+    }
     pub fn init(config: LoggerConfig) -> Result<(), String> {
+        if CONFIG.get().is_some() {
+            return Err(ERROR_CONFIG_ALREADY_SET.to_owned());
+        }
+        if FILE.get().is_some() {
+            return Err(ERROR_FILE_ALREADY_SET.to_owned());
+        }
         let file: Option<File> = match config.file.as_ref() {
             Some(path) => match OpenOptions::new().create(true).append(true).open(path) {
                 Ok(file) => Some(file),
@@ -26515,19 +29855,15 @@ impl LoggerPlugin {
             },
             None => None,
         };
+        let level: LevelFilter = config.level;
+        set_logger(&LoggerPlugin)
+            .map_err(|_: SetLoggerError| ERROR_LOGGER_ALREADY_INSTALLED.to_owned())?;
+        FILE.set(Mutex::new(file))
+            .map_err(|_: Mutex<Option<File>>| ERROR_FILE_ALREADY_SET.to_owned())?;
         CONFIG
             .set(config)
-            .map_err(|_: LoggerConfig| "the logger configuration was already set".to_owned())?;
-        FILE.set(Mutex::new(file))
-            .map_err(|_: Mutex<Option<File>>| "the log file was already set".to_owned())?;
-        set_logger(&LoggerPlugin)
-            .map_err(|_: SetLoggerError| "a logger was already installed".to_owned())?;
-        set_max_level(
-            CONFIG
-                .get()
-                .map(|config: &LoggerConfig| config.level)
-                .unwrap_or(LevelFilter::Info),
-        );
+            .map_err(|_: LoggerConfig| ERROR_CONFIG_ALREADY_SET.to_owned())?;
+        set_max_level(level);
         Ok(())
     }
     pub fn get() -> Option<&'static LoggerConfig> {
@@ -26622,6 +29958,12 @@ pub(super) static FILE: OnceLock<Mutex<Option<File>>> = OnceLock::new();
 pub(crate) const ATTRIBUTE_STARTED_AT: &str = "hyperlane-plugin-logger-started-at";
 pub(crate) const PATH_UNKNOWN: &str = "-";
 pub(crate) const METHOD_UNKNOWN: &str = "-";
+pub(crate) const ERROR_CONFIG_ALREADY_SET: &str = "the logger configuration was already set";
+pub(crate) const ERROR_FILE_ALREADY_SET: &str = "the log file was already set";
+pub(crate) const ERROR_LOGGER_ALREADY_INSTALLED: &str = "a logger was already installed";
+pub(crate) const ESCAPED_CR: &str = "\\r";
+pub(crate) const ESCAPED_LF: &str = "\\n";
+pub(crate) const ESCAPED_ESC: &str = "\\x1b";
 ```
 # Path: hyperlane/plugin/logger/src/struct.rs
 ```rust
@@ -26660,6 +30002,2952 @@ use std::{
 };
 use hyperlane::{Context, ServerHook, Status, Stream};
 use log::{Metadata, Record, SetLoggerError, set_logger, set_max_level};
+```
+# Path: hyperlane/plugin/sse/README.md
+# hyperlane-plugin-sse
+A Server-Sent Events (SSE) plugin for the Hyperlane framework providing WHATWG-compliant event framing, CRLF injection protection, named topic fan-out, bounded `Last-Event-ID` replay, and heartbeat streaming.
+# Path: hyperlane/plugin/sse/tests/mod.rs
+```rust
+mod sse;
+use super::*;
+use hyperlane::tokio;
+```
+# Path: hyperlane/plugin/sse/tests/sse/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/plugin/sse/tests/sse/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_sse_event_encode_sanitizes_crlf_and_splits_multiline_data() {
+    let event: SseEvent = SseEvent::new("line1\r\nline2\rline3")
+        .with_id("42\r\ndata: injected")
+        .with_event("update\nretry: 1")
+        .with_retry(2500);
+    let encoded: String = String::from_utf8(event.encode()).unwrap();
+    assert!(encoded.contains("id: 42data: injected\n"));
+    assert!(encoded.contains("event: updateretry: 1\n"));
+    assert!(encoded.contains("retry: 2500\n"));
+    assert!(encoded.contains("data: line1\ndata: line2\ndata: line3\n\n"));
+    let comment: SseEvent = SseEvent::comment_only("ping\r\nevent: fake");
+    let comment_wire: String = String::from_utf8(comment.encode()).unwrap();
+    assert_eq!(comment_wire, ": pingevent: fake\n\n");
+}
+#[tokio::test]
+async fn test_sse_hub_pubsub_replay_topic_limit_and_cleanup() {
+    let mut cfg: SseConfig = SseConfig::default();
+    cfg.set_max_topics(2).set_replay_capacity(4);
+    let hub: SseHub = SseHub::new(cfg);
+    let seq1: u64 = hub.publish("orders", SseEvent::new("first")).unwrap();
+    let seq2: u64 = hub.publish("orders", SseEvent::new("second")).unwrap();
+    assert_eq!(seq2, seq1 + 1);
+    let mut resumed: SseSubscription = hub.subscribe("orders", Some(&seq1.to_string())).unwrap();
+    let replayed: SseEvent = resumed.recv().await.unwrap();
+    assert_eq!(replayed.get_data(), "second");
+    assert_eq!(hub.subscriber_count("orders"), 1usize);
+    let _: u64 = hub.publish("orders", SseEvent::new("live")).unwrap();
+    let live: SseEvent = resumed.recv().await.unwrap();
+    assert_eq!(live.get_data(), "live");
+    let ephem: SseSubscription = hub.subscribe("ephemeral", None).unwrap();
+    assert_eq!(hub.topic_count(), 2usize);
+    assert_eq!(
+        hub.publish("overflow", SseEvent::new("blocked")),
+        Err(SseError::TopicLimitReached)
+    );
+    drop(ephem);
+    assert_eq!(hub.topic_count(), 1usize);
+    let mut ctx: Context = Context::default();
+    SseStream::prepare(&mut ctx);
+    assert_eq!(
+        ctx.get_response()
+            .try_get_header_back(CONTENT_TYPE)
+            .as_deref(),
+        Some(SSE_CONTENT_TYPE)
+    );
+    assert_eq!(
+        ctx.get_response()
+            .try_get_header_back(CACHE_CONTROL)
+            .as_deref(),
+        Some(SSE_CACHE_CONTROL)
+    );
+}
+```
+# Path: hyperlane/plugin/sse/src/impl.rs
+```rust
+use super::*;
+impl Display for SseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TopicLimitReached => f.write_str(ERR_TOPIC_LIMIT),
+            Self::ChannelClosed => f.write_str(ERR_CHANNEL_CLOSED),
+            Self::Lagged(skipped) => write!(f, "SSE subscriber lagged by {skipped} events"),
+            Self::Transport(msg) => f.write_str(msg),
+        }
+    }
+}
+impl Error for SseError {}
+impl Default for SseConfig {
+    fn default() -> Self {
+        Self {
+            heartbeat_ms: DEFAULT_SSE_HEARTBEAT_MS,
+            retry_ms: DEFAULT_SSE_RETRY_MS,
+            replay_capacity: DEFAULT_SSE_REPLAY_CAPACITY,
+            channel_capacity: DEFAULT_SSE_CHANNEL_CAPACITY,
+            max_topics: DEFAULT_SSE_MAX_TOPICS,
+        }
+    }
+}
+impl SseEvent {
+    pub fn new<D>(data: D) -> Self
+    where
+        D: Into<String>,
+    {
+        Self {
+            id: None,
+            event: None,
+            data: data.into(),
+            retry: None,
+            comment: None,
+        }
+    }
+    pub fn comment_only<C>(comment: C) -> Self
+    where
+        C: Into<String>,
+    {
+        Self {
+            id: None,
+            event: None,
+            data: String::new(),
+            retry: None,
+            comment: Some(comment.into()),
+        }
+    }
+    pub fn with_id<I>(mut self, id: I) -> Self
+    where
+        I: Into<String>,
+    {
+        self.set_id(Some(id.into()));
+        self
+    }
+    pub fn with_event<E>(mut self, event: E) -> Self
+    where
+        E: Into<String>,
+    {
+        self.set_event(Some(event.into()));
+        self
+    }
+    pub fn with_retry(mut self, retry_ms: u64) -> Self {
+        self.set_retry(Some(retry_ms));
+        self
+    }
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out: String = String::with_capacity(self.get_data().len() + 64);
+        if let Some(comment) = self.get_comment() {
+            let safe_comment: String = sanitize_sse_line(&comment);
+            out.push_str(SSE_COMMENT_PREFIX);
+            out.push_str(&safe_comment);
+            out.push('\n');
+        }
+        if let Some(id) = self.get_id() {
+            let safe_id: String = sanitize_sse_line(&id);
+            out.push_str(SSE_FIELD_ID);
+            out.push_str(&safe_id);
+            out.push('\n');
+        }
+        if let Some(event) = self.get_event() {
+            let safe_event: String = sanitize_sse_line(&event);
+            out.push_str(SSE_FIELD_EVENT);
+            out.push_str(&safe_event);
+            out.push('\n');
+        }
+        if let Some(retry) = self.get_retry() {
+            out.push_str(SSE_FIELD_RETRY);
+            out.push_str(&retry.to_string());
+            out.push('\n');
+        }
+        let has_data: bool = !self.get_data().is_empty() || self.get_comment().is_none();
+        if has_data {
+            let normalized: String = self.get_data().replace("\r\n", "\n").replace('\r', "\n");
+            for line in normalized.split('\n') {
+                out.push_str(SSE_FIELD_DATA);
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+        out.push('\n');
+        out.into_bytes()
+    }
+}
+impl SseHub {
+    pub fn new(config: SseConfig) -> Self {
+        Self {
+            inner: Arc::new(SseHubInner {
+                config,
+                next_seq: AtomicU64::new(1),
+                topics: Mutex::new(HashMap::new()),
+            }),
+        }
+    }
+    pub fn get_config(&self) -> &SseConfig {
+        &self.inner.config
+    }
+    pub fn publish<T>(&self, topic: T, mut event: SseEvent) -> Result<u64, SseError>
+    where
+        T: Into<String>,
+    {
+        let Self { inner } = self;
+        let topic_name: String = topic.into();
+        let seq: u64 = inner.next_seq.fetch_add(1, Ordering::Relaxed);
+        if event.get_id().is_none() {
+            event.set_id(Some(seq.to_string()));
+        }
+        let Ok(mut map) = inner.topics.lock() else {
+            return Err(SseError::ChannelClosed);
+        };
+        if !map.contains_key(&topic_name) && map.len() >= inner.config.get_max_topics() {
+            return Err(SseError::TopicLimitReached);
+        }
+        let chan_cap: usize = inner.config.get_channel_capacity().max(1);
+        let replay_cap: usize = inner.config.get_replay_capacity();
+        let entry: &mut TopicState = map.entry(topic_name).or_insert_with(|| {
+            let (tx, _): (Sender<SseEvent>, Receiver<SseEvent>) = broadcast::channel(chan_cap);
+            TopicState {
+                sender: tx,
+                replay: VecDeque::with_capacity(replay_cap),
+            }
+        });
+        if replay_cap > 0 {
+            if entry.replay.len() >= replay_cap {
+                let _: Option<(u64, SseEvent)> = entry.replay.pop_front();
+            }
+            entry.replay.push_back((seq, event.clone()));
+        }
+        let _: Result<usize, broadcast::error::SendError<SseEvent>> = entry.sender.send(event);
+        Ok(seq)
+    }
+    pub fn subscribe<T>(
+        &self,
+        topic: T,
+        last_event_id: Option<&str>,
+    ) -> Result<SseSubscription, SseError>
+    where
+        T: Into<String>,
+    {
+        let Self { inner } = self;
+        let topic_name: String = topic.into();
+        let after_seq: Option<u64> = parse_last_event_id(last_event_id);
+        let Ok(mut map) = inner.topics.lock() else {
+            return Err(SseError::ChannelClosed);
+        };
+        if !map.contains_key(&topic_name) && map.len() >= inner.config.get_max_topics() {
+            return Err(SseError::TopicLimitReached);
+        }
+        let chan_cap: usize = inner.config.get_channel_capacity().max(1);
+        let replay_cap: usize = inner.config.get_replay_capacity();
+        let entry: &mut TopicState = map.entry(topic_name.clone()).or_insert_with(|| {
+            let (tx, _): (Sender<SseEvent>, Receiver<SseEvent>) = broadcast::channel(chan_cap);
+            TopicState {
+                sender: tx,
+                replay: VecDeque::with_capacity(replay_cap),
+            }
+        });
+        let mut replayed: VecDeque<SseEvent> = VecDeque::new();
+        if let Some(cursor) = after_seq {
+            for (seq, ev) in &entry.replay {
+                if *seq > cursor {
+                    replayed.push_back(ev.clone());
+                }
+            }
+        }
+        let receiver: Receiver<SseEvent> = entry.sender.subscribe();
+        Ok(SseSubscription {
+            topic: topic_name,
+            hub: Arc::clone(inner),
+            replayed,
+            receiver,
+        })
+    }
+    pub fn topic_count(&self) -> usize {
+        let Self { inner } = self;
+        inner
+            .topics
+            .lock()
+            .map(|map: MutexGuard<'_, HashMap<String, TopicState>>| map.len())
+            .unwrap_or(0)
+    }
+    pub fn subscriber_count(&self, topic: &str) -> usize {
+        let Self { inner } = self;
+        inner
+            .topics
+            .lock()
+            .ok()
+            .and_then(|map: MutexGuard<'_, HashMap<String, TopicState>>| {
+                map.get(topic)
+                    .map(|state: &TopicState| state.sender.receiver_count())
+            })
+            .unwrap_or(0)
+    }
+}
+impl Default for SseHub {
+    fn default() -> Self {
+        Self::new(SseConfig::default())
+    }
+}
+impl SseSubscription {
+    pub fn topic(&self) -> &str {
+        let Self { topic, .. } = self;
+        topic
+    }
+    pub async fn recv(&mut self) -> Result<SseEvent, SseError> {
+        let Self {
+            replayed, receiver, ..
+        } = self;
+        if let Some(event) = replayed.pop_front() {
+            return Ok(event);
+        }
+        match receiver.recv().await {
+            Ok(event) => Ok(event),
+            Err(RecvError::Lagged(skipped)) => Err(SseError::Lagged(skipped)),
+            Err(RecvError::Closed) => Err(SseError::ChannelClosed),
+        }
+    }
+}
+impl Drop for SseSubscription {
+    fn drop(&mut self) {
+        let Self { hub, topic, .. } = self;
+        if let Ok(mut map) = hub.topics.lock()
+            && let Some(state) = map.get(topic)
+            && state.sender.receiver_count() <= 1
+            && state.replay.is_empty()
+        {
+            map.remove(topic);
+        }
+    }
+}
+impl SseStream {
+    pub fn prepare(ctx: &mut Context) {
+        ctx.get_mut_response()
+            .set_header(CONTENT_TYPE, SSE_CONTENT_TYPE)
+            .set_header(CACHE_CONTROL, SSE_CACHE_CONTROL)
+            .set_header(SSE_ACCEL_BUFFERING_HEADER, SSE_ACCEL_BUFFERING_VALUE);
+    }
+    pub async fn send_event(stream: &mut Stream, event: &SseEvent) -> Result<(), SseError> {
+        let bytes: Vec<u8> = event.encode();
+        stream
+            .try_send(&bytes)
+            .await
+            .map_err(|err: ResponseError| SseError::Transport(err.to_string()))
+    }
+    pub async fn send_comment(stream: &mut Stream, comment: &str) -> Result<(), SseError> {
+        let frame: SseEvent = SseEvent::comment_only(comment);
+        Self::send_event(stream, &frame).await
+    }
+    pub async fn serve_subscription(
+        stream: &mut Stream,
+        ctx: &mut Context,
+        mut subscription: SseSubscription,
+        config: &SseConfig,
+    ) -> Result<(), SseError> {
+        Self::prepare(ctx);
+        let head: ResponseData = ctx.get_mut_response().build_head();
+        stream
+            .try_send(&head)
+            .await
+            .map_err(|err: ResponseError| SseError::Transport(err.to_string()))?;
+        if config.get_retry_ms() > 0 {
+            let hint: SseEvent =
+                SseEvent::comment_only(SSE_HEARTBEAT_COMMENT).with_retry(config.get_retry_ms());
+            Self::send_event(stream, &hint).await?;
+        }
+        let heartbeat_ms: u64 = config.get_heartbeat_ms();
+        if heartbeat_ms == 0 {
+            loop {
+                match subscription.recv().await {
+                    Ok(event) => Self::send_event(stream, &event).await?,
+                    Err(SseError::Lagged(_)) => continue,
+                    Err(SseError::ChannelClosed) => {
+                        stream.set_closed(true);
+                        return Ok(());
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+        }
+        let mut ticker: Interval = interval(Duration::from_millis(heartbeat_ms));
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        let _: Instant = ticker.tick().await;
+        loop {
+            select! {
+                _ = ticker.tick() => {
+                    Self::send_comment(stream, SSE_HEARTBEAT_COMMENT).await?;
+                }
+                next = subscription.recv() => {
+                    match next {
+                        Ok(event) => Self::send_event(stream, &event).await?,
+                        Err(SseError::Lagged(_)) => continue,
+                        Err(SseError::ChannelClosed) => {
+                            stream.set_closed(true);
+                            return Ok(());
+                        }
+                        Err(err) => return Err(err),
+                    }
+                }
+            }
+        }
+    }
+}
+impl SsePlugin {
+    pub fn init(config: SseConfig) -> &'static Self {
+        SSE_PLUGIN.get_or_init(|| Self {
+            hub: SseHub::new(config.clone()),
+            config,
+        })
+    }
+    pub fn get() -> Option<&'static Self> {
+        SSE_PLUGIN.get()
+    }
+    pub fn get_config(&self) -> &SseConfig {
+        &self.config
+    }
+    pub fn get_hub(&self) -> &SseHub {
+        &self.hub
+    }
+}
+```
+# Path: hyperlane/plugin/sse/src/enum.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SseError {
+    TopicLimitReached,
+    ChannelClosed,
+    Lagged(u64),
+    Transport(String),
+}
+```
+# Path: hyperlane/plugin/sse/src/static.rs
+```rust
+use super::*;
+pub(crate) static SSE_PLUGIN: OnceLock<SsePlugin> = OnceLock::new();
+```
+# Path: hyperlane/plugin/sse/src/const.rs
+```rust
+pub const SSE_CONTENT_TYPE: &str = "text/event-stream; charset=utf-8";
+pub const SSE_CACHE_CONTROL: &str = "no-cache";
+pub const SSE_ACCEL_BUFFERING_HEADER: &str = "x-accel-buffering";
+pub const SSE_ACCEL_BUFFERING_VALUE: &str = "no";
+pub const DEFAULT_SSE_HEARTBEAT_MS: u64 = 15_000;
+pub const DEFAULT_SSE_RETRY_MS: u64 = 3_000;
+pub const DEFAULT_SSE_REPLAY_CAPACITY: usize = 64;
+pub const DEFAULT_SSE_CHANNEL_CAPACITY: usize = 256;
+pub const DEFAULT_SSE_MAX_TOPICS: usize = 1024;
+pub(crate) const SSE_FIELD_ID: &str = "id: ";
+pub(crate) const SSE_FIELD_EVENT: &str = "event: ";
+pub(crate) const SSE_FIELD_RETRY: &str = "retry: ";
+pub(crate) const SSE_FIELD_DATA: &str = "data: ";
+pub(crate) const SSE_COMMENT_PREFIX: &str = ": ";
+pub(crate) const SSE_HEARTBEAT_COMMENT: &str = "keep-alive";
+pub(crate) const ERR_TOPIC_LIMIT: &str = "SSE topic limit reached";
+pub(crate) const ERR_CHANNEL_CLOSED: &str = "SSE topic channel closed";
+```
+# Path: hyperlane/plugin/sse/src/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Default, Eq, PartialEq)]
+pub struct SseEvent {
+    #[get(type(clone))]
+    pub(crate) id: Option<String>,
+    #[get(type(clone))]
+    pub(crate) event: Option<String>,
+    pub(crate) data: String,
+    #[get(type(copy))]
+    pub(crate) retry: Option<u64>,
+    #[get(type(clone))]
+    pub(crate) comment: Option<String>,
+}
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct SseConfig {
+    #[get(type(copy))]
+    pub(crate) heartbeat_ms: u64,
+    #[get(type(copy))]
+    pub(crate) retry_ms: u64,
+    #[get(type(copy))]
+    pub(crate) replay_capacity: usize,
+    #[get(type(copy))]
+    pub(crate) channel_capacity: usize,
+    #[get(type(copy))]
+    pub(crate) max_topics: usize,
+}
+pub(crate) struct TopicState {
+    pub(crate) sender: Sender<SseEvent>,
+    pub(crate) replay: VecDeque<(u64, SseEvent)>,
+}
+pub(crate) struct SseHubInner {
+    pub(crate) config: SseConfig,
+    pub(crate) next_seq: AtomicU64,
+    pub(crate) topics: Mutex<HashMap<String, TopicState>>,
+}
+#[derive(Clone)]
+pub struct SseHub {
+    pub(crate) inner: Arc<SseHubInner>,
+}
+pub struct SseSubscription {
+    pub(crate) topic: String,
+    pub(crate) hub: Arc<SseHubInner>,
+    pub(crate) replayed: VecDeque<SseEvent>,
+    pub(crate) receiver: Receiver<SseEvent>,
+}
+pub struct SseStream;
+#[derive(Clone)]
+pub struct SsePlugin {
+    pub(crate) config: SseConfig,
+    pub(crate) hub: SseHub,
+}
+```
+# Path: hyperlane/plugin/sse/src/fn.rs
+```rust
+pub(crate) fn sanitize_sse_line(raw: &str) -> String {
+    let mut out: String = String::with_capacity(raw.len());
+    for ch in raw.chars() {
+        if ch != '\r' && ch != '\n' && ch != '\0' {
+            out.push(ch);
+        }
+    }
+    out
+}
+pub(crate) fn parse_last_event_id(raw: Option<&str>) -> Option<u64> {
+    raw.and_then(|text: &str| text.trim().parse::<u64>().ok())
+}
+```
+# Path: hyperlane/plugin/sse/src/lib.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
+pub use {r#enum::*, r#struct::*};
+pub(crate) use {r#const::*, r#fn::*, r#static::*};
+use std::{
+    collections::{HashMap, VecDeque},
+    error::Error,
+    fmt::{self, Display, Formatter},
+    sync::{
+        Arc, Mutex, MutexGuard, OnceLock,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
+use {
+    hyperlane::{
+        CACHE_CONTROL, CONTENT_TYPE, Context, ResponseData, ResponseError, Stream,
+        tokio::{
+            select,
+            sync::broadcast::{self, Receiver, Sender, error::RecvError},
+            time::{Instant, Interval, MissedTickBehavior, interval},
+        },
+    },
+    lombok_macros::*,
+};
+```
+# Path: hyperlane/plugin/gateway/README.md
+# hyperlane-plugin-gateway
+A reverse proxy and API gateway plugin for the Hyperlane framework powered by `http-request` with pooled HTTP/1.1 & HTTP/2 upstream connections, round-robin / least-connections / weighted load balancing, circuit breaking, per-route token-bucket rate limiting, RFC 9110 hop-by-hop header stripping, `X-Forwarded-*` injection, and an opt-in `GatewayHook` `ServerHook`.
+# Path: hyperlane/plugin/gateway/tests/mod.rs
+```rust
+mod gateway;
+use super::*;
+use std::{collections::VecDeque, io::Error, net::SocketAddr};
+use hyperlane::tokio::{
+    self,
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+};
+```
+# Path: hyperlane/plugin/gateway/tests/gateway/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/plugin/gateway/tests/gateway/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_gateway_prefix_boundary_hop_by_hop_and_weighted_selection() {
+    assert!(path_matches_prefix("/api", "/api"));
+    assert!(path_matches_prefix("/api/v1/users", "/api"));
+    assert!(!path_matches_prefix("/apiv2/users", "/api"));
+    assert_eq!(
+        build_upstream_url("http://127.0.0.1:9000", "/api/users", "a=1", "/api", true),
+        "http://127.0.0.1:9000/users?a=1"
+    );
+    assert_eq!(
+        build_upstream_url("http://127.0.0.1:9000", "/api", "", "/api", true),
+        "http://127.0.0.1:9000/"
+    );
+    let extra: HashSet<String> = HashSet::from(["x-internal-hop".to_owned()]);
+    assert!(is_hop_by_hop_header("Connection", &extra));
+    assert!(is_hop_by_hop_header("Transfer-Encoding", &extra));
+    assert!(is_hop_by_hop_header("X-Internal-Hop", &extra));
+    assert!(!is_hop_by_hop_header("X-Request-Id", &extra));
+    let mut route: GatewayRoute = GatewayRoute::new(
+        "/svc",
+        vec![
+            UpstreamTarget::new("http://u1.local").with_weight(2),
+            UpstreamTarget::new("http://u2.local").with_weight(1),
+        ],
+    );
+    route.set_strategy(LoadBalanceStrategy::WeightedRoundRobin);
+    let mut cfg: GatewayConfig = GatewayConfig::default();
+    cfg.set_routes(vec![route]);
+    let runtime: GatewayRuntime = GatewayRuntime::new(cfg);
+    let picks: Vec<String> = (0..3usize)
+        .map(|_: usize| runtime.select_target_url(None, "/svc/ping").unwrap())
+        .collect();
+    assert_eq!(
+        picks,
+        vec!["http://u1.local", "http://u1.local", "http://u2.local"]
+    );
+}
+#[tokio::test]
+async fn test_gateway_end_to_end_forward_rate_limit_and_circuit_breaker() {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let server: tokio::task::JoinHandle<()> = tokio::spawn(async move {
+        while let Ok((mut stream, _)) = listener.accept().await {
+            tokio::spawn(async move {
+                let mut buf: [u8; 1024] = [0u8; 1024];
+                let n: usize = stream.read(&mut buf).await.unwrap_or(0);
+                let req_str: String = String::from_utf8_lossy(&buf[..n]).into_owned();
+                let resp_body: String = if req_str.starts_with("GET /hello") {
+                    "proxied-ok".to_owned()
+                } else {
+                    "unexpected".to_owned()
+                };
+                let wire: String = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\nX-Backend: up\r\n\r\n{resp_body}",
+                    resp_body.len()
+                );
+                let _: Result<(), Error> = stream.write_all(wire.as_bytes()).await;
+            });
+        }
+    });
+    let mut route: GatewayRoute =
+        GatewayRoute::new("/api", vec![UpstreamTarget::new(format!("http://{addr}"))]);
+    route
+        .set_strip_prefix(true)
+        .set_rate_limit(Some(RateLimitConfig {
+            requests_per_second: 1,
+            burst: 1,
+        }));
+    let dead_route: GatewayRoute =
+        GatewayRoute::new("/dead", vec![UpstreamTarget::new("http://127.0.0.1:1")]);
+    let mut cfg: GatewayConfig = GatewayConfig::default();
+    cfg.set_routes(vec![route, dead_route])
+        .set_circuit_failure_threshold(1)
+        .set_circuit_reset_ms(5_000);
+    let runtime: GatewayRuntime = GatewayRuntime::new(cfg);
+    let mut ctx: Context = Context::default();
+    ctx.get_mut_request()
+        .set_method(hyperlane::Method::Get)
+        .set_path("/api/hello".to_owned());
+    ctx.get_mut_request()
+        .get_mut_headers()
+        .insert(HOST.to_owned(), VecDeque::from(["gateway.test".to_owned()]));
+    ctx.get_mut_request().get_mut_headers().insert(
+        CONNECTION.to_owned(),
+        VecDeque::from(["keep-alive, x-secret-hop".to_owned()]),
+    );
+    ctx.get_mut_request().get_mut_headers().insert(
+        "x-secret-hop".to_owned(),
+        VecDeque::from(["drop-me".to_owned()]),
+    );
+    assert!(runtime.forward(&mut ctx, Some("10.0.0.5")).await);
+    assert_eq!(ctx.get_response().get_status_code(), 200usize);
+    assert_eq!(ctx.get_response().get_body().as_slice(), b"proxied-ok");
+    assert_eq!(
+        ctx.get_response()
+            .try_get_header_back("x-backend")
+            .as_deref(),
+        Some("up")
+    );
+    let mut limited_ctx: Context = Context::default();
+    limited_ctx
+        .get_mut_request()
+        .set_method(hyperlane::Method::Get)
+        .set_path("/api/hello".to_owned());
+    assert!(runtime.forward(&mut limited_ctx, None).await);
+    assert_eq!(
+        limited_ctx.get_response().get_status_code(),
+        HttpStatus::TooManyRequests.code()
+    );
+    let mut dead_ctx1: Context = Context::default();
+    dead_ctx1
+        .get_mut_request()
+        .set_method(hyperlane::Method::Get)
+        .set_path("/dead/ping".to_owned());
+    assert!(runtime.forward(&mut dead_ctx1, None).await);
+    assert_eq!(
+        dead_ctx1.get_response().get_status_code(),
+        HttpStatus::BadGateway.code()
+    );
+    let mut dead_ctx2: Context = Context::default();
+    dead_ctx2
+        .get_mut_request()
+        .set_method(hyperlane::Method::Get)
+        .set_path("/dead/ping".to_owned());
+    assert!(runtime.forward(&mut dead_ctx2, None).await);
+    assert_eq!(
+        dead_ctx2.get_response().get_status_code(),
+        HttpStatus::ServiceUnavailable.code()
+    );
+    server.abort();
+}
+```
+# Path: hyperlane/plugin/gateway/src/impl.rs
+```rust
+use super::*;
+impl UpstreamTarget {
+    pub fn new<U>(url: U) -> Self
+    where
+        U: Into<String>,
+    {
+        Self {
+            url: url.into(),
+            weight: 1,
+        }
+    }
+    pub fn with_weight(mut self, weight: u32) -> Self {
+        self.set_weight(weight.max(1));
+        self
+    }
+}
+impl GatewayRoute {
+    pub fn new<P>(prefix: P, upstreams: Vec<UpstreamTarget>) -> Self
+    where
+        P: Into<String>,
+    {
+        Self {
+            prefix: prefix.into(),
+            strip_prefix: false,
+            host: None,
+            upstreams,
+            strategy: LoadBalanceStrategy::RoundRobin,
+            timeout_ms: DEFAULT_UPSTREAM_TIMEOUT_MS,
+            max_retries: 0,
+            rate_limit: None,
+            use_http2: false,
+        }
+    }
+}
+impl Default for GatewayConfig {
+    fn default() -> Self {
+        Self {
+            routes: Vec::new(),
+            max_body_size: DEFAULT_GATEWAY_MAX_BODY_SIZE,
+            circuit_failure_threshold: DEFAULT_CIRCUIT_FAILURE_THRESHOLD,
+            circuit_reset_ms: DEFAULT_CIRCUIT_RESET_MS,
+        }
+    }
+}
+impl TokenBucket {
+    pub(crate) fn new(config: RateLimitConfig) -> Self {
+        let cap: f64 = config.get_burst().max(1) as f64;
+        Self {
+            rate_per_sec: config.get_requests_per_second().max(1) as f64,
+            capacity: cap,
+            state: Mutex::new(TokenBucketState {
+                tokens: cap,
+                last_refill: Instant::now(),
+            }),
+        }
+    }
+    pub(crate) fn try_acquire(&self) -> bool {
+        let Self {
+            rate_per_sec,
+            capacity,
+            state,
+        } = self;
+        let Ok(mut guard) = state.lock() else {
+            return true;
+        };
+        let now: Instant = Instant::now();
+        let elapsed_secs: f64 = now.duration_since(guard.last_refill).as_secs_f64();
+        guard.tokens = (guard.tokens + elapsed_secs * *rate_per_sec).min(*capacity);
+        guard.last_refill = now;
+        if guard.tokens >= 1.0 {
+            guard.tokens -= 1.0;
+            true
+        } else {
+            false
+        }
+    }
+}
+impl UpstreamRuntime {
+    pub(crate) fn is_available(&self, now_ms: u64) -> bool {
+        let Self { open_until_ms, .. } = self;
+        let open_until: u64 = open_until_ms.load(Ordering::Relaxed);
+        open_until == 0 || now_ms >= open_until
+    }
+    pub(crate) fn record_success(&self) {
+        let Self {
+            consecutive_failures,
+            open_until_ms,
+            ..
+        } = self;
+        consecutive_failures.store(0, Ordering::Relaxed);
+        open_until_ms.store(0, Ordering::Relaxed);
+    }
+    pub(crate) fn record_failure(&self, threshold: u32, reset_ms: u64) {
+        let Self {
+            consecutive_failures,
+            open_until_ms,
+            ..
+        } = self;
+        let failures: u32 = consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
+        if threshold > 0 && failures >= threshold {
+            let until: u64 = gateway_now_ms().saturating_add(reset_ms);
+            open_until_ms.store(until, Ordering::Relaxed);
+        }
+    }
+}
+impl CompiledRoute {
+    pub(crate) fn select_upstream(&self, now_ms: u64) -> Option<Arc<UpstreamRuntime>> {
+        let Self {
+            route,
+            upstreams,
+            cursor,
+            ..
+        } = self;
+        let healthy: Vec<&Arc<UpstreamRuntime>> = upstreams
+            .iter()
+            .filter(|node: &&Arc<UpstreamRuntime>| node.is_available(now_ms))
+            .collect();
+        if healthy.is_empty() {
+            return None;
+        }
+        match route.get_strategy() {
+            LoadBalanceStrategy::RoundRobin => {
+                let idx: usize = cursor.fetch_add(1, Ordering::Relaxed) % healthy.len();
+                Some(Arc::clone(healthy[idx]))
+            }
+            LoadBalanceStrategy::LeastConnections => healthy
+                .into_iter()
+                .min_by_key(|node: &&Arc<UpstreamRuntime>| {
+                    node.active_conns.load(Ordering::Relaxed)
+                })
+                .cloned(),
+            LoadBalanceStrategy::WeightedRoundRobin => {
+                let total_weight: usize = healthy
+                    .iter()
+                    .map(|node: &&Arc<UpstreamRuntime>| node.weight.max(1) as usize)
+                    .sum();
+                let mut slot: usize = cursor.fetch_add(1, Ordering::Relaxed) % total_weight;
+                for node in healthy {
+                    let w: usize = node.weight.max(1) as usize;
+                    if slot < w {
+                        return Some(Arc::clone(node));
+                    }
+                    slot -= w;
+                }
+                None
+            }
+        }
+    }
+}
+impl GatewayRuntime {
+    pub fn new(config: GatewayConfig) -> Self {
+        let mut compiled: Vec<CompiledRoute> = config
+            .get_routes()
+            .iter()
+            .map(|route: &GatewayRoute| {
+                let normalized_prefix: String = normalize_prefix(route.get_prefix());
+                let upstreams: Vec<Arc<UpstreamRuntime>> = route
+                    .get_upstreams()
+                    .iter()
+                    .map(|u: &UpstreamTarget| {
+                        Arc::new(UpstreamRuntime {
+                            base_url: u.get_url().trim_end_matches('/').to_owned(),
+                            weight: u.get_weight().max(1),
+                            active_conns: AtomicUsize::new(0),
+                            consecutive_failures: AtomicU32::new(0),
+                            open_until_ms: AtomicU64::new(0),
+                        })
+                    })
+                    .collect();
+                let limiter: Option<TokenBucket> = route.get_rate_limit().map(TokenBucket::new);
+                CompiledRoute {
+                    route: route.clone(),
+                    normalized_prefix,
+                    upstreams,
+                    cursor: AtomicUsize::new(0),
+                    limiter,
+                }
+            })
+            .collect();
+        compiled.sort_by(|a: &CompiledRoute, b: &CompiledRoute| {
+            b.normalized_prefix
+                .len()
+                .cmp(&a.normalized_prefix.len())
+                .then_with(|| {
+                    b.route
+                        .get_host()
+                        .is_some()
+                        .cmp(&a.route.get_host().is_some())
+                })
+        });
+        Self {
+            config,
+            routes: Arc::new(compiled),
+        }
+    }
+    pub fn get_config(&self) -> &GatewayConfig {
+        &self.config
+    }
+    pub(crate) fn match_route(&self, host: Option<&str>, path: &str) -> Option<&CompiledRoute> {
+        let Self { routes, .. } = self;
+        for compiled in routes.iter() {
+            if let Some(required_host) = compiled.route.get_host() {
+                let matches_host: bool = host.is_some_and(|incoming: &str| {
+                    incoming.trim().eq_ignore_ascii_case(&required_host)
+                });
+                if !matches_host {
+                    continue;
+                }
+            }
+            if path_matches_prefix(path, &compiled.normalized_prefix) {
+                return Some(compiled);
+            }
+        }
+        None
+    }
+    pub fn select_target_url(&self, host: Option<&str>, path: &str) -> Option<String> {
+        let route: &CompiledRoute = self.match_route(host, path)?;
+        route
+            .select_upstream(gateway_now_ms())
+            .map(|node: Arc<UpstreamRuntime>| node.base_url.clone())
+    }
+    pub async fn forward(&self, ctx: &mut Context, peer_ip: Option<&str>) -> bool {
+        let path: String = ctx.get_request().get_path().clone();
+        let host_hdr: Option<String> = ctx.get_request().try_get_header_back(HOST);
+        let Some(compiled) = self.match_route(host_hdr.as_deref(), &path) else {
+            return false;
+        };
+        if let Some(limiter) = &compiled.limiter
+            && !limiter.try_acquire()
+        {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::TooManyRequests.code())
+                .set_body(Vec::new());
+            return true;
+        }
+        let req_body: Vec<u8> = ctx.get_request().get_body().clone();
+        if req_body.len() > self.get_config().get_max_body_size() {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::PayloadTooLarge.code())
+                .set_body(Vec::new());
+            return true;
+        }
+        let Some(upstream) = compiled.select_upstream(gateway_now_ms()) else {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::ServiceUnavailable.code())
+                .set_body(Vec::new());
+            return true;
+        };
+        let mut query: String = String::new();
+        for (k, vals) in ctx.get_request().get_querys() {
+            for v in vals {
+                if !query.is_empty() {
+                    query.push('&');
+                }
+                query.push_str(k);
+                if !v.is_empty() {
+                    query.push('=');
+                    query.push_str(v);
+                }
+            }
+        }
+        let target_url: String = build_upstream_url(
+            &upstream.base_url,
+            &path,
+            &query,
+            &compiled.normalized_prefix,
+            compiled.route.get_strip_prefix(),
+        );
+        let conn_vals: Vec<String> = ctx
+            .get_request()
+            .get_headers()
+            .iter()
+            .filter(|(k, _): &(&String, &RequestHeadersValue)| k.eq_ignore_ascii_case(CONNECTION))
+            .flat_map(|(_, vals): (&String, &RequestHeadersValue)| vals.iter().cloned())
+            .collect();
+        let extra_hop: HashSet<String> = extract_connection_header_tokens(&conn_vals);
+        let mut forward_headers: HashMap<String, String> = HashMap::new();
+        for (name, values) in ctx.get_request().get_headers() {
+            if name.eq_ignore_ascii_case(HOST)
+                || name.eq_ignore_ascii_case(HEADER_CONTENT_LENGTH)
+                || is_hop_by_hop_header(name, &extra_hop)
+            {
+                continue;
+            }
+            if let Some(last) = values.back() {
+                forward_headers.insert(name.to_ascii_lowercase(), last.clone());
+            }
+        }
+        if let Some(client_ip) = peer_ip
+            && !client_ip.is_empty()
+        {
+            let xff: String = match forward_headers.get(HEADER_X_FORWARDED_FOR) {
+                Some(prev) if !prev.is_empty() => format!("{prev}, {client_ip}"),
+                _ => client_ip.to_owned(),
+            };
+            forward_headers.insert(HEADER_X_FORWARDED_FOR.to_owned(), xff);
+        }
+        if let Some(original_host) = host_hdr {
+            forward_headers
+                .entry(HEADER_X_FORWARDED_HOST.to_owned())
+                .or_insert(original_host);
+        }
+        forward_headers
+            .entry(HEADER_X_FORWARDED_PROTO.to_owned())
+            .or_insert_with(|| PROTO_HTTP.to_owned());
+        let mut builder: RequestBuilder = RequestBuilder::new();
+        builder
+            .method(ctx.get_request().get_method().clone())
+            .url(target_url)
+            .headers(forward_headers)
+            .body(req_body)
+            .timeout(compiled.route.get_timeout_ms())
+            .retry(compiled.route.get_max_retries())
+            .keep_alive(true);
+        if compiled.route.get_use_http2() {
+            builder.http2_only();
+        }
+        let mut upstream_req: HttpRequest = builder.build();
+        upstream.active_conns.fetch_add(1, Ordering::Relaxed);
+        let send_res: Result<HttpResponse, _> = upstream_req.send_async().await;
+        upstream.active_conns.fetch_sub(1, Ordering::Relaxed);
+        match send_res {
+            Ok(resp) => {
+                if resp.get_status_code() >= 502 && resp.get_status_code() <= 504 {
+                    upstream.record_failure(
+                        self.get_config().get_circuit_failure_threshold(),
+                        self.get_config().get_circuit_reset_ms(),
+                    );
+                } else {
+                    upstream.record_success();
+                }
+                let resp_conn_vals: Vec<String> = resp
+                    .get_headers()
+                    .iter()
+                    .filter(|(k, _): &(&String, &String)| k.eq_ignore_ascii_case(CONNECTION))
+                    .map(|(_, v): (&String, &String)| v.clone())
+                    .collect();
+                let resp_extra_hop: HashSet<String> =
+                    extract_connection_header_tokens(&resp_conn_vals);
+                let out_resp: &mut Response = ctx.get_mut_response();
+                out_resp.set_status_code(resp.get_status_code());
+                for (name, value) in resp.get_headers() {
+                    if name.eq_ignore_ascii_case(HEADER_CONTENT_LENGTH)
+                        || is_hop_by_hop_header(name, &resp_extra_hop)
+                    {
+                        continue;
+                    }
+                    out_resp.set_header(name, value);
+                }
+                out_resp
+                    .set_header(HEADER_X_GATEWAY_UPSTREAM, &upstream.base_url)
+                    .set_body(resp.bytes());
+            }
+            Err(_) => {
+                upstream.record_failure(
+                    self.get_config().get_circuit_failure_threshold(),
+                    self.get_config().get_circuit_reset_ms(),
+                );
+                ctx.get_mut_response()
+                    .set_status_code(HttpStatus::BadGateway.code())
+                    .set_body(Vec::new());
+            }
+        }
+        true
+    }
+}
+impl GatewayPlugin {
+    pub fn init(config: GatewayConfig) -> &'static Self {
+        GATEWAY_PLUGIN.get_or_init(|| Self {
+            runtime: GatewayRuntime::new(config),
+        })
+    }
+    pub fn get() -> Option<&'static Self> {
+        GATEWAY_PLUGIN.get()
+    }
+    pub fn get_runtime(&self) -> &GatewayRuntime {
+        &self.runtime
+    }
+}
+impl ServerHook for GatewayHook {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let Some(plugin) = GatewayPlugin::get() else {
+            return Status::Continue;
+        };
+        let peer_ip: Option<String> = stream
+            .get_peer_addr()
+            .ok()
+            .map(|addr: SocketAddr| addr.ip().to_string());
+        if plugin.get_runtime().forward(ctx, peer_ip.as_deref()).await {
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+```
+# Path: hyperlane/plugin/gateway/src/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum LoadBalanceStrategy {
+    #[default]
+    RoundRobin,
+    LeastConnections,
+    WeightedRoundRobin,
+}
+```
+# Path: hyperlane/plugin/gateway/src/static.rs
+```rust
+use super::*;
+pub(crate) static GATEWAY_PLUGIN: OnceLock<GatewayPlugin> = OnceLock::new();
+```
+# Path: hyperlane/plugin/gateway/src/const.rs
+```rust
+pub const DEFAULT_GATEWAY_MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
+pub const DEFAULT_CIRCUIT_FAILURE_THRESHOLD: u32 = 5;
+pub const DEFAULT_CIRCUIT_RESET_MS: u64 = 15_000;
+pub const DEFAULT_UPSTREAM_TIMEOUT_MS: u64 = 10_000;
+pub const HEADER_X_FORWARDED_FOR: &str = "x-forwarded-for";
+pub const HEADER_X_FORWARDED_HOST: &str = "x-forwarded-host";
+pub const HEADER_X_FORWARDED_PROTO: &str = "x-forwarded-proto";
+pub const HEADER_X_GATEWAY_UPSTREAM: &str = "x-gateway-upstream";
+pub(crate) const PROTO_HTTP: &str = "http";
+pub(crate) const HEADER_PROXY_CONNECTION: &str = "proxy-connection";
+pub(crate) const HEADER_TRAILER: &str = "trailer";
+pub(crate) const HEADER_CONTENT_LENGTH: &str = "content-length";
+```
+# Path: hyperlane/plugin/gateway/src/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Copy, Data, Debug, Eq, PartialEq)]
+pub struct RateLimitConfig {
+    #[get(type(copy))]
+    pub(crate) requests_per_second: u64,
+    #[get(type(copy))]
+    pub(crate) burst: u64,
+}
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct UpstreamTarget {
+    pub(crate) url: String,
+    #[get(type(copy))]
+    pub(crate) weight: u32,
+}
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct GatewayRoute {
+    pub(crate) prefix: String,
+    #[get(type(copy))]
+    pub(crate) strip_prefix: bool,
+    #[get(type(clone))]
+    pub(crate) host: Option<String>,
+    pub(crate) upstreams: Vec<UpstreamTarget>,
+    #[get(type(copy))]
+    pub(crate) strategy: LoadBalanceStrategy,
+    #[get(type(copy))]
+    pub(crate) timeout_ms: u64,
+    #[get(type(copy))]
+    pub(crate) max_retries: usize,
+    #[get(type(copy))]
+    pub(crate) rate_limit: Option<RateLimitConfig>,
+    #[get(type(copy))]
+    pub(crate) use_http2: bool,
+}
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct GatewayConfig {
+    pub(crate) routes: Vec<GatewayRoute>,
+    #[get(type(copy))]
+    pub(crate) max_body_size: usize,
+    #[get(type(copy))]
+    pub(crate) circuit_failure_threshold: u32,
+    #[get(type(copy))]
+    pub(crate) circuit_reset_ms: u64,
+}
+pub(crate) struct UpstreamRuntime {
+    pub(crate) base_url: String,
+    pub(crate) weight: u32,
+    pub(crate) active_conns: AtomicUsize,
+    pub(crate) consecutive_failures: AtomicU32,
+    pub(crate) open_until_ms: AtomicU64,
+}
+pub(crate) struct TokenBucketState {
+    pub(crate) tokens: f64,
+    pub(crate) last_refill: Instant,
+}
+pub(crate) struct TokenBucket {
+    pub(crate) rate_per_sec: f64,
+    pub(crate) capacity: f64,
+    pub(crate) state: Mutex<TokenBucketState>,
+}
+pub(crate) struct CompiledRoute {
+    pub(crate) route: GatewayRoute,
+    pub(crate) normalized_prefix: String,
+    pub(crate) upstreams: Vec<Arc<UpstreamRuntime>>,
+    pub(crate) cursor: AtomicUsize,
+    pub(crate) limiter: Option<TokenBucket>,
+}
+#[derive(Clone)]
+pub struct GatewayRuntime {
+    pub(crate) config: GatewayConfig,
+    pub(crate) routes: Arc<Vec<CompiledRoute>>,
+}
+#[derive(Clone)]
+pub struct GatewayPlugin {
+    pub(crate) runtime: GatewayRuntime,
+}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct GatewayHook;
+```
+# Path: hyperlane/plugin/gateway/src/fn.rs
+```rust
+use super::*;
+pub(crate) fn gateway_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|dur: Duration| dur.as_millis() as u64)
+        .unwrap_or(0)
+}
+pub(crate) fn normalize_prefix(prefix: &str) -> String {
+    let trimmed: &str = prefix.trim();
+    if trimmed.is_empty() || trimmed == "/" {
+        return "/".to_owned();
+    }
+    let with_slash: String = if trimmed.starts_with('/') {
+        trimmed.to_owned()
+    } else {
+        format!("/{trimmed}")
+    };
+    with_slash.trim_end_matches('/').to_owned()
+}
+pub fn path_matches_prefix(path: &str, prefix: &str) -> bool {
+    if prefix == "/" {
+        return true;
+    }
+    let Some(rest) = path.strip_prefix(prefix) else {
+        return false;
+    };
+    rest.is_empty() || rest.starts_with('/')
+}
+pub fn build_upstream_url(
+    base_url: &str,
+    path: &str,
+    query: &str,
+    prefix: &str,
+    strip_prefix: bool,
+) -> String {
+    let forward_path: &str = if strip_prefix && prefix != "/" {
+        let stripped: &str = path.strip_prefix(prefix).unwrap_or(path);
+        if stripped.is_empty() { "/" } else { stripped }
+    } else if path.is_empty() {
+        "/"
+    } else {
+        path
+    };
+    if query.is_empty() {
+        format!("{base_url}{forward_path}")
+    } else {
+        format!("{base_url}{forward_path}?{query}")
+    }
+}
+pub fn is_hop_by_hop_header(name: &str, extra_connection_headers: &HashSet<String>) -> bool {
+    let lower: String = name.to_ascii_lowercase();
+    lower == CONNECTION
+        || lower == KEEP_ALIVE
+        || lower == PROXY_AUTHENTICATE
+        || lower == PROXY_AUTHORIZATION
+        || lower == HEADER_PROXY_CONNECTION
+        || lower == TE
+        || lower == HEADER_TRAILER
+        || lower == TRANSFER_ENCODING
+        || lower == UPGRADE
+        || extra_connection_headers.contains(&lower)
+}
+pub(crate) fn extract_connection_header_tokens(values: &[String]) -> HashSet<String> {
+    let mut tokens: HashSet<String> = HashSet::new();
+    for val in values {
+        for part in val.split(',') {
+            let trimmed: &str = part.trim();
+            if !trimmed.is_empty() {
+                tokens.insert(trimmed.to_ascii_lowercase());
+            }
+        }
+    }
+    tokens
+}
+```
+# Path: hyperlane/plugin/gateway/src/lib.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
+pub use {r#const::*, r#enum::*, r#fn::*, r#struct::*};
+pub(crate) use r#static::*;
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    sync::{
+        Arc, Mutex, OnceLock,
+        atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
+use {
+    http_request::{HttpRequest, HttpResponse, RequestBuilder},
+    hyperlane::{
+        CONNECTION, Context, HOST, HttpStatus, KEEP_ALIVE, PROXY_AUTHENTICATE, PROXY_AUTHORIZATION,
+        RequestHeadersValue, Response, ResponseData, ResponseError, ServerHook, Status, Stream, TE,
+        TRANSFER_ENCODING, UPGRADE,
+    },
+    lombok_macros::*,
+};
+```
+# Path: hyperlane/plugin/grpc/README.md
+# hyperlane-plugin-grpc
+A gRPC over HTTP/2 plugin for the Hyperlane framework providing 5-byte length-prefixed framing, bounded compression/decompression, canonical gRPC status codes `0..=16`, percent-encoded `grpc-message`, `grpc-timeout` deadline enforcement, service routing, and an opt-in `GrpcHook` `ServerHook`.
+# Path: hyperlane/plugin/grpc/tests/mod.rs
+```rust
+mod grpc;
+use super::*;
+use hyperlane::tokio;
+```
+# Path: hyperlane/plugin/grpc/tests/grpc/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/plugin/grpc/tests/grpc/fn.rs
+```rust
+use super::*;
+#[test]
+fn test_grpc_frame_roundtrip_compression_bounds_and_timeout_parser() {
+    let raw_payload: Vec<u8> = b"protobuf-encoded-payload-hello-world".to_vec();
+    let frame: GrpcFrame = GrpcFrame::new(raw_payload.clone());
+    let plain_wire: Vec<u8> = frame.encode(Compress::Unknown).unwrap();
+    assert_eq!(plain_wire[0], 0u8);
+    let decoded_plain: GrpcFrame = GrpcFrame::decode(&plain_wire, Compress::Unknown, 1024).unwrap();
+    assert_eq!(decoded_plain.get_payload(), &raw_payload);
+    let gzip_wire: Vec<u8> = frame.encode(Compress::Gzip).unwrap();
+    assert_eq!(gzip_wire[0], 1u8);
+    let decoded_gzip: GrpcFrame = GrpcFrame::decode(&gzip_wire, Compress::Gzip, 1024).unwrap();
+    assert_eq!(decoded_gzip.get_payload(), &raw_payload);
+    assert_eq!(
+        GrpcFrame::decode(&gzip_wire, Compress::Unknown, 1024)
+            .unwrap_err()
+            .get_status(),
+        GrpcStatus::Unimplemented
+    );
+    assert_eq!(
+        GrpcFrame::decode(&[2u8, 0, 0, 0, 0], Compress::Unknown, 1024)
+            .unwrap_err()
+            .get_status(),
+        GrpcStatus::Internal
+    );
+    let huge_bomb: Vec<u8> = vec![b'A'; 16 * 1024];
+    let bomb_wire: Vec<u8> = GrpcFrame::new(huge_bomb).encode(Compress::Gzip).unwrap();
+    assert_eq!(
+        GrpcFrame::decode(&bomb_wire, Compress::Gzip, 1024)
+            .unwrap_err()
+            .get_status(),
+        GrpcStatus::ResourceExhausted
+    );
+    assert_eq!(parse_grpc_timeout("5S"), Some(Duration::from_secs(5)));
+    assert_eq!(parse_grpc_timeout("250m"), Some(Duration::from_millis(250)));
+    assert_eq!(parse_grpc_timeout("bad"), None);
+    assert!(is_grpc_content_type(
+        "application/grpc+proto; charset=utf-8"
+    ));
+    assert!(!is_grpc_content_type("application/json"));
+    assert_eq!(
+        percent_encode_grpc_message("ok %100\r\n"),
+        "ok %25100%0D%0A"
+    );
+}
+#[tokio::test]
+async fn test_grpc_router_dispatch_unimplemented_and_deadline_exceeded() {
+    let mut router: GrpcRouter = GrpcRouter::new();
+    router.register(
+        "/demo.Echo/Say",
+        |payload: Vec<u8>| async move { Ok(payload) },
+    );
+    router.register("/demo.Echo/Slow", |_payload: Vec<u8>| async move {
+        tokio::time::sleep(Duration::from_millis(120)).await;
+        Ok(b"late".to_vec())
+    });
+    let cfg: GrpcConfig = GrpcConfig::default();
+    let req_wire: Vec<u8> = GrpcFrame::new(b"ping".to_vec())
+        .encode(Compress::Unknown)
+        .unwrap();
+    let (status, msg, body): (GrpcStatus, String, Vec<u8>) = router
+        .dispatch("/demo.Echo/Say", &req_wire, Compress::Unknown, None, &cfg)
+        .await;
+    assert_eq!(status, GrpcStatus::Ok);
+    assert!(msg.is_empty());
+    let resp_frame: GrpcFrame = GrpcFrame::decode(&body, Compress::Unknown, 1024).unwrap();
+    assert_eq!(resp_frame.get_payload().as_slice(), b"ping");
+    let (unimpl, _, _): (GrpcStatus, String, Vec<u8>) = router
+        .dispatch(
+            "/demo.Echo/Missing",
+            &req_wire,
+            Compress::Unknown,
+            None,
+            &cfg,
+        )
+        .await;
+    assert_eq!(unimpl, GrpcStatus::Unimplemented);
+    let (timed_out, _, _): (GrpcStatus, String, Vec<u8>) = router
+        .dispatch(
+            "/demo.Echo/Slow",
+            &req_wire,
+            Compress::Unknown,
+            Some(Duration::from_millis(20)),
+            &cfg,
+        )
+        .await;
+    assert_eq!(timed_out, GrpcStatus::DeadlineExceeded);
+}
+```
+# Path: hyperlane/plugin/grpc/src/type.rs
+```rust
+use super::*;
+pub type GrpcFuture = Pin<Box<dyn Future<Output = Result<Vec<u8>, GrpcError>> + Send>>;
+pub type GrpcHandler = Arc<dyn Fn(Vec<u8>) -> GrpcFuture + Send + Sync>;
+```
+# Path: hyperlane/plugin/grpc/src/impl.rs
+```rust
+use super::*;
+impl GrpcStatus {
+    pub fn code(self) -> u8 {
+        self as u8
+    }
+    pub fn from_code(code: u8) -> Self {
+        match code {
+            0 => Self::Ok,
+            1 => Self::Cancelled,
+            2 => Self::Unknown,
+            3 => Self::InvalidArgument,
+            4 => Self::DeadlineExceeded,
+            5 => Self::NotFound,
+            6 => Self::AlreadyExists,
+            7 => Self::PermissionDenied,
+            8 => Self::ResourceExhausted,
+            9 => Self::FailedPrecondition,
+            10 => Self::Aborted,
+            11 => Self::OutOfRange,
+            12 => Self::Unimplemented,
+            13 => Self::Internal,
+            14 => Self::Unavailable,
+            15 => Self::DataLoss,
+            16 => Self::Unauthenticated,
+            _ => Self::Unknown,
+        }
+    }
+}
+impl Display for GrpcError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "gRPC status {}: {}",
+            self.get_status().code(),
+            self.get_message()
+        )
+    }
+}
+impl Error for GrpcError {}
+impl GrpcError {
+    pub fn new<M>(status: GrpcStatus, message: M) -> Self
+    where
+        M: Into<String>,
+    {
+        Self {
+            status,
+            message: message.into(),
+        }
+    }
+    pub fn encoded_message(&self) -> String {
+        percent_encode_grpc_message(self.get_message())
+    }
+}
+impl Default for GrpcConfig {
+    fn default() -> Self {
+        Self {
+            max_message_size: DEFAULT_GRPC_MAX_MESSAGE_SIZE,
+            compression: Compress::Unknown,
+        }
+    }
+}
+impl GrpcFrame {
+    pub fn new(payload: Vec<u8>) -> Self {
+        Self {
+            compressed: false,
+            payload,
+        }
+    }
+    pub fn encode(&self, encoding: Compress) -> Result<Vec<u8>, GrpcError> {
+        let (flag, body): (u8, Vec<u8>) = if matches!(encoding, Compress::Unknown) {
+            (0u8, self.get_payload().clone())
+        } else {
+            let compressed: Vec<u8> = encoding
+                .encode(self.get_payload(), GRPC_DECOMPRESS_BUF_SIZE)
+                .into_owned();
+            (1u8, compressed)
+        };
+        let len_u32: u32 = u32::try_from(body.len())
+            .map_err(|_| GrpcError::new(GrpcStatus::ResourceExhausted, ERR_GRPC_MSG_TOO_LARGE))?;
+        let mut wire: Vec<u8> = Vec::with_capacity(GRPC_FRAME_HEADER_LEN + body.len());
+        wire.push(flag);
+        wire.extend_from_slice(&len_u32.to_be_bytes());
+        wire.extend_from_slice(&body);
+        Ok(wire)
+    }
+    pub fn decode(
+        raw: &[u8],
+        encoding: Compress,
+        max_message_size: usize,
+    ) -> Result<Self, GrpcError> {
+        if raw.len() < GRPC_FRAME_HEADER_LEN {
+            return Err(GrpcError::new(
+                GrpcStatus::Internal,
+                ERR_GRPC_TRUNCATED_HEADER,
+            ));
+        }
+        let flag: u8 = raw[0];
+        if flag > 1 {
+            return Err(GrpcError::new(GrpcStatus::Internal, ERR_GRPC_INVALID_FLAG));
+        }
+        let declared_len: usize = u32::from_be_bytes([raw[1], raw[2], raw[3], raw[4]]) as usize;
+        if declared_len > max_message_size {
+            return Err(GrpcError::new(
+                GrpcStatus::ResourceExhausted,
+                ERR_GRPC_MSG_TOO_LARGE,
+            ));
+        }
+        let body_end: usize = GRPC_FRAME_HEADER_LEN.saturating_add(declared_len);
+        if raw.len() < body_end {
+            return Err(GrpcError::new(
+                GrpcStatus::Internal,
+                ERR_GRPC_TRUNCATED_BODY,
+            ));
+        }
+        let frame_slice: &[u8] = &raw[GRPC_FRAME_HEADER_LEN..body_end];
+        if flag == 0 {
+            return Ok(Self {
+                compressed: false,
+                payload: frame_slice.to_vec(),
+            });
+        }
+        if matches!(encoding, Compress::Unknown) {
+            return Err(GrpcError::new(
+                GrpcStatus::Unimplemented,
+                ERR_GRPC_UNSUPPORTED_ENCODING,
+            ));
+        }
+        let decoded: Vec<u8> = encoding
+            .decode(frame_slice, GRPC_DECOMPRESS_BUF_SIZE)
+            .into_owned();
+        if decoded.len() > max_message_size {
+            return Err(GrpcError::new(
+                GrpcStatus::ResourceExhausted,
+                ERR_GRPC_MSG_TOO_LARGE,
+            ));
+        }
+        Ok(Self {
+            compressed: true,
+            payload: decoded,
+        })
+    }
+}
+impl GrpcRouter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn register<P, F, Fut>(&mut self, path: P, handler: F) -> &mut Self
+    where
+        P: Into<String>,
+        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<u8>, GrpcError>> + Send + 'static,
+    {
+        let Self { methods } = self;
+        let boxed: GrpcHandler = Arc::new(move |payload: Vec<u8>| Box::pin(handler(payload)));
+        methods.insert(path.into(), boxed);
+        self
+    }
+    pub fn has_method(&self, path: &str) -> bool {
+        let Self { methods } = self;
+        methods.contains_key(path)
+    }
+    pub async fn dispatch(
+        &self,
+        path: &str,
+        raw_body: &[u8],
+        req_encoding: Compress,
+        deadline: Option<Duration>,
+        config: &GrpcConfig,
+    ) -> (GrpcStatus, String, Vec<u8>) {
+        let Self { methods } = self;
+        let Some(handler) = methods.get(path) else {
+            return (
+                GrpcStatus::Unimplemented,
+                percent_encode_grpc_message(ERR_GRPC_UNIMPLEMENTED),
+                Vec::new(),
+            );
+        };
+        let frame: GrpcFrame =
+            match GrpcFrame::decode(raw_body, req_encoding, config.get_max_message_size()) {
+                Ok(decoded) => decoded,
+                Err(err) => return (err.get_status(), err.encoded_message(), Vec::new()),
+            };
+        let outcome: Result<Vec<u8>, GrpcError> = match deadline {
+            Some(limit) => match timeout(limit, handler(frame.payload)).await {
+                Ok(res) => res,
+                Err(_) => Err(GrpcError::new(
+                    GrpcStatus::DeadlineExceeded,
+                    ERR_GRPC_DEADLINE_EXCEEDED,
+                )),
+            },
+            None => handler(frame.payload).await,
+        };
+        match outcome {
+            Ok(resp_payload) => {
+                if resp_payload.len() > config.get_max_message_size() {
+                    return (
+                        GrpcStatus::ResourceExhausted,
+                        percent_encode_grpc_message(ERR_GRPC_MSG_TOO_LARGE),
+                        Vec::new(),
+                    );
+                }
+                match GrpcFrame::new(resp_payload).encode(config.get_compression()) {
+                    Ok(wire) => (GrpcStatus::Ok, String::new(), wire),
+                    Err(err) => (err.get_status(), err.encoded_message(), Vec::new()),
+                }
+            }
+            Err(err) => (err.get_status(), err.encoded_message(), Vec::new()),
+        }
+    }
+}
+impl GrpcPlugin {
+    pub fn init(config: GrpcConfig, router: GrpcRouter) -> &'static Self {
+        GRPC_PLUGIN.get_or_init(|| Self { config, router })
+    }
+    pub fn get() -> Option<&'static Self> {
+        GRPC_PLUGIN.get()
+    }
+    pub fn get_config(&self) -> &GrpcConfig {
+        &self.config
+    }
+    pub fn get_router(&self) -> &GrpcRouter {
+        &self.router
+    }
+}
+impl ServerHook for GrpcHook {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let Some(plugin) = GrpcPlugin::get() else {
+            return Status::Continue;
+        };
+        let is_grpc: bool = ctx
+            .get_request()
+            .try_get_header_back(CONTENT_TYPE)
+            .is_some_and(|val: String| is_grpc_content_type(&val));
+        if !is_grpc {
+            return Status::Continue;
+        }
+        if !ctx.get_request().get_method().is_post() {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::MethodNotAllowed.code())
+                .set_body(Vec::new());
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        let path: String = ctx.get_request().get_path().clone();
+        let req_encoding: Compress = parse_grpc_encoding(
+            ctx.get_request()
+                .try_get_header_back(GRPC_ENCODING_HEADER)
+                .as_deref(),
+        );
+        let deadline: Option<Duration> = ctx
+            .get_request()
+            .try_get_header_back(GRPC_TIMEOUT_HEADER)
+            .and_then(|val: String| parse_grpc_timeout(&val));
+        let raw_body: Vec<u8> = ctx.get_request().get_body().clone();
+        let config: &GrpcConfig = plugin.get_config();
+        let (status, encoded_msg, wire_body): (GrpcStatus, String, Vec<u8>) = plugin
+            .get_router()
+            .dispatch(&path, &raw_body, req_encoding, deadline, config)
+            .await;
+        let response: &mut Response = ctx.get_mut_response();
+        response
+            .set_status_code(HttpStatus::Ok.code())
+            .set_header(CONTENT_TYPE, GRPC_CONTENT_TYPE)
+            .set_header(GRPC_STATUS_HEADER, status.code().to_string())
+            .set_body(wire_body);
+        if !encoded_msg.is_empty() {
+            response.set_header(GRPC_MESSAGE_HEADER, encoded_msg);
+        }
+        if !matches!(config.get_compression(), Compress::Unknown) && status == GrpcStatus::Ok {
+            response.set_header(GRPC_ENCODING_HEADER, config.get_compression().as_str());
+        }
+        let wire: ResponseData = ctx.get_mut_response().build();
+        let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+        Status::Reject
+    }
+}
+```
+# Path: hyperlane/plugin/grpc/src/enum.rs
+```rust
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[repr(u8)]
+pub enum GrpcStatus {
+    #[default]
+    Ok = 0,
+    Cancelled = 1,
+    Unknown = 2,
+    InvalidArgument = 3,
+    DeadlineExceeded = 4,
+    NotFound = 5,
+    AlreadyExists = 6,
+    PermissionDenied = 7,
+    ResourceExhausted = 8,
+    FailedPrecondition = 9,
+    Aborted = 10,
+    OutOfRange = 11,
+    Unimplemented = 12,
+    Internal = 13,
+    Unavailable = 14,
+    DataLoss = 15,
+    Unauthenticated = 16,
+}
+```
+# Path: hyperlane/plugin/grpc/src/static.rs
+```rust
+use super::*;
+pub(crate) static GRPC_PLUGIN: OnceLock<GrpcPlugin> = OnceLock::new();
+```
+# Path: hyperlane/plugin/grpc/src/const.rs
+```rust
+pub const GRPC_CONTENT_TYPE: &str = "application/grpc";
+pub const GRPC_STATUS_HEADER: &str = "grpc-status";
+pub const GRPC_MESSAGE_HEADER: &str = "grpc-message";
+pub const GRPC_ENCODING_HEADER: &str = "grpc-encoding";
+pub const GRPC_TIMEOUT_HEADER: &str = "grpc-timeout";
+pub const DEFAULT_GRPC_MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
+pub const GRPC_FRAME_HEADER_LEN: usize = 5;
+pub(crate) const GRPC_DECOMPRESS_BUF_SIZE: usize = 4096;
+pub(crate) const GRPC_HEX_UPPER: &[u8; 16] = b"0123456789ABCDEF";
+pub(crate) const GRPC_IDENTITY_ENCODING: &str = "identity";
+pub(crate) const ERR_GRPC_TRUNCATED_HEADER: &str = "Truncated gRPC frame header";
+pub(crate) const ERR_GRPC_INVALID_FLAG: &str = "Invalid gRPC compression flag";
+pub(crate) const ERR_GRPC_MSG_TOO_LARGE: &str = "gRPC message exceeds max_message_size";
+pub(crate) const ERR_GRPC_TRUNCATED_BODY: &str = "Truncated gRPC frame payload";
+pub(crate) const ERR_GRPC_UNSUPPORTED_ENCODING: &str = "Unsupported or missing grpc-encoding";
+pub(crate) const ERR_GRPC_UNIMPLEMENTED: &str = "gRPC method not implemented";
+pub(crate) const ERR_GRPC_DEADLINE_EXCEEDED: &str = "gRPC deadline exceeded";
+```
+# Path: hyperlane/plugin/grpc/src/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct GrpcError {
+    #[get(type(copy))]
+    pub(crate) status: GrpcStatus,
+    pub(crate) message: String,
+}
+#[derive(Clone, Data, Debug, Default, Eq, PartialEq)]
+pub struct GrpcFrame {
+    #[get(type(copy))]
+    pub(crate) compressed: bool,
+    pub(crate) payload: Vec<u8>,
+}
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct GrpcConfig {
+    #[get(type(copy))]
+    pub(crate) max_message_size: usize,
+    #[get(type(copy))]
+    pub(crate) compression: Compress,
+}
+#[derive(Clone, Default)]
+pub struct GrpcRouter {
+    pub(crate) methods: HashMap<String, GrpcHandler>,
+}
+#[derive(Clone)]
+pub struct GrpcPlugin {
+    pub(crate) config: GrpcConfig,
+    pub(crate) router: GrpcRouter,
+}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct GrpcHook;
+```
+# Path: hyperlane/plugin/grpc/src/fn.rs
+```rust
+use super::*;
+pub fn parse_grpc_timeout(raw: &str) -> Option<Duration> {
+    let trimmed: &str = raw.trim();
+    if trimmed.len() < 2 || trimmed.len() > 9 {
+        return None;
+    }
+    let (digits, unit): (&str, &str) = trimmed.split_at(trimmed.len() - 1);
+    if !digits.bytes().all(|b: u8| b.is_ascii_digit()) {
+        return None;
+    }
+    let value: u64 = digits.parse::<u64>().ok()?;
+    match unit {
+        "H" => Some(Duration::from_secs(value.saturating_mul(3600))),
+        "M" => Some(Duration::from_secs(value.saturating_mul(60))),
+        "S" => Some(Duration::from_secs(value)),
+        "m" => Some(Duration::from_millis(value)),
+        "u" => Some(Duration::from_micros(value)),
+        "n" => Some(Duration::from_nanos(value)),
+        _ => None,
+    }
+}
+pub fn percent_encode_grpc_message(raw: &str) -> String {
+    let mut out: String = String::with_capacity(raw.len());
+    for &byte in raw.as_bytes() {
+        let safe: bool = (0x20..=0x7e).contains(&byte) && byte != b'%';
+        if safe {
+            out.push(char::from(byte));
+        } else {
+            out.push('%');
+            out.push(char::from(GRPC_HEX_UPPER[(byte >> 4) as usize]));
+            out.push(char::from(GRPC_HEX_UPPER[(byte & 0x0f) as usize]));
+        }
+    }
+    out
+}
+pub fn is_grpc_content_type(content_type: &str) -> bool {
+    let base: &str = content_type.split(';').next().unwrap_or_default().trim();
+    if base.len() < GRPC_CONTENT_TYPE.len() {
+        return false;
+    }
+    let (prefix, rest): (&str, &str) = base.split_at(GRPC_CONTENT_TYPE.len());
+    prefix.eq_ignore_ascii_case(GRPC_CONTENT_TYPE) && (rest.is_empty() || rest.starts_with('+'))
+}
+pub(crate) fn parse_grpc_encoding(raw: Option<&str>) -> Compress {
+    let Some(token) = raw.map(str::trim) else {
+        return Compress::Unknown;
+    };
+    if token.is_empty() || token.eq_ignore_ascii_case(GRPC_IDENTITY_ENCODING) {
+        return Compress::Unknown;
+    }
+    Compress::from_str(token).unwrap_or(Compress::Unknown)
+}
+```
+# Path: hyperlane/plugin/grpc/src/lib.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
+mod r#type;
+pub use {r#const::*, r#enum::*, r#fn::*, r#struct::*, r#type::*};
+pub(crate) use r#static::*;
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt::{self, Display, Formatter},
+    future::Future,
+    pin::Pin,
+    str::FromStr,
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
+use {
+    http_compress::Compress,
+    hyperlane::{
+        CONTENT_TYPE, Context, HttpStatus, Response, ResponseData, ResponseError, ServerHook,
+        Status, Stream, tokio::time::timeout,
+    },
+    lombok_macros::*,
+};
+```
+# Path: hyperlane/plugin/rpc/README.md
+# hyperlane-plugin-rpc
+A JSON-RPC 2.0 plugin for the Hyperlane framework providing typed async method routing, single and batch dispatch, notification handling, bounded payload/batch protection, and an opt-in `RpcHook` `ServerHook`.
+# Path: hyperlane/plugin/rpc/tests/mod.rs
+```rust
+mod rpc;
+use super::*;
+use hyperlane::tokio;
+use serde_json::json;
+```
+# Path: hyperlane/plugin/rpc/tests/rpc/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/plugin/rpc/tests/rpc/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_rpc_router_single_batch_notification_and_dos_bounds() {
+    let mut router: RpcRouter = RpcRouter::new();
+    router.register("add", |params: Option<Value>| async move {
+        let Some(Value::Array(arr)) = params else {
+            return Err(RpcError::invalid_params(None));
+        };
+        let a: i64 = arr
+            .first()
+            .and_then(Value::as_i64)
+            .ok_or_else(|| RpcError::invalid_params(None))?;
+        let b: i64 = arr
+            .get(1)
+            .and_then(Value::as_i64)
+            .ok_or_else(|| RpcError::invalid_params(None))?;
+        Ok(json!(a + b))
+    });
+    assert!(router.has_method("add"));
+    let mut cfg: RpcConfig = RpcConfig::default();
+    cfg.set_max_batch_size(2);
+    let single_raw: &[u8] = br#"{"jsonrpc":"2.0","method":"add","params":[3,4],"id":1}"#;
+    let single_out: Vec<u8> = router.dispatch_bytes(single_raw, &cfg).await.unwrap();
+    let single_resp: RpcResponse = from_slice(&single_out).unwrap();
+    assert_eq!(single_resp.get_result(), Some(json!(7)));
+    assert_eq!(single_resp.get_id(), &RpcId::Number(1));
+    let notif_raw: &[u8] = br#"{"jsonrpc":"2.0","method":"add","params":[1,2]}"#;
+    assert!(router.dispatch_bytes(notif_raw, &cfg).await.is_none());
+    let batch_raw: &[u8] = br#"[
+        {"jsonrpc":"2.0","method":"add","params":[10,5],"id":"a"},
+        {"jsonrpc":"2.0","method":"missing","id":"b"}
+    ]"#;
+    let batch_out: Vec<u8> = router.dispatch_bytes(batch_raw, &cfg).await.unwrap();
+    let batch_resps: Vec<RpcResponse> = from_slice(&batch_out).unwrap();
+    assert_eq!(batch_resps.len(), 2usize);
+    assert_eq!(batch_resps[0].get_result(), Some(json!(15)));
+    assert_eq!(
+        batch_resps[1].get_error().map(|e: RpcError| e.get_code()),
+        Some(RPC_METHOD_NOT_FOUND)
+    );
+    let huge_batch: &[u8] = br#"[
+        {"jsonrpc":"2.0","method":"add","params":[1,1],"id":1},
+        {"jsonrpc":"2.0","method":"add","params":[1,1],"id":2},
+        {"jsonrpc":"2.0","method":"add","params":[1,1],"id":3}
+    ]"#;
+    let huge_out: Vec<u8> = router.dispatch_bytes(huge_batch, &cfg).await.unwrap();
+    let huge_resp: RpcResponse = from_slice(&huge_out).unwrap();
+    assert_eq!(
+        huge_resp.get_error().map(|e: RpcError| e.get_code()),
+        Some(RPC_INVALID_REQUEST)
+    );
+    let bad_json_out: Vec<u8> = router.dispatch_bytes(b"{broken", &cfg).await.unwrap();
+    let bad_json_resp: RpcResponse = from_slice(&bad_json_out).unwrap();
+    assert_eq!(
+        bad_json_resp.get_error().map(|e: RpcError| e.get_code()),
+        Some(RPC_PARSE_ERROR)
+    );
+    let empty_batch_out: Vec<u8> = router.dispatch_bytes(b"[]", &cfg).await.unwrap();
+    let empty_batch_resp: RpcResponse = from_slice(&empty_batch_out).unwrap();
+    assert_eq!(
+        empty_batch_resp.get_error().map(|e: RpcError| e.get_code()),
+        Some(RPC_INVALID_REQUEST)
+    );
+}
+```
+# Path: hyperlane/plugin/rpc/src/type.rs
+```rust
+use super::*;
+pub type RpcFuture = Pin<Box<dyn Future<Output = Result<Value, RpcError>> + Send>>;
+pub type RpcHandler = Arc<dyn Fn(Option<Value>) -> RpcFuture + Send + Sync>;
+```
+# Path: hyperlane/plugin/rpc/src/impl.rs
+```rust
+use super::*;
+impl Display for RpcError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "JSON-RPC error {}: {}",
+            self.get_code(),
+            self.get_message()
+        )
+    }
+}
+impl Error for RpcError {}
+impl RpcError {
+    pub fn parse_error() -> Self {
+        Self::custom(RPC_PARSE_ERROR, MSG_PARSE_ERROR, None)
+    }
+    pub fn invalid_request() -> Self {
+        Self::custom(RPC_INVALID_REQUEST, MSG_INVALID_REQUEST, None)
+    }
+    pub fn method_not_found() -> Self {
+        Self::custom(RPC_METHOD_NOT_FOUND, MSG_METHOD_NOT_FOUND, None)
+    }
+    pub fn invalid_params(data: Option<Value>) -> Self {
+        Self::custom(RPC_INVALID_PARAMS, MSG_INVALID_PARAMS, data)
+    }
+    pub fn internal_error(data: Option<Value>) -> Self {
+        Self::custom(RPC_INTERNAL_ERROR, MSG_INTERNAL_ERROR, data)
+    }
+    pub fn custom<M>(code: i64, message: M, data: Option<Value>) -> Self
+    where
+        M: Into<String>,
+    {
+        Self {
+            code,
+            message: message.into(),
+            data,
+        }
+    }
+}
+impl RpcResponse {
+    pub fn success(id: RpcId, result: Value) -> Self {
+        Self {
+            jsonrpc: JSONRPC_VERSION.to_owned(),
+            result: Some(result),
+            error: None,
+            id,
+        }
+    }
+    pub fn failure(id: RpcId, error: RpcError) -> Self {
+        Self {
+            jsonrpc: JSONRPC_VERSION.to_owned(),
+            result: None,
+            error: Some(error),
+            id,
+        }
+    }
+}
+impl Default for RpcConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: DEFAULT_RPC_ENDPOINT.to_owned(),
+            max_body_size: DEFAULT_RPC_MAX_BODY_SIZE,
+            max_batch_size: DEFAULT_RPC_MAX_BATCH_SIZE,
+        }
+    }
+}
+impl RpcRouter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn register<N, F, Fut>(&mut self, name: N, handler: F) -> &mut Self
+    where
+        N: Into<String>,
+        F: Fn(Option<Value>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Value, RpcError>> + Send + 'static,
+    {
+        let Self { methods } = self;
+        let boxed: RpcHandler = Arc::new(move |params: Option<Value>| Box::pin(handler(params)));
+        methods.insert(name.into(), boxed);
+        self
+    }
+    pub fn has_method(&self, name: &str) -> bool {
+        let Self { methods } = self;
+        methods.contains_key(name)
+    }
+    pub fn method_names(&self) -> Vec<String> {
+        let Self { methods } = self;
+        methods.keys().cloned().collect()
+    }
+    pub async fn dispatch_value(&self, raw: Value) -> Option<RpcResponse> {
+        let Self { methods } = self;
+        let req: RpcRequest = match from_value(raw) {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                return Some(RpcResponse::failure(
+                    RpcId::Null,
+                    RpcError::invalid_request(),
+                ));
+            }
+        };
+        if req.get_jsonrpc() != JSONRPC_VERSION || req.get_method().is_empty() {
+            let id: RpcId = req.get_id().unwrap_or(RpcId::Null);
+            return Some(RpcResponse::failure(id, RpcError::invalid_request()));
+        }
+        let Some(handler) = methods.get(req.get_method()) else {
+            return req
+                .get_id()
+                .map(|id: RpcId| RpcResponse::failure(id, RpcError::method_not_found()));
+        };
+        let outcome: Result<Value, RpcError> = handler(req.get_params()).await;
+        let id: RpcId = req.get_id()?;
+        match outcome {
+            Ok(value) => Some(RpcResponse::success(id, value)),
+            Err(err) => Some(RpcResponse::failure(id, err)),
+        }
+    }
+    pub async fn dispatch_bytes(&self, raw: &[u8], config: &RpcConfig) -> Option<Vec<u8>> {
+        let parsed: Value = match from_slice(raw) {
+            Ok(val) => val,
+            Err(_) => {
+                let err_resp: RpcResponse =
+                    RpcResponse::failure(RpcId::Null, RpcError::parse_error());
+                return Some(encode_rpc_response(&err_resp));
+            }
+        };
+        match parsed {
+            Value::Array(items) => {
+                if items.is_empty() {
+                    let err_resp: RpcResponse =
+                        RpcResponse::failure(RpcId::Null, RpcError::invalid_request());
+                    return Some(encode_rpc_response(&err_resp));
+                }
+                if items.len() > config.get_max_batch_size() {
+                    let err_resp: RpcResponse = RpcResponse::failure(
+                        RpcId::Null,
+                        RpcError::custom(RPC_INVALID_REQUEST, MSG_BATCH_TOO_LARGE, None),
+                    );
+                    return Some(encode_rpc_response(&err_resp));
+                }
+                let mut responses: Vec<RpcResponse> = Vec::with_capacity(items.len());
+                for item in items {
+                    if let Some(resp) = self.dispatch_value(item).await {
+                        responses.push(resp);
+                    }
+                }
+                if responses.is_empty() {
+                    None
+                } else {
+                    Some(to_vec(&responses).unwrap_or_default())
+                }
+            }
+            single => self
+                .dispatch_value(single)
+                .await
+                .map(|resp: RpcResponse| encode_rpc_response(&resp)),
+        }
+    }
+}
+impl RpcPlugin {
+    pub fn init(config: RpcConfig, router: RpcRouter) -> &'static Self {
+        RPC_PLUGIN.get_or_init(|| Self { config, router })
+    }
+    pub fn get() -> Option<&'static Self> {
+        RPC_PLUGIN.get()
+    }
+    pub fn get_config(&self) -> &RpcConfig {
+        &self.config
+    }
+    pub fn get_router(&self) -> &RpcRouter {
+        &self.router
+    }
+}
+impl ServerHook for RpcHook {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let Some(plugin) = RpcPlugin::get() else {
+            return Status::Continue;
+        };
+        let config: &RpcConfig = plugin.get_config();
+        if ctx.get_request().get_path() != config.get_endpoint() {
+            return Status::Continue;
+        }
+        if !ctx.get_request().get_method().is_post() {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::MethodNotAllowed.code())
+                .set_body(Vec::new());
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        let body: &[u8] = ctx.get_request().get_body();
+        if body.len() > config.get_max_body_size() {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::PayloadTooLarge.code())
+                .set_body(Vec::new());
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        match plugin.get_router().dispatch_bytes(body, config).await {
+            Some(payload) => {
+                ctx.get_mut_response()
+                    .set_status_code(HttpStatus::Ok.code())
+                    .set_header(CONTENT_TYPE, APPLICATION_JSON)
+                    .set_body(payload);
+            }
+            None => {
+                ctx.get_mut_response()
+                    .set_status_code(HttpStatus::NoContent.code())
+                    .set_body(Vec::new());
+            }
+        }
+        let wire: ResponseData = ctx.get_mut_response().build();
+        let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+        Status::Reject
+    }
+}
+```
+# Path: hyperlane/plugin/rpc/src/enum.rs
+```rust
+use super::*;
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum RpcId {
+    Number(i64),
+    Text(String),
+    #[default]
+    Null,
+}
+```
+# Path: hyperlane/plugin/rpc/src/static.rs
+```rust
+use super::*;
+pub(crate) static RPC_PLUGIN: OnceLock<RpcPlugin> = OnceLock::new();
+```
+# Path: hyperlane/plugin/rpc/src/const.rs
+```rust
+pub const JSONRPC_VERSION: &str = "2.0";
+pub const DEFAULT_RPC_ENDPOINT: &str = "/rpc";
+pub const DEFAULT_RPC_MAX_BODY_SIZE: usize = 1024 * 1024;
+pub const DEFAULT_RPC_MAX_BATCH_SIZE: usize = 64;
+pub const RPC_PARSE_ERROR: i64 = -32700;
+pub const RPC_INVALID_REQUEST: i64 = -32600;
+pub const RPC_METHOD_NOT_FOUND: i64 = -32601;
+pub const RPC_INVALID_PARAMS: i64 = -32602;
+pub const RPC_INTERNAL_ERROR: i64 = -32603;
+pub(crate) const MSG_PARSE_ERROR: &str = "Parse error";
+pub(crate) const MSG_INVALID_REQUEST: &str = "Invalid Request";
+pub(crate) const MSG_METHOD_NOT_FOUND: &str = "Method not found";
+pub(crate) const MSG_INVALID_PARAMS: &str = "Invalid params";
+pub(crate) const MSG_INTERNAL_ERROR: &str = "Internal error";
+pub(crate) const MSG_BATCH_TOO_LARGE: &str = "Batch size exceeds configured limit";
+```
+# Path: hyperlane/plugin/rpc/src/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct RpcError {
+    #[get(type(copy))]
+    pub(crate) code: i64,
+    pub(crate) message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[get(type(clone))]
+    pub(crate) data: Option<Value>,
+}
+#[derive(Clone, Data, Debug, Deserialize, PartialEq, Serialize)]
+pub struct RpcRequest {
+    pub(crate) jsonrpc: String,
+    pub(crate) method: String,
+    #[serde(default)]
+    #[get(type(clone))]
+    pub(crate) params: Option<Value>,
+    #[serde(default)]
+    #[get(type(clone))]
+    pub(crate) id: Option<RpcId>,
+}
+#[derive(Clone, Data, Debug, Deserialize, PartialEq, Serialize)]
+pub struct RpcResponse {
+    pub(crate) jsonrpc: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[get(type(clone))]
+    pub(crate) result: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[get(type(clone))]
+    pub(crate) error: Option<RpcError>,
+    pub(crate) id: RpcId,
+}
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct RpcConfig {
+    pub(crate) endpoint: String,
+    #[get(type(copy))]
+    pub(crate) max_body_size: usize,
+    #[get(type(copy))]
+    pub(crate) max_batch_size: usize,
+}
+#[derive(Clone, Default)]
+pub struct RpcRouter {
+    pub(crate) methods: HashMap<String, RpcHandler>,
+}
+#[derive(Clone)]
+pub struct RpcPlugin {
+    pub(crate) config: RpcConfig,
+    pub(crate) router: RpcRouter,
+}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RpcHook;
+```
+# Path: hyperlane/plugin/rpc/src/fn.rs
+```rust
+use super::*;
+pub(crate) fn encode_rpc_response(response: &RpcResponse) -> Vec<u8> {
+    to_vec(response).unwrap_or_default()
+}
+```
+# Path: hyperlane/plugin/rpc/src/lib.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
+mod r#type;
+pub use {r#const::*, r#enum::*, r#struct::*, r#type::*};
+pub(crate) use {r#fn::*, r#static::*};
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt::{self, Display, Formatter},
+    future::Future,
+    pin::Pin,
+    sync::{Arc, OnceLock},
+};
+use {
+    hyperlane::{
+        APPLICATION_JSON, CONTENT_TYPE, Context, HttpStatus, ResponseData, ResponseError,
+        ServerHook, Status, Stream,
+    },
+    lombok_macros::*,
+    serde::{Deserialize, Serialize},
+    serde_json::{Value, from_slice, from_value, to_vec},
+};
+```
+# Path: hyperlane/plugin/mq/README.md
+# hyperlane-plugin-mq
+A message queue plugin for the Hyperlane framework defining the async `MessageBroker` abstraction plus a high-throughput `InMemoryBroker` supporting topics, consumer groups, bounded queues, TTL expiry, visibility timeouts, retries, and dead-letter queues (DLQ).
+# Path: hyperlane/plugin/mq/tests/mod.rs
+```rust
+mod mq;
+use super::*;
+use std::time::Duration;
+```
+# Path: hyperlane/plugin/mq/tests/mq/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/plugin/mq/tests/mq/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_mq_consumer_groups_ack_nack_dlq_and_backpressure() {
+    let mut cfg: MqConfig = MqConfig::default();
+    cfg.set_max_queue_len(2)
+        .set_default_max_retries(2)
+        .set_visibility_timeout_ms(50);
+    let broker: InMemoryBroker = InMemoryBroker::new(cfg);
+    broker.subscribe_group("orders", "billing").await.unwrap();
+    broker.subscribe_group("orders", "analytics").await.unwrap();
+    let msg1: MqMessage = MqMessage::new("orders", b"order-1".to_vec())
+        .with_key("k1")
+        .with_header("trace", "t1");
+    let msg2: MqMessage = MqMessage::new("orders", b"order-2".to_vec());
+    let msg3: MqMessage = MqMessage::new("orders", b"order-3".to_vec());
+    let id1: u64 = broker.publish(msg1).await.unwrap();
+    let id2: u64 = broker.publish(msg2).await.unwrap();
+    assert_eq!(id2, id1 + 1);
+    assert_eq!(broker.publish(msg3).await, Err(MqError::QueueFull));
+    let d1: MqDelivery = broker.consume("orders", "billing").await.unwrap().unwrap();
+    assert_eq!(d1.get_message().get_payload().as_slice(), b"order-1");
+    assert_eq!(d1.get_message().get_attempts(), 1u32);
+    broker.ack(d1.get_receipt_id()).await.unwrap();
+    assert_eq!(
+        broker.ack(d1.get_receipt_id()).await,
+        Err(MqError::UnknownDelivery)
+    );
+    let d2: MqDelivery = broker.consume("orders", "billing").await.unwrap().unwrap();
+    broker.nack(d2.get_receipt_id(), true).await.unwrap();
+    let d2_retry: MqDelivery = broker.consume("orders", "billing").await.unwrap().unwrap();
+    assert_eq!(d2_retry.get_message().get_attempts(), 2u32);
+    broker.nack(d2_retry.get_receipt_id(), true).await.unwrap();
+    let dlq: Vec<MqMessage> = broker.drain_dlq("orders");
+    assert_eq!(dlq.len(), 1usize);
+    assert_eq!(dlq[0].get_payload().as_slice(), b"order-2");
+    let a1: MqDelivery = broker
+        .consume("orders", "analytics")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(a1.get_message().get_payload().as_slice(), b"order-1");
+    tokio::time::sleep(Duration::from_millis(70)).await;
+    let redelivered: MqDelivery = broker
+        .consume("orders", "analytics")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        redelivered.get_message().get_payload().as_slice(),
+        b"order-1"
+    );
+    assert_eq!(redelivered.get_message().get_attempts(), 2u32);
+    broker.ack(redelivered.get_receipt_id()).await.unwrap();
+    let stats: MqStats = broker.stats("orders", "billing").await.unwrap();
+    assert_eq!(stats.get_published_total(), 2u64);
+    assert_eq!(stats.get_acked_total(), 1u64);
+}
+#[tokio::test]
+async fn test_mq_ttl_expiration_drops_stale_messages() {
+    let broker: InMemoryBroker = InMemoryBroker::default();
+    let mut expired: MqMessage = MqMessage::new("events", b"old".to_vec());
+    expired.set_expires_at_ms(Some(1));
+    assert_eq!(broker.publish(expired).await, Err(MqError::MessageExpired));
+    let short_ttl: MqMessage = MqMessage::new("events", b"ephemeral".to_vec()).with_ttl_ms(20);
+    let _: u64 = broker.publish(short_ttl).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(35)).await;
+    assert!(
+        broker
+            .consume("events", DEFAULT_MQ_GROUP)
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+```
+# Path: hyperlane/plugin/mq/src/type.rs
+```rust
+use super::*;
+pub type BrokerFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, MqError>> + Send + 'a>>;
+```
+# Path: hyperlane/plugin/mq/src/impl.rs
+```rust
+use super::*;
+impl Display for MqError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::QueueFull => f.write_str(ERR_MQ_QUEUE_FULL),
+            Self::UnknownDelivery => f.write_str(ERR_MQ_UNKNOWN_DELIVERY),
+            Self::BrokerClosed => f.write_str(ERR_MQ_BROKER_CLOSED),
+            Self::MessageExpired => f.write_str(ERR_MQ_EXPIRED),
+            Self::Backend(msg) => f.write_str(msg),
+        }
+    }
+}
+impl Error for MqError {}
+impl Default for MqConfig {
+    fn default() -> Self {
+        Self {
+            max_queue_len: DEFAULT_MQ_MAX_QUEUE_LEN,
+            visibility_timeout_ms: DEFAULT_MQ_VISIBILITY_TIMEOUT_MS,
+            default_max_retries: DEFAULT_MQ_MAX_RETRIES,
+            dlq_suffix: DEFAULT_MQ_DLQ_SUFFIX.to_owned(),
+        }
+    }
+}
+impl MqMessage {
+    pub fn new<T, P>(topic: T, payload: P) -> Self
+    where
+        T: Into<String>,
+        P: Into<Vec<u8>>,
+    {
+        Self {
+            id: 0,
+            topic: topic.into(),
+            key: None,
+            payload: payload.into(),
+            headers: HashMap::new(),
+            attempts: 0,
+            max_retries: 0,
+            created_at_ms: now_epoch_ms(),
+            expires_at_ms: None,
+        }
+    }
+    pub fn with_key<K>(mut self, key: K) -> Self
+    where
+        K: Into<String>,
+    {
+        self.set_key(Some(key.into()));
+        self
+    }
+    pub fn with_header<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.get_mut_headers().insert(key.into(), value.into());
+        self
+    }
+    pub fn with_ttl_ms(mut self, ttl_ms: u64) -> Self {
+        let base: u64 = self.get_created_at_ms();
+        self.set_expires_at_ms(Some(base.saturating_add(ttl_ms)));
+        self
+    }
+    pub fn with_max_retries(mut self, max_retries: u32) -> Self {
+        self.set_max_retries(max_retries);
+        self
+    }
+}
+impl InMemoryBroker {
+    pub fn new(config: MqConfig) -> Self {
+        Self {
+            inner: Arc::new(InMemoryBrokerInner {
+                config,
+                next_msg_id: AtomicU64::new(1),
+                next_receipt_id: AtomicU64::new(1),
+                state: Mutex::new(BrokerState {
+                    topic_groups: HashMap::new(),
+                    queues: HashMap::new(),
+                    in_flight: HashMap::new(),
+                    dlqs: HashMap::new(),
+                    published_totals: HashMap::new(),
+                    acked_totals: HashMap::new(),
+                }),
+            }),
+        }
+    }
+    pub fn get_config(&self) -> &MqConfig {
+        &self.inner.config
+    }
+    fn reclaim_expired_in_flight(state: &mut BrokerState, config: &MqConfig, now_ms: u64) {
+        let expired_ids: Vec<u64> = state
+            .in_flight
+            .iter()
+            .filter_map(|(id, entry): (&u64, &InFlightEntry)| {
+                (now_ms >= entry.visible_after_ms).then_some(*id)
+            })
+            .collect();
+        for receipt_id in expired_ids {
+            let Some(entry) = state.in_flight.remove(&receipt_id) else {
+                continue;
+            };
+            if is_message_expired(&entry.message, now_ms) {
+                continue;
+            }
+            let max_attempts: u32 = if entry.message.get_max_retries() > 0 {
+                entry.message.get_max_retries()
+            } else {
+                config.get_default_max_retries().max(1)
+            };
+            if entry.message.get_attempts() >= max_attempts {
+                let dlq_name: String = dlq_topic_name(entry.message.get_topic(), config);
+                state
+                    .dlqs
+                    .entry(dlq_name)
+                    .or_default()
+                    .push_back(entry.message);
+            } else {
+                let key: (String, String) = (entry.message.get_topic().clone(), entry.group);
+                state
+                    .queues
+                    .entry(key)
+                    .or_default()
+                    .push_front(entry.message);
+            }
+        }
+    }
+    pub fn drain_dlq(&self, topic: &str) -> Vec<MqMessage> {
+        let Self { inner } = self;
+        let dlq_name: String = dlq_topic_name(topic, &inner.config);
+        let Ok(mut state) = inner.state.lock() else {
+            return Vec::new();
+        };
+        state
+            .dlqs
+            .remove(&dlq_name)
+            .map(|queue: VecDeque<MqMessage>| queue.into_iter().collect())
+            .unwrap_or_default()
+    }
+}
+impl Default for InMemoryBroker {
+    fn default() -> Self {
+        Self::new(MqConfig::default())
+    }
+}
+impl MessageBroker for InMemoryBroker {
+    fn subscribe_group<'a>(&'a self, topic: &'a str, group: &'a str) -> BrokerFuture<'a, ()> {
+        Box::pin(async move {
+            let Self { inner } = self;
+            let Ok(mut state) = inner.state.lock() else {
+                return Err(MqError::BrokerClosed);
+            };
+            state
+                .topic_groups
+                .entry(topic.to_owned())
+                .or_default()
+                .insert(group.to_owned());
+            state
+                .queues
+                .entry((topic.to_owned(), group.to_owned()))
+                .or_default();
+            Ok(())
+        })
+    }
+    fn publish(&self, mut message: MqMessage) -> BrokerFuture<'_, u64> {
+        Box::pin(async move {
+            let Self { inner } = self;
+            let now_ms: u64 = now_epoch_ms();
+            if is_message_expired(&message, now_ms) {
+                return Err(MqError::MessageExpired);
+            }
+            let id: u64 = inner.next_msg_id.fetch_add(1, Ordering::Relaxed);
+            message.set_id(id);
+            if message.get_max_retries() == 0 {
+                message.set_max_retries(inner.config.get_default_max_retries().max(1));
+            }
+            let Ok(mut state) = inner.state.lock() else {
+                return Err(MqError::BrokerClosed);
+            };
+            let topic: String = message.get_topic().clone();
+            let groups: Vec<String> = match state.topic_groups.get(&topic) {
+                Some(set) if !set.is_empty() => set.iter().cloned().collect(),
+                _ => vec![DEFAULT_MQ_GROUP.to_owned()],
+            };
+            let max_len: usize = inner.config.get_max_queue_len();
+            for group in &groups {
+                let current_len: usize = state
+                    .queues
+                    .get(&(topic.clone(), group.clone()))
+                    .map_or(0, VecDeque::len);
+                if current_len >= max_len {
+                    return Err(MqError::QueueFull);
+                }
+            }
+            for group in groups {
+                state
+                    .queues
+                    .entry((topic.clone(), group))
+                    .or_default()
+                    .push_back(message.clone());
+            }
+            let total: &mut u64 = state.published_totals.entry(topic).or_insert(0);
+            *total = total.saturating_add(1);
+            Ok(id)
+        })
+    }
+    fn consume<'a>(
+        &'a self,
+        topic: &'a str,
+        group: &'a str,
+    ) -> BrokerFuture<'a, Option<MqDelivery>> {
+        Box::pin(async move {
+            let Self { inner } = self;
+            let now_ms: u64 = now_epoch_ms();
+            let Ok(mut state) = inner.state.lock() else {
+                return Err(MqError::BrokerClosed);
+            };
+            Self::reclaim_expired_in_flight(&mut state, &inner.config, now_ms);
+            let queue_key: (String, String) = (topic.to_owned(), group.to_owned());
+            let Some(queue) = state.queues.get_mut(&queue_key) else {
+                return Ok(None);
+            };
+            let mut next_msg: Option<MqMessage> = None;
+            while let Some(candidate) = queue.pop_front() {
+                if !is_message_expired(&candidate, now_ms) {
+                    next_msg = Some(candidate);
+                    break;
+                }
+            }
+            let Some(mut msg) = next_msg else {
+                return Ok(None);
+            };
+            msg.set_attempts(msg.get_attempts().saturating_add(1));
+            let receipt_id: u64 = inner.next_receipt_id.fetch_add(1, Ordering::Relaxed);
+            let visible_after_ms: u64 =
+                now_ms.saturating_add(inner.config.get_visibility_timeout_ms());
+            state.in_flight.insert(
+                receipt_id,
+                InFlightEntry {
+                    group: group.to_owned(),
+                    message: msg.clone(),
+                    visible_after_ms,
+                },
+            );
+            Ok(Some(MqDelivery {
+                message: msg,
+                receipt_id,
+                group: group.to_owned(),
+            }))
+        })
+    }
+    fn ack(&self, receipt_id: u64) -> BrokerFuture<'_, ()> {
+        Box::pin(async move {
+            let Self { inner } = self;
+            let Ok(mut state) = inner.state.lock() else {
+                return Err(MqError::BrokerClosed);
+            };
+            let Some(entry) = state.in_flight.remove(&receipt_id) else {
+                return Err(MqError::UnknownDelivery);
+            };
+            let key: (String, String) = (entry.message.get_topic().clone(), entry.group);
+            let acked: &mut u64 = state.acked_totals.entry(key).or_insert(0);
+            *acked = acked.saturating_add(1);
+            Ok(())
+        })
+    }
+    fn nack(&self, receipt_id: u64, requeue: bool) -> BrokerFuture<'_, ()> {
+        Box::pin(async move {
+            let Self { inner } = self;
+            let now_ms: u64 = now_epoch_ms();
+            let Ok(mut state) = inner.state.lock() else {
+                return Err(MqError::BrokerClosed);
+            };
+            let Some(entry) = state.in_flight.remove(&receipt_id) else {
+                return Err(MqError::UnknownDelivery);
+            };
+            if is_message_expired(&entry.message, now_ms) {
+                return Ok(());
+            }
+            let max_attempts: u32 = if entry.message.get_max_retries() > 0 {
+                entry.message.get_max_retries()
+            } else {
+                inner.config.get_default_max_retries().max(1)
+            };
+            if requeue && entry.message.get_attempts() < max_attempts {
+                let key: (String, String) = (entry.message.get_topic().clone(), entry.group);
+                state
+                    .queues
+                    .entry(key)
+                    .or_default()
+                    .push_back(entry.message);
+            } else {
+                let dlq_name: String = dlq_topic_name(entry.message.get_topic(), &inner.config);
+                state
+                    .dlqs
+                    .entry(dlq_name)
+                    .or_default()
+                    .push_back(entry.message);
+            }
+            Ok(())
+        })
+    }
+    fn stats<'a>(&'a self, topic: &'a str, group: &'a str) -> BrokerFuture<'a, MqStats> {
+        Box::pin(async move {
+            let Self { inner } = self;
+            let now_ms: u64 = now_epoch_ms();
+            let Ok(mut state) = inner.state.lock() else {
+                return Err(MqError::BrokerClosed);
+            };
+            Self::reclaim_expired_in_flight(&mut state, &inner.config, now_ms);
+            let key: (String, String) = (topic.to_owned(), group.to_owned());
+            let queued: usize = state.queues.get(&key).map_or(0, VecDeque::len);
+            let in_flight: usize = state
+                .in_flight
+                .values()
+                .filter(|e: &&InFlightEntry| e.message.get_topic() == topic && e.group == group)
+                .count();
+            let dlq_name: String = dlq_topic_name(topic, &inner.config);
+            let dead_lettered: usize = state.dlqs.get(&dlq_name).map_or(0, VecDeque::len);
+            let published_total: u64 = state.published_totals.get(topic).copied().unwrap_or(0);
+            let acked_total: u64 = state.acked_totals.get(&key).copied().unwrap_or(0);
+            Ok(MqStats {
+                queued,
+                in_flight,
+                dead_lettered,
+                published_total,
+                acked_total,
+            })
+        })
+    }
+}
+impl MqPlugin {
+    pub fn init(config: MqConfig) -> &'static Self {
+        MQ_PLUGIN.get_or_init(|| Self {
+            broker: InMemoryBroker::new(config.clone()),
+            config,
+        })
+    }
+    pub fn get() -> Option<&'static Self> {
+        MQ_PLUGIN.get()
+    }
+    pub fn get_config(&self) -> &MqConfig {
+        &self.config
+    }
+    pub fn get_broker(&self) -> &InMemoryBroker {
+        &self.broker
+    }
+}
+```
+# Path: hyperlane/plugin/mq/src/enum.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MqError {
+    QueueFull,
+    UnknownDelivery,
+    BrokerClosed,
+    MessageExpired,
+    Backend(String),
+}
+```
+# Path: hyperlane/plugin/mq/src/static.rs
+```rust
+use super::*;
+pub(crate) static MQ_PLUGIN: OnceLock<MqPlugin> = OnceLock::new();
+```
+# Path: hyperlane/plugin/mq/src/const.rs
+```rust
+pub const DEFAULT_MQ_MAX_QUEUE_LEN: usize = 10_000;
+pub const DEFAULT_MQ_VISIBILITY_TIMEOUT_MS: u64 = 30_000;
+pub const DEFAULT_MQ_MAX_RETRIES: u32 = 3;
+pub const DEFAULT_MQ_GROUP: &str = "default";
+pub const DEFAULT_MQ_DLQ_SUFFIX: &str = ".dlq";
+pub(crate) const ERR_MQ_QUEUE_FULL: &str = "Message queue capacity exceeded";
+pub(crate) const ERR_MQ_UNKNOWN_DELIVERY: &str = "Unknown message delivery receipt";
+pub(crate) const ERR_MQ_BROKER_CLOSED: &str = "Message broker is unavailable";
+pub(crate) const ERR_MQ_EXPIRED: &str = "Message already expired";
+```
+# Path: hyperlane/plugin/mq/src/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct MqConfig {
+    #[get(type(copy))]
+    pub(crate) max_queue_len: usize,
+    #[get(type(copy))]
+    pub(crate) visibility_timeout_ms: u64,
+    #[get(type(copy))]
+    pub(crate) default_max_retries: u32,
+    pub(crate) dlq_suffix: String,
+}
+#[derive(Clone, Data, Debug, Default, Eq, PartialEq)]
+pub struct MqMessage {
+    #[get(type(copy))]
+    pub(crate) id: u64,
+    pub(crate) topic: String,
+    #[get(type(clone))]
+    pub(crate) key: Option<String>,
+    pub(crate) payload: Vec<u8>,
+    pub(crate) headers: HashMap<String, String>,
+    #[get(type(copy))]
+    pub(crate) attempts: u32,
+    #[get(type(copy))]
+    pub(crate) max_retries: u32,
+    #[get(type(copy))]
+    pub(crate) created_at_ms: u64,
+    #[get(type(copy))]
+    pub(crate) expires_at_ms: Option<u64>,
+}
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct MqDelivery {
+    pub(crate) message: MqMessage,
+    #[get(type(copy))]
+    pub(crate) receipt_id: u64,
+    pub(crate) group: String,
+}
+#[derive(Clone, Copy, Data, Debug, Default, Eq, PartialEq)]
+pub struct MqStats {
+    #[get(type(copy))]
+    pub(crate) queued: usize,
+    #[get(type(copy))]
+    pub(crate) in_flight: usize,
+    #[get(type(copy))]
+    pub(crate) dead_lettered: usize,
+    #[get(type(copy))]
+    pub(crate) published_total: u64,
+    #[get(type(copy))]
+    pub(crate) acked_total: u64,
+}
+pub(crate) struct InFlightEntry {
+    pub(crate) group: String,
+    pub(crate) message: MqMessage,
+    pub(crate) visible_after_ms: u64,
+}
+pub(crate) struct BrokerState {
+    pub(crate) topic_groups: HashMap<String, HashSet<String>>,
+    pub(crate) queues: HashMap<(String, String), VecDeque<MqMessage>>,
+    pub(crate) in_flight: HashMap<u64, InFlightEntry>,
+    pub(crate) dlqs: HashMap<String, VecDeque<MqMessage>>,
+    pub(crate) published_totals: HashMap<String, u64>,
+    pub(crate) acked_totals: HashMap<(String, String), u64>,
+}
+pub(crate) struct InMemoryBrokerInner {
+    pub(crate) config: MqConfig,
+    pub(crate) next_msg_id: AtomicU64,
+    pub(crate) next_receipt_id: AtomicU64,
+    pub(crate) state: Mutex<BrokerState>,
+}
+#[derive(Clone)]
+pub struct InMemoryBroker {
+    pub(crate) inner: Arc<InMemoryBrokerInner>,
+}
+#[derive(Clone)]
+pub struct MqPlugin {
+    pub(crate) config: MqConfig,
+    pub(crate) broker: InMemoryBroker,
+}
+```
+# Path: hyperlane/plugin/mq/src/fn.rs
+```rust
+use super::*;
+pub(crate) fn now_epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|dur: Duration| dur.as_millis() as u64)
+        .unwrap_or(0)
+}
+pub(crate) fn is_message_expired(message: &MqMessage, now_ms: u64) -> bool {
+    message
+        .get_expires_at_ms()
+        .is_some_and(|deadline: u64| now_ms >= deadline)
+}
+pub(crate) fn dlq_topic_name(topic: &str, config: &MqConfig) -> String {
+    format!("{topic}{}", config.get_dlq_suffix())
+}
+```
+# Path: hyperlane/plugin/mq/src/trait.rs
+```rust
+use super::*;
+pub trait MessageBroker: Send + Sync {
+    fn subscribe_group<'a>(&'a self, topic: &'a str, group: &'a str) -> BrokerFuture<'a, ()>;
+    fn publish(&self, message: MqMessage) -> BrokerFuture<'_, u64>;
+    fn consume<'a>(
+        &'a self,
+        topic: &'a str,
+        group: &'a str,
+    ) -> BrokerFuture<'a, Option<MqDelivery>>;
+    fn ack(&self, receipt_id: u64) -> BrokerFuture<'_, ()>;
+    fn nack(&self, receipt_id: u64, requeue: bool) -> BrokerFuture<'_, ()>;
+    fn stats<'a>(&'a self, topic: &'a str, group: &'a str) -> BrokerFuture<'a, MqStats>;
+}
+```
+# Path: hyperlane/plugin/mq/src/lib.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
+mod r#trait;
+mod r#type;
+pub use {r#enum::*, r#struct::*, r#trait::*, r#type::*};
+pub(crate) use {r#const::*, r#fn::*, r#static::*};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    error::Error,
+    fmt::{self, Display, Formatter},
+    future::Future,
+    pin::Pin,
+    sync::{
+        Arc, Mutex, OnceLock,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+use lombok_macros::*;
 ```
 # Path: hyperlane/plugin/websocket/README.md
 ## hyperlane-plugin-websocket
@@ -27915,40 +34203,62 @@ impl WebSocket {
         let mut receiver: Receiver<Vec<u8>> = match &broadcast_type {
             BroadcastType::PointToPoint(key1, key2) => self.point_to_point(key1, key2, capacity),
             BroadcastType::PointToGroup(key) => self.point_to_group(key, capacity),
-            BroadcastType::Unknown => panic!("BroadcastType must be PointToPoint or PointToGroup"),
+            BroadcastType::Unknown => {
+                stream.set_closed(true);
+                return;
+            }
         };
         let key: String = BroadcastType::get_key(broadcast_type);
-        if connected_hook(stream, ctx).await.is_reject() {
-            return;
-        }
-        let mut is_reject: bool;
-        loop {
-            tokio::select! {
-                request_res = stream.try_get_websocket_request() => {
-                    if let Ok(body) = request_res {
-                        ctx.get_mut_request().set_body(body);
-                        is_reject = request_hook(stream, ctx).await.is_reject();
-                    } else {
-                        is_reject = true;
-                        closed_hook(stream, ctx).await;
-                    }
-                    let body: ResponseBody = ctx.get_response().get_body().clone();
-                    let is_err: bool = self.get_broadcast_map().try_send(&key, body).is_err();
-                    if is_err || sended_hook(stream, ctx).await.is_reject() || is_reject {
-                        break;
-                    }
-                },
-                msg_res = receiver.recv() => {
-                    if let Ok(msg) = &msg_res {
-                        if stream.try_send_list(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
-                            continue;
+        let mut closed_called: bool = false;
+        if connected_hook(stream, ctx).await.is_continue() {
+            loop {
+                tokio::select! {
+                    request_res = stream.try_get_websocket_request() => {
+                        if let Ok(body) = request_res {
+                            ctx.get_mut_request().set_body(body);
+                            let is_reject: bool = request_hook(stream, ctx).await.is_reject();
+                            let body: ResponseBody = ctx.get_response().get_body().clone();
+                            let is_err: bool = self.get_broadcast_map().try_send(&key, body).is_err();
+                            if is_err || sended_hook(stream, ctx).await.is_reject() || is_reject {
+                                break;
+                            }
                         } else {
+                            closed_called = true;
+                            ctx.get_mut_response().set_body(Vec::new());
+                            closed_hook(stream, ctx).await;
+                            let body: ResponseBody = ctx.get_response().get_body().clone();
+                            if !body.is_empty() {
+                                let _: Result<Option<ReceiverCount>, SendError<Vec<u8>>> =
+                                    self.get_broadcast_map().try_send(&key, body);
+                                let _: Status = sended_hook(stream, ctx).await;
+                            }
                             break;
                         }
+                    },
+                    msg_res = receiver.recv() => {
+                        if let Ok(msg) = &msg_res {
+                            if stream.try_send_list(&WebSocketFrame::create_frame_list(msg)).await.is_ok() {
+                                continue;
+                            }
+                            break;
+                        }
+                        break;
                     }
-                    break;
                 }
             }
+        }
+        if !closed_called {
+            ctx.get_mut_response().set_body(Vec::new());
+            closed_hook(stream, ctx).await;
+            let body: ResponseBody = ctx.get_response().get_body().clone();
+            if !body.is_empty() {
+                let _: Result<Option<ReceiverCount>, SendError<Vec<u8>>> =
+                    self.get_broadcast_map().try_send(&key, body);
+            }
+        }
+        drop(receiver);
+        if self.get_broadcast_map().receiver_count(&key) == Some(0) {
+            let _: Option<Broadcast<Vec<u8>>> = self.get_broadcast_map().unsubscribe(&key);
         }
         stream.set_closed(true);
     }
@@ -28030,6 +34340,933 @@ use {
     tokio_broadcast::*,
 };
 ```
+# Path: hyperlane/plugin/mcp/README.md
+# hyperlane-plugin-mcp
+A Model Context Protocol (MCP) Streamable HTTP server plugin for the Hyperlane framework providing tool, resource, and prompt registries, `Mcp-Session-Id` session lifecycle management, DNS-rebinding `Origin` validation, and an opt-in `McpHook` `ServerHook`.
+# Path: hyperlane/plugin/mcp/tests/mod.rs
+```rust
+mod mcp;
+use super::*;
+use hyperlane::tokio;
+```
+# Path: hyperlane/plugin/mcp/tests/mcp/mod.rs
+```rust
+mod r#fn;
+use super::*;
+```
+# Path: hyperlane/plugin/mcp/tests/mcp/fn.rs
+```rust
+use super::*;
+#[tokio::test]
+async fn test_mcp_initialize_tools_resources_prompts_sessions_and_origin_guard() {
+    let mut registry: McpRegistry = McpRegistry::new();
+    registry.register_tool(
+        McpTool {
+            name: "sum".to_owned(),
+            description: "Adds two integers".to_owned(),
+            input_schema: json!({"type":"object"}),
+        },
+        |args: Value| async move {
+            let a: i64 = args.get("a").and_then(Value::as_i64).unwrap_or(0);
+            let b: i64 = args.get("b").and_then(Value::as_i64).unwrap_or(0);
+            Ok(McpToolResult::text(format!("{}", a + b)))
+        },
+    );
+    registry.register_resource(
+        McpResource {
+            uri: "hyperlane://status".to_owned(),
+            name: "status".to_owned(),
+            description: "Server status".to_owned(),
+            mime_type: "application/json".to_owned(),
+        },
+        |uri: String| async move {
+            Ok(McpResourceContent {
+                uri,
+                mime_type: "application/json".to_owned(),
+                text: "{\"healthy\":true}".to_owned(),
+            })
+        },
+    );
+    registry.register_prompt(
+        McpPrompt {
+            name: "greet".to_owned(),
+            description: "Greeting prompt".to_owned(),
+            arguments: vec![McpPromptArgument {
+                name: "user".to_owned(),
+                description: "Username".to_owned(),
+                required: true,
+            }],
+        },
+        |args: Value| async move {
+            let user: &str = args.get("user").and_then(Value::as_str).unwrap_or("guest");
+            Ok(json!({
+                "messages": [{"role": "user", "content": {"type": "text", "text": format!("Hello {user}")}}]
+            }))
+        },
+    );
+    let mut cfg: McpServerConfig = McpServerConfig::default();
+    cfg.set_max_sessions(1)
+        .set_allowed_origins(vec!["https://trusted.example".to_owned()]);
+    assert!(is_origin_allowed(
+        Some("https://trusted.example"),
+        cfg.get_allowed_origins()
+    ));
+    assert!(!is_origin_allowed(
+        Some("https://evil.example"),
+        cfg.get_allowed_origins()
+    ));
+    let init_req: &[u8] = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#;
+    let init_out: McpDispatchOutcome = registry.handle_json_bytes(init_req, None, &cfg).await;
+    let session_id: String = match init_out {
+        McpDispatchOutcome::Response {
+            body,
+            new_session_id: Some(sid),
+        } => {
+            let v: Value = from_slice(&body).unwrap();
+            assert_eq!(v["result"]["protocolVersion"], DEFAULT_MCP_PROTOCOL_VERSION);
+            sid
+        }
+        other => panic!("unexpected outcome: {other:?}"),
+    };
+    assert_eq!(registry.session_count(), 1usize);
+    assert_eq!(
+        registry.handle_json_bytes(init_req, None, &cfg).await,
+        McpDispatchOutcome::SessionLimitReached
+    );
+    let bad_sid_out: McpDispatchOutcome = registry
+        .handle_json_bytes(
+            br#"{"jsonrpc":"2.0","id":2,"method":"ping"}"#,
+            Some("unknown-session"),
+            &cfg,
+        )
+        .await;
+    assert_eq!(bad_sid_out, McpDispatchOutcome::UnknownSession);
+    let call_req: &[u8] =
+        br#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"sum","arguments":{"a":9,"b":11}}}"#;
+    let call_out: McpDispatchOutcome = registry
+        .handle_json_bytes(call_req, Some(&session_id), &cfg)
+        .await;
+    let McpDispatchOutcome::Response {
+        body: call_body, ..
+    } = call_out
+    else {
+        panic!("expected tool response");
+    };
+    let call_json: Value = from_slice(&call_body).unwrap();
+    assert_eq!(call_json["result"]["content"][0]["text"], "20");
+    let read_req: Vec<u8> = to_vec(&json!({
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "resources/read",
+        "params": {
+            "uri": "hyperlane://status"
+        }
+    }))
+    .unwrap();
+    let McpDispatchOutcome::Response {
+        body: read_body, ..
+    } = registry
+        .handle_json_bytes(&read_req, Some(&session_id), &cfg)
+        .await
+    else {
+        panic!("expected resource response");
+    };
+    let read_json: Value = from_slice(&read_body).unwrap();
+    assert_eq!(
+        read_json["result"]["contents"][0]["text"],
+        "{\"healthy\":true}"
+    );
+    let prompt_req: &[u8] =
+        br#"{"jsonrpc":"2.0","id":5,"method":"prompts/get","params":{"name":"greet","arguments":{"user":"ada"}}}"#;
+    let McpDispatchOutcome::Response {
+        body: prompt_body, ..
+    } = registry
+        .handle_json_bytes(prompt_req, Some(&session_id), &cfg)
+        .await
+    else {
+        panic!("expected prompt response");
+    };
+    let prompt_json: Value = from_slice(&prompt_body).unwrap();
+    assert_eq!(
+        prompt_json["result"]["messages"][0]["content"]["text"],
+        "Hello ada"
+    );
+    assert!(registry.close_session(&session_id));
+    assert_eq!(registry.session_count(), 0usize);
+}
+```
+# Path: hyperlane/plugin/mcp/src/type.rs
+```rust
+use super::*;
+pub type McpToolFuture = Pin<Box<dyn Future<Output = Result<McpToolResult, McpError>> + Send>>;
+pub type McpToolHandler = Arc<dyn Fn(Value) -> McpToolFuture + Send + Sync>;
+pub type McpResourceFuture =
+    Pin<Box<dyn Future<Output = Result<McpResourceContent, McpError>> + Send>>;
+pub type McpResourceHandler = Arc<dyn Fn(String) -> McpResourceFuture + Send + Sync>;
+pub type McpPromptFuture = Pin<Box<dyn Future<Output = Result<Value, McpError>> + Send>>;
+pub type McpPromptHandler = Arc<dyn Fn(Value) -> McpPromptFuture + Send + Sync>;
+```
+# Path: hyperlane/plugin/mcp/src/impl.rs
+```rust
+use super::*;
+impl Display for McpError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidParams(msg) | Self::NotFound(msg) | Self::Internal(msg) => {
+                f.write_str(msg)
+            }
+        }
+    }
+}
+impl Error for McpError {}
+impl Default for McpServerConfig {
+    fn default() -> Self {
+        Self {
+            name: DEFAULT_MCP_SERVER_NAME.to_owned(),
+            version: DEFAULT_MCP_SERVER_VERSION.to_owned(),
+            protocol_version: DEFAULT_MCP_PROTOCOL_VERSION.to_owned(),
+            endpoint: DEFAULT_MCP_ENDPOINT.to_owned(),
+            allowed_origins: Vec::new(),
+            max_sessions: DEFAULT_MCP_MAX_SESSIONS,
+            max_body_size: DEFAULT_MCP_MAX_BODY_SIZE,
+        }
+    }
+}
+impl McpToolResult {
+    pub fn text<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self {
+            content: vec![mcp_text_content(text.into())],
+            is_error: false,
+        }
+    }
+    pub fn error_text<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self {
+            content: vec![mcp_text_content(text.into())],
+            is_error: true,
+        }
+    }
+}
+impl Default for McpRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl McpRegistry {
+    pub fn new() -> Self {
+        Self {
+            tools: HashMap::new(),
+            resources: HashMap::new(),
+            prompts: HashMap::new(),
+            sessions: Arc::new(Mutex::new(HashSet::new())),
+            next_session_seq: Arc::new(AtomicU64::new(1)),
+        }
+    }
+    pub fn register_tool<F, Fut>(&mut self, meta: McpTool, handler: F) -> &mut Self
+    where
+        F: Fn(Value) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<McpToolResult, McpError>> + Send + 'static,
+    {
+        let Self { tools, .. } = self;
+        let key: String = meta.get_name().clone();
+        let boxed: McpToolHandler = Arc::new(move |args: Value| Box::pin(handler(args)));
+        tools.insert(
+            key,
+            RegisteredTool {
+                meta,
+                handler: boxed,
+            },
+        );
+        self
+    }
+    pub fn register_resource<F, Fut>(&mut self, meta: McpResource, handler: F) -> &mut Self
+    where
+        F: Fn(String) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<McpResourceContent, McpError>> + Send + 'static,
+    {
+        let Self { resources, .. } = self;
+        let key: String = meta.get_uri().clone();
+        let boxed: McpResourceHandler = Arc::new(move |uri: String| Box::pin(handler(uri)));
+        resources.insert(
+            key,
+            RegisteredResource {
+                meta,
+                handler: boxed,
+            },
+        );
+        self
+    }
+    pub fn register_prompt<F, Fut>(&mut self, meta: McpPrompt, handler: F) -> &mut Self
+    where
+        F: Fn(Value) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Value, McpError>> + Send + 'static,
+    {
+        let Self { prompts, .. } = self;
+        let key: String = meta.get_name().clone();
+        let boxed: McpPromptHandler = Arc::new(move |args: Value| Box::pin(handler(args)));
+        prompts.insert(
+            key,
+            RegisteredPrompt {
+                meta,
+                handler: boxed,
+            },
+        );
+        self
+    }
+    pub fn close_session(&self, session_id: &str) -> bool {
+        let Self { sessions, .. } = self;
+        sessions
+            .lock()
+            .map(|mut set: MutexGuard<'_, HashSet<String>>| set.remove(session_id))
+            .unwrap_or(false)
+    }
+    pub fn session_count(&self) -> usize {
+        let Self { sessions, .. } = self;
+        sessions
+            .lock()
+            .map(|set: MutexGuard<'_, HashSet<String>>| set.len())
+            .unwrap_or(0)
+    }
+    fn create_session(&self, max_sessions: usize) -> Option<String> {
+        let Self {
+            sessions,
+            next_session_seq,
+            ..
+        } = self;
+        let mut guard: MutexGuard<'_, HashSet<String>> = sessions.lock().ok()?;
+        if guard.len() >= max_sessions {
+            return None;
+        }
+        let seq: u64 = next_session_seq.fetch_add(1, Ordering::Relaxed);
+        let id: String = format!("mcp-sess-{seq:016x}");
+        guard.insert(id.clone());
+        Some(id)
+    }
+    fn has_session(&self, session_id: &str) -> bool {
+        let Self { sessions, .. } = self;
+        sessions
+            .lock()
+            .map(|set: MutexGuard<'_, HashSet<String>>| set.contains(session_id))
+            .unwrap_or(false)
+    }
+    pub async fn handle_json_bytes(
+        &self,
+        raw: &[u8],
+        session_id: Option<&str>,
+        config: &McpServerConfig,
+    ) -> McpDispatchOutcome {
+        let Self {
+            tools,
+            resources,
+            prompts,
+            ..
+        } = self;
+        let parsed: Value = match from_slice(raw) {
+            Ok(val) => val,
+            Err(_) => {
+                return McpDispatchOutcome::Response {
+                    body: mcp_json_error(Value::Null, MCP_ERR_PARSE, MSG_MCP_PARSE_ERROR),
+                    new_session_id: None,
+                };
+            }
+        };
+        let Some(obj) = parsed.as_object() else {
+            return McpDispatchOutcome::Response {
+                body: mcp_json_error(
+                    Value::Null,
+                    MCP_ERR_INVALID_REQUEST,
+                    MSG_MCP_INVALID_REQUEST,
+                ),
+                new_session_id: None,
+            };
+        };
+        let version_ok: bool = obj
+            .get(KEY_JSONRPC)
+            .and_then(Value::as_str)
+            .is_some_and(|v: &str| v == MCP_JSONRPC_VERSION);
+        let Some(method) = obj.get(KEY_METHOD).and_then(Value::as_str) else {
+            let id: Value = obj.get(KEY_ID).cloned().unwrap_or(Value::Null);
+            return McpDispatchOutcome::Response {
+                body: mcp_json_error(id, MCP_ERR_INVALID_REQUEST, MSG_MCP_INVALID_REQUEST),
+                new_session_id: None,
+            };
+        };
+        if !version_ok {
+            let id: Value = obj.get(KEY_ID).cloned().unwrap_or(Value::Null);
+            return McpDispatchOutcome::Response {
+                body: mcp_json_error(id, MCP_ERR_INVALID_REQUEST, MSG_MCP_INVALID_REQUEST),
+                new_session_id: None,
+            };
+        }
+        let id_opt: Option<Value> = obj.get(KEY_ID).cloned();
+        let params: Value = obj.get(KEY_PARAMS).cloned().unwrap_or_else(|| json!({}));
+        if method != METHOD_INITIALIZE
+            && let Some(sid) = session_id
+            && !self.has_session(sid)
+        {
+            return McpDispatchOutcome::UnknownSession;
+        }
+        if method == METHOD_NOTIF_INITIALIZED || id_opt.is_none() {
+            return McpDispatchOutcome::Accepted;
+        }
+        let id: Value = id_opt.unwrap_or(Value::Null);
+        match method {
+            METHOD_INITIALIZE => {
+                let Some(new_sid) = self.create_session(config.get_max_sessions()) else {
+                    return McpDispatchOutcome::SessionLimitReached;
+                };
+                let result: Value = mcp_initialize_result(config);
+                McpDispatchOutcome::Response {
+                    body: mcp_json_result(id, result),
+                    new_session_id: Some(new_sid),
+                }
+            }
+            METHOD_PING => McpDispatchOutcome::Response {
+                body: mcp_json_result(id, json!({})),
+                new_session_id: None,
+            },
+            METHOD_TOOLS_LIST => {
+                let list: Vec<&McpTool> = tools
+                    .values()
+                    .map(|item: &RegisteredTool| &item.meta)
+                    .collect();
+                let list_val: Value = to_value(&list).unwrap_or(Value::Array(Vec::new()));
+                McpDispatchOutcome::Response {
+                    body: mcp_json_result(id, mcp_single_field_object(KEY_TOOLS, list_val)),
+                    new_session_id: None,
+                }
+            }
+            METHOD_TOOLS_CALL => {
+                let Some(name) = params.get(KEY_NAME).and_then(Value::as_str) else {
+                    return McpDispatchOutcome::Response {
+                        body: mcp_json_error(id, MCP_ERR_INVALID_PARAMS, MSG_MCP_INVALID_PARAMS),
+                        new_session_id: None,
+                    };
+                };
+                let Some(entry) = tools.get(name) else {
+                    return McpDispatchOutcome::Response {
+                        body: mcp_json_error(id, MCP_ERR_METHOD_NOT_FOUND, MSG_MCP_UNKNOWN_TOOL),
+                        new_session_id: None,
+                    };
+                };
+                let args: Value = params
+                    .get(KEY_ARGUMENTS)
+                    .cloned()
+                    .unwrap_or_else(|| json!({}));
+                let body: Vec<u8> = match (entry.handler)(args).await {
+                    Ok(res) => mcp_json_result(id, json!(res)),
+                    Err(McpError::InvalidParams(msg)) => {
+                        mcp_json_error(id, MCP_ERR_INVALID_PARAMS, &msg)
+                    }
+                    Err(McpError::NotFound(msg)) => {
+                        mcp_json_error(id, MCP_ERR_METHOD_NOT_FOUND, &msg)
+                    }
+                    Err(McpError::Internal(msg)) => mcp_json_error(id, MCP_ERR_INTERNAL, &msg),
+                };
+                McpDispatchOutcome::Response {
+                    body,
+                    new_session_id: None,
+                }
+            }
+            METHOD_RESOURCES_LIST => {
+                let list: Vec<&McpResource> = resources
+                    .values()
+                    .map(|item: &RegisteredResource| &item.meta)
+                    .collect();
+                let list_val: Value = to_value(&list).unwrap_or(Value::Array(Vec::new()));
+                McpDispatchOutcome::Response {
+                    body: mcp_json_result(id, mcp_single_field_object(KEY_RESOURCES, list_val)),
+                    new_session_id: None,
+                }
+            }
+            METHOD_RESOURCES_READ => {
+                let Some(uri) = params.get(KEY_URI).and_then(Value::as_str) else {
+                    return McpDispatchOutcome::Response {
+                        body: mcp_json_error(id, MCP_ERR_INVALID_PARAMS, MSG_MCP_INVALID_PARAMS),
+                        new_session_id: None,
+                    };
+                };
+                let Some(entry) = resources.get(uri) else {
+                    return McpDispatchOutcome::Response {
+                        body: mcp_json_error(
+                            id,
+                            MCP_ERR_METHOD_NOT_FOUND,
+                            MSG_MCP_UNKNOWN_RESOURCE,
+                        ),
+                        new_session_id: None,
+                    };
+                };
+                let body: Vec<u8> = match (entry.handler)(uri.to_owned()).await {
+                    Ok(content) => {
+                        let contents_val: Value =
+                            to_value([content]).unwrap_or(Value::Array(Vec::new()));
+                        mcp_json_result(id, mcp_single_field_object(KEY_CONTENTS, contents_val))
+                    }
+                    Err(McpError::InvalidParams(msg)) => {
+                        mcp_json_error(id, MCP_ERR_INVALID_PARAMS, &msg)
+                    }
+                    Err(McpError::NotFound(msg)) => {
+                        mcp_json_error(id, MCP_ERR_METHOD_NOT_FOUND, &msg)
+                    }
+                    Err(McpError::Internal(msg)) => mcp_json_error(id, MCP_ERR_INTERNAL, &msg),
+                };
+                McpDispatchOutcome::Response {
+                    body,
+                    new_session_id: None,
+                }
+            }
+            METHOD_PROMPTS_LIST => {
+                let list: Vec<&McpPrompt> = prompts
+                    .values()
+                    .map(|item: &RegisteredPrompt| &item.meta)
+                    .collect();
+                let list_val: Value = to_value(&list).unwrap_or(Value::Array(Vec::new()));
+                McpDispatchOutcome::Response {
+                    body: mcp_json_result(id, mcp_single_field_object(KEY_PROMPTS, list_val)),
+                    new_session_id: None,
+                }
+            }
+            METHOD_PROMPTS_GET => {
+                let Some(name) = params.get(KEY_NAME).and_then(Value::as_str) else {
+                    return McpDispatchOutcome::Response {
+                        body: mcp_json_error(id, MCP_ERR_INVALID_PARAMS, MSG_MCP_INVALID_PARAMS),
+                        new_session_id: None,
+                    };
+                };
+                let Some(entry) = prompts.get(name) else {
+                    return McpDispatchOutcome::Response {
+                        body: mcp_json_error(id, MCP_ERR_METHOD_NOT_FOUND, MSG_MCP_UNKNOWN_PROMPT),
+                        new_session_id: None,
+                    };
+                };
+                let args: Value = params
+                    .get(KEY_ARGUMENTS)
+                    .cloned()
+                    .unwrap_or_else(|| json!({}));
+                let body: Vec<u8> = match (entry.handler)(args).await {
+                    Ok(rendered) => mcp_json_result(id, rendered),
+                    Err(McpError::InvalidParams(msg)) => {
+                        mcp_json_error(id, MCP_ERR_INVALID_PARAMS, &msg)
+                    }
+                    Err(McpError::NotFound(msg)) => {
+                        mcp_json_error(id, MCP_ERR_METHOD_NOT_FOUND, &msg)
+                    }
+                    Err(McpError::Internal(msg)) => mcp_json_error(id, MCP_ERR_INTERNAL, &msg),
+                };
+                McpDispatchOutcome::Response {
+                    body,
+                    new_session_id: None,
+                }
+            }
+            _ => McpDispatchOutcome::Response {
+                body: mcp_json_error(id, MCP_ERR_METHOD_NOT_FOUND, MSG_MCP_METHOD_NOT_FOUND),
+                new_session_id: None,
+            },
+        }
+    }
+}
+impl McpPlugin {
+    pub fn init(config: McpServerConfig, registry: McpRegistry) -> &'static Self {
+        MCP_PLUGIN.get_or_init(|| Self { config, registry })
+    }
+    pub fn get() -> Option<&'static Self> {
+        MCP_PLUGIN.get()
+    }
+    pub fn get_config(&self) -> &McpServerConfig {
+        &self.config
+    }
+    pub fn get_registry(&self) -> &McpRegistry {
+        &self.registry
+    }
+}
+impl ServerHook for McpHook {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let Some(plugin) = McpPlugin::get() else {
+            return Status::Continue;
+        };
+        let config: &McpServerConfig = plugin.get_config();
+        if ctx.get_request().get_path() != config.get_endpoint() {
+            return Status::Continue;
+        }
+        let origin: Option<String> = ctx.get_request().try_get_header_back(ORIGIN);
+        if !is_origin_allowed(origin.as_deref(), config.get_allowed_origins()) {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::Forbidden.code())
+                .set_body(Vec::new());
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        let session_id: Option<String> =
+            ctx.get_request().try_get_header_back(MCP_SESSION_ID_HEADER);
+        if ctx.get_request().get_method().is_delete() {
+            let closed: bool = session_id
+                .as_deref()
+                .is_some_and(|sid: &str| plugin.get_registry().close_session(sid));
+            let code: usize = if closed {
+                HttpStatus::NoContent.code()
+            } else {
+                HttpStatus::NotFound.code()
+            };
+            ctx.get_mut_response()
+                .set_status_code(code)
+                .set_body(Vec::new());
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        if !ctx.get_request().get_method().is_post() {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::MethodNotAllowed.code())
+                .set_body(Vec::new());
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        let body: Vec<u8> = ctx.get_request().get_body().clone();
+        if body.len() > config.get_max_body_size() {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::PayloadTooLarge.code())
+                .set_body(Vec::new());
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        let outcome: McpDispatchOutcome = plugin
+            .get_registry()
+            .handle_json_bytes(&body, session_id.as_deref(), config)
+            .await;
+        match outcome {
+            McpDispatchOutcome::Response {
+                body: resp_body,
+                new_session_id,
+            } => {
+                ctx.get_mut_response()
+                    .set_status_code(HttpStatus::Ok.code())
+                    .set_header(CONTENT_TYPE, APPLICATION_JSON)
+                    .set_body(resp_body);
+                if let Some(sid) = new_session_id {
+                    ctx.get_mut_response()
+                        .set_header(MCP_SESSION_ID_HEADER, sid);
+                }
+            }
+            McpDispatchOutcome::Accepted => {
+                ctx.get_mut_response()
+                    .set_status_code(HttpStatus::Accepted.code())
+                    .set_body(Vec::new());
+            }
+            McpDispatchOutcome::UnknownSession => {
+                ctx.get_mut_response()
+                    .set_status_code(HttpStatus::NotFound.code())
+                    .set_body(Vec::new());
+            }
+            McpDispatchOutcome::SessionLimitReached => {
+                ctx.get_mut_response()
+                    .set_status_code(HttpStatus::ServiceUnavailable.code())
+                    .set_header(CONTENT_TYPE, APPLICATION_JSON)
+                    .set_body(mcp_json_error(
+                        Value::Null,
+                        MCP_ERR_INTERNAL,
+                        MSG_MCP_SESSION_LIMIT,
+                    ));
+            }
+        }
+        let wire: ResponseData = ctx.get_mut_response().build();
+        let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+        Status::Reject
+    }
+}
+```
+# Path: hyperlane/plugin/mcp/src/enum.rs
+```rust
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum McpError {
+    InvalidParams(String),
+    NotFound(String),
+    Internal(String),
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum McpDispatchOutcome {
+    Response {
+        body: Vec<u8>,
+        new_session_id: Option<String>,
+    },
+    Accepted,
+    UnknownSession,
+    SessionLimitReached,
+}
+```
+# Path: hyperlane/plugin/mcp/src/static.rs
+```rust
+use super::*;
+pub(crate) static MCP_PLUGIN: OnceLock<McpPlugin> = OnceLock::new();
+```
+# Path: hyperlane/plugin/mcp/src/const.rs
+```rust
+pub const DEFAULT_MCP_ENDPOINT: &str = "/mcp";
+pub const DEFAULT_MCP_PROTOCOL_VERSION: &str = "2025-03-26";
+pub const MCP_SESSION_ID_HEADER: &str = "mcp-session-id";
+pub const DEFAULT_MCP_MAX_SESSIONS: usize = 1024;
+pub const DEFAULT_MCP_MAX_BODY_SIZE: usize = 1024 * 1024;
+pub(crate) const MCP_JSONRPC_VERSION: &str = "2.0";
+pub(crate) const DEFAULT_MCP_SERVER_NAME: &str = "hyperlane-mcp";
+pub(crate) const DEFAULT_MCP_SERVER_VERSION: &str = "1.0.0";
+pub(crate) const MCP_ERR_PARSE: i64 = -32700;
+pub(crate) const MCP_ERR_INVALID_REQUEST: i64 = -32600;
+pub(crate) const MCP_ERR_METHOD_NOT_FOUND: i64 = -32601;
+pub(crate) const MCP_ERR_INVALID_PARAMS: i64 = -32602;
+pub(crate) const MCP_ERR_INTERNAL: i64 = -32603;
+pub(crate) const METHOD_INITIALIZE: &str = "initialize";
+pub(crate) const METHOD_NOTIF_INITIALIZED: &str = "notifications/initialized";
+pub(crate) const METHOD_PING: &str = "ping";
+pub(crate) const METHOD_TOOLS_LIST: &str = "tools/list";
+pub(crate) const METHOD_TOOLS_CALL: &str = "tools/call";
+pub(crate) const METHOD_RESOURCES_LIST: &str = "resources/list";
+pub(crate) const METHOD_RESOURCES_READ: &str = "resources/read";
+pub(crate) const METHOD_PROMPTS_LIST: &str = "prompts/list";
+pub(crate) const METHOD_PROMPTS_GET: &str = "prompts/get";
+pub(crate) const MSG_MCP_PARSE_ERROR: &str = "Parse error";
+pub(crate) const MSG_MCP_INVALID_REQUEST: &str = "Invalid Request";
+pub(crate) const MSG_MCP_METHOD_NOT_FOUND: &str = "Method not found";
+pub(crate) const MSG_MCP_INVALID_PARAMS: &str = "Invalid params";
+pub(crate) const MSG_MCP_SESSION_LIMIT: &str = "MCP session limit reached";
+pub(crate) const MSG_MCP_UNKNOWN_TOOL: &str = "Unknown MCP tool";
+pub(crate) const MSG_MCP_UNKNOWN_RESOURCE: &str = "Unknown MCP resource";
+pub(crate) const MSG_MCP_UNKNOWN_PROMPT: &str = "Unknown MCP prompt";
+pub(crate) const KEY_JSONRPC: &str = "jsonrpc";
+pub(crate) const KEY_ID: &str = "id";
+pub(crate) const KEY_METHOD: &str = "method";
+pub(crate) const KEY_PARAMS: &str = "params";
+pub(crate) const KEY_RESULT: &str = "result";
+pub(crate) const KEY_ERROR: &str = "error";
+pub(crate) const KEY_CODE: &str = "code";
+pub(crate) const KEY_MESSAGE: &str = "message";
+pub(crate) const KEY_TYPE: &str = "type";
+pub(crate) const KEY_TEXT: &str = "text";
+pub(crate) const KEY_PROTOCOL_VERSION: &str = "protocolVersion";
+pub(crate) const KEY_CAPABILITIES: &str = "capabilities";
+pub(crate) const KEY_TOOLS: &str = "tools";
+pub(crate) const KEY_RESOURCES: &str = "resources";
+pub(crate) const KEY_PROMPTS: &str = "prompts";
+pub(crate) const KEY_LIST_CHANGED: &str = "listChanged";
+pub(crate) const KEY_SUBSCRIBE: &str = "subscribe";
+pub(crate) const KEY_SERVER_INFO: &str = "serverInfo";
+pub(crate) const KEY_NAME: &str = "name";
+pub(crate) const KEY_VERSION: &str = "version";
+pub(crate) const KEY_ARGUMENTS: &str = "arguments";
+pub(crate) const KEY_URI: &str = "uri";
+pub(crate) const KEY_CONTENTS: &str = "contents";
+```
+# Path: hyperlane/plugin/mcp/src/struct.rs
+```rust
+use super::*;
+#[derive(Clone, Data, Debug, Eq, PartialEq)]
+pub struct McpServerConfig {
+    pub(crate) name: String,
+    pub(crate) version: String,
+    pub(crate) protocol_version: String,
+    pub(crate) endpoint: String,
+    pub(crate) allowed_origins: Vec<String>,
+    #[get(type(copy))]
+    pub(crate) max_sessions: usize,
+    #[get(type(copy))]
+    pub(crate) max_body_size: usize,
+}
+#[derive(Clone, Data, Debug, Deserialize, PartialEq, Serialize)]
+pub struct McpTool {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    #[serde(rename = "inputSchema")]
+    pub(crate) input_schema: Value,
+}
+#[derive(Clone, Data, Debug, Deserialize, PartialEq, Serialize)]
+pub struct McpToolResult {
+    pub(crate) content: Vec<Value>,
+    #[serde(rename = "isError")]
+    #[get(type(copy))]
+    pub(crate) is_error: bool,
+}
+#[derive(Clone, Data, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct McpResource {
+    pub(crate) uri: String,
+    pub(crate) name: String,
+    pub(crate) description: String,
+    #[serde(rename = "mimeType")]
+    pub(crate) mime_type: String,
+}
+#[derive(Clone, Data, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct McpResourceContent {
+    pub(crate) uri: String,
+    #[serde(rename = "mimeType")]
+    pub(crate) mime_type: String,
+    pub(crate) text: String,
+}
+#[derive(Clone, Data, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct McpPromptArgument {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    #[get(type(copy))]
+    pub(crate) required: bool,
+}
+#[derive(Clone, Data, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct McpPrompt {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) arguments: Vec<McpPromptArgument>,
+}
+#[derive(Clone)]
+pub(crate) struct RegisteredTool {
+    pub(crate) meta: McpTool,
+    pub(crate) handler: McpToolHandler,
+}
+#[derive(Clone)]
+pub(crate) struct RegisteredResource {
+    pub(crate) meta: McpResource,
+    pub(crate) handler: McpResourceHandler,
+}
+#[derive(Clone)]
+pub(crate) struct RegisteredPrompt {
+    pub(crate) meta: McpPrompt,
+    pub(crate) handler: McpPromptHandler,
+}
+#[derive(Clone)]
+pub struct McpRegistry {
+    pub(crate) tools: HashMap<String, RegisteredTool>,
+    pub(crate) resources: HashMap<String, RegisteredResource>,
+    pub(crate) prompts: HashMap<String, RegisteredPrompt>,
+    pub(crate) sessions: Arc<Mutex<HashSet<String>>>,
+    pub(crate) next_session_seq: Arc<AtomicU64>,
+}
+#[derive(Clone)]
+pub struct McpPlugin {
+    pub(crate) config: McpServerConfig,
+    pub(crate) registry: McpRegistry,
+}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct McpHook;
+```
+# Path: hyperlane/plugin/mcp/src/fn.rs
+```rust
+use super::*;
+pub(crate) fn mcp_single_field_object(key: &str, value: Value) -> Value {
+    let mut map: Map<String, Value> = Map::with_capacity(1);
+    map.insert(key.to_owned(), value);
+    Value::Object(map)
+}
+pub(crate) fn mcp_text_content(text: String) -> Value {
+    let mut map: Map<String, Value> = Map::with_capacity(2);
+    map.insert(KEY_TYPE.to_owned(), Value::String(KEY_TEXT.to_owned()));
+    map.insert(KEY_TEXT.to_owned(), Value::String(text));
+    Value::Object(map)
+}
+pub(crate) fn mcp_initialize_result(config: &McpServerConfig) -> Value {
+    let mut tools_cap: Map<String, Value> = Map::with_capacity(1);
+    tools_cap.insert(KEY_LIST_CHANGED.to_owned(), Value::Bool(false));
+    let mut resources_cap: Map<String, Value> = Map::with_capacity(2);
+    resources_cap.insert(KEY_SUBSCRIBE.to_owned(), Value::Bool(false));
+    resources_cap.insert(KEY_LIST_CHANGED.to_owned(), Value::Bool(false));
+    let mut prompts_cap: Map<String, Value> = Map::with_capacity(1);
+    prompts_cap.insert(KEY_LIST_CHANGED.to_owned(), Value::Bool(false));
+    let mut capabilities: Map<String, Value> = Map::with_capacity(3);
+    capabilities.insert(KEY_TOOLS.to_owned(), Value::Object(tools_cap));
+    capabilities.insert(KEY_RESOURCES.to_owned(), Value::Object(resources_cap));
+    capabilities.insert(KEY_PROMPTS.to_owned(), Value::Object(prompts_cap));
+    let mut server_info: Map<String, Value> = Map::with_capacity(2);
+    server_info.insert(
+        KEY_NAME.to_owned(),
+        Value::String(config.get_name().clone()),
+    );
+    server_info.insert(
+        KEY_VERSION.to_owned(),
+        Value::String(config.get_version().clone()),
+    );
+    let mut result: Map<String, Value> = Map::with_capacity(3);
+    result.insert(
+        KEY_PROTOCOL_VERSION.to_owned(),
+        Value::String(config.get_protocol_version().clone()),
+    );
+    result.insert(KEY_CAPABILITIES.to_owned(), Value::Object(capabilities));
+    result.insert(KEY_SERVER_INFO.to_owned(), Value::Object(server_info));
+    Value::Object(result)
+}
+pub(crate) fn mcp_json_error(id: Value, code: i64, message: &str) -> Vec<u8> {
+    let mut err_obj: Map<String, Value> = Map::with_capacity(2);
+    err_obj.insert(KEY_CODE.to_owned(), Value::from(code));
+    err_obj.insert(KEY_MESSAGE.to_owned(), Value::String(message.to_owned()));
+    let mut payload: Map<String, Value> = Map::with_capacity(3);
+    payload.insert(
+        KEY_JSONRPC.to_owned(),
+        Value::String(MCP_JSONRPC_VERSION.to_owned()),
+    );
+    payload.insert(KEY_ID.to_owned(), id);
+    payload.insert(KEY_ERROR.to_owned(), Value::Object(err_obj));
+    to_vec(&Value::Object(payload)).unwrap_or_default()
+}
+pub(crate) fn mcp_json_result(id: Value, result: Value) -> Vec<u8> {
+    let mut payload: Map<String, Value> = Map::with_capacity(3);
+    payload.insert(
+        KEY_JSONRPC.to_owned(),
+        Value::String(MCP_JSONRPC_VERSION.to_owned()),
+    );
+    payload.insert(KEY_ID.to_owned(), id);
+    payload.insert(KEY_RESULT.to_owned(), result);
+    to_vec(&Value::Object(payload)).unwrap_or_default()
+}
+pub(crate) fn is_origin_allowed(origin: Option<&str>, allowed_origins: &[String]) -> bool {
+    if allowed_origins.is_empty() {
+        return true;
+    }
+    let Some(value) = origin else {
+        return true;
+    };
+    allowed_origins
+        .iter()
+        .any(|allowed: &String| allowed.eq_ignore_ascii_case(value.trim()))
+}
+```
+# Path: hyperlane/plugin/mcp/src/lib.rs
+```rust
+mod r#const;
+mod r#enum;
+mod r#fn;
+mod r#impl;
+mod r#static;
+mod r#struct;
+#[cfg(test)]
+#[path = "../tests/mod.rs"]
+mod tests;
+mod r#type;
+pub use {r#const::*, r#enum::*, r#struct::*, r#type::*};
+pub(crate) use {r#fn::*, r#static::*};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    fmt::{self, Display, Formatter},
+    future::Future,
+    pin::Pin,
+    sync::{
+        Arc, Mutex, MutexGuard, OnceLock,
+        atomic::{AtomicU64, Ordering},
+    },
+};
+use {
+    hyperlane::{
+        APPLICATION_JSON, CONTENT_TYPE, Context, HttpStatus, ORIGIN, ResponseData, ResponseError,
+        ServerHook, Status, Stream,
+    },
+    lombok_macros::*,
+    serde::{Deserialize, Serialize},
+    serde_json::{Map, Value, from_slice, json, to_value, to_vec},
+};
+```
 # Path: hyperlane/plugin/negotiate/README.md
 # hyperlane-plugin-negotiate
 Answers a response with the content coding the client accepts, and answers a
@@ -28083,8 +35320,9 @@ the answer into a `304` that keeps it.
 mod r#negotiate;
 use super::*;
 use std::{
+    collections::VecDeque,
     io,
-    net::TcpListener,
+    net::{SocketAddr, TcpListener},
     num::ParseIntError,
     str::{Utf8Error, from_utf8},
     time::Duration,
@@ -28697,6 +35935,50 @@ async fn keeps_the_variance_when_the_validator_matches() -> Result<(), String> {
     assert_header(&wire, VARY, VARY_ACCEPT_ENCODING)?;
     Ok(())
 }
+#[tokio::test]
+async fn test_security_conditional_never_turns_error_status_into_304_and_honors_no_transform() {
+    let listener: tokio::net::TcpListener =
+        tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    let (client_res, accept_res): (io::Result<TcpStream>, io::Result<(TcpStream, SocketAddr)>) =
+        tokio::join!(TcpStream::connect(addr), listener.accept());
+    let _client: TcpStream = client_res.unwrap();
+    let (server_tcp, _): (TcpStream, SocketAddr) = accept_res.unwrap();
+    let mut stream: Stream = Stream::new(server_tcp, RequestConfig::default(), false);
+    let mut err_ctx: Context = Context::default();
+    err_ctx
+        .get_mut_request()
+        .set_method(Method::Get)
+        .get_mut_headers()
+        .insert(IF_NONE_MATCH.to_owned(), VecDeque::from(["*".to_owned()]));
+    err_ctx
+        .get_mut_response()
+        .set_status_code(HttpStatus::InternalServerError.code())
+        .set_body("error-body");
+    let cond: ConditionalMiddleware = ConditionalMiddleware::new(&mut stream, &mut err_ctx).await;
+    let _: Status = cond.handle(&mut stream, &mut err_ctx).await;
+    assert_eq!(
+        err_ctx.get_response().get_status_code(),
+        HttpStatus::InternalServerError.code()
+    );
+    let mut nt_ctx: Context = Context::default();
+    nt_ctx
+        .get_mut_request()
+        .set_method(Method::Get)
+        .get_mut_headers()
+        .insert(
+            ACCEPT_ENCODING.to_owned(),
+            VecDeque::from(["gzip".to_owned()]),
+        );
+    nt_ctx
+        .get_mut_response()
+        .set_status_code(HttpStatus::Ok.code())
+        .set_header(CACHE_CONTROL, "public, no-transform")
+        .set_body("x".repeat(4096));
+    let comp: CompressMiddleware = CompressMiddleware::new(&mut stream, &mut nt_ctx).await;
+    let _: Status = comp.handle(&mut stream, &mut nt_ctx).await;
+    assert!(!nt_ctx.get_response().has_header(CONTENT_ENCODING));
+}
 ```
 # Path: hyperlane/plugin/negotiate/src/impl.rs
 ```rust
@@ -28718,18 +36000,47 @@ impl CompressMiddleware {
     pub fn init(config: CompressConfig) -> Result<(), String> {
         CONFIG
             .set(config)
-            .map_err(|_: CompressConfig| "the compress configuration was already set".to_owned())
+            .map_err(|_: CompressConfig| COMPRESS_CONFIG_ALREADY_SET.to_owned())
     }
     fn config() -> CompressConfig {
         CONFIG.get().copied().unwrap_or_default()
     }
     fn negotiated_coding(request: &Request) -> Option<Compress> {
-        let values: &RequestHeadersValue = request.get_headers().get(ACCEPT_ENCODING)?;
-        let first: &String = values.front()?;
-        if values.len() == 1 {
-            return Compress::from_accept_encoding(first);
+        let mut total_values: usize = 0;
+        let mut total_len: usize = 0;
+        let mut single: Option<&str> = None;
+        for (key, values) in request.get_headers() {
+            if !key.eq_ignore_ascii_case(ACCEPT_ENCODING) {
+                continue;
+            }
+            for value in values {
+                total_values += 1;
+                total_len = total_len.saturating_add(value.len());
+                if total_values == 1 {
+                    single = Some(value.as_str());
+                }
+            }
         }
-        let joined: String = values.iter().cloned().collect::<Vec<String>>().join(COMMA);
+        if total_values == 0 {
+            return None;
+        }
+        if total_values == 1 {
+            return single.and_then(Compress::from_accept_encoding);
+        }
+        let mut joined: String = String::with_capacity(total_len + total_values);
+        let mut first: bool = true;
+        for (key, values) in request.get_headers() {
+            if !key.eq_ignore_ascii_case(ACCEPT_ENCODING) {
+                continue;
+            }
+            for value in values {
+                if !first {
+                    joined.push_str(COMMA);
+                }
+                joined.push_str(value);
+                first = false;
+            }
+        }
         Compress::from_accept_encoding(joined)
     }
 }
@@ -28742,7 +36053,8 @@ impl ServerHook for CompressMiddleware {
             return Status::Continue;
         };
         let response: &mut Response = ctx.get_mut_response();
-        if response.get_headers().contains_key(CONTENT_ENCODING)
+        if has_response_header_ci(response, CONTENT_ENCODING)
+            || has_no_transform(response)
             || response.get_body().len() < Self::config().get_min_length()
             || has_no_body(response.get_status_code())
             || is_event_stream(response)
@@ -28771,8 +36083,9 @@ impl ConditionalMiddleware {
     fn entity_tag(response: &mut Response) -> EntityTag {
         let existing: Option<String> = response
             .get_headers()
-            .get(ETAG)
-            .and_then(|values: &ResponseHeadersValue| values.back().cloned());
+            .iter()
+            .find(|(key, _): &(&String, &ResponseHeadersValue)| key.eq_ignore_ascii_case(ETAG))
+            .and_then(|(_, values): (&String, &ResponseHeadersValue)| values.back().cloned());
         match existing {
             Some(etag) => EntityTag(etag),
             None => {
@@ -28792,7 +36105,8 @@ impl ServerHook for ConditionalMiddleware {
         if !method.is_get() && !method.is_head() {
             return Status::Continue;
         }
-        if has_no_body(ctx.get_response().get_status_code()) {
+        let status_code: ResponseStatusCode = ctx.get_response().get_status_code();
+        if !(200..300).contains(&status_code) || has_no_body(status_code) {
             return Status::Continue;
         }
         let etag: EntityTag = Self::entity_tag(ctx.get_mut_response());
@@ -28814,6 +36128,10 @@ pub(super) static CONFIG: OnceLock<CompressConfig> = OnceLock::new();
 ```rust
 pub(crate) const DEFAULT_MIN_LENGTH: usize = 256;
 pub(crate) const ENTITY_TAG_QUOTE: &str = "\"";
+pub(crate) const MEDIA_TYPE_PARAM_DELIMITER: char = ';';
+pub(crate) const CACHE_CONTROL_NO_TRANSFORM: &str = "no-transform";
+pub(crate) const VARY_WILDCARD: &str = "*";
+pub(crate) const COMPRESS_CONFIG_ALREADY_SET: &str = "the compress configuration was already set";
 ```
 # Path: hyperlane/plugin/negotiate/src/struct.rs
 ```rust
@@ -28837,32 +36155,65 @@ pub(crate) fn has_no_body(status_code: ResponseStatusCode) -> bool {
         || status_code == HttpStatus::ResetContent.code()
         || status_code == HttpStatus::NotModified.code()
 }
+pub(crate) fn has_response_header_ci(response: &Response, target: &str) -> bool {
+    response
+        .get_headers()
+        .keys()
+        .any(|key: &String| key.eq_ignore_ascii_case(target))
+}
+pub(crate) fn has_no_transform(response: &Response) -> bool {
+    response
+        .get_headers()
+        .iter()
+        .any(|(key, values): (&String, &ResponseHeadersValue)| {
+            key.eq_ignore_ascii_case(CACHE_CONTROL)
+                && values.iter().any(|value: &String| {
+                    value.split(COMMA).any(|directive: &str| {
+                        directive
+                            .trim()
+                            .eq_ignore_ascii_case(CACHE_CONTROL_NO_TRANSFORM)
+                    })
+                })
+        })
+}
 pub(crate) fn is_event_stream(response: &Response) -> bool {
     response
         .get_headers()
-        .get(CONTENT_TYPE)
-        .is_some_and(|values: &ResponseHeadersValue| {
-            values
-                .iter()
-                .any(|value: &String| value.eq_ignore_ascii_case(TEXT_EVENT_STREAM))
+        .iter()
+        .any(|(key, values): (&String, &ResponseHeadersValue)| {
+            key.eq_ignore_ascii_case(CONTENT_TYPE)
+                && values.iter().any(|value: &String| {
+                    value
+                        .split(MEDIA_TYPE_PARAM_DELIMITER)
+                        .next()
+                        .is_some_and(|media: &str| {
+                            media.trim().eq_ignore_ascii_case(TEXT_EVENT_STREAM)
+                        })
+                })
         })
 }
 pub(crate) fn vary_accept_encoding(response: &mut Response) {
-    let declared: bool =
-        response
-            .get_headers()
-            .get(VARY)
-            .is_some_and(|values: &ResponseHeadersValue| {
-                values.iter().any(|value: &String| {
-                    value
-                        .split(COMMA)
-                        .any(|token: &str| token.trim().eq_ignore_ascii_case(VARY_ACCEPT_ENCODING))
-                })
-            });
+    let mut has_vary: bool = false;
+    let mut declared: bool = false;
+    for (key, values) in response.get_headers() {
+        if !key.eq_ignore_ascii_case(VARY) {
+            continue;
+        }
+        has_vary = true;
+        if values.iter().any(|value: &String| {
+            value.split(COMMA).any(|token: &str| {
+                let trimmed: &str = token.trim();
+                trimmed.eq_ignore_ascii_case(VARY_ACCEPT_ENCODING) || trimmed == VARY_WILDCARD
+            })
+        }) {
+            declared = true;
+            break;
+        }
+    }
     if declared {
         return;
     }
-    if response.has_header(VARY) {
+    if has_vary {
         response.add_header(VARY, VARY_ACCEPT_ENCODING);
     } else {
         response.set_header(VARY, VARY_ACCEPT_ENCODING);
@@ -28885,8 +36236,8 @@ use std::{hash::Hasher, sync::OnceLock};
 use {
     http_compress::{Compress, XxHash3_64},
     hyperlane::{
-        ACCEPT_ENCODING, COMMA, CONTENT_ENCODING, CONTENT_TYPE, Context, EMPTY_STR, ETAG,
-        HttpStatus, Request, RequestHeadersValue, RequestMethod, Response, ResponseHeadersValue,
+        ACCEPT_ENCODING, CACHE_CONTROL, COMMA, CONTENT_ENCODING, CONTENT_TYPE, Context, EMPTY_STR,
+        ETAG, HttpStatus, Request, RequestMethod, Response, ResponseHeadersValue,
         ResponseStatusCode, ServerHook, Status, Stream, TEXT_EVENT_STREAM, VARY,
         VARY_ACCEPT_ENCODING,
     },
@@ -36758,6 +44109,7 @@ mod error;
 mod framing;
 mod protocol;
 mod route;
+mod security;
 mod server;
 #[cfg(target_os = "linux")]
 mod uring;
@@ -36777,7 +44129,10 @@ use std::{
     panic::{catch_unwind, resume_unwind},
 };
 use bytes::{Buf, Bytes};
-use h2::{Error, RecvStream, SendStream, client::ResponseFuture, client::handshake};
+use h2::{
+    Error, RecvStream, SendStream,
+    client::{ResponseFuture, SendRequest, handshake},
+};
 use h3::{
     client::RequestStream,
     client::new,
@@ -38430,6 +45785,186 @@ fn large_tail_regex_routes() {
         "Average per tail regex route match: {:?}",
         match_duration / ROUTE_COUNT
     );
+}
+```
+# Path: hyperlane/core/tests/security/impl.rs
+```rust
+use super::*;
+impl ServerHook for RejectGuardMiddleware {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        if ctx.get_request().get_path() == "/deny" {
+            ctx.get_mut_response()
+                .set_status_code(HttpStatus::Forbidden.code())
+                .set_body("denied");
+            let wire: ResponseData = ctx.get_mut_response().build();
+            let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+            return Status::Reject;
+        }
+        Status::Continue
+    }
+}
+impl ServerHook for SetAttrRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.set_attribute("secret", "leaked".to_owned());
+        ctx.get_mut_response()
+            .set_header("x-leaked", "yes")
+            .set_body("attr-set");
+        Status::Continue
+    }
+}
+impl ServerHook for CheckIsolationRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let leaked_attr: bool = ctx.try_get_attribute::<String, _>("secret").is_some();
+        let leaked_param: bool = !ctx.get_route_params().is_empty();
+        let leaked_hdr: bool = ctx.get_response().has_header("x-leaked");
+        let body: String = format!("{leaked_attr},{leaked_param},{leaked_hdr}");
+        ctx.get_mut_response().set_body(body);
+        Status::Continue
+    }
+}
+impl ServerHook for PanicRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, _: &mut Context) -> Status {
+        panic!("intentional security isolation panic");
+    }
+}
+impl ServerHook for RegexEchoRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        let item: String = ctx.try_get_route_param("item").unwrap_or_default();
+        ctx.get_mut_response().set_body(format!("matched:{item}"));
+        Status::Continue
+    }
+}
+impl ServerHook for AdminRoute {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, _: &mut Stream, ctx: &mut Context) -> Status {
+        ctx.get_mut_response().set_body("admin-secret");
+        Status::Continue
+    }
+}
+impl ServerHook for SecuritySendMiddleware {
+    async fn new(_: &mut Stream, _: &mut Context) -> Self {
+        Self
+    }
+    async fn handle(self, stream: &mut Stream, ctx: &mut Context) -> Status {
+        let wire: ResponseData = ctx.get_mut_response().build();
+        let _: Result<(), ResponseError> = stream.try_send(&wire).await;
+        Status::Continue
+    }
+}
+```
+# Path: hyperlane/core/tests/security/mod.rs
+```rust
+mod r#fn;
+mod r#impl;
+mod r#struct;
+use super::*;
+use r#struct::*;
+```
+# Path: hyperlane/core/tests/security/struct.rs
+```rust
+#[derive(Clone, Copy, Default)]
+pub(crate) struct RejectGuardMiddleware;
+#[derive(Clone, Copy, Default)]
+pub(crate) struct SetAttrRoute;
+#[derive(Clone, Copy, Default)]
+pub(crate) struct CheckIsolationRoute;
+#[derive(Clone, Copy, Default)]
+pub(crate) struct PanicRoute;
+#[derive(Clone, Copy, Default)]
+pub(crate) struct RegexEchoRoute;
+#[derive(Clone, Copy, Default)]
+pub(crate) struct AdminRoute;
+#[derive(Clone, Copy, Default)]
+pub(crate) struct SecuritySendMiddleware;
+```
+# Path: hyperlane/core/tests/security/fn.rs
+```rust
+use super::*;
+async fn start_security_server(protocol: ServerProtocol) -> (ServerControlHook, SocketAddr) {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    drop(listener);
+    let mut cfg: ServerConfig = ServerConfig::default();
+    cfg.set_address(addr.to_string()).set_protocol(protocol);
+    let mut server: Server = Server::default();
+    server
+        .server_config(cfg)
+        .request_middleware::<RejectGuardMiddleware>()
+        .route::<SetAttrRoute>("/set-attr")
+        .route::<CheckIsolationRoute>("/check")
+        .route::<PanicRoute>("/panic")
+        .route::<RegexEchoRoute>("/items/{item:foo|foobar}")
+        .route::<AdminRoute>("/admin")
+        .route::<AdminRoute>("/deny")
+        .response_middleware::<SecuritySendMiddleware>();
+    let control: ServerControlHook = server.run().await.unwrap();
+    (control, addr)
+}
+#[tokio::test]
+#[tokio::test]
+async fn test_security_http2_rejects_forbidden_headers_and_duplicate_cl() {
+    let (control, addr): (ServerControlHook, SocketAddr) =
+        start_security_server(ServerProtocol::Http2).await;
+    let tcp: TcpStream = TcpStream::connect(addr).await.unwrap();
+    let (client, conn): (SendRequest<Bytes>, h2::client::Connection<TcpStream, Bytes>) =
+        handshake(tcp).await.unwrap();
+    let driver: JoinHandle<()> = spawn(async move {
+        let _: Result<(), Error> = conn.await;
+    });
+    let mut ready_client: SendRequest<Bytes> = client.clone().ready().await.unwrap();
+    let (ok_fut, _): (ResponseFuture, SendStream<Bytes>) = ready_client
+        .send_request(
+            Builder::new()
+                .method("GET")
+                .uri(format!("http://{addr}/check"))
+                .body(())
+                .unwrap(),
+            true,
+        )
+        .unwrap();
+    let ok_status: u16 = timeout(Duration::from_secs(2), ok_fut)
+        .await
+        .unwrap()
+        .unwrap()
+        .status()
+        .as_u16();
+    assert_eq!(ok_status, 200u16);
+    let mut ready_bad: SendRequest<Bytes> = client.ready().await.unwrap();
+    let (bad_fut, _): (ResponseFuture, SendStream<Bytes>) = ready_bad
+        .send_request(
+            Builder::new()
+                .method("POST")
+                .uri(format!("http://{addr}/check"))
+                .header("content-length", "5")
+                .header("content-length", "6")
+                .body(())
+                .unwrap(),
+            true,
+        )
+        .unwrap();
+    if let Ok(resp) = timeout(Duration::from_secs(2), bad_fut).await.unwrap() {
+        assert_eq!(resp.status().as_u16(), 400u16);
+    }
+    driver.abort();
+    control.shutdown().await;
+    control.wait().await;
 }
 ```
 # Path: hyperlane/core/tests/error/mod.rs
@@ -45406,13 +52941,14 @@ use std::{
     cell::{RefCell, RefMut},
     cmp::Ordering,
     collections::{HashMap, HashSet, VecDeque},
+    error::Error,
     fmt,
     future::{Future, poll_fn},
     hash::{Hash, Hasher},
-    io::{self, IoSlice, IoSliceMut, Write, stderr, stdout},
+    io::{self, ErrorKind, IoSlice, IoSliceMut, Write, stderr, stdout},
     marker::PhantomPinned,
     mem::{self, MaybeUninit},
-    net::{self, AddrParseError, SocketAddr},
+    net::{self, SocketAddr},
     num::ParseIntError,
     panic::AssertUnwindSafe,
     pin::{Pin, pin},
@@ -45443,18 +52979,19 @@ use {
     inventory::collect,
     lombok_macros::*,
     quinn::{
-        self, AsyncUdpSocket, Connection, ConnectionId, ConnectionIdGenerator, Endpoint,
-        EndpointConfig, Incoming, RecvStream, Runtime, SendStream, TokioRuntime, UdpPoller, VarInt,
-        WriteError,
+        self, AsyncUdpSocket, Chunk, Connection, ConnectionId, ConnectionIdGenerator, Endpoint,
+        EndpointConfig, Incoming, ReadError, RecvStream, Runtime, SendStream, TokioRuntime,
+        TransportConfig, UdpPoller, VarInt, WriteError,
         crypto::rustls::{HandshakeData, NoInitialCipherSuite, QuicServerConfig},
         udp::{BATCH_SIZE, RecvMeta, Transmit},
     },
-    regex::{Match, Regex},
+    regex::Regex,
     rustls::{
         SupportedCipherSuite,
         crypto::{
             CryptoProvider, SecureRandom,
             ring::{
+                Ticketer,
                 cipher_suite::{
                     TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
                     TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
@@ -45470,7 +53007,7 @@ use {
             CertificateDer, PrivateKeyDer,
             pem::{self, PemObject},
         },
-        server::UnbufferedServerConnection,
+        server::{ServerSessionMemoryCache, UnbufferedServerConnection},
         unbuffered::{ConnectionState, EncodeError, EncryptError, UnbufferedStatus},
         version::{TLS12, TLS13},
     },
@@ -45478,11 +53015,11 @@ use {
     socket2::{Domain, SockRef, Socket, Type},
     tokio::{
         io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
-        net::{TcpListener, TcpStream},
+        net::{TcpListener, TcpStream, lookup_host},
         runtime, spawn,
-        sync::watch::{Receiver, Sender, channel, error::RecvError, error::SendError},
+        sync::watch::{Receiver, Sender, channel, error::SendError},
         task::{JoinError, JoinHandle, spawn_blocking},
-        time::{error::Elapsed, timeout},
+        time::{Sleep, error::Elapsed, sleep, timeout},
     },
 };
 #[cfg(not(target_os = "linux"))]
@@ -45622,27 +53159,27 @@ impl Hash for HookType {
             HookType::TaskPanic(order, factory) => {
                 0u8.hash(state);
                 order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
             HookType::RequestError(order, factory) => {
                 1u8.hash(state);
                 order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
             HookType::RequestMiddleware(order, factory) => {
                 2u8.hash(state);
                 order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
             HookType::Route(path, factory) => {
                 3u8.hash(state);
                 path.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
             HookType::ResponseMiddleware(order, factory) => {
                 4u8.hash(state);
                 order.hash(state);
-                (factory as *const fn() -> ServerHookHandler).hash(state);
+                (*factory as usize).hash(state);
             }
         }
     }
@@ -45670,10 +53207,17 @@ impl HookType {
     }
     #[inline(always)]
     pub fn assert_unique_order(list: Vec<HookType>) {
-        let mut seen: HashSet<(HookType, isize)> = HashSet::new();
+        let mut seen: HashSet<(u8, isize)> = HashSet::new();
         list.iter().for_each(|hook: &HookType| {
+            let kind: u8 = match hook {
+                HookType::TaskPanic(_, _) => 0,
+                HookType::RequestError(_, _) => 1,
+                HookType::RequestMiddleware(_, _) => 2,
+                HookType::Route(_, _) => 3,
+                HookType::ResponseMiddleware(_, _) => 4,
+            };
             if let Some(order) = hook.try_get_order()
-                && !seen.insert((*hook, order))
+                && !seen.insert((kind, order))
             {
                 panic!("Duplicate hook detected: {} with order {}", hook, order);
             }
@@ -45911,6 +53455,32 @@ impl Context {
         self
     }
     #[inline(always)]
+    fn is_plain_external_key(key: &str) -> bool {
+        key.len() <= EXTERNAL_ATTR_STACK_LIMIT
+            && key
+                .bytes()
+                .all(|byte: u8| (0x20..0x7f).contains(&byte) && byte != b'"' && byte != b'\\')
+    }
+    #[inline(always)]
+    fn format_plain_external_key<'a>(key: &str, buf: &'a mut [u8; 128]) -> &'a str {
+        let prefix_len: usize = EXTERNAL_ATTR_PREFIX.len();
+        let key_bytes: &[u8] = key.as_bytes();
+        let suffix_len: usize = EXTERNAL_ATTR_SUFFIX.len();
+        buf[..prefix_len].copy_from_slice(EXTERNAL_ATTR_PREFIX);
+        buf[prefix_len..prefix_len + key_bytes.len()].copy_from_slice(key_bytes);
+        let suffix_start: usize = prefix_len + key_bytes.len();
+        buf[suffix_start..suffix_start + suffix_len].copy_from_slice(EXTERNAL_ATTR_SUFFIX);
+        let total: usize = suffix_start + suffix_len;
+        from_utf8(&buf[..total]).unwrap_or_default()
+    }
+    #[inline(always)]
+    fn internal_attribute_key(key: InternalAttribute) -> &'static str {
+        match key {
+            InternalAttribute::TaskPanicData => INTERNAL_TASK_PANIC_KEY,
+            InternalAttribute::RequestErrorData => INTERNAL_REQUEST_ERROR_KEY,
+        }
+    }
+    #[inline(always)]
     pub fn try_get_attribute<V, K>(&self, key: K) -> Option<V>
     where
         V: AnySendSyncClone,
@@ -45926,6 +53496,15 @@ impl Context {
                 }
                 None => None,
             };
+        }
+        if Self::is_plain_external_key(key) {
+            let mut stack_buf: [u8; 128] = [0; 128];
+            let formatted: &str = Self::format_plain_external_key(key, &mut stack_buf);
+            return self
+                .get_attributes()
+                .get(formatted)
+                .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<V>())
+                .cloned();
         }
         self.get_attributes()
             .get(&Attribute::External(key.to_owned()).to_string())
@@ -45946,10 +53525,14 @@ impl Context {
         K: AsRef<str>,
         V: AnySendSyncClone,
     {
-        self.get_mut_attributes().insert(
-            Attribute::External(key.as_ref().to_owned()).to_string(),
-            Arc::new(value),
-        );
+        let key_str: &str = key.as_ref();
+        let map_key: String = if Self::is_plain_external_key(key_str) {
+            let mut stack_buf: [u8; 128] = [0; 128];
+            Self::format_plain_external_key(key_str, &mut stack_buf).to_owned()
+        } else {
+            Attribute::External(key_str.to_owned()).to_string()
+        };
+        self.get_mut_attributes().insert(map_key, Arc::new(value));
         self
     }
     #[inline(always)]
@@ -45957,8 +53540,15 @@ impl Context {
     where
         K: AsRef<str>,
     {
+        let key_str: &str = key.as_ref();
+        if Self::is_plain_external_key(key_str) {
+            let mut stack_buf: [u8; 128] = [0; 128];
+            let formatted: &str = Self::format_plain_external_key(key_str, &mut stack_buf);
+            self.get_mut_attributes().remove(formatted);
+            return self;
+        }
         self.get_mut_attributes()
-            .remove(&Attribute::External(key.as_ref().to_owned()).to_string());
+            .remove(&Attribute::External(key_str.to_owned()).to_string());
         self
     }
     #[inline(always)]
@@ -45972,7 +53562,7 @@ impl Context {
         V: AnySendSyncClone,
     {
         self.get_attributes()
-            .get(&Attribute::Internal(key).to_string())
+            .get(Self::internal_attribute_key(key))
             .and_then(|arc: &ArcAnySendSync| arc.downcast_ref::<V>())
             .cloned()
     }
@@ -45988,8 +53578,10 @@ impl Context {
     where
         V: AnySendSyncClone,
     {
-        self.get_mut_attributes()
-            .insert(Attribute::Internal(key).to_string(), Arc::new(value));
+        self.get_mut_attributes().insert(
+            Self::internal_attribute_key(key).to_owned(),
+            Arc::new(value),
+        );
         self
     }
     #[inline(always)]
@@ -46021,6 +53613,11 @@ impl Context {
 # Path: hyperlane/core/src/context/const.rs
 ```rust
 pub(crate) const REQUEST_TARGET_ATTRIBUTE: &str = "hyperlane.request.target";
+pub(crate) const INTERNAL_TASK_PANIC_KEY: &str = "Internal(TaskPanicData)";
+pub(crate) const INTERNAL_REQUEST_ERROR_KEY: &str = "Internal(RequestErrorData)";
+pub(crate) const EXTERNAL_ATTR_PREFIX: &[u8] = b"External(\"";
+pub(crate) const EXTERNAL_ATTR_SUFFIX: &[u8] = b"\")";
+pub(crate) const EXTERNAL_ATTR_STACK_LIMIT: usize = 110;
 ```
 # Path: hyperlane/core/src/context/mod.rs
 ```rust
@@ -46323,6 +53920,10 @@ impl Server {
                     return;
                 }
                 Err(error) => {
+                    ctx.get_mut_response().reset();
+                    ctx.clear_route_params();
+                    ctx.reset_request_attributes();
+                    let _: Option<String> = ctx.take_original_target();
                     ctx.set_original_head(None);
                     let version: Option<HttpVersion> = h1_error_response_version(stream, &error);
                     Box::pin(reply_to_request_error(self, stream, ctx, &error, version)).await;
@@ -46340,8 +53941,11 @@ impl Server {
         let panicked: Option<PanicData> =
             catch_connection_panic(self.handle_connection(pipeline, stream, &mut ctx)).await;
         if let Some(panic) = panicked {
+            let version: RequestVersion = ctx.get_request().get_version().clone();
             ctx.set_task_panic(panic)
                 .get_mut_response()
+                .reset()
+                .set_version(version)
                 .set_status_code(HttpStatus::InternalServerError.code());
             stream.set_closed(false);
             for hook in self.get_task_panic().iter() {
@@ -46366,8 +53970,11 @@ impl Server {
         let Some(panic) = panicked else {
             return;
         };
+        let version: RequestVersion = ctx.get_request().get_version().clone();
         ctx.set_task_panic(panic)
             .get_mut_response()
+            .reset()
+            .set_version(version)
             .set_status_code(HttpStatus::InternalServerError.code());
         stream.set_closed(false);
         for hook in self.get_task_panic().iter() {
@@ -46409,15 +54016,18 @@ impl Server {
                         },
                     )?,
                 );
-                let bind_addr: SocketAddr =
-                    bind_address
-                        .parse::<SocketAddr>()
-                        .map_err(|error: AddrParseError| {
-                            Box::new(ServerError::Tls(format!(
-                                "invalid bind address {}: {}",
-                                bind_address, error
+                let bind_addr: SocketAddr = match bind_address.parse::<SocketAddr>() {
+                    Ok(addr) => addr,
+                    Err(_) => lookup_host(bind_address)
+                        .await
+                        .map_err(|error: io::Error| Box::new(ServerError::from(error)))?
+                        .next()
+                        .ok_or_else(|| {
+                            Box::new(ServerError::TcpBind(format!(
+                                "invalid bind address {bind_address}"
                             )))
-                        })?;
+                        })?,
+                };
                 let endpoints: QuicEndpointSet = bind_quic_endpoints(quic_config, bind_addr)?;
                 let env: ConnectionEnv = ConnectionEnv {
                     shared: Arc::new(ConnectionShared {
@@ -46454,7 +54064,9 @@ impl Server {
             let mut running_receiver_clone: Receiver<bool> = running_receiver.clone();
             Box::pin(async move {
                 while !*running_receiver_clone.borrow_and_update() {
-                    let _: Result<(), RecvError> = running_receiver_clone.changed().await;
+                    if running_receiver_clone.changed().await.is_err() {
+                        break;
+                    }
                 }
             })
         });
@@ -46510,6 +54122,14 @@ pub(crate) const SERVER_RUNNING: bool = false;
 pub(crate) const H2_HANDSHAKE_TIMEOUT: &str = "http2 handshake exceeded the read timeout";
 pub(crate) const NO_TIMEOUT_MS: u64 = u64::MAX;
 pub(crate) const TCP_LISTEN_BACKLOG: i32 = 1024;
+pub(crate) const TCP_ACCEPT_BACKOFF_MS: u64 = 10;
+pub(crate) const H2_INITIAL_STREAM_WINDOW_SIZE: u32 = 1024 * 1024;
+pub(crate) const H2_INITIAL_CONNECTION_WINDOW_SIZE: u32 = 4 * 1024 * 1024;
+pub(crate) const H2_MAX_CONCURRENT_STREAMS: u32 = 1024;
+pub(crate) const H2_MAX_CONCURRENT_RESET_STREAMS: usize = 64;
+pub(crate) const H2_MAX_PENDING_ACCEPT_RESET_STREAMS: usize = 64;
+pub(crate) const H2_MIN_MAX_HEADER_LIST_SIZE: u32 = 64 * 1024;
+pub(crate) const H2_MAX_HEADER_LIST_SIZE_CAP: u32 = 1024 * 1024;
 ```
 # Path: hyperlane/core/src/listener/mod.rs
 ```rust
@@ -46545,6 +54165,7 @@ pub(crate) async fn bind_tcp_listeners(
     for _ in 0..shard_count {
         let socket: Socket = Socket::new(Domain::for_address(bind_addr), Type::STREAM, None)
             .map_err(|error: io::Error| Box::new(ServerError::from(error)))?;
+        #[cfg(unix)]
         if bind_addr.port() != 0 {
             socket
                 .set_reuse_address(true)
@@ -46572,18 +54193,35 @@ async fn tcp_accept_loop(
     tcp_listener: Arc<TcpListener>,
     mut shutdown_receiver: Receiver<()>,
 ) {
+    let local: Option<SocketAddr> = tcp_listener.local_addr().ok();
     loop {
-        let accepted: Option<(TcpStream, SocketAddr)> = tokio::select! {
+        let accepted: Option<io::Result<(TcpStream, SocketAddr)>> = tokio::select! {
             biased;
             _ = shutdown_receiver.changed() => None,
-            accepted = tcp_listener.accept() => accepted.ok(),
+            accepted = tcp_listener.accept() => Some(accepted),
         };
-        let Some((stream, remote)) = accepted else {
+        let Some(result) = accepted else {
             break;
         };
+        let (stream, remote): (TcpStream, SocketAddr) = match result {
+            Ok(pair) => pair,
+            Err(error) => {
+                if !matches!(
+                    error.kind(),
+                    ErrorKind::ConnectionAborted
+                        | ErrorKind::ConnectionReset
+                        | ErrorKind::Interrupted
+                        | ErrorKind::WouldBlock
+                ) {
+                    sleep(Duration::from_millis(TCP_ACCEPT_BACKOFF_MS)).await;
+                }
+                continue;
+            }
+        };
         let env: ConnectionEnv = env.clone();
+        let conn_shutdown: Receiver<()> = shutdown_receiver.clone();
         spawn(async move {
-            serve_tcp_connection(env, stream, remote).await;
+            serve_tcp_connection(env, stream, local, remote, conn_shutdown).await;
         });
     }
     drop(tcp_listener);
@@ -46608,7 +54246,9 @@ async fn quic_accept_loop(
         let remote: SocketAddr = connecting.remote_address();
         let env: ConnectionEnv = env.clone();
         spawn(async move {
-            let Ok(connection) = connecting.await else {
+            let Ok(Ok(connection)) =
+                bounded_handshake(env.shared.request_config, async move { connecting.await }).await
+            else {
                 return;
             };
             if !negotiated_quic_protocol_matches(&connection) {
@@ -46721,21 +54361,31 @@ pub(crate) async fn quic_accept_all(
 pub(crate) async fn serve_tcp_connection(
     env: ConnectionEnv,
     stream: TcpStream,
+    cached_local: Option<SocketAddr>,
     remote: SocketAddr,
+    shutdown_receiver: Receiver<()>,
 ) {
     let shared: &ConnectionShared = &env.shared;
     configure_socket(&stream, &shared.server);
     let Some(tls_config) = shared.tls_config.as_ref() else {
         if shared.protocol == ServerProtocol::Http2 {
-            let local: SocketAddr = stream.local_addr().unwrap_or(remote);
-            serve_plain_tcp(env, StreamPeers { local, remote }, stream).await;
+            let local: SocketAddr = cached_local
+                .or_else(|| stream.local_addr().ok())
+                .unwrap_or(remote);
+            serve_plain_tcp(
+                env,
+                StreamPeers { local, remote },
+                stream,
+                shutdown_receiver,
+            )
+            .await;
         } else {
             serve_h1_connection(env, stream).await;
         }
         return;
     };
     let local: Option<SocketAddr> = if shared.protocol == ServerProtocol::Http2 {
-        stream.local_addr().ok()
+        cached_local.or_else(|| stream.local_addr().ok())
     } else {
         None
     };
@@ -46758,7 +54408,7 @@ pub(crate) async fn serve_tcp_connection(
             local: local.unwrap_or(remote),
             remote,
         };
-        serve_tls_stream(env, peers, transport).await;
+        serve_tls_stream(env, peers, transport, shutdown_receiver).await;
     } else {
         serve_h1_transport(env, transport).await;
     }
@@ -46808,27 +54458,54 @@ pub(crate) fn configure_socket(stream: &TcpStream, server: &Server) {
         let _: Result<(), io::Error> = stream.set_ttl(ttl);
     }
 }
-fn h2_server_builder() -> H2ServerBuilder {
+fn h2_server_builder(request_config: &RequestConfig) -> H2ServerBuilder {
+    let max_header_count: usize = request_config.get_max_header_count();
+    let max_header_key_size: usize = request_config.get_max_header_key_size();
+    let max_header_value_size: usize = request_config.get_max_header_value_size();
+    let is_low_security: bool = max_header_count == DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
+        || max_header_key_size == DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+        || max_header_value_size == DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE;
+    let max_header_list_size: u32 = if is_low_security {
+        H2_MAX_HEADER_LIST_SIZE_CAP
+    } else {
+        let per_header: usize = max_header_key_size
+            .saturating_add(max_header_value_size)
+            .saturating_add(32);
+        let budget: usize = max_header_count
+            .saturating_mul(per_header)
+            .saturating_add(request_config.get_max_path_size());
+        u32::try_from(budget)
+            .unwrap_or(H2_MAX_HEADER_LIST_SIZE_CAP)
+            .clamp(H2_MIN_MAX_HEADER_LIST_SIZE, H2_MAX_HEADER_LIST_SIZE_CAP)
+    };
     let mut builder: H2ServerBuilder = H2ServerBuilder::new();
     builder
-        .initial_window_size(1024 * 1024)
-        .initial_connection_window_size(4 * 1024 * 1024)
-        .max_concurrent_streams(1024);
+        .initial_window_size(H2_INITIAL_STREAM_WINDOW_SIZE)
+        .initial_connection_window_size(H2_INITIAL_CONNECTION_WINDOW_SIZE)
+        .max_concurrent_streams(H2_MAX_CONCURRENT_STREAMS)
+        .max_header_list_size(max_header_list_size)
+        .max_concurrent_reset_streams(H2_MAX_CONCURRENT_RESET_STREAMS)
+        .max_pending_accept_reset_streams(H2_MAX_PENDING_ACCEPT_RESET_STREAMS);
     builder
 }
-pub(crate) async fn serve_plain_tcp(env: ConnectionEnv, peers: StreamPeers, stream: TcpStream) {
+pub(crate) async fn serve_plain_tcp(
+    env: ConnectionEnv,
+    peers: StreamPeers,
+    stream: TcpStream,
+    shutdown_receiver: Receiver<()>,
+) {
     match env.shared.protocol {
         ServerProtocol::Http2 => {
             let handshake: Result<ConnectionH2<TcpStream>, String> = bounded_handshake(
                 env.shared.request_config,
-                h2_server_builder().handshake(stream),
+                h2_server_builder(&env.shared.request_config).handshake(stream),
             )
             .await
             .map_err(|_: Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
             .and_then(|connection: Result<_, H2Error>| {
                 connection.map_err(|error: H2Error| error.to_string())
             });
-            serve_h2_connection(env, peers, handshake).await;
+            serve_h2_connection(env, peers, handshake, shutdown_receiver).await;
         }
         _ => {
             serve_h1_connection(env, stream).await;
@@ -46839,20 +54516,21 @@ pub(crate) async fn serve_tls_stream(
     env: ConnectionEnv,
     peers: StreamPeers,
     transport: TlsTransport,
+    shutdown_receiver: Receiver<()>,
 ) {
     match env.shared.protocol {
         ServerProtocol::Http2 => {
             let session: TlsTransport = transport;
             let handshake: Result<ConnectionH2<TlsTransport>, String> = bounded_handshake(
                 env.shared.request_config,
-                h2_server_builder().handshake(session),
+                h2_server_builder(&env.shared.request_config).handshake(session),
             )
             .await
             .map_err(|_: Elapsed| H2_HANDSHAKE_TIMEOUT.to_owned())
             .and_then(|connection: Result<_, H2Error>| {
                 connection.map_err(|error: H2Error| error.to_string())
             });
-            serve_h2_connection(env, peers, handshake).await;
+            serve_h2_connection(env, peers, handshake, shutdown_receiver).await;
         }
         _ => {
             serve_h1_transport(env, transport).await;
@@ -47168,7 +54846,7 @@ impl RoutePattern {
         if route.is_empty() {
             return Err(RouteError::EmptyPattern);
         }
-        let route: &str = route.trim_start_matches(DEFAULT_HTTP_PATH);
+        let route: &str = route.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(route);
         if route.is_empty() {
             return Ok(Vec::new());
         }
@@ -47178,7 +54856,8 @@ impl RoutePattern {
             if segment.starts_with(LEFT_BRACKET) && segment.ends_with(RIGHT_BRACKET) {
                 let content: &str = &segment[1..segment.len() - 1];
                 if let Some((name, pattern)) = content.split_once(COLON) {
-                    match Regex::new(pattern) {
+                    let anchored: String = format!("\\A(?:{pattern})\\z");
+                    match Regex::new(&anchored) {
                         Ok(regex) => {
                             segments.push(RouteSegment::Regex(name.to_owned(), regex));
                         }
@@ -47241,7 +54920,7 @@ impl RoutePattern {
         }
     }
     pub(crate) fn try_match_path_into(&self, path: &str, params: &mut RouteParams) -> bool {
-        let trimmed: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let trimmed: &str = path.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(path);
         let route_segments: &[RouteSegment] = self.get_0().as_slice();
         let route_segments_len: usize = route_segments.len();
         if trimmed.is_empty() {
@@ -47252,10 +54931,13 @@ impl RoutePattern {
         }
         let is_tail_regex: bool = matches!(route_segments.last(), Some(RouteSegment::Regex(_, _)));
         if !is_tail_regex {
+            let mut captured: [(&str, &str); 16] = [("", ""); 16];
+            let mut captured_len: usize = 0;
+            let mut overflow: Option<Vec<(&str, &str)>> = None;
             let mut seg_idx: usize = 0;
             for part in trimmed.split(DEFAULT_HTTP_PATH) {
                 if part.is_empty() {
-                    continue;
+                    return false;
                 }
                 let Some(expected) = route_segments.get(seg_idx) else {
                     return false;
@@ -47266,13 +54948,27 @@ impl RoutePattern {
                             return false;
                         }
                     }
-                    RouteSegment::Dynamic(_) => {}
-                    RouteSegment::Regex(_, regex) => {
-                        let Some(mat) = regex.find(part) else {
+                    RouteSegment::Dynamic(param_name) => {
+                        if captured_len < captured.len() {
+                            captured[captured_len] = (param_name.as_str(), part);
+                            captured_len += 1;
+                        } else {
+                            overflow
+                                .get_or_insert_with(Vec::new)
+                                .push((param_name.as_str(), part));
+                        }
+                    }
+                    RouteSegment::Regex(param_name, regex) => {
+                        if !regex.is_match(part) {
                             return false;
-                        };
-                        if mat.start() != 0 || mat.end() != part.len() {
-                            return false;
+                        }
+                        if captured_len < captured.len() {
+                            captured[captured_len] = (param_name.as_str(), part);
+                            captured_len += 1;
+                        } else {
+                            overflow
+                                .get_or_insert_with(Vec::new)
+                                .push((param_name.as_str(), part));
                         }
                     }
                 }
@@ -47281,21 +54977,19 @@ impl RoutePattern {
             if seg_idx != route_segments_len {
                 return false;
             }
-            let mut write_idx: usize = 0;
-            for part in trimmed.split(DEFAULT_HTTP_PATH) {
-                if part.is_empty() {
-                    continue;
+            for &(param_name, part) in &captured[..captured_len] {
+                let (mut key, mut val): (String, String) = take_route_param_entry();
+                key.push_str(param_name);
+                val.push_str(part);
+                params.insert(key, val);
+            }
+            if let Some(extra) = overflow {
+                for (param_name, part) in extra {
+                    let (mut key, mut val): (String, String) = take_route_param_entry();
+                    key.push_str(param_name);
+                    val.push_str(part);
+                    params.insert(key, val);
                 }
-                match &route_segments[write_idx] {
-                    RouteSegment::Static(_) => {}
-                    RouteSegment::Dynamic(param_name) | RouteSegment::Regex(param_name, _) => {
-                        let (mut key, mut val): (String, String) = take_route_param_entry();
-                        key.push_str(param_name);
-                        val.push_str(part);
-                        params.insert(key, val);
-                    }
-                }
-                write_idx += 1;
             }
             return true;
         }
@@ -47308,7 +55002,7 @@ impl RoutePattern {
         }
     }
     pub(crate) fn try_match_path(&self, path: &str) -> Option<RouteParams> {
-        let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let path: &str = path.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(path);
         let route_segments_len: usize = self.get_0().len();
         let is_tail_regex: bool = matches!(self.get_0().last(), Some(RouteSegment::Regex(_, _)));
         if path.is_empty() {
@@ -47321,19 +55015,16 @@ impl RoutePattern {
             return self.try_match_static_path(path);
         }
         let mut path_segments: PathComponentList = Vec::with_capacity(route_segments_len);
-        let path_bytes: &[u8] = path.as_bytes();
-        let path_separator_byte: u8 = DEFAULT_HTTP_PATH_BYTES[0];
-        let mut segment_start: usize = 0;
-        for (byte_index, &current_byte) in path_bytes.iter().enumerate() {
-            if current_byte == path_separator_byte {
-                if segment_start < byte_index {
-                    path_segments.push(&path[segment_start..byte_index]);
+        for segment in path.split(DEFAULT_HTTP_PATH) {
+            if segment.is_empty() {
+                if !is_tail_regex {
+                    return None;
                 }
-                segment_start = byte_index + 1;
+                if path_segments.len() < route_segments_len - 1 {
+                    return None;
+                }
             }
-        }
-        if segment_start < path.len() {
-            path_segments.push(&path[segment_start..]);
+            path_segments.push(segment);
         }
         let path_segments_len: usize = path_segments.len();
         if (!is_tail_regex && path_segments_len != route_segments_len)
@@ -47350,27 +55041,26 @@ impl RoutePattern {
                     }
                 }
                 RouteSegment::Dynamic(param_name) => {
-                    params.insert(param_name.clone(), path_segments.get(idx)?.to_string());
+                    let val: &str = path_segments.get(idx)?;
+                    if val.is_empty() {
+                        return None;
+                    }
+                    params.insert(param_name.clone(), val.to_string());
                 }
                 RouteSegment::Regex(param_name, regex) => {
-                    let segment_value: String = if idx == route_segments_len - 1 {
-                        path_segments[idx..].join(DEFAULT_HTTP_PATH)
-                    } else {
-                        {
-                            let val: &&str = path_segments.get(idx)?;
-                            val.to_string()
-                        }
-                    };
-                    {
-                        let mat: Match<'_> = regex.find(&segment_value)?;
-                        if mat.start() != 0 || mat.end() != segment_value.len() {
+                    if idx == route_segments_len - 1 {
+                        let segment_value: String = path_segments[idx..].join(DEFAULT_HTTP_PATH);
+                        if !regex.is_match(&segment_value) {
                             return None;
                         }
-                    }
-                    params.insert(param_name.clone(), segment_value);
-                    if idx == route_segments_len - 1 {
+                        params.insert(param_name.clone(), segment_value);
                         return Some(params);
                     }
+                    let val: &str = path_segments.get(idx)?;
+                    if !regex.is_match(val) {
+                        return None;
+                    }
+                    params.insert(param_name.clone(), val.to_string());
                 }
             }
         }
@@ -47408,7 +55098,7 @@ impl RouteMatcher {
     }
     #[inline(always)]
     fn count_path_segments(path: &str) -> usize {
-        let path: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let path: &str = path.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(path);
         if path.is_empty() {
             return 0;
         }
@@ -47466,7 +55156,7 @@ impl RouteMatcher {
             }
         }
         for (&segment_count, routes) in self.get_regex_route() {
-            if segment_count >= path_segment_count {
+            if segment_count == path_segment_count || segment_count > path_segment_count + 1 {
                 continue;
             }
             for (pattern, hook) in routes {
@@ -47524,6 +55214,8 @@ pub struct RouteMatcher {
 # Path: hyperlane/core/src/error/impl.rs
 ```rust
 use super::*;
+impl Error for ServerError {}
+impl Error for RouteError {}
 impl From<io::Error> for ServerError {
     #[inline(always)]
     fn from(error: io::Error) -> Self {
@@ -47679,7 +55371,13 @@ where
                         match encoded {
                             Ok(n) => break n,
                             Err(EncryptError::InsufficientSize(need)) => {
-                                out_buf.resize(*out_len + need.required_size, 0);
+                                let next_len: usize = out_len.saturating_add(need.required_size);
+                                if next_len > TLS_MAX_OUTGOING_BUFFER {
+                                    return Poll::Ready(Err(io::Error::other(
+                                        TLS_OUTGOING_BUFFER_EXCEEDED,
+                                    )));
+                                }
+                                out_buf.resize(next_len, 0);
                             }
                             Err(error) => {
                                 return Poll::Ready(Err(io::Error::other(format!("{error:?}"))));
@@ -47714,7 +55412,13 @@ where
                             break;
                         }
                         Err(EncodeError::InsufficientSize(need)) => {
-                            out_buf.resize(*out_len + need.required_size, 0);
+                            let next_len: usize = out_len.saturating_add(need.required_size);
+                            if next_len > TLS_MAX_OUTGOING_BUFFER {
+                                return Poll::Ready(Err(io::Error::other(
+                                    TLS_OUTGOING_BUFFER_EXCEEDED,
+                                )));
+                            }
+                            out_buf.resize(next_len, 0);
                         }
                         Err(error) => {
                             return Poll::Ready(Err(io::Error::other(format!("{error:?}"))));
@@ -47820,10 +55524,8 @@ where
         buffer: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let this: &mut Self = self.get_mut();
-        match this.poll_flush_out(context) {
-            Poll::Ready(Ok(())) => {}
-            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
-            Poll::Pending => return Poll::Pending,
+        if let Poll::Ready(Err(error)) = this.poll_flush_out(context) {
+            return Poll::Ready(Err(error));
         }
         {
             let Self {
@@ -47851,8 +55553,17 @@ where
             return Poll::Ready(Ok(()));
         }
         let initial_filled: usize = buffer.filled().len();
+        let mut empty_app_records: usize = 0;
         loop {
-            {
+            let should_process: bool = {
+                let Self {
+                    in_len,
+                    needs_process,
+                    ..
+                } = this;
+                *in_len > 0 || *needs_process
+            };
+            if should_process {
                 let (discard, action): (usize, Result<u8, io::Error>) = {
                     let Self {
                         conn,
@@ -47869,10 +55580,22 @@ where
                     let step: Result<u8, io::Error> = match state {
                         Ok(ConnectionState::ReadTraffic(mut rt)) => {
                             let mut err: Option<io::Error> = None;
+                            let mut saw_non_empty: bool = false;
                             while let Some(rec) = rt.next_record() {
                                 match rec {
                                     Ok(app) => {
                                         let payload: &[u8] = app.payload;
+                                        if payload.is_empty() {
+                                            empty_app_records += 1;
+                                            if empty_app_records > TLS_MAX_EMPTY_APP_RECORDS {
+                                                err = Some(io::Error::other(
+                                                    TLS_EMPTY_RECORDS_EXCEEDED,
+                                                ));
+                                                break;
+                                            }
+                                            continue;
+                                        }
+                                        saw_non_empty = true;
                                         if plain_buf.is_empty() && buffer.remaining() > 0 {
                                             let direct: usize =
                                                 payload.len().min(buffer.remaining());
@@ -47890,6 +55613,9 @@ where
                                     }
                                 }
                             }
+                            if saw_non_empty {
+                                empty_app_records = 0;
+                            }
                             match err {
                                 Some(error) => Err(error),
                                 None => Ok(1),
@@ -47902,7 +55628,12 @@ where
                                     break Ok(2);
                                 }
                                 Err(EncodeError::InsufficientSize(need)) => {
-                                    out_buf.resize(*out_len + need.required_size, 0);
+                                    let next_len: usize =
+                                        out_len.saturating_add(need.required_size);
+                                    if next_len > TLS_MAX_OUTGOING_BUFFER {
+                                        break Err(io::Error::other(TLS_OUTGOING_BUFFER_EXCEEDED));
+                                    }
+                                    out_buf.resize(next_len, 0);
                                 }
                                 Err(error) => {
                                     break Err(io::Error::other(format!("{error:?}")));
@@ -47946,7 +55677,16 @@ where
                         Poll::Pending => return Poll::Pending,
                     },
                     Ok(4) => return Poll::Ready(Ok(())),
-                    Ok(_) => {}
+                    Ok(_) => {
+                        let Self {
+                            in_len,
+                            needs_process,
+                            ..
+                        } = this;
+                        if *in_len == 0 {
+                            *needs_process = false;
+                        }
+                    }
                     Err(error) => return Poll::Ready(Err(error)),
                 }
             }
@@ -47954,6 +55694,7 @@ where
                 tcp,
                 in_buf,
                 in_len,
+                needs_process,
                 ..
             } = this;
             if *in_len == in_buf.len() {
@@ -47976,6 +55717,7 @@ where
                         )));
                     }
                     *in_len += read_len;
+                    *needs_process = true;
                 }
             }
         }
@@ -48104,8 +55846,12 @@ thread_local! {
 pub(crate) const TLS_RECORD_BUFFER_SIZE: usize = 18 * 1024;
 pub(crate) const TLS_MAX_PLAINTEXT_CHUNK: usize = 16 * 1024;
 pub(crate) const TLS_MAX_INCOMING_BUFFER: usize = 64 * 1024;
+pub(crate) const TLS_MAX_OUTGOING_BUFFER: usize = 256 * 1024;
+pub(crate) const TLS_MAX_EMPTY_APP_RECORDS: usize = 32;
 pub(crate) const MAX_POOLED_TLS_BUFFERS: usize = 64;
 pub(crate) const TLS_TRANSMIT_WRITE_ZERO: &str = "tcp write zero during tls transmit";
+pub(crate) const TLS_OUTGOING_BUFFER_EXCEEDED: &str = "tls outgoing buffer exceeds limit";
+pub(crate) const TLS_EMPTY_RECORDS_EXCEEDED: &str = "tls empty application records exceeded";
 ```
 # Path: hyperlane/core/src/protocol/transport/mod.rs
 ```rust
@@ -48132,6 +55878,7 @@ pub(crate) struct TlsTransport<T = TcpStream> {
     pub(super) out_len: usize,
     pub(super) peer_closed: bool,
     pub(super) write_closed: bool,
+    pub(super) needs_process: bool,
 }
 pub(crate) struct ConnectionShared {
     pub(crate) server: Server,
@@ -48309,6 +56056,7 @@ where
         out_len,
         peer_closed: false,
         write_closed: false,
+        needs_process: true,
     })
 }
 ```
@@ -48368,7 +56116,7 @@ impl UringWakeState {
         let Self {
             eventfd, signaled, ..
         } = self;
-        if !signaled.swap(true, AtomicOrdering::AcqRel) {
+        if !signaled.swap(true, AtomicOrdering::SeqCst) {
             let val: u64 = 1;
             let _: isize = unsafe {
                 write(
@@ -48389,7 +56137,7 @@ impl UringWakeState {
     }
     pub(crate) fn trigger_shutdown(&self) {
         let Self { shutdown, .. } = self;
-        shutdown.store(true, AtomicOrdering::Release);
+        shutdown.store(true, AtomicOrdering::SeqCst);
         self.notify_eventfd();
     }
 }
@@ -49338,7 +57086,11 @@ async fn run_uring_h1_tls(env: ConnectionEnv, transport: UringTcpTransport) {
         .server
         .serve_h1_connection_stream(&env.shared.pipeline, &mut stream)
         .await;
-    let _: Result<(), io::Error> = stream.shutdown().await;
+    let _: Result<Result<(), io::Error>, Elapsed> = bounded_handshake(
+        env.shared.request_config,
+        stream.get_mut_stream().shutdown(),
+    )
+    .await;
 }
 fn poll_local_ready_slots() {
     loop {
@@ -49617,7 +57369,7 @@ fn run_uring_worker_thread(
                         reactor
                             .wake_state
                             .signaled
-                            .store(false, AtomicOrdering::Release);
+                            .store(false, AtomicOrdering::SeqCst);
                         let mut external: Vec<usize> = Vec::new();
                         if let Ok(mut ready_list) = reactor.wake_state.ready.lock() {
                             mem::swap(&mut *ready_list, &mut external);
@@ -49625,7 +57377,7 @@ fn run_uring_worker_thread(
                         for slot_id in external {
                             reactor.schedule_local(slot_id);
                         }
-                        if reactor.wake_state.shutdown.load(AtomicOrdering::Acquire) {
+                        if reactor.wake_state.shutdown.load(AtomicOrdering::SeqCst) {
                             shutdown_now = true;
                         } else {
                             arm_eventfd_poll(reactor);
@@ -49635,7 +57387,7 @@ fn run_uring_worker_thread(
                 }
             }
             if !shutdown_initiated
-                && (shutdown_now || reactor.wake_state.shutdown.load(AtomicOrdering::Acquire))
+                && (shutdown_now || reactor.wake_state.shutdown.load(AtomicOrdering::SeqCst))
             {
                 shutdown_initiated = true;
                 for (acc_idx, acc) in accept_slots.iter().enumerate() {
@@ -49956,7 +57708,7 @@ impl CompiledPipeline {
         if dynamic_routes.is_empty() && regex_routes.is_empty() {
             return None;
         }
-        let trimmed: &str = path.trim_start_matches(DEFAULT_HTTP_PATH);
+        let trimmed: &str = path.strip_prefix(DEFAULT_HTTP_PATH).unwrap_or(path);
         let segment_count: usize = if trimmed.is_empty() {
             0
         } else {
@@ -49978,7 +57730,7 @@ impl CompiledPipeline {
                 }
             }
             for (&pattern_seg_count, routes) in regex_routes.iter() {
-                if pattern_seg_count != segment_count {
+                if pattern_seg_count != segment_count && pattern_seg_count <= segment_count + 1 {
                     for (pattern, hook) in routes.iter() {
                         if pattern.has_tail_regex() && pattern.try_match_path_into(path, params) {
                             return Some(hook);
@@ -49988,6 +57740,38 @@ impl CompiledPipeline {
             }
         }
         None
+    }
+    #[inline(always)]
+    fn response_allows_keep_alive(ctx: &Context, req_keep_alive: bool) -> bool {
+        if !req_keep_alive {
+            return false;
+        }
+        let headers: &ResponseHeaders = ctx.get_response().get_headers();
+        if let Some(values) = headers.get(CONNECTION) {
+            for header_value in values {
+                if header_value == KEEP_ALIVE {
+                    continue;
+                }
+                for token in header_value.split(COMMA) {
+                    if token.trim().eq_ignore_ascii_case(CLOSE) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        for (name, values) in headers {
+            if name.eq_ignore_ascii_case(CONNECTION) {
+                for header_value in values {
+                    for token in header_value.split(COMMA) {
+                        if token.trim().eq_ignore_ascii_case(CLOSE) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        true
     }
     #[inline(always)]
     pub(crate) async fn run_request(
@@ -50015,14 +57799,14 @@ impl CompiledPipeline {
                 if let Some(target) = stream.get_line_buffer().split_ascii_whitespace().nth(1) {
                     ctx.set_request_target(target);
                 } else {
-                    ctx.clear_attribute();
+                    let _: Option<String> = ctx.take_original_target();
                 }
             }
         }
         stream.set_closed(false);
         for hook in request_middleware.iter() {
             if hook.call(stream, ctx).await.is_reject() {
-                return stream.is_keep_alive(keep_alive);
+                return stream.is_keep_alive(Self::response_allows_keep_alive(ctx, keep_alive));
             }
         }
         let matched_hook: Option<&CompiledHook> = {
@@ -50032,14 +57816,14 @@ impl CompiledPipeline {
         if let Some(hook) = matched_hook
             && hook.call(stream, ctx).await.is_reject()
         {
-            return stream.is_keep_alive(keep_alive);
+            return stream.is_keep_alive(Self::response_allows_keep_alive(ctx, keep_alive));
         }
         for hook in response_middleware.iter() {
             if hook.call(stream, ctx).await.is_reject() {
-                return stream.is_keep_alive(keep_alive);
+                return stream.is_keep_alive(Self::response_allows_keep_alive(ctx, keep_alive));
             }
         }
-        stream.is_keep_alive(keep_alive)
+        stream.is_keep_alive(Self::response_allows_keep_alive(ctx, keep_alive))
     }
 }
 ```
@@ -50291,10 +58075,50 @@ pub fn find_line_end(bytes: &[u8]) -> Option<usize> {
         .position(|byte: &u8| *byte == LF_U8)
         .map(|index: usize| index + 1)
 }
+#[inline(always)]
+fn try_parse_fast_200_head(head: &[u8], is_head: bool) -> Option<ParsedProtocolHead> {
+    let rest: &[u8] = head
+        .strip_prefix(FAST_PROTOCOL_H2_200_PREFIX)
+        .or_else(|| head.strip_prefix(FAST_PROTOCOL_H11_200_PREFIX))?;
+    let digits: &[u8] = rest.strip_suffix(FAST_PROTOCOL_DEFAULT_SUFFIX)?;
+    if digits.is_empty() {
+        return None;
+    }
+    let mut length: usize = 0;
+    for &byte in digits {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        length = length
+            .checked_mul(10)?
+            .checked_add((byte - b'0') as usize)?;
+    }
+    let mut response: ProtocolResponse<()> = ProtocolResponse::new(());
+    *response.status_mut() = StatusCode::OK;
+    let headers: &mut ProtocolHeaders = response.headers_mut();
+    let cl_value: HeaderValue = if let Some(&static_len) = STATIC_CONTENT_LENGTHS.get(length) {
+        HeaderValue::from_static(static_len)
+    } else {
+        HeaderValue::from_bytes(digits).ok()?
+    };
+    headers.append(HeaderName::from_static(CONTENT_LENGTH), cl_value);
+    headers.append(
+        HeaderName::from_static(CONTENT_TYPE),
+        HeaderValue::from_static(STATIC_CT_HTML_UTF8),
+    );
+    Some(ParsedProtocolHead {
+        response,
+        announced_len: Some(length),
+        suppress_body: is_head,
+    })
+}
 pub(crate) fn parse_protocol_response_head(
     head: &[u8],
     is_head: bool,
 ) -> Result<ParsedProtocolHead, ResponseError> {
+    if let Some(fast) = try_parse_fast_200_head(head, is_head) {
+        return Ok(fast);
+    }
     let text: &str =
         from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
     let mut lines: SplitLines<'_> = text.split(CRLF);
@@ -50382,9 +58206,17 @@ pub(crate) fn parse_protocol_response_head(
             if hide_length {
                 continue;
             }
-            let Ok(header_value) = HeaderValue::from_bytes(trimmed_value.as_bytes()) else {
-                return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
-            };
+            let header_value: HeaderValue =
+                if let Some(&static_len) = STATIC_CONTENT_LENGTHS.get(length) {
+                    HeaderValue::from_static(static_len)
+                } else {
+                    match HeaderValue::from_bytes(trimmed_value.as_bytes()) {
+                        Ok(value) => value,
+                        Err(_) => {
+                            return Err(ResponseError::Send(MALFORMED_RESPONSE_HEADER.to_owned()));
+                        }
+                    }
+                };
             headers.append(HeaderName::from_static(CONTENT_LENGTH), header_value);
             continue;
         }
@@ -50500,6 +58332,54 @@ pub(crate) const HTTP_QUOTED_FIELD_QUOTE: u8 = b'"';
 pub(crate) const HTTP_QUOTED_FIELD_ESCAPE: u8 = b'\\';
 pub(crate) const PSEUDO_HEADER_PREFIX: &str = ":";
 pub(crate) const QUESTION_MARK: char = '?';
+pub(crate) const TRAILER_HEADER: &str = "trailer";
+pub(crate) const HTTP_SCHEME: &str = "http";
+pub(crate) const HTTPS_SCHEME: &str = "https";
+pub(crate) const RESPONSE_HEAD_MAX: usize = 16 * 1024;
+pub(crate) const RESPONSE_HEAD_TOO_LONG: &str = "response head exceeds its bound";
+pub(crate) const MISSING_RESPONSE_HEAD: &str = "response ended before a head was written";
+pub(crate) const UNSUPPORTED_TRANSFER_ENCODING: &str =
+    "response transfer-encoding is not supported on this protocol";
+pub(crate) const STATIC_CT_HTML_UTF8: &str = "text/html; charset=utf-8";
+pub(crate) const STATIC_CT_PLAIN: &str = "text/plain";
+pub(crate) const STATIC_CT_PLAIN_UTF8: &str = "text/plain; charset=utf-8";
+pub(crate) const STATIC_CT_JSON: &str = "application/json";
+pub(crate) const INVALID_RESPONSE_STATUS: &str = "response head has an unusable status code";
+pub(crate) const MALFORMED_RESPONSE_HEADER: &str = "response head has a malformed header line";
+pub(crate) const TRUNCATED_RESPONSE_BODY: &str =
+    "response ended before the announced content length arrived";
+pub(crate) const OVERFLOWING_RESPONSE_BODY: &str =
+    "response carried more bytes than the announced content length";
+pub(crate) const MISSING_SEND_CAPACITY: &str =
+    "the send stream was closed before capacity was granted";
+pub(crate) const MIN_STATUS_CODE: usize = 100;
+pub(crate) const MAX_STATUS_CODE: usize = 999;
+pub(crate) const FAST_PROTOCOL_H11_200_PREFIX: &[u8] = b"HTTP/1.1 200 OK\r\ncontent-length:";
+pub(crate) const FAST_PROTOCOL_H2_200_PREFIX: &[u8] = b"HTTP/2 200 OK\r\ncontent-length:";
+pub(crate) const FAST_PROTOCOL_H3_200_PREFIX: &[u8] = b"HTTP/3 200 OK\r\ncontent-length:";
+pub(crate) const FAST_PROTOCOL_DEFAULT_SUFFIX: &[u8] =
+    b"\r\nconnection:keep-alive\r\ncontent-type:text/html; charset=utf-8\r\n\r\n";
+pub(crate) const STATIC_CONTENT_LENGTHS: [&str; 257] = [
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
+    "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32",
+    "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48",
+    "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64",
+    "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80",
+    "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95", "96",
+    "97", "98", "99", "100", "101", "102", "103", "104", "105", "106", "107", "108", "109", "110",
+    "111", "112", "113", "114", "115", "116", "117", "118", "119", "120", "121", "122", "123",
+    "124", "125", "126", "127", "128", "129", "130", "131", "132", "133", "134", "135", "136",
+    "137", "138", "139", "140", "141", "142", "143", "144", "145", "146", "147", "148", "149",
+    "150", "151", "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162",
+    "163", "164", "165", "166", "167", "168", "169", "170", "171", "172", "173", "174", "175",
+    "176", "177", "178", "179", "180", "181", "182", "183", "184", "185", "186", "187", "188",
+    "189", "190", "191", "192", "193", "194", "195", "196", "197", "198", "199", "200", "201",
+    "202", "203", "204", "205", "206", "207", "208", "209", "210", "211", "212", "213", "214",
+    "215", "216", "217", "218", "219", "220", "221", "222", "223", "224", "225", "226", "227",
+    "228", "229", "230", "231", "232", "233", "234", "235", "236", "237", "238", "239", "240",
+    "241", "242", "243", "244", "245", "246", "247", "248", "249", "250", "251", "252", "253",
+    "254", "255", "256",
+];
 ```
 # Path: hyperlane/core/src/protocol/constants/mod.rs
 ```rust
@@ -50562,42 +58442,62 @@ impl AsyncUdpSocket for ShardUdpSocket {
         bufs: &mut [IoSliceMut<'_>],
         meta: &mut [RecvMeta],
     ) -> Poll<io::Result<usize>> {
-        let Self { queue, .. } = self;
-        let max_take: usize = bufs.len().min(meta.len());
+        let Self { queue, recycle, .. } = self;
+        let max_take: usize = bufs.len().min(meta.len()).min(BATCH_SIZE);
         if max_take == 0 {
             return Poll::Ready(Ok(0));
         }
-        let Ok(mut state) = queue.lock() else {
-            return Poll::Ready(Err(io::Error::other("quic shard queue poisoned")));
-        };
+        let mut taken: [Option<ShardDatagram>; BATCH_SIZE] = [const { None }; BATCH_SIZE];
         let mut delivered: usize = 0;
-        while delivered < max_take {
-            let Some(mut datagram) = state.queue.pop_front() else {
-                break;
+        {
+            let Ok(mut state) = queue.lock() else {
+                return Poll::Ready(Err(io::Error::other("quic shard queue poisoned")));
             };
-            let copy_len: usize = datagram.data.len().min(bufs[delivered].len());
-            bufs[delivered][..copy_len].copy_from_slice(&datagram.data[..copy_len]);
-            let mut item_meta: RecvMeta = datagram.meta;
-            item_meta.len = copy_len;
-            item_meta.stride = copy_len;
-            meta[delivered] = item_meta;
-            delivered += 1;
-            if state.pool.len() < QUIC_SHARD_POOL_CAP
-                && datagram.data.capacity() <= QUIC_DATAGRAM_INIT_CAP * 4
+            if let Ok(mut recycled) = recycle.lock()
+                && !recycled.is_empty()
             {
-                datagram.data.clear();
-                state.pool.push(datagram.data);
+                let room: usize = QUIC_SHARD_POOL_CAP.saturating_sub(state.pool.len());
+                if room > 0 {
+                    let take: usize = room.min(recycled.len());
+                    state.pool.extend(recycled.drain(..take));
+                }
+                recycled.clear();
+            }
+            while delivered < max_take {
+                let Some(datagram) = state.queue.pop_front() else {
+                    break;
+                };
+                taken[delivered] = Some(datagram);
+                delivered += 1;
+            }
+            if delivered == 0 {
+                if state.closed {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::ConnectionAborted,
+                        "quic shard dispatcher stopped",
+                    )));
+                }
+                state.waker = Some(cx.waker().clone());
+                return Poll::Pending;
             }
         }
-        if delivered == 0 {
-            if state.closed {
-                return Poll::Ready(Err(io::Error::new(
-                    io::ErrorKind::ConnectionAborted,
-                    "quic shard dispatcher stopped",
-                )));
+        let mut recycled_guard: Option<MutexGuard<'_, Vec<Vec<u8>>>> = recycle.lock().ok();
+        for idx in 0..delivered {
+            if let Some(mut datagram) = taken[idx].take() {
+                let copy_len: usize = datagram.data.len().min(bufs[idx].len());
+                bufs[idx][..copy_len].copy_from_slice(&datagram.data[..copy_len]);
+                let mut item_meta: RecvMeta = datagram.meta;
+                item_meta.len = copy_len;
+                item_meta.stride = copy_len;
+                meta[idx] = item_meta;
+                if let Some(recycled) = recycled_guard.as_mut()
+                    && recycled.len() < QUIC_SHARD_POOL_CAP
+                    && datagram.data.capacity() <= QUIC_DATAGRAM_INIT_CAP * 4
+                {
+                    datagram.data.clear();
+                    recycled.push(datagram.data);
+                }
             }
-            state.waker = Some(cx.waker().clone());
-            return Poll::Pending;
         }
         Poll::Ready(Ok(delivered))
     }
@@ -50662,6 +58562,7 @@ pub(crate) struct ShardQueueState {
 pub(crate) struct ShardUdpSocket {
     pub(super) real_socket: Arc<dyn AsyncUdpSocket>,
     pub(super) queue: Arc<Mutex<ShardQueueState>>,
+    pub(super) recycle: Mutex<Vec<Vec<u8>>>,
 }
 pub(crate) struct QuicEndpointSet {
     pub(crate) endpoints: Vec<Endpoint>,
@@ -50719,7 +58620,8 @@ async fn run_quic_shard_dispatcher(
     let mut metas: Vec<RecvMeta> = vec![RecvMeta::default(); BATCH_SIZE];
     let shard_count: usize = queues.len();
     let mut wakers_to_wake: [Option<Waker>; 64] = [const { None }; 64];
-    let mut staged: Vec<Vec<(usize, usize, usize, RecvMeta)>> = (0..shard_count)
+    let mut local_pool: Vec<Vec<u8>> = Vec::with_capacity(QUIC_SHARD_POOL_CAP);
+    let mut staged: Vec<Vec<ShardDatagram>> = (0..shard_count)
         .map(|_: usize| Vec::with_capacity(BATCH_SIZE))
         .collect();
     loop {
@@ -50750,7 +58652,15 @@ async fn run_quic_shard_dispatcher(
                 let mut seg_meta: RecvMeta = meta;
                 seg_meta.len = slice.len();
                 seg_meta.stride = slice.len();
-                staged[shard_idx].push((idx, offset, end, seg_meta));
+                let mut payload: Vec<u8> = local_pool
+                    .pop()
+                    .unwrap_or_else(|| Vec::with_capacity(slice.len().max(QUIC_DATAGRAM_INIT_CAP)));
+                payload.clear();
+                payload.extend_from_slice(slice);
+                staged[shard_idx].push(ShardDatagram {
+                    data: payload,
+                    meta: seg_meta,
+                });
                 if shard_idx < 64 {
                     touched_mask |= 1u64 << shard_idx;
                 }
@@ -50759,35 +58669,39 @@ async fn run_quic_shard_dispatcher(
         }
         let mut wake_mask: u64 = 0;
         let mut iter_mask: u64 = touched_mask;
+        let max_local_pool: usize = QUIC_SHARD_POOL_CAP.saturating_mul(2);
         while iter_mask != 0 {
             let shard_idx: usize = iter_mask.trailing_zeros() as usize;
             iter_mask &= iter_mask - 1;
-            let batch: &mut Vec<(usize, usize, usize, RecvMeta)> = &mut staged[shard_idx];
+            let batch: &mut Vec<ShardDatagram> = &mut staged[shard_idx];
             if batch.is_empty() {
                 continue;
             }
             if let Ok(mut q) = queues[shard_idx].lock() {
-                for &(buf_idx, start, end, seg_meta) in batch.iter() {
-                    if q.queue.len() >= QUIC_SHARD_QUEUE_CAP {
-                        break;
-                    }
-                    let slice: &[u8] = &buffers[buf_idx][start..end];
-                    let mut payload: Vec<u8> = q.pool.pop().unwrap_or_else(|| {
-                        Vec::with_capacity(slice.len().max(QUIC_DATAGRAM_INIT_CAP))
-                    });
-                    payload.clear();
-                    payload.extend_from_slice(slice);
-                    q.queue.push_back(ShardDatagram {
-                        data: payload,
-                        meta: seg_meta,
-                    });
+                let room: usize = QUIC_SHARD_QUEUE_CAP.saturating_sub(q.queue.len());
+                if room > 0 {
+                    let take: usize = room.min(batch.len());
+                    q.queue.extend(batch.drain(..take));
+                }
+                if local_pool.len() < max_local_pool && !q.pool.is_empty() {
+                    let pull: usize = (max_local_pool - local_pool.len()).min(q.pool.len());
+                    let split: usize = q.pool.len() - pull;
+                    local_pool.extend(q.pool.drain(split..));
                 }
                 if let Some(waker) = q.waker.take() {
                     wakers_to_wake[shard_idx] = Some(waker);
                     wake_mask |= 1u64 << shard_idx;
                 }
             }
-            batch.clear();
+            for dropped in batch.drain(..) {
+                if local_pool.len() < max_local_pool
+                    && dropped.data.capacity() <= QUIC_DATAGRAM_INIT_CAP * 4
+                {
+                    let mut buf: Vec<u8> = dropped.data;
+                    buf.clear();
+                    local_pool.push(buf);
+                }
+            }
         }
         let mut mask: u64 = wake_mask;
         while mask != 0 {
@@ -50812,10 +58726,20 @@ async fn run_quic_shard_dispatcher(
         }
     }
 }
+fn build_quic_transport_config() -> Arc<TransportConfig> {
+    let mut transport: TransportConfig = TransportConfig::default();
+    transport.max_concurrent_bidi_streams(VarInt::from_u32(512));
+    transport.stream_receive_window(VarInt::from_u32(256 * 1024));
+    transport.receive_window(VarInt::from_u32(2 * 1024 * 1024));
+    transport.send_window(2 * 1024 * 1024);
+    transport.datagram_receive_buffer_size(None);
+    Arc::new(transport)
+}
 pub(crate) fn create_quic_endpoint_set(
     quic_config: Arc<QuicServerConfig>,
     bind_addr: SocketAddr,
 ) -> Result<QuicEndpointSet, Box<ServerError>> {
+    let transport_config: Arc<TransportConfig> = build_quic_transport_config();
     let workers: usize = Handle::current().metrics().num_workers();
     if workers <= 1 {
         let domain: Domain = if bind_addr.is_ipv6() {
@@ -50836,7 +58760,11 @@ pub(crate) fn create_quic_endpoint_set(
         let std_udp: StdUdpSocket = StdUdpSocket::from(socket);
         let endpoint: Endpoint = Endpoint::new(
             EndpointConfig::default(),
-            Some(quinn::ServerConfig::with_crypto(quic_config)),
+            Some(
+                quinn::ServerConfig::with_crypto(quic_config)
+                    .transport_config(transport_config)
+                    .clone(),
+            ),
             std_udp,
             Arc::new(TokioRuntime),
         )
@@ -50872,6 +58800,7 @@ pub(crate) fn create_quic_endpoint_set(
         let shard_socket: Arc<ShardUdpSocket> = Arc::new(ShardUdpSocket {
             real_socket: Arc::clone(&tx_socket),
             queue: Arc::clone(&queue),
+            recycle: Mutex::new(Vec::with_capacity(BATCH_SIZE)),
         });
         let mut endpoint_config: EndpointConfig = EndpointConfig::default();
         let shard_id: u8 = shard_idx as u8;
@@ -50885,7 +58814,11 @@ pub(crate) fn create_quic_endpoint_set(
         let crypto: Arc<QuicServerConfig> = Arc::clone(&quic_config);
         let endpoint: Endpoint = Endpoint::new_with_abstract_socket(
             endpoint_config,
-            Some(quinn::ServerConfig::with_crypto(crypto)),
+            Some(
+                quinn::ServerConfig::with_crypto(crypto)
+                    .transport_config(Arc::clone(&transport_config))
+                    .clone(),
+            ),
             shard_socket,
             Arc::clone(&runtime),
         )
@@ -50916,10 +58849,54 @@ pub(crate) fn create_quic_endpoint_set(
     })
 }
 ```
+# Path: hyperlane/core/src/protocol/http3/stream/type.rs
+```rust
+use super::*;
+pub(crate) type H3DirectStateHandle = Arc<Mutex<H3DirectState>>;
+pub(crate) type PooledH3Stream = (Stream, H3DirectStateHandle);
+```
 # Path: hyperlane/core/src/protocol/http3/stream/impl.rs
 ```rust
 use super::*;
 impl H3DirectState {
+    #[inline(always)]
+    pub(super) fn reinit(
+        &mut self,
+        send_stream: QuicSendStream,
+        peers: StreamPeers,
+        is_head: bool,
+    ) {
+        self.set_send_stream(Some(send_stream));
+        self.get_mut_pending_wire().clear();
+        self.set_pending_wire_offset(0);
+        self.get_mut_pending_head().clear();
+        self.set_head_sent(false);
+        self.set_suppress_body(is_head);
+        self.set_is_head(is_head);
+        self.set_announced_len(None);
+        self.set_body_len(0);
+        self.set_finished(false);
+        self.set_failed(false);
+        self.set_peers(peers);
+    }
+    #[inline(always)]
+    pub(super) fn release(&mut self) {
+        if !self.get_finished() {
+            self.reset();
+        }
+        let _: Option<QuicSendStream> = self.get_mut_send_stream().take();
+        if self.get_pending_wire().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+            self.set_pending_wire(Vec::with_capacity(H3_READ_CHUNK_SIZE));
+        } else {
+            self.get_mut_pending_wire().clear();
+        }
+        if self.get_pending_head().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+            self.set_pending_head(Vec::new());
+        } else {
+            self.get_mut_pending_head().clear();
+        }
+        self.set_pending_wire_offset(0);
+    }
     pub(super) fn reset(&mut self) {
         if let Some(mut stream) = self.get_mut_send_stream().take() {
             let _: Result<(), _> = stream.reset(VarInt::from_u32(H3_INTERNAL_ERROR));
@@ -50999,43 +58976,135 @@ impl H3DirectState {
             self.set_body_len(accepted_body);
         }
         self.set_pending_wire_offset(0);
+        let is_complete: bool =
+            meta.suppress_body || self.try_get_announced_len() == Some(accepted_body);
         match self.poll_drain_pending_wire(context) {
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
-            Poll::Ready(Ok(())) | Poll::Pending => Poll::Ready(Ok(consumed)),
+            Poll::Ready(Ok(())) => {
+                if is_complete && !self.get_finished() {
+                    self.set_finished(true);
+                    if let Some(mut stream) = self.get_mut_send_stream().take() {
+                        let _: Result<(), _> = stream.finish();
+                    }
+                }
+                Poll::Ready(Ok(consumed))
+            }
+            Poll::Pending => Poll::Ready(Ok(consumed)),
         }
     }
 }
 impl H3DirectTransport {
-    pub(crate) fn new(send_stream: QuicSendStream, peers: StreamPeers, is_head: bool) -> Self {
-        Self {
-            state: Mutex::new(H3DirectState {
-                send_stream: Some(send_stream),
-                pending_wire: take_h3_buffer(),
-                pending_wire_offset: 0,
-                pending_head: Vec::new(),
-                head_sent: false,
-                suppress_body: is_head,
-                is_head,
-                announced_len: None,
-                body_len: 0,
-                finished: false,
-                failed: false,
-            }),
-            peers,
+    pub(crate) fn from_shared(state: Arc<Mutex<H3DirectState>>) -> Self {
+        Self { state }
+    }
+}
+impl H3StreamGuard {
+    #[inline(always)]
+    pub(crate) fn take(
+        send_stream: QuicSendStream,
+        peers: StreamPeers,
+        request_config: RequestConfig,
+        is_head: bool,
+    ) -> Self {
+        let pooled: Option<PooledH3Stream> =
+            H3_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH3Stream>>| pool.borrow_mut().pop());
+        let pair: PooledH3Stream = match pooled {
+            Some((mut stream, state)) if *stream.get_request_config() == request_config => {
+                if let Ok(mut guard) = state.lock() {
+                    guard.reinit(send_stream, peers, is_head);
+                }
+                stream.set_closed(false);
+                (stream, state)
+            }
+            _ => {
+                let state: Arc<Mutex<H3DirectState>> = Arc::new(Mutex::new(H3DirectState {
+                    send_stream: Some(send_stream),
+                    pending_wire: Vec::with_capacity(H3_READ_CHUNK_SIZE),
+                    pending_wire_offset: 0,
+                    pending_head: Vec::new(),
+                    head_sent: false,
+                    suppress_body: is_head,
+                    is_head,
+                    announced_len: None,
+                    body_len: 0,
+                    finished: false,
+                    failed: false,
+                    peers,
+                }));
+                let stream: Stream = Stream::from_transport(
+                    H3DirectTransport::from_shared(Arc::clone(&state)),
+                    request_config,
+                    false,
+                );
+                (stream, state)
+            }
+        };
+        Self { inner: Some(pair) }
+    }
+    #[inline(always)]
+    pub(crate) fn stream_mut(&mut self) -> Option<&mut Stream> {
+        let Self { inner } = self;
+        inner.as_mut().map(|pair: &mut PooledH3Stream| &mut pair.0)
+    }
+    #[inline(always)]
+    pub(crate) async fn finish(mut self) {
+        let Self { inner } = &mut self;
+        let Some((mut stream, state)) = inner.take() else {
+            return;
+        };
+        let already_finished: bool = match state.lock() {
+            Ok(mut guard) if guard.get_finished() && !guard.get_failed() => {
+                guard.release();
+                true
+            }
+            Ok(_) => false,
+            Err(_) => return,
+        };
+        if !already_finished {
+            let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+            if let Ok(mut guard) = state.lock() {
+                guard.release();
+            } else {
+                return;
+            }
         }
+        stream.set_closed(false);
+        H3_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH3Stream>>| {
+            let mut pool: RefMut<'_, Vec<PooledH3Stream>> = pool.borrow_mut();
+            if pool.len() < MAX_POOLED_CONTEXTS {
+                pool.push((stream, state));
+            }
+        });
+    }
+}
+impl Drop for H3StreamGuard {
+    fn drop(&mut self) {
+        let Self { inner } = self;
+        let Some((mut stream, state)) = inner.take() else {
+            return;
+        };
+        if let Ok(mut guard) = state.lock() {
+            guard.release();
+        } else {
+            return;
+        }
+        stream.set_closed(false);
+        H3_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH3Stream>>| {
+            let mut pool: RefMut<'_, Vec<PooledH3Stream>> = pool.borrow_mut();
+            if pool.len() < MAX_POOLED_CONTEXTS {
+                pool.push((stream, state));
+            }
+        });
     }
 }
 impl fmt::Debug for H3DirectTransport {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("H3DirectTransport")
-            .field("peers", &self.peers)
-            .finish()
+        formatter.debug_struct("H3DirectTransport").finish()
     }
 }
 impl Drop for H3DirectTransport {
     fn drop(&mut self) {
-        if let Ok(state) = self.get_mut_state().get_mut() {
+        if let Ok(mut state) = self.get_state().lock() {
             if !state.finished {
                 state.reset();
             }
@@ -51046,10 +59115,16 @@ impl Drop for H3DirectTransport {
 }
 impl Transport for H3DirectTransport {
     fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
-        Ok(self.get_peers().remote)
+        self.get_state()
+            .lock()
+            .map(|state: MutexGuard<'_, H3DirectState>| state.get_peers().remote)
+            .map_err(|_| io::Error::other(MISSING_SEND_CAPACITY))
     }
     fn local_addr(&self) -> Result<SocketAddr, io::Error> {
-        Ok(self.get_peers().local)
+        self.get_state()
+            .lock()
+            .map(|state: MutexGuard<'_, H3DirectState>| state.get_peers().local)
+            .map_err(|_| io::Error::other(MISSING_SEND_CAPACITY))
     }
 }
 impl AsyncRead for H3DirectTransport {
@@ -51068,7 +59143,7 @@ impl AsyncWrite for H3DirectTransport {
         context: &mut task::Context<'_>,
         bytes: &[u8],
     ) -> Poll<io::Result<usize>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -51141,13 +59216,23 @@ impl AsyncWrite for H3DirectTransport {
         encode_varint(accepted as u64, wire);
         wire.extend_from_slice(&bytes[..accepted]);
         state.pending_wire_offset = 0;
+        let is_complete: bool = state.announced_len == Some(state.body_len);
         match state.poll_drain_pending_wire(context) {
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
-            Poll::Ready(Ok(())) | Poll::Pending => Poll::Ready(Ok(accepted)),
+            Poll::Ready(Ok(())) => {
+                if is_complete && !state.finished {
+                    state.finished = true;
+                    if let Some(mut stream) = state.send_stream.take() {
+                        let _: Result<(), _> = stream.finish();
+                    }
+                }
+                Poll::Ready(Ok(accepted))
+            }
+            Poll::Pending => Poll::Ready(Ok(accepted)),
         }
     }
     fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -51159,7 +59244,7 @@ impl AsyncWrite for H3DirectTransport {
         self: Pin<&mut Self>,
         context: &mut task::Context<'_>,
     ) -> Poll<io::Result<()>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -51195,6 +59280,8 @@ impl AsyncWrite for H3DirectTransport {
 use super::*;
 thread_local! {
     pub(crate) static H3_BUFFER_POOL: RefCell<Vec<Vec<u8>>> = const { RefCell::new(Vec::new()) };
+    pub(crate) static H3_STREAM_POOL: RefCell<Vec<PooledH3Stream>> =
+        const { RefCell::new(Vec::new()) };
 }
 ```
 # Path: hyperlane/core/src/protocol/http3/stream/const.rs
@@ -51255,6 +59342,8 @@ pub(crate) const MAX_POOLED_H3_BUFFERS: usize = 64;
 pub(crate) const H3_READ_CHUNK_SIZE: usize = 4 * 1024;
 pub(crate) const H3_MAX_HEADERS_FRAME_LEN: usize = 256 * 1024;
 pub(crate) const H3_MAX_SETTINGS_FRAME_LEN: usize = 16 * 1024;
+pub(crate) const H3_MAX_SKIP_PAYLOAD_BYTES: usize = 64 * 1024;
+pub(crate) const H3_MAX_QPACK_INT_CONTINUATIONS: u8 = 10;
 ```
 # Path: hyperlane/core/src/protocol/http3/stream/mod.rs
 ```rust
@@ -51263,7 +59352,8 @@ mod r#fn;
 mod r#impl;
 mod r#static;
 mod r#struct;
-pub(crate) use {r#const::*, r#fn::*, r#static::*, r#struct::*};
+mod r#type;
+pub(crate) use {r#const::*, r#fn::*, r#static::*, r#struct::*, r#type::*};
 use super::*;
 ```
 # Path: hyperlane/core/src/protocol/http3/stream/struct.rs
@@ -51315,28 +59405,26 @@ pub(crate) struct H3DirectState {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) failed: bool,
-}
-#[derive(Data)]
-pub(crate) struct H3DirectTransport {
-    #[get(skip)]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) state: Mutex<H3DirectState>,
     #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) peers: StreamPeers,
+}
+#[derive(Data)]
+pub(crate) struct H3DirectTransport {
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) state: H3DirectStateHandle,
+}
+pub(crate) struct H3StreamGuard {
+    pub(super) inner: Option<PooledH3Stream>,
 }
 #[derive(Default)]
 pub(crate) struct H3ControlState {
     pub(super) control_seen: AtomicBool,
     pub(super) qpack_enc_seen: AtomicBool,
     pub(super) qpack_dec_seen: AtomicBool,
-}
-#[derive(Clone)]
-pub(crate) struct H3RequestEnv {
-    pub(crate) shared: Arc<ConnectionShared>,
-    pub(crate) peers: StreamPeers,
 }
 ```
 # Path: hyperlane/core/src/protocol/http3/stream/fn.rs
@@ -51390,88 +59478,141 @@ pub(crate) async fn serve_h3_connection(
         }
         Err(_) => return,
     };
+    let shared: &ConnectionShared = &env.shared;
     let control_state: H3ControlState = H3ControlState::default();
     let mut first_req: Pin<&mut Option<_>> = pin!(None);
     let mut extra_reqs: Option<FuturesUnordered<_>> = None;
     let mut first_uni: Pin<&mut Option<_>> = pin!(None);
     let mut extra_unis: Option<FuturesUnordered<_>> = None;
-    loop {
-        let has_extra_reqs: bool = extra_reqs
-            .as_ref()
-            .is_some_and(|queue: &FuturesUnordered<_>| !queue.is_empty());
-        let has_extra_unis: bool = extra_unis
-            .as_ref()
-            .is_some_and(|queue: &FuturesUnordered<_>| !queue.is_empty());
-        tokio::select! {
-            biased;
-            _ = async {
-                if let Some(fut) = first_req.as_mut().as_pin_mut() {
-                    let _: Result<(), Box<dyn Any + Send>> = fut.await;
-                }
-            }, if first_req.is_some() => {
+    let mut accept_bi: Pin<&mut Option<_>> = pin!(None);
+    let mut accept_uni: Pin<&mut Option<_>> = pin!(None);
+    poll_fn(|cx: &mut task::Context<'_>| -> Poll<()> {
+        loop {
+            let mut progressed: bool = false;
+            if let Some(fut) = first_req.as_mut().as_pin_mut()
+                && Future::poll(fut, cx).is_ready()
+            {
                 first_req.set(None);
+                progressed = true;
             }
-            _ = async {
-                if let Some(queue) = extra_reqs.as_mut() {
-                    let _: Option<Result<(), Box<dyn Any + Send>>> = queue.next().await;
+            let mut completed_reqs: usize = 0;
+            if let Some(queue) = extra_reqs.as_mut() {
+                while !queue.is_empty() && completed_reqs < 64 {
+                    match queue.poll_next_unpin(cx) {
+                        Poll::Ready(Some(_)) => {
+                            completed_reqs += 1;
+                            progressed = true;
+                        }
+                        Poll::Ready(None) | Poll::Pending => break,
+                    }
                 }
-            }, if has_extra_reqs => {}
-            _ = async {
-                if let Some(fut) = first_uni.as_mut().as_pin_mut() {
-                    fut.await;
-                }
-            }, if first_uni.is_some() => {
+            }
+            if let Some(fut) = first_uni.as_mut().as_pin_mut()
+                && Future::poll(fut, cx).is_ready()
+            {
                 first_uni.set(None);
+                progressed = true;
             }
-            _ = async {
-                if let Some(queue) = extra_unis.as_mut() {
-                    let _: Option<()> = queue.next().await;
+            if let Some(queue) = extra_unis.as_mut() {
+                while !queue.is_empty() {
+                    match queue.poll_next_unpin(cx) {
+                        Poll::Ready(Some(())) => {
+                            progressed = true;
+                        }
+                        Poll::Ready(None) | Poll::Pending => break,
+                    }
                 }
-            }, if has_extra_unis => {}
-            accepted = connection.accept_bi() => {
-                match accepted {
-                    Ok((send, recv)) => {
-                        let req_env: H3RequestEnv = H3RequestEnv {
-                            shared: Arc::clone(&env.shared),
-                            peers,
-                        };
+            }
+            let mut accepted_bi: usize = 0;
+            while accepted_bi < 64 {
+                if accept_bi.is_none() {
+                    accept_bi.set(Some(connection.accept_bi()));
+                }
+                let Some(bi_fut) = accept_bi.as_mut().as_pin_mut() else {
+                    break;
+                };
+                match Future::poll(bi_fut, cx) {
+                    Poll::Ready(Ok((send, recv))) => {
+                        accept_bi.set(None);
                         if first_req.is_none() {
                             first_req.set(Some(
-                                AssertUnwindSafe(h3_request_task(req_env, &connection, send, recv))
-                                    .catch_unwind(),
+                                AssertUnwindSafe(h3_request_task(
+                                    shared,
+                                    peers,
+                                    &connection,
+                                    send,
+                                    recv,
+                                ))
+                                .catch_unwind(),
                             ));
+                            if let Some(fut) = first_req.as_mut().as_pin_mut()
+                                && Future::poll(fut, cx).is_ready()
+                            {
+                                first_req.set(None);
+                            }
                         } else {
-                            extra_reqs
-                                .get_or_insert_with(FuturesUnordered::new)
-                                .push(
-                                    AssertUnwindSafe(h3_request_task(req_env, &connection, send, recv))
-                                        .catch_unwind(),
-                                );
+                            extra_reqs.get_or_insert_with(FuturesUnordered::new).push(
+                                AssertUnwindSafe(h3_request_task(
+                                    shared,
+                                    peers,
+                                    &connection,
+                                    send,
+                                    recv,
+                                ))
+                                .catch_unwind(),
+                            );
                         }
+                        accepted_bi += 1;
+                        progressed = true;
                     }
-                    Err(_) => break,
+                    Poll::Ready(Err(_)) => return Poll::Ready(()),
+                    Poll::Pending => break,
                 }
             }
-            uni = connection.accept_uni() => {
-                match uni {
-                    Ok(recv) => {
+            let mut accepted_uni: usize = 0;
+            while accepted_uni < 8 {
+                if accept_uni.is_none() {
+                    accept_uni.set(Some(connection.accept_uni()));
+                }
+                let Some(uni_fut) = accept_uni.as_mut().as_pin_mut() else {
+                    break;
+                };
+                match Future::poll(uni_fut, cx) {
+                    Poll::Ready(Ok(recv)) => {
+                        accept_uni.set(None);
                         if first_uni.is_none() {
                             first_uni.set(Some(handle_h3_uni_stream(
                                 &connection,
                                 recv,
                                 &control_state,
                             )));
+                            if let Some(fut) = first_uni.as_mut().as_pin_mut()
+                                && Future::poll(fut, cx).is_ready()
+                            {
+                                first_uni.set(None);
+                            }
                         } else {
                             extra_unis
                                 .get_or_insert_with(FuturesUnordered::new)
                                 .push(handle_h3_uni_stream(&connection, recv, &control_state));
                         }
+                        accepted_uni += 1;
+                        progressed = true;
                     }
-                    Err(_) => break,
+                    Poll::Ready(Err(_)) => return Poll::Ready(()),
+                    Poll::Pending => break,
                 }
             }
+            if !progressed {
+                return Poll::Pending;
+            }
+            if accepted_bi == 64 || completed_reqs == 64 {
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
+            }
         }
-    }
+    })
+    .await;
     let _: Option<QuicSendStream> = control_stream.take();
 }
 fn validate_h3_settings_payload(payload: &[u8]) -> Result<(), u32> {
@@ -51506,15 +59647,26 @@ fn validate_h3_settings_payload(payload: &[u8]) -> Result<(), u32> {
     }
     Ok(())
 }
+#[inline(always)]
+fn compact_h3_buffer(buf: &mut Vec<u8>, pos: &mut usize) {
+    if *pos == 0 {
+        return;
+    }
+    if *pos >= buf.len() {
+        buf.clear();
+        *pos = 0;
+    } else if *pos >= H3_READ_CHUNK_SIZE {
+        buf.drain(..*pos);
+        *pos = 0;
+    }
+}
 async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRecvStream) {
     let mut buf: Vec<u8> = take_h3_buffer();
     let mut pos: usize = 0;
     let mut settings_seen: bool = false;
+    let mut skipped_total: usize = 0;
     loop {
-        if pos == buf.len() {
-            buf.clear();
-            pos = 0;
-        }
+        compact_h3_buffer(&mut buf, &mut pos);
         let header: Option<(u64, usize)> =
             match read_h3_frame_header(recv, &mut buf, &mut pos).await {
                 Ok(Some(pair)) => Some(pair),
@@ -51597,7 +59749,7 @@ async fn drive_h3_control_stream(connection: &QuicConnection, recv: &mut QuicRec
                 return;
             }
             _ => {
-                if skip_h3_payload(recv, &mut buf, &mut pos, payload_len)
+                if skip_h3_payload(recv, &mut buf, &mut pos, payload_len, &mut skipped_total)
                     .await
                     .is_err()
                 {
@@ -51684,6 +59836,8 @@ async fn handle_h3_uni_stream(
                 return;
             }
             let mut buf: [u8; 64] = [0; 64];
+            let mut in_cancel_continuation: bool = false;
+            let mut cancel_cont_bytes: u8 = 0;
             loop {
                 match recv.read(&mut buf).await {
                     Ok(Some(0)) | Ok(None) => {
@@ -51694,16 +59848,32 @@ async fn handle_h3_uni_stream(
                         return;
                     }
                     Ok(Some(n)) => {
-                        if buf[..n].iter().any(|b: &u8| {
-                            let is_inc: bool = (*b & 0xc0) == 0x00;
-                            let is_ack: bool = (*b & 0x80) == 0x80;
-                            is_inc || is_ack
-                        }) {
-                            connection.close(
-                                VarInt::from_u32(H3_QPACK_DECODER_STREAM_ERROR),
-                                H3_REASON_QPACK_DECODER_INVALID,
-                            );
-                            return;
+                        for &byte in &buf[..n] {
+                            if in_cancel_continuation {
+                                cancel_cont_bytes += 1;
+                                if cancel_cont_bytes > H3_MAX_QPACK_INT_CONTINUATIONS {
+                                    connection.close(
+                                        VarInt::from_u32(H3_QPACK_DECODER_STREAM_ERROR),
+                                        H3_REASON_QPACK_DECODER_INVALID,
+                                    );
+                                    return;
+                                }
+                                if (byte & 0x80) == 0 {
+                                    in_cancel_continuation = false;
+                                    cancel_cont_bytes = 0;
+                                }
+                            } else if (byte & 0xc0) == 0x40 {
+                                if (byte & 0x3f) == 0x3f {
+                                    in_cancel_continuation = true;
+                                    cancel_cont_bytes = 0;
+                                }
+                            } else {
+                                connection.close(
+                                    VarInt::from_u32(H3_QPACK_DECODER_STREAM_ERROR),
+                                    H3_REASON_QPACK_DECODER_INVALID,
+                                );
+                                return;
+                            }
                         }
                     }
                     Err(_) => return,
@@ -51729,19 +59899,16 @@ async fn ensure_h3_bytes(
     needed: usize,
 ) -> Result<bool, RequestError> {
     while buf.len() - pos < needed {
-        let old_len: usize = buf.len();
-        let grow: usize = H3_READ_CHUNK_SIZE.max(needed - (old_len - pos));
-        buf.resize(old_len + grow, 0);
-        match recv.read(&mut buf[old_len..]).await {
-            Ok(Some(n)) if n > 0 => {
-                buf.truncate(old_len + n);
+        let grow: usize = H3_READ_CHUNK_SIZE.max(needed - (buf.len() - pos));
+        let chunk_res: Result<Option<Chunk>, ReadError> = recv.read_chunk(grow, true).await;
+        match chunk_res {
+            Ok(Some(chunk)) if !chunk.bytes.is_empty() => {
+                buf.extend_from_slice(&chunk.bytes);
             }
             Ok(Some(_)) | Ok(None) => {
-                buf.truncate(old_len);
                 return Ok(false);
             }
             Err(error) => {
-                buf.truncate(old_len);
                 return Err(RequestError::Request(error.to_string()));
             }
         }
@@ -51803,7 +59970,13 @@ async fn skip_h3_payload(
     buf: &mut Vec<u8>,
     pos: &mut usize,
     mut remaining: usize,
+    skipped_total: &mut usize,
 ) -> Result<(), RequestError> {
+    let next_total: usize = skipped_total.saturating_add(remaining);
+    if next_total > H3_MAX_SKIP_PAYLOAD_BYTES {
+        return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+    }
+    *skipped_total = next_total;
     while remaining > 0 {
         let avail: usize = buf.len() - *pos;
         if avail > 0 {
@@ -51829,7 +60002,9 @@ async fn read_h3_request_headers(
     request: &mut Request,
     target: &mut String,
 ) -> Result<Option<H3DecodedRequestMeta>, RequestError> {
+    let mut skipped_total: usize = 0;
     loop {
+        compact_h3_buffer(buf, pos);
         let Some((frame_type, payload_len)) = read_h3_frame_header(recv, buf, pos).await? else {
             return Ok(None);
         };
@@ -51845,7 +60020,7 @@ async fn read_h3_request_headers(
                 connection.close(VarInt::from_u32(H3_FRAME_UNEXPECTED), reason);
                 return Err(RequestError::HttpRead(HttpStatus::BadRequest));
             }
-            skip_h3_payload(recv, buf, pos, payload_len).await?;
+            skip_h3_payload(recv, buf, pos, payload_len, &mut skipped_total).await?;
             continue;
         }
         if payload_len > H3_MAX_HEADERS_FRAME_LEN {
@@ -51869,14 +60044,13 @@ async fn collect_h3_data_frames(
     buf: &mut Vec<u8>,
     pos: &mut usize,
     max_body_size: usize,
+    declared: Option<usize>,
     body: &mut Vec<u8>,
 ) -> Result<(), RequestError> {
     let mut trailers_seen: bool = false;
+    let mut skipped_total: usize = 0;
     loop {
-        if *pos == buf.len() {
-            buf.clear();
-            *pos = 0;
-        }
+        compact_h3_buffer(buf, pos);
         let Some((frame_type, payload_len)) = read_h3_frame_header(recv, buf, pos).await? else {
             return Ok(());
         };
@@ -51889,8 +60063,14 @@ async fn collect_h3_data_frames(
                     );
                     return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                 }
+                if let Some(expected) = declared
+                    && payload_len > expected.saturating_sub(body.len())
+                {
+                    let _: Result<(), _> = recv.stop(VarInt::from_u32(H3_NO_ERROR));
+                    return Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned()));
+                }
                 if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE
-                    && body.len().saturating_add(payload_len) > max_body_size
+                    && payload_len > max_body_size.saturating_sub(body.len())
                 {
                     let _: Result<(), _> = recv.stop(VarInt::from_u32(H3_NO_ERROR));
                     return Err(RequestError::ContentLengthTooLarge(
@@ -51907,20 +60087,18 @@ async fn collect_h3_data_frames(
                         remaining -= take;
                         continue;
                     }
-                    let old_len: usize = body.len();
                     let chunk_len: usize = remaining.min(MAX_POOLED_BUFFER_CAPACITY);
-                    body.resize(old_len + chunk_len, 0);
-                    match recv.read(&mut body[old_len..]).await {
-                        Ok(Some(n)) if n > 0 => {
-                            body.truncate(old_len + n);
-                            remaining -= n;
+                    let chunk_res: Result<Option<Chunk>, ReadError> =
+                        recv.read_chunk(chunk_len, true).await;
+                    match chunk_res {
+                        Ok(Some(chunk)) if !chunk.bytes.is_empty() => {
+                            body.extend_from_slice(&chunk.bytes);
+                            remaining -= chunk.bytes.len();
                         }
                         Ok(Some(_)) | Ok(None) => {
-                            body.truncate(old_len);
                             return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                         }
                         Err(error) => {
-                            body.truncate(old_len);
                             return Err(RequestError::Request(error.to_string()));
                         }
                     }
@@ -51935,10 +60113,10 @@ async fn collect_h3_data_frames(
                     return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                 }
                 trailers_seen = true;
-                skip_h3_payload(recv, buf, pos, payload_len).await?;
+                skip_h3_payload(recv, buf, pos, payload_len, &mut skipped_total).await?;
             }
             other if is_grease_id(other) => {
-                skip_h3_payload(recv, buf, pos, payload_len).await?;
+                skip_h3_payload(recv, buf, pos, payload_len, &mut skipped_total).await?;
             }
             H3_FRAME_SETTINGS
             | H3_FRAME_GOAWAY
@@ -51959,67 +60137,116 @@ async fn collect_h3_data_frames(
                 return Err(RequestError::HttpRead(HttpStatus::BadRequest));
             }
             _ => {
-                skip_h3_payload(recv, buf, pos, payload_len).await?;
+                skip_h3_payload(recv, buf, pos, payload_len, &mut skipped_total).await?;
             }
         }
     }
 }
+async fn read_h3_request_headers_fast(
+    connection: &QuicConnection,
+    recv: &mut QuicRecvStream,
+    read_buf: &mut Option<Vec<u8>>,
+    read_pos: &mut usize,
+    config: &RequestConfig,
+    request: &mut Request,
+    target: &mut String,
+) -> Result<Option<H3DecodedRequestMeta>, RequestError> {
+    let chunk_res: Result<Option<Chunk>, ReadError> =
+        recv.read_chunk(H3_READ_CHUNK_SIZE, true).await;
+    let first_chunk: Chunk = match chunk_res {
+        Ok(Some(chunk)) if !chunk.bytes.is_empty() => chunk,
+        Ok(Some(_)) | Ok(None) => return Ok(None),
+        Err(error) => return Err(RequestError::Request(error.to_string())),
+    };
+    let bytes: &[u8] = &first_chunk.bytes;
+    if let Some((frame_type, type_len)) = decode_varint(bytes)
+        && frame_type == H3_FRAME_HEADERS
+        && let Some((payload_len_u64, len_bytes)) = decode_varint(&bytes[type_len..])
+        && let Ok(payload_len) = usize::try_from(payload_len_u64)
+    {
+        if payload_len > H3_MAX_HEADERS_FRAME_LEN {
+            return Err(RequestError::HeaderValueTooLong(
+                HttpStatus::RequestHeaderFieldsTooLarge,
+            ));
+        }
+        let header_start: usize = type_len + len_bytes;
+        if let Some(frame_end) = header_start.checked_add(payload_len)
+            && frame_end <= bytes.len()
+        {
+            let meta: H3DecodedRequestMeta =
+                decode_qpack_request(&bytes[header_start..frame_end], config, request, target)?;
+            if frame_end < bytes.len() {
+                let buf: &mut Vec<u8> = read_buf.get_or_insert_with(take_h3_buffer);
+                buf.extend_from_slice(&bytes[frame_end..]);
+                *read_pos = 0;
+            }
+            return Ok(Some(meta));
+        }
+    }
+    let buf: &mut Vec<u8> = read_buf.get_or_insert_with(take_h3_buffer);
+    buf.extend_from_slice(bytes);
+    *read_pos = 0;
+    read_h3_request_headers(connection, recv, buf, read_pos, config, request, target).await
+}
 pub(crate) async fn h3_request_task(
-    env: H3RequestEnv,
+    shared: &ConnectionShared,
+    peers: StreamPeers,
     connection: &QuicConnection,
     mut send_stream: QuicSendStream,
     mut recv_stream: QuicRecvStream,
 ) {
-    let H3RequestEnv { shared, peers } = env;
     let server: &Server = &shared.server;
     let request_config: RequestConfig = shared.request_config;
-    let mut read_buf: Vec<u8> = take_h3_buffer();
+    let mut read_buf: Option<Vec<u8>> = None;
     let mut read_pos: usize = 0;
     let mut ctx: Context = take_pooled_context();
     let mut target: String = take_target_buffer();
     let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
-    let head_result: Result<Option<H3DecodedRequestMeta>, RequestError> =
-        if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
-            read_h3_request_headers(
-                connection,
-                &mut recv_stream,
-                &mut read_buf,
-                &mut read_pos,
-                &request_config,
-                ctx.get_mut_request(),
-                &mut target,
-            )
+    let head_result: Result<Option<H3DecodedRequestMeta>, RequestError> = if read_timeout_ms
+        == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS
+    {
+        read_h3_request_headers_fast(
+            connection,
+            &mut recv_stream,
+            &mut read_buf,
+            &mut read_pos,
+            &request_config,
+            ctx.get_mut_request(),
+            &mut target,
+        )
+        .await
+    } else {
+        let mut reading: Pin<&mut _> = pin!(read_h3_request_headers_fast(
+            connection,
+            &mut recv_stream,
+            &mut read_buf,
+            &mut read_pos,
+            &request_config,
+            ctx.get_mut_request(),
+            &mut target,
+        ));
+        match poll_with_timeout_protocol(reading.as_mut(), Duration::from_millis(read_timeout_ms))
             .await
-        } else {
-            let mut reading: Pin<&mut _> = pin!(read_h3_request_headers(
-                connection,
-                &mut recv_stream,
-                &mut read_buf,
-                &mut read_pos,
-                &request_config,
-                ctx.get_mut_request(),
-                &mut target,
-            ));
-            if let Some(done) = poll_once_protocol(reading.as_mut()).await {
-                done
-            } else {
-                match timeout(Duration::from_millis(read_timeout_ms), reading).await {
-                    Ok(done) => done,
-                    Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
-                }
-            }
-        };
+        {
+            Some(done) => done,
+            None => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+        }
+    };
     let meta: H3DecodedRequestMeta = match head_result {
         Ok(Some(meta)) => meta,
         Ok(None) => {
-            return_h3_buffer(read_buf);
+            if let Some(buf) = read_buf {
+                return_h3_buffer(buf);
+            }
             return_target_buffer(target);
             return_pooled_context(ctx);
             return;
         }
         Err(error) => {
             let _: Result<(), _> = recv_stream.stop(VarInt::from_u32(H3_NO_ERROR));
-            return_h3_buffer(read_buf);
+            if let Some(buf) = read_buf {
+                return_h3_buffer(buf);
+            }
             return_target_buffer(target);
             h3_fail_request(
                 server,
@@ -52051,28 +60278,49 @@ pub(crate) async fn h3_request_task(
                     .await
                     .map_err(|error: QuicWriteError| RequestError::Request(error.to_string()))?;
             }
+            if read_buf.is_none()
+                && !meta.expect_continue
+                && matches!(meta.declared_content_length, None | Some(0))
+            {
+                match recv_stream.read_chunk(H3_READ_CHUNK_SIZE, true).await {
+                    Ok(None) => return Ok(()),
+                    Ok(Some(chunk)) => {
+                        let buf: &mut Vec<u8> = read_buf.get_or_insert_with(take_h3_buffer);
+                        buf.extend_from_slice(&chunk.bytes);
+                        read_pos = 0;
+                    }
+                    Err(error) => return Err(RequestError::Request(error.to_string())),
+                }
+            }
+            let buf: &mut Vec<u8> = read_buf.get_or_insert_with(take_h3_buffer);
             collect_h3_data_frames(
                 connection,
                 &mut recv_stream,
-                &mut read_buf,
+                buf,
                 &mut read_pos,
                 max_body_size,
+                meta.declared_content_length,
                 body,
             )
             .await
         });
         if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
             reading.await
-        } else if let Some(done) = poll_once_protocol(reading.as_mut()).await {
-            done
         } else {
-            match timeout(Duration::from_millis(read_timeout_ms), reading).await {
-                Ok(done) => done,
-                Err(_) => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
+            match poll_with_timeout_protocol(
+                reading.as_mut(),
+                Duration::from_millis(read_timeout_ms),
+            )
+            .await
+            {
+                Some(done) => done,
+                None => Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
             }
         }
     };
-    return_h3_buffer(read_buf);
+    if let Some(buf) = read_buf {
+        return_h3_buffer(buf);
+    }
     let body_check: Result<(), RequestError> =
         body_result.and_then(|()| match meta.declared_content_length {
             None => Ok(()),
@@ -52097,15 +60345,14 @@ pub(crate) async fn h3_request_task(
         return_pooled_context(ctx);
         return;
     }
-    let mut stream: Stream = Stream::from_transport(
-        H3DirectTransport::new(send_stream, peers, meta.is_head),
-        request_config,
-        false,
-    );
-    server
-        .run_protocol_lifecycle_in_place(&shared.pipeline, &mut stream, &mut ctx, target)
-        .await;
-    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    let mut stream_guard: H3StreamGuard =
+        H3StreamGuard::take(send_stream, peers, request_config, meta.is_head);
+    if let Some(stream) = stream_guard.stream_mut() {
+        server
+            .run_protocol_lifecycle_in_place(&shared.pipeline, stream, &mut ctx, target)
+            .await;
+    }
+    stream_guard.finish().await;
     return_pooled_context(ctx);
 }
 #[cold]
@@ -52122,13 +60369,12 @@ pub(crate) async fn h3_fail_request(
     ctx.get_mut_response().reset().set_version(version.clone());
     ctx.clear_route_params();
     ctx.reset_request_attributes();
-    let mut stream: Stream = Stream::from_transport(
-        H3DirectTransport::new(send_stream, peers, false),
-        request_config,
-        false,
-    );
-    reply_to_request_error(server, &mut stream, ctx, &error, Some(version)).await;
-    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    let mut stream_guard: H3StreamGuard =
+        H3StreamGuard::take(send_stream, peers, request_config, false);
+    if let Some(stream) = stream_guard.stream_mut() {
+        reply_to_request_error(server, stream, ctx, &error, Some(version)).await;
+        let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    }
 }
 ```
 # Path: hyperlane/core/src/protocol/http3/qpack/static.rs
@@ -52595,7 +60841,7 @@ fn encode_prefix_int(flags: u8, prefix_bits: u8, mut val: u64, out: &mut Vec<u8>
 fn decode_qpack_string<'a>(
     buf: &'a [u8],
     prefix_bits: u8,
-    scratch: &mut Vec<u8>,
+    scratch: &mut Option<Vec<u8>>,
 ) -> Result<(&'a [u8], bool, usize), RequestError> {
     let first: u8 = *buf
         .first()
@@ -52612,7 +60858,8 @@ fn decode_qpack_string<'a>(
         .get(int_bytes..end)
         .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
     if is_huffman {
-        decode_huffman(raw, scratch)?;
+        let scratch_buf: &mut Vec<u8> = scratch.get_or_insert_with(take_h3_buffer);
+        decode_huffman(raw, scratch_buf)?;
         Ok((&[], true, end))
     } else {
         Ok((raw, false, end))
@@ -52643,11 +60890,7 @@ fn validate_h3_header_value(bytes: &[u8]) -> Result<&str, RequestError> {
     from_utf8(bytes).map_err(|_| RequestError::HttpRead(HttpStatus::BadRequest))
 }
 fn value_has_continue_expectation(value: &str) -> bool {
-    value.split(',').any(|member: &str| {
-        member
-            .trim_matches([' ', '\t'])
-            .eq_ignore_ascii_case(CONTINUE_EXPECT)
-    })
+    contains_continue_member(value.as_bytes())
 }
 #[inline(always)]
 fn insert_pooled_h3_header(headers: &mut RequestHeaders, name: &str, value: &str) {
@@ -52675,6 +60918,32 @@ pub(crate) fn decode_qpack_request(
     config: &RequestConfig,
     request: &mut Request,
     target: &mut String,
+) -> Result<H3DecodedRequestMeta, RequestError> {
+    let mut name_scratch: Option<Vec<u8>> = None;
+    let mut val_scratch: Option<Vec<u8>> = None;
+    let result: Result<H3DecodedRequestMeta, RequestError> = decode_qpack_request_inner(
+        payload,
+        config,
+        request,
+        target,
+        &mut name_scratch,
+        &mut val_scratch,
+    );
+    if let Some(buf) = name_scratch {
+        return_h3_buffer(buf);
+    }
+    if let Some(buf) = val_scratch {
+        return_h3_buffer(buf);
+    }
+    result
+}
+fn decode_qpack_request_inner(
+    payload: &[u8],
+    config: &RequestConfig,
+    request: &mut Request,
+    target: &mut String,
+    name_scratch: &mut Option<Vec<u8>>,
+    val_scratch: &mut Option<Vec<u8>>,
 ) -> Result<H3DecodedRequestMeta, RequestError> {
     if payload.len() < 2 {
         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
@@ -52711,8 +60980,6 @@ pub(crate) fn decode_qpack_request(
     let mut expect_continue: bool = false;
     let mut seen_regular_header: bool = false;
     let mut header_count: usize = 0;
-    let mut name_scratch: Vec<u8> = take_h3_buffer();
-    let mut val_scratch: Vec<u8> = take_h3_buffer();
     while pos < payload.len() {
         let first: u8 = payload[pos];
         let (name_slice, val_slice): (&str, &str) = if (first & 0x80) != 0 {
@@ -52738,10 +61005,10 @@ pub(crate) fn decode_qpack_request(
                 .get(idx)
                 .ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
             let (raw_val, used_scratch, val_consumed): (&[u8], bool, usize) =
-                decode_qpack_string(&payload[pos..], 7, &mut val_scratch)?;
+                decode_qpack_string(&payload[pos..], 7, val_scratch)?;
             pos += val_consumed;
             let val_bytes: &[u8] = if used_scratch {
-                val_scratch.as_slice()
+                val_scratch.as_deref().unwrap_or(&[])
             } else {
                 raw_val
             };
@@ -52749,18 +61016,18 @@ pub(crate) fn decode_qpack_request(
             (static_name, val_str)
         } else if (first & 0x20) != 0 {
             let (raw_name, used_name_scratch, name_consumed): (&[u8], bool, usize) =
-                decode_qpack_string(&payload[pos..], 3, &mut name_scratch)?;
+                decode_qpack_string(&payload[pos..], 3, name_scratch)?;
             pos += name_consumed;
             let name_bytes: &[u8] = if used_name_scratch {
-                name_scratch.as_slice()
+                name_scratch.as_deref().unwrap_or(&[])
             } else {
                 raw_name
             };
             let (raw_val, used_val_scratch, val_consumed): (&[u8], bool, usize) =
-                decode_qpack_string(&payload[pos..], 7, &mut val_scratch)?;
+                decode_qpack_string(&payload[pos..], 7, val_scratch)?;
             pos += val_consumed;
             let val_bytes: &[u8] = if used_val_scratch {
-                val_scratch.as_slice()
+                val_scratch.as_deref().unwrap_or(&[])
             } else {
                 raw_val
             };
@@ -52803,8 +61070,6 @@ pub(crate) fn decode_qpack_request(
                 }
                 ":scheme" => {
                     if scheme.is_some() || scheme_owned.is_some() || val_slice.is_empty() {
-                        return_h3_buffer(name_scratch);
-                        return_h3_buffer(val_scratch);
                         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                     }
                     if val_slice == HTTP_SCHEME {
@@ -52817,8 +61082,6 @@ pub(crate) fn decode_qpack_request(
                 }
                 ":path" => {
                     if has_path || val_slice.is_empty() {
-                        return_h3_buffer(name_scratch);
-                        return_h3_buffer(val_scratch);
                         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                     }
                     has_path = true;
@@ -52826,8 +61089,6 @@ pub(crate) fn decode_qpack_request(
                 }
                 ":authority" => {
                     if has_authority {
-                        return_h3_buffer(name_scratch);
-                        return_h3_buffer(val_scratch);
                         return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                     }
                     has_authority = true;
@@ -52875,8 +61136,6 @@ pub(crate) fn decode_qpack_request(
             }
             "host" => {
                 if has_host {
-                    return_h3_buffer(name_scratch);
-                    return_h3_buffer(val_scratch);
                     return Err(RequestError::HttpRead(HttpStatus::BadRequest));
                 }
                 has_host = true;
@@ -52900,8 +61159,6 @@ pub(crate) fn decode_qpack_request(
                     .map_err(|_| RequestError::InvalidContentLength(HttpStatus::BadRequest))?;
                 if max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE && parsed_len > max_body_size
                 {
-                    return_h3_buffer(name_scratch);
-                    return_h3_buffer(val_scratch);
                     return Err(RequestError::ContentLengthTooLarge(
                         HttpStatus::PayloadTooLarge,
                     ));
@@ -52915,8 +61172,6 @@ pub(crate) fn decode_qpack_request(
         }
         insert_pooled_h3_header(request.get_mut_headers(), name_slice, val_slice);
     }
-    return_h3_buffer(name_scratch);
-    return_h3_buffer(val_scratch);
     let method: Method = method.ok_or(RequestError::HttpRead(HttpStatus::BadRequest))?;
     let scheme_str: Option<&str> = scheme.or(scheme_owned.as_deref());
     if method == Method::Connect {
@@ -53090,11 +61345,56 @@ fn is_hop_by_hop_h3_header(name: &str) -> bool {
         || name.eq_ignore_ascii_case(TE)
         || name.eq_ignore_ascii_case(TRAILER_HEADER)
 }
+#[inline(always)]
+fn try_encode_fast_h3_200_head(
+    head: &[u8],
+    is_head: bool,
+    out: &mut Vec<u8>,
+) -> Option<H3EncodedResponseMeta> {
+    let rest: &[u8] = head
+        .strip_prefix(FAST_PROTOCOL_H3_200_PREFIX)
+        .or_else(|| head.strip_prefix(FAST_PROTOCOL_H11_200_PREFIX))?;
+    let digits: &[u8] = rest.strip_suffix(FAST_PROTOCOL_DEFAULT_SUFFIX)?;
+    if digits.is_empty() || digits.len() > 20 {
+        return None;
+    }
+    let mut length: usize = 0;
+    for &byte in digits {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        length = length
+            .checked_mul(10)?
+            .checked_add((byte - b'0') as usize)?;
+    }
+    let block_len: usize = if digits == b"0" { 5 } else { 6 + digits.len() };
+    out.reserve(2 + block_len);
+    out.push(H3_FRAME_HEADERS as u8);
+    out.push(block_len as u8);
+    out.push(0x00);
+    out.push(0x00);
+    out.push(0xC0 | 25);
+    if digits == b"0" {
+        out.push(0xC0 | 4);
+    } else {
+        out.push(0x50 | 4);
+        out.push(digits.len() as u8);
+        out.extend_from_slice(digits);
+    }
+    out.push(0xC0 | 52);
+    Some(H3EncodedResponseMeta {
+        announced_len: if is_head { None } else { Some(length) },
+        suppress_body: is_head,
+    })
+}
 pub(crate) fn encode_h3_response_head(
     head: &[u8],
     is_head: bool,
     out: &mut Vec<u8>,
 ) -> Result<H3EncodedResponseMeta, ResponseError> {
+    if let Some(fast) = try_encode_fast_h3_200_head(head, is_head, out) {
+        return Ok(fast);
+    }
     let text: &str =
         from_utf8(head).map_err(|error: Utf8Error| ResponseError::Send(error.to_string()))?;
     let mut lines: SplitLines<'_> = text.split(CRLF);
@@ -53116,10 +61416,7 @@ pub(crate) fn encode_h3_response_head(
         .map_err(|error: ParseIntError| ResponseError::Send(error.to_string()))?;
     validate_status_code(status_code)?;
     let hide_length: bool = hides_entity_length(status_code, is_head);
-    let suppress_body: bool = is_head
-        || status_code < HttpStatus::Ok.code()
-        || status_code == HttpStatus::NoContent.code()
-        || status_code == HttpStatus::NotModified.code();
+    let suppress_body: bool = is_bodyless_status(status_code, is_head);
     let mut parsed_lines: [(&str, &str); 32] = [("", ""); 32];
     let mut parsed_count: usize = 0;
     let mut overflow_lines: Vec<(&str, &str)> = Vec::new();
@@ -53184,9 +61481,12 @@ pub(crate) fn encode_h3_response_head(
             overflow_lines.push((trimmed_name, trimmed_value));
         }
     }
-    let mut block: Vec<u8> = take_h3_buffer();
-    block.extend_from_slice(&[0, 0]);
-    encode_qpack_status(status_code, &mut block);
+    let frame_start: usize = out.len();
+    out.push(H3_FRAME_HEADERS as u8);
+    out.push(0);
+    let payload_start: usize = out.len();
+    out.extend_from_slice(&[0, 0]);
+    encode_qpack_status(status_code, out);
     let mut lower_buf: [u8; 64] = [0; 64];
     let nom_slice: &[&str] = &nominated[..nominated_count];
     for &(name, value) in parsed_lines[..parsed_count]
@@ -53204,21 +61504,29 @@ pub(crate) fn encode_h3_response_head(
         let name_bytes: &[u8] = name.as_bytes();
         let has_upper: bool = name_bytes.iter().any(|b: &u8| b.is_ascii_uppercase());
         if !has_upper {
-            encode_qpack_header(name_bytes, value.as_bytes(), &mut block);
+            encode_qpack_header(name_bytes, value.as_bytes(), out);
         } else if name_bytes.len() <= lower_buf.len() {
             for (idx, &b) in name_bytes.iter().enumerate() {
                 lower_buf[idx] = b.to_ascii_lowercase();
             }
-            encode_qpack_header(&lower_buf[..name_bytes.len()], value.as_bytes(), &mut block);
+            encode_qpack_header(&lower_buf[..name_bytes.len()], value.as_bytes(), out);
         } else {
             let lowered: String = name.to_ascii_lowercase();
-            encode_qpack_header(lowered.as_bytes(), value.as_bytes(), &mut block);
+            encode_qpack_header(lowered.as_bytes(), value.as_bytes(), out);
         }
     }
-    out.push(H3_FRAME_HEADERS as u8);
-    encode_varint(block.len() as u64, out);
-    out.extend_from_slice(&block);
-    return_h3_buffer(block);
+    let block_len: usize = out.len() - payload_start;
+    if block_len < 64 {
+        out[frame_start + 1] = block_len as u8;
+    } else {
+        let mut len_buf: Vec<u8> = Vec::with_capacity(8);
+        encode_varint(block_len as u64, &mut len_buf);
+        let extra: usize = len_buf.len() - 1;
+        let old_len: usize = out.len();
+        out.resize(old_len + extra, 0);
+        out.copy_within(payload_start..old_len, payload_start + extra);
+        out[frame_start + 1..frame_start + 1 + len_buf.len()].copy_from_slice(&len_buf);
+    }
     Ok(H3EncodedResponseMeta {
         announced_len: if suppress_body { None } else { announced_len },
         suppress_body,
@@ -53321,70 +61629,12 @@ pub(crate) fn write_request_target(path: &str, query: Option<&str>, target: &mut
         }
     }
 }
-pub fn check_request_authority(headers: &ProtocolHeaders, uri: &Uri) -> Result<(), RequestError> {
-    let host_count: usize = headers.get_all(HOST).iter().count();
-    if host_count > 1 {
-        return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
-    }
-    let authority: Option<&str> = uri
-        .authority()
-        .map(|authority: &Authority| authority.as_str());
-    let host: Option<&str> = match headers.get(HOST) {
-        Some(value) => match value.to_str() {
-            Ok(value) => Some(value),
-            Err(_) => return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest)),
-        },
-        None => match headers.get(COLON_AUTHORITY) {
-            Some(value) => match value.to_str() {
-                Ok(value) => Some(value),
-                Err(_) => return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest)),
-            },
-            None => None,
-        },
-    };
-    if let Some(authority) = authority
-        && authority.contains(AT_SIGN)
-    {
-        return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
-    }
-    if let Some(host) = host
-        && host.contains(AT_SIGN)
-    {
-        return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
-    }
-    let (Some(authority), Some(host)) = (authority, host) else {
-        return Ok(());
-    };
-    let scheme: Option<&str> = uri.scheme_str();
-    if !same_authority(authority, host, scheme) {
-        return Err(RequestError::InvalidUrlHost(HttpStatus::BadRequest));
-    }
-    Ok(())
-}
-pub fn same_authority(authority: &str, host: &str, scheme: Option<&str>) -> bool {
-    if authority.eq_ignore_ascii_case(host) {
-        return true;
-    }
-    let (auth_host, auth_port): (&str, Option<&str>) = split_authority_port(authority);
-    let (host_host, host_port): (&str, Option<&str>) = split_authority_port(host);
-    if !auth_host.eq_ignore_ascii_case(host_host) {
+fn is_valid_authority_value(value: &str) -> bool {
+    if value.is_empty() {
         return false;
     }
-    let default_port: Option<&str> = match scheme {
-        Some(HTTP_SCHEME) => Some(DEFAULT_HTTP_PORT_STR),
-        Some(HTTPS_SCHEME) => Some(DEFAULT_HTTPS_PORT_STR),
-        _ => None,
-    };
-    let effective_auth_port: Option<&str> = match (auth_port, default_port) {
-        (Some(port), Some(default_port)) if port == default_port => None,
-        (port, _) => port,
-    };
-    let effective_host_port: Option<&str> = match (host_port, default_port) {
-        (Some(port), Some(default_port)) if port == default_port => None,
-        (port, _) => port,
-    };
-    effective_auth_port == effective_host_port
-}
+    for byte in value.bytes() {
+        let forbidden: bool = match byte {
 #[cfg(test)]
 pub fn normalize_authority(authority: &str, scheme: Option<&str>) -> (String, Option<String>) {
     let (host, port): (&str, Option<&str>) = split_authority_port(authority);
@@ -53421,39 +61671,50 @@ pub fn split_target_query(
     query_index: Option<usize>,
     hash_index: Option<usize>,
 ) -> &str {
-    query_index.map_or(EMPTY_STR, |query_index: usize| {
-        let rest: &str = &target[query_index + 1..];
-        match hash_index {
-            None => rest,
-            Some(hash_index) if hash_index <= query_index => rest,
-            Some(hash_index) => &rest[..hash_index - query_index - 1],
-        }
-    })
+    match (query_index, hash_index) {
+        (Some(query_index), Some(hash_index)) if hash_index < query_index => EMPTY_STR,
+        (Some(query_index), Some(hash_index)) => &target[query_index + 1..hash_index],
+        (Some(query_index), None) => &target[query_index + 1..],
+        (None, _) => EMPTY_STR,
+    }
 }
 pub fn split_target_path(
     target: &str,
     query_index: Option<usize>,
     hash_index: Option<usize>,
 ) -> &str {
-    match query_index.or(hash_index) {
-        Some(separator_index) => &target[..separator_index],
-        None => target,
+    match (query_index, hash_index) {
+        (Some(query_index), Some(hash_index)) => &target[..query_index.min(hash_index)],
+        (Some(query_index), None) => &target[..query_index],
+        (None, Some(hash_index)) => &target[..hash_index],
+        (None, None) => target,
     }
 }
 pub fn fill_request_querys(query: &str, querys: &mut RequestQuerys) {
     if query.is_empty() {
         return;
     }
+    let mut param_count: usize = 0;
     for pair in query.split(AND) {
+        if param_count >= PROTOCOL_MAX_QUERY_PARAM_COUNT {
+            break;
+        }
         if let Some((key, value)) = pair.split_once(EQUAL) {
             if !key.is_empty() {
-                querys
-                    .entry(key.to_string())
-                    .or_default()
-                    .push_back(value.to_string());
+                param_count += 1;
+                if let Some(existing) = querys.get_mut(key) {
+                    existing.push_back(value.to_owned());
+                } else {
+                    let mut values: VecDeque<String> = VecDeque::with_capacity(1);
+                    values.push_back(value.to_owned());
+                    querys.insert(key.to_owned(), values);
+                }
             }
         } else if !pair.is_empty() {
-            querys.entry(pair.to_string()).or_default();
+            param_count += 1;
+            if !querys.contains_key(pair) {
+                querys.insert(pair.to_owned(), VecDeque::new());
+            }
         }
     }
 }
@@ -53497,52 +61758,59 @@ pub fn fill_request_headers(
     let max_header_value_size: usize = config.get_max_header_value_size();
     let target_headers: &mut RequestHeaders = request.get_mut_headers();
     let mut header_count: usize = 0;
-    for (name, value) in headers.iter() {
-        let key: &str = name.as_str();
-        if key.starts_with(PSEUDO_HEADER_PREFIX) || is_hop_by_hop(key) {
-            continue;
+    PROTOCOL_HEADER_POOL.with(|pool: &RefCell<Vec<(String, VecDeque<String>)>>| {
+        let mut pool_guard: RefMut<'_, Vec<(String, VecDeque<String>)>> = pool.borrow_mut();
+        for (name, value) in headers.iter() {
+            let key: &str = name.as_str();
+            if key.starts_with(PSEUDO_HEADER_PREFIX) {
+                continue;
+            }
+            if is_forbidden_h2_header(key, value.as_bytes()) {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            }
+            let Ok(value) = value.to_str() else {
+                return Err(RequestError::HttpRead(HttpStatus::BadRequest));
+            };
+            header_count += 1;
+            if header_count > max_header_count
+                && max_header_count != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
+            {
+                return Err(RequestError::TooManyHeaders(
+                    HttpStatus::RequestHeaderFieldsTooLarge,
+                ));
+            }
+            if key.len() > max_header_key_size
+                && max_header_key_size != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
+            {
+                return Err(RequestError::HeaderKeyTooLong(HttpStatus::BadRequest));
+            }
+            if value.len() > max_header_value_size
+                && max_header_value_size != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
+            {
+                return Err(RequestError::HeaderValueTooLong(HttpStatus::BadRequest));
+            }
+            if let Some(existing) = target_headers.get_mut(key) {
+                existing.push_back(value.to_owned());
+                continue;
+            }
+            let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) = pool_guard
+                .pop()
+                .unwrap_or_else(|| (String::new(), VecDeque::new()));
+            pooled_key.clear();
+            pooled_key.push_str(key);
+            while pooled_values.len() > 1 {
+                pooled_values.pop_back();
+            }
+            if let Some(slot) = pooled_values.front_mut() {
+                slot.clear();
+                slot.push_str(value);
+            } else {
+                pooled_values.push_back(value.to_owned());
+            }
+            target_headers.insert(pooled_key, pooled_values);
         }
-        let Ok(value) = value.to_str() else {
-            continue;
-        };
-        header_count += 1;
-        if header_count > max_header_count
-            && max_header_count != DEFAULT_LOW_SECURITY_MAX_HEADER_COUNT
-        {
-            return Err(RequestError::TooManyHeaders(
-                HttpStatus::RequestHeaderFieldsTooLarge,
-            ));
-        }
-        if key.len() > max_header_key_size
-            && max_header_key_size != DEFAULT_LOW_SECURITY_MAX_HEADER_KEY_SIZE
-        {
-            return Err(RequestError::HeaderKeyTooLong(HttpStatus::BadRequest));
-        }
-        if value.len() > max_header_value_size
-            && max_header_value_size != DEFAULT_LOW_SECURITY_MAX_HEADER_VALUE_SIZE
-        {
-            return Err(RequestError::HeaderValueTooLong(HttpStatus::BadRequest));
-        }
-        if let Some(existing) = target_headers.get_mut(key) {
-            existing.push_back(value.to_owned());
-            continue;
-        }
-        let (mut pooled_key, mut pooled_values): (String, VecDeque<String>) =
-            take_protocol_header_entry().unwrap_or_else(|| (String::new(), VecDeque::new()));
-        pooled_key.clear();
-        pooled_key.push_str(key);
-        while pooled_values.len() > 1 {
-            pooled_values.pop_back();
-        }
-        if let Some(slot) = pooled_values.front_mut() {
-            slot.clear();
-            slot.push_str(value);
-        } else {
-            pooled_values.push_back(value.to_owned());
-        }
-        target_headers.insert(pooled_key, pooled_values);
-    }
-    Ok(())
+        Ok(())
+    })
 }
 pub fn is_hop_by_hop(name: &str) -> bool {
     matches!(
@@ -53561,19 +61829,23 @@ pub fn declared_content_length(
     headers: &ProtocolHeaders,
     max_body_size: usize,
 ) -> Result<Option<usize>, RequestError> {
-    let Some(value) = headers.get(CONTENT_LENGTH) else {
-        return Ok(None);
-    };
-    let Ok(value) = value.to_str() else {
-        return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
-    };
-    let declared: usize = parse_ascii_length(value)?;
-    if declared > max_body_size && max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
-        return Err(RequestError::ContentLengthTooLarge(
-            HttpStatus::PayloadTooLarge,
-        ));
+    let mut declared: Option<usize> = None;
+    for value in headers.get_all(CONTENT_LENGTH).iter() {
+        if declared.is_some() {
+            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+        }
+        let Ok(value) = value.to_str() else {
+            return Err(RequestError::InvalidContentLength(HttpStatus::BadRequest));
+        };
+        let parsed: usize = parse_ascii_length(value)?;
+        if parsed > max_body_size && max_body_size != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
+            return Err(RequestError::ContentLengthTooLarge(
+                HttpStatus::PayloadTooLarge,
+            ));
+        }
+        declared = Some(parsed);
     }
-    Ok(Some(declared))
+    Ok(declared)
 }
 #[cold]
 pub(crate) fn has_continue_expectation(headers: &ProtocolHeaders) -> bool {
@@ -53582,7 +61854,7 @@ pub(crate) fn has_continue_expectation(headers: &ProtocolHeaders) -> bool {
         .iter()
         .any(|value: &HeaderValue| contains_continue_member(value.as_bytes()))
 }
-fn contains_continue_member(value: &[u8]) -> bool {
+pub(crate) fn contains_continue_member(value: &[u8]) -> bool {
     let token: &[u8] = CONTINUE_EXPECT.as_bytes();
     let mut start: usize = 0;
     let mut quoted: bool = false;
@@ -53619,6 +61891,7 @@ pub fn is_bodyless_status(status_code: usize, is_head: bool) -> bool {
     is_head
         || status_code < 200
         || status_code == HttpStatus::NoContent.code()
+        || status_code == HttpStatus::ResetContent.code()
         || status_code == HttpStatus::NotModified.code()
 }
 pub fn push_bounded_body(
@@ -53626,7 +61899,8 @@ pub fn push_bounded_body(
     body: &mut Vec<u8>,
     chunk: Bytes,
 ) -> Result<(), RequestError> {
-    if body.len() + chunk.len() > limit && limit != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE {
+    if limit != DEFAULT_LOW_SECURITY_MAX_BODY_SIZE && chunk.len() > limit.saturating_sub(body.len())
+    {
         return Err(RequestError::ContentLengthTooLarge(
             HttpStatus::PayloadTooLarge,
         ));
@@ -53648,10 +61922,56 @@ pub fn request_target(path: &str, query: Option<&str>) -> String {
     }
 }
 ```
+# Path: hyperlane/core/src/protocol/http2/type.rs
+```rust
+use super::*;
+pub(crate) type H2DirectStateHandle = Arc<Mutex<H2DirectState>>;
+pub(crate) type PooledH2Stream = (Stream, H2DirectStateHandle);
+```
 # Path: hyperlane/core/src/protocol/http2/impl.rs
 ```rust
 use super::*;
 impl H2DirectState {
+    #[inline(always)]
+    pub(super) fn reinit(
+        &mut self,
+        send_response: H2SendResponse,
+        peers: StreamPeers,
+        is_head: bool,
+    ) {
+        self.set_send_response(Some(send_response));
+        self.set_send_stream(None);
+        self.get_mut_pending_head().clear();
+        self.get_mut_pending_body().clear();
+        self.set_pending_body_offset(0);
+        self.set_head_sent(false);
+        self.set_suppress_body(is_head);
+        self.set_is_head(is_head);
+        self.set_announced_len(None);
+        self.set_body_len(0);
+        self.set_finished(false);
+        self.set_failed(false);
+        self.set_peers(peers);
+    }
+    #[inline(always)]
+    pub(super) fn release(&mut self) {
+        if !self.get_finished() {
+            self.reset();
+        }
+        let _: Option<H2SendResponse> = self.get_mut_send_response().take();
+        let _: Option<H2SendStream> = self.get_mut_send_stream().take();
+        if self.get_pending_head().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+            self.set_pending_head(Vec::new());
+        } else {
+            self.get_mut_pending_head().clear();
+        }
+        if self.get_pending_body().capacity() > MAX_POOLED_BUFFER_CAPACITY {
+            self.set_pending_body(Vec::new());
+        } else {
+            self.get_mut_pending_body().clear();
+        }
+        self.set_pending_body_offset(0);
+    }
     pub(super) fn reset(&mut self) {
         if let Some(mut send_response) = self.get_mut_send_response().take() {
             send_response.send_reset(Reason::INTERNAL_ERROR);
@@ -53690,15 +62010,20 @@ impl H2DirectState {
                     let start: usize = self.get_pending_body_offset();
                     let end: usize = start + take;
                     let new_len: usize = self.get_body_len() + take;
+                    let is_final: bool = self.try_get_announced_len() == Some(new_len);
                     let chunk: Bytes = Bytes::copy_from_slice(&self.get_pending_body()[start..end]);
                     let Some(send_stream) = self.get_mut_send_stream().as_mut() else {
                         return Poll::Ready(Err(self.fail(MISSING_SEND_CAPACITY)));
                     };
-                    if let Err(error) = send_stream.send_data(chunk, false) {
+                    if let Err(error) = send_stream.send_data(chunk, is_final) {
                         return Poll::Ready(Err(self.fail(&error.to_string())));
                     }
                     self.set_body_len(new_len);
                     self.set_pending_body_offset(end);
+                    if is_final {
+                        self.set_finished(true);
+                        let _: Option<H2SendStream> = self.get_mut_send_stream().take();
+                    }
                 }
                 Poll::Ready(Some(Ok(_))) => continue,
                 Poll::Ready(Some(Err(error))) => {
@@ -53742,6 +62067,14 @@ impl H2DirectState {
             send_response.send_reset(Reason::INTERNAL_ERROR);
             return Err(self.fail(OVERFLOWING_RESPONSE_BODY));
         }
+        if parsed.announced_len == Some(0) && body_bytes.is_empty() {
+            if let Err(error) = send_response.send_response(parsed.response, true) {
+                return Err(self.fail(&error.to_string()));
+            }
+            self.set_head_sent(true);
+            self.set_finished(true);
+            return Ok(0);
+        }
         let mut send_stream: H2SendStream =
             match send_response.send_response(parsed.response, false) {
                 Ok(stream) => stream,
@@ -53756,12 +62089,17 @@ impl H2DirectState {
         match send_stream.poll_capacity(context) {
             Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
                 let take: usize = capacity.min(body_bytes.len());
+                let is_final: bool = self.try_get_announced_len() == Some(take);
                 let chunk: Bytes = Bytes::copy_from_slice(&body_bytes[..take]);
-                if let Err(error) = send_stream.send_data(chunk, false) {
+                if let Err(error) = send_stream.send_data(chunk, is_final) {
                     return Err(self.fail(&error.to_string()));
                 }
                 self.set_body_len(take);
-                self.set_send_stream(Some(send_stream));
+                if is_final {
+                    self.set_finished(true);
+                } else {
+                    self.set_send_stream(Some(send_stream));
+                }
                 Ok(take)
             }
             Poll::Ready(Some(Ok(_))) | Poll::Pending => {
@@ -53774,29 +62112,113 @@ impl H2DirectState {
     }
 }
 impl H2DirectTransport {
-    pub(crate) fn new(send_response: H2SendResponse, peers: StreamPeers, is_head: bool) -> Self {
-        Self {
-            state: Mutex::new(H2DirectState {
-                send_response: Some(send_response),
-                send_stream: None,
-                pending_head: Vec::new(),
-                pending_body: Vec::new(),
-                pending_body_offset: 0,
-                head_sent: false,
-                suppress_body: is_head,
-                is_head,
-                announced_len: None,
-                body_len: 0,
-                finished: false,
-                failed: false,
-            }),
-            peers,
+    pub(crate) fn from_shared(state: Arc<Mutex<H2DirectState>>) -> Self {
+        Self { state }
+    }
+}
+impl H2StreamGuard {
+    #[inline(always)]
+    pub(crate) fn take(
+        send_response: H2SendResponse,
+        peers: StreamPeers,
+        request_config: RequestConfig,
+        is_head: bool,
+    ) -> Self {
+        let pooled: Option<PooledH2Stream> =
+            H2_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH2Stream>>| pool.borrow_mut().pop());
+        let pair: PooledH2Stream = match pooled {
+            Some((mut stream, state)) if *stream.get_request_config() == request_config => {
+                if let Ok(mut guard) = state.lock() {
+                    guard.reinit(send_response, peers, is_head);
+                }
+                stream.set_closed(false);
+                (stream, state)
+            }
+            _ => {
+                let state: Arc<Mutex<H2DirectState>> = Arc::new(Mutex::new(H2DirectState {
+                    send_response: Some(send_response),
+                    send_stream: None,
+                    pending_head: Vec::new(),
+                    pending_body: Vec::new(),
+                    pending_body_offset: 0,
+                    head_sent: false,
+                    suppress_body: is_head,
+                    is_head,
+                    announced_len: None,
+                    body_len: 0,
+                    finished: false,
+                    failed: false,
+                    peers,
+                }));
+                let stream: Stream = Stream::from_transport(
+                    H2DirectTransport::from_shared(Arc::clone(&state)),
+                    request_config,
+                    false,
+                );
+                (stream, state)
+            }
+        };
+        Self { inner: Some(pair) }
+    }
+    #[inline(always)]
+    pub(crate) fn stream_mut(&mut self) -> Option<&mut Stream> {
+        let Self { inner } = self;
+        inner.as_mut().map(|pair: &mut PooledH2Stream| &mut pair.0)
+    }
+    #[inline(always)]
+    pub(crate) async fn finish(mut self) {
+        let Self { inner } = &mut self;
+        let Some((mut stream, state)) = inner.take() else {
+            return;
+        };
+        let already_finished: bool = match state.lock() {
+            Ok(mut guard) if guard.get_finished() && !guard.get_failed() => {
+                guard.release();
+                true
+            }
+            Ok(_) => false,
+            Err(_) => return,
+        };
+        if !already_finished {
+            let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+            if let Ok(mut guard) = state.lock() {
+                guard.release();
+            } else {
+                return;
+            }
         }
+        stream.set_closed(false);
+        H2_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH2Stream>>| {
+            let mut pool: RefMut<'_, Vec<PooledH2Stream>> = pool.borrow_mut();
+            if pool.len() < MAX_POOLED_CONTEXTS {
+                pool.push((stream, state));
+            }
+        });
+    }
+}
+impl Drop for H2StreamGuard {
+    fn drop(&mut self) {
+        let Self { inner } = self;
+        let Some((mut stream, state)) = inner.take() else {
+            return;
+        };
+        if let Ok(mut guard) = state.lock() {
+            guard.release();
+        } else {
+            return;
+        }
+        stream.set_closed(false);
+        H2_STREAM_POOL.with(|pool: &RefCell<Vec<PooledH2Stream>>| {
+            let mut pool: RefMut<'_, Vec<PooledH2Stream>> = pool.borrow_mut();
+            if pool.len() < MAX_POOLED_CONTEXTS {
+                pool.push((stream, state));
+            }
+        });
     }
 }
 impl Drop for H2DirectTransport {
     fn drop(&mut self) {
-        if let Ok(state) = self.get_mut_state().get_mut()
+        if let Ok(mut state) = self.get_state().lock()
             && !state.finished
         {
             state.reset();
@@ -53805,10 +62227,16 @@ impl Drop for H2DirectTransport {
 }
 impl Transport for H2DirectTransport {
     fn peer_addr(&self) -> Result<SocketAddr, io::Error> {
-        Ok(self.get_peers().remote)
+        self.get_state()
+            .lock()
+            .map(|state: MutexGuard<'_, H2DirectState>| state.get_peers().remote)
+            .map_err(|_| io::Error::other(MISSING_SEND_CAPACITY))
     }
     fn local_addr(&self) -> Result<SocketAddr, io::Error> {
-        Ok(self.get_peers().local)
+        self.get_state()
+            .lock()
+            .map(|state: MutexGuard<'_, H2DirectState>| state.get_peers().local)
+            .map_err(|_| io::Error::other(MISSING_SEND_CAPACITY))
     }
 }
 impl AsyncRead for H2DirectTransport {
@@ -53827,7 +62255,7 @@ impl AsyncWrite for H2DirectTransport {
         context: &mut task::Context<'_>,
         bytes: &[u8],
     ) -> Poll<io::Result<usize>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -53905,28 +62333,47 @@ impl AsyncWrite for H2DirectTransport {
             return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
         }
         let current_body_len: usize = state.body_len;
-        let Some(send_stream) = state.send_stream.as_mut() else {
-            return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
-        };
-        send_stream.reserve_capacity(bytes.len());
-        match send_stream.poll_capacity(context) {
-            Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
-                let take: usize = capacity.min(bytes.len());
-                let new_len: usize = current_body_len + take;
-                let chunk: Bytes = Bytes::copy_from_slice(&bytes[..take]);
-                if let Err(error) = send_stream.send_data(chunk, false) {
+        let announced_len: Option<usize> = state.announced_len;
+        loop {
+            let capacity: Poll<Option<Result<usize, H2Error>>> = {
+                let Some(send_stream) = state.send_stream.as_mut() else {
+                    return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
+                };
+                send_stream.reserve_capacity(bytes.len());
+                send_stream.poll_capacity(context)
+            };
+            match capacity {
+                Poll::Ready(Some(Ok(capacity))) if capacity > 0 => {
+                    let take: usize = capacity.min(bytes.len());
+                    let new_len: usize = current_body_len + take;
+                    let is_final: bool = announced_len == Some(new_len);
+                    let chunk: Bytes = Bytes::copy_from_slice(&bytes[..take]);
+                    let Some(send_stream) = state.send_stream.as_mut() else {
+                        return Poll::Ready(Err(state.fail(OVERFLOWING_RESPONSE_BODY)));
+                    };
+                    if let Err(error) = send_stream.send_data(chunk, is_final) {
+                        return Poll::Ready(Err(state.fail(&error.to_string())));
+                    }
+                    state.body_len = new_len;
+                    if is_final {
+                        state.finished = true;
+                        let _: Option<H2SendStream> = state.send_stream.take();
+                    }
+                    return Poll::Ready(Ok(take));
+                }
+                Poll::Ready(Some(Ok(_))) => continue,
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Some(Err(error))) => {
                     return Poll::Ready(Err(state.fail(&error.to_string())));
                 }
-                state.body_len = new_len;
-                Poll::Ready(Ok(take))
+                Poll::Ready(None) => {
+                    return Poll::Ready(Err(state.fail(MISSING_SEND_CAPACITY)));
+                }
             }
-            Poll::Ready(Some(Ok(_))) | Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Err(error))) => Poll::Ready(Err(state.fail(&error.to_string()))),
-            Poll::Ready(None) => Poll::Ready(Err(state.fail(MISSING_SEND_CAPACITY))),
         }
     }
     fn poll_flush(self: Pin<&mut Self>, context: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -53938,7 +62385,7 @@ impl AsyncWrite for H2DirectTransport {
         self: Pin<&mut Self>,
         context: &mut task::Context<'_>,
     ) -> Poll<io::Result<()>> {
-        let Ok(state) = self.get_mut().get_mut_state().get_mut() else {
+        let Ok(mut state) = self.get_mut().get_state().lock() else {
             return Poll::Ready(Err(io::Error::other(MISSING_SEND_CAPACITY)));
         };
         if state.failed {
@@ -53971,12 +62418,22 @@ impl AsyncWrite for H2DirectTransport {
     }
 }
 ```
+# Path: hyperlane/core/src/protocol/http2/static.rs
+```rust
+use super::*;
+thread_local! {
+    pub(crate) static H2_STREAM_POOL: RefCell<Vec<PooledH2Stream>> =
+        const { RefCell::new(Vec::new()) };
+}
+```
 # Path: hyperlane/core/src/protocol/http2/mod.rs
 ```rust
 mod r#fn;
 mod r#impl;
+mod r#static;
 mod r#struct;
-pub(crate) use {r#fn::*, r#struct::*};
+mod r#type;
+pub(crate) use {r#fn::*, r#static::*, r#struct::*, r#type::*};
 use super::*;
 ```
 # Path: hyperlane/core/src/protocol/http2/struct.rs
@@ -54032,22 +62489,20 @@ pub(crate) struct H2DirectState {
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) failed: bool,
-}
-#[derive(Data, Debug)]
-pub(crate) struct H2DirectTransport {
-    #[get(skip)]
-    #[get_mut(pub(super))]
-    #[set(pub(super))]
-    pub(super) state: Mutex<H2DirectState>,
     #[get(pub(super), type(copy))]
     #[get_mut(pub(super))]
     #[set(pub(super))]
     pub(super) peers: StreamPeers,
 }
-#[derive(Clone)]
-pub(crate) struct H2RequestEnv {
-    pub(crate) shared: Arc<ConnectionShared>,
-    pub(crate) peers: StreamPeers,
+#[derive(Data, Debug)]
+pub(crate) struct H2DirectTransport {
+    #[get(pub(super))]
+    #[get_mut(pub(super))]
+    #[set(pub(super))]
+    pub(super) state: H2DirectStateHandle,
+}
+pub(crate) struct H2StreamGuard {
+    pub(super) inner: Option<PooledH2Stream>,
 }
 ```
 # Path: hyperlane/core/src/protocol/http2/fn.rs
@@ -54057,6 +62512,7 @@ pub(crate) async fn serve_h2_connection<T>(
     env: ConnectionEnv,
     peers: StreamPeers,
     connection: Result<ConnectionH2<T>, String>,
+    mut shutdown_receiver: Receiver<()>,
 ) where
     T: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static,
 {
@@ -54064,41 +62520,85 @@ pub(crate) async fn serve_h2_connection<T>(
         Ok(connection) => connection,
         Err(_) => return,
     };
-    let mut requests: FuturesUnordered<_> = FuturesUnordered::new();
+    let shared: &ConnectionShared = &env.shared;
+    let mut inline_req: Pin<&mut Option<_>> = pin!(None);
+    let mut requests: Option<FuturesUnordered<_>> = None;
+    let mut shutdown_fut: Pin<&mut _> = pin!(shutdown_receiver.changed());
+    let mut shutdown_sent: bool = false;
+    let mut accepting: bool = true;
     poll_fn(|cx: &mut task::Context<'_>| -> Poll<()> {
         loop {
             let mut progressed: bool = false;
+            if !shutdown_sent && shutdown_fut.as_mut().poll(cx).is_ready() {
+                shutdown_sent = true;
+                connection.graceful_shutdown();
+                progressed = true;
+            }
+            if let Some(fut) = inline_req.as_mut().as_pin_mut()
+                && Future::poll(fut, cx).is_ready()
+            {
+                inline_req.set(None);
+                progressed = true;
+            }
             let mut accepted_batch: usize = 0;
-            while accepted_batch < 64 {
+            while accepting && accepted_batch < 64 {
                 match connection.poll_accept(cx) {
                     Poll::Ready(Some(Ok((request, send_response)))) => {
-                        requests.push(
-                            AssertUnwindSafe(h2_request_task(
-                                H2RequestEnv {
-                                    shared: Arc::clone(&env.shared),
+                        if inline_req.is_none() {
+                            inline_req.set(Some(
+                                AssertUnwindSafe(h2_request_task(
+                                    shared,
                                     peers,
-                                },
-                                request,
-                                send_response,
-                            ))
-                            .catch_unwind(),
-                        );
+                                    request,
+                                    send_response,
+                                ))
+                                .catch_unwind(),
+                            ));
+                            if let Some(fut) = inline_req.as_mut().as_pin_mut()
+                                && Future::poll(fut, cx).is_ready()
+                            {
+                                inline_req.set(None);
+                            }
+                        } else {
+                            requests.get_or_insert_with(FuturesUnordered::new).push(
+                                AssertUnwindSafe(h2_request_task(
+                                    shared,
+                                    peers,
+                                    request,
+                                    send_response,
+                                ))
+                                .catch_unwind(),
+                            );
+                        }
                         accepted_batch += 1;
                         progressed = true;
                     }
-                    Poll::Ready(Some(Err(_))) | Poll::Ready(None) => return Poll::Ready(()),
+                    Poll::Ready(None) => {
+                        accepting = false;
+                        progressed = true;
+                        break;
+                    }
+                    Poll::Ready(Some(Err(_))) => return Poll::Ready(()),
                     Poll::Pending => break,
                 }
             }
             let mut completed_batch: usize = 0;
-            while !requests.is_empty() && completed_batch < 64 {
-                match requests.poll_next_unpin(cx) {
-                    Poll::Ready(Some(_)) => {
-                        completed_batch += 1;
-                        progressed = true;
+            if let Some(queue) = requests.as_mut() {
+                while !queue.is_empty() && completed_batch < 64 {
+                    match queue.poll_next_unpin(cx) {
+                        Poll::Ready(Some(_)) => {
+                            completed_batch += 1;
+                            progressed = true;
+                        }
+                        Poll::Ready(None) | Poll::Pending => break,
                     }
-                    Poll::Ready(None) | Poll::Pending => break,
                 }
+            }
+            let queue_empty: bool = requests
+                .as_ref()
+                .is_none_or(|queue: &FuturesUnordered<_>| queue.is_empty());
+            if !accepting && inline_req.is_none() && queue_empty {
+                return Poll::Ready(());
             }
             if !progressed {
                 return Poll::Pending;
@@ -54112,15 +62612,29 @@ pub(crate) async fn serve_h2_connection<T>(
     .await;
 }
 pub(crate) async fn h2_request_task(
-    env: H2RequestEnv,
+    shared: &ConnectionShared,
+    peers: StreamPeers,
     request: ProtocolRequest<H2RecvStream>,
     mut send_response: H2SendResponse,
 ) {
-    let H2RequestEnv { shared, peers } = env;
     let server: &Server = &shared.server;
     let request_config: RequestConfig = shared.request_config;
-    let (parts, mut recv_stream): (Parts, H2RecvStream) = request.into_parts();
+    let (mut parts, mut recv_stream): (Parts, H2RecvStream) = request.into_parts();
     let mut ctx: Context = take_pooled_context();
+    if has_forbidden_h2_request_header(&parts.headers) {
+        h2_fail_request(
+            server,
+            request_config,
+            peers,
+            send_response,
+            &mut ctx,
+            HttpVersion::Http2,
+            RequestError::HttpRead(HttpStatus::BadRequest),
+        )
+        .await;
+        return_pooled_context(ctx);
+        return;
+    }
     let mut body: Vec<u8> = mem::take(ctx.get_mut_request().get_mut_body());
     body.clear();
     if let Err(error) = collect_h2_body(
@@ -54147,7 +62661,7 @@ pub(crate) async fn h2_request_task(
         return;
     }
     let mut target: String = take_target_buffer();
-    let method: ProtocolMethod = parts.method.clone();
+    let method: ProtocolMethod = mem::take(&mut parts.method);
     let built: Result<(), RequestError> = fill_protocol_request(
         &request_config,
         ProtocolRequestHead {
@@ -54175,15 +62689,14 @@ pub(crate) async fn h2_request_task(
         return;
     }
     let is_head: bool = ctx.get_request().get_method().is_head();
-    let mut stream: Stream = Stream::from_transport(
-        H2DirectTransport::new(send_response, peers, is_head),
-        request_config,
-        false,
-    );
-    server
-        .run_protocol_lifecycle_in_place(&shared.pipeline, &mut stream, &mut ctx, target)
-        .await;
-    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    let mut stream_guard: H2StreamGuard =
+        H2StreamGuard::take(send_response, peers, request_config, is_head);
+    if let Some(stream) = stream_guard.stream_mut() {
+        server
+            .run_protocol_lifecycle_in_place(&shared.pipeline, stream, &mut ctx, target)
+            .await;
+    }
+    stream_guard.finish().await;
     return_pooled_context(ctx);
 }
 #[cold]
@@ -54200,13 +62713,12 @@ pub(crate) async fn h2_fail_request(
     ctx.get_mut_response().reset().set_version(version.clone());
     ctx.clear_route_params();
     ctx.reset_request_attributes();
-    let mut stream: Stream = Stream::from_transport(
-        H2DirectTransport::new(send_response, peers, false),
-        request_config,
-        false,
-    );
-    reply_to_request_error(server, &mut stream, ctx, &error, Some(version)).await;
-    let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    let mut stream_guard: H2StreamGuard =
+        H2StreamGuard::take(send_response, peers, request_config, false);
+    if let Some(stream) = stream_guard.stream_mut() {
+        reply_to_request_error(server, stream, ctx, &error, Some(version)).await;
+        let _: Result<(), io::Error> = stream.get_mut_stream().shutdown().await;
+    }
 }
 async fn collect_h2_body(
     send_response: &mut H2SendResponse,
@@ -54235,18 +62747,18 @@ async fn collect_h2_body(
     }
     let read_timeout_ms: u64 = request_config.get_read_timeout_ms();
     if read_timeout_ms == DEFAULT_LOW_SECURITY_READ_TIMEOUT_MS {
-        collect_h2_body_until_end(recv_stream, max_body_size, body).await?;
+        collect_h2_body_until_end(recv_stream, max_body_size, declared, body).await?;
     } else {
-        let mut reading: Pin<&mut _> =
-            pin!(collect_h2_body_until_end(recv_stream, max_body_size, body));
-        if let Some(collected) = poll_once_protocol(reading.as_mut()).await {
-            collected?;
-        } else {
-            let bound: Duration = Duration::from_millis(read_timeout_ms);
-            match timeout(bound, reading).await {
-                Ok(collected) => collected?,
-                Err(_) => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
-            }
+        let mut reading: Pin<&mut _> = pin!(collect_h2_body_until_end(
+            recv_stream,
+            max_body_size,
+            declared,
+            body,
+        ));
+        let bound: Duration = Duration::from_millis(read_timeout_ms);
+        match poll_with_timeout_protocol(reading.as_mut(), bound).await {
+            Some(collected) => collected?,
+            None => return Err(RequestError::ReadTimeout(HttpStatus::RequestTimeout)),
         }
     }
     match declared {
@@ -54260,6 +62772,7 @@ async fn collect_h2_body(
 async fn collect_h2_body_until_end(
     recv_stream: &mut H2RecvStream,
     max_body_size: usize,
+    declared: Option<usize>,
     body: &mut Vec<u8>,
 ) -> Result<(), RequestError> {
     loop {
@@ -54270,6 +62783,12 @@ async fn collect_h2_body_until_end(
         let data: Bytes =
             received.map_err(|error: H2Error| RequestError::Request(error.to_string()))?;
         let data_len: usize = data.len();
+        if let Some(expected) = declared
+            && data_len > expected.saturating_sub(body.len())
+        {
+            let _: Result<(), H2Error> = recv_stream.flow_control().release_capacity(data_len);
+            return Err(RequestError::Request(CONTENT_LENGTH_MISMATCH.to_owned()));
+        }
         let collected: Result<(), RequestError> = push_bounded_body(max_body_size, body, data);
         let _: Result<(), H2Error> = recv_stream.flow_control().release_capacity(data_len);
         collected?;
@@ -54294,6 +62813,8 @@ pub(crate) const MAX_POOLED_BUFFER_CAPACITY: usize = 64 * 1024;
 pub(crate) const MAX_POOLED_CONTEXTS: usize = 64;
 pub(crate) const MAX_POOLED_PROTOCOL_HEADERS: usize = 256;
 pub(crate) const MAX_POOLED_STRING_CAPACITY: usize = 4 * 1024;
+pub(crate) const PROTOCOL_MAX_QUERY_PARAM_COUNT: usize = 1024;
+pub(crate) const HTTP_TE_TRAILERS: &str = "trailers";
 ```
 # Path: hyperlane/core/src/protocol/pump/mod.rs
 ```rust
@@ -54414,16 +62935,37 @@ pub(crate) fn return_route_param_entry(mut pair: (String, String)) {
         }
     });
 }
-pub(crate) async fn poll_once_protocol<F>(mut future: Pin<&mut F>) -> Option<F::Output>
+pub(crate) async fn poll_with_timeout_protocol<F>(
+    mut future: Pin<&mut F>,
+    duration: Duration,
+) -> Option<F::Output>
 where
     F: Future,
 {
-    poll_fn(
-        |context: &mut task::Context<'_>| match future.as_mut().poll(context) {
-            Poll::Ready(value) => Poll::Ready(Some(value)),
-            Poll::Pending => Poll::Ready(None),
-        },
-    )
+    let mut deadline: Pin<&mut Option<Sleep>> = pin!(None);
+    poll_fn(|context: &mut task::Context<'_>| {
+        if deadline.is_none() {
+            if let Poll::Ready(value) = future.as_mut().poll(context) {
+                return Poll::Ready(Some(value));
+            }
+            deadline.set(Some(sleep(duration)));
+            if let Some(timer) = deadline.as_mut().as_pin_mut()
+                && timer.poll(context).is_ready()
+            {
+                return Poll::Ready(None);
+            }
+            return Poll::Pending;
+        }
+        if let Poll::Ready(value) = future.as_mut().poll(context) {
+            return Poll::Ready(Some(value));
+        }
+        if let Some(timer) = deadline.as_mut().as_pin_mut()
+            && timer.poll(context).is_ready()
+        {
+            return Poll::Ready(None);
+        }
+        Poll::Pending
+    })
     .await
 }
 pub(crate) fn hides_entity_length(status_code: usize, _is_head: bool) -> bool {
@@ -54498,6 +63040,10 @@ pub fn build_server_tls_config(
             .map_err(|error: TlsError| Box::new(ServerError::Tls(error.to_string())))?;
     server_config.alpn_protocols = vec![alpn.to_vec()];
     server_config.ignore_client_order = true;
+    server_config.session_storage = ServerSessionMemoryCache::new(8192);
+    if let Ok(ticketer) = Ticketer::new() {
+        server_config.ticketer = ticketer;
+    }
     Ok(Arc::new(server_config))
 }
 pub fn build_stream_tls_config(
