@@ -1,4 +1,4 @@
-<!--2026-11-27 20:54:13-->
+<!--2026-11-28 07:00:04-->
 # Path: hyperlane/CLAUDE.md
 # CLAUDE.md
 See [AGENTS.md](AGENTS.md) for workspace architecture, public API and security invariants, Rust coding standards, and verification commands.
